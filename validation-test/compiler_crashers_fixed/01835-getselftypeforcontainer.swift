@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func i<Y> {
-t..Generator.f = Swift.init([0.E == {
+t..Iterator.f = Swift.init([0.E == {
 class a {
 }
 print() -> {
@@ -26,7 +26,7 @@ protocol b {
 extension NSSet {
 }
 typealias f : b<Y> {
-func f: SequenceType where h>, self.c: A, AnyObject, "))
+func f: Sequence where h>, self.c: A, AnyObject, "))
 func b: a {
 }
 }

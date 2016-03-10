@@ -5,6 +5,6 @@
 // Test case found by fuzzing
 
 class B<T where g:a{
-class A{let t:BooleanType
+class A{let t:Boolean
 struct S{var d{class a{
 protocol

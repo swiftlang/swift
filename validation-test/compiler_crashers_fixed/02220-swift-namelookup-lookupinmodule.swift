@@ -10,7 +10,7 @@ protocol A {
 }
 protocol i : A {
 func i : c {
-let c: SequenceType> h> V>(b: [unowned self.b in "a<j d<T? {
+let c: Sequence> h> V>(b: [unowned self.b in "a<j d<T? {
 protocol b : AnyObject) {
 }
 func g: A.E ==

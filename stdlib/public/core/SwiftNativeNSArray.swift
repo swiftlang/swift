@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  _ContiguousArrayStorageBase supplies the implementation of the
-//  _NSArrayCoreType API (and thus, NSArray the API) for our
+//  _NSArrayCore API (and thus, NSArray the API) for our
 //  _ContiguousArrayStorage<T>.  We can't put this implementation
 //  directly on _ContiguousArrayStorage because generic classes can't
 //  override Objective-C selectors.
@@ -24,20 +24,20 @@ import SwiftShims
 /// Returns `true` iff the given `index` is valid as a position, i.e. `0
 /// ≤ index ≤ count`.
 @_transparent
-internal func _isValidArrayIndex(index: Int, _ count: Int) -> Bool {
+internal func _isValidArrayIndex(index: Int, count: Int) -> Bool {
   return (index >= 0) && (index <= count)
 }
 
 /// Returns `true` iff the given `index` is valid for subscripting, i.e.
 /// `0 ≤ index < count`.
 @_transparent
-internal func _isValidArraySubscript(index: Int, _ count: Int) -> Bool {
+internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
   return (index >= 0) && (index < count)
 }
 
 /// An `NSArray` with Swift-native reference counting and contiguous
 /// storage.
-class _SwiftNativeNSArrayWithContiguousStorage
+internal class _SwiftNativeNSArrayWithContiguousStorage
   : _SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
 
   // Operate on our contiguous storage
@@ -50,16 +50,17 @@ class _SwiftNativeNSArrayWithContiguousStorage
 }
 
 // Implement the APIs required by NSArray 
-extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
+extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }
 
-  @objc internal func objectAtIndex(index: Int) -> AnyObject {
+  @objc(objectAtIndex:)
+  internal func objectAt(index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
-        _isValidArraySubscript(index, objects.count),
+        _isValidArraySubscript(index, count: objects.count),
         "Array index out of range")
       return objects[index]
     }
@@ -71,12 +72,12 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
-        _isValidArrayIndex(range.location, objects.count),
+        _isValidArrayIndex(range.location, count: objects.count),
         "Array index out of range")
 
       _precondition(
         _isValidArrayIndex(
-          range.location + range.length, objects.count),
+          range.location + range.length, count: objects.count),
         "Array index out of range")
 
       // These objects are "returned" at +0, so treat them as values to
@@ -87,11 +88,12 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     }
   }
 
-  @objc internal func countByEnumeratingWithState(
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumeratingWith(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int {
-    var enumerationState = state.memory
+    var enumerationState = state.pointee
 
     if enumerationState.state != 0 {
       return 0
@@ -102,14 +104,15 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       enumerationState.itemsPtr = unsafeBitCast(
         objects.baseAddress,
-        AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
+        to: AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
       enumerationState.state = 1
-      state.memory = enumerationState
+      state.pointee = enumerationState
       return objects.count
     }
   }
 
-  @objc internal func copyWithZone(_: _SwiftNSZone) -> AnyObject {
+  @objc(copyWithZone:)
+  internal func copy(with _: _SwiftNSZone) -> AnyObject {
     return self
   }
 }
@@ -141,7 +144,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   internal var _heapBufferBridged: HeapBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, HeapBufferStorage.self)
+      return unsafeBitCast(ref, to: HeapBufferStorage.self)
     }
     return nil
   }
@@ -154,7 +157,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     if let bridgedStorage = hb {
       let heapBuffer = _HeapBuffer(bridgedStorage)
       let count = heapBuffer.value
-      heapBuffer.baseAddress.destroy(count)
+      heapBuffer.baseAddress.deinitialize(count: count)
     }
   }
 
@@ -190,9 +193,9 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
         if !_stdlib_atomicInitializeARCRef(
           object: _heapBufferBridgedPtr, desired: objects.storage!) {
 
-          // Another thread won the race.  Throw out our buffer
-          let storage: HeapBufferStorage = unsafeDowncast(objects.storage!)
-          _destroyBridgedStorage(storage)
+          // Another thread won the race.  Throw out our buffer.
+          _destroyBridgedStorage(
+            unsafeDowncast(objects.storage!, to: HeapBufferStorage.self))
         }
         continue // Try again
       }
@@ -260,9 +263,9 @@ internal class _ContiguousArrayStorageBase
   }
 #endif
 
-  func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
+  func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
     _sanityCheckFailure(
-      "Concrete subclasses must implement canStoreElementsOfDynamicType")
+      "Concrete subclasses must implement canStoreElements(ofDynamicType:)")
   }
 
   /// A type that every element in the array is.

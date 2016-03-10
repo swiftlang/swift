@@ -16,7 +16,7 @@ public struct _FDInputStream {
   public let fd: CInt
   public var isClosed: Bool = false
   public var isEOF: Bool = false
-  internal var _buffer = [UInt8](count: 256, repeatedValue: 0)
+  internal var _buffer = [UInt8](repeating: 0, count: 256)
   internal var _bufferUsed: Int = 0
 
   public init(fd: CInt) {
@@ -25,10 +25,10 @@ public struct _FDInputStream {
 
   public mutating func getline() -> String? {
     if let newlineIndex =
-      _buffer[0..<_bufferUsed].indexOf(UInt8(UnicodeScalar("\n").value)) {
+      _buffer[0..<_bufferUsed].index(of: UInt8(UnicodeScalar("\n").value)) {
       let result = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: _buffer[0..<newlineIndex])
-      _buffer.removeRange(0...newlineIndex)
+      _buffer.removeSubrange(0...newlineIndex)
       _bufferUsed -= newlineIndex + 1
       return result
     }
@@ -81,7 +81,7 @@ public struct _FDInputStream {
   }
 }
 
-public struct _Stderr : OutputStreamType {
+public struct _Stderr : OutputStream {
   public init() {}
 
   public mutating func write(string: String) {
@@ -91,7 +91,7 @@ public struct _Stderr : OutputStreamType {
   }
 }
 
-public struct _FDOutputStream : OutputStreamType {
+public struct _FDOutputStream : OutputStream {
   public let fd: CInt
   public var isClosed: Bool = false
 

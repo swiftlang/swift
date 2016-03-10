@@ -14,4 +14,4 @@ init <T> Bool {
 }
 enum a<T> : a {
 protocol a {
-func b<T : SequenceType, length: b(a<
+func b<T : Sequence, length: b(a<

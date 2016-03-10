@@ -30,17 +30,17 @@ var FooEnum3Y: FooEnum3 { get }
 enum FooComparisonResult : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
-  case OrderedAscending
-  case OrderedSame
-  case OrderedDescending
+  case orderedAscending
+  case orderedSame
+  case orderedDescending
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
-struct FooRuncingOptions : OptionSetType {
+struct FooRuncingOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
-  static var EnableMince: FooRuncingOptions { get }
-  static var EnableQuince: FooRuncingOptions { get }
+  static var enableMince: FooRuncingOptions { get }
+  static var enableQuince: FooRuncingOptions { get }
 }
 struct FooStruct1 {
   var x: Int32
@@ -227,7 +227,7 @@ class FooClassPropertyOwnership : FooClassBase {
 class FooUnavailableMembers : FooClassBase {
   convenience init!(int i: Int32)
   @available(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")
-  class func unavailableMembersWithInt(i: Int32) -> Self!
+  class func withInt(i: Int32) -> Self!
   @available(*, unavailable, message="x")
   func unavailable()
   @available(*, unavailable, message="Not available in Swift")
@@ -255,7 +255,7 @@ class FooUnavailableMembers : FooClassBase {
 }
 class FooCFType {
 }
-@available(*, deprecated, renamed="FooCFType")
+@available(*, unavailable, renamed="FooCFType", message="Not available in Swift")
 typealias FooCFTypeRef = FooCFType
 @available(*, unavailable, message="Core Foundation objects are automatically memory managed")
 func FooCFTypeRelease(_: FooCFType!)
@@ -276,9 +276,9 @@ extension FooRepeatedMembers {
 enum SCNFilterMode : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
-  case None
-  case Nearest
-  case Linear
+  case none
+  case nearest
+  case linear
   @available(*, unavailable)
   case SCNNoFiltering
 }

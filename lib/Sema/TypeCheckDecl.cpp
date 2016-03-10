@@ -2190,8 +2190,8 @@ static void checkBridgedFunctions(TypeChecker &TC) {
     checkObjCBridgingFunctions(TC, module,
                                TC.Context.getSwiftName(
                                  KnownFoundationEntity::NSError),
-                               "_convertNSErrorToErrorType",
-                               "_convertErrorTypeToNSError");
+                               "_convertNSErrorToErrorProtocol",
+                               "_convertErrorProtocolToNSError");
   }
 }
 

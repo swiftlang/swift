@@ -14,7 +14,7 @@ return m: A<b(","\() -> String {
 }
 func i> {
 }
-return z: a<S : SequenceType where k) -> Int = B) -> {
+return z: a<S : Sequence where k) -> Int = B) -> {
 }
 protocol P {
 typealias A : A {

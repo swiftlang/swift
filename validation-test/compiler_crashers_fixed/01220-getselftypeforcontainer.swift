@@ -17,7 +17,7 @@ class d: f{  class func i {}
 func a(b: Int = 0) {
 }
 let c = a
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
 }
 protocol a {
 class b: a {

@@ -7,6 +7,6 @@
 class T{class A{
 struct S{
 enum b<T where k:A{
-struct A{struct A{let:BooleanType
+struct A{struct A{let:Boolean
 let:{struct b{enum S{struct B{
 let a=A{

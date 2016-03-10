@@ -112,7 +112,7 @@ func pair_<T,U> (a: T) -> (b: U) -> (T,U) {
 infix operator <+> { }
 func <+><T,U,V> (lhs: T?, rhs: T -> U -> V) -> U -> V? {
 	if let x = lhs {
-		return { y in .Some(rhs(x)(y)) }
+		return { y in .some(rhs(x)(y)) }
 	} else {
 		return { _ in nil }
 	}

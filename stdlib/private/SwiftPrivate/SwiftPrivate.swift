@@ -13,26 +13,26 @@
 import SwiftShims
 
 /// Convert the given numeric value to a hexadecimal string.
-public func asHex<T : IntegerType>(x: T) -> String {
+public func asHex<T : Integer>(x: T) -> String {
   return "0x" + String(x.toIntMax(), radix: 16)
 }
 
 /// Convert the given sequence of numeric values to a string representing
 /// their hexadecimal values.
 public func asHex<
-  S: SequenceType
+  S: Sequence
 where
-  S.Generator.Element : IntegerType
+  S.Iterator.Element : Integer
 >(x: S) -> String {
-  return "[ " + x.lazy.map { asHex($0) }.joinWithSeparator(", ") + " ]"
+  return "[ " + x.lazy.map { asHex($0) }.joined(separator: ", ") + " ]"
 }
 
 /// Compute the prefix sum of `seq`.
 public func scan<
-  S : SequenceType, U
->(seq: S, _ initial: U, _ combine: (U, S.Generator.Element) -> U) -> [U] {
+  S : Sequence, U
+>(seq: S, _ initial: U, _ combine: (U, S.Iterator.Element) -> U) -> [U] {
   var result: [U] = []
-  result.reserveCapacity(seq.underestimateCount())
+  result.reserveCapacity(seq.underestimatedCount)
   var runningResult = initial
   for element in seq {
     runningResult = combine(runningResult, element)
@@ -43,7 +43,7 @@ public func scan<
 
 public func randomShuffle<T>(a: [T]) -> [T] {
   var result = a
-  for i in (1..<a.count).reverse() {
+  for i in (1..<a.count).reversed() {
     // FIXME: 32 bits are not enough in general case!
     let j = Int(rand32(exclusiveUpperBound: UInt32(i + 1)))
     if i != j {
@@ -54,13 +54,13 @@ public func randomShuffle<T>(a: [T]) -> [T] {
 }
 
 public func gather<
-  C : CollectionType,
-  IndicesSequence : SequenceType
+  C : Collection,
+  IndicesSequence : Sequence
   where
-  IndicesSequence.Generator.Element == C.Index
+  IndicesSequence.Iterator.Element == C.Index
 >(
   collection: C, _ indices: IndicesSequence
-) -> [C.Generator.Element] {
+) -> [C.Iterator.Element] {
   return Array(indices.map { collection[$0] })
 }
 
@@ -76,14 +76,14 @@ public func withArrayOfCStrings<R>(
   args: [String], _ body: ([UnsafeMutablePointer<CChar>]) -> R
 ) -> R {
 
-  let argsLengths = Array(args.map { $0.utf8.count + 1 })
-  let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
+  let argsCounts = Array(args.map { $0.utf8.count + 1 })
+  let argsOffsets = [ 0 ] + scan(argsCounts, 0, +)
   let argsBufferSize = argsOffsets.last!
 
   var argsBuffer: [UInt8] = []
   argsBuffer.reserveCapacity(argsBufferSize)
   for arg in args {
-    argsBuffer.appendContentsOf(arg.utf8)
+    argsBuffer.append(contentsOf: arg.utf8)
     argsBuffer.append(0)
   }
 

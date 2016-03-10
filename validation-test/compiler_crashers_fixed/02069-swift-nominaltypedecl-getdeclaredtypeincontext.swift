@@ -9,7 +9,7 @@ print(a: A<l : A>]])
 let a
 return ")
 }
-class d<S : CollectionType where h: A? {
+class d<S : Collection where h: A? {
 map(f(n: 1](Any, end)
 }
 typealias h: S<H : ()""")
@@ -17,4 +17,4 @@ var b {
 struct S<d where B : c
 class C<T>) -> Any {
 class A {
-i(bytes: BooleanType
+i(bytes: Boolean

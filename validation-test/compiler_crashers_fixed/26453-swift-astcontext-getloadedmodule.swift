@@ -3,7 +3,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-SequenceType
+Sequence
 enum S{enum S{struct d<T where g:b{class A{
-let l:SequenceType
+let l:Sequence
 var d=a

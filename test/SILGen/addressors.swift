@@ -76,7 +76,7 @@ func test1() -> Int32 {
   return A()[0]
 }
 
-let uninitAddr = UnsafeMutablePointer<Int32>.alloc(1)
+let uninitAddr = UnsafeMutablePointer<Int32>(allocatingCapacity: 1)
 var global: Int32 {
   unsafeAddress {
     return UnsafePointer(uninitAddr)
@@ -190,7 +190,7 @@ struct D : Subscriptable {
 // SILGEN:   [[ADDR_TMP:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
 // SILGEN:   [[ADDR:%.*]] = pointer_to_address [[ADDR_TMP]]
 // SILGEN:   [[PTR:%.*]] = address_to_pointer [[ADDR]]
-// SILGEN:   [[OPT:%.*]] = enum $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>, #Optional.None!enumelt
+// SILGEN:   [[OPT:%.*]] = enum $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>, #Optional.none!enumelt
 // SILGEN:   [[T2:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[OPT]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>)
 // SILGEN:   return [[T2]] :
 
@@ -243,7 +243,7 @@ func test_e(e: E) {
 }
 
 class F {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer(allocatingCapacity: 100)
 
   final var value: Int32 {
     addressWithNativeOwner {
@@ -294,7 +294,7 @@ func test_f1(f: F) {
 // CHECK:   strong_release [[SELF]] : $F
 
 class G {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer(allocatingCapacity: 100)
 
   var value: Int32 {
     addressWithNativeOwner {
@@ -348,7 +348,7 @@ class G {
 // CHECK:   [[PTR:%.*]] = address_to_pointer [[ADDR]]
 //   Set up the callback.
 // CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_TFFC10addressors1Gm5valueVs5Int32U_T_ :
-// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[CALLBACK_FN]]
+// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt.1, [[CALLBACK_FN]]
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>)
 // CHECK:   return [[RESULT]]
@@ -362,7 +362,7 @@ class G {
 // CHECK:   dealloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 
 class H {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer(allocatingCapacity: 100)
 
   final var value: Int32 {
     addressWithPinnedNativeOwner {
@@ -413,7 +413,7 @@ func test_h1(f: H) {
 // CHECK:   strong_release [[SELF]] : $H
 
 class I {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer(allocatingCapacity: 100)
 
   var value: Int32 {
     addressWithPinnedNativeOwner {
@@ -466,7 +466,7 @@ class I {
 // CHECK:   [[PTR:%.*]] = address_to_pointer [[ADDR]]
 //   Set up the callback.
 // CHECK:   [[CALLBACK_FN:%.*]] = function_ref @_TFFC10addressors1Im5valueVs5Int32U_T_ :
-// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[CALLBACK_FN]] 
+// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt.1, [[CALLBACK_FN]] 
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>)
 // CHECK:   return [[RESULT]]
@@ -488,7 +488,7 @@ struct RecMiddle {
   var inner: RecInner
 }
 class RecOuter {
-  var data: UnsafeMutablePointer<RecMiddle> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<RecMiddle> = UnsafeMutablePointer(allocatingCapacity: 100)
   final var middle: RecMiddle {
     addressWithPinnedNativeOwner {
       return (UnsafePointer(data), Builtin.tryPin(Builtin.castToNativeObject(self)))

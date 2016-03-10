@@ -7,7 +7,7 @@
 
 protocol b {
 i<T>(Range(e> U -> T : b, T> (p: T>
-typealias e where f<T>(#object1, f(t: SequenceType> ("
+typealias e where f<T>(#object1, f(t: Sequence> ("
 self.init()
 class C(i: start, a)
 typealias C {

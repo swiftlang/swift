@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func i: BooleanType>, A, g.E == [Int) {
+func i: Boolean>, A, g.E == [Int) {
 func a(""")
 protocol A {
 typealias B : B

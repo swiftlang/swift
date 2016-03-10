@@ -58,4 +58,4 @@ return z({
 }
 func prefix(with: String) -> <T>(() -> T return "\(with): \(g())" }
 }
-struct c<S: SequenceType, T where Optional<T> == S.Generator.Element>
+struct c<S: Sequence, T where Optional<T> == S.Iterator.Element>

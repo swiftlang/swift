@@ -22,6 +22,6 @@ func b<b: () {
 if c where B {
 struct A(a(b) + seq: b: X<T) -> T -> T : Int = {
 protocol d where T where f<f = {
-case .Generator.a<H : a: d where T where I) {
+case .Iterator.a<H : a: d where T where I) {
 }
 }

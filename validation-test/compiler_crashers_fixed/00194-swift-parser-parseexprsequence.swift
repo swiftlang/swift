@@ -23,7 +23,7 @@ struct d<f : e,e where g.h == f.h> {
 }
 protocolias h
 }
-func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
+func some<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
     for (mx : T?) in xs {
         if let x = mx {
             return x

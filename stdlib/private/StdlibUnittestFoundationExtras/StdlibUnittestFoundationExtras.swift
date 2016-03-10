@@ -27,7 +27,7 @@ public func withOverriddenNSLocaleCurrentLocale<Result>(
   @noescape _ body: () -> Result
 ) -> Result {
   let oldMethod = class_getClassMethod(
-    NSLocale.self, #selector(NSLocale.currentLocale))
+    NSLocale.self, #selector(NSLocale.current))
   precondition(oldMethod != nil, "could not find +[NSLocale currentLocale]")
 
   let newMethod = class_getClassMethod(

@@ -40,7 +40,7 @@ let a
 }}
 struct E{{
 (A}
-struct S<T where B:BooleanType w
+struct S<T where B:Boolean w
 func j}}{
 }}
 1
@@ -95,7 +95,7 @@ protocol a
 func a{{
 {}{enum S<T where h:A{func f
 struct B:d{{var d
-(((((((A<T where T:A<T:BooleanType w
+(((((((A<T where T:A<T:Boolean w
 {}class D{
 {{{
 struct B<g:A.c

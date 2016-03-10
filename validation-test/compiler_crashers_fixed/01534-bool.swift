@@ -13,7 +13,7 @@ let x }
 return { x {
 }
 }
-self.endIndex - range.Generator.init() {
+self.endIndex - range.Iterator.init() {
 struct c = Swift.c : Any) -> {
 func g(a<T.B>(T)) {
 func i: A, U) {

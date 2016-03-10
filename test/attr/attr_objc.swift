@@ -871,8 +871,8 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_UInt32: UInt32
 // CHECK-LABEL: @objc var var_UInt64: UInt64
 
-  var var_COpaquePointer: COpaquePointer
-// CHECK-LABEL: @objc var var_COpaquePointer: COpaquePointer
+  var var_OpaquePointer: OpaquePointer
+// CHECK-LABEL: @objc var var_OpaquePointer: OpaquePointer
 
   var var_PlainClass: PlainClass
 // CHECK-LABEL: {{^}}  var var_PlainClass: PlainClass
@@ -1065,7 +1065,7 @@ class infer_instanceVar1 {
   var var_UnsafeMutablePointer4: UnsafeMutablePointer<String>
   var var_UnsafeMutablePointer5: UnsafeMutablePointer<Float>
   var var_UnsafeMutablePointer6: UnsafeMutablePointer<Double>
-  var var_UnsafeMutablePointer7: UnsafeMutablePointer<COpaquePointer>
+  var var_UnsafeMutablePointer7: UnsafeMutablePointer<OpaquePointer>
   var var_UnsafeMutablePointer8: UnsafeMutablePointer<PlainClass>
   var var_UnsafeMutablePointer9: UnsafeMutablePointer<PlainStruct>
   var var_UnsafeMutablePointer10: UnsafeMutablePointer<PlainEnum>
@@ -1081,7 +1081,7 @@ class infer_instanceVar1 {
 // CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer4: UnsafeMutablePointer<String>
 // CHECK-LABEL: @objc var var_UnsafeMutablePointer5: UnsafeMutablePointer<Float>
 // CHECK-LABEL: @objc var var_UnsafeMutablePointer6: UnsafeMutablePointer<Double>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer7: UnsafeMutablePointer<COpaquePointer>
+// CHECK-LABEL: @objc var var_UnsafeMutablePointer7: UnsafeMutablePointer<OpaquePointer>
 // CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer8: UnsafeMutablePointer<PlainClass>
 // CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer9: UnsafeMutablePointer<PlainStruct>
 // CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer10: UnsafeMutablePointer<PlainEnum>
@@ -1151,7 +1151,7 @@ class infer_instanceVar1 {
   var var_Optional_fail12: Int?
   var var_Optional_fail13: Bool?
   var var_Optional_fail14: CBool?
-  var var_Optional_fail16: COpaquePointer?
+  var var_Optional_fail16: OpaquePointer?
   var var_Optional_fail17: UnsafeMutablePointer<Int>?
   var var_Optional_fail18: UnsafeMutablePointer<Class_ObjC1>?
   var var_Optional_fail20: AnyObject??
@@ -1656,9 +1656,6 @@ class HasNSManaged {
 
   func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {}
   // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
-
-  func cFunctionPointer(p: CFunctionPointer<() -> ()>) {} // expected-error{{unavailable}}
-  // CHECK-LABEL: {{^}} func cFunctionPointer(p: <<error type>>) -> <<error type>>
 }
 
 // @objc with nullary names

@@ -1863,16 +1863,15 @@ static bool isConversionConstraint(const Constraint *C) {
 /// low that we would only like to issue an error message about it if there is
 /// nothing else interesting we can scrape out of the constraint system.
 static bool isLowPriorityConstraint(Constraint *C) {
-  // If the member constraint is a ".Generator" lookup to find the generator
+  // If the member constraint is a ".Iterator" lookup to find the iterator
   // type in a foreach loop, or a ".Element" lookup to find its element type,
   // then it is very low priority: We will get a better and more useful
-  // diagnostic from the failed conversion to SequenceType that will fail as
-  // well.
+  // diagnostic from the failed conversion to Sequence that will fail as well.
   if (C->getKind() == ConstraintKind::TypeMember) {
     if (auto *loc = C->getLocator())
       for (auto Elt : loc->getPath())
         if (Elt.getKind() == ConstraintLocator::GeneratorElementType ||
-            Elt.getKind() == ConstraintLocator::SequenceGeneratorType)
+            Elt.getKind() == ConstraintLocator::SequenceIteratorProtocol)
           return true;
   }
 
@@ -2467,10 +2466,9 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   
   if (auto PT = toType->getAs<ProtocolType>()) {
-    
-    // Check for "=" converting to BooleanType.  The user probably meant ==.
+    // Check for "=" converting to Boolean.  The user probably meant ==.
     if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
-      if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
+      if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::Boolean)) {
         diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
         .fixItReplace(AE->getEqualLoc(), "==")
         .highlight(AE->getDest()->getLoc())
@@ -4522,7 +4520,7 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
   auto falseExpr = typeCheckChildIndependently(IE->getElseExpr());
   if (!falseExpr) return true;
 
-  // Check for "=" converting to BooleanType.  The user probably meant ==.
+  // Check for "=" converting to Boolean.  The user probably meant ==.
   if (auto *AE = dyn_cast<AssignExpr>(condExpr->getValueProvidingExpr())) {
     diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
       .fixItReplace(AE->getEqualLoc(), "==")
@@ -4533,7 +4531,7 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
 
   // If the condition wasn't of boolean type, diagnose the problem.
   auto booleanType = CS->TC.getProtocol(IE->getQuestionLoc(),
-                                        KnownProtocolKind::BooleanType);
+                                        KnownProtocolKind::Boolean);
   if (!booleanType) return true;
 
   if (!CS->TC.conformsToProtocol(condExpr->getType(), booleanType, CS->DC,

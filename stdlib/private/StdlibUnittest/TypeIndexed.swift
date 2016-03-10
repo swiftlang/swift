@@ -52,7 +52,7 @@ public class TypeIndexed<Value> : Resettable {
   internal var defaultValue: Value
 }
 
-extension TypeIndexed where Value : ForwardIndexType {
+extension TypeIndexed where Value : ForwardIndex {
   public func expectIncrement<R>(
     t: Any.Type,
     @autoclosure _ message: () -> String = "",
@@ -105,7 +105,7 @@ public func expectEqual<V: Comparable>(
   file: String = #file, line: UInt = #line
 ) {
   expectEqualsUnordered(
-    expected.map { (TypeIdentifier($0.0), $0.1) },
+    expected.map { (key: TypeIdentifier($0.0), value: $0.1) },
     actual.byType,
     message(), stackTrace: stackTrace) { $0 <=> $1 }
 }

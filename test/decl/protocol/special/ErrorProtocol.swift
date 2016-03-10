@@ -1,8 +1,8 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -parse -verify -primary-file %t/main.swift %S/Inputs/ErrorType_other.swift
+// RUN: %target-swift-frontend -parse -verify -primary-file %t/main.swift %S/Inputs/ErrorProtocol_other.swift
 
-enum ClericalErrorDomain: ErrorType {
+enum ClericalErrorDomain: ErrorProtocol {
   case MisplacedDocument(name: String)
   case AccidentallyErasedTape(fromMinute: Double, toMinute: Double)
 }
@@ -17,7 +17,7 @@ struct UseEnumBeforeDeclaration {
   let errorDomain: String = EnumToUseBeforeDeclaration.A._domain
   let errorCode: Int = EnumToUseBeforeDeclaration.A._code
 }
-enum EnumToUseBeforeDeclaration: ErrorType {
+enum EnumToUseBeforeDeclaration: ErrorProtocol {
   case A
 }
 
@@ -29,18 +29,18 @@ enum NotAnError { case A }
 let notAnErrorDomain: String = NotAnError.A._domain // expected-error{{value of type 'NotAnError' has no member '_domain'}}
 let notAnErrorCode: Int = NotAnError.A._code // expected-error{{value of type 'NotAnError' has no member '_code'}}
 
-enum EmptyErrorDomain: ErrorType {}
+enum EmptyErrorDomain: ErrorProtocol {}
 
-struct ErrorStruct : ErrorType {
+struct ErrorStruct : ErrorProtocol {
 }
 
-class ErrorClass : ErrorType {
+class ErrorClass : ErrorProtocol {
 }
 
 struct ErrorStruct2 { }
 
-extension ErrorStruct2 : ErrorType { }
+extension ErrorStruct2 : ErrorProtocol { }
 
 class ErrorClass2 { }
 
-extension ErrorClass2 : ErrorType { }
+extension ErrorClass2 : ErrorProtocol { }

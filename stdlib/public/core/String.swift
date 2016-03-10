@@ -12,6 +12,9 @@
 
 import SwiftShims
 
+// FIXME: complexity documentation for most of methods on String is ought to be
+// qualified with "amortized" at least, as Characters are variable-length.
+
 /// An arbitrary Unicode string value.
 ///
 /// Unicode-Correct
@@ -50,7 +53,7 @@ import SwiftShims
 ///
 ///     var a = "foo"
 ///     var b = a
-///     b.appendContentsOf("bar")
+///     b.append("bar")
 ///     print("a=\(a), b=\(b)")     // a=foo, b=foobar
 ///
 /// Strings use Copy-on-Write so that their data is only copied
@@ -123,8 +126,8 @@ extension String {
   @warn_unused_result
   public // @testable
   static func _fromWellFormedCodeUnitSequence<
-    Encoding: UnicodeCodecType, Input: CollectionType
-    where Input.Generator.Element == Encoding.CodeUnit
+    Encoding: UnicodeCodec, Input: Collection
+    where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
   ) -> String {
@@ -134,13 +137,13 @@ extension String {
   @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequence<
-    Encoding: UnicodeCodecType, Input: CollectionType
-    where Input.Generator.Element == Encoding.CodeUnit
+    Encoding: UnicodeCodec, Input: Collection
+    where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
   ) -> String? {
     let (stringBufferOptional, _) =
-        _StringBuffer.fromCodeUnits(encoding, input: input,
+        _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: false)
     if let stringBuffer = stringBufferOptional {
       return String(_storage: stringBuffer)
@@ -152,13 +155,13 @@ extension String {
   @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequenceWithRepair<
-    Encoding: UnicodeCodecType, Input: CollectionType
-    where Input.Generator.Element == Encoding.CodeUnit
+    Encoding: UnicodeCodec, Input: Collection
+    where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
   ) -> (String, hadError: Bool) {
     let (stringBuffer, hadError) =
-        _StringBuffer.fromCodeUnits(encoding, input: input,
+        _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: true)
     return (String(_storage: stringBuffer!), hadError)
   }
@@ -185,13 +188,13 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   @_semantics("string.makeUTF8")
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) {
     self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(
-            start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-            count: Int(byteSize)))
+      UTF8.self,
+      input: UnsafeBufferPointer(
+        start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
+        count: Int(utf8CodeUnitCount)))
   }
 }
 
@@ -207,12 +210,12 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
   @_semantics("string.makeUTF16")
   public init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    numberOfCodeUnits: Builtin.Word
+    utf16CodeUnitCount: Builtin.Word
   ) {
     self = String(
       _StringCore(
-        baseAddress: COpaquePointer(start),
-        count: Int(numberOfCodeUnits),
+        baseAddress: OpaquePointer(start),
+        count: Int(utf16CodeUnitCount),
         elementShift: 1,
         hasCocoaBuffer: false,
         owner: nil))
@@ -224,23 +227,23 @@ extension String : _BuiltinStringLiteralConvertible {
   @_semantics("string.makeUTF8")
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) {
     if Bool(isASCII) {
       self = String(
         _StringCore(
-          baseAddress: COpaquePointer(start),
-          count: Int(byteSize),
+          baseAddress: OpaquePointer(start),
+          count: Int(utf8CodeUnitCount),
           elementShift: 0,
           hasCocoaBuffer: false,
           owner: nil))
     }
     else {
       self = String._fromWellFormedCodeUnitSequence(
-          UTF8.self,
-          input: UnsafeBufferPointer(
-              start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-              count: Int(byteSize)))
+        UTF8.self,
+        input: UnsafeBufferPointer(
+          start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
+          count: Int(utf8CodeUnitCount)))
     }
   }
 }
@@ -257,7 +260,7 @@ extension String : CustomDebugStringConvertible {
   public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {
-      result += us.escape(asASCII: false)
+      result += us.escaped(asASCII: false)
     }
     result += "\""
     return result
@@ -269,7 +272,7 @@ extension String {
   /// in the given encoding.
   @warn_unused_result
   func _encodedLength<
-    Encoding: UnicodeCodecType
+    Encoding: UnicodeCodec
   >(encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
     let output: (Encoding.CodeUnit) -> Void = { _ in codeUnitCount += 1 }
@@ -285,7 +288,7 @@ extension String {
   // Related: <rdar://problem/17340917> Please document how NSString interacts
   // with unpaired surrogates
   func _encode<
-    Encoding: UnicodeCodecType
+    Encoding: UnicodeCodec
   >(encoding: Encoding.Type, output: (Encoding.CodeUnit) -> Void)
   {
     return _core.encode(encoding, output: output)
@@ -423,7 +426,7 @@ public func <(lhs: String, rhs: String) -> Bool {
 extension String {
 
   /// Append the elements of `other` to `self`.
-  public mutating func appendContentsOf(other: String) {
+  public mutating func append(other: String) {
     _core.append(other._core)
   }
 
@@ -432,10 +435,6 @@ extension String {
   /// - Complexity: Amortized O(1).
   public mutating func append(x: UnicodeScalar) {
     _core.append(x)
-  }
-
-  var _utf16Count: Int {
-    return _core.count
   }
 
   public // SPI(Foundation)
@@ -474,7 +473,7 @@ extension String : Hashable {
     // FIXME(performance): constructing a temporary NSString is extremely
     // wasteful and inefficient.
     let cocoaString = unsafeBitCast(
-      self._bridgeToObjectiveCImpl(), _NSStringCoreType.self)
+      self._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
 
     // If we have an ASCII string, we do not need to normalize.
     if self._core.isASCII {
@@ -527,11 +526,13 @@ extension String {
   public // COMPILER_INTRINSIC
   static func _fromUTF8InRawMemory(
     resultStorage: UnsafeMutablePointer<String>,
-    start: UnsafeMutablePointer<UTF8.CodeUnit>, utf8Count: Int
+    start: UnsafeMutablePointer<UTF8.CodeUnit>,
+    utf8CodeUnitCount: Int
   ) {
-    resultStorage.initialize(
-        String._fromWellFormedCodeUnitSequence(UTF8.self,
-            input: UnsafeBufferPointer(start: start, count: utf8Count)))
+    resultStorage.initialize(with: 
+      String._fromWellFormedCodeUnitSequence(
+        UTF8.self,
+        input: UnsafeBufferPointer(start: start, count: utf8CodeUnitCount)))
   }
 }
 
@@ -551,7 +552,7 @@ extension String {
 
   /// Access the `Character` at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self.characters`
+  /// - Precondition: `position` is a valid position in `self.characters`
   ///   and `position != endIndex`.
   public subscript(i: Index) -> Character { return characters[i] }
 }
@@ -567,12 +568,12 @@ public func < (lhs: String.Index, rhs: String.Index) -> Bool {
 }
 
 extension String {
-  /// Access the characters in the given `subRange`.
+  /// Return the characters within the given `bounds`.
   ///
   /// - Complexity: O(1) unless bridging from Objective-C requires an
   ///   O(N) conversion.
-  public subscript(subRange: Range<Index>) -> String {
-    return String(characters[subRange])
+  public subscript(bounds: Range<Index>) -> String {
+    return String(characters[bounds])
   }
 }
 
@@ -588,41 +589,30 @@ extension String {
     }
   }
   
-  public mutating func appendContentsOf<
-      S : SequenceType
-  where S.Generator.Element == Character
-  >(newElements: S) {
+  public mutating func append<
+    S : Sequence where S.Iterator.Element == Character
+  >(contentsOf newElements: S) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.appendContentsOf(newElements)
+      (v: inout CharacterView) in v.append(contentsOf: newElements)
     }
   }
   
   /// Create an instance containing `characters`.
   public init<
-      S : SequenceType
-      where S.Generator.Element == Character
+    S : Sequence where S.Iterator.Element == Character
   >(_ characters: S) {
     self._core = CharacterView(characters)._core
   }
 }
 
-extension String {
-  @available(*, unavailable, message="call the 'joinWithSeparator()' method on the sequence of elements")
-  public func join<
-    S : SequenceType where S.Generator.Element == String
-  >(elements: S) -> String {
-    fatalError("unavailable function can't be called")
-  }
-}
-
-extension SequenceType where Generator.Element == String {
+extension Sequence where Iterator.Element == String {
 
   /// Interpose the `separator` between elements of `self`, then concatenate
   /// the result.  For example:
   ///
-  ///     ["foo", "bar", "baz"].joinWithSeparator("-|-") // "foo-|-bar-|-baz"
+  ///     ["foo", "bar", "baz"].joined(separator: "-|-") // "foo-|-bar-|-baz"
   @warn_unused_result
-  public func joinWithSeparator(separator: String) -> String {
+  public func joined(separator separator: String) -> String {
     var result = ""
 
     // FIXME(performance): this code assumes UTF-16 in-memory representation.
@@ -646,17 +636,17 @@ extension SequenceType where Generator.Element == String {
 
     if separatorSize == 0 {
       for x in self {
-        result.appendContentsOf(x)
+        result.append(x)
       }
       return result
     }
-    
-    var gen = generate()
-    if let first = gen.next() {
-      result.appendContentsOf(first)
-      while let next = gen.next() {
-        result.appendContentsOf(separator)
-        result.appendContentsOf(next)
+
+    var iter = makeIterator()
+    if let first = iter.next() {
+      result.append(first)
+      while let next = iter.next() {
+        result.append(separator)
+        result.append(next)
       }
     }
 
@@ -665,101 +655,102 @@ extension SequenceType where Generator.Element == String {
 }
 
 extension String {
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replace the characters within `bounds` with the elements of
+  /// `replacement`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == Character
+  public mutating func replaceSubrange<
+    C: Collection where C.Iterator.Element == Character
   >(
-    subRange: Range<Index>, with newElements: C
+    bounds: Range<Index>, with newElements: C
   ) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.replaceRange(subRange, with: newElements)
+      (v: inout CharacterView) in v.replaceSubrange(bounds, with: newElements)
     }
   }
 
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replace the text in `bounds` with `replacement`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceRange(
-    subRange: Range<Index>, with newElements: String
+  public mutating func replaceSubrange(
+    bounds: Range<Index>, with newElements: String
   ) {
-    replaceRange(subRange, with: newElements.characters)
+    replaceSubrange(bounds, with: newElements.characters)
   }
 
-  /// Insert `newElement` at index `i`.
+  /// Insert `newElement` at position `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func insert(newElement: Character, atIndex i: Index) {
+  public mutating func insert(newElement: Character, at i: Index) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.insert(newElement, atIndex: i)
+      (v: inout CharacterView) in v.insert(newElement, at: i)
     }
   }
 
-  /// Insert `newElements` at index `i`.
+  /// Insert `newElements` at position `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
-  public mutating func insertContentsOf<
-    S : CollectionType where S.Generator.Element == Character
-  >(newElements: S, at i: Index) {
+  public mutating func insert<
+    S : Collection where S.Iterator.Element == Character
+  >(contentsOf newElements: S, at i: Index) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.insertContentsOf(newElements, at: i)
+      (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
     }
   }
 
-  /// Remove and return the element at index `i`.
+  /// Remove and return the `Character` at position `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeAtIndex(i: Index) -> Character {
+  public mutating func remove(at i: Index) -> Character {
     return withMutableCharacters {
-      (v: inout CharacterView) in v.removeAtIndex(i)
+      (v: inout CharacterView) in v.remove(at: i)
     }
   }
 
-  /// Remove the indicated `subRange` of characters.
+  /// Remove the characters in `bounds`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeRange(subRange: Range<Index>) {
+  public mutating func removeSubrange(bounds: Range<Index>) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.removeRange(subRange)
+      (v: inout CharacterView) in v.removeSubrange(bounds)
     }
   }
 
-  /// Remove all characters.
+  /// Replace `self` with the empty string.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - parameter keepCapacity: If `true`, prevents the release of
   ///   allocated storage, which can be a useful optimization
   ///   when `self` is going to be grown again.
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.removeAll(keepCapacity: keepCapacity)
+      (v: inout CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
     }
   }
 }
 #if _runtime(_ObjC)
 @warn_unused_result
 @_silgen_name("swift_stdlib_NSStringLowercaseString")
-func _stdlib_NSStringLowercaseString(str: AnyObject) -> _CocoaStringType
+func _stdlib_NSStringLowercaseString(str: AnyObject) -> _CocoaString
 
 @warn_unused_result
 @_silgen_name("swift_stdlib_NSStringUppercaseString")
-func _stdlib_NSStringUppercaseString(str: AnyObject) -> _CocoaStringType
+func _stdlib_NSStringUppercaseString(str: AnyObject) -> _CocoaString
 #else
 @warn_unused_result
 internal func _nativeUnicodeLowercaseString(str: String) -> String {
@@ -834,14 +825,17 @@ extension String {
     }
   }
 
-  public var lowercaseString: String {
+  /// Return `self` converted to lower case.
+  ///
+  /// - Complexity: O(n)
+  public func lowercased() -> String {
     if self._core.isASCII {
-      let length = self._core.count
+      let count = self._core.count
       let source = self._core.startASCII
       let buffer = _StringBuffer(
-        capacity: length, initialSize: length, elementWidth: 1)
+        capacity: count, initialSize: count, elementWidth: 1)
       let dest = UnsafeMutablePointer<UInt8>(buffer.start)
-      for i in 0..<length {
+      for i in 0..<count {
         // For each character in the string, we lookup if it should be shifted
         // in our ascii table, then we return 0x20 if it should, 0x0 if not.
         // This code is equivalent to:
@@ -872,14 +866,17 @@ extension String {
 #endif
   }
 
-  public var uppercaseString: String {
+  /// Return `self` converted to upper case.
+  ///
+  /// - Complexity: O(n)
+  public func uppercased() -> String {
     if self._core.isASCII {
-      let length = self._core.count
+      let count = self._core.count
       let source = self._core.startASCII
       let buffer = _StringBuffer(
-        capacity: length, initialSize: length, elementWidth: 1)
+        capacity: count, initialSize: count, elementWidth: 1)
       let dest = UnsafeMutablePointer<UInt8>(buffer.start)
-      for i in 0..<length {
+      for i in 0..<count {
         // See the comment above in lowercaseString.
         let value = source[i]
         let isLower =
@@ -905,7 +902,7 @@ extension String.Index {
   /// Construct the position in `characters` that corresponds exactly to
   /// `unicodeScalarIndex`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `unicodeScalarIndex` is an element of
+  /// - Precondition: `unicodeScalarIndex` is an element of
   ///   `characters.unicodeScalars.indices`.
   public init?(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
@@ -920,15 +917,15 @@ extension String.Index {
   /// Construct the position in `characters` that corresponds exactly to
   /// `utf16Index`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `utf16Index` is an element of
+  /// - Precondition: `utf16Index` is an element of
   ///   `characters.utf16.indices`.
   public init?(
     _ utf16Index: String.UTF16Index,
     within characters: String
   ) {
-    if let me = utf16Index.samePositionIn(
-      characters.unicodeScalars
-    )?.samePositionIn(characters) {
+    if let me = utf16Index.samePosition(
+      in: characters.unicodeScalars
+    )?.samePosition(in: characters) {
       self = me
     }
     else {
@@ -939,15 +936,15 @@ extension String.Index {
   /// Construct the position in `characters` that corresponds exactly to
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `utf8Index` is an element of
+  /// - Precondition: `utf8Index` is an element of
   ///   `characters.utf8.indices`.
   public init?(
     _ utf8Index: String.UTF8Index,
     within characters: String
   ) {
-    if let me = utf8Index.samePositionIn(
-      characters.unicodeScalars
-    )?.samePositionIn(characters) {
+    if let me = utf8Index.samePosition(
+      in: characters.unicodeScalars
+    )?.samePosition(in: characters) {
       self = me
     }
     else {
@@ -958,10 +955,10 @@ extension String.Index {
   /// Returns the position in `utf8` that corresponds exactly
   /// to `self`.
   ///
-  /// - Requires: `self` is an element of `String(utf8).indices`.
+  /// - Precondition: `self` is an element of `String(utf8).indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf8: String.UTF8View
+  public func samePosition(
+    in utf8: String.UTF8View
   ) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
@@ -969,10 +966,10 @@ extension String.Index {
   /// Returns the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
-  /// - Requires: `self` is an element of `String(utf16).indices`.
+  /// - Precondition: `self` is an element of `String(utf16).indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf16: String.UTF16View
+  public func samePosition(
+    in utf16: String.UTF16View
   ) -> String.UTF16View.Index {
     return String.UTF16View.Index(self, within: utf16)
   }
@@ -980,11 +977,75 @@ extension String.Index {
   /// Returns the position in `unicodeScalars` that corresponds exactly
   /// to `self`.
   ///
-  /// - Requires: `self` is an element of `String(unicodeScalars).indices`.
+  /// - Precondition: `self` is an element of `String(unicodeScalars).indices`.
   @warn_unused_result
-  public func samePositionIn(
-    unicodeScalars: String.UnicodeScalarView
+  public func samePosition(
+    in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarView.Index {
     return String.UnicodeScalarView.Index(self, within: unicodeScalars)
+  }
+}
+
+extension String {
+  @available(*, unavailable, renamed="append")
+  public mutating func appendContentsOf(other: String) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="append(contentsOf:)")
+  public mutating func appendContentsOf<
+    S : Sequence where S.Iterator.Element == Character
+  >(newElements: S) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="insert(contentsOf:at:)")
+  public mutating func insertContentsOf<
+    S : Collection where S.Iterator.Element == Character
+  >(newElements: S, at i: Index) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="replaceSubrange")
+  public mutating func replaceRange<
+    C : Collection where C.Iterator.Element == Character
+  >(
+    subRange: Range<Index>, with newElements: C
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="replaceSubrange")
+  public mutating func replaceRange(
+    subRange: Range<Index>, with newElements: String
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="removeAt")
+  public mutating func removeAtIndex(i: Index) -> Character {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="removeSubrange")
+  public mutating func removeRange(subRange: Range<Index>) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="lowercased()")
+  public var lowercaseString: String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="uppercased()")
+  public var uppercaseString: String {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Sequence where Iterator.Element == String {
+  @available(*, unavailable, renamed="joined")
+  public func joinWithSeparator(separator: String) -> String {
+    fatalError("unavailable function can't be called")
   }
 }

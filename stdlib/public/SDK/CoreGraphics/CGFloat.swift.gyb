@@ -49,7 +49,7 @@ public struct CGFloat {
   public var native: NativeType
 }
 
-@_transparent extension CGFloat : FloatingPointType {
+@_transparent extension CGFloat : FloatingPoint {
   public typealias _BitsType = UInt
 
   public static func _fromBitPattern(bits: UInt) -> CGFloat {
@@ -72,8 +72,8 @@ public struct CGFloat {
     return CGFloat(NativeType.infinity)
   }
 
-  public static var NaN: CGFloat {
-    return CGFloat(NativeType.NaN)
+  public static var nan: CGFloat {
+    return CGFloat(NativeType.nan)
   }
 
   public static var quietNaN: CGFloat {
@@ -147,7 +147,7 @@ public var CGFLOAT_MAX: CGFloat {
 
 extension CGFloat : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: native)
   }
 }
@@ -236,21 +236,21 @@ public func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
 }
 
 @_transparent extension CGFloat : Strideable {
-  /// Returns a stride `x` such that `self.advancedBy(x)` approximates
+  /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
   ///
   /// - Complexity: O(1).
-  @_transparent public
-  func distanceTo(other: CGFloat) -> CGFloat {
+  @_transparent
+  public func distance(to other: CGFloat) -> CGFloat {
     return CGFloat(other.native - self.native)
   }
 
-  /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
+  /// Returns a `Self` `x` such that `self.distance(to: x)` approximates
   /// `n`.
   ///
   /// - Complexity: O(1).
-  @_transparent public
-  func advancedBy(amount: CGFloat) -> CGFloat {
+  @_transparent
+  public func advanced(by amount: CGFloat) -> CGFloat {
     return CGFloat(self.native + amount.native)
   }
 }
@@ -731,7 +731,7 @@ public func yn(n: Int, _ x: CGFloat) -> CGFloat {
 }
 
 @_transparent
-extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAlignedType {
+extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
   public var _cVarArgEncoding: [Int] {

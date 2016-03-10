@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 /// The underlying buffer for an ArrayType conforms to
-/// `_ArrayBufferType`.  This buffer does not provide value semantics.
-public protocol _ArrayBufferType : MutableCollectionType {
+/// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
+public protocol _ArrayBufferProtocol : MutableCollection {
   /// The type of elements stored in the buffer.
   associatedtype Element
 
@@ -22,11 +22,12 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// Adopt the entire buffer, presenting it at the provided `startIndex`.
   init(_ buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
 
-  /// Copy the given subRange of this buffer into uninitialized memory
-  /// starting at target.  Return a pointer past-the-end of the
+  /// Copy the elements in `bounds` from this buffer into uninitialized
+  /// memory starting at `target`.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  func _uninitializedCopy(
-    subRange: Range<Int>, target: UnsafeMutablePointer<Element>
+  func _copyContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element>
 
   /// Get or set the index'th element.
@@ -44,8 +45,9 @@ public protocol _ArrayBufferType : MutableCollectionType {
   ///   may acquire spurious extra references, which will cause
   ///   unnecessary reallocation.
   @warn_unused_result
-  mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
-    -> _ContiguousArrayBuffer<Element>?
+  mutating func requestUniqueMutableBackingBuffer(
+    minimumCapacity minimumCapacity: Int
+  ) -> _ContiguousArrayBuffer<Element>?
 
   /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer.
@@ -65,15 +67,16 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// Replace the given `subRange` with the first `newCount` elements of
   /// the given collection.
   ///
-  /// - Requires: This buffer is backed by a uniquely-referenced
+  /// - Precondition: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
-  mutating func replace<C: CollectionType where C.Generator.Element == Element>(
-    subRange subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
+  mutating func replace<C : Collection where C.Iterator.Element == Element>(
+    subRange subRange: Range<Int>,
+    with newCount: Int,
+    elementsOf newValues: C
   )
 
-  /// Returns a `_SliceBuffer` containing the given `subRange` of values
-  /// from this buffer.
-  subscript(subRange: Range<Int>) -> _SliceBuffer<Element> { get }
+  /// Returns a `_SliceBuffer` containing the elements in `bounds`.
+  subscript(bounds: Range<Int>) -> _SliceBuffer<Element> { get }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
@@ -85,7 +88,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   ///
-  /// - Requires: Such contiguous storage exists or the buffer is empty.
+  /// - Precondition: Such contiguous storage exists or the buffer is empty.
   mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R
@@ -103,7 +106,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// element. Otherwise, `nil`.
   var firstElementAddress: UnsafeMutablePointer<Element> { get }
 
-  /// Returns a base address to which you can add an index `i` to get the 
+  /// Returns a base address to which you can add an index `i` to get the
   /// address of the corresponding element at `i`.
   var subscriptBaseAddress: UnsafeMutablePointer<Element> { get }
 
@@ -121,7 +124,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   var startIndex: Int { get }
 }
 
-extension _ArrayBufferType {
+extension _ArrayBufferProtocol {
   public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
@@ -132,9 +135,12 @@ extension _ArrayBufferType {
   }
 
   public mutating func replace<
-    C: CollectionType where C.Generator.Element == Element
-  >(subRange subRange: Range<Int>, with newCount: Int,
-    elementsOf newValues: C) {
+    C : Collection where C.Iterator.Element == Element
+  >(
+    subRange subRange: Range<Int>,
+    with newCount: Int,
+    elementsOf newValues: C
+  ) {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count
     let eraseCount = subRange.count
@@ -164,7 +170,7 @@ extension _ArrayBufferType {
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(newValues[i])
+        (elements + j).initialize(with: newValues[i])
         i._successorInPlace()
       }
       _expectEnd(i, newValues)
@@ -202,7 +208,8 @@ extension _ArrayBufferType {
         newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
         // Destroy elements remaining after the tail in subRange
-        (newTailStart + tailCount).destroy(shrinkage - tailCount)
+        (newTailStart + tailCount).deinitialize(
+          count: shrinkage - tailCount)
       }
     }
   }

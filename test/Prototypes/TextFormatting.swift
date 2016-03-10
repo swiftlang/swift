@@ -132,7 +132,7 @@ struct EscapedStringFormat : XStreamable {
   func writeTo<Target: XOutputStream>(target: inout Target) {
     target.append("\"")
     for c in _value.unicodeScalars {
-      target.append(c.escape(asASCII: true))
+      target.append(c.escaped(asASCII: true))
     }
     target.append("\"")
   }
@@ -154,7 +154,7 @@ extension String : XPrintable {
 }
 
 /// \brief An integral type that can be printed
-protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumberType, XPrintable {
+protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber, XPrintable {
   func %(lhs: Self, rhs: Self) -> Self
   func /(lhs: Self, rhs: Self) -> Self
 

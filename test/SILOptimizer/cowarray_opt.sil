@@ -270,7 +270,7 @@ bb1:
   release_value %2 : $MyArray<MyStruct>
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  %8 = enum $Optional<MyArray<MyStruct>>, #Optional.Some!enumelt.1, %2 : $MyArray<MyStruct>
+  %8 = enum $Optional<MyArray<MyStruct>>, #Optional.some!enumelt.1, %2 : $MyArray<MyStruct>
   mark_dependence %1 : $*Builtin.Int1 on %8 : $Optional<MyArray<MyStruct>>
   cond_br %3, bb1, bb2
 
@@ -395,7 +395,7 @@ bb1:
   strong_release %6 : $Builtin.NativeObject
   %10 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %11 = apply %10(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  %12 = enum $Optional<MyArray<MyStruct>>, #Optional.Some!enumelt.1, %2 : $MyArray<MyStruct>
+  %12 = enum $Optional<MyArray<MyStruct>>, #Optional.some!enumelt.1, %2 : $MyArray<MyStruct>
   %13 = mark_dependence %1 : $*Builtin.Int1 on %12 : $Optional<MyArray<MyStruct>>
   cond_br %8, bb1, bb2
 
@@ -577,7 +577,7 @@ bb6(%23 : $Builtin.Int64):
   strong_release %38 : $Builtin.BridgeObject
   %42 = load %18 : $*Builtin.BridgeObject
   %43 = unchecked_ref_cast %42 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %44 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %43 : $Builtin.NativeObject
+  %44 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %43 : $Builtin.NativeObject
   %45 = struct_extract %40 : $UnsafeMutablePointer<My2dArray<MyInt>>, #UnsafeMutablePointer._rawValue
   %46 = pointer_to_address %45 : $Builtin.RawPointer to $*My2dArray<MyInt>
   %47 = mark_dependence %46 : $*My2dArray<MyInt> on %44 : $Optional<Builtin.NativeObject>
@@ -601,7 +601,7 @@ bb6(%23 : $Builtin.Int64):
   %65 = struct_element_addr %64 : $*_MyBridgeStorage, #_MyBridgeStorage.rawValue
   %66 = load %65 : $*Builtin.BridgeObject
   %67 = unchecked_ref_cast %66 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %68 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %67 : $Builtin.NativeObject
+  %68 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %67 : $Builtin.NativeObject
   %69 = struct_extract %61 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %70 = pointer_to_address %69 : $Builtin.RawPointer to $*MyInt
   %71 = mark_dependence %70 : $*MyInt on %68 : $Optional<Builtin.NativeObject>
@@ -678,7 +678,7 @@ bb6(%23 : $Builtin.Int64):
   strong_release %38 : $Builtin.BridgeObject
   %42 = load %18 : $*Builtin.BridgeObject
   %43 = unchecked_ref_cast %42 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %44 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %43 : $Builtin.NativeObject
+  %44 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %43 : $Builtin.NativeObject
   %45 = struct_extract %40 : $UnsafeMutablePointer<My2dArray<MyInt>>, #UnsafeMutablePointer._rawValue
   %46 = pointer_to_address %45 : $Builtin.RawPointer to $*My2dArray<MyInt>
   %47 = mark_dependence %46 : $*My2dArray<MyInt> on %44 : $Optional<Builtin.NativeObject>
@@ -702,7 +702,7 @@ bb6(%23 : $Builtin.Int64):
   %65 = struct_element_addr %64 : $*_MyBridgeStorage, #_MyBridgeStorage.rawValue
   %66 = load %65 : $*Builtin.BridgeObject
   %67 = unchecked_ref_cast %66 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %68 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %67 : $Builtin.NativeObject
+  %68 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %67 : $Builtin.NativeObject
   %69 = struct_extract %61 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %70 = pointer_to_address %69 : $Builtin.RawPointer to $*MyInt
   %71 = mark_dependence %70 : $*MyInt on %68 : $Optional<Builtin.NativeObject>
@@ -780,7 +780,7 @@ bb6(%23 : $Builtin.Int64):
   strong_release %38 : $Builtin.BridgeObject
   %42 = load %18 : $*Builtin.BridgeObject
   %43 = unchecked_ref_cast %42 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %44 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %43 : $Builtin.NativeObject
+  %44 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %43 : $Builtin.NativeObject
   %45 = struct_extract %40 : $UnsafeMutablePointer<My2dArray<MyInt>>, #UnsafeMutablePointer._rawValue
   %46 = pointer_to_address %45 : $Builtin.RawPointer to $*My2dArray<MyInt>
   %47 = mark_dependence %46 : $*My2dArray<MyInt> on %44 : $Optional<Builtin.NativeObject>
@@ -804,7 +804,7 @@ bb6(%23 : $Builtin.Int64):
   %65 = struct_element_addr %64 : $*_MyBridgeStorage, #_MyBridgeStorage.rawValue
   %66 = load %65 : $*Builtin.BridgeObject
   %67 = unchecked_ref_cast %66 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %68 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %67 : $Builtin.NativeObject
+  %68 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %67 : $Builtin.NativeObject
   %69 = struct_extract %61 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %70 = pointer_to_address %69 : $Builtin.RawPointer to $*MyInt
   %71 = mark_dependence %70 : $*MyInt on %68 : $Optional<Builtin.NativeObject>
@@ -883,7 +883,7 @@ bb6(%23 : $Builtin.Int64):
   strong_release %38 : $Builtin.BridgeObject
   %42 = load %18 : $*Builtin.BridgeObject
   %43 = unchecked_ref_cast %42 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %44 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %43 : $Builtin.NativeObject
+  %44 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %43 : $Builtin.NativeObject
   %45 = struct_extract %40 : $UnsafeMutablePointer<My2dArray<MyInt>>, #UnsafeMutablePointer._rawValue
   %46 = pointer_to_address %45 : $Builtin.RawPointer to $*My2dArray<MyInt>
   %47 = mark_dependence %46 : $*My2dArray<MyInt> on %44 : $Optional<Builtin.NativeObject>
@@ -907,7 +907,7 @@ bb6(%23 : $Builtin.Int64):
   %65 = struct_element_addr %64 : $*_MyBridgeStorage, #_MyBridgeStorage.rawValue
   %66 = load %65 : $*Builtin.BridgeObject
   %67 = unchecked_ref_cast %66 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %68 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %67 : $Builtin.NativeObject
+  %68 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %67 : $Builtin.NativeObject
   %69 = struct_extract %61 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %70 = pointer_to_address %69 : $Builtin.RawPointer to $*MyInt
   %71 = mark_dependence %70 : $*MyInt on %68 : $Optional<Builtin.NativeObject>
@@ -987,7 +987,7 @@ bb6(%23 : $Builtin.Int64):
   strong_release %38 : $Builtin.BridgeObject
   %42 = load %18 : $*Builtin.BridgeObject
   %43 = unchecked_ref_cast %42 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %44 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %43 : $Builtin.NativeObject
+  %44 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %43 : $Builtin.NativeObject
   %45 = struct_extract %40 : $UnsafeMutablePointer<My2dArray<MyInt>>, #UnsafeMutablePointer._rawValue
   %46 = pointer_to_address %45 : $Builtin.RawPointer to $*My2dArray<MyInt>
   %47 = mark_dependence %46 : $*My2dArray<MyInt> on %44 : $Optional<Builtin.NativeObject>
@@ -1011,7 +1011,7 @@ bb6(%23 : $Builtin.Int64):
   %65 = struct_element_addr %64 : $*_MyBridgeStorage, #_MyBridgeStorage.rawValue
   %66 = load %65 : $*Builtin.BridgeObject
   %67 = unchecked_ref_cast %66 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %68 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %67 : $Builtin.NativeObject
+  %68 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %67 : $Builtin.NativeObject
   %69 = struct_extract %61 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %70 = pointer_to_address %69 : $Builtin.RawPointer to $*MyInt
   %71 = mark_dependence %70 : $*MyInt on %68 : $Optional<Builtin.NativeObject>
@@ -1209,7 +1209,7 @@ bb2(%27 : $Builtin.Int64):
   %66 = struct_extract %65 : $_My2dArrayBuffer<My2dArray<MyInt>>, #_My2dArrayBuffer._storage
   %67 = struct_extract %66 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
   %72 = unchecked_ref_cast %67 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %73 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %72 : $Builtin.NativeObject
+  %73 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %72 : $Builtin.NativeObject
   %74 = struct_extract %63 : $UnsafeMutablePointer<My2dArray<MyInt>>, #UnsafeMutablePointer._rawValue
   %75 = pointer_to_address %74 : $Builtin.RawPointer to $*My2dArray<MyInt>
   %76 = mark_dependence %75 : $*My2dArray<MyInt> on %73 : $Optional<Builtin.NativeObject>
@@ -1221,7 +1221,7 @@ bb2(%27 : $Builtin.Int64):
   %87 = struct_extract %86 : $_My2dArrayBuffer<MyInt>, #_My2dArrayBuffer._storage
   %88 = struct_extract %87 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
   %93 = unchecked_ref_cast %88 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %94 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %93 : $Builtin.NativeObject
+  %94 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %93 : $Builtin.NativeObject
   %95 = struct_extract %84 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %96 = pointer_to_address %95 : $Builtin.RawPointer to $*MyInt
   %97 = mark_dependence %96 : $*MyInt on %94 : $Optional<Builtin.NativeObject>
@@ -1299,7 +1299,7 @@ bb2(%27 : $Builtin.Int64):
   %66 = struct_extract %65 : $_My2dArrayBuffer<My2dArray<MyInt>>, #_My2dArrayBuffer._storage
   %67 = struct_extract %66 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
   %72 = unchecked_ref_cast %67 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %73 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %72 : $Builtin.NativeObject
+  %73 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %72 : $Builtin.NativeObject
   %74 = struct_extract %63 : $UnsafeMutablePointer<My2dArray<MyInt>>, #UnsafeMutablePointer._rawValue
   %75 = pointer_to_address %74 : $Builtin.RawPointer to $*My2dArray<MyInt>
   %76 = mark_dependence %75 : $*My2dArray<MyInt> on %73 : $Optional<Builtin.NativeObject>
@@ -1311,7 +1311,7 @@ bb2(%27 : $Builtin.Int64):
   %87 = struct_extract %86 : $_My2dArrayBuffer<MyInt>, #_My2dArrayBuffer._storage
   %88 = struct_extract %87 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
   %93 = unchecked_ref_cast %88 : $Builtin.BridgeObject to $Builtin.NativeObject
-  %94 = enum $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1, %93 : $Builtin.NativeObject
+  %94 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %93 : $Builtin.NativeObject
   %95 = struct_extract %84 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %96 = pointer_to_address %95 : $Builtin.RawPointer to $*MyInt
   %97 = mark_dependence %96 : $*MyInt on %94 : $Optional<Builtin.NativeObject>

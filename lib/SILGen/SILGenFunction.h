@@ -1383,11 +1383,11 @@ public:
                                         SILFunctionTypeRepresentation srcRep,
                                         CanType nativeTy);
 
-  /// Convert a bridged error type to the native Swift ErrorType
+  /// Convert a bridged error type to the native Swift ErrorProtocol
   /// representation.  The value may be optional.
   ManagedValue emitBridgedToNativeError(SILLocation loc, ManagedValue v);
 
-  /// Convert a value in the native Swift ErrorType representation to
+  /// Convert a value in the native Swift ErrorProtocol representation to
   /// a bridged error type representation.
   ManagedValue emitNativeToBridgedError(SILLocation loc, ManagedValue v,
                                         CanType bridgedType);

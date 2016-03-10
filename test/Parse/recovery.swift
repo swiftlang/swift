@@ -204,18 +204,18 @@ for{{ // expected-error {{expression resolves to an unused function}}
 }
 
 func missingControllingExprInForEach() {
-  for in { // expected-error {{expected pattern}} expected-error {{expected SequenceType expression for for-each loop}}
+  for in { // expected-error {{expected pattern}} expected-error {{expected Sequence expression for for-each loop}}
   }
 
 
   // expected-error @+4 {{expected 'in' after for-each pattern}}
   // expected-error @+3 {{expected '{' to start the body of for-each loop}}
   // expected-error @+2 {{expected pattern}}
-  // expected-error @+1 {{expected SequenceType expression for for-each loop}}
-  for for in { // expected-error {{expected pattern}} expected-error {{expected SequenceType expression for for-each loop}}
+  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  for for in { // expected-error {{expected pattern}} expected-error {{expected Sequence expression for for-each loop}}
   }
 
-  for i in { // expected-error {{expected SequenceType expression for for-each loop}}
+  for i in { // expected-error {{expected Sequence expression for for-each loop}}
   }
 }
 

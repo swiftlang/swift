@@ -1749,14 +1749,14 @@ namespace {
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinUTF16StringLiteral,
-                         tc.Context.getIdentifier("numberOfCodeUnits") });
+                         tc.Context.getIdentifier("utf16CodeUnitCount") });
 
           elements.push_back(
             TupleTypeElt(tc.Context.TheRawPointerType,
                          tc.Context.Id_builtinUTF16StringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                         tc.Context.getIdentifier("numberOfCodeUnits")));
+                         tc.Context.getIdentifier("utf16CodeUnitCount")));
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF16);
           else
@@ -1769,13 +1769,13 @@ namespace {
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinStringLiteral,
-                         tc.Context.getIdentifier("byteSize"),
+                         tc.Context.getIdentifier("utf8CodeUnitCount"),
                          tc.Context.getIdentifier("isASCII") });
           elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType,
                                          tc.Context.Id_builtinStringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                         tc.Context.getIdentifier("byteSize")));
+                         tc.Context.getIdentifier("utf8CodeUnitCount")));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
                          tc.Context.getIdentifier("isASCII")));
@@ -1794,7 +1794,7 @@ namespace {
         builtinLiteralFuncName
           = DeclName(tc.Context, tc.Context.Id_init,
                      { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
-                       tc.Context.getIdentifier("byteSize"),
+                       tc.Context.getIdentifier("utf8CodeUnitCount"),
                        tc.Context.getIdentifier("isASCII") });
 
         builtinProtocol = tc.getProtocol(
@@ -1805,7 +1805,7 @@ namespace {
                        tc.Context.Id_builtinExtendedGraphemeClusterLiteral));
         elements.push_back(
           TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                       tc.Context.getIdentifier("byteSize")));
+                       tc.Context.getIdentifier("utf8CodeUnitCount")));
         elements.push_back(
           TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
                        tc.Context.getIdentifier("isASCII")));
@@ -4911,8 +4911,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::BridgeToNSError: {
-      // Tell the ErrorType to become an NSError, using _bridgeErrorTypeToNSError.
-      auto fn = tc.Context.getBridgeErrorTypeToNSError(&tc);
+      // Tell the ErrorProtocol to become an NSError, using
+      // _bridgeErrorProtocolToNSError.
+      auto fn = tc.Context.getBridgeErrorProtocolToNSError(&tc);
       if (!fn) {
         tc.diagnose(expr->getLoc(), diag::missing_nserror_bridging_function);
         return nullptr;
@@ -4928,9 +4929,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
       
-      // The return type of _bridgeErrorTypeToNSError is formally 'AnyObject' to
-      // avoid stdlib-to-Foundation dependencies, but it's really NSError.
-      // Abuse CovariantReturnConversionExpr to fix this.
+      // The return type of _bridgeErrorProtocolToNSError is formally
+      // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's really
+      // NSError.  Abuse CovariantReturnConversionExpr to fix this.
       return new (tc.Context) CovariantReturnConversionExpr(call, toType);
     }
 
@@ -5849,7 +5850,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   
   if (!resolved->getPath().empty()) {
     // We allow OptionalToBoolean fixes with an opened type to refer to the
-    // BooleanType conformance.
+    // Boolean conformance.
     if (fix.first.getKind() == FixKind::OptionalToBoolean &&
         resolved->getPath().size() == 1 &&
         resolved->getPath()[0].getKind() == ConstraintLocator::OpenedGeneric)
@@ -6425,7 +6426,7 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) 
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
-                                 KnownProtocolKind::BooleanType),
+                                 KnownProtocolKind::Boolean),
                   tc.Context.Id_boolValue,
                   tc.Context.Id_getBuiltinLogicValue,
                   diag::condition_broken_proto,
@@ -6446,7 +6447,7 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
 
   // Find the library intrinsic.
   auto &ctx = tc.Context;
-  auto *fn = ctx.getDoesOptionalHaveValueAsBoolDecl(&tc, OTK_Optional);
+  auto *fn = ctx.getOptionalIsSomeDecl(&tc, OTK_Optional);
   tc.validateDecl(fn);
 
   // Form a reference to the function. This library intrinsic is generic, so we

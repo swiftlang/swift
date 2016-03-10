@@ -185,8 +185,8 @@ state.
       var storage: ArrayStorage
 
       @preserve_unique
-      mutating func replaceRange<
-        C: CollectionType where C.Generator.Element == T
+      mutating func replaceSubrange<
+        C : CollectionType where C.Iterator.Element == T
       >(
         subRange: Range<Int>, with newElements: C
       ) { ... }
@@ -203,7 +203,7 @@ state.
   Note: In terms of low-level SIL attributes such a method will be marked:::
 
     @self_effects(preserve_unique, nocapture, norelease)
-    func replaceRange<> {}
+    func replaceSubrange<> {}
 
 ``@get_subobject``
 
@@ -342,8 +342,8 @@ state.
       var storage: ArrayStorage
 
       @set_subobject
-      func setElement(elt: T, atIndex: Int) {
-        storage.set(elt, atIndex)
+      func setElement(elt: T, at index: Int) {
+        storage.set(elt, index)
       }
     }
 
@@ -413,7 +413,7 @@ It will see the following calls because methods with attributes are not inlined.
     for i in 0 .. A.size {
       makeUnique(&A)
       addr = getElementAddr(i, &A)
-      addr.memory = value
+      addr.pointee = value
       f()
     }
   }

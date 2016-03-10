@@ -50,17 +50,17 @@ public struct BasStruct : Bassable {
 
 prefix operator ~~~ {}
 
-public protocol _CyclicAssociatedType {
+public protocol _CyclicAssociated {
   typealias Assoc = CyclicImpl
 }
 
-public protocol CyclicAssociatedType : _CyclicAssociatedType {
+public protocol CyclicAssociated : _CyclicAssociated {
   prefix func ~~~(_: Self.Type)
 }
 
-prefix public func ~~~ <T: _CyclicAssociatedType>(_: T.Type) {}
+prefix public func ~~~ <T: _CyclicAssociated>(_: T.Type) {}
 
-public struct CyclicImpl : CyclicAssociatedType {
+public struct CyclicImpl : CyclicAssociated {
   public typealias Assoc = CyclicImpl
   public init() {}
 }

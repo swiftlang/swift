@@ -1,5 +1,5 @@
-// Adopt ForwardIndexType via BidirectionalIndexType.
-public struct Counter<T: protocol<RandomAccessIndexType, IntegerLiteralConvertible>> : BidirectionalIndexType {
+// Adopt ForwardIndex via BidirectionalIndex.
+public struct Counter<T: protocol<RandomAccessIndex, IntegerLiteralConvertible>> : BidirectionalIndex {
   public var value = 0
   
   public func predecessor() -> Counter {

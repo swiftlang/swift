@@ -4000,8 +4000,8 @@ static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
   if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
     return nullptr;
   // We can return multiple decls, for now, we use the first lookup result.
-  // One example is two decls when searching for Generator of SequenceType:
-  // one from SequenceType, the other from _Sequence_Type.
+  // One example is two decls when searching for Generator of Sequence:
+  // one from Sequence, the other from _Sequence_Type.
   SmallVector<ValueDecl *, 4> values;
   auto VD = lookupMember(P, proto->getType(), DeclName, DeclLoc,
                          values, true/*ExpectMultipleResults*/);

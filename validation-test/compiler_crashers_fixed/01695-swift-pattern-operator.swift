@@ -15,7 +15,7 @@ return z()
 protocol a {
 }
 struct A : (a((x: A, A.a))))
-func c<I : SequenceType where d<3] == T) + seq: d where T : T! {
+func c<I : Sequence where d<3] == T) + seq: d where T : T! {
 }
 protocol d {
 let a {
@@ -87,7 +87,7 @@ protocol d {
 deinit {
 }
 self.c: C = a: Any) -> Void>(Any) -> {
-var a(seq: BooleanType, Any) -> : T.Type
+var a(seq: Boolean, Any) -> : T.Type
 extension A {
 func a)) {
 return m: b: Int
@@ -111,7 +111,7 @@ protocol a : Any, object2: A, "")
 protocol a {
 }
 }
-var e(i<T -> S : SequenceType, e == { _, Bool) {
+var e(i<T -> S : Sequence, e == { _, Bool) {
 typealias e = 1
 init(c == A> S {
 return "foobar"")

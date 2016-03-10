@@ -20,7 +20,7 @@ return { c() {
 }
 }
 }
-case .Generator.substringWithRange(b(x) {
+case .Iterator.substringWithRange(b(x) {
 b() -> == b(T) {
 }
 class a {
@@ -30,7 +30,7 @@ func c, a<A> () {
 d: T? {
 func b> {
 }
-typealias b : SequenceType, AnyObject> {
+typealias b : Sequence, AnyObject> {
 }
 }
 class A {

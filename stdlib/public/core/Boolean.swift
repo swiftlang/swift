@@ -9,12 +9,12 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// BooleanType
+// Boolean
 //===----------------------------------------------------------------------===//
 
 /// Returns the result of inverting `a`'s logic value.
 @warn_unused_result
-public prefix func !<T : BooleanType>(a: T) -> Bool {
+public prefix func !<T : Boolean>(a: T) -> Bool {
   return !a.boolValue
 }
 
@@ -22,7 +22,7 @@ public prefix func !<T : BooleanType>(a: T) -> Bool {
 /// return its `boolValue`.
 @inline(__always)
 @warn_unused_result
-public func && <T : BooleanType, U : BooleanType>(
+public func && <T : Boolean, U : Boolean>(
   lhs: T, @autoclosure rhs: () throws -> U
 ) rethrows -> Bool {
   return lhs.boolValue ? try rhs().boolValue : false
@@ -32,7 +32,7 @@ public func && <T : BooleanType, U : BooleanType>(
 /// return its `boolValue`.
 @inline(__always)
 @warn_unused_result
-public func || <T : BooleanType, U : BooleanType>(
+public func || <T : Boolean, U : Boolean>(
   lhs: T, @autoclosure rhs: () throws -> U
 ) rethrows -> Bool {
   return lhs.boolValue ? true : try rhs().boolValue
@@ -43,7 +43,7 @@ public func || <T : BooleanType, U : BooleanType>(
 // for Bool.  We've done the same for ObjCBool
 @_transparent
 @warn_unused_result
-public func && <T : BooleanType>(
+public func && <T : Boolean>(
   lhs: T, @autoclosure rhs: () throws -> Bool
 ) rethrows -> Bool {
   return lhs.boolValue ? try rhs().boolValue : false
@@ -51,7 +51,7 @@ public func && <T : BooleanType>(
 
 @_transparent
 @warn_unused_result
-public func || <T : BooleanType>(
+public func || <T : Boolean>(
   lhs: T, @autoclosure rhs: () throws -> Bool
 ) rethrows -> Bool {
   return lhs.boolValue ? true : try rhs().boolValue

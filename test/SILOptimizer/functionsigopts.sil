@@ -207,12 +207,12 @@ bb0(%0 : $boo):
 
 // Make sure we do not move the retain_value in the throw block.
 //
-// CHECK-LABEL: sil [fragile] [thunk] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorType) {
-// CHECK: function_ref @_TTSf4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorType)
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol) {
+// CHECK: function_ref @_TTSf4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorProtocol)
 // CHECK: bb1
 // CHECK-NOT retain_value
 // CHECK: bb2
-sil [fragile] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorType) {
+sil [fragile] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol) {
 bb0(%0 : $boo):
   cond_br undef, bb1, bb2
 
@@ -222,7 +222,7 @@ bb1:
 
 bb2:
   retain_value %0 : $boo
-  throw undef : $ErrorType
+  throw undef : $ErrorProtocol
 }
 
 // CHECK-LABEL: sil [fragile] [thunk] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
@@ -396,14 +396,14 @@ bb2:
   br bb3
 
 bb3:
-  %2 = function_ref @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorType), normal bb4, error bb5
+  %2 = function_ref @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol), normal bb4, error bb5
 
 bb4(%99 : $boo):
   %4 = tuple()
   return %4 : $()
 
-bb5(%100 : $ErrorType):
+bb5(%100 : $ErrorProtocol):
   unreachable
 }
 
@@ -437,16 +437,16 @@ bb0(%0 : $boo):
 //========================================
 // @owned => @guaranteed with error result
 
-// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
 // CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
 // CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
 // CHECK-NEXT: release_value
 // CHECK-NEXT: return [[NORMRET]]
-// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorType):
+// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorProtocol):
 // CHECK-NEXT: release_value
 // CHECK-NEXT: throw [[THROW]]
-sil [fragile] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+sil [fragile] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
 bb0(%0 : $Builtin.NativeObject, %1 : $Int):
   %f1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
   apply %f1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
@@ -458,28 +458,28 @@ bb1:
 
 bb2:
   release_value %0 : $Builtin.NativeObject
-  throw undef : $ErrorType
+  throw undef : $ErrorProtocol
 }
 
-// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
 // CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
 // CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
 // CHECK-NEXT: release_value
 // CHECK-NEXT: return [[NORMRET]]
-// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorType):
+// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorProtocol):
 // CHECK-NEXT: release_value
 // CHECK-NEXT: throw [[THROW]]
-sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
 bb0(%0 : $Builtin.NativeObject, %1 : $Int):
-  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType)
-  try_apply %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType), normal bb1, error bb2
+  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol)
+  try_apply %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%a1 : $Int):
   return %a1 : $Int
 
-bb2(%a2 : $ErrorType):
-  throw %a2 : $ErrorType
+bb2(%a2 : $ErrorProtocol):
+  throw %a2 : $ErrorProtocol
 }
 
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
@@ -489,8 +489,8 @@ bb2(%a2 : $ErrorType):
 // CHECK-NEXT: return [[NORMRET]]
 sil [fragile] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
 bb0(%0 : $Builtin.NativeObject, %1 : $Int):
-  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType)
-  %r1 = apply [nothrow] %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType)
+  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol)
+  %r1 = apply [nothrow] %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol)
   return %r1 : $Int
 }
 
@@ -781,7 +781,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK: retain_value
 // CHECK: release_value
 
-// CHECK-LABEL: @_TTSf4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorType) {
+// CHECK-LABEL: @_TTSf4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorProtocol) {
 // CHECK: bb2
 // CHECK: retain_value
 // CHECK: throw
@@ -806,7 +806,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: sil private [fragile] @_TTSf4d_n__private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0(
 
-// CHECK-LABEL: sil [fragile] @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+// CHECK-LABEL: sil [fragile] @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
 // CHECK-NOT: release
 // CHECK: throw
 

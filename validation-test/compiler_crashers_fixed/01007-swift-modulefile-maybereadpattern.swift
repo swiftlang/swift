@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-var a: B<d where d<b: T : b: A> (mx : CollectionType where k.init([Byte])
+var a: B<d where d<b: T : b: A> (mx : Collection where k.init([Byte])
 class B {
 var e<U {
 }

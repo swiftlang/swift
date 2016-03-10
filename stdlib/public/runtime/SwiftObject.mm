@@ -520,7 +520,7 @@ void swift::swift_unknownRelease(void *object)
 /// Return true iff the given BridgeObject is not known to use native
 /// reference-counting.
 ///
-/// Requires: object does not encode a tagged pointer
+/// Precondition: object does not encode a tagged pointer
 static bool isNonNative_unTagged_bridgeObject(void *object) {
   static_assert((heap_object_abi::SwiftSpareBitsMask & objectPointerIsObjCBit) ==
                 objectPointerIsObjCBit,
@@ -532,7 +532,7 @@ static bool isNonNative_unTagged_bridgeObject(void *object) {
 // Mask out the spare bits in a bridgeObject, returning the object it
 // encodes.
 ///
-/// Requires: object does not encode a tagged pointer
+/// Precondition: object does not encode a tagged pointer
 static void* toPlainObject_unTagged_bridgeObject(void *object) {
   return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
 }

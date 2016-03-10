@@ -1749,7 +1749,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // The expression type must conform to the Sequence.
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *sequenceProto
-        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::SequenceType);
+        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::Sequence);
       if (!sequenceProto) {
         return true;
       }
@@ -1763,7 +1763,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       auto generatorLocator =
         cs.getConstraintLocator(Locator,
-                                ConstraintLocator::SequenceGeneratorType);
+                                ConstraintLocator::SequenceIteratorProtocol);
       auto elementLocator =
         cs.getConstraintLocator(generatorLocator,
                                 ConstraintLocator::GeneratorElementType);
@@ -1776,6 +1776,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       
       // Manually search for the generator witness. If no generator/element pair
       // exists, solve for them.
+      // FIXME: rename generatorType to iteratorType due to the protocol
+      // renaming
       Type generatorType;
       Type elementType;
       
@@ -1784,7 +1786,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         lookupOptions |= NameLookupFlags::KnownPrivate;
       auto member = cs.TC.lookupMemberType(cs.DC,
                                            expr->getType()->getRValueType(),
-                                           tc.Context.Id_Generator,
+                                           tc.Context.Id_Iterator,
                                            lookupOptions);
       
       if (member) {
@@ -1806,7 +1808,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         cs.addConstraint(Constraint::create(
                            cs, ConstraintKind::TypeMember,
                            SequenceType, generatorType,
-                           tc.Context.Id_Generator, generatorLocator));
+                           tc.Context.Id_Iterator, generatorLocator));
 
         // Determine the element type of the generator.
         // FIXME: Should look up the type witness.
@@ -1917,7 +1919,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // If this expression is already typechecked and has an i1 type, then it has
-  // already got its conversion from BooleanType back to i1.  Just re-typecheck
+  // already got its conversion from Boolean back to i1.  Just re-typecheck
   // it.
   if (expr->getType() && expr->getType()->isBuiltinIntegerType(1))
     return typeCheckExpression(expr, dc);
@@ -1927,22 +1929,22 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     Expr *OrigExpr = nullptr;
 
   public:
-    // Add the appropriate BooleanType constraint.
+    // Add the appropriate Boolean constraint.
     virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the original expression.
       OrigExpr = expr;
       
-      // Otherwise, the result must be a BooleanType.
+      // Otherwise, the result must be a Boolean.
       auto &tc = cs.getTypeChecker();
       auto logicValueProto = tc.getProtocol(expr->getLoc(),
-                                            KnownProtocolKind::BooleanType);
+                                            KnownProtocolKind::Boolean);
       if (!logicValueProto)
         return true;
 
       auto logicValueType = logicValueProto->getDeclaredType();
 
-      // We use SelfObjectOfProtocol because an existential BooleanType is
-      // allowed as a condition, but BooleanType is not self-conforming.
+      // We use SelfObjectOfProtocol because an existential Boolean is
+      // allowed as a condition, but Boolean is not self-conforming.
       cs.addConstraint(ConstraintKind::SelfObjectOfProtocol,
                        expr->getType(), logicValueType,
                        cs.getConstraintLocator(OrigExpr), /*isFavored*/true);
@@ -2725,16 +2727,17 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  // We can conditionally cast from NSError to an ErrorType-conforming type.
-  // This is handled in the runtime, so it doesn't need a special cast kind.
-  if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::ErrorType)) {
+  // We can conditionally cast from NSError to an ErrorProtocol-conforming
+  // type.  This is handled in the runtime, so it doesn't need a special cast
+  // kind.
+  if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::ErrorProtocol)) {
     if (conformsToProtocol(toType, errorTypeProto, dc,
                            (ConformanceCheckFlags::InExpression|
                             ConformanceCheckFlags::Used)))
       if (auto NSErrorTy = getNSErrorType(dc))
         if (isSubtypeOf(fromType, NSErrorTy, dc)
-            // Don't mask "always true" warnings if NSError is cast to ErrorType
-            // itself.
+            // Don't mask "always true" warnings if NSError is cast to
+            // ErrorProtocol itself.
             && !isSubtypeOf(fromType, toType, dc))
           return CheckedCastKind::ValueCast;
   }

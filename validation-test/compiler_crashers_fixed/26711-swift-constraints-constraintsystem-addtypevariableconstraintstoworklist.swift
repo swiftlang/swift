@@ -4,7 +4,7 @@
 // Test case found by fuzzing
 
 let a{
-struct B:CollectionType
-class A:CollectionType func a{{{{
+struct B:Collection
+class A:Collection func a{{{{
 }
 }{

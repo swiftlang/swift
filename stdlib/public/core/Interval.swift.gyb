@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An interval over a `Comparable` type.
-public protocol IntervalType {
+public protocol Interval {
   /// The type of the `Interval`'s endpoints.
   associatedtype Bound : Comparable
 
@@ -46,9 +46,9 @@ public protocol IntervalType {
 
 %{
 selfDocComment = """
-/// A half-open `IntervalType`, which contains its `start` but not its
+/// A half-open `Interval`, which contains its `start` but not its
 /// `end`.  Can represent an empty interval.""" if Kind == 'HalfOpen' else """
-/// A closed `IntervalType`, which contains both its `start` and its
+/// A closed `Interval`, which contains both its `start` and its
 /// `end`.  Cannot represent an empty interval."""
 
 selfDocComment += """
@@ -58,11 +58,8 @@ selfDocComment += """
 
 ${selfDocComment}
 public struct ${Self}<Bound : Comparable>
-  : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible,
+  : Interval, Equatable, CustomStringConvertible, CustomDebugStringConvertible,
   CustomReflectable, CustomPlaygroundQuickLookable {
-
-  @available(*, unavailable, renamed="Bound")
-  public typealias T = Bound
 
   /// Construct a copy of `x`.
   public init(_ x: ${Self}) {
@@ -73,11 +70,11 @@ public struct ${Self}<Bound : Comparable>
 
   /// Construct an interval with the given bounds.
   ///
-  /// - Requires: `start <= end`.
-  public init(_ start: Bound, _ end: Bound) {
-    _precondition(end >= start, "Invalid ${Self} bounds (end < start)")
-    _start = start
-    _end = end
+  /// - Precondition: `start <= end`.
+  internal init(_start: Bound, end: Bound) {
+    _precondition(end >= _start, "Invalid ${Self} bounds (end < start)")
+    self._start = _start
+    self._end = end
   }
 
   /// The `Interval`'s lower bound.
@@ -116,13 +113,13 @@ public struct ${Self}<Bound : Comparable>
   /// `self`.
   @warn_unused_result
   public func clamp(intervalToClamp: ${Self}) -> ${Self} {
-
     return ${Self}(
-      self.start > intervalToClamp.start ? self.start
+      _start:
+        self.start > intervalToClamp.start ? self.start
         : self.end < intervalToClamp.start ? self.end
         : intervalToClamp.start,
-
-      self.end < intervalToClamp.end ? self.end
+      end:
+        self.end < intervalToClamp.end ? self.end
         : self.start > intervalToClamp.end ? self.start
         : intervalToClamp.end
     )
@@ -130,12 +127,12 @@ public struct ${Self}<Bound : Comparable>
 
 
   /// Returns a mirror that reflects `self`.
-  public func customMirror() -> Mirror {
-    return Mirror(self, children: ["start": start, "end": end])
+  public var customMirror: Mirror {
+    return Mirror(self, children: ["start": _start, "end": _end])
   }
 
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .Text(description)
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(description)
   }
 
   internal var _start: Bound
@@ -166,22 +163,15 @@ extension ClosedInterval {
   }
 }
 
-extension IntervalType {
+extension Interval {
   /// Returns `true` iff `lhs` and `rhs` have a non-empty intersection.
   @warn_unused_result
   public func overlaps<
-    I: IntervalType where I.Bound == Bound
+    I: Interval where I.Bound == Bound
   >(other: I) -> Bool {
     return (!other.isEmpty && contains(other.start))
       || (!isEmpty && other.contains(start))
   }
-}
-
-@available(*, unavailable, message="call the 'overlaps(other)' method on the interval")
-public func overlaps<
-  I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
->(lhs: I0, _ rhs: I1) -> Bool {
-  fatalError("unavailable function can't be called")
 }
 
 /// Returns a half-open interval from `start` to `end`.
@@ -189,7 +179,7 @@ public func overlaps<
 public func ..< <Bound : Comparable>(
   start: Bound, end: Bound
 ) -> HalfOpenInterval<Bound> {
-  return HalfOpenInterval(start, end)
+  return HalfOpenInterval(_start: start, end: end)
 }
 
 /// Returns a closed interval from `start` through `end`.
@@ -197,11 +187,29 @@ public func ..< <Bound : Comparable>(
 public func ... <Bound : Comparable>(
   start: Bound, end: Bound
 ) -> ClosedInterval<Bound> {
-  return ClosedInterval(start, end)
+  return ClosedInterval(_start: start, end: end)
 }
 
 /// Returns `true` iff `pattern` contains `value`.
 @warn_unused_result
-public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
+public func ~= <I: Interval>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)
 }
+
+@available(*, unavailable, renamed="Interval")
+public typealias IntervalType = Interval
+
+extension HalfOpenInterval {
+  @available(*, unavailable, message="Please use the '..<' operator instead.")
+  public init(_ start: Bound, _ end: Bound) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension ClosedInterval {
+  @available(*, unavailable, message="Please use the '...' operator instead.")
+  public init(_ start: Bound, _ end: Bound) {
+    fatalError("unavailable function can't be called")
+  }
+}
+

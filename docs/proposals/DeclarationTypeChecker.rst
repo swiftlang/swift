@@ -80,7 +80,7 @@ We can address this problem by restricting the language to disallow extensions v
 
   protocol SequenceType {
     typealias Element
-    mutating func generate() -> Element?
+    mutating func makeIterator() -> Element?
   }
 
   struct IntRangeGenerator : SequenceType {
@@ -88,7 +88,7 @@ We can address this problem by restricting the language to disallow extensions v
     let limit: Int
 
     // infers SequenceType's Element == Int
-    mutating func generate() -> Int? {
+    mutating func makeIterator() -> Int? {
       if current == limit { return nil }
       return current++
     }

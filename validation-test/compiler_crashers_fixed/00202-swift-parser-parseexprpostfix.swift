@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func c<b:c
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }

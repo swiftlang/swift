@@ -9,5 +9,5 @@ func c) -> {
 private class b> == "A> A {
 }
 class A {
-struct X<h : SequenceType where h: d where T -> {
+struct X<h : Sequence where h: d where T -> {
 let f = c()

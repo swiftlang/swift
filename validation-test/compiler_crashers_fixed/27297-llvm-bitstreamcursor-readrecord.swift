@@ -19,14 +19,14 @@ class
 class d {
 c,
 class
-class b: T where I. : S<T where g:BooleanType:d}}
+class b: T where I. : S<T where g:Boolean:d}}
 typealias e {
 a {
 func < {
 struct b
 }
 class d {
-struct S<T where B : BooleanType, A {
+struct S<T where B : Boolean, A {
 class c : A<T where I.h =b{
 class
 ) )b {
@@ -81,13 +81,13 @@ if true{
 var b {func e {
 class C<T](")
 class d
-var e: BooleanType:A<T where B : T.h =
+var e: Boolean:A<T where B : T.h =
 protocol a d}{ }
 {
 { }t
 case c,case
 }
-typealias e : T.E === e: BooleanType, A {class d:T.h =
+typealias e : T.E === e: Boolean, A {class d:T.h =
 let
 struct S<T](", A {
 class
@@ -108,7 +108,7 @@ b{
 class d = e
 class c : A<T{
 struct ( e: a {{
-func g:BooleanType:d
+func g:Boolean:d
 {
 struct S<T where g:d
 let
@@ -117,7 +117,7 @@ case
 var a== e: T where I.h == e: A<T where g:b {
 }
 {
-let t: BooleanType, A {
+let t: Boolean, A {
 }
 struct Q<g where B =b{
 let a{

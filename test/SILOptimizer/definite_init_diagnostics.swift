@@ -1133,13 +1133,13 @@ extension ProtocolInitTest {
   }
 
   init(test2 ii: Int) {
-    self = unsafeBitCast(0, Self.self)
+    self = unsafeBitCast(0, to: Self.self)
     i = ii
   }
 
   init(test3 ii: Int) {
     i = ii                // expected-error {{'self' used before chaining to another self.init requirement}}
-    self = unsafeBitCast(0, Self.self)
+    self = unsafeBitCast(0, to: Self.self)
   }
 
   init(test4 ii: Int) {

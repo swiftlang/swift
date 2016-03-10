@@ -72,7 +72,7 @@ func testBindExistential() {
 protocol Mine {}
 class M1: Mine {}
 class M2: Mine {}
-extension CollectionType where Generator.Element : Mine {
+extension Collection where Iterator.Element : Mine {
     final func takeAll() {}
 }
 

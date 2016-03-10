@@ -24,10 +24,10 @@ func f<g : d {
   enum g {
         func g
         var _ = g
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+f(true as Boolean)
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 var f = 1
 var e: Int -> Int = {
     return $0

@@ -13,27 +13,26 @@
 /// A collection on which normally-eager operations such as `map` and
 /// `filter` are implemented lazily.
 ///
-/// Please see `LazySequenceType` for background; `LazyCollectionType`
+/// Please see `LazySequenceProtocol` for background; `LazyCollectionProtocol`
 /// is an analogous component, but for collections.
 ///
 /// To add new lazy collection operations, extend this protocol with
 /// methods that return lazy wrappers that are themselves
-/// `LazyCollectionType`s.
+/// `LazyCollectionProtocol`s.
 ///
-/// - See Also: `LazySequenceType`, `LazyCollection`
-public protocol LazyCollectionType
-  : CollectionType, LazySequenceType {
-  /// A `CollectionType` that can contain the same elements as this one,
+/// - See Also: `LazySequenceProtocol`, `LazyCollection`
+public protocol LazyCollectionProtocol
+  : Collection, LazySequenceProtocol {
+  /// A `Collection` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  associatedtype Elements: CollectionType = Self
-
+  associatedtype Elements : Collection = Self
 }
 
 /// When there's no special associated `Elements` type, the `elements`
 /// property is provided.
-extension LazyCollectionType where Elements == Self {
+extension LazyCollectionProtocol where Elements == Self {
   /// Identical to `self`.
   public var elements: Self { return self }
 }
@@ -42,9 +41,9 @@ extension LazyCollectionType where Elements == Self {
 /// but on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
-/// - See also: `LazySequenceType`, `LazyCollection`
-public struct LazyCollection<Base : CollectionType>
-  : LazyCollectionType {
+/// - See also: `LazySequenceProtocol`, `LazyCollection`
+public struct LazyCollection<Base : Collection>
+  : LazyCollectionProtocol {
 
   /// The type of the underlying collection
   public typealias Elements = Base
@@ -60,8 +59,8 @@ public struct LazyCollection<Base : CollectionType>
   
   /// Construct an instance with `base` as its underlying Collection
   /// instance.
-  public init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   internal var _base: Base
@@ -69,38 +68,40 @@ public struct LazyCollection<Base : CollectionType>
 
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
-extension LazyCollection : SequenceType {
+extension LazyCollection : Sequence {
   
-  /// Returns a generator over the elements of this sequence.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Base.Generator { return _base.generate() }
+  public func makeIterator() -> Base.Iterator {
+    return _base.makeIterator()
+  }
   
   /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  public func underestimateCount() -> Int { return _base.underestimateCount() }
+  public var underestimatedCount: Int { return _base.underestimatedCount }
 
   public func _copyToNativeArrayBuffer() 
-     -> _ContiguousArrayBuffer<Base.Generator.Element> {
+     -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     return _base._copyToNativeArrayBuffer()
   }
   
-  public func _initializeTo(
-    ptr: UnsafeMutablePointer<Base.Generator.Element>
-  ) -> UnsafeMutablePointer<Base.Generator.Element> {
-    return _base._initializeTo(ptr)
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    return _base._copyContents(initializing: ptr)
   }
 
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
 }
 
-extension LazyCollection : CollectionType {
+extension LazyCollection : Collection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -119,9 +120,9 @@ extension LazyCollection : CollectionType {
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Base.Index) -> Base.Generator.Element {
+  public subscript(position: Base.Index) -> Base.Iterator.Element {
     return _base[position]
   }
 
@@ -130,7 +131,7 @@ extension LazyCollection : CollectionType {
   ///
   /// - Complexity: O(1)
   public subscript(bounds: Range<Index>) -> LazyCollection<Slice<Base>> {
-    return Slice(base: _base, bounds: bounds).lazy
+    return Slice(_base: _base, bounds: bounds).lazy
   }
   
   /// Returns `true` iff `self` is empty.
@@ -140,13 +141,13 @@ extension LazyCollection : CollectionType {
 
   /// Returns the number of elements.
   ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
   public var count: Index.Distance {
     return _base.count
   }
   
-  // The following requirement enables dispatching for indexOf when
+  // The following requirement enables dispatching for index(of:) when
   // the element type is Equatable.
   
   /// Returns `Optional(Optional(index))` if an element was found;
@@ -154,50 +155,38 @@ extension LazyCollection : CollectionType {
   ///
   /// - Complexity: O(N).
   public func _customIndexOfEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Index?? {
     return _base._customIndexOfEquatableElement(element)
   }
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
-  public var first: Base.Generator.Element? {
+  public var first: Base.Iterator.Element? {
     return _base.first
   }
-
-  @available(*, unavailable, renamed="Base")
-  public typealias S = Void
 }
 
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.
-extension CollectionType {
+extension Collection {
   /// A collection with contents identical to `self`, but on which
   /// normally-eager operations such as `map` and `filter` are
   /// implemented lazily.
   ///
-  /// - See Also: `LazySequenceType`, `LazyCollectionType`.
+  /// - See Also: `LazySequenceProtocol`, `LazyCollectionProtocol`.
   public var lazy: LazyCollection<Self> {
-    return LazyCollection(self)
+    return LazyCollection(_base: self)
   }
 }
 
-extension LazyCollectionType {
+extension LazyCollectionProtocol {
   /// Identical to `self`.
   public var lazy: Self { // Don't re-wrap already-lazy collections
     return self
   }
 }
 
-@available(*, unavailable, message="Please use the collection's '.lazy' property")
-public func lazy<Base : CollectionType>(s: Base) -> LazyCollection<Base> {
-  fatalError("unavailable")
-}
-
-@available(*, unavailable, renamed="LazyCollection")
-public struct LazyForwardCollection<T> {}
-@available(*, unavailable, renamed="LazyCollection")
-public struct LazyBidirectionalCollection<T> {}
-@available(*, unavailable, renamed="LazyCollection")
-public struct LazyRandomAccessCollection<T> {}
+@available(*, unavailable, renamed="LazyCollectionProtocol")
+public typealias LazyCollectionType = LazyCollectionProtocol
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

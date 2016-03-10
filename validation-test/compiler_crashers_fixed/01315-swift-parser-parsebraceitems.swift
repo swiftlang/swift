@@ -67,7 +67,7 @@ let a
 var b<T) -> Self {
 default:
 typealias B
-S.Generator.f : S<b(A(A>() -> T {
+S.Iterator.f : S<b(A(A>() -> T {
 protocol b {
 }
 init(#object1, k : AnyObject.c
@@ -84,7 +84,7 @@ class A {
 let h> {
 let h = Swift.advance(A, length: A<D> : B)
 var d {
-func f.Generator.A"
+func f.Iterator.A"
 func e<d<D>()
 }
 protocol a {
@@ -102,7 +102,7 @@ class A<T where T : String {
 func f: a {
 typealias b = b: d {
 }
-class B : SequenceType> ()
+class B : Sequence> ()
 }
 }
 }

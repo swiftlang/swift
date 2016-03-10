@@ -108,8 +108,8 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Set<T>.
   NominalTypeDecl *SetDecl = nullptr;
 
-  /// The declaration of Swift.SequenceType<T>.
-  NominalTypeDecl *SequenceTypeDecl = nullptr;
+  /// The declaration of Swift.Sequence<T>.
+  NominalTypeDecl *SequenceDecl = nullptr;
 
   /// The declaration of Swift.Dictionary<T>.
   NominalTypeDecl *DictionaryDecl = nullptr;
@@ -123,8 +123,8 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
 
-  /// The declaration of Swift.OptionSetType.
-  NominalTypeDecl *OptionSetTypeDecl = nullptr;
+  /// The declaration of Swift.OptionSet.
+  NominalTypeDecl *OptionSetDecl = nullptr;
 
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
   EnumElementDecl *ImplicitlyUnwrappedOptionalSomeDecl = nullptr;
@@ -160,11 +160,11 @@ struct ASTContext::Implementation {
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
-  /// func _doesOptionalHaveValueAsBool<T>(v: Optional<T>) -> Bool
-  FuncDecl *DoesOptionalHaveValueAsBoolDecls[NumOptionalTypeKinds] = {};
+  /// func _stdlib_Optional_isSome<T>(v: Optional<T>) -> Bool
+  FuncDecl *OptionalIsSomeSomeDecls[NumOptionalTypeKinds] = {};
 
-  /// func _getOptionalValue<T>(v : Optional<T>) -> T
-  FuncDecl *GetOptionalValueDecls[NumOptionalTypeKinds] = {};
+  /// func _stdlib_Optional_unwrapped<T>(v: Optional<T>) -> T
+  FuncDecl *OptionalUnwrappedDecls[NumOptionalTypeKinds] = {};
 
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.
   EnumDecl *ImplicitlyUnwrappedOptionalDecl = nullptr;
@@ -555,7 +555,7 @@ NominalTypeDecl *ASTContext::getStringDecl() const {
 }
 
 CanType ASTContext::getExceptionType() const {
-  if (auto exn = getExceptionTypeDecl()) {
+  if (auto exn = getErrorProtocolDecl()) {
     return exn->getDeclaredType()->getCanonicalType();
   } else {
     // Use Builtin.NativeObject just as a stand-in.
@@ -563,8 +563,8 @@ CanType ASTContext::getExceptionType() const {
   }
 }
 
-NominalTypeDecl *ASTContext::getExceptionTypeDecl() const {
-  return getProtocol(KnownProtocolKind::ErrorType);
+NominalTypeDecl *ASTContext::getErrorProtocolDecl() const {
+  return getProtocol(KnownProtocolKind::ErrorProtocol);
 }
 
 NominalTypeDecl *ASTContext::getArrayDecl() const {
@@ -579,10 +579,10 @@ NominalTypeDecl *ASTContext::getSetDecl() const {
   return Impl.SetDecl;
 }
 
-NominalTypeDecl *ASTContext::getSequenceTypeDecl() const {
-  if (!Impl.SequenceTypeDecl)
-    Impl.SequenceTypeDecl = findStdlibType(*this, "SequenceType", 1);
-  return Impl.SequenceTypeDecl;
+NominalTypeDecl *ASTContext::getSequenceDecl() const {
+  if (!Impl.SequenceDecl)
+    Impl.SequenceDecl = findStdlibType(*this, "Sequence", 1);
+  return Impl.SequenceDecl;
 }
 
 NominalTypeDecl *ASTContext::getDictionaryDecl() const {
@@ -610,11 +610,9 @@ EnumDecl *ASTContext::getOptionalDecl() const {
   return Impl.OptionalDecl;
 }
 
-static EnumElementDecl *findEnumElement(EnumDecl *e, StringRef name) {
-  if (!e) return nullptr;
-  auto ident = e->getASTContext().getIdentifier(name);
+static EnumElementDecl *findEnumElement(EnumDecl *e, Identifier name) {
   for (auto elt : e->getAllElements()) {
-    if (elt->getName() == ident)
+    if (elt->getName() == name)
       return elt;
   }
   return nullptr;
@@ -646,13 +644,13 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl(OptionalTypeKind kind) const {
 
 EnumElementDecl *ASTContext::getOptionalSomeDecl() const {
   if (!Impl.OptionalSomeDecl)
-    Impl.OptionalSomeDecl = findEnumElement(getOptionalDecl(), "Some");
+    Impl.OptionalSomeDecl = findEnumElement(getOptionalDecl(), Id_some);
   return Impl.OptionalSomeDecl;
 }
 
 EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
   if (!Impl.OptionalNoneDecl)
-    Impl.OptionalNoneDecl = findEnumElement(getOptionalDecl(), "None");
+    Impl.OptionalNoneDecl = findEnumElement(getOptionalDecl(), Id_none);
   return Impl.OptionalNoneDecl;
 }
 
@@ -668,21 +666,21 @@ EnumDecl *ASTContext::getImplicitlyUnwrappedOptionalDecl() const {
 EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalSomeDecl() const {
   if (!Impl.ImplicitlyUnwrappedOptionalSomeDecl)
     Impl.ImplicitlyUnwrappedOptionalSomeDecl =
-      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), "Some");
+      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), Id_some);
   return Impl.ImplicitlyUnwrappedOptionalSomeDecl;
 }
 
 EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
   if (!Impl.ImplicitlyUnwrappedOptionalNoneDecl)
     Impl.ImplicitlyUnwrappedOptionalNoneDecl =
-      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), "None");
+      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), Id_none);
   return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
 }
 
-NominalTypeDecl *ASTContext::getOptionSetTypeDecl() const {
-  if (!Impl.OptionSetTypeDecl)
-    Impl.OptionSetTypeDecl = findStdlibType(*this, "OptionSetType", 1);
-  return Impl.OptionSetTypeDecl;
+NominalTypeDecl *ASTContext::getOptionSetDecl() const {
+  if (!Impl.OptionSetDecl)
+    Impl.OptionSetDecl = findStdlibType(*this, "OptionSet", 1);
+  return Impl.OptionSetDecl;
 }
 
 NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
@@ -716,7 +714,7 @@ NominalTypeDecl *ASTContext::getUnmanagedDecl() const {
   return Impl.UnmanagedDecl;
 }
 
-static VarDecl *getMemoryProperty(VarDecl *&cache,
+static VarDecl *getPointeeProperty(VarDecl *&cache,
                            NominalTypeDecl *(ASTContext::*getNominal)() const,
                                   const ASTContext &ctx) {
   if (cache) return cache;
@@ -728,8 +726,8 @@ static VarDecl *getMemoryProperty(VarDecl *&cache,
   if (!generics) return nullptr;
   if (generics->size() != 1) return nullptr;
 
-  // There must be a property named "memory".
-  auto identifier = ctx.getIdentifier("memory");
+  // There must be a property named "pointee".
+  auto identifier = ctx.getIdentifier("pointee");
   auto results = nominal->lookupDirect(identifier);
   if (results.size() != 1) return nullptr;
 
@@ -744,18 +742,18 @@ static VarDecl *getMemoryProperty(VarDecl *&cache,
 }
 
 VarDecl *
-ASTContext::getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const {
+ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
   switch (ptrKind) {
   case PTK_UnsafeMutablePointer:
-    return getMemoryProperty(Impl.UnsafeMutablePointerMemoryDecl,
+    return getPointeeProperty(Impl.UnsafeMutablePointerMemoryDecl,
                              &ASTContext::getUnsafeMutablePointerDecl,
                              *this);
   case PTK_UnsafePointer:
-    return getMemoryProperty(Impl.UnsafePointerMemoryDecl,
+    return getPointeeProperty(Impl.UnsafePointerMemoryDecl,
                              &ASTContext::getUnsafePointerDecl,
                              *this);
   case PTK_AutoreleasingUnsafeMutablePointer:
-    return getMemoryProperty(Impl.AutoreleasingUnsafeMutablePointerMemoryDecl,
+    return getPointeeProperty(Impl.AutoreleasingUnsafeMutablePointerMemoryDecl,
                          &ASTContext::getAutoreleasingUnsafeMutablePointerDecl,
                              *this);
   }
@@ -1098,14 +1096,14 @@ static unsigned asIndex(OptionalTypeKind optionalKind) {
     ? (PREFIX "Optional" SUFFIX)                       \
     : (PREFIX "ImplicitlyUnwrappedOptional" SUFFIX))
 
-FuncDecl *ASTContext::getDoesOptionalHaveValueAsBoolDecl(
+FuncDecl *ASTContext::getOptionalIsSomeDecl(
     LazyResolver *resolver, OptionalTypeKind optionalKind) const {
-  auto &cache = Impl.DoesOptionalHaveValueAsBoolDecls[asIndex(optionalKind)];
+  auto &cache = Impl.OptionalIsSomeSomeDecls[asIndex(optionalKind)];
   if (cache)
     return cache;
 
   auto name =
-      getOptionalIntrinsicName("_does", optionalKind, "HaveValueAsBool");
+      getOptionalIntrinsicName("_stdlib_", optionalKind, "_isSome");
 
   // Look for a generic function.
   CanType input, output, param;
@@ -1127,12 +1125,13 @@ FuncDecl *ASTContext::getDoesOptionalHaveValueAsBoolDecl(
   return decl;
 }
 
-FuncDecl *ASTContext::getGetOptionalValueDecl(LazyResolver *resolver,
+FuncDecl *ASTContext::getOptionalUnwrappedDecl(LazyResolver *resolver,
                                          OptionalTypeKind optionalKind) const {
-  auto &cache = Impl.GetOptionalValueDecls[asIndex(optionalKind)];
+  auto &cache = Impl.OptionalUnwrappedDecls[asIndex(optionalKind)];
   if (cache) return cache;
 
-  auto name = getOptionalIntrinsicName("_get", optionalKind, "Value");
+  auto name = getOptionalIntrinsicName(
+      "_stdlib_", optionalKind, "_unwrapped");
 
   // Look for the function.
   CanType input, output, param;
@@ -1154,7 +1153,8 @@ FuncDecl *ASTContext::getGetOptionalValueDecl(LazyResolver *resolver,
 
 static bool hasOptionalIntrinsics(const ASTContext &ctx, LazyResolver *resolver,
                                   OptionalTypeKind optionalKind) {
-  return ctx.getGetOptionalValueDecl(resolver, optionalKind);
+  return ctx.getOptionalIsSomeDecl(resolver, optionalKind) &&
+    ctx.getOptionalUnwrappedDecl(resolver, optionalKind);
 }
 
 bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {

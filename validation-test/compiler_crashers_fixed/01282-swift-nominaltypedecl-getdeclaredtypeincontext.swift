@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 s))
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
 return !(a)
 }
 f
@@ -80,7 +80,7 @@ struct B : A {
 }
 struct C<D, E: A where D.C == E> {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b: d
 }
 func a<d>() -> [c<d>] {

@@ -2,7 +2,7 @@
 
 @_exported import ObjectiveC
 
-public struct ObjCBool : BooleanType {
+public struct ObjCBool : Boolean {
   var value : UInt8
 
   /// \brief Allow use in a Boolean context.
@@ -20,7 +20,7 @@ func _convertObjCBoolToBool(x: ObjCBool) -> Bool
 
 
 public struct Selector : StringLiteralConvertible {
-  private var ptr : COpaquePointer
+  private var ptr : OpaquePointer
 
   public init(unicodeScalarLiteral value: String) {
     self.init(stringLiteral: value)

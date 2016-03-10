@@ -750,7 +750,7 @@ private:
       MAP(UInt, "NSUInteger", false);
       MAP(Bool, "BOOL", false);
 
-      MAP(COpaquePointer, "void *", true);
+      MAP(OpaquePointer, "void *", true);
 
       Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 
@@ -1543,7 +1543,7 @@ public:
     ASTContext &ctx = M.getASTContext();
 
     auto protos = ED->getAllProtocols();
-    auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::ErrorType);
+    auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::ErrorProtocol);
     if (std::find(protos.begin(), protos.end(), errorTypeProto) !=
         protos.end()) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),

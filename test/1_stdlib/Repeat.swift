@@ -13,11 +13,16 @@ import ObjectiveC
 
 let RepeatTests = TestSuite("Repeat")
 RepeatTests.test("Attributes") {
-  let r = Repeat(count: 42, repeatedValue: "repeat")
+  let r = repeatElement("repeat", count: 42)
   expectEqual(r.count, 42)
   expectEqual(r.startIndex, 0)
   expectEqual(r.endIndex, 42)
   expectEqual(r.repeatedValue, "repeat")
+}
+
+RepeatTests.test("Non-negative count") {
+  expectCrashLater()
+  repeatElement("repeat", count: -42)
 }
 
 runAllTests()

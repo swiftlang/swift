@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 protocol b {
-enum A : CollectionType where h)
+enum A : Collection where h)
 a()
 }
 }

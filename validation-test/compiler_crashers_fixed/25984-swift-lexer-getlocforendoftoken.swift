@@ -5,5 +5,5 @@
 
 func f{
 protocol b:b{
-typealias b:BooleanType
+typealias b:Boolean
 func b<T where g:a

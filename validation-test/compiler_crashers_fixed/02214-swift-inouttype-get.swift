@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 ar e<T, x in return [](x)?
-func a: BooleanType>(b: A {
+func a: Boolean>(b: A {
 }
 protocol B : d {
 let i: ()

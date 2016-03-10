@@ -359,8 +359,8 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
-  /// Retrieve the declaration of Swift.ErrorType.
-  NominalTypeDecl *getExceptionTypeDecl() const;
+  /// Retrieve the declaration of Swift.ErrorProtocol.
+  NominalTypeDecl *getErrorProtocolDecl() const;
   CanType getExceptionType() const;
   
   /// Retrieve the declaration of Swift.Bool.
@@ -387,8 +387,8 @@ public:
   /// Retrieve the declaration of Swift.Set<T>.
   NominalTypeDecl *getSetDecl() const;
 
-  /// Retrieve the declaration of Swift.SequenceType<T>.
-  NominalTypeDecl *getSequenceTypeDecl() const;
+  /// Retrieve the declaration of Swift.Sequence<T>.
+  NominalTypeDecl *getSequenceDecl() const;
 
   /// Retrieve the declaration of Swift.Dictionary<K, V>.
   NominalTypeDecl *getDictionaryDecl() const;
@@ -417,8 +417,8 @@ public:
   EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
   EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of Swift.OptionSetType.
-  NominalTypeDecl *getOptionSetTypeDecl() const;
+  /// Retrieve the declaration of Swift.OptionSet.
+  NominalTypeDecl *getOptionSetDecl() const;
   
   /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *getUnsafeMutablePointerDecl() const;
@@ -432,8 +432,8 @@ public:
   /// Retrieve the declaration of Swift.Unmanaged<T>.
   NominalTypeDecl *getUnmanagedDecl() const;
 
-  /// Retrieve the declaration of the "memory" property of a pointer type.
-  VarDecl *getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const;
+  /// Retrieve the declaration of the "pointee" property of a pointer type.
+  VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 
   /// Retrieve the declaration of Swift.Void.
   TypeAliasDecl *getVoidDecl() const;
@@ -449,14 +449,14 @@ public:
   FuncDecl *get##Name(LazyResolver *resolver) const;
 #include "swift/AST/KnownDecls.def"
 
-  /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValueAsBool.
-  FuncDecl *getDoesOptionalHaveValueAsBoolDecl(LazyResolver *resolver,
-                                               OptionalTypeKind kind) const;
+  /// Swift._stdlib_{,ImplicitlyUnwrapped}Optional_isSome.
+  FuncDecl *getOptionalIsSomeDecl(LazyResolver *resolver,
+                                  OptionalTypeKind kind) const;
 
   /// Retrieve the declaration of
-  /// Swift._get{,ImplicitlyUnwrapped}OptionalValue.
-  FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver,
-                                    OptionalTypeKind kind) const;
+  /// Swift._stdlib_{,ImplicitlyUnwrapped}Optional_unwrapped.
+  FuncDecl *getOptionalUnwrappedDecl(LazyResolver *resolver,
+                                     OptionalTypeKind kind) const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.

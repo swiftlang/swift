@@ -17,21 +17,21 @@
 /// A generalized set whose distinct elements are not necessarily
 /// disjoint.
 ///
-/// In a model of `SetAlgebraType`, some elements may subsume other
+/// In a model of `SetAlgebra`, some elements may subsume other
 /// elements, where
 ///
 /// > `a` **subsumes** `b` iff `([a] as Self).isSupersetOf([b])`
 ///
-/// In many models of `SetAlgebraType` such as `Set<Element>`, `a`
+/// In many models of `SetAlgebra` such as `Set<Element>`, `a`
 /// *subsumes* `b` if and only if `a == b`, but that is not always the
 /// case.  For example, option sets typically do not satisfy that
 /// property.
 ///
 /// Two elements are **disjoint** when neither one *subsumes* the other.
 ///
-/// - SeeAlso: `OptionSetType`.
+/// - SeeAlso: `OptionSet`.
 ///
-/// - Axioms, where `S` conforms to `SetAlgebraType`, `x` and `y` are
+/// - Axioms, where `S` conforms to `SetAlgebra`, `x` and `y` are
 ///   of type `S`, and `e` is of type `S.Element`:
 ///
 ///   - `S() == []`
@@ -45,7 +45,7 @@
 ///   - `x.isSubsetOf(y)` iff `y.isSupersetOf(x)`
 ///   - `x.isStrictSupersetOf(y)` iff `x.isSupersetOf(y) && x != y`
 ///   - `x.isStrictSubsetOf(y)` iff `x.isSubsetOf(y) && x != y`
-public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
+public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// A type for which `Self` provides a containment test.
   associatedtype Element
   
@@ -127,7 +127,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   var isEmpty: Bool { get }
   
   /// Creates the set containing all elements of `sequence`.
-  init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S)
+  init<S : Sequence where S.Iterator.Element == Element>(_ sequence: S)
 
   /// Removes all elements of `other` from `self`.
   ///
@@ -149,16 +149,16 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   static func element(a: Element, isDisjointWith b: Element) -> Bool
 }
 
-/// `SetAlgebraType` requirements for which default implementations
+/// `SetAlgebra` requirements for which default implementations
 /// are supplied.
 ///
-/// - Note: A type conforming to `SetAlgebraType` can implement any of
+/// - Note: A type conforming to `SetAlgebra` can implement any of
 ///   these initializers or methods, and those implementations will be
 ///   used in lieu of these defaults.
-extension SetAlgebraType {
+extension SetAlgebra {
   /// Creates the set containing all elements of `sequence`.
   public init<
-    S : SequenceType where S.Generator.Element == Element
+    S : Sequence where S.Iterator.Element == Element
   >(_ sequence: S) {
     self.init()
     for e in sequence { insert(e) }
@@ -241,3 +241,7 @@ extension SetAlgebraType {
     return ([a] as Self).isDisjointWith([b])
   }
 }
+
+@available(*, unavailable, renamed="SetAlgebra")
+public typealias SetAlgebraType = SetAlgebra
+

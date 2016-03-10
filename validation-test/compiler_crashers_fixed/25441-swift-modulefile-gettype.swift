@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct c<T:SequenceType
+struct c<T:Sequence
 class b<T where h:a{
 enum b{
 struct a

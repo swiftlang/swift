@@ -5,4 +5,12 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-{println(""""?struct{
+public protocol P {}
+
+public func foo<T, TargetStream : P>(
+  value: T, inout _ target: TargetStream
+) {
+  fatalError()
+}
+
+{foo(""""?struct{

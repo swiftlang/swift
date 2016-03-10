@@ -20,6 +20,6 @@ protocol A {
 var b = A.init(h: B<T> d.d>()
 }
 protocol A {
-case c) -> <T: B, Any, B<T>]].Generator.c == e: d {
+case c) -> <T: B, Any, B<T>]].Iterator.c == e: d {
 }
 typealias e: e> a

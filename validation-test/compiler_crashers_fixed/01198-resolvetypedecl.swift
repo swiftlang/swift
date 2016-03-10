@@ -39,7 +39,7 @@ struct c {
 func e() {
 }
 }
-func d<b: SequenceType, e where Optional<e> == b.Generat<d>(() -> d) {
+func d<b: Sequence, e where Optional<e> == b.Generat<d>(() -> d) {
 }
 protocol A {
 }

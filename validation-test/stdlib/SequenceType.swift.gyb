@@ -1,8 +1,8 @@
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/SequenceType.swift -D test_path="%S"
-// RUN: %S/../../utils/line-directive %t/SequenceType.swift -- %target-build-swift %t/SequenceType.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/SequenceType.swift -- %target-run %t/a.out
+// RUN: %S/../../utils/gyb %s -o %t/Sequence.swift -D test_path="%S"
+// RUN: %S/../../utils/line-directive %t/Sequence.swift -- %target-build-swift %t/Sequence.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/Sequence.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 % import gyb
@@ -23,7 +23,7 @@ import ObjectiveC
 // implementation in 'InstrumentedP' that does some bookkeeping for
 // testing (like counting calls to the operation) and then dispatches
 // to the same operation on its 'base' member.  InstrumentedSequence
-// already contains implementations of all the SequenceType
+// already contains implementations of all the Sequence
 // requirements.
 
 var _nonCustomizableOperation = TypeIndexed(0)
@@ -42,11 +42,11 @@ extension LoggingSequence {
 }
 
 // Add a non-customizable operation to sequence
-extension SequenceType {
+extension Sequence {
   func nonCustomizableOperation() {}
 }
 
-var SequenceTypeTests = TestSuite("SequenceType")
+var SequenceTypeTests = TestSuite("Sequence")
 
 //===----------------------------------------------------------------------===//
 
@@ -58,22 +58,22 @@ var SequenceTypeTests = TestSuite("SequenceType")
 //
 // - NaN behavior of floating point types, combined with these generic
 // algorithms, should make sense if possible.  For example,
-// [1.0, Double.NaN].startsWith([1.0, 2.0]) should be false.
+// [1.0, Double.nan].starts(with: [1.0, 2.0]) should be false.
 
 //===----------------------------------------------------------------------===//
-// minElement(), maxElement()
+// min(), max()
 //===----------------------------------------------------------------------===//
 
 % for algorithmKind in [ 'min', 'max' ]:
 %   AlgorithmKind = algorithmKind.capitalize()
 
-SequenceTypeTests.test("${algorithmKind}Element/WhereElementIsComparable") {
-  for test in minMaxElementTests {
+SequenceTypeTests.test("${algorithmKind}/WhereElementIsComparable") {
+  for test in minMaxTests {
     let s = MinimalSequence<MinimalComparableValue>(
-      elements: test.sequence.enumerate().map {
+      elements: test.sequence.enumerated().map {
         MinimalComparableValue($1, identity: $0)
       })
-    var maybeResult = s.${algorithmKind}Element()
+    var maybeResult = s.${algorithmKind}()
     expectType(Optional<MinimalComparableValue>.self, &maybeResult)
     if let result = maybeResult {
       expectEqual(
@@ -94,14 +94,14 @@ SequenceTypeTests.test("${algorithmKind}Element/WhereElementIsComparable") {
   }
 }
 
-SequenceTypeTests.test("${algorithmKind}Element/Predicate") {
-  for test in minMaxElementTests {
+SequenceTypeTests.test("${algorithmKind}/Predicate") {
+  for test in minMaxTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      elements: test.sequence.enumerate().map {
+      elements: test.sequence.enumerated().map {
         OpaqueValue($1, identity: $0)
       })
     var timesClosureWasCalled = 0
-    var maybeResult = s.${algorithmKind}Element {
+    var maybeResult = s.${algorithmKind} {
       (lhs, rhs) -> Bool in
       timesClosureWasCalled += 1
       return lhs.value < rhs.value
@@ -125,7 +125,7 @@ SequenceTypeTests.test("${algorithmKind}Element/Predicate") {
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
     expectEqual(
       max(0, test.sequence.count - 1), timesClosureWasCalled,
-      "maxElement() should be eager and should only call its predicate"
+      "max() should be eager and should only call its predicate"
       + " once per element")
   }
 }
@@ -134,13 +134,13 @@ SequenceTypeTests.test("${algorithmKind}Element/Predicate") {
 
 
 //===----------------------------------------------------------------------===//
-// GeneratorSequence
+// IteratorSequence
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
 protocol TestProtocol1 {}
 
-extension GeneratorSequence where Base : TestProtocol1 {
+extension IteratorSequence where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -157,109 +157,109 @@ SequenceTypeTests.test("Demonstration/NotCustomizable") {
   expectNotCustomizable(tester, tester.log.nonCustomizableOperation)
 }
 
-SequenceTypeTests.test("GeneratorSequence/GeneratorType/empty") {
+SequenceTypeTests.test("IteratorSequence/IteratorProtocol/empty") {
   do {
     let data: [OpaqueValue<Int>] = []
-    let base = MinimalGenerator(data)
-    var g = GeneratorSequence(base)
+    let base = MinimalIterator(data)
+    var iter = IteratorSequence(base)
     expectType(
-      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
-      &g)
-    checkGenerator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+      IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
+      &iter)
+    checkIterator(data, iter, resiliencyChecks: .none) { $0.value == $1.value }
   }
   do {
     let data: [OpaqueValue<Int>] = []
-    let base = data.generate()
-    var g = GeneratorSequence(base)
+    let base = data.makeIterator()
+    var iter = IteratorSequence(base)
     expectType(
-      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
-      &g)
-    checkGenerator(data, g) { $0.value == $1.value }
+      IteratorSequence<IndexingIterator<Array<OpaqueValue<Int>>>>.self,
+      &iter)
+    checkIterator(data, iter) { $0.value == $1.value }
   }
 }
 
-SequenceTypeTests.test("GeneratorSequence/GeneratorType") {
+SequenceTypeTests.test("IteratorSequence/IteratorProtocol") {
   do {
     let data: [OpaqueValue<Int>] = []
-    let base = MinimalGenerator(data)
-    var g = GeneratorSequence(base)
+    let base = MinimalIterator(data)
+    var iter = IteratorSequence(base)
     expectType(
-      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
-      &g)
-    checkGenerator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+      IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
+      &iter)
+    checkIterator(data, iter, resiliencyChecks: .none) { $0.value == $1.value }
   }
   do {
     let data: [OpaqueValue<Int>] = []
-    let base = data.generate()
-    var g = GeneratorSequence(base)
+    let base = data.makeIterator()
+    var iter = IteratorSequence(base)
     expectType(
-      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
-      &g)
-    checkGenerator(data, g) { $0.value == $1.value }
+      IteratorSequence<IndexingIterator<Array<OpaqueValue<Int>>>>.self,
+      &iter)
+    checkIterator(data, iter) { $0.value == $1.value }
   }
 }
 
-SequenceTypeTests.test("GeneratorSequence/SequenceType/empty") {
+SequenceTypeTests.test("IteratorSequence/Sequence/empty") {
   do {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
-    let base = MinimalGenerator(data)
-    var g = GeneratorSequence(base)
+    let base = MinimalIterator(data)
+    var iter = IteratorSequence(base)
     expectType(
-      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
-      &g)
-    checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+      IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
+      &iter)
+    checkSequence(data, iter, resiliencyChecks: .none) { $0.value == $1.value }
   }
   do {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
-    let base = data.generate()
-    var g = GeneratorSequence(base)
+    let base = data.makeIterator()
+    var iter = IteratorSequence(base)
     expectType(
-      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
-      &g)
-    checkSequence(data, g) { $0.value == $1.value }
+      IteratorSequence<IndexingIterator<Array<OpaqueValue<Int>>>>.self,
+      &iter)
+    checkSequence(data, iter) { $0.value == $1.value }
   }
 }
 
-SequenceTypeTests.test("GeneratorSequence/SequenceType") {
+SequenceTypeTests.test("IteratorSequence/Sequence") {
   do {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
-    let base = MinimalGenerator(data)
-    var g = GeneratorSequence(base)
+    let base = MinimalIterator(data)
+    var iter = IteratorSequence(base)
     expectType(
-      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
-      &g)
-    checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+      IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
+      &iter)
+    checkSequence(data, iter, resiliencyChecks: .none) { $0.value == $1.value }
   }
   do {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
-    let base = data.generate()
-    var g = GeneratorSequence(base)
+    let base = data.makeIterator()
+    var iter = IteratorSequence(base)
     expectType(
-      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
-      &g)
-    checkSequence(data, g) { $0.value == $1.value }
+      IteratorSequence<IndexingIterator<Array<OpaqueValue<Int>>>>.self,
+      &iter)
+    checkSequence(data, iter) { $0.value == $1.value }
   }
 }
 
 //===----------------------------------------------------------------------===//
-// enumerate()
+// enumerated()
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
-extension EnumerateGenerator where Base : TestProtocol1 {
+extension EnumeratedIterator where Base : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension EnumerateSequence where Base : TestProtocol1 {
+extension EnumeratedSequence where Base : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-SequenceTypeTests.test("enumerate") {
-  typealias Element = (index: Int, element: OpaqueValue<Int>)
+SequenceTypeTests.test("enumerated()") {
+  typealias Element = (offset: Int, element: OpaqueValue<Int>)
   func compareElements(lhs: Element, rhs: Element) -> Bool {
     return lhs.0 == rhs.0 && lhs.1.value == rhs.1.value
   }
@@ -267,14 +267,14 @@ SequenceTypeTests.test("enumerate") {
   for test in enumerateTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    var result = s.enumerate()
+    var result = s.enumerated()
     expectType(
-      EnumerateSequence<MinimalSequence<OpaqueValue<Int>>>.self,
+      EnumeratedSequence<MinimalSequence<OpaqueValue<Int>>>.self,
       &result)
     
     checkSequence(
       test.expected.map {
-        (index: $0.0, element: OpaqueValue($0.1))
+        (offset: $0.0, element: OpaqueValue($0.1))
       } as [Element],
       result,
       resiliencyChecks: .none, sameValue: compareElements)
@@ -283,10 +283,10 @@ SequenceTypeTests.test("enumerate") {
 }
 
 //===----------------------------------------------------------------------===//
-// startsWith()
+// starts(with:)
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
+SequenceTypeTests.test("starts(with:)/WhereElementIsEquatable") {
   for test in startsWithTests {
     do {
       let s = MinimalSequence<MinimalEquatableValue>(
@@ -295,7 +295,7 @@ SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
         elements: test.prefix.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix),
+        s.starts(with: prefix),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -313,7 +313,7 @@ SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
         elements: test.prefix.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix),
+        s.starts(with: prefix),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
@@ -325,7 +325,7 @@ SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
   }
 }
 
-SequenceTypeTests.test("startsWith/Predicate") {
+SequenceTypeTests.test("starts(with:)/Predicate") {
   for test in startsWithTests {
     do {
       let s = MinimalSequence<OpaqueValue<Int>>(
@@ -334,7 +334,7 @@ SequenceTypeTests.test("startsWith/Predicate") {
         elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix) { $0.value == $1.value },
+        s.starts(with: prefix) { $0.value == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -350,7 +350,7 @@ SequenceTypeTests.test("startsWith/Predicate") {
         elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix) { $0.value / 2 == $1.value },
+        s.starts(with: prefix) { $0.value / 2 == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value / 2 },
@@ -368,7 +368,7 @@ SequenceTypeTests.test("startsWith/Predicate") {
         elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix) { $0.value == $1.value },
+        s.starts(with: prefix) { $0.value == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
@@ -463,11 +463,11 @@ SequenceTypeTests.test("elementsEqual/Predicate") {
 }
 
 //===----------------------------------------------------------------------===//
-// lexicographicalCompare()
+// lexicographicallyPrecedes()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
-  for test in lexicographicalCompareTests {
+SequenceTypeTests.test("lexicographicallyPrecedes(_:)/WhereElementIsComparable") {
+  for test in lexicographicallyPrecedesTests {
     do {
       let s = MinimalSequence<MinimalComparableValue>(
         elements: test.sequence.map(MinimalComparableValue.init))
@@ -475,7 +475,7 @@ SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
         elements: test.other.map(MinimalComparableValue.init))
       expectEqual(
         test.expected.isLT(),
-        s.lexicographicalCompare(other),
+        s.lexicographicallyPrecedes(other),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -493,7 +493,7 @@ SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
         elements: test.other.map(MinimalComparableValue.init))
       expectEqual(
         test.expected.isLT(),
-        s.lexicographicalCompare(other),
+        s.lexicographicallyPrecedes(other),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
@@ -505,8 +505,8 @@ SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
   }
 }
 
-SequenceTypeTests.test("lexicographicalCompare/Predicate") {
-  for test in lexicographicalCompareTests {
+SequenceTypeTests.test("lexicographicallyPrecedes(_:)/Predicate") {
+  for test in lexicographicallyPrecedesTests {
     do {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
@@ -514,7 +514,7 @@ SequenceTypeTests.test("lexicographicalCompare/Predicate") {
         elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected.isLT(),
-        s.lexicographicalCompare(other) { $0.value < $1.value },
+        s.lexicographicallyPrecedes(other) { $0.value < $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -532,7 +532,7 @@ SequenceTypeTests.test("lexicographicalCompare/Predicate") {
         elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected.isLT(),
-        s.lexicographicalCompare(other) { $0.value < $1.value },
+        s.lexicographicallyPrecedes(other) { $0.value < $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
@@ -567,8 +567,8 @@ func callStaticContains(
 }
 
 func callGenericContains<
-  S : SequenceType where S.Generator.Element : Equatable
->(sequence: S, _ element: S.Generator.Element) -> Bool {
+  S : Sequence where S.Iterator.Element : Equatable
+>(sequence: S, _ element: S.Iterator.Element) -> Bool {
   return sequence.contains(element)
 }
 
@@ -683,14 +683,14 @@ SequenceTypeTests.test("reduce") {
 }
 
 //===----------------------------------------------------------------------===//
-// reverse()
+// reversed()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("reverse/SequenceType") {
+SequenceTypeTests.test("reverse/Sequence") {
   for test in reverseTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    var result = s.reverse()
+    var result = s.reversed()
     expectType([OpaqueValue<Int>].self, &result)
     expectEqual(
       test.expected, result.map { $0.value },
@@ -703,7 +703,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsBidirectional,BidirectionalReverseVi
   for test in reverseTests {
     let s = MinimalBidirectionalCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    var result = s.reverse()
+    var result = s.reversed()
     expectType(
       ReverseCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
       &result)
@@ -711,7 +711,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsBidirectional,BidirectionalReverseVi
       test.expected, result.map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
 
-    // Check ReverseCollection's CollectionType conformance.
+    // Check ReverseCollection's Collection conformance.
     checkBidirectionalCollection(
       test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>],
       result) { $0.value == $1.value }
@@ -722,7 +722,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
   for test in reverseTests {
     let s = MinimalRandomAccessCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    var result = s.reverse()
+    var result = s.reversed()
     expectType(
       ReverseRandomAccessCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
       &result)
@@ -730,7 +730,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
       test.expected, result.map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
 
-    // Check ReverseRandomAccessCollection CollectionType conformance.
+    // Check ReverseRandomAccessCollection Collection conformance.
     checkRandomAccessCollection(
       test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>],
       result) { $0.value == $1.value }
@@ -742,23 +742,23 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
 // filter()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("filter/SequenceType/Dispatch") {
+SequenceTypeTests.test("filter/Sequence/Dispatch") {
   let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.filter { _ in false }
   expectCustomizable(tester, tester.log.filter)
 }
 
-SequenceTypeTests.test("filter/SequenceType/Semantics") {
+SequenceTypeTests.test("filter/Sequence/Semantics") {
   for test in filterTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Half,
-      UnderestimateCountBehavior.Value(0)
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
     ] {
       
       let s = DefaultedSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedCount: underestimatedCountBehavior)
       
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
@@ -792,14 +792,14 @@ var MinimalSequenceWithCustomMap_timesMapWasCalled: Int = 0
 
 % for Implementation in [ 'Default', 'Custom' ]:
 
-struct MinimalSequenceWith${Implementation}Map<Element> : SequenceType {
-  init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
+struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
+  init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
     self._data = MinimalSequence(
       elements: data, underestimatedCount: underestimatedCount)
   }
 
-  func generate() -> MinimalGenerator<Element> {
-    return _data.generate()
+  func makeIterator() -> MinimalIterator<Element> {
+    return _data.makeIterator()
   }
 
   var _data: MinimalSequence<Element>
@@ -846,9 +846,9 @@ func callStaticSequenceMap<T>(
   return result
 }
 
-func callGenericSequenceMap<S : SequenceType, T>(
+func callGenericSequenceMap<S : Sequence, T>(
   sequence: S,
-  @noescape transform: (S.Generator.Element) -> T
+  @noescape transform: (S.Iterator.Element) -> T
 ) -> [T] {
   var result = sequence.map(transform)
   expectType([T].self, &result)
@@ -860,17 +860,17 @@ func callGenericSequenceMap<S : SequenceType, T>(
 %   for dispatch in [ 'Static', 'Generic' ]:
 
 SequenceTypeTests.test(
-  "map/SequenceType/${Implementation}Implementation/${dispatch}"
+  "map/Sequence/${Implementation}Implementation/${dispatch}"
 ) {
   for test in mapTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Half,
-      UnderestimateCountBehavior.Value(0)
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalSequenceWith${Implementation}Map<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedCount: underestimatedCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -906,15 +906,15 @@ SequenceTypeTests.test(
 // flatMap()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("flatMap/SequenceType") {
+SequenceTypeTests.test("flatMap/Sequence") {
   for test in flatMapTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Value(0)
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedCount: underestimatedCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       var timesClosureWasCalled = 0
       var result = s.flatMap {
@@ -944,15 +944,15 @@ SequenceTypeTests.test("flatMap/SequenceType") {
 % LazyFlatMapTest = gyb.execute_template(TLazyFlatMapTest, Test='SequenceTypeTests', Kinds=['Sequence'])
 ${LazyFlatMapTest}
 
-SequenceTypeTests.test("flatMap/SequenceType/TransformProducesOptional") {
+SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
   for test in flatMapToOptionalTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Value(0)
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedCount: underestimatedCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -1032,7 +1032,7 @@ SequenceTypeTests.test("suffix/dispatch") {
 // split()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("SequenceType/split/dispatch") {
+SequenceTypeTests.test("Sequence/split/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
@@ -1042,15 +1042,16 @@ SequenceTypeTests.test("SequenceType/split/dispatch") {
 // zip()
 //===----------------------------------------------------------------------===//
 
-// Check that the generic parameters are called 'Generator1' and 'Generator2'.
-extension Zip2Generator
-  where Generator1 : TestProtocol1, Generator2 : TestProtocol1 {
+// Check generic parameter names.
+extension Zip2Iterator
+  where Iterator1 : TestProtocol1, Iterator2 : TestProtocol1 {
 
   var _generator1IsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
+// Check generic parameter names.
 extension Zip2Sequence
   where Sequence1 : TestProtocol1, Sequence2 : TestProtocol1 {
 
@@ -1075,7 +1076,7 @@ SequenceTypeTests.test("zip") {
       Zip2Sequence<MinimalSequence<OpaqueValue<Int>>, MinimalSequence<OpaqueValue<Int32>>>.self,
       &result)
 
-    // Check for expected result and check the Zip2Sequence's SequenceType
+    // Check for expected result and check the Zip2Sequence's Sequence
     // conformance.
     checkSequence(
       test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, result,
@@ -1094,51 +1095,51 @@ SequenceTypeTests.test("zip") {
 }
 
 //===----------------------------------------------------------------------===//
-// underestimateCount()
+// underestimatedCount
 //===----------------------------------------------------------------------===//
 
-struct SequenceWithDefaultUnderestimateCount : SequenceType {
+struct SequenceWithDefaultUnderestimatedCount : Sequence {
   init() {}
 
-  func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
+  func makeIterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
     expectUnreachable()
     return MinimalSequence(
       elements: [ 1, 2, 3 ].map(OpaqueValue.init)
-    ).generate()
+    ).makeIterator()
   }
 }
 
-SequenceTypeTests.test("underestimateCount/SequenceType/DefaultImplementation") {
-  let s = SequenceWithDefaultUnderestimateCount()
+SequenceTypeTests.test("underestimatedCount/Sequence/DefaultImplementation") {
+  let s = SequenceWithDefaultUnderestimatedCount()
   expectEqual(0, callGenericUnderestimatedCount(s))
 }
 
-struct SequenceWithCustomUnderestimateCount : SequenceType {
+struct SequenceWithCustomUnderestimatedCount : Sequence {
   init(underestimatedCount: Int) {
     self._underestimatedCount = underestimatedCount
   }
 
-  func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
+  func makeIterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
     expectUnreachable()
     return MinimalSequence(
       elements: [ 0xffff, 0xffff, 0xffff ].map(OpaqueValue.init)
-    ).generate()
+    ).makeIterator()
   }
 
-  func underestimateCount() -> Int {
+  var underestimatedCount: Int {
     return _underestimatedCount
   }
 
   let _underestimatedCount: Int
 }
 
-SequenceTypeTests.test("underestimateCount/SequenceType/CustomImplementation") {
+SequenceTypeTests.test("underestimatedCount/Sequence/CustomImplementation") {
   do {
-    let s = SequenceWithCustomUnderestimateCount(underestimatedCount: 5)
+    let s = SequenceWithCustomUnderestimatedCount(underestimatedCount: 5)
     expectEqual(5, callGenericUnderestimatedCount(s))
   }
   do {
-    let s = SequenceWithCustomUnderestimateCount(underestimatedCount: 42)
+    let s = SequenceWithCustomUnderestimatedCount(underestimatedCount: 42)
     expectEqual(42, callGenericUnderestimatedCount(s))
   }
 }
@@ -1147,13 +1148,13 @@ SequenceTypeTests.test("underestimateCount/SequenceType/CustomImplementation") {
 // _copyToNativeArrayBuffer()
 //===----------------------------------------------------------------------===//
 SequenceTypeTests.test("_copyToNativeArrayBuffer/OverestimatedCount")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let s = MinimalSequence<OpaqueValue<Int>>(
     elements: [ 1, 2, 3 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(4))
+    underestimatedCount: .value(4))
   expectCrashLater()
   let array = s._copyToNativeArrayBuffer()
   _blackHole(array)

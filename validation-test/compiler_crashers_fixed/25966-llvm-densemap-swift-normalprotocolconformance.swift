@@ -52,7 +52,7 @@ in
 }
 case c
 typealias e : A
-extension g:BooleanType{
+extension g:Boolean{
 class A {}
 extension NSFileManager {
 return E.c{ enum b {
@@ -61,7 +61,7 @@ typealias e = compose()enum C {
 {struct A
 var d {
 {
-func a :BooleanType{
+func a :Boolean{
 let b{struct B<T:C>()
 let h : A {
 case c
@@ -100,7 +100,7 @@ struct b: a {enum b = F>() {
 ( "
 func a {
 class A : A
-func a:BooleanType{
+func a:Boolean{
 var f = compose(n: Dictionary<String, C>())
 struct b: A
 protocol A {

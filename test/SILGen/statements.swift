@@ -176,7 +176,7 @@ func for_loops1(x: Int, c: Bool) {
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops2
 func for_loops2() {
   // rdar://problem/19316670
-  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVs17IndexingGenerator4next
+  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVs16IndexingIterator4next
   // CHECK-NEXT: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: apply [[NEXT]]<Array<MyClass>,
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
@@ -254,7 +254,7 @@ func test_break(i : Int) {
 // CHECK-LABEL: sil hidden @_TF10statements13test_if_breakFGSqCS_1C_T_
 func test_if_break(c : C?) {
 label1:
-  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
 // CHECK: [[TRUE]]({{.*}} : $C):
 
@@ -274,7 +274,7 @@ label1:
 // CHECK-LABEL: sil hidden @_TF10statements18test_if_else_breakFGSqCS_1C_T_
 func test_if_else_break(c : C?) {
 label2:
-  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
@@ -294,7 +294,7 @@ label2:
 // CHECK-LABEL: sil hidden @_TF10statements23test_if_else_then_breakFTSbGSqCS_1C__T_
 func test_if_else_then_break(a : Bool, _ c : C?) {
   label3:
-  // CHECK: switch_enum %1 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum %1 : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
@@ -566,7 +566,7 @@ func testRequireExprPattern(a : Int) {
 // CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional1FGSqSi_Si
 // CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT:   debug_value %0 : $Optional<Int>, let, name "a"
-// CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, default bb2
+// CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: bb1, default bb2
 func testRequireOptional1(a : Int?) -> Int {
 
   // CHECK: bb1(%3 : $Int):
@@ -586,7 +586,7 @@ func testRequireOptional1(a : Int?) -> Int {
 // CHECK: bb0(%0 : $Optional<String>):
 // CHECK-NEXT:   debug_value %0 : $Optional<String>, let, name "a"
 // CHECK-NEXT:   retain_value %0 : $Optional<String>
-// CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb1, default bb2
+// CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.some!enumelt.1: bb1, default bb2
 func testRequireOptional2(a : String?) -> String {
   guard let t = a else { abort() }
 
@@ -603,18 +603,19 @@ func testRequireOptional2(a : String?) -> String {
   return t
 }
 
-enum MyOpt<T> {
-  case None, Some(T)
+enum MyOptional<Wrapped> {
+  case none
+  case some(Wrapped)
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequire
-// CHECK: bb0(%0 : $*T, %1 : $*MyOpt<T>):
-// CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>, let, name "a"
+// CHECK: bb0(%0 : $*T, %1 : $*MyOptional<T>):
+// CHECK-NEXT: debug_value_addr %1 : $*MyOptional<T>, let, name "a"
 // CHECK-NEXT: %3 = alloc_stack $T, let, name "t"
-// CHECK-NEXT: %4 = alloc_stack $MyOpt<T>
-// CHECK-NEXT: copy_addr %1 to [initialization] %4 : $*MyOpt<T>
-// CHECK-NEXT: switch_enum_addr %4 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
-func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
+// CHECK-NEXT: %4 = alloc_stack $MyOptional<T>
+// CHECK-NEXT: copy_addr %1 to [initialization] %4 : $*MyOptional<T>
+// CHECK-NEXT: switch_enum_addr %4 : $*MyOptional<T>, case #MyOptional.some!enumelt.1: bb2, default bb1
+func testAddressOnlyEnumInRequire<T>(a: MyOptional<T>) -> T {
   // CHECK:  bb1:
   // CHECK-NEXT:   dealloc_stack %4
   // CHECK-NEXT:   dealloc_stack %3
@@ -622,12 +623,12 @@ func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
   guard let t = a else { abort() }
 
   // CHECK:    bb2:
-  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
+  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4 : $*MyOptional<T>, #MyOptional.some!enumelt.1
   // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3 : $*T
   // CHECK-NEXT:     dealloc_stack %4
   // CHECK-NEXT:     copy_addr [take] %3 to [initialization] %0 : $*T
   // CHECK-NEXT:     dealloc_stack %3
-  // CHECK-NEXT:     destroy_addr %1 : $*MyOpt<T>
+  // CHECK-NEXT:     destroy_addr %1 : $*MyOptional<T>
   // CHECK-NEXT:     tuple ()
   // CHECK-NEXT:     return
 
@@ -678,7 +679,7 @@ func let_else_tuple_binding(a : (Int, Int)?) -> Int {
 
   // CHECK: bb0(%0 : $Optional<(Int, Int)>):
   // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>, let, name "a"
-  // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.Some!enumelt.1: bb1, default bb2
+  // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.some!enumelt.1: bb1, default bb2
 
   guard let (x, y) = a else { }
   _ = y

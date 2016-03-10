@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 protocol C {
-typealias e : SequenceType, x {
+typealias e : Sequence, x {
 }
 typealias d
 func f<T] == [c

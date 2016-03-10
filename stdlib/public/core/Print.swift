@@ -36,13 +36,13 @@ public func print(
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
     _print(
-      items, separator: separator, terminator: terminator, toStream: &output)
+      items, separator: separator, terminator: terminator, to: &output)
     hook(output.left)
   }
   else {
     var output = _Stdout()
     _print(
-      items, separator: separator, terminator: terminator, toStream: &output)
+      items, separator: separator, terminator: terminator, to: &output)
   }
 }
 
@@ -66,13 +66,13 @@ public func debugPrint(
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
     _debugPrint(
-      items, separator: separator, terminator: terminator, toStream: &output)
+      items, separator: separator, terminator: terminator, to: &output)
     hook(output.left)
   }
   else {
     var output = _Stdout()
     _debugPrint(
-      items, separator: separator, terminator: terminator, toStream: &output)
+      items, separator: separator, terminator: terminator, to: &output)
   }
 }
 
@@ -87,13 +87,13 @@ public func debugPrint(
 /// - SeeAlso: `debugPrint`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(__always)
-public func print<Target: OutputStreamType>(
+public func print<Target : OutputStream>(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n",
-  toStream output: inout Target
+  to output: inout Target
 ) {
-  _print(items, separator: separator, terminator: terminator, toStream: &output)
+  _print(items, separator: separator, terminator: terminator, to: &output)
 }
 
 /// Writes the textual representations of `items` most suitable for
@@ -108,23 +108,23 @@ public func print<Target: OutputStreamType>(
 /// - SeeAlso: `print`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(__always)
-public func debugPrint<Target: OutputStreamType>(
+public func debugPrint<Target : OutputStream>(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n",
-  toStream output: inout Target
+  to output: inout Target
 ) {
   _debugPrint(
-    items, separator: separator, terminator: terminator, toStream: &output)
+    items, separator: separator, terminator: terminator, to: &output)
 }
 
 @inline(never)
 @_semantics("stdlib_binary_only")
-internal func _print<Target: OutputStreamType>(
+internal func _print<Target : OutputStream>(
   items: [Any],
   separator: String = " ",
   terminator: String = "\n",
-  toStream output: inout Target
+  to output: inout Target
 ) {
   var prefix = ""
   output._lock()
@@ -139,11 +139,11 @@ internal func _print<Target: OutputStreamType>(
 
 @inline(never)
 @_semantics("stdlib_binary_only")
-internal func _debugPrint<Target: OutputStreamType>(
+internal func _debugPrint<Target : OutputStream>(
   items: [Any],
   separator: String = " ",
   terminator: String = "\n",
-  toStream output: inout Target
+  to output: inout Target
 ) {
   var prefix = ""
   output._lock()
@@ -166,16 +166,16 @@ public func debugPrint<T>(_: T, appendNewline: Bool = true) {}
 
 
 //===--- FIXME: Not working due to <rdar://22101775> ----------------------===//
-@available(*, unavailable, message="Please use the 'toStream' label for the target stream: 'print((...), toStream: &...)'")
-public func print<T>(_: T, _: inout OutputStreamType) {}
-@available(*, unavailable, message="Please use the 'toStream' label for the target stream: 'debugPrint((...), toStream: &...))'")
-public func debugPrint<T>(_: T, _: inout OutputStreamType) {}
+@available(*, unavailable, message="Please use the 'to' label for the target stream: 'print((...), to: &...)'")
+public func print<T>(_: T, _: inout OutputStream) {}
+@available(*, unavailable, message="Please use the 'to' label for the target stream: 'debugPrint((...), to: &...))'")
+public func debugPrint<T>(_: T, _: inout OutputStream) {}
 
 @available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'print((...), terminator: \"\", toStream: &...)'")
-public func print<T>(_: T, _: inout OutputStreamType, appendNewline: Bool = true) {}
+public func print<T>(_: T, _: inout OutputStream, appendNewline: Bool = true) {}
 @available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'debugPrint((...), terminator: \"\", toStream: &...)'")
 public func debugPrint<T>(
-  _: T, _: inout OutputStreamType, appendNewline: Bool = true
+  _: T, _: inout OutputStream, appendNewline: Bool = true
 ) {}
 //===----------------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//

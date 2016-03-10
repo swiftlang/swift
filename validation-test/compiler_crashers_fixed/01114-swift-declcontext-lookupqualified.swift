@@ -18,5 +18,5 @@ struct d<i : b> : b {
 rotocol a : a {
 }
 strucequ}
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 func b<e>(e : e) -> c

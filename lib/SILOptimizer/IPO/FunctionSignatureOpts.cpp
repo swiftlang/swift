@@ -1009,9 +1009,9 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
     ReturnValue = NormalBlock->createBBArg(ResultType, 0);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
-    SILType ErrorType =
+    SILType ErrorProtocol =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createBBArg(ErrorType, 0);
+    auto *ErrorArg = ErrorBlock->createBBArg(ErrorProtocol, 0);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 

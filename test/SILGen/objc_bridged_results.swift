@@ -24,15 +24,15 @@ func testNullable(obj: Test) -> [AnyObject]? {
   // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
 
   // CHECK: [[CASE_NON_NIL]]:
-  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $Optional<NSArray>, #Optional.Some!enumelt.1
+  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $Optional<NSArray>, #Optional.some!enumelt.1
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray
-  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[COCOA_VAL_NON_NIL]]
+  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
   // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_SOME_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.Some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
   // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<AnyObject>>)
   
   // CHECK: [[CASE_NIL]]:
-  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.None!enumelt
+  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.none!enumelt
   // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<AnyObject>>)
   
   // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $Optional<Array<AnyObject>>):
@@ -49,15 +49,15 @@ func testNullUnspecified(obj: Test) -> [AnyObject]! {
   // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
 
   // CHECK: [[CASE_NON_NIL]]:
-  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>, #ImplicitlyUnwrappedOptional.Some!enumelt.1
+  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>, #ImplicitlyUnwrappedOptional.some!enumelt.1
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray
-  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[COCOA_VAL_NON_NIL]]
+  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
   // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_SOME_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
   // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>)
   
   // CHECK: [[CASE_NIL]]:
-  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.None!enumelt
+  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.none!enumelt
   // CHECK: br [[FINISH]]([[RESULT_NONE]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>)
 
   // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>):
@@ -118,8 +118,8 @@ func testNonnullSubscript(obj: Test) -> [AnyObject] {
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results19testPerformSelectorFCSo8NSObjectT_
 func testPerformSelector(obj: NSObject) {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $NSObject, #NSObject.performSelector!1.foreign
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $NSObject, #NSObject.perform!1.foreign
   // CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, {{%[0-9]+}}, %0)
-  _ = obj.performSelector("foo", withObject: nil)
+  _ = obj.perform("foo", with: nil)
   // CHECK-NOT: {{(retain|release).+}}[[RESULT]]
 } // CHECK: {{^}$}}

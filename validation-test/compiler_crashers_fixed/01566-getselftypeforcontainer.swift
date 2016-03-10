@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 let a {
-let c: SequenceType> <T : NSObject {
+let c: Sequence> <T : NSObject {
 }
 protocol c {
 }

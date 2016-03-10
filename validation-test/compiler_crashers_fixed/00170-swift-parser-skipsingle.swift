@@ -8,7 +8,7 @@ func i(f: g) -> <j>(() -> j) -> g { func g
 k, l {
     typealias l = m<k<m>, f>
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 func b(c) -> <d>(() -> d) {
@@ -191,7 +191,7 @@ protocol k {
    class func j()
 }
 class e: k{  class func j
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b:  [c<d>] {
     return []
 }
@@ -202,9 +202,9 @@ class b: a {
     class func c() { }
 }
 (b() as a).dynamicType.c()
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func a(x: Any, y: Any) -> (((Any, Any) -> Any) -> A  var d: b.Type
     func e() {
         d.e()
@@ -217,7 +217,7 @@ otocol A {
 }
 struct  }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
@@ -282,7 +282,7 @@ func p<p>() -> (p, p -> p) -> p {
 }
 j(k(m, k(2, 3)))
 func l(p: j) -> <n>(() -> n
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 d = i
 }
 class d<j : i, f : i where j.i == f> : e {
@@ -537,7 +537,7 @@ i c {
 }
 class d: c{  class func f {}
 struct d<c : f,f where g.i == c.i>
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
     l g: e
 }
 func h<e>() -> [l<e>] {
@@ -559,9 +559,9 @@ func e<l {
 class l: j{  k() -> ())
 }
 ({})
-func j<o : BooleanType>(l: o) {
+func j<o : Boolean>(l: o) {
 }
-j(j q BooleanType)
+j(j q Boolean)
 func p(l: Any, g: Any) -> (((Any, Any) -> Any) -> Any) {
     return {
         (p: (Any, Any) -> Any) -> Any in
@@ -590,9 +590,9 @@ f> {
  c(d ())
 }
 func b(e)-> <d>(() -> d)
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 class A: A {
 }
 class B : C {

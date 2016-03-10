@@ -69,6 +69,6 @@ public func run_Phonebook(N: Int) {
   }
   for _ in 1...N {
     var t = Names;
-    t.sortInPlace()
+    t.sort()
   }
 }

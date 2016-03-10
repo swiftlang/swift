@@ -3,5 +3,5 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct c:BooleanType
+struct c:Boolean
 class A{protocol A{enum S<T:A

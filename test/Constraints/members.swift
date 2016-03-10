@@ -88,7 +88,7 @@ var zcurriedFull = z.curried(0)(1)
 Swift.print(3, terminator: "")
 
 var format : String
-format._splitFirstIf({ $0.isASCII() })
+format._splitFirstIf({ $0.isASCII })
 
 ////
 // Unqualified references
@@ -122,7 +122,7 @@ var wcurriedFull : () = w.curried(0)(1)
 
 // Member of enum Type
 func enumMetatypeMember(opt: Int?) {
-  opt.None // expected-error{{static member 'None' cannot be used on instance of type 'Int?'}}
+  opt.none // expected-error{{static member 'none' cannot be used on instance of type 'Int?'}}
 }
 
 ////
@@ -146,7 +146,7 @@ func goo() {
 
 func id<T>(t: T) -> T { return t }
 
-func doGetLogicValue<T : BooleanType>(t: T) {
+func doGetLogicValue<T : Boolean>(t: T) {
   t.boolValue
 }
 
@@ -521,15 +521,15 @@ let _ : [UnavailMember] = [.XYZ] // expected-error {{'XYZ' is unavailable}}
 let _ : [UnavailMember] = [.ABC] // expected-error {{type 'UnavailMember' has no member 'ABC'}}
 
 
-// <rdar://problem/22490787> QoI: Poor error message iterating over property with non-sequence type that defines a Generator type alias
+// <rdar://problem/22490787> QoI: Poor error message iterating over property with non-sequence type that defines an Iterator type alias
 struct S22490787 {
-  typealias Generator = AnyGenerator<Int>
+  typealias Iterator = AnyIterator<Int>
 }
 
 func f22490787() {
   var path: S22490787 = S22490787()
   
-  for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'SequenceType'}}
+  for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'Sequence'}}
   }
 }
 
@@ -537,7 +537,7 @@ func f22490787() {
 enum r23942743 {
   case Tomato(cloud: String)
 }
-let _ = .Tomato(cloud: .None)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
+let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
 
 
 

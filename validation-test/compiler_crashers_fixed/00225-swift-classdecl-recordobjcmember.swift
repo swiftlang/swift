@@ -49,9 +49,9 @@ class c {
 }
 struct c<d, e: b where d.c == e> {
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 enum S<T> {
     case C(T, () -> ())
 }
@@ -73,7 +73,7 @@ func a(x: Any, y: Any) -> (((Any, Any) -> Any) -> Any) {
     for (mx : e?) in c {
     }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {

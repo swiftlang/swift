@@ -46,26 +46,26 @@ public typealias IntMax = ${IntMax}
 /// The largest native unsigned integer type.
 public typealias UIntMax = ${UIntMax}
 
-/// This protocol is an implementation detail of `IntegerType`; do
+/// This protocol is an implementation detail of `Integer`; do
 /// not use it directly.
-public protocol _IntegerType
+public protocol _Integer
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
     CustomStringConvertible,
     Hashable,
-    IntegerArithmeticType,
-    BitwiseOperationsType,
+    IntegerArithmetic,
+    BitwiseOperations,
     _Incrementable
 {
 }
 
 /// A set of common requirements for Swift's integer types.
-public protocol IntegerType : _IntegerType, RandomAccessIndexType {
+public protocol Integer : _Integer, RandomAccessIndex {
 }
 
-/// This protocol is an implementation detail of `SignedIntegerType`;
+/// This protocol is an implementation detail of `SignedInteger`;
 /// do not use it directly.
-public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
+public protocol _SignedInteger : _Integer, SignedNumber {
   /// Represent this number using Swift's widest native signed integer
   /// type.
   @warn_unused_result
@@ -77,7 +77,7 @@ public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
 }
 
 /// A set of common requirements for Swift's signed integer types.
-public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
+public protocol SignedInteger : _SignedInteger, Integer {
   /// Represent this number using Swift's widest native signed integer
   /// type.
   func toIntMax() -> IntMax
@@ -87,18 +87,18 @@ public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
   init(_: IntMax)
 }
 
-/// This protocol is an implementation detail of `UnsignedIntegerType`;
+/// This protocol is an implementation detail of `UnsignedInteger`;
 /// do not use it directly.
-public protocol _DisallowMixedSignArithmetic : _IntegerType {
+public protocol _DisallowMixedSignArithmetic : _Integer {
   // Used to create a deliberate ambiguity in cases like UInt(1) +
   // Int(1), which would otherwise compile due to the arithmetic
   // operators defined for Strideable types (unsigned types are
   // Strideable).
-  associatedtype _DisallowMixedSignArithmetic : SignedIntegerType = Int
+  associatedtype _DisallowMixedSignArithmetic : SignedInteger = Int
 }
 
 /// A set of common requirements for Swift's unsigned integer types.
-public protocol UnsignedIntegerType : _DisallowMixedSignArithmetic, IntegerType {
+public protocol UnsignedInteger : _DisallowMixedSignArithmetic, Integer {
 
   /// Represent this number using Swift's widest native unsigned
   /// integer type.
@@ -120,7 +120,7 @@ public protocol UnsignedIntegerType : _DisallowMixedSignArithmetic, IntegerType 
 ///     func g(x: Int64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
-  T : _SignedIntegerType, U : _SignedIntegerType
+  T : _SignedInteger, U : _SignedInteger
 >(x: T) -> U {
   return U(x.toIntMax())
 }
@@ -135,7 +135,7 @@ public func numericCast<
 ///     func g(x: UInt64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
-  T : UnsignedIntegerType, U : UnsignedIntegerType
+  T : UnsignedInteger, U : UnsignedInteger
 >(x: T) -> U {
   return U(x.toUIntMax())
 }
@@ -150,7 +150,7 @@ public func numericCast<
 ///     func g(x: Int64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
-  T : _SignedIntegerType, U : UnsignedIntegerType
+  T : _SignedInteger, U : UnsignedInteger
 >(x: T) -> U {
   return U(UIntMax(x.toIntMax()))
 }
@@ -165,7 +165,7 @@ public func numericCast<
 ///     func g(x: UInt64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
-T : UnsignedIntegerType, U : _SignedIntegerType
+T : UnsignedInteger, U : _SignedInteger
 >(x: T) -> U {
   return U(IntMax(x.toUIntMax()))
 }
@@ -183,7 +183,7 @@ T : UnsignedIntegerType, U : _SignedIntegerType
 /// ${Article} ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
 /// type.
 public struct ${Self}
-   : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'},
+   : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'},
      Comparable, Equatable {
   public // @testable
   var _value: Builtin.${BuiltinName}
@@ -364,37 +364,37 @@ extension ${Self} : CustomStringConvertible {
 // precondition violations in this context.  Therefore, we use masked
 // arithmetic in this conformance, and we need to be sure that
 // generic implementations of the arithmetic operators for
-// RandomAccessIndexType's are all shadowed by more-specific
+// RandomAccessIndex's are all shadowed by more-specific
 // implementations that *do* check for overflows.
 @_transparent
-extension ${Self} : RandomAccessIndexType {
-  // HACK: Disable indexing and slicing Ranges of IntegerType types
+extension ${Self} : RandomAccessIndex {
+  // HACK: Disable indexing and slicing Ranges of Integer types
   // outside of a generic context.  See the implementation of Range
   // for details of how this works.
   public typealias _DisabledRangeIndex = ${Self}
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   @_transparent public
   func successor() -> ${Self} {
     return self &+ 1
   }
   /// Returns the previous consecutive value before `self`.
   ///
-  /// - Requires: The previous value is representable.
+  /// - Precondition: The previous value is representable.
   @_transparent public
   func predecessor() -> ${Self} {
     return self &- 1
   }
 
   @_transparent public
-  func distanceTo(other: ${Self}) -> ${Self}.Distance {
+  func distance(to other: ${Self}) -> ${Self}.Distance {
     return numericCast((numericCast(other) as IntMax) &- numericCast(self))
   }
 
   @_transparent public
-  func advancedBy(n: ${Self}.Distance) -> ${Self} {
+  func advanced(by n: ${Self}.Distance) -> ${Self} {
     return numericCast((numericCast(self) as IntMax) &+ numericCast(n))
   }
 }
@@ -452,7 +452,7 @@ extension ${Self} {
 
 % if signed:
 @_transparent
-extension ${Self} : SignedNumberType {}
+extension ${Self} : SignedNumber {}
 % end
 
 // Construction from other integer types
@@ -597,7 +597,7 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 
 // Bitwise operations
 @_transparent
-extension ${Self} : BitwiseOperationsType {
+extension ${Self} : BitwiseOperations {
   /// The empty bitset of type ${Self}.
   public static var allZeros: ${Self} { return 0 }
 }
@@ -668,11 +668,14 @@ public func _leadingZeros(x: Builtin.Int${bits}) -> Builtin.Int${bits} {
 
 //===--- End loop over all integer types ----------------------------------===//
 
-@available(*, unavailable, renamed="Int")
-public typealias Word = Int
+@available(*, unavailable, renamed="Integer")
+public typealias IntegerType = Integer
 
-@available(*, unavailable, renamed="UInt")
-public typealias UWord = UInt
+@available(*, unavailable, renamed="SignedInteger")
+public typealias SignedIntegerType = SignedInteger
+
+@available(*, unavailable, renamed="UnsignedInteger")
+public typealias UnsignedIntegerType = UnsignedInteger
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

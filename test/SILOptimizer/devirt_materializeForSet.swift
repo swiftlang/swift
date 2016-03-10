@@ -6,7 +6,7 @@
 // CHECK-LABEL: sil [transparent] [thunk] @_TTWC24devirt_materializeForSet7BaseFooS_3FooS_FS1_m3barSS
 // CHECK: checked_cast_br [exact] %{{.*}} : $BaseFoo to $ChildFoo
 // CHECK: convert_function %{{.*}} : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout ChildFoo, @thick ChildFoo.Type) -> () to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout BaseFoo, @thick BaseFoo.Type) -> ()
-// CHECK: enum $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout BaseFoo, @thick BaseFoo.Type) -> ()>, #Optional.Some!enumelt.1, %{{.*}} : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout BaseFoo, @thick BaseFoo.Type) -> ()
+// CHECK: enum $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout BaseFoo, @thick BaseFoo.Type) -> ()>, #Optional.some!enumelt.1, %{{.*}} : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout BaseFoo, @thick BaseFoo.Type) -> ()
 // CHECK: tuple (%{{.*}} : $Builtin.RawPointer, %{{.*}} : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout BaseFoo, @thick BaseFoo.Type) -> ()>)
 
 public protocol Foo {

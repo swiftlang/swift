@@ -223,7 +223,7 @@ extension ${Self} : CustomDebugStringConvertible {
 % if bits in allIntBits:
 // Not transparent because the compiler crashes in that case.
 //@_transparent
-extension ${Self} : FloatingPointType {
+extension ${Self} : FloatingPoint {
   public typealias _BitsType = UInt${bits}
 
   public static func _fromBitPattern(bits: _BitsType) -> ${Self} {
@@ -256,7 +256,7 @@ extension ${Self} : FloatingPointType {
   }
 
   /// A quiet NaN.
-  public static var NaN: ${Self} {
+  public static var nan: ${Self} {
     return quietNaN
   }
 
@@ -347,7 +347,7 @@ extension ${Self} : FloatingPointType {
 }
 
 // Not @_transparent because the function is too complex.
-extension ${Self} /* : FloatingPointType */ {
+extension ${Self} /* : FloatingPoint */ {
   /// The IEEE 754 "class" of this type.
   public var floatingPointClass: FloatingPointClassification {
     get {
@@ -356,23 +356,23 @@ extension ${Self} /* : FloatingPointType */ {
         let significand = __getSignificand()
         // This is either +/-inf or NaN.
         if significand == 0 {
-          return isSignMinus ? .NegativeInfinity : .PositiveInfinity
+          return isSignMinus ? .negativeInfinity : .positiveInfinity
         }
         let isQNaN = (significand >> (${getSignificantBitCount(bits)} - 1)) == 1
-        return isQNaN ? .QuietNaN : .SignalingNaN
+        return isQNaN ? .quietNaN : .signalingNaN
       }
 
       // OK, the number is finite.
       let isMinus = isSignMinus
       if biasedExponent != 0 {
-        return isMinus ? .NegativeNormal : .PositiveNormal
+        return isMinus ? .negativeNormal : .positiveNormal
       }
 
       // Exponent is zero.
       if __getSignificand() == 0 {
-        return isMinus ? .NegativeZero : .PositiveZero
+        return isMinus ? .negativeZero : .positiveZero
       }
-      return isMinus ? .NegativeSubnormal : .PositiveSubnormal
+      return isMinus ? .negativeSubnormal : .positiveSubnormal
     }
   }
 }
@@ -601,21 +601,21 @@ public postfix func -- (lhs: inout ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1
 
 @_transparent
 extension ${Self} : Strideable {
-  /// Returns a stride `x` such that `self.advancedBy(x)` approximates
+  /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
   ///
   /// - Complexity: O(1).
-  @_transparent public
-  func distanceTo(other: ${Self}) -> ${Self} {
+  @_transparent
+  public func distance(to other: ${Self}) -> ${Self} {
     return other - self
   }
   
-  /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
+  /// Returns a `Self` `x` such that `self.distance(to: x)` approximates
   /// `n`.
   ///
   /// - Complexity: O(1).
-  @_transparent public
-  func advancedBy(amount: ${Self}) -> ${Self} {
+  @_transparent
+  public func advanced(by amount: ${Self}) -> ${Self} {
     return self + amount
   }
 }

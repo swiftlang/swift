@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 class c: String {
-protocol b in c = f<T, y: c(x: BooleanType)
+protocol b in c = f<T, y: c(x: Boolean)
 var b = c) -> String {
 var b.g : Any, x }
 protocol b {

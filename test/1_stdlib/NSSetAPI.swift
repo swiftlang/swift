@@ -17,7 +17,7 @@ import Foundation
 
 var NSSetAPI = TestSuite("NSSetAPI")
 
-NSSetAPI.test("SequenceType") {
+NSSetAPI.test("Sequence") {
   let result = NSSet()
   expectSequenceType(result)
 }
@@ -25,9 +25,9 @@ NSSetAPI.test("SequenceType") {
 private func compareAnythingAtAll(x: AnyObject, y: AnyObject)
   -> ExpectedComparisonResult {
   switch (x.description < y.description, x.description == y.description) {
-  case (true, _): return .LT
-  case (_, true): return .EQ
-  default: return .GT
+  case (true, _): return .lt
+  case (_, true): return .eq
+  default: return .gt
   }
 }
 
@@ -50,7 +50,7 @@ NSSetAPI.test("CustomStringConvertible") {
 
 var NSOrderedSetAPI = TestSuite("NSOrderedSetAPI")
 
-NSOrderedSetAPI.test("SequenceType") {
+NSOrderedSetAPI.test("Sequence") {
   let result = NSOrderedSet()
   expectSequenceType(result)
 }
@@ -81,18 +81,18 @@ NSSetAPI.test("copy construction") {
 
 var NSIndexSetAPI = TestSuite("NSIndexSetAPI")
 
-NSIndexSetAPI.test("SequenceType") {
+NSIndexSetAPI.test("Sequence") {
   let result = NSIndexSet()
   expectSequenceType(result)
-  let s = NSIndexSet(indexesInRange: NSMakeRange(1, 1))
-  var g = s.generate()
+  let s = NSIndexSet(indexesIn: NSMakeRange(1, 1))
+  var iter = s.makeIterator()
   // FIXME: Compiler doesn't accept these terms.
-  // expectEqual(Optional<Int>.Some(1), g.next())
-  // expectEqual(Optional<Int>.None, g.next())
-  expectOptionalEqual(1, g.next())
-  expectEmpty(g.next())
-  let empty = NSIndexSet(indexesInRange: NSMakeRange(1, 0))
-  var emptyGen = empty.generate()
+  // expectEqual(Optional<Int>.some(1), iter.next())
+  // expectEqual(Optional<Int>.none, iter.next())
+  expectOptionalEqual(1, iter.next())
+  expectEmpty(iter.next())
+  let empty = NSIndexSet(indexesIn: NSMakeRange(1, 0))
+  var emptyGen = empty.makeIterator()
   expectEmpty(emptyGen.next())
 }
 

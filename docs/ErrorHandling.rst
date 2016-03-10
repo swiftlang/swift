@@ -257,7 +257,7 @@ Throwing an error
 
 The ``throw`` statement begins the propagation of an error.  It always
 takes an argument, which can be any value that conforms to the
-``ErrorType`` protocol (described below).
+``ErrorProtocol`` protocol (described below).
 
 ::
 
@@ -311,15 +311,15 @@ be marked ``throws``).
 
 We expect to refine the ``catch`` syntax with usage experience.
 
-``ErrorType``
--------------
+``ErrorProtocol``
+-----------------
 
-The Swift standard library will provide ``ErrorType``, a protocol with
+The Swift standard library will provide ``ErrorProtocol``, a protocol with
 a very small interface (which is not described in this proposal).  The
 standard pattern should be to define the conformance of an ``enum`` to
 the type::
 
-  enum HomeworkError : ErrorType {
+  enum HomeworkError : ErrorProtocol {
     case Overworked
     case Impossible
     case EatenByCat(Cat)
@@ -332,13 +332,13 @@ within that namespace, and optional values to attach to each option.
 Note that this corresponds very cleanly to the ``NSError`` model of an
 error domain, an error code, and optional user data.  We expect to
 import system error domains as enums that follow this approach and
-implement ``ErrorType``.  ``NSError`` and ``CFError`` themselves will also
-conform to ``ErrorType``.
+implement ``ErrorProtocol``.  ``NSError`` and ``CFError`` themselves will also
+conform to ``ErrorProtocol``.
 
 The physical representation (still being nailed down) will make it
-efficient to embed an ``NSError`` as an ``ErrorType`` and vice-versa.  It
+efficient to embed an ``NSError`` as an ``ErrorProtocol`` and vice-versa.  It
 should be possible to turn an arbitrary Swift ``enum`` that conforms to
-``ErrorType`` into an ``NSError`` by using the qualified type name as the
+``ErrorProtocol`` into an ``NSError`` by using the qualified type name as the
 domain key, the enumerator as the error code, and turning the payload
 into user data.
 

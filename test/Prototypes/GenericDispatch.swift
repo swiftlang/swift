@@ -25,7 +25,7 @@ print("testing...")
 //===--- Think of this code as being "in the library" ---------------------===//
 //===----------------------------------------------------------------------===//
 
-//===--- F "base" protocol (like ForwardIndexType) ------------------------===//
+//===--- F "base" protocol (like ForwardIndex) ------------------------===//
 
 protocol F {
   func successor() -> Self
@@ -65,7 +65,7 @@ func distance<T: F>(x: T, _ y: T) -> Int {
   return x~>_distance(y)
 }
 
-//===--- R refined protocol (like RandomAccessIndexType) ------------------===//
+//===--- R refined protocol (like RandomAccessIndex) ----------------------===//
 protocol R : F {
   // Non-defaulted requirements of R go here, e.g. something to
   // measure the distance in O(1)

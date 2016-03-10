@@ -403,12 +403,12 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // correctly if we are asked to.
 // ----------------------------------------------------------------------------
 
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_12SequenceTypeS_FS1_17_constrainElement{{.*}} : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_8SequenceS_FS1_17_constrainElement{{.*}} : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
 // CHECK: bb0([[ARG0_PTR:%.*]] : $*FakeElement, [[ARG1_PTR:%.*]] : $*FakeArray):
 // CHECK: [[GUARANTEED_COPY_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]
 // CHECK: [[ARG0:%.*]] = load [[ARG0_PTR]]
-// CHECK: function_ref (extension in guaranteed_self):guaranteed_self.SequenceDefaultsType._constrainElement
+// CHECK: function_ref (extension in guaranteed_self):guaranteed_self.SequenceDefaults._constrainElement
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
 // CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[GUARANTEED_COPY_STACK_SLOT]])
 // CHECK: destroy_addr [[GUARANTEED_COPY_STACK_SLOT]]
@@ -421,29 +421,29 @@ public struct FakeArray {
 }
 public struct FakeElement {}
 
-public protocol FakeGeneratorType {
-  typealias Element
+public protocol FakeGeneratorProtocol {
+  associatedtype Element
 }
 
-extension FakeGenerator : FakeGeneratorType {
+extension FakeGenerator : FakeGeneratorProtocol {
   public typealias Element = FakeElement
 }
 
-public protocol SequenceDefaultsType {
-  typealias Element
-  typealias Generator : FakeGeneratorType
+public protocol SequenceDefaults {
+  associatedtype Element
+  associatedtype Generator : FakeGeneratorProtocol
 }
 
-extension SequenceDefaultsType {
+extension SequenceDefaults {
   public final func _constrainElement(_: FakeGenerator.Element) {}
 }
 
-public protocol SequenceType : SequenceDefaultsType {
+public protocol Sequence : SequenceDefaults {
   func _constrainElement(_: Element)
 }
 
 
-extension FakeArray : SequenceType {
+extension FakeArray : Sequence {
   public typealias Element = FakeElement
   public typealias Generator = FakeGenerator
 

@@ -5,6 +5,6 @@
 // Test case found by fuzzing
 
 class a{func g{{
-func a:CollectionType
+func a:Collection
 b
 }enum E<T where B:a{struct B{struct B<g{class B{class d{var _=B{

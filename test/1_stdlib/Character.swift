@@ -184,8 +184,8 @@ func checkRoundTripThroughCharacter(s: String) {
 }
 
 func isSmallRepresentation(s: String) -> Bool {
-  switch(Character(s)._representation) {
-    case .Small:
+  switch Character(s)._representation {
+    case .small:
       return true
     default:
       return false
@@ -272,7 +272,7 @@ UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
 }
 
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -289,11 +289,11 @@ UnicodeScalarTests.test("UInt32(_: UnicodeScalar),UInt64(_: UnicodeScalar)") {
 }
 
 UnicodeScalarTests.test("isASCII()") {
-  expectTrue(UnicodeScalar(0).isASCII())
-  expectTrue(("A" as UnicodeScalar).isASCII())
-  expectTrue(UnicodeScalar(127).isASCII())
-  expectFalse(UnicodeScalar(128).isASCII())
-  expectFalse(UnicodeScalar(256).isASCII())
+  expectTrue(UnicodeScalar(0).isASCII)
+  expectTrue(("A" as UnicodeScalar).isASCII)
+  expectTrue(UnicodeScalar(127).isASCII)
+  expectFalse(UnicodeScalar(128).isASCII)
+  expectFalse(UnicodeScalar(256).isASCII)
 }
 
 UnicodeScalarTests.test("Comparable") {

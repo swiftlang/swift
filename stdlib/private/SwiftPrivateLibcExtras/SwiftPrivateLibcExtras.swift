@@ -22,7 +22,7 @@ public func _stdlib_mkstemps(template: inout String, _ suffixlen: CInt) -> CInt 
   let (fd, fileName) = utf8.withUnsafeMutableBufferPointer {
     (utf8) -> (CInt, String) in
     let fd = mkstemps(UnsafeMutablePointer(utf8.baseAddress), suffixlen)
-    let fileName = String.fromCString(UnsafePointer(utf8.baseAddress))!
+    let fileName = String(cString: UnsafePointer(utf8.baseAddress))
     return (fd, fileName)
   }
   template = fileName
@@ -41,8 +41,8 @@ public struct _stdlib_fd_set {
 
   public init() {
     _data = [UInt32](
-      count: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits,
-      repeatedValue: 0)
+      repeating: 0,
+      count: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits)
   }
 
   public func isset(fd: CInt) -> Bool {

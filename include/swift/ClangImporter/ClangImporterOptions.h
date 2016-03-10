@@ -64,15 +64,15 @@ public:
   /// If true, remove words from imported names that are redundant
   /// with the type information of the corresponding parameter or
   /// property.
-  bool OmitNeedlessWords = false;
+  bool OmitNeedlessWords = true;
 
   // If true, infer default arguments for nullable pointers (nil) and
   // option sets ([]).
-  bool InferDefaultArguments = false;
+  bool InferDefaultArguments = true;
 
   /// If true, we should use the Swift name lookup tables rather than
   /// Clang's name lookup facilities.
-  bool UseSwiftLookupTables = false;
+  bool UseSwiftLookupTables = true;
 };
 
 } // end namespace swift

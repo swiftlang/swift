@@ -65,7 +65,7 @@ func isOSAtLeast(major: Int, _ minor: Int, patch: Int = 0) -> Bool {
   // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
   if #available(iOS 8.0, OSX 10.10, *) {
     let procInfo: AnyObject = NSProcessInfo.processInfo()
-    return procInfo.isOperatingSystemAtLeastVersion(
+    return procInfo.isOperatingSystem(atLeastVersion:
             NSOperatingSystemVersion(majorVersion: major, minorVersion: minor,
                                      patchVersion: patch))
   }
@@ -96,7 +96,7 @@ func expectTagged(s: NSString, _ expected: Bool) -> NSString {
 
   let taggedStringsSupported = osSupportsTaggedStrings && mask != 0
 
-  let tagged = unsafeBitCast(s, UInt.self) & mask != 0
+  let tagged = unsafeBitCast(s, to: UInt.self) & mask != 0
 
   if taggedStringsSupported  &&  expected == tagged {
     // okay

@@ -8,4 +8,4 @@ var m: Int -> Int = {
 n $0
 o: Int = { d, l f
 }(, j: v where t.h == j
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>

@@ -27,7 +27,7 @@ import ObjectiveC
 // Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
 
-extension StrideToGenerator where Element : TestProtocol1 {
+extension StrideToIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -39,7 +39,7 @@ extension StrideTo where Element : TestProtocol1 {
   }
 }
 
-extension StrideThroughGenerator where Element : TestProtocol1 {
+extension StrideThroughIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -53,7 +53,7 @@ extension StrideThrough where Element : TestProtocol1 {
 
 var StrideTestSuite = TestSuite("Strideable")
 
-struct R : RandomAccessIndexType {
+struct R : RandomAccessIndex {
   typealias Distance = Int
   var x: Int
 
@@ -67,24 +67,24 @@ struct R : RandomAccessIndexType {
   func predecessor() -> R {
     return R(x - 1)
   }
-  func distanceTo(rhs: R) -> Int {
+  func distance(to rhs: R) -> Int {
     return rhs.x - x
   }
-  func advancedBy(n: Int) -> R {
+  func advanced(by n: Int) -> R {
     return R(x + n)
   }
-  func advancedBy(n: Int, limit: R) -> R {
-    let d = distanceTo(limit)
+  func advanced(by n: Int, limit: R) -> R {
+    let d = distance(to: limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit
     }
-    return self.advancedBy(n)
+    return self.advanced(by: n)
   }
 }
 
 StrideTestSuite.test("Double") {
   // Doubles are not yet ready for testing, since they still conform
-  // to RandomAccessIndexType
+  // to RandomAccessIndex
 }
 
 StrideTestSuite.test("HalfOpen") {
@@ -92,12 +92,12 @@ StrideTestSuite.test("HalfOpen") {
     // Work on Ints
     expectEqual(
       sum,
-      start.stride(to: end, by: stepSize).reduce(0, combine: +))
+      stride(from: start, to: end, by: stepSize).reduce(0, combine: +))
 
-    // Work on an arbitrary RandomAccessIndexType
+    // Work on an arbitrary RandomAccessIndex
     expectEqual(
       sum,
-      R(start).stride(to: R(end), by: stepSize).reduce(0) { $0 + $1.x })
+      stride(from: R(start), to: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
   
   check(from: 1, to: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
@@ -117,12 +117,12 @@ StrideTestSuite.test("Closed") {
     // Work on Ints
     expectEqual(
       sum,
-      start.stride(through: end, by: stepSize).reduce(0, combine: +))
+      stride(from: start, through: end, by: stepSize).reduce(0, combine: +))
 
-    // Work on an arbitrary RandomAccessIndexType
+    // Work on an arbitrary RandomAccessIndex
     expectEqual(
       sum,
-      R(start).stride(through: R(end), by: stepSize).reduce(0) { $0 + $1.x })
+      stride(from: R(start), through: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
   
   check(from: 1, through: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13

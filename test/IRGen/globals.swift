@@ -8,7 +8,7 @@ var g2 : (Void, Int, Int)
 var g3 : Bool
 
 // FIXME: enum IRgen
-// enum TY4 { case Some(Int, Int); case None }
+// enum TY4 { case some(Int, Int); case none }
 // var g4 : TY4
 
 // FIXME: enum IRgen

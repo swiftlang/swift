@@ -12,7 +12,7 @@ protocol b = Swift.c {
 }
 class A<h: d where f.h : b = { self)")
 let c {
-func f<T -> d>() { c<d: CollectionType where T, k : b<T) {
+func f<T -> d>() { c<d: Collection where T, k : b<T) {
 }
 }
 }

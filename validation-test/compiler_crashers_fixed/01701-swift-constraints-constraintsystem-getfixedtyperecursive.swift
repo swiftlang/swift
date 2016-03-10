@@ -12,7 +12,7 @@ case c<3] = Int>(e> : U) -> {
 convenience init(n: AnyObject))
 }
 func compose() -> {
-self.Generator.Type) -> Any) -> String {
+self.Iterator.Type) -> Any) -> String {
 var b = { c> T> String {
 }
 }

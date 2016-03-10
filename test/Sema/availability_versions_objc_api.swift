@@ -59,16 +59,16 @@ extension SomeSoonToBeConformingClass : NSProtocolAvailableOn10_51 {
 
 // Enums from Objective-C
 
-let _: NSPotentiallyUnavailableOptions = .First // expected-error {{'NSPotentiallyUnavailableOptions' is only available on OS X 10.51 or newer}}
+let _: NSPotentiallyUnavailableOptions = .first // expected-error {{'NSPotentiallyUnavailableOptions' is only available on OS X 10.51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
 
-let _: NSOptionsWithUnavailableElement = .Third // expected-error {{'Third' is only available on OS X 10.51 or newer}}
+let _: NSOptionsWithUnavailableElement = .third // expected-error {{'third' is only available on OS X 10.51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
 
-let _: NSUnavailableEnum = .First // expected-error {{'NSUnavailableEnum' is only available on OS X 10.51 or newer}}
+let _: NSUnavailableEnum = .first // expected-error {{'NSUnavailableEnum' is only available on OS X 10.51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
 
-let _: NSEnumWithUnavailableElement = .Third // expected-error {{'Third' is only available on OS X 10.51 or newer}}
+let _: NSEnumWithUnavailableElement = .third // expected-error {{'third' is only available on OS X 10.51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
 
 // Differing availability on getters and setters imported from ObjC.
@@ -142,16 +142,16 @@ class SubclassWithItsOwnAvailableWitnessOfNSClassWithMethodFromNSProtocolWithOpt
 class UserClass : UnannotatedFrameworkProtocol {
 
   @available(OSX 10.51, *)
-  @objc
-  func doSomethingWithClass(k: AnnotatedFrameworkClass?) { }
+  @objc(doSomethingWithClass:)
+  func doSomething(with k: AnnotatedFrameworkClass?) { }
 
   @available(OSX 10.51, *)
   @objc
-  func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass) { }
+  func doSomething(withNonNullableClass k: AnnotatedFrameworkClass) { }
 
   @available(OSX 10.51, *)
-  @objc
-  func doSomethingWithIUOClass(k: AnnotatedFrameworkClass!) { }
+  @objc(doSomethingWithIUOClass:)
+  func doSomething(withIUOClass k: AnnotatedFrameworkClass!) { }
 
   @objc
   @available(OSX 10.51, *)
@@ -162,8 +162,8 @@ class UserClass : UnannotatedFrameworkProtocol {
   @objc
   func noUnavailableTypesInSignature() { }
 
-  @objc @available(OSX 10.52, *)
-  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass) { }
+  @objc(doSomethingWithClass:andLaterClass:) @available(OSX 10.52, *)
+  func doSomething(with k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass) { }
 
   @objc
   @available(OSX 10.53, *)
@@ -190,7 +190,7 @@ func callViaAnnotatedFrameworkProtocol(p: AnnotatedFrameworkProtocol) {
 
 class SubclassOfFrameworkClassConformingToUnannotatedFrameworkProtocol : FrameworkClassConformingToUnannotatedFrameworkProtocol {
   @available(OSX 10.51, *)
-  override func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass) {
+  override func doSomething(withNonNullableClass k: AnnotatedFrameworkClass) {
   }
 
   @available(OSX 10.51, *)
@@ -200,13 +200,13 @@ class SubclassOfFrameworkClassConformingToUnannotatedFrameworkProtocol : Framewo
   }
 
   @available(OSX 10.52, *)
-  override func doSomethingWithIUOClass(k: AnnotatedFrameworkClass!) { } // expected-error {{'doSomethingWithIUOClass' must be as available as declaration it overrides}}
+  override func doSomething(withIUOClass k: AnnotatedFrameworkClass!) { } // expected-error {{'doSomething' must be as available as declaration it overrides}}
 }
 
 @available(OSX 10.52, *)
 class SubclassOfLaterFrameworkClassConformingToUnannotatedFrameworkProtocol : LaterFrameworkClassConformingToUnannotatedFrameworkProtocol {
   @available(OSX 10.52, *)
-  override func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass) {
+  override func doSomething(withNonNullableClass k: AnnotatedFrameworkClass) {
   }
 
   @available(OSX 10.53, *)

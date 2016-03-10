@@ -38,19 +38,19 @@ struct X { }
 var d : S<X> // expected-error{{type 'X' does not conform to protocol 'MyFormattedPrintable'}}
 
 enum Optional<T> {
-  case Element(T)
-  case None
+  case element(T)
+  case none
 
-  init() { self = .None }
-  init(_ t: T) { self = .Element(t) }
+  init() { self = .none }
+  init(_ t: T) { self = .element(t) }
 }
 typealias OptionalInt = Optional<Int>
-var uniontest1 : (Int) -> Optional<Int> = OptionalInt.Element
-var uniontest2 : Optional<Int> = OptionalInt.None
+var uniontest1 : (Int) -> Optional<Int> = OptionalInt.element
+var uniontest2 : Optional<Int> = OptionalInt.none
 var uniontest3 = OptionalInt(1)
 
 // FIXME: Stuff that should work, but doesn't yet.
-// var uniontest4 : OptInt = .None
+// var uniontest4 : OptInt = .none
 // var uniontest5 : OptInt = .Some(1)
 
 func formattedTest<T : MyFormattedPrintable>(a: T) {
@@ -63,16 +63,16 @@ struct formattedTestS<T : MyFormattedPrintable> {
 }
 
 struct GenericReq<
-  T : GeneratorType, U : GeneratorType where T.Element == U.Element
+  T : IteratorProtocol, U : IteratorProtocol where T.Element == U.Element
 > {}
 
-func getFirst<R : GeneratorType>(r: R) -> R.Element {
+func getFirst<R : IteratorProtocol>(r: R) -> R.Element {
   var r = r
   return r.next()!
 }
 
 func testGetFirst(ir: Range<Int>) {
-  _ = getFirst(ir.generate()) as Int
+  _ = getFirst(ir.makeIterator()) as Int
 }
 
 struct XT<T> {
@@ -137,8 +137,11 @@ var d2 : Dictionary<String, Int>
 d1["hello"] = d2["world"]
 i = d2["blarg"]
 
-struct RangeOfPrintables<R : SequenceType
-         where R.Generator.Element : MyFormattedPrintable> {
+struct RangeOfPrintables<
+  R : Sequence
+  where
+  R.Iterator.Element : MyFormattedPrintable
+> {
   var r : R
 
   func format() -> String {
@@ -151,16 +154,16 @@ struct RangeOfPrintables<R : SequenceType
 }
 
 struct Y {}
-struct SequenceY : SequenceType, GeneratorType {
-  typealias Generator = SequenceY
+struct SequenceY : Sequence, IteratorProtocol {
+  typealias Iterator = SequenceY
   typealias Element = Y
 
   func next() -> Element? { return Y() }
-  func generate() -> Generator { return self }
+  func makeIterator() -> Iterator { return self }
 }
 
 func useRangeOfPrintables(roi : RangeOfPrintables<[Int]>) {
-  var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'SequenceType'}}
+  var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'Sequence'}}
   var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' (aka 'Y') does not conform to protocol 'MyFormattedPrintable'}}
 }
 

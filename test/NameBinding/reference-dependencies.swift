@@ -15,7 +15,7 @@
 // CHECK-NEXT: "someGlobal"
 // CHECK-NEXT: "ExtraFloatLiteralConvertible"
 // CHECK-NEXT: "~~~"
-// CHECK-NEXT: "ThreeTildeType"
+// CHECK-NEXT: "ThreeTilde"
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "topLevelComputedProperty"
@@ -116,15 +116,15 @@ private protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
 }
 
 prefix operator ~~~ {}
-protocol ThreeTildeType {
+protocol ThreeTilde {
   prefix func ~~~(lhs: Self)
 }
 
-private struct ThreeTildeTypeImpl : ThreeTildeType {
+private struct ThreeTildeTypeImpl : ThreeTilde {
 }
 
 func overloadedOnProto<T>(_: T) {}
-func overloadedOnProto<T: ThreeTildeType>(_: T) {}
+func overloadedOnProto<T: ThreeTilde>(_: T) {}
 
 // CHECK-DAG: - "~~~"
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}
@@ -207,7 +207,7 @@ func lookUpManyTopLevelNames() {
     break
   }
   
-  for _: OtherFileEnumWrapper.Enum in EmptyGenerator<X>() {}
+  for _: OtherFileEnumWrapper.Enum in EmptyIterator<X>() {}
   
   // CHECK-DAG: !private "otherFileGetNonImpl"
   overloadedOnProto(otherFileGetNonImpl())
@@ -372,7 +372,7 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["Sb", "InnerToBool"]
 // CHECK-DAG: - !private ["Vs10Dictionary", "Key"]
 // CHECK-DAG: - !private ["Vs10Dictionary", "Value"]
-// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Generator"]
+// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Iterator"]
 // CHECK-DAG: - !private ["V4main17OtherFileIntArray", "deinit"]
 // CHECK-DAG: - !private ["V4main18OtherFileOuterType", "InnerType"]
 // CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "init"]
@@ -381,9 +381,9 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", "deinit"]
 // CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", "deinit"]
 // CHECK-DAG: - !private ["V4main28OtherFileProtoNonImplementor", "deinit"]
-// CHECK-DAG: - !private ["Vs14EmptyGenerator", "Element"]
-// CHECK-DAG: - !private ["Vs14EmptyGenerator", "init"]
-// CHECK-DAG: - !private ["Vs17IndexingGenerator", "Element"]
+// CHECK-DAG: - !private ["Vs13EmptyIterator", "Element"]
+// CHECK-DAG: - !private ["Vs13EmptyIterator", "init"]
+// CHECK-DAG: - !private ["Vs16IndexingIterator", "Element"]
 // CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
 // CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
 
@@ -421,8 +421,8 @@ struct Sentinel2 {}
 // CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
 // CHECK-DAG: !private "V4main28OtherFileProtoNonImplementor"
-// CHECK-DAG: !private "Vs14EmptyGenerator"
-// CHECK-DAG: !private "Vs17IndexingGenerator"
+// CHECK-DAG: !private "Vs13EmptyIterator"
+// CHECK-DAG: !private "Vs16IndexingIterator"
 // CHECK-DAG: - "O4main13OtherFileEnum"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"

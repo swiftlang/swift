@@ -107,7 +107,7 @@ testProtocol()
 protocol P : class { }
 
 func test_rdar15293354() {
-  weak var x : P? = .None
+  weak var x : P? = .none
   if x != nil {
     _ = x!
   }

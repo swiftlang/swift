@@ -2,7 +2,7 @@
 // RUN: %target-run %t.out | FileCheck %s
 // REQUIRES: executable_test
 
-// General Mutable, CollectionType, Value-Type Collections
+// General Mutable, Collection, Value-Type Collections
 // =================================================
 //
 // Basic copy-on-write (COW) requires a container's data to be copied
@@ -16,7 +16,7 @@
 // an open-addressing hash table) are not traversable with a fixed
 // size offset, so incrementing/decrementing indices requires looking
 // at the contents of the container.  The current interface for
-// incrementing/decrementing indices of an CollectionType is the usual ++i,
+// incrementing/decrementing indices of an Collection is the usual ++i,
 // --i. Therefore, for memory safety, the indices need to keep a
 // reference to the container's underlying data so that it can be
 // inspected.  But having multiple outstanding references to the
@@ -107,7 +107,7 @@ class FixedSizedRefArrayOfOptionalStorage<T> : _HeapBufferStorage<Int, T?> {
   deinit {
     let buffer = Buffer(self)
     for i in 0..<buffer.value {
-      (buffer.baseAddress + i).destroy()
+      (buffer.baseAddress + i).deinitialize()
     }
   }
 }
@@ -121,7 +121,7 @@ struct FixedSizedRefArrayOfOptional<T>
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
     for var i = 0; i < capacity; ++i {
-      (buffer.baseAddress + i).initialize(.None)
+      (buffer.baseAddress + i).initialize(with: .none)
     }
 
     buffer.value = capacity
@@ -130,12 +130,12 @@ struct FixedSizedRefArrayOfOptional<T>
   subscript(i: Int) -> T? {
     get {
       assert(i >= 0 && i < buffer.value)
-      return (buffer.baseAddress + i).memory
+      return (buffer.baseAddress + i).pointee
     }
     nonmutating
     set {
       assert(i >= 0 && i < buffer.value)
-      (buffer.baseAddress + i).memory = newValue
+      (buffer.baseAddress + i).pointee = newValue
     }
   }
 
@@ -177,7 +177,7 @@ func == <Element>(lhs: DictionaryIndex<Element>, rhs: DictionaryIndex<Element>) 
   return lhs.offset == rhs.offset
 }
 
-struct DictionaryIndex<Element> : BidirectionalIndexType {
+struct DictionaryIndex<Element> : BidirectionalIndex {
   typealias Index = DictionaryIndex<Element>
 
   func predecessor() -> Index {
@@ -209,7 +209,7 @@ struct DictionaryIndex<Element> : BidirectionalIndexType {
   var offset: Int
 }
 
-struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
+struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
   typealias _Self = Dictionary<Key, Value>
   typealias BufferOwner = DictionaryBufferOwner<Key, Value>
   typealias Buffer = BufferOwner.Buffer
@@ -237,7 +237,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
     }
     set(keyValue) {
       assert(keyValue.key == self[i].key)
-      _buffer[i.offset] = .Some(keyValue)
+      _buffer[i.offset] = .some(keyValue)
     }
   }
 
@@ -267,7 +267,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
       // count + 2 below ensures that we don't fill in the last hole
       var minCapacity = found
         ? capacity
-        : max(Int(Double(count + 1) * _maxLoadFactorInverse), count + 2)
+        : Swift.max(Int(Double(count + 1) * _maxLoadFactorInverse), count + 2)
 
       if (_ensureUniqueBuffer(minCapacity)) {
         i = find(key).0
@@ -359,7 +359,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
     }
 
     // remove the element
-    _buffer[pos.offset] = .None
+    _buffer[pos.offset] = .none
     --_count
 
     // If we've put a hole in a chain of contiguous elements, some
@@ -398,7 +398,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
 
       // Move the found element into the hole
       _buffer[hole] = _buffer[b]
-      _buffer[b] = .None
+      _buffer[b] = .none
       hole = b
     }
 
@@ -413,11 +413,6 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
   var _owner: BufferOwner
   var _buffer: Buffer {
     return _owner.buffer
-  }
-
-  // Satisfying SequenceType
-  func generate() -> IndexingGenerator<_Self> {
-    return IndexingGenerator(self)
   }
 }
 

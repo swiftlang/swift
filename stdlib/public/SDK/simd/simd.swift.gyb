@@ -747,12 +747,12 @@ public struct ${mattype} : CustomDebugStringConvertible {
 
   /// Initialize matrix from corresponding C matrix type.
   public init(_ cmatrix: ${cmatrix}) {
-    self = unsafeBitCast(cmatrix, ${mattype}.self)
+    self = unsafeBitCast(cmatrix, to: ${mattype}.self)
   }
 
   /// Get the matrix as the corresponding C matrix type.
   public var cmatrix: ${cmatrix} {
-    get { return unsafeBitCast(self, ${cmatrix}.self) }
+    get { return unsafeBitCast(self, to: ${cmatrix}.self) }
   }
 
   /// Access to individual columns.

@@ -10,54 +10,62 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  To create a SequenceType that forwards requirements to an
-//  underlying SequenceType, have it conform to this protocol.
+//  To create a Sequence that forwards requirements to an
+//  underlying Sequence, have it conform to this protocol.
 //
 //===----------------------------------------------------------------------===//
 
 /// A type that is just a wrapper over some base Sequence
 public // @testable
-protocol _SequenceWrapperType {
-  associatedtype Base : SequenceType
-  associatedtype Generator : GeneratorType = Base.Generator
+protocol _SequenceWrapper {
+  associatedtype Base : Sequence
+  associatedtype Iterator : IteratorProtocol = Base.Iterator
   
   var _base: Base { get }
 }
 
-extension SequenceType
-  where Self : _SequenceWrapperType, Self.Generator == Self.Base.Generator {
-  /// Returns a generator over the elements of this sequence.
+extension _SequenceWrapper where
+  Self : Sequence,
+  Self.Iterator == Self.Base.Iterator {
+
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
+}
+
+extension Sequence
+  where
+  Self : _SequenceWrapper,
+  Self.Iterator == Self.Base.Iterator {
+
+  /// Return an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Base.Generator {
-    return self._base.generate()
-  }
-
-  public func underestimateCount() -> Int {
-    return _base.underestimateCount()
+  public func makeIterator() -> Base.Iterator {
+    return self._base.makeIterator()
   }
 
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) throws -> T
+    @noescape transform: (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
 
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) throws -> Bool
-  ) rethrows -> [Base.Generator.Element] {
+    @noescape includeElement: (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> [Base.Iterator.Element] {
     return try _base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
   
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R? {
@@ -67,14 +75,15 @@ extension SequenceType
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     return _base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
-    return _base._initializeTo(ptr)
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    return _base._copyContents(initializing: ptr)
   }
 }

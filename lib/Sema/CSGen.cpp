@@ -2498,7 +2498,7 @@ namespace {
       Expr *condExpr = expr->getCondExpr();
       auto booleanType
         = CS.getTypeChecker().getProtocol(expr->getQuestionLoc(),
-                                          KnownProtocolKind::BooleanType);
+                                          KnownProtocolKind::Boolean);
       if (!booleanType)
         return Type();
 

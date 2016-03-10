@@ -2,17 +2,17 @@ import Foundation
 
 var x = NSUTF8StringEncoding
 
-var d : AnyGenerator<Int>
+var d : AnyIterator<Int>
 
 func foo1(var a : [Int]) {
-	a = a.sort()
-	a.append(1)
+  a = a.sorted()
+  a.append(1)
 }
 
 struct S1 {}
 
 func foo2(var a : [S1]) {
-  a = a.sort({ (a, b) -> Bool in
+  a = a.sorted(isOrderedBefore: { (a, b) -> Bool in
     return false
   })
   a.append(S1())
@@ -25,17 +25,17 @@ func foo2(var a : [S1]) {
 // CHECK-OVERLAY-NEXT: UInt
 // CHECK-OVERLAY-NEXT: <Declaration>public let NSUTF8StringEncoding: <Type usr="s:Su">UInt</Type></Declaration>
 
-// RUN: %sourcekitd-test -req=cursor -pos=5:13 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-GENERATOR %s
-// CHECK-GENERATOR-NOT: _AnyGeneratorBase
-// CHECK-GENERATOR: <Group>Collection/Type-erased</Group>
+// RUN: %sourcekitd-test -req=cursor -pos=5:13 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-ITERATOR %s
+// CHECK-ITERATOR-NOT: _AnyIteratorBase
+// CHECK-ITERATOR: <Group>Collection/Type-erased</Group>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT1 %s
 // CHECK-REPLACEMENT1: <Group>Collection/Array</Group>
-// CHECK-REPLACEMENT1: <Declaration>@warn_unused_result(mutable_variant=&quot;sortInPlace&quot;) func sort() -&gt; [<Type usr="s:Si">Int</Type>]</Declaration>
+// CHECK-REPLACEMENT1: <Declaration>@warn_unused_result(mutable_variant=&quot;sort&quot;) func sorted() -&gt; [<Type usr="s:Si">Int</Type>]</Declaration>
 // CHECK-REPLACEMENT1: RELATED BEGIN
-// CHECK-REPLACEMENT1: sort(@noescape _: @noescape (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
-// CHECK-REPLACEMENT1: sort() -&gt; [Int]</RelatedName>
-// CHECK-REPLACEMENT1: sort(@noescape _: @noescape (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
+// CHECK-REPLACEMENT1: sorted(@noescape isOrderedBefore _: @noescape (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
+// CHECK-REPLACEMENT1: sorted() -&gt; [Int]</RelatedName>
+// CHECK-REPLACEMENT1: sorted(@noescape isOrderedBefore _: @noescape (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
 // CHECK-REPLACEMENT1: RELATED END
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT2 %s
@@ -44,10 +44,10 @@ func foo2(var a : [S1]) {
 
 // RUN: %sourcekitd-test -req=cursor -pos=15:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT3 %s
 // CHECK-REPLACEMENT3: <Group>Collection/Array</Group>
-// CHECK-REPLACEMENT3: func sort(@noescape isOrderedBefore: @noescape (<Type usr="s:V13cursor_stdlib2S1">S1</Type>
-// CHECK-REPLACEMENT3: sort() -&gt; [S1]</RelatedName>
-// CHECK-REPLACEMENT3: sort() -&gt; [S1]</RelatedName>
-// CHECK-REPLACEMENT3: sort(@noescape _: @noescape (S1, S1) -&gt; Bool) -&gt; [S1]</RelatedName>
+// CHECK-REPLACEMENT3: func sorted(@noescape isOrderedBefore isOrderedBefore: @noescape (<Type usr="s:V13cursor_stdlib2S1">S1</Type>
+// CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>
+// CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>
+// CHECK-REPLACEMENT3: sorted(@noescape isOrderedBefore _: @noescape (S1, S1) -&gt; Bool) -&gt; [S1]</RelatedName>
 
 // RUN: %sourcekitd-test -req=cursor -pos=18:8 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT4 %s
 // CHECK-REPLACEMENT4: <Group>Collection/Array</Group>

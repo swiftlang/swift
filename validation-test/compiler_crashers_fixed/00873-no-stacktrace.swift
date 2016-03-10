@@ -7,7 +7,7 @@
 func compose<U, T) {
 class a: e)
 struct c {
-typealias e : A>(e: X<H : SequenceType> S<h.Type) -> String {
+typealias e : A>(e: X<H : Sequence> S<h.Type) -> String {
 d(Range())) {
 }
 var f == b<U {

@@ -76,19 +76,19 @@ struct FakeStaticString {
 sil @fakestaticstring_user : $@convention(thin) (FakeStaticString) -> ()
 
 @objc protocol FakeAnyObject {}
-struct FakeCOpaquePointer {
+struct FakeOpaquePointer {
   var rawValue : Builtin.RawPointer
 }
 enum FakeOptional<T> {
-  case None
-  case Some(T)
+  case none
+  case some(T)
 }
 struct FakeUWord {
   var value: Builtin.Word
 }
 
 struct FakeStringCore {
-  var baseAddress : FakeCOpaquePointer
+  var baseAddress : FakeOpaquePointer
   var countAndFlags : FakeUWord
   var owner : FakeOptional<FakeAnyObject>
 }

@@ -6,9 +6,9 @@ import Foundation
 func isNativeDictionary<KeyTy : Hashable, ValueTy>(
   d: Dictionary<KeyTy, ValueTy>) -> Bool {
   switch d._variantStorage {
-  case .Native:
+  case .native:
     return true
-  case .Cocoa:
+  case .cocoa:
     return false
   }
 }
@@ -20,18 +20,18 @@ func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
 
 func isNativeNSDictionary(d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOfString("_NativeDictionaryStorageOwner").length > 0
+  return className.range(of: "_NativeDictionaryStorageOwner").length > 0
 }
 
 func isCocoaNSDictionary(d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOfString("NSDictionary").length > 0 ||
-    className.rangeOfString("NSCFDictionary").length > 0
+  return className.range(of: "NSDictionary").length > 0 ||
+    className.range(of: "NSCFDictionary").length > 0
 }
 
 func isNativeNSArray(d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOfString("_SwiftDeferredNSArray").length > 0
+  return className.range(of: "_SwiftDeferredNSArray").length > 0
 }
 
 var _objcKeyCount = _stdlib_AtomicInt(0)
@@ -66,8 +66,8 @@ class TestObjCKeyTy : NSObject, NSCopying {
     serial = -serial
   }
 
-  @objc
-  func copyWithZone(zone: NSZone) -> AnyObject {
+  @objc(copyWithZone:)
+  func copy(with zone: NSZone) -> AnyObject {
     return TestObjCKeyTy(value)
   }
 
@@ -223,7 +223,7 @@ struct TestBridgedKeyTy
 
   static func _forceBridgeFromObjectiveC(
     x: TestObjCKeyTy,
-    inout result: TestBridgedKeyTy?
+    result: inout TestBridgedKeyTy?
   ) {
     _bridgedKeyBridgeOperations.fetchAndAdd(1)
     result = TestBridgedKeyTy(x.value)
@@ -231,7 +231,7 @@ struct TestBridgedKeyTy
 
   static func _conditionallyBridgeFromObjectiveC(
     x: TestObjCKeyTy,
-    inout result: TestBridgedKeyTy?
+    result: inout TestBridgedKeyTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -288,7 +288,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: TestObjCValueTy,
-    inout result: TestBridgedValueTy?
+    result: inout TestBridgedValueTy?
   ) {
     TestBridgedValueTy.bridgeOperations += 1
     result = TestBridgedValueTy(x.value)
@@ -296,7 +296,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _conditionallyBridgeFromObjectiveC(
     x: TestObjCValueTy,
-    inout result: TestBridgedValueTy?
+    result: inout TestBridgedValueTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -346,7 +346,7 @@ struct TestBridgedEquatableValueTy
 
   static func _forceBridgeFromObjectiveC(
     x: TestObjCEquatableValueTy,
-    inout result: TestBridgedEquatableValueTy?
+    result: inout TestBridgedEquatableValueTy?
   ) {
     _bridgedEquatableValueBridgeOperations.fetchAndAdd(1)
     result = TestBridgedEquatableValueTy(x.value)
@@ -354,7 +354,7 @@ struct TestBridgedEquatableValueTy
 
   static func _conditionallyBridgeFromObjectiveC(
     x: TestObjCEquatableValueTy,
-    inout result: TestBridgedEquatableValueTy?
+    result: inout TestBridgedEquatableValueTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -426,7 +426,7 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   let bridged =
-    unsafeBitCast(_convertDictionaryToNSDictionary(d), NSDictionary.self)
+    unsafeBitCast(_convertDictionaryToNSDictionary(d), to: NSDictionary.self)
 
   assert(isNativeNSDictionary(bridged))
 
@@ -437,7 +437,7 @@ func getBridgedEmptyNSDictionary() -> NSDictionary {
   let d = Dictionary<TestObjCKeyTy, TestObjCValueTy>()
 
   let bridged =
-    unsafeBitCast(_convertDictionaryToNSDictionary(d), NSDictionary.self)
+    unsafeBitCast(_convertDictionaryToNSDictionary(d), to: NSDictionary.self)
   assert(isNativeNSDictionary(bridged))
 
   return bridged
@@ -474,8 +474,8 @@ func slurpFastEnumerationFromSwift(
 
   var itemsReturned = 0
   while true {
-    let returnedCount = fe.countByEnumeratingWithState(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+    let returnedCount = fe.countByEnumerating(
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -493,8 +493,8 @@ func slurpFastEnumerationFromSwift(
   }
 
   for _ in 0..<3 {
-    let returnedCount = fe.countByEnumeratingWithState(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+    let returnedCount = fe.countByEnumerating(
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -516,8 +516,8 @@ func slurpFastEnumerationFromSwift(
 
   var itemsReturned = 0
   while true {
-    let returnedCount = fe.countByEnumeratingWithState(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+    let returnedCount = fe.countByEnumerating(
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -526,7 +526,7 @@ func slurpFastEnumerationFromSwift(
     }
     for i in 0..<returnedCount {
       let key: AnyObject = state.itemsPtr[i]!
-      let value: AnyObject = d.objectForKey(key)!
+      let value: AnyObject = d.object(forKey: key)!
       let kv = (key, value)
       sink(kv)
       itemsReturned += 1
@@ -537,8 +537,8 @@ func slurpFastEnumerationFromSwift(
   }
 
   for _ in 0..<3 {
-    let returnedCount = fe.countByEnumeratingWithState(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+    let returnedCount = fe.countByEnumerating(
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectEqual(0, returnedCount)
   }
@@ -563,7 +563,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
   slurpFastEnumerationFromSwift(
     d, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.objectForKey(key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = (key, value)
     sink(kv)
   }
@@ -597,7 +597,7 @@ func _checkArrayFastEnumerationImpl(
       (value: AnyObject) in
       actualContents.append(ExpectedArrayElement(
         value: convertValue(value),
-        valueIdentity: unsafeBitCast(value, UInt.self)))
+        valueIdentity: unsafeBitCast(value, to: UInt.self)))
     }
 
     useEnumerator(a, makeEnumerator(), sink)
@@ -675,7 +675,7 @@ func _checkSetFastEnumerationImpl(
       (value: AnyObject) in
       actualContents.append(ExpectedSetElement(
         value: convertMember(value),
-        valueIdentity: unsafeBitCast(value, UInt.self)))
+        valueIdentity: unsafeBitCast(value, to: UInt.self)))
     }
 
     useEnumerator(s, makeEnumerator(), sink)
@@ -726,8 +726,8 @@ func slurpFastEnumerationFromSwift(
 
   var itemsReturned = 0
   while true {
-    let returnedCount = fe.countByEnumeratingWithState(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+    let returnedCount = fe.countByEnumerating(
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -745,8 +745,8 @@ func slurpFastEnumerationFromSwift(
   }
 
   for _ in 0..<3 {
-    let returnedCount = fe.countByEnumeratingWithState(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+    let returnedCount = fe.countByEnumerating(
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -828,8 +828,8 @@ func _checkDictionaryFastEnumerationImpl(
       actualContents.append(ExpectedDictionaryElement(
         key: convertKey(key),
         value: convertValue(value),
-        keyIdentity: unsafeBitCast(key, UInt.self),
-        valueIdentity: unsafeBitCast(value, UInt.self)))
+        keyIdentity: unsafeBitCast(key, to: UInt.self),
+        valueIdentity: unsafeBitCast(value, to: UInt.self)))
     }
 
     useEnumerator(d, makeEnumerator(), sink)

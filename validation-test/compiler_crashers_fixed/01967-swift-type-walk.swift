@@ -7,7 +7,7 @@
 class B {
 struct c<B : () {
 }
-let b = c() -> : b: BooleanType>(e(a
+let b = c() -> : b: Boolean>(e(a
 private let end = "a: c: b: Array<h: Range()
 print() {
 }

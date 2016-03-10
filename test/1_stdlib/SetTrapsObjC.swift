@@ -136,7 +136,7 @@ SetTraps.test("BridgedKeyIsNotNSCopyable1") {
 }
 
 SetTraps.test("Downcast1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -151,7 +151,7 @@ SetTraps.test("Downcast1")
 }
 
 SetTraps.test("Downcast2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

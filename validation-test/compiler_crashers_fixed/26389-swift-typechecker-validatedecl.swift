@@ -5,5 +5,5 @@
 
 var b{struct B:A
 protocol A{
-typealias e:CollectionType
+typealias e:Collection
 typealias e

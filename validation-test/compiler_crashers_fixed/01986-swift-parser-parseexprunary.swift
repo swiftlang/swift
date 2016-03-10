@@ -6,7 +6,7 @@
 
 f : a {
 let h>() {
-var a: SequenceType where B : I.c>() -> Any) {
+var a: Sequence where B : I.c>() -> Any) {
 func a():Any) {
 c, range.Element>>? {
 return nil

@@ -7,7 +7,7 @@
 
 protocol A {
 func f: a(x: C = B
-struct q: CollectionType where B : b<T== "[B, x in x in 0) ->(g: B, AnyObject, U)
+struct q: Collection where B : b<T== "[B, x in x in 0) ->(g: B, AnyObject, U)
 protocol a {
 func d<B : b
 func n<Int) -> String {

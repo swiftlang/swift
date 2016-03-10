@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  String is-not-a SequenceType or CollectionType, but it exposes a
+//  String is-not-a Sequence or Collection, but it exposes a
 //  collection of characters.
 //
 //===----------------------------------------------------------------------===//
@@ -37,7 +37,12 @@ extension String {
   /// [extended grapheme
   /// clusters](http://www.unicode.org/glossary/#extended_grapheme_cluster).
   public var characters: CharacterView {
-    return CharacterView(self)
+    get {
+      return CharacterView(self)
+    }
+    set {
+      self = String(newValue)
+    }
   }
 
   /// Efficiently mutate `self` by applying `body` to its `characters`.
@@ -65,28 +70,29 @@ extension String {
 }
 
 /// `String.CharacterView` is a collection of `Character`.
-extension String.CharacterView : CollectionType {
+extension String.CharacterView : Collection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core)
   }
   
   /// A character position.
-  public struct Index : BidirectionalIndexType, Comparable, CustomPlaygroundQuickLookable {
+  public struct Index : BidirectionalIndex, Comparable, CustomPlaygroundQuickLookable {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index) {
       self._base = _base
-      self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
+      self._countUTF16 =
+          Index._measureExtendedGraphemeClusterForward(from: _base)
     }
 
-    internal init(_base: UnicodeScalarView.Index, _lengthUTF16: Int) {
+    internal init(_base: UnicodeScalarView.Index, _countUTF16: Int) {
       self._base = _base
-      self._lengthUTF16 = _lengthUTF16
+      self._countUTF16 = _countUTF16
     }
 
     /// Returns the next consecutive value after `self`.
     ///
-    /// - Requires: The next value is representable.
+    /// - Precondition: The next value is representable.
     public func successor() -> Index {
       _precondition(_base != _base._viewEndIndex, "cannot increment endIndex")
       return Index(_base: _endBase)
@@ -94,12 +100,12 @@ extension String.CharacterView : CollectionType {
 
     /// Returns the previous consecutive value before `self`.
     ///
-    /// - Requires: The previous value is representable.
+    /// - Precondition: The previous value is representable.
     public func predecessor() -> Index {
       _precondition(_base != _base._viewStartIndex,
           "cannot decrement startIndex")
       let predecessorLengthUTF16 =
-          Index._measureExtendedGraphemeClusterBackward(_base)
+          Index._measureExtendedGraphemeClusterBackward(from: _base)
       return Index(
         _base: UnicodeScalarView.Index(
           _utf16Index - predecessorLengthUTF16, _base._core))
@@ -107,8 +113,8 @@ extension String.CharacterView : CollectionType {
 
     internal let _base: UnicodeScalarView.Index
 
-    /// The length of this extended grapheme cluster in UTF-16 code units.
-    internal let _lengthUTF16: Int
+    /// The count of this extended grapheme cluster in UTF-16 code units.
+    internal let _countUTF16: Int
 
     /// The integer offset of this index in UTF-16 code units.
     public // SPI(Foundation)
@@ -120,7 +126,7 @@ extension String.CharacterView : CollectionType {
     /// scalars.
     internal var _endBase: UnicodeScalarView.Index {
       return UnicodeScalarView.Index(
-          _utf16Index + _lengthUTF16, _base._core)
+          _utf16Index + _countUTF16, _base._core)
     }
 
     /// Returns the length of the first extended grapheme cluster in UTF-16
@@ -128,7 +134,7 @@ extension String.CharacterView : CollectionType {
     @warn_unused_result
     @inline(never)
     internal static func _measureExtendedGraphemeClusterForward(
-        start: UnicodeScalarView.Index
+        from start: UnicodeScalarView.Index
     ) -> Int {
       var start = start
       let end = start._viewEndIndex
@@ -170,7 +176,7 @@ extension String.CharacterView : CollectionType {
     @warn_unused_result
     @inline(never)
     internal static func _measureExtendedGraphemeClusterBackward(
-        end: UnicodeScalarView.Index
+        from end: UnicodeScalarView.Index
     ) -> Int {
       let start = end._viewStartIndex
       if start == end {
@@ -205,8 +211,8 @@ extension String.CharacterView : CollectionType {
       return endIndexUTF16 - graphemeClusterStartUTF16
     }
 
-    public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-      return .Int(Int64(_utf16Index))
+    public var customPlaygroundQuickLook: PlaygroundQuickLook {
+      return .int(Int64(_utf16Index))
     }
   }
 
@@ -227,34 +233,34 @@ extension String.CharacterView : CollectionType {
 
   /// Access the `Character` at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(i: Index) -> Character {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 }
 
-extension String.CharacterView : RangeReplaceableCollectionType {
+extension String.CharacterView : RangeReplaceableCollection {
   /// Create an empty instance.
   public init() {
     self.init("")
   }
 
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replace the characters within `bounds` with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == Character
+  public mutating func replaceSubrange<
+    C: Collection where C.Iterator.Element == Character
   >(
-    subRange: Range<Index>, with newElements: C
+    bounds: Range<Index>, with newElements: C
   ) {
-    let rawSubRange = subRange.startIndex._base._position
-      ..< subRange.endIndex._base._position
+    let rawSubRange = bounds.startIndex._base._position
+      ..< bounds.endIndex._base._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
-    _core.replaceRange(rawSubRange, with: lazyUTF16)
+    _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
 
   /// Reserve enough space to store `n` ASCII characters.
@@ -269,20 +275,19 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   /// - Complexity: Amortized O(1).
   public mutating func append(c: Character) {
     switch c._representation {
-    case .Small(let _63bits):
+    case .small(let _63bits):
       let bytes = Character._smallValue(_63bits)
-      _core.appendContentsOf(Character._SmallUTF16(bytes))
-    case .Large(_):
+      _core.append(contentsOf: Character._SmallUTF16(bytes))
+    case .large(_):
       _core.append(String(c)._core)
     }
   }
 
   /// Append the elements of `newElements` to `self`.
-  public mutating func appendContentsOf<
-      S : SequenceType
-      where S.Generator.Element == Character
-  >(newElements: S) {
-    reserveCapacity(_core.count + newElements.underestimateCount())
+  public mutating func append<
+    S : Sequence where S.Iterator.Element == Character
+  >(contentsOf newElements: S) {
+    reserveCapacity(_core.count + newElements.underestimatedCount)
     for c in newElements {
       self.append(c)
     }
@@ -290,24 +295,41 @@ extension String.CharacterView : RangeReplaceableCollectionType {
 
   /// Create an instance containing `characters`.
   public init<
-      S : SequenceType
-      where S.Generator.Element == Character
+    S : Sequence where S.Iterator.Element == Character
   >(_ characters: S) {
     self = String.CharacterView()
-    self.appendContentsOf(characters)
+    self.append(contentsOf: characters)
   }
 }
 
 // Algorithms
 extension String.CharacterView {
-  /// Access the characters in the given `subRange`.
+  /// Access the characters in `bounds`.
   ///
   /// - Complexity: O(1) unless bridging from Objective-C requires an
   ///   O(N) conversion.
-  public subscript(subRange: Range<Index>) -> String.CharacterView {
+  public subscript(bounds: Range<Index>) -> String.CharacterView {
     let unicodeScalarRange =
-      subRange.startIndex._base..<subRange.endIndex._base
+      bounds.startIndex._base..<bounds.endIndex._base
     return String.CharacterView(
       String(_core).unicodeScalars[unicodeScalarRange]._core)
+  }
+}
+
+extension String.CharacterView {
+  @available(*, unavailable, renamed="replaceSubrange")
+  public mutating func replaceRange<
+    C : Collection where C.Iterator.Element == Character
+  >(
+    subRange: Range<Index>, with newElements: C
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="append(contentsOf:)")
+  public mutating func appendContentsOf<
+    S : Sequence where S.Iterator.Element == Character
+  >(newElements: S) {
+    fatalError("unavailable function can't be called")
   }
 }

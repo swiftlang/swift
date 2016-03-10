@@ -6,5 +6,5 @@
 
 import Foundation
 var b {
-class C<T where g: SequenceType> {
+class C<T where g: Sequence> {
 var b = a

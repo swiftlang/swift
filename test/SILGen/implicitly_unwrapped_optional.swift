@@ -24,7 +24,7 @@ func foo(f f: (()->())!) {
 // CHECK:      br bb2
 //   (first nothing block)
 // CHECK:    bb3:
-// CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
+// CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br bb2
 //   The rest of this is tested in optional.swift
 
@@ -32,7 +32,7 @@ func wrap<T>(x x: T) -> T! { return x }
 
 // CHECK-LABEL: sil hidden @_TF29implicitly_unwrapped_optional16wrap_then_unwrap
 func wrap_then_unwrap<T>(x x: T) -> T {
-  // CHECK: [[FORCE:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+  // CHECK: [[FORCE:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
   // CHECK: apply [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x: x)!
 }

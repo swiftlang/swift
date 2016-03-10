@@ -5,4 +5,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-var d:CollectionType{for c d in
+var d:Collection{for c d in

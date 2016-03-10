@@ -23,7 +23,7 @@ struct D : C {
 func g<T where T.E == F>(f: B<T>) {
 }
 }
-func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
+func some<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
 for (mx : T?) in xs {
 if let x = mx {
 }

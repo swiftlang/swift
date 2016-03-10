@@ -70,7 +70,7 @@ public func testTopLevel() {
   _ = foo as __PrivProto
 
   // CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_PrivProto"
-  foo.conformsToProtocol(__PrivProto.self)
+  foo.conforms(to: __PrivProto.self)
 
   // CHECK: call void @privTest()
   __privTest()
@@ -100,17 +100,21 @@ public func testTopLevel() {
 _ = __PrivAnonymousA
 _ = __E0PrivA
 _ = __PrivE1A as __PrivE1
-_ = NSEnum.__PrivA
+_ = NSEnum.__privA
 _ = NSEnum.B
-_ = NSOptions.__PrivA
+_ = NSOptions.__privA
 _ = NSOptions.B
 
 func makeSureAnyObject(_: AnyObject) {}
-func testCF(a: __PrivCFTypeRef, b: __PrivCFSubRef, c: __PrivInt) {
-  // expected-warning@-1{{'__PrivCFTypeRef' is deprecated: renamed to '__PrivCFType'}}
-  // expected-note@-2{{use '__PrivCFType' instead}}
-  // expected-warning@-3{{__PrivCFSubRef' is deprecated: renamed to '__PrivCFSub'}}
-  // expected-note@-4{{use '__PrivCFSub' instead}}
+
+#if !IRGEN
+func testUnavailableRefs() {
+  var x: __PrivCFTypeRef // expected-error {{'__PrivCFTypeRef' is unavailable in Swift}}
+  var y: __PrivCFSubRef // expected-error {{'__PrivCFSubRef' is unavailable in Swift}}
+}
+#endif
+
+func testCF(a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
   makeSureAnyObject(a)
   makeSureAnyObject(b)
 #if !IRGEN

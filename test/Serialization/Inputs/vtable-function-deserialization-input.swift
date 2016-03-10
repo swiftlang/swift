@@ -3,11 +3,11 @@
 public protocol NilLiteralConvertible {
   init(nilLiteral: ())
 }
-public enum Optional<T>: NilLiteralConvertible {
-  case Some(T)
-  case None
+public enum Optional<T> : NilLiteralConvertible {
+  case none
+  case some(T)
 
-  public init(nilLiteral: ()) { self = .None }
+  public init(nilLiteral: ()) { self = .none }
 }
 
 public struct Y {}

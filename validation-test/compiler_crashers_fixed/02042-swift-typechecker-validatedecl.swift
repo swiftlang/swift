@@ -7,7 +7,7 @@
 extension A {
 }
 protocol A : A {
-let h == T>([c: BooleanType))
+let h == T>([c: Boolean))
 func f: A""")
 protocol b : A> {
 }

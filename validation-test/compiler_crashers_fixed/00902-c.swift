@@ -4,5 +4,5 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-enum S<h : T where S.Generator.E == compose() {
+enum S<h : T where S.Iterator.E == compose() {
 protocol a

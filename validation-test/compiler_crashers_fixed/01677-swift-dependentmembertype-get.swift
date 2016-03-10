@@ -11,7 +11,7 @@ init(() -> Any] == 1]()
 assert(T> Any, U>(.<c<f = compose<T.c where Optional<D>Bool)] as String):
 A"
 func a)
-let n1: CollectionType where f: b: l.endIndex - range..b(b(i> {
+let n1: Collection where f: b: l.endIndex - range..b(b(i> {
 protocol a {
 }
 }
@@ -87,7 +87,7 @@ typealias C {
 protocol A {
 var a""
 return { _, g = Int
-}(c) -> : T>(f() -> (z: BooleanType>(m(v: Int>()] = { c
+}(c) -> : T>(f() -> (z: Boolean>(m(v: Int>()] = { c
 }
 typealias e : NSObject {
 let n1: 1], let g == Swift.join(h, Bool) -> (g.endIndex - range.startIndex))

@@ -231,43 +231,43 @@ struct Y7<T> : P7 {
   func f() -> Int { return 0 }
 }
 
-struct MyAnySequence<Element> : MySequenceType {
+struct MyAnySequence<Element> : MySequence {
   typealias SubSequence = MyAnySequence<Element>
-  func generate() -> MyAnyGenerator<Element> {
-    return MyAnyGenerator<Element>()
+  func makeIterator() -> MyAnyIterator<Element> {
+    return MyAnyIterator<Element>()
   }
 }
 
-struct MyAnyGenerator<T> : MyGeneratorType {
+struct MyAnyIterator<T> : MyIteratorType {
   typealias Element = T
 }
 
-protocol MyGeneratorType {
+protocol MyIteratorType {
   associatedtype Element
 }
 
-protocol MySequenceType {
-  associatedtype Generator : MyGeneratorType
+protocol MySequence {
+  associatedtype Iterator : MyIteratorType
   associatedtype SubSequence
 
   func foo() -> SubSequence
-  func generate() -> Generator
+  func makeIterator() -> Iterator
 }
 
-extension MySequenceType {
-  func foo() -> MyAnySequence<Generator.Element> {
+extension MySequence {
+  func foo() -> MyAnySequence<Iterator.Element> {
     return MyAnySequence()
   }
 }
 
-struct SomeStruct<Element> : MySequenceType {
+struct SomeStruct<Element> : MySequence {
   let element: Element
   init(_ element: Element) {
     self.element = element
   }
 
-  func generate() -> MyAnyGenerator<Element> {
-    return MyAnyGenerator<Element>()
+  func makeIterator() -> MyAnyIterator<Element> {
+    return MyAnyIterator<Element>()
   }
 }
 

@@ -19,5 +19,5 @@ extension NSData {
 }
 typealias R = { _, V>()
 }
-func a: (x: SequenceType, f()
+func a: (x: Sequence, f()
 func

@@ -21,7 +21,7 @@ typealias d, e? = A? = a<S {
 extension NSSet {
 enum A : a {
 convenience init()
-protocol d : BooleanType, let foo as a<T: C(x()
+protocol d : Boolean, let foo as a<T: C(x()
 extension NSSet {
 }
 }
@@ -79,11 +79,11 @@ f() -> Any, (B)
 t: T>) {
 }
 }
-init(range: CollectionType where A: B<T>(self)
+init(range: Collection where A: B<T>(self)
 return {
 }
 return "foobar"]([c()
-func i: start, ((object1, a: SequenceType> V, c(T, object2)
+func i: start, ((object1, a: Sequence> V, c(T, object2)
 enum b : ExtensibleCollectionType>("
 func b: Bool) -> d.dynamicType)
 protocol B : d) {

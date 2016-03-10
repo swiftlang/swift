@@ -339,7 +339,7 @@ namespace {
       }
       
       // All other C pointers to concrete types map to
-      // UnsafeMutablePointer<T> or COpaquePointer (FIXME:, except in
+      // UnsafeMutablePointer<T> or OpaquePointer (FIXME:, except in
       // parameter position under the pre-
       // intrinsic-pointer-conversion regime.)
 
@@ -355,7 +355,7 @@ namespace {
                                       /*can fully bridge*/false);
 
       // If the pointed-to type is unrepresentable in Swift, import as
-      // COpaquePointer.
+      // OpaquePointer.
       if (!pointeeType)
         return getOpaquePointerType();
       
@@ -393,7 +393,7 @@ namespace {
     }
 
     Type getOpaquePointerType() {
-      return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
+      return Impl.getNamedSwiftType(Impl.getStdlibModule(), "OpaquePointer");
     }
 
     ImportResult VisitBlockPointerType(const clang::BlockPointerType *type) {

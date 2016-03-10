@@ -16,7 +16,7 @@ struct Array2D {
   let cols: Int
 
   init(numRows: Int, numCols: Int) {
-    storage = [Int](count: numRows * numCols, repeatedValue: 0)
+    storage = [Int](repeating: 0, count: numRows * numCols)
     rows = numRows
     cols = numCols
   }

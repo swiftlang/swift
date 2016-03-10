@@ -5,8 +5,8 @@
 // Test case found by fuzzing
 
 struct c<h:d
-class A:BooleanType}{class B<T where k:c<I : {
-struct B:BooleanType}}enum S<T where g: Int = Swift.c {
+class A:Boolean}{class B<T where k:c<I : {
+struct B:Boolean}}enum S<T where g: Int = Swift.c {
 let a {
 class n{
 var f=[1)let v: p
@@ -16,7 +16,7 @@ struct B : e:
 {
 class B:d
 struct Q{{
-let :BooleanType}
+let :Boolean}
 class B<T where H:A
 class A{
 }
@@ -39,7 +39,7 @@ var d func b<I :A<T where h: C {
 }
 {:
 struct S<f=[1){
-class B<T where H:BooleanType}class c<T {
+class B<T where H:Boolean}class c<T {
 func b{() {return"
 func a<T where T: b { func a{
 struct S<T where H : C {

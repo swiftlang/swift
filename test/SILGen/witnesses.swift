@@ -21,9 +21,9 @@ func archetype_generic_method<T: X>(x x: T, y: Loadable) -> Loadable {
 // CHECK:         apply [[METHOD]]<T, Loadable>({{%.*}}, {{%.*}}, {{%.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : X><τ_1_0> (@in τ_1_0, @inout τ_0_0) -> @out τ_1_0
 // CHECK:       }
 
-// CHECK-LABEL: sil hidden @_TF9witnesses32archetype_associated_type_method{{.*}} : $@convention(thin) <T where T : WithAssocType> (@in T, @in T.AssocType) -> @out T
+// CHECK-LABEL: sil hidden @_TF9witnesses32archetype_associated_type_method{{.*}} : $@convention(thin) <T where T : WithAssoc> (@in T, @in T.AssocType) -> @out T
 // CHECK:         apply %{{[0-9]+}}<T, T.AssocType>
-func archetype_associated_type_method<T: WithAssocType>(x x: T, y: T.AssocType) -> T {
+func archetype_associated_type_method<T: WithAssoc>(x x: T, y: T.AssocType) -> T {
   return x.useAssocType(x: y)
 }
 
@@ -86,7 +86,7 @@ protocol X {
 }
 protocol Y {}
 
-protocol WithAssocType {
+protocol WithAssoc {
   typealias AssocType
   func useAssocType(x x: AssocType) -> Self
 }
@@ -365,7 +365,7 @@ struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
   // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
   
-  // CHECK:   [[FORCE_FN:%[0-9]+]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue{{.*}} : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
+  // CHECK:   [[FORCE_FN:%[0-9]+]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x{{.*}} : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
   // CHECK:   [[RESULT_TEMP:%[0-9]+]] = alloc_stack $IUOFailableModel
   // CHECK:   apply [[FORCE_FN]]<IUOFailableModel>([[RESULT_TEMP]], [[IUO_RESULT_TEMP]]) : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
   // CHECK:   [[RESULT:%[0-9]+]] = load [[RESULT_TEMP]] : $*IUOFailableModel
@@ -408,7 +408,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_26NonFailableClassRefinementS_FS1_C{{.*}}
-  // CHECK: function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue{{.*}}
+  // CHECK: function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
   // CHECK: return [[RESULT:%[0-9]+]] : $IUOFailableClassModel
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_27IUOFailableClassRequirementS_FS1_C{{.*}}
@@ -425,21 +425,21 @@ protocol HasAssoc {
   typealias Assoc
 }
 
-protocol GenericParameterNameCollisionType {
+protocol GenericParameterNameCollisionProtocol {
   func foo<T>(x: T)
   typealias Assoc2
   func bar<T>(x: T -> Assoc2)
 }
 
 struct GenericParameterNameCollision<T: HasAssoc> :
-    GenericParameterNameCollisionType {
+    GenericParameterNameCollisionProtocol {
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionType{{.*}}foo{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@in T, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}foo{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@in T, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
   // CHECK:       bb0(%0 : $*T, %1 : $*GenericParameterNameCollision<T1>):
   // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
   func foo<U>(x: U) {}
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionType{{.*}}bar{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@owned @callee_owned (@in T) -> @out T1.Assoc, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@owned @callee_owned (@in T) -> @out T1.Assoc, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
   // CHECK:       bb0(%0 : $@callee_owned (@in T) -> @out T1.Assoc, %1 : $*GenericParameterNameCollision<T1>):
   // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
   func bar<V>(x: V -> T.Assoc) {}

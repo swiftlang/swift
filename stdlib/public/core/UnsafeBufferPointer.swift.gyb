@@ -10,25 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator for the elements in the buffer referenced by
+/// An iterator for the elements in the buffer referenced by
 /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`.
-public struct UnsafeBufferPointerGenerator<Element>
-  : GeneratorType, SequenceType {
-
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
+public struct UnsafeBufferPointerIterator<Element>
+  : IteratorProtocol, Sequence {
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    if position == end { return nil }
+    if _position == _end { return nil }
 
-    let result = position.memory
-    position += 1
+    let result = _position.pointee
+    _position += 1
     return result
   }
 
-  var position, end: UnsafePointer<Element>
+  internal var _position, _end: UnsafePointer<Element>
 }
 
 %for Mutable in ('Mutable', ''):
@@ -38,10 +35,7 @@ public struct UnsafeBufferPointerGenerator<Element>
 ///
 /// The pointer should be aligned to `alignof(Element.self)`.
 public struct Unsafe${Mutable}BufferPointer<Element>
-  : ${Mutable}CollectionType {
-
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
+  : ${Mutable}Collection {
 
   /// Always zero, which is the index of the first element in a
   /// non-empty buffer.
@@ -61,14 +55,14 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// Access the `i`th element in the buffer.
   public subscript(i: Int) -> Element {
     get {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
+      _stdlibAssert(i >= 0)
+      _stdlibAssert(i < endIndex)
       return _position[i]
     }
 %if Mutable:
     nonmutating set {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
+      _stdlibAssert(i >= 0)
+      _stdlibAssert(i < endIndex)
       _position[i] = newValue
     }
 %end
@@ -83,11 +77,11 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     _end = start + count
   }
 
-  /// Returns a generator over the elements of this sequence.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func generate() -> UnsafeBufferPointerGenerator<Element> {
-    return UnsafeBufferPointerGenerator(position: _position, end: _end)
+  public func makeIterator() -> UnsafeBufferPointerIterator<Element> {
+    return UnsafeBufferPointerIterator(_position: _position, _end: _end)
   }
 
   /// A pointer to the first element of the buffer.
@@ -100,17 +94,20 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return _end - _position
   }
 
-  var _position, _end: Unsafe${Mutable}Pointer<Element>
+  let _position, _end: Unsafe${Mutable}Pointer<Element>
 }
 
 extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"
-    + "(start: \(_position), length: \(_end - _position))"
+    + "(start: \(_position), count: \(_end - _position))"
   }
 }
 %end
+
+@available(*, unavailable, renamed="UnsafeBufferPointerIterator")
+public struct UnsafeBufferPointerGenerator<Element> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

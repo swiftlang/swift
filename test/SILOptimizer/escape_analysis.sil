@@ -50,10 +50,10 @@ class LinkedNode {
   init(_ n: LinkedNode)
 }
 
-struct MyError : ErrorType {
+struct MyError : ErrorProtocol {
 }
 
-final class ErrorClass : ErrorType {
+final class ErrorClass : ErrorProtocol {
 }
 
 struct SomeData {
@@ -675,16 +675,16 @@ bb2(%5 : $LinkedNode):
 // CHECK-NEXT:    Val %3 Esc: R, Succ: %0
 // CHECK-NEXT:    Ret Esc: R, Succ: %3
 // CHECK-NEXT:  End
-sil @call_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType) {
+sil @call_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol) {
 bb0(%0 : $X):
-  %1 = function_ref @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType)
-  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType), normal bb1, error bb2
+  %1 = function_ref @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol)
+  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%3 : $X):
   return %3 : $X
 
-bb2(%5 : $ErrorType):
-  throw %5 : $ErrorType
+bb2(%5 : $ErrorProtocol):
+  throw %5 : $ErrorProtocol
 }
 
 // CHECK-LABEL: CG of throwing_func
@@ -693,16 +693,16 @@ bb2(%5 : $ErrorType):
 // CHECK-NEXT:    Con %3.1 Esc: G, Succ: 
 // CHECK-NEXT:    Ret  Esc: R, Succ: %0
 // CHECK-NEXT:  End
-sil @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType) {
+sil @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol) {
 bb0(%0 : $X):
   cond_br undef, bb1, bb2
 
 bb1:
-  %2 = alloc_existential_box $ErrorType, $MyError
-  %3 = project_existential_box $MyError in %2 : $ErrorType
+  %2 = alloc_existential_box $ErrorProtocol, $MyError
+  %3 = project_existential_box $MyError in %2 : $ErrorProtocol
   %4 = struct $MyError ()
   store %4 to %3 : $*MyError
-  throw %2 : $ErrorType
+  throw %2 : $ErrorProtocol
 
 bb2:
   return %0 : $X
@@ -717,19 +717,19 @@ bb2:
 // CHECK-NEXT:    Con %3.1 Esc: G, Succ: 
 // CHECK-NEXT:    Ret Esc: R, Succ: %3
 // CHECK-NEXT:  End
-sil @call_unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType) {
+sil @call_unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol) {
 bb0(%0 : $X):
-  %1 = function_ref @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType)
-  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType), normal bb1, error bb2
+  %1 = function_ref @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol)
+  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%3 : $X):
   return %3 : $X
 
-bb2(%5 : $ErrorType):
-  throw %5 : $ErrorType
+bb2(%5 : $ErrorProtocol):
+  throw %5 : $ErrorProtocol
 }
 
-sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorType)
+sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol)
 
 // Test that the deinit of a box itself does not capture anything.
 
@@ -945,8 +945,8 @@ bb0(%0 : $X):
 // CHECK-NEXT:  End
 sil @test_unknown_store : $@convention(thin) (@owned ErrorClass) -> () {
 bb0(%0 : $ErrorClass):
-  %2 = alloc_existential_box $ErrorType, $ErrorClass
-  %3 = project_existential_box $ErrorClass in %2 : $ErrorType
+  %2 = alloc_existential_box $ErrorProtocol, $ErrorClass
+  %3 = project_existential_box $ErrorClass in %2 : $ErrorProtocol
   store %0 to %3 : $*ErrorClass
   %5 = tuple ()
   return %5 : $()

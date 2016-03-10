@@ -55,7 +55,7 @@ struct Q<D{
 class A
 }
 {
-class B<T{func BooleanType
+class B<T{func Boolean
 var f{
 {
 let i( ) {{

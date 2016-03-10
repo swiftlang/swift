@@ -24,6 +24,6 @@ init(T>Bool]
 init() -> Self {
 return z(true }
 b(start: Array<H : B? {
-func g(f() -> Any, f: A, y: Int = F>(g, AnyObject, k : SequenceType> ()
+func g(f() -> Any, f: A, y: Int = F>(g, AnyObject, k : Sequence> ()
 struct c : (i(c]()
 defa

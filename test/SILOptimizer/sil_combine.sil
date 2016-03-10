@@ -9,8 +9,8 @@ class RawBuffer {}
 class HeapBufferStorage<T,U> : RawBuffer {}
 
 enum FakeOptional<T> {
-  case None
-  case Some(T)
+  case none
+  case some(T)
 }
 
 struct StringData {
@@ -834,13 +834,13 @@ bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32, %2 : $@callee_owned (Builtin.Int3
 //CHECK: return
 sil @remove_init_ex : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %1 = alloc_stack $BooleanType
-  %2 = init_existential_addr %1 : $*BooleanType, $Bool
+  %1 = alloc_stack $Boolean
+  %2 = init_existential_addr %1 : $*Boolean, $Bool
   %3 = integer_literal $Builtin.Int1, 1
   %4 = struct $Bool (%3 : $Builtin.Int1)
   store %4 to %2 : $*Bool
-  destroy_addr %1 : $*BooleanType
-  dealloc_stack %1 : $*BooleanType
+  destroy_addr %1 : $*Boolean
+  dealloc_stack %1 : $*Boolean
   %8 = tuple ()
   return %8 : $()
 }
@@ -940,11 +940,11 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
 // CHECK-LABEL: sil @enum_promotion_of_concrete_types
 // CHECK: bb0([[INT_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA1:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
-// CHECK-NEXT: [[ENUM1:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.None!enumelt
+// CHECK-NEXT: [[ENUM1:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.none!enumelt
 // CHECK-NEXT: store [[ENUM1]] to [[ALLOCA1]]
 // CHECK-NEXT: [[ALLOCA2:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[INT:%[0-9]+]] = load [[INT_PTR]] : $*Builtin.Int1
-// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1, [[INT]] : $Builtin.Int1
+// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1, [[INT]] : $Builtin.Int1
 // CHECK-NEXT: store [[ENUM2]] to [[ALLOCA2]] : $*FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[RESULT1:%[0-9]+]] = load [[ALLOCA1]]
 // CHECK-NEXT: [[RESULT2:%[0-9]+]] = load [[ALLOCA2]]
@@ -955,14 +955,14 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
 sil @enum_promotion_of_concrete_types : $@convention(thin) (@in Builtin.Int1) -> (FakeOptional<Builtin.Int1>, FakeOptional<Builtin.Int1>) {
 bb0(%0 : $*Builtin.Int1):
   %1 = alloc_stack $FakeOptional<Builtin.Int1>
-  inject_enum_addr %1 : $*FakeOptional<Builtin.Int1>, #FakeOptional.None!enumelt
+  inject_enum_addr %1 : $*FakeOptional<Builtin.Int1>, #FakeOptional.none!enumelt
 
   %2 = integer_literal $Builtin.Int1, 1
   %3 = alloc_stack $FakeOptional<Builtin.Int1>
-  %4 = init_enum_data_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
   %5 = load %0 : $*Builtin.Int1
   store %5 to %4 : $*Builtin.Int1
-  inject_enum_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
 
   %6 = load %1 : $*FakeOptional<Builtin.Int1>
   %7 = load %3 : $*FakeOptional<Builtin.Int1>
@@ -978,7 +978,7 @@ bb0(%0 : $*Builtin.Int1):
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
 // CHECK-NEXT: strong_retain [[B_PTR]]
-// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.Some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[B_PTR]] : $B
 // CHECK-NEXT: store [[ENUM]] to [[ALLOCA]] : $*FakeOptional<B>
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
@@ -987,14 +987,14 @@ bb0(%0 : $*Builtin.Int1):
 sil @enum_promotion_case2 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : $B):
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   store %0 to %3 : $*B
 
   // This instruction between the store and the inject_enum_addr should not prevent
   // the optimization.
   strong_retain %0 : $B
 
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   strong_release %0 : $B
@@ -1005,9 +1005,9 @@ bb0(%0 : $B):
 // CHECK-LABEL: sil @no_enum_promotion_of_non_concrete_types
 // CHECK: bb0
 // CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.None!enumelt
+// CHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.none!enumelt
 // CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.Some!enumelt.1
+// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
 // CHECK-NEXT: copy_addr
 // CHECK-NEXT:  inject_enum_addr
 // CHECK-NEXT: cond_br
@@ -1024,11 +1024,11 @@ bb0(%0 : $B):
 sil @no_enum_promotion_of_non_concrete_types : $@convention(thin) <T> (@inout T, Builtin.Int1) -> @out FakeOptional<T> {
 bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
   %3 = alloc_stack $FakeOptional<T>
-  inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.None!enumelt
+  inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.none!enumelt
   %4 = alloc_stack $FakeOptional<T>
-  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.Some!enumelt.1
+  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
   copy_addr [take] %1 to [initialization] %5 : $*T
-  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
   cond_br %2, bb1, bb2
 
 bb1:
@@ -1088,8 +1088,8 @@ bb0(%0 : $*E):
 sil @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
-  %1 = enum $FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.Int1
-  %2 = unchecked_enum_data %1 : $FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1
+  %1 = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1, %0 : $Builtin.Int1
+  %2 = unchecked_enum_data %1 : $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
   return %2 : $Builtin.Int1
 }
 
@@ -1195,10 +1195,10 @@ bb0(%0 : $E):
 // CHECK-NEXT: return
 sil @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout FakeOptional<B>) -> B {
 bb0(%0 : $*FakeOptional<B>):
-  %1 = switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+  %1 = switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   debug_value %2 : $*B  // should not prevent the optimization
   %3 = load %2 : $*B
   return %3 : $B
@@ -1372,7 +1372,7 @@ bb0:
 // CHECK-NEXT: return
 sil @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@convention(thin) (Builtin.NativeObject) -> FakeOptional<Builtin.NativeObject> {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.NativeObject
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1, %0 : $Builtin.NativeObject
   retain_value %1 : $FakeOptional<Builtin.NativeObject>
   br bb1
 
@@ -1609,11 +1609,11 @@ bb0:
 // CHECK-NOT: select_enum
   %1 = integer_literal $Builtin.Int32, 8
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %2 : $Int32
+  %3 = enum $Optional<Int32>, #Optional.some!enumelt.1, %2 : $Int32
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ONE:%[^ ]+]] = integer_literal $Builtin.Int1, -1
-  %5 = select_enum %3 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
+  %5 = select_enum %3 : $Optional<Int32>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ONE]]
   return %5 : $Builtin.Int1
 }
@@ -1623,11 +1623,11 @@ sil @isnil : $@convention(thin) () -> Builtin.Int1 {
 bb0:
 // CHECK: bb0
 // CHECK-NOT: select_enum
-  %1 = enum $Optional<Int>, #Optional.None!enumelt
+  %1 = enum $Optional<Int>, #Optional.none!enumelt
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ZERO:%[^ ]+]] = integer_literal $Builtin.Int1, 0
-  %5 = select_enum %1 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
+  %5 = select_enum %1 : $Optional<Int>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ZERO]]
   return %5 : $Builtin.Int1
 }
@@ -1685,11 +1685,11 @@ bb0(%0 : $*SSS):
 
 sil [readonly] @read_only_in : $@convention(thin) (@in SSS) -> ()
 
-struct MyError : ErrorType {
+struct MyError : ErrorProtocol {
 }
 
 sil @unknown : $@convention(thin) () -> ()
-sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
+sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
 
 //CHECK-LABEL: sil @test_delete_readonly_try_apply
 //CHECK:      bb0(%0 : $ZZZ): 
@@ -1704,15 +1704,15 @@ sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @er
 //CHECK:        return
 sil @test_delete_readonly_try_apply : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorType):
-  strong_release %8 : $ErrorType
+bb2(%8 : $ErrorProtocol):
+  strong_release %8 : $ErrorProtocol
   br bb3
 
 bb3:
@@ -1724,18 +1724,18 @@ bb3:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply1 : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorType):
+bb2(%8 : $ErrorProtocol):
   // Additional instructions in error block.
   %u = function_ref @unknown : $@convention(thin) () -> ()
   %r = apply %u() : $@convention(thin) () -> ()
-  strong_release %8 : $ErrorType
+  strong_release %8 : $ErrorProtocol
   br bb3
 
 bb3:
@@ -1747,8 +1747,8 @@ bb3:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply2 : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   // Additional instructions in normal return block.
@@ -1757,8 +1757,8 @@ bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorType):
-  strong_release %8 : $ErrorType
+bb2(%8 : $ErrorProtocol):
+  strong_release %8 : $ErrorProtocol
   br bb3
 
 bb3:
@@ -1770,15 +1770,15 @@ bb3:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply3 : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorType):
-  strong_release %8 : $ErrorType
+bb2(%8 : $ErrorProtocol):
+  strong_release %8 : $ErrorProtocol
   // Normal and error block don't have a common successor block.
   br bb4
 
@@ -1796,15 +1796,15 @@ bb4:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply4 : $@convention(thin) (@owned ZZZ, @owned ZZZ) -> @owned ZZZ {
 bb0(%0 : $ZZZ, %1 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3(%0 : $ZZZ)
 
-bb2(%8 : $ErrorType):
-  strong_release %8 : $ErrorType
+bb2(%8 : $ErrorProtocol):
+  strong_release %8 : $ErrorProtocol
   // Normal and error block don't use the same block arguments for the common successor.
   br bb3(%1 : $ZZZ)
 
@@ -1827,7 +1827,7 @@ struct FakeInt32 {
 // CHECK-NOT: switch_enum_addr
 sil @loadable_switch_enum_addr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
-  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
   br bb3
@@ -2573,7 +2573,7 @@ bb0(%0 : $@sil_unowned NClass, %1 : $@sil_unowned NClass):
 }
 
 
-enum VendingMachineError: ErrorType {
+enum VendingMachineError: ErrorProtocol {
     case InvalidSelection
     case InsufficientFunds(required: Double)
     case OutOfStock
@@ -2585,7 +2585,7 @@ enum VendingMachineError: ErrorType {
 // CHECK-NOT: alloc_existential_box
 // CHECK-NOT: enum $VendingMachineError
 // CHECK: return
-sil hidden @RemoveUnusedException : $@convention(thin) (Int32) -> (Double, @error ErrorType) {
+sil hidden @RemoveUnusedException : $@convention(thin) (Int32) -> (Double, @error ErrorProtocol) {
 bb0(%0 : $Int32):
   debug_value %0 : $Int32, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int32, 10         // user: %4
@@ -2594,15 +2594,15 @@ bb0(%0 : $Int32):
   cond_br %4, bb1, bb2                            // id: %5
 
 bb1:                                              // Preds: bb0
-  %6 = alloc_existential_box $ErrorType, $VendingMachineError // users: %8, %9, %13
-  %6a = project_existential_box $VendingMachineError in %6 : $ErrorType
+  %6 = alloc_existential_box $ErrorProtocol, $VendingMachineError // users: %8, %9, %13
+  %6a = project_existential_box $VendingMachineError in %6 : $ErrorProtocol
   %7 = enum $VendingMachineError, #VendingMachineError.OutOfStock!enumelt // user: %8
   store %7 to %6a : $*VendingMachineError        // id: %8
-  debug_value %6 : $ErrorType, let, name "error" // id: %9
+  debug_value %6 : $ErrorProtocol, let, name "error" // id: %9
   %10 = float_literal $Builtin.FPIEEE80, 0x3FFF8000000000000000 // 1 // user: %11
   %11 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%10 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %12
   %12 = struct $Double (%11 : $Builtin.FPIEEE64)  // user: %14
-  strong_release %6 : $ErrorType                // id: %13
+  strong_release %6 : $ErrorProtocol                // id: %13
   br bb3(%12 : $Double)                           // id: %14
 
 bb2:                                              // Preds: bb0
@@ -2770,21 +2770,21 @@ bb0(%0 : $*Optional<CC2>, %1 : $CC1, %2 : $CC3, %3 : $CC4, %4 : $CC2):
   %12 = partial_apply %5(%1, %8, %9) : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
   dealloc_stack %9 : $*CC4
   dealloc_stack %6 : $*CC3
-  %15 = convert_function %12 : $@callee_owned (@in CC2) -> Optional<Int> to $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  %15 = convert_function %12 : $@callee_owned (@in CC2) -> Optional<Int> to $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %16 = alloc_stack $Optional<Int>
   %17 = alloc_stack $Optional<CC2>
   copy_addr %0 to [initialization] %17 : $*Optional<CC2>
-  switch_enum_addr %17 : $*Optional<CC2>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
+  switch_enum_addr %17 : $*Optional<CC2>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %21 = unchecked_take_enum_data_addr %17 : $*Optional<CC2>, #Optional.Some!enumelt.1
+  %21 = unchecked_take_enum_data_addr %17 : $*Optional<CC2>, #Optional.some!enumelt.1
 
   %22 = alloc_stack $CC2
   copy_addr [take] %21 to [initialization] %22 : $*CC2
   %24 = alloc_stack $CC2
   copy_addr %22 to [initialization] %24 : $*CC2
   destroy_addr %22 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %28 = apply %12(%24) : $@callee_owned (@in CC2) -> Optional<Int>
   store %28 to %16 : $*Optional<Int>
   dealloc_stack %24 : $*CC2
@@ -2795,7 +2795,7 @@ bb1:
   %104 = alloc_stack $CC2
   copy_addr %102 to [initialization] %104 : $*CC2
   destroy_addr %102 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %108 = apply %12(%104) : $@callee_owned (@in CC2) -> Optional<Int>
   store %108 to %16 : $*Optional<Int>
   dealloc_stack %104 : $*CC2
@@ -2808,7 +2808,7 @@ bb1:
 bb2:
   %39 = alloc_stack $CC2
   store %4 to %39 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %42 = apply %12(%39) : $@callee_owned (@in CC2) -> Optional<Int>
   store %42 to %16 : $*Optional<Int>
   dealloc_stack %39 : $*CC2
@@ -2817,7 +2817,7 @@ bb2:
 
 bb3:
   destroy_addr %0 : $*Optional<CC2>
-  strong_release %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  strong_release %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %36 = load %16 : $*Optional<Int>
   dealloc_stack %16 : $*Optional<Int>
   return %36 : $Optional<Int>
@@ -2860,7 +2860,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
 // CHECK-NEXT: strong_release [[B_PTR]]
-// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.Some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[B_PTR]] : $B
 // CHECK-NEXT: store [[ENUM]] to [[ALLOCA]] : $*FakeOptional<B>
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
@@ -2869,14 +2869,14 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 sil @enum_promotion_case3 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : $B):
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   store %0 to %3 : $*B
 
   // This instruction between the store and the inject_enum_addr should not prevent
   // the optimization.
   strong_release %0 : $B
 
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   strong_release %0 : $B
@@ -2894,16 +2894,16 @@ sil @init_enum : $@convention(thin) () -> @out B
 // CHECK:  [[V3:%.*]] = alloc_stack $B
 // CHECK:               apply [[V2]]([[V3]])
 // CHECK:  [[V4:%.*]] = load [[V3]]
-// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.Some!enumelt.1, [[V4]]
+// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[V4]]
 // CHECK:  store [[V5]] to [[V1]]
 
 sil @enum_promotion_case4 : $@convention(thin) () -> @owned FakeOptional<B> {
 bb0:
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   %4 = function_ref @init_enum : $@convention(thin) () -> @out B
   %5 = apply %4(%3) : $@convention(thin) () -> @out B
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   return %7 : $FakeOptional<B>

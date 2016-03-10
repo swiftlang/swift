@@ -1,21 +1,21 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
-protocol IntegerArithmeticType {
+protocol IntegerArithmetic {
   static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Self, Bool)
 }
 
-protocol RandomAccessIndexType : IntegerArithmeticType {
-  typealias Distance : IntegerArithmeticType
+protocol RandomAccessIndex : IntegerArithmetic {
+  typealias Distance : IntegerArithmetic
   static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Distance, Bool)
 }
 
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtTQQq_F9archetype16ExistentialTuple
 // CHECK-SAME:             identifier: [[TT:".+"]])
-// archetype.ExistentialTuple <A : RandomAccessIndexType, B>(x : A, y : A) -> B
+// archetype.ExistentialTuple <A : RandomAccessIndex, B>(x : A, y : A) -> B
 // CHECK: !DISubprogram(name: "ExistentialTuple", linkageName: "_TF9archetype16ExistentialTuple
 // CHECK-SAME:          line: [[@LINE+2]]
 // CHECK-SAME:          isDefinition: true
-func ExistentialTuple<T: RandomAccessIndexType>(x: T, y: T) -> T.Distance {
+func ExistentialTuple<T: RandomAccessIndex>(x: T, y: T) -> T.Distance {
   // (B, Swift.Bool)
   // CHECK: !DILocalVariable(name: "tmp"
   // CHECK-SAME:             line: [[@LINE+2]]

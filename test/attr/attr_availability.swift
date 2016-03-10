@@ -196,8 +196,8 @@ func someFuncUsingOldAttribute() { }
 
 
 // <rdar://problem/23853709> Compiler crash on call to unavailable "print"
-func OutputStreamTest(message: String, to: inout OutputStreamType) {
-  print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'toStream' label for the target stream: 'print((...), toStream: &...)'}}
+func OutputStreamTest(message: String, to: inout OutputStream) {
+  print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'to' label for the target stream: 'print((...), to: &...)'}}
 }
 
 // expected-note@+1{{'T' has been explicitly marked unavailable here}}

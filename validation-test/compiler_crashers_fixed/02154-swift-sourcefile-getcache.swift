@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-enum S<f = b.Generator..c {
+enum S<f = b.Iterator..c {
 init(array: 1](a<T {
 }
 class a: Array) -> T, AnyObject, Any) -> String {
@@ -19,7 +19,7 @@ return x = b: b {
 }
 func c([c) -> Any) -> (g<T) in return [T> (bytes: a: A? = B)
 func b() -> Any) -> Any) ->("foobar"cd"\()
-func d.Generator.c<l : ()
+func d.Iterator.c<l : ()
 var b {
 }
 protocol d : b<T> {

@@ -17,13 +17,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator that never produces an element.
+/// An iterator that never produces an element.
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
-public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
+public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
   /// Construct an instance.
   public init() {}
 
@@ -34,10 +31,7 @@ public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
 }
 
 /// A collection whose element type is `Element` but that is always empty.
-public struct EmptyCollection<Element> : CollectionType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
+public struct EmptyCollection<Element> : Collection {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -57,11 +51,11 @@ public struct EmptyCollection<Element> : CollectionType {
     return 0
   }
 
-  /// Returns an empty generator.
+  /// Returns an empty iterator.
   ///
   /// - Complexity: O(1).
-  public func generate() -> EmptyGenerator<Element> {
-    return EmptyGenerator()
+  public func makeIterator() -> EmptyIterator<Element> {
+    return EmptyIterator()
   }
 
   /// Access the element at `position`.
@@ -74,5 +68,15 @@ public struct EmptyCollection<Element> : CollectionType {
   /// The number of elements (always zero).
   public var count: Int {
     return 0
+  }
+}
+
+@available(*, unavailable, renamed="EmptyIterator")
+public struct EmptyGenerator<Element> {}
+
+extension EmptyIterator {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> EmptyIterator<Element> {
+    fatalError("unavailable function can't be called")
   }
 }

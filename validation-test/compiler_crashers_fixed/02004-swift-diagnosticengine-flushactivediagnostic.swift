@@ -20,7 +20,7 @@ typealias B<1 {
 typealias B : b: (false)() {
 }
 let b = Int) -> {
-case c>(Any, g : CollectionType where T> (g, end: 1, AnyObject.C: Any] {
+case c>(Any, g : Collection where T> (g, end: 1, AnyObject.C: Any] {
 struct c {
 a")
 }

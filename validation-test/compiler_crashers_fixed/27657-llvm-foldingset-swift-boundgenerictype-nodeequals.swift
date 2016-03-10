@@ -9,4 +9,4 @@ struct B{{
 }class a{class A:a
 enum ct{
 struct B{
-func a<T:SequenceType
+func a<T:Sequence

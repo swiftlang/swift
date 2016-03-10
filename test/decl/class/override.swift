@@ -4,13 +4,13 @@ class A {
   func ret_sametype() -> Int { return 0 }
   func ret_subclass() -> A { return self }
   func ret_subclass_rev() -> B { return B() }
-  func ret_nonclass_optional() -> Int? { return .None }
+  func ret_nonclass_optional() -> Int? { return .none }
   func ret_nonclass_optional_rev() -> Int { return 0 }
-  func ret_class_optional() -> B? { return .None }
+  func ret_class_optional() -> B? { return .none }
   func ret_class_optional_rev() -> A { return self }
   func ret_class_uoptional() -> B! { return B() }
   func ret_class_uoptional_rev() -> A { return self }
-  func ret_class_optional_uoptional() -> B? { return .None }
+  func ret_class_optional_uoptional() -> B? { return .none }
   func ret_class_optional_uoptional_rev() -> A! { return self }
 
   func param_sametype(x : Int) {}
@@ -64,13 +64,13 @@ class E {
   var var_sametype: Int { get { return 0 } set {} }
   var var_subclass: E { get { return self } set {} } // expected-note{{attempt to override property here}}
   var var_subclass_rev: F { get { return F() } set {} } // expected-note{{attempt to override property here}}
-  var var_nonclass_optional: Int? { get { return .None } set {} } // expected-note{{attempt to override property here}}
+  var var_nonclass_optional: Int? { get { return .none } set {} } // expected-note{{attempt to override property here}}
   var var_nonclass_optional_rev: Int { get { return 0 } set {} } // expected-note{{attempt to override property here}}
-  var var_class_optional: F? { get { return .None } set {} } // expected-note{{attempt to override property here}}
+  var var_class_optional: F? { get { return .none } set {} } // expected-note{{attempt to override property here}}
   var var_class_optional_rev: E { get { return self } set {} } // expected-note{{attempt to override property here}}
   var var_class_uoptional: F! { get { return F() } set {} } // expected-note{{attempt to override property here}}
   var var_class_uoptional_rev: E { get { return self } set {} } // expected-note{{attempt to override property here}}
-  var var_class_optional_uoptional: F? { get { return .None } set {} }
+  var var_class_optional_uoptional: F? { get { return .none } set {} }
   var var_class_optional_uoptional_rev: E! { get { return self } set {} }
 
   var ro_sametype: Int { return 0 }
@@ -78,11 +78,11 @@ class E {
   var ro_subclass_rev: F { return F() }
   var ro_nonclass_optional: Int? { return 0 }
   var ro_nonclass_optional_rev: Int { return 0 } // expected-note{{attempt to override property here}}
-  var ro_class_optional: F? { return .None }
+  var ro_class_optional: F? { return .none }
   var ro_class_optional_rev: E { return self } // expected-note{{attempt to override property here}}
   var ro_class_uoptional: F! { return F() }
   var ro_class_uoptional_rev: E { return self } // expected-note{{attempt to override property here}}
-  var ro_class_optional_uoptional: F? { return .None }
+  var ro_class_optional_uoptional: F? { return .none }
   var ro_class_optional_uoptional_rev: E! { return self }
 }
 
@@ -96,7 +96,7 @@ class F : E {
   override var var_class_optional_rev: E? { get { return self } set {} } // expected-error{{property 'var_class_optional_rev' with type 'E?' cannot override a property with type 'E'}}
   override var var_class_uoptional: F { get { return F() } set {} } // expected-error{{cannot override mutable property 'var_class_uoptional' of type 'F!' with covariant type 'F'}}
   override var var_class_uoptional_rev: E! { get { return self }  set {} } // expected-error{{property 'var_class_uoptional_rev' with type 'E!' cannot override a property with type 'E'}}
-  override var var_class_optional_uoptional: F! { get { return .None } set {} }
+  override var var_class_optional_uoptional: F! { get { return .none } set {} }
   override var var_class_optional_uoptional_rev: E? { get { return self } set {} }
 
   override var ro_sametype: Int { return 0 }
@@ -108,7 +108,7 @@ class F : E {
   override var ro_class_optional_rev: E? { return self } // expected-error{{property 'ro_class_optional_rev' with type 'E?' cannot override a property with type 'E'}}
   override var ro_class_uoptional: F { return F() }
   override var ro_class_uoptional_rev: E! { return self } // expected-error{{property 'ro_class_uoptional_rev' with type 'E!' cannot override a property with type 'E'}}
-  override var ro_class_optional_uoptional: F! { return .None }
+  override var ro_class_optional_uoptional: F! { return .none }
   override var ro_class_optional_uoptional_rev: E? { return self }
 }
 

@@ -70,7 +70,7 @@ protocol A {
 }
 class C<D{
 }
-f(true as BooleanType)
+f(true as Boolean)
 class a {
     typealias b = b
 }

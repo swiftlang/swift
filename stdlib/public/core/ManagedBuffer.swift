@@ -34,9 +34,9 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
-  public final var allocatedElementCount: Int {
+  public final var capacity: Int {
     let p = ManagedBufferPointer<Value,Element>(self)
-    return p.allocatedElementCount
+    return p.capacity
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -98,21 +98,24 @@ public class ManagedBuffer<Value, Element>
   /// `initializeValue` on the partially-constructed object to
   /// generate an initial `Value`.
   public final class func create(
-    minimumCapacity: Int,
-    initialValue: (ManagedProtoBuffer<Value,Element>) -> Value
-  ) -> ManagedBuffer<Value,Element> {
+    minimumCapacity minimumCapacity: Int,
+    initialValue: (ManagedProtoBuffer<Value, Element>) -> Value
+  ) -> ManagedBuffer<Value, Element> {
 
     let p = ManagedBufferPointer<Value,Element>(
       bufferClass: self,
       minimumCapacity: minimumCapacity,
-      initialValue: { buffer, _ in initialValue(unsafeDowncast(buffer)) })
+      initialValue: { buffer, _ in
+        initialValue(
+          unsafeDowncast(buffer, to: ManagedProtoBuffer<Value, Element>.self))
+      })
 
-    return unsafeDowncast(p.buffer)
+    return unsafeDowncast(p.buffer, to: ManagedBuffer<Value, Element>.self)
   }
 
   /// Destroy the stored Value.
   deinit {
-    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.destroy() }
+    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.deinitialize() }
   }
 
   /// The stored `Value` instance.
@@ -147,8 +150,8 @@ public class ManagedBuffer<Value, Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToValue, pointerToElements) -> Void in
-///            pointerToElements.destroy(self.count)
-///            pointerToValue.destroy()
+///            pointerToElements.deinitialize(count: self.count)
+///            pointerToValue.deinitialize()
 ///          }
 ///        }
 ///
@@ -174,24 +177,24 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   ///   object and a function that can be called on it to get the actual
   ///   number of allocated elements.
   ///
-  /// - Requires: `minimumCapacity >= 0`, and the type indicated by
+  /// - Precondition: `minimumCapacity >= 0`, and the type indicated by
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Value` and any constructed `Element`s.
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
-    initialValue: (buffer: AnyObject, allocatedCount: (AnyObject) -> Int) -> Value
+    initialValue: (buffer: AnyObject, capacity: (AnyObject) -> Int) -> Value
   ) {
     self = ManagedBufferPointer(bufferClass: bufferClass, minimumCapacity: minimumCapacity)
 
     // initialize the value field
     withUnsafeMutablePointerToValue {
-      $0.initialize(
+      $0.initialize(with: 
         initialValue(
           buffer: self.buffer,
-          allocatedCount: {
-            ManagedBufferPointer(unsafeBufferObject: $0).allocatedElementCount
+          capacity: {
+            ManagedBufferPointer(unsafeBufferObject: $0).capacity
           }))
     }
     // FIXME: workaround for <rdar://problem/18619176>.  If we don't
@@ -201,9 +204,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Manage the given `buffer`.
   ///
-  /// - Requires: `buffer` is an instance of a non-`@objc` class whose
-  ///   `deinit` destroys its stored `Value` and any constructed
-  ///   `Element`s.
+  /// - Precondition: `buffer` is an instance of a non-`@objc` class whose
+  ///   `deinit` destroys its stored `Value` and any constructed `Element`s.
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
 
@@ -243,8 +245,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
-  public var allocatedElementCount: Int {
-    return (_allocatedByteCount &- _My._elementOffset) / strideof(Element)
+  public var capacity: Int {
+    return (_capacityInBytes &- _My._elementOffset) / strideof(Element)
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -306,7 +308,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - parameter minimumCapacity: The minimum number of `Element`s that
   ///   must be able to be stored in the new buffer.
   ///
-  /// - Requires: `minimumCapacity >= 0`, and the type indicated by
+  /// - Precondition: `minimumCapacity >= 0`, and the type indicated by
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Value` and any constructed `Element`s.
@@ -338,7 +340,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
       +  minimumCapacity * strideof(Element.self)
 
     let newBuffer: AnyObject = _swift_bufferAllocate(
-      _uncheckedBufferClass, totalSize, _My._alignmentMask)
+      bufferType: _uncheckedBufferClass,
+      size: totalSize,
+      alignmentMask: _My._alignmentMask)
 
     self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
   }
@@ -356,7 +360,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   internal static func _checkValidBufferClass(
     bufferClass: AnyClass, creating: Bool = false
   ) {
-    _debugPrecondition(
+    _stdlibAssert(
       _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
       || (
         !creating
@@ -364,7 +368,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
           == _valueOffset + sizeof(Value.self)),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
-    _debugPrecondition(
+    _stdlibAssert(
       _usesNativeSwiftReferenceCounting(bufferClass),
       "ManagedBufferPointer buffer class must be non-@objc"
     )
@@ -395,7 +399,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
 
   /// The actual number of bytes allocated for this object.
-  internal var _allocatedByteCount: Int {
+  internal var _capacityInBytes: Int {
     return _swift_stdlib_malloc_size(_address)
   }
 
@@ -406,7 +410,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Offset from the allocated storage for `self` to the stored `Value`
   internal static var _valueOffset: Int {
-    return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
+    return _roundUp(
+      sizeof(_HeapObject.self),
+      toAlignment: alignof(Value.self))
   }
 
   /// An **unmanaged** pointer to the storage for the `Value`
@@ -425,8 +431,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Offset from the allocated storage for `self` to the `Element` storage
   internal static var _elementOffset: Int {
-    return _roundUpToAlignment(
-      _valueOffset + sizeof(Value.self), alignof(Element.self))
+    return _roundUp(
+      _valueOffset + sizeof(Value.self),
+      toAlignment: alignof(Element.self))
   }
 
   internal var _nativeBuffer: Builtin.NativeObject
@@ -529,4 +536,11 @@ public func isUniquelyReferencedNonObjC<T : AnyObject>(
   object: inout T?
 ) -> Bool {
   return _isUnique(&object)
+}
+
+extension ManagedBufferPointer {
+  @available(*, unavailable, renamed="capacity")
+  public var allocatedElementCount: Int {
+    fatalError("unavailable function can't be called")
+  }
 }

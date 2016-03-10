@@ -14,7 +14,7 @@ struct d<f : e, g: e where g.h == f.h> {
 }
 protocol e {
 }
-func f BooleanType>(b: T) {
+func f Boolean>(b: T) {
 }
 f(   func b(b: X.Type) {
 }

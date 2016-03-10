@@ -45,7 +45,7 @@ struct SatisfySameTypeAssocTypeRequirementDependent<T>
 
 // Pulled in from old standard library to keep the following test
 // (LazySequenceOf) valid.
-public struct GeneratorOf<T> : GeneratorType, SequenceType {
+public struct GeneratorOf<T> : IteratorProtocol, Sequence {
 
   /// Construct an instance whose `next()` method calls `nextElement`.
   public init(_ nextElement: () -> T?) {
@@ -54,7 +54,7 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
   
   /// Construct an instance whose `next()` method pulls its results
   /// from `base`.
-  public init<G: GeneratorType where G.Element == T>(_ base: G) {
+  public init<I : IteratorProtocol where I.Element == T>(_ base: I) {
     var base = base
     self._next = { base.next() }
   }
@@ -62,24 +62,24 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: `next()` has not been applied to a copy of `self`
+  /// Precondition: `next()` has not been applied to a copy of `self`
   /// since the copy was made, and no preceding call to `self.next()`
   /// has returned `nil`.
   public mutating func next() -> T? {
     return _next()
   }
 
-  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`\ s
+  /// `GeneratorOf<T>` is also a `Sequence`, so it `generate`\ s
   /// a copy of itself
-  public func generate() -> GeneratorOf {
+  public func makeIterator() -> GeneratorOf {
     return self
   }
   let _next: () -> T?
 }
 
 // rdar://problem/19009056
-public struct LazySequenceOf<S : SequenceType, A where S.Generator.Element == A> : SequenceType {
-  public func generate() -> GeneratorOf<A> { 
+public struct LazySequenceOf<S : Sequence, A where S.Iterator.Element == A> : Sequence {
+  public func makeIterator() -> GeneratorOf<A> { 
     return GeneratorOf<A>({ return nil })
   }
   public subscript(i : A) -> A { return i }
@@ -89,14 +89,14 @@ public func iterate<A>(f : A -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? 
   return { x in nil }
 }
 
-public final class Iterate<A> : SequenceType {
-  typealias GeneratorType = IterateGenerator<A>
-  public func generate() -> IterateGenerator<A> {
+public final class Iterate<A> : Sequence {
+  typealias IteratorProtocol = IterateGenerator<A>
+  public func makeIterator() -> IterateGenerator<A> {
     return IterateGenerator<A>()
   }
 }
 
-public final class IterateGenerator<A> : GeneratorType {
+public final class IterateGenerator<A> : IteratorProtocol {
   public func next() -> A? {
     return nil
   }
@@ -142,7 +142,7 @@ protocol Seq {
 
 // rdar://problem/18435371
 extension Dictionary {
-    func multiSubscript<S: SequenceType where S.Generator.Element == Key>(seq: S) -> [Value?] {
+    func multiSubscript<S : Sequence where S.Iterator.Element == Key>(seq: S) -> [Value?] {
         var result = [Value?]()
         for seqElt in seq {
             result.append(self[seqElt])
@@ -190,7 +190,7 @@ struct Something<T> {
 }
 
 extension Something {
-    init<S: SequenceType where S.Generator.Element == T>(_ s: S) {
+    init<S : Sequence where S.Iterator.Element == T>(_ s: S) {
         for item in s {
             items.append(item)
         }
@@ -198,45 +198,45 @@ extension Something {
 }
 
 // rdar://problem/18120419
-func TTGenWrap<T, G: GeneratorType where G.Element == (T,T)>(gen: G)
+func TTGenWrap<T, I : IteratorProtocol where I.Element == (T,T)>(iterator: I)
 {
-  var gen = gen
-  _ = gen.next()
+  var iterator = iterator
+  _ = iterator.next()
 }
 
-func IntIntGenWrap<G: GeneratorType where G.Element == (Int,Int)>(gen: G)
+func IntIntGenWrap<I : IteratorProtocol where I.Element == (Int,Int)>(iterator: I)
 {
-  var gen = gen
-  _ = gen.next()
+  var iterator = iterator
+  _ = iterator.next()
 }
 
-func GGWrap<G1: GeneratorType, G2: GeneratorType where G1.Element == G2.Element>(g1: G1, _ g2: G2)
+func GGWrap<I1 : IteratorProtocol, I2 : IteratorProtocol where I1.Element == I2.Element>(i1: I1, _ i2: I2)
 {
-  var g1 = g1
-  var g2 = g2
-  _ = g1.next()
-  _ = g2.next()
+  var i1 = i1
+  var i2 = i2
+  _ = i1.next()
+  _ = i2.next()
 }
 
 func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
-  GGWrap(a.generate(), s.generate())
-  TTGenWrap(a.generate())
-  IntIntGenWrap(s.generate())
+  GGWrap(a.makeIterator(), s.makeIterator())
+  TTGenWrap(a.makeIterator())
+  IntIntGenWrap(s.makeIterator())
 }
 
 // rdar://problem/20256475
-protocol FooType {
+protocol FooProtocol {
   associatedtype Element
 
   func getElement() -> Element
 }
-protocol BarType {
-  associatedtype Foo : FooType
+protocol Bar {
+  associatedtype Foo : FooProtocol
 
   func getFoo() -> Foo
 
   mutating func extend<
-    C : FooType
+    C : FooProtocol
     where
     C.Element == Foo.Element
   >(elements: C)

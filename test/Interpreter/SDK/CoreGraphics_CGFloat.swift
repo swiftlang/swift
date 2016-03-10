@@ -70,19 +70,19 @@ CGFloatTestSuite.test("comparisons") {
   expectFalse(x <= z)
   expectTrue(x >= z)
   expectTrue(x > z)
-  checkComparable(.GT, x, z)
+  checkComparable(.gt, x, z)
 
   expectTrue(z < x)
   expectTrue(z <= x)
   expectFalse(z >= x)
   expectFalse(z > x)
-  checkComparable(.LT, z, x)
+  checkComparable(.lt, z, x)
 
   expectFalse(x < y)
   expectTrue(x <= y)
   expectTrue(x >= y)
   expectFalse(x > y)
-  checkComparable(.EQ, x, y)
+  checkComparable(.eq, x, y)
 }
 
 
@@ -105,7 +105,7 @@ CGFloatTestSuite.test("arithmetic") {
 CGFloatTestSuite.test("striding") {
   if true {
     var result = [CGFloat]()
-    for f in (1.0 as CGFloat).stride(to: 2.0, by: 0.5) {
+    for f in stride(from: (1.0 as CGFloat), to: 2.0, by: 0.5) {
       result.append(f)
     }
     expectEqual([ 1.0, 1.5 ], result)
@@ -113,7 +113,7 @@ CGFloatTestSuite.test("striding") {
 
   if true {
     var result = [CGFloat]()
-    for f in (1.0 as CGFloat).stride(through: 2.0, by: 0.5) {
+    for f in stride(from: (1.0 as CGFloat), through: 2.0, by: 0.5) {
       result.append(f)
     }
     expectEqual([ 1.0, 1.5, 2.0 ], result)
@@ -150,13 +150,13 @@ CGFloatTestSuite.test("bridging") {
 }
 
 CGFloatTestSuite.test("varargs") {
-  let v: CVarArgType = CGFloat(0)
+  let v: CVarArg = CGFloat(0)
   expectEqual(
-    "0.023230", NSString(format: "%.6f", CGFloat(0.02323) as CVarArgType))
+    "0.023230", NSString(format: "%.6f", CGFloat(0.02323) as CVarArg))
   expectEqual(
-    "0.123450", NSString(format: "%.6f", CGFloat(0.12345) as CVarArgType))
+    "0.123450", NSString(format: "%.6f", CGFloat(0.12345) as CVarArg))
   expectEqual(
-    "1.234560", NSString(format: "%.6f", CGFloat(1.23456) as CVarArgType))
+    "1.234560", NSString(format: "%.6f", CGFloat(1.23456) as CVarArg))
 }
 
 runAllTests()

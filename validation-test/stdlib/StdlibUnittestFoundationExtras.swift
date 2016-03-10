@@ -25,7 +25,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(NSLocale)") {
     let result = withOverriddenNSLocaleCurrentLocale(
       NSLocale(localeIdentifier: "en_US")) {
       () -> Int in
-      expectEqual("en_US", NSLocale.currentLocale().localeIdentifier)
+      expectEqual("en_US", NSLocale.current().localeIdentifier)
       return 42
     }
     expectEqual(42, result)
@@ -34,7 +34,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(NSLocale)") {
     let result = withOverriddenNSLocaleCurrentLocale(
       NSLocale(localeIdentifier: "uk")) {
       () -> Int in
-      expectEqual("uk", NSLocale.currentLocale().localeIdentifier)
+      expectEqual("uk", NSLocale.current().localeIdentifier)
       return 42
     }
     expectEqual(42, result)
@@ -63,7 +63,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(String)") {
   do {
     let result = withOverriddenNSLocaleCurrentLocale("en_US") {
       () -> Int in
-      expectEqual("en_US", NSLocale.currentLocale().localeIdentifier)
+      expectEqual("en_US", NSLocale.current().localeIdentifier)
       return 42
     }
     expectEqual(42, result)
@@ -71,7 +71,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(String)") {
   do {
     let result = withOverriddenNSLocaleCurrentLocale("uk") {
       () -> Int in
-      expectEqual("uk", NSLocale.currentLocale().localeIdentifier)
+      expectEqual("uk", NSLocale.current().localeIdentifier)
       return 42
     }
     expectEqual(42, result)

@@ -4,6 +4,6 @@ import Swift
 protocol P {
   typealias CodeUnit
   mutating func decode<
-    G : GeneratorType where G.Element == CodeUnit
+    G : IteratorProtocol where G.Element == CodeUnit
   >(next: inout G) -> Int
 }

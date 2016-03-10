@@ -14,7 +14,7 @@ protocol a {
 }
 protocol c {
 }
-(f: BooleanType>("")
+(f: Boolean>("")
 protocol b {
 struct c {
 }

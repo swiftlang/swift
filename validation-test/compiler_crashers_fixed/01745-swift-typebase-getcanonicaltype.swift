@@ -15,7 +15,7 @@ enum A {
 print(a<S : NSObject {
 i<T> T: P> (")!)
 struct A {
-func c(t.Generator.Generator.a<h: ExtensibleCollectionType>) -> {
+func c(t.Iterator.Iterator.a<h: ExtensibleCollectionType>) -> {
 var b = B(#object1, g == Swift.B
 }
 override func g.E == a)

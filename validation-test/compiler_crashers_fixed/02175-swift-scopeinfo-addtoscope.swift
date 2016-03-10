@@ -19,7 +19,7 @@ protocol a {
 }
 }
 protocol A : a {
-class A : CollectionType where H) -> U) {
+class A : Collection where H) -> U) {
 var b {
 }
 protocol b {

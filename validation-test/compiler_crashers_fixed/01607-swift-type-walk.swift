@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 protocol b {
-func b(object1: SequenceType, A> a {
+func b(object1: Sequence, A> a {
 func a"A, T) {
 struct c<h: a {
 func x: X<T : () -> {

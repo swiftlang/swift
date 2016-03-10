@@ -15,5 +15,5 @@ return nil
 }
 }
 struct c {
-enum S<d where f: CollectionType where l.e: U -> {
+enum S<d where f: Collection where l.e: U -> {
 static let n1: [T>()]

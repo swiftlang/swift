@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func c: a):
-func b(x: SequenceType> String {
+func b(x: Sequence> String {
 }
 protocol a {
 class A {

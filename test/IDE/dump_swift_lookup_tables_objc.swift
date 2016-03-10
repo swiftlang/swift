@@ -5,6 +5,7 @@
 // RUN: FileCheck -check-prefix=CHECK-OMIT-NEEDLESS-WORDS %s < %t-omit-needless-words.log
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 // CHECK-LABEL: <<Foundation lookup table>>
 // CHECK:   NSTimeIntervalSince1970:
@@ -49,11 +50,11 @@
 // CHECK-NEXT:     TU: __swift
 // CHECK-NEXT:   accessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility accessibilityFloat]
-// CHECK-NEXT:   categoryMethodWithX:
+// CHECK-NEXT:   categoryMethodWith:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass categoryMethodWithX:y:], -[SNSomeClass categoryMethodWithX:y:z:]
 // CHECK-NEXT:   doubleProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.doubleProperty
-// CHECK-NEXT:   extensionMethodWithX:
+// CHECK-NEXT:   extensionMethodWith:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass extensionMethodWithX:y:]
 // CHECK-NEXT:   floatProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.floatProperty
@@ -61,17 +62,15 @@
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithFloat:], -[SNSomeClass initWithDefault], +[SNSomeClass someClassWithDouble:], +[SNSomeClass someClassWithTry:], +[SNSomeClass buildWithUnsignedChar:]
 // CHECK-NEXT:     UIActionSheet: -[UIActionSheet initWithTitle:delegate:cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:]
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports initAndReturnError:], -[NSErrorImports initWithFloat:error:]
-// CHECK-NEXT:   instanceMethodWithX:
+// CHECK-NEXT:   instanceMethodWith:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:Y:Z:]
 // CHECK-NEXT:   method:
-// CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodAndReturnError:]
-// CHECK-NEXT:   methodWithFloat:
-// CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodAndReturnError:], -[NSErrorImports methodWithFloat:error:]
 // CHECK-NEXT:   objectAtIndexedSubscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 // CHECK-NEXT:   optSetter:
 // CHECK-NEXT:     SNCollision: SNCollision.optSetter
-// CHECK-NEXT:   protoInstanceMethodWithX:
+// CHECK-NEXT:   protoInstanceMethodWith:
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
 // CHECK-NEXT:   reqSetter:
 // CHECK-NEXT:     SNCollision: SNCollision.reqSetter

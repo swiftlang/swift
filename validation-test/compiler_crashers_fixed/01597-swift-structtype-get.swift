@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol b : BooleanType>? {
+protocol b : Boolean>? {
 }
 protocol a : b {
 func f: A, AnyObject, T> T>? = a

@@ -19,7 +19,7 @@ typealias e = 0
 if true{
 {
 var:(<T>(e = c<T: B<T.b{
-typealias e:CollectionType where T.e = c<T where H.h =nil
+typealias e:Collection where T.e = c<T where H.h =nil
 struct Q<func u( )
 class B<T where T where H.e = 0
 struct S< {
@@ -31,7 +31,7 @@ let:d
 let a {struct Q<T.e = ")
 typealias e : d = [Void>
 }}
-let:CollectionType where H:e:d:a{
+let:Collection where H:e:d:a{
 func a=b() {
 struct c
 class p {

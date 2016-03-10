@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-if true as BooleanType>) -> {
+if true as Boolean>) -> {
 func dc: T] = {
 class A {
 class A : C {
@@ -21,7 +21,7 @@ clas
 }
 }
 }
-func k) -> T>(m>: SequenceType, q
+func k) -> T>(m>: Sequence, q
 class C((i: g = T, b : e(("
 }
 }

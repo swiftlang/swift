@@ -6,14 +6,14 @@
 
 func c<e>() -> (e -> e) -> e {
 e, e -> e) ->)func d(f: b) -> <e>(() -> e) -> b {
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b:  [c<d>] {
 }
 protocol a {
 }
 class b: a {
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
 func e() {
 }

@@ -54,7 +54,7 @@ func funcdecl5(a: Int, y: Int) {
   }
 
   // FIXME: This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+  if x {}   // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 
   if true {
     if (B) {
@@ -94,7 +94,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'BooleanType'}}
+  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'Boolean'}}
 }
 
 // test "builder" API style
@@ -328,7 +328,7 @@ Loop:  // expected-note {{previously declared here}}
   
   // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
   switch x {
-  case .Some(42): break
+  case .some(42): break
   case nil: break
   
   }
@@ -383,7 +383,7 @@ func test_require(x : Int, y : Int??, cond : Bool) {
   markUsed(a)
   guard let b = y where cond else {}
   guard case let c = x where cond else {}
-  guard case let Optional.Some(d) = y else {}
+  guard case let Optional.some(d) = y else {}
   guard x != 4, case _ = x else { }
 
 
@@ -428,7 +428,7 @@ func r18776073(a : Int?) {
 
 // <rdar://problem/22491782> unhelpful error message from "throw nil"
 func testThrowNil() throws {
-  throw nil  // expected-error {{cannot infer concrete ErrorType for thrown 'nil' value}}
+  throw nil  // expected-error {{cannot infer concrete ErrorProtocol for thrown 'nil' value}}
 }
 
 

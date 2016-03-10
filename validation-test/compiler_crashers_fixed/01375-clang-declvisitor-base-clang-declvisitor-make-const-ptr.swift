@@ -57,7 +57,7 @@ return d.c(AnyObject, AnyObject) {
 }
 default:
 }
-convenience init(bytes: SequenceType> V>(Any, Any) {
+convenience init(bytes: Sequence> V>(Any, Any) {
 }
 var f.E == B
 self.init(f<T) {

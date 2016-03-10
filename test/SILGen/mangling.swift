@@ -87,7 +87,7 @@ func uses_objc_class_and_protocol(o o: NSObject, p: NSAnsing) {}
 func uses_clang_struct(r r: NSRect) {}
 
 // CHECK-LABEL: sil hidden @_TF8mangling14uses_optionalsFT1xGSqSi__GSqSc_
-func uses_optionals(x x: Int?) -> UnicodeScalar? { return Optional() }
+func uses_optionals(x x: Int?) -> UnicodeScalar? { return nil }
 
 enum GenericUnion<T> {
   // CHECK-LABEL: sil shared [transparent] @_TFO8mangling12GenericUnion3FoourfMGS0_x_FSiGS0_x_
@@ -157,25 +157,25 @@ func curry1() {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@convention(thin) () -> (Int, @error ErrorType)
+// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@convention(thin) () -> (Int, @error ErrorProtocol)
 func bar() throws -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@convention(thin) () -> @error ErrorType
+// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@convention(thin) () -> @error ErrorProtocol
 func curry1Throws() throws {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> (), @error ErrorType)
+// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> (), @error ErrorProtocol)
 func curry2Throws() throws -> () -> () {
   return curry1
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@convention(thin) () -> @owned @callee_owned () -> @error ErrorType
+// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@convention(thin) () -> @owned @callee_owned () -> @error ErrorProtocol
 func curry3() -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> @error ErrorType, @error ErrorType)
+// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> @error ErrorProtocol, @error ErrorProtocol)
 func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }

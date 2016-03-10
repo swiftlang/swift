@@ -4,6 +4,6 @@
 // Test case found by fuzzing
 
 struct d<T where h: a {struct S<B{
-class a{struct B<T : BooleanType {
+class a{struct B<T : Boolean {
 struct B:
 a ST

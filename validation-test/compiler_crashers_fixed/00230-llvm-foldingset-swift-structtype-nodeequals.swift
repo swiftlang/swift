@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 func i(c: () -> ()) {

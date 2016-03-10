@@ -13,28 +13,28 @@
 /// A sequence of pairs built out of two underlying sequences, where
 /// the elements of the `i`th pair are the `i`th elements of each
 /// underlying sequence.
-public func zip<Sequence1 : SequenceType, Sequence2 : SequenceType>(
+public func zip<Sequence1 : Sequence, Sequence2 : Sequence>(
   sequence1: Sequence1, _ sequence2: Sequence2
 ) -> Zip2Sequence<Sequence1, Sequence2> {
-  return Zip2Sequence(sequence1, sequence2)
+  return Zip2Sequence(_sequence1: sequence1, _sequence2: sequence2)
 }
 
-/// A generator for `Zip2Sequence`.
-public struct Zip2Generator<
-  Generator1 : GeneratorType, Generator2 : GeneratorType
-> : GeneratorType {
+/// An iterator for `Zip2Sequence`.
+public struct Zip2Iterator<
+  Iterator1 : IteratorProtocol, Iterator2 : IteratorProtocol
+> : IteratorProtocol {
   /// The type of element returned by `next()`.
-  public typealias Element = (Generator1.Element, Generator2.Element)
+  public typealias Element = (Iterator1.Element, Iterator2.Element)
 
-  /// Construct around a pair of underlying generators.
-  public init(_ generator1: Generator1, _ generator2: Generator2) {
-    (_baseStream1, _baseStream2) = (generator1, generator2)
+  /// Construct around a pair of underlying iterators.
+  internal init(_ iterator1: Iterator1, _ iterator2: Iterator2) {
+    (_baseStream1, _baseStream2) = (iterator1, iterator2)
   }
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
+  /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Element? {
@@ -56,49 +56,43 @@ public struct Zip2Generator<
     return (element1, element2)
   }
 
-  internal var _baseStream1: Generator1
-  internal var _baseStream2: Generator2
+  internal var _baseStream1: Iterator1
+  internal var _baseStream2: Iterator2
   internal var _reachedEnd: Bool = false
 }
 
 /// A sequence of pairs built out of two underlying sequences, where
 /// the elements of the `i`th pair are the `i`th elements of each
 /// underlying sequence.
-public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
-  : SequenceType {
+public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
+  : Sequence {
 
-  public typealias Stream1 = Sequence1.Generator
-  public typealias Stream2 = Sequence2.Generator
+  public typealias Stream1 = Sequence1.Iterator
+  public typealias Stream2 = Sequence2.Iterator
 
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
-  public typealias Generator = Zip2Generator<Stream1, Stream2>
+  public typealias Iterator = Zip2Iterator<Stream1, Stream2>
+
+  @available(*, unavailable, renamed="Iterator")
+  public typealias Generator = Iterator
 
   /// Construct an instance that makes pairs of elements from `sequence1` and
   /// `sequence2`.
-  public init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
+  public // @testable
+  init(_sequence1 sequence1: Sequence1, _sequence2 sequence2: Sequence2) {
     (_sequence1, _sequence2) = (sequence1, sequence2)
   }
 
-  /// Returns a generator over the elements of this sequence.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Generator {
-    return Generator(
-      _sequence1.generate(),
-      _sequence2.generate())
+  public func makeIterator() -> Iterator {
+    return Iterator(
+      _sequence1.makeIterator(),
+      _sequence2.makeIterator())
   }
 
   internal let _sequence1: Sequence1
   internal let _sequence2: Sequence2
 }
-
-@available(*, unavailable, renamed="Zip2Generator")
-public struct ZipGenerator2<
-  Generator1 : GeneratorType, Generator2 : GeneratorType
-> {}
-
-@available(*, unavailable, renamed="Zip2Sequence")
-public struct Zip2<
-  Sequence1 : SequenceType, Sequence2 : SequenceType
-> {}

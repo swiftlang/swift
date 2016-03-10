@@ -289,7 +289,7 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
 /// unknown enum.
 ///
 /// \code
-/// struct NSSomeOptionSet : OptionSetType {
+/// struct NSSomeOptionSet : OptionSet {
 ///   let rawValue: Raw
 /// }
 /// \endcode
@@ -1200,7 +1200,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   // Make the property decl
   auto errorDomainPropertyDecl = new (swiftCtx) VarDecl(
       isStatic,
-      /*isLet=*/false, noLoc, swiftCtx.Id_NSErrorDomain, stringTy, swiftDecl);
+      /*isLet=*/false, noLoc, swiftCtx.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
@@ -1911,7 +1911,7 @@ namespace {
       // Note that this is a raw option set type.
       structDecl->getAttrs().add(
         new (Impl.SwiftContext) SynthesizedProtocolAttr(
-                                  KnownProtocolKind::OptionSetType));
+                                  KnownProtocolKind::OptionSet));
 
       
       // Create a field to store the underlying value.
@@ -1939,9 +1939,9 @@ namespace {
                                 /*wantCtorParamNames=*/true,
                                 /*wantBody=*/!Impl.hasFinishedTypeChecking());
 
-      // Build an OptionSetType conformance for the type.
+      // Build an OptionSet conformance for the type.
       ProtocolDecl *protocols[]
-        = {cxt.getProtocol(KnownProtocolKind::OptionSetType)};
+        = {cxt.getProtocol(KnownProtocolKind::OptionSet)};
       populateInheritedTypes(structDecl, protocols);
 
       structDecl->addMember(labeledValueConstructor);

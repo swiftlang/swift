@@ -42,13 +42,13 @@ struct c<h : b> : b {
     typealias d = h
     typealias e = a<c<h>, d>
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
     return []
 }
-func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
+func some<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
     for (mx : T?) in xs {
        func a(b:T -> T) -> T {
     var b: ((T, T -> T) -> T)!

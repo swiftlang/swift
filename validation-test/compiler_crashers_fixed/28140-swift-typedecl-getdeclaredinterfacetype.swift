@@ -7,7 +7,7 @@
 class c{
 let a{
 a
-struct S<>:CollectionType
+struct S<>:Collection
 struct S{
 struct S{
 struct S{

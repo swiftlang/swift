@@ -50,17 +50,17 @@ func useEmAll(model: CCMagnetismModel) {
 }
 
 // Ensure that accessors are emitted for fields used as protocol witnesses.
-protocol ImpedanceType {
+protocol Impedance {
   typealias Component
   var real: Component { get }
   var imag: Component { get }
 }
 
-extension CCImpedance: ImpedanceType {}
+extension CCImpedance: Impedance {}
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4realwx9Component
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf9ImpedanceS0_FS1_g4realwx9Component
 // CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4realSd
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4imagwx9Component
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf9ImpedanceS0_FS1_g4imagwx9Component
 // CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4imagSd
 
 class MyMagnetism : CCMagnetismModel {

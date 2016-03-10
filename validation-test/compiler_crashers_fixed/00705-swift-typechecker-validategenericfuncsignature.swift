@@ -18,6 +18,6 @@ func b.<j : e?) ->(.E == e> Any, U) {
 }
 }
 }
-var d where k) -> <d.B : CollectionType where f: A) as String
+var d where k) -> <d.B : Collection where f: A) as String
 var a: Array<d>Bool]()
 typealias d.co

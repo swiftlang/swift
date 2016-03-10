@@ -7,6 +7,6 @@
 class c {
 a<S {
 }
-let t: SequenceType where I.R
+let t: Sequence where I.R
 protocol d : a {
 func a

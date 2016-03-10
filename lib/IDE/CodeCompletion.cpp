@@ -2694,12 +2694,12 @@ public:
     return false;
   }
 
-  void handleOptionSetType(Decl *D, DeclVisibilityKind Reason) {
+  void handleOptionSet(Decl *D, DeclVisibilityKind Reason) {
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      if (isOptionSetTypeDecl(NTD)) {
+      if (isOptionSetDecl(NTD)) {
         for (auto M : NTD->getMembers()) {
           if (auto *VD = dyn_cast<VarDecl>(M)) {
-            if (isOptionSetType(VD->getType()) && VD->isStatic()) {
+            if (isOptionSet(VD->getType()) && VD->isStatic()) {
               addVarDeclRef(VD, Reason);
             }
           }
@@ -2708,8 +2708,8 @@ public:
     }
   }
 
-  bool isOptionSetTypeDecl(NominalTypeDecl *D) {
-    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetTypeDecl());
+  bool isOptionSetDecl(NominalTypeDecl *D) {
+    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetDecl());
     if (!optionSetType)
       return false;
 
@@ -2718,10 +2718,10 @@ public:
                                 optionSetType, conformances);
   }
 
-  bool isOptionSetType(Type Ty) {
+  bool isOptionSet(Type Ty) {
     return Ty &&
            Ty->getNominalOrBoundGenericNominal() &&
-           isOptionSetTypeDecl(Ty->getNominalOrBoundGenericNominal());
+           isOptionSetDecl(Ty->getNominalOrBoundGenericNominal());
   }
 
   void getTupleExprCompletions(TupleType *ExprType) {
@@ -3319,7 +3319,7 @@ public:
         if (HandledDecls.count(NTD) == 0) {
           auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
           if (!Lookup.handleEnumElement(NTD, Reason)) {
-            Lookup.handleOptionSetType(NTD, Reason);
+            Lookup.handleOptionSet(NTD, Reason);
           }
           HandledDecls.insert(NTD);
         }
@@ -3362,7 +3362,7 @@ public:
       if (T && T->getNominalOrBoundGenericNominal()) {
         auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
         if (!handleEnumElement(T->getNominalOrBoundGenericNominal(), Reason)) {
-          handleOptionSetType(T->getNominalOrBoundGenericNominal(), Reason);
+          handleOptionSet(T->getNominalOrBoundGenericNominal(), Reason);
         }
       }
     }
@@ -4414,7 +4414,7 @@ public:
          if (auto SEQ = FES->getSequence()) {
            if (SM.rangeContains(SEQ->getSourceRange(),
                                 ParsedExpr->getSourceRange())) {
-             Callback(Context.getSequenceTypeDecl()->getDeclaredInterfaceType());
+             Callback(Context.getSequenceDecl()->getDeclaredInterfaceType());
            }
          }
          break;

@@ -91,7 +91,7 @@ class F: D {
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuo
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
-// CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+// CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:         apply [[FORCE_UNWRAP_FN]]<B>([[UNWRAP_Y_ADDR:%[0-9]*]],
 // CHECK:         [[UNWRAP_Y:%.*]] = load [[UNWRAP_Y_ADDR]]
 // CHECK:         [[RES:%.*]] = apply {{%.*}}([[WRAP_X]], [[UNWRAP_Y]], %2, %3)
@@ -181,7 +181,7 @@ class Noot : Aap {
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dV13vtable_thunks1S_XFo__dGSqS0___
 // CHECK:         [[INNER:%.*]] = apply %0()
-// CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, %1 : $S
+// CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %1 : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot3map{{.*}}
@@ -192,7 +192,7 @@ class Noot : Aap {
 // CHECK:         return [[OUTER]]
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqV13vtable_thunks1S__oXFo__oCS_4Noot__XFo_dS0__oXFo__oGSqCS_3Aap___
-// CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, %0
+// CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %0
 // CHECK:         [[INNER:%.*]] = apply %1(%2)
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_owned () -> @owned Noot to $@callee_owned () -> @owned Optional<Aap>
 // CHECK:         return [[OUTER]]

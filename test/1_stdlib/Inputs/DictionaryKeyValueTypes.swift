@@ -12,16 +12,17 @@ func equalsUnordered<T : Comparable>(
   lhs: Array<(T, T)>, _ rhs: Array<(T, T)>
 ) -> Bool {
   func comparePair(lhs: (T, T), _ rhs: (T, T)) -> Bool {
-    return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
+    return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
   }
-  return lhs.sort(comparePair).elementsEqual(rhs.sort(comparePair)) {
+  return lhs.sorted(isOrderedBefore: comparePair)
+    .elementsEqual(rhs.sorted(isOrderedBefore: comparePair)) {
     (lhs: (T, T), rhs: (T, T)) -> Bool in
     lhs.0 == rhs.0 && lhs.1 == rhs.1
   }
 }
 
 func equalsUnordered<T : Comparable>(lhs: [T], _ rhs: [T]) -> Bool {
-  return lhs.sort().elementsEqual(rhs.sort())
+  return lhs.sorted().elementsEqual(rhs.sorted())
 }
 
 var _keyCount = _stdlib_AtomicInt(0)
@@ -188,7 +189,7 @@ func < (
 ) -> Bool {
   let lhsElements = [ lhs.value, Int(bitPattern: lhs.valueIdentity) ]
   let rhsElements = [ rhs.value, Int(bitPattern: rhs.valueIdentity) ]
-  return lhsElements.lexicographicalCompare(rhsElements)
+  return lhsElements.lexicographicallyPrecedes(rhsElements)
 }
 
 func _equalsWithoutElementIdentity(
@@ -242,7 +243,7 @@ func < (
 ) -> Bool {
   let lhsElements = [ lhs.value, Int(bitPattern: lhs.valueIdentity) ]
   let rhsElements = [ rhs.value, Int(bitPattern: rhs.valueIdentity) ]
-  return lhsElements.lexicographicalCompare(rhsElements)
+  return lhsElements.lexicographicallyPrecedes(rhsElements)
 }
 
 func _makeExpectedSetContents(
@@ -308,7 +309,7 @@ func < (
     rhs.key, rhs.value, Int(bitPattern: rhs.keyIdentity),
     Int(bitPattern: rhs.valueIdentity)
   ]
-  return lhsElements.lexicographicalCompare(rhsElements)
+  return lhsElements.lexicographicallyPrecedes(rhsElements)
 }
 
 func _equalsUnorderedWithoutElementIdentity(
@@ -332,4 +333,3 @@ func _makeExpectedDictionaryContents(
   }
   return result
 }
-

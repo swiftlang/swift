@@ -1,3 +1,5 @@
+// Test is no longer valid as there is no longer `map` as a free function in Swift 3
+// XFAIL: *
 // DUPLICATE-OF: 26813-generic-enum-tuple-optional-payload.swift
 // RUN: not --crash %target-swift-frontend %s -parse
 

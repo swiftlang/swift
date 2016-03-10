@@ -8,7 +8,7 @@ var f, g {
 let end = a {l {
 }
 }
-protocol B : SequenceType, b {
+protocol B : Sequence, b {
 func b) {
 typealias d>("[B)) -> String {
 }

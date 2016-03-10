@@ -80,7 +80,7 @@ struct A : P2 {
   func wonka() {}
 }
 let a = A()
-for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'SequenceType'}}
+for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'Sequence'}}
 }
 
 // Generic as part of function/tuple types
@@ -139,11 +139,23 @@ infix operator ***~ {
 func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
+@available(*, unavailable, message="call the 'map()' method on the sequence")
+public func myMap<C : Collection, T>(
+  source: C, _ transform: (C.Iterator.Element) -> T
+) -> [T] {
+  fatalError("unavailable function can't be called")
+}
+
+@available(*, unavailable, message="call the 'map()' method on the optional value")
+public func myMap<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
+  fatalError("unavailable function can't be called")
+}
+
 // <rdar://problem/20142523>
 // FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to
 // make sure that it doesn't crash.
 func rdar20142523() {
-  map(0..<10, { x in // expected-error{{ambiguous reference to member '..<'}}
+  myMap(0..<10, { x in // expected-error{{ambiguous reference to member '..<'}}
     ()
     return x
   })
@@ -174,16 +186,16 @@ func recArea(h: Int, w : Int) {
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
 func r17224804(monthNumber : Int) {
   // expected-error @+2 {{binary operator '+' cannot be applied to operands of type 'String' and 'Int'}}
-  // expected-note @+1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
+  // expected-note @+1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (UnsafeMutablePointer<Pointee>, Int), (UnsafePointer<Pointee>, Int)}}
   let monthString = (monthNumber <= 9) ? ("0" + monthNumber) : String(monthNumber)
 }
 
 // <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
 func r17020197(x : Int?, y : Int) {
-  if x! {  }  // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+  if x! {  }  // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 
   // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
-  if y {}    // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+  if y {}    // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 }
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
@@ -522,13 +534,13 @@ func testTypeSugar(a : Int) {
 
   let x = Stride(a)
   x+"foo"            // expected-error {{binary operator '+' cannot be applied to operands of type 'Stride' (aka 'Int') and 'String'}}
-// expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Memory>), (Int, UnsafePointer<Memory>)}}
+// expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 }
 
 // <rdar://problem/21974772> SegFault in FailureDiagnosis::visitInOutExpr
 func r21974772(y : Int) {
   let x = &(1.0 + y)  // expected-error {{binary operator '+' cannot be applied to operands of type 'Double' and 'Int'}}
-   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
+   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (UnsafeMutablePointer<Pointee>, Int), (UnsafePointer<Pointee>, Int)}}
 }
 
 // <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
@@ -542,12 +554,12 @@ func r22020088bar(p: r22020088P?) {
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
 func f(arguments: [String]) -> [ArraySlice<String>] {
-  return arguments.split(1, allowEmptySlices: true, isSeparator: { $0 == "--" })
+  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, isSeparator: { $0 == "--" })
 }
 
 
 
-struct AOpts : OptionSetType {
+struct AOpts : OptionSet {
   let rawValue : Int
 }
 
@@ -571,7 +583,7 @@ func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
   
-  let closureIndex = closures.indexOf{$0 === testClosure} // expected-error {{cannot convert value of type 'MyClosure' (aka 'Array<Int> -> Bool') to expected argument type 'AnyObject?'}}
+  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot convert value of type 'MyClosure' (aka 'Array<Int> -> Bool') to expected argument type 'AnyObject?'}}
 }
 
 // <rdar://problem/18397777> QoI: special case comparisons with nil
@@ -629,7 +641,7 @@ func r22470302(c: r22470302Class) {
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
   @available(*, unavailable, message="calling this is unwise")
-  func unavail<T : SequenceType where T.Generator.Element == String> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
+  func unavail<T : Sequence where T.Iterator.Element == String> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
     (a : T) -> String {}
 }
 extension Array {
@@ -647,16 +659,16 @@ func safeAssign<T: RawRepresentable>(lhs: inout T) -> Bool {}
 // expected-note @-1 {{in call to function 'safeAssign'}}
 let a = safeAssign // expected-error {{generic parameter 'T' could not be inferred}}
 
-
 // <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
-func foo() -> [Int] {
-  return Array <Int> (count: 1) { // expected-error {{cannot invoke initializer for type 'Array<Int>' with an argument list of type '(count: Int, () -> Int)'}}
-    // expected-note @-1 {{expected an argument list of type '(count: Int, repeatedValue: Element)'}}
+struct Radar21692808<Element> {
+  init(count: Int, value: Element) {}
+}
+func radar21692808() -> Radar21692808<Int> {
+  return Radar21692808<Int>(count: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(count: Int, () -> Int)'}}
+    // expected-note @-1 {{expected an argument list of type '(count: Int, value: Element)'}}
     return 1
   }
 }
-
-
 
 // <rdar://problem/17557899> - This shouldn't suggest calling with ().
 func someOtherFunction() {}
@@ -708,8 +720,8 @@ func r23272739(contentType: String) {
 // <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
 func r23641896() {
   var g = "Hello World"
-  g.replaceRange(0...2, with: "ce")  // expected-error {{String may not be indexed with 'Int', it has variable size elements}}
-  // expected-note @-1 {{consider using an existing high level algorithm, str.startIndex.advancedBy(n), or a projection like str.utf8}}
+  g.replaceSubrange(0...2, with: "ce")  // expected-error {{String may not be indexed with 'Int', it has variable size elements}}
+  // expected-note @-1 {{consider using an existing high level algorithm, str.startIndex.advanced(by: n), or a projection like str.utf8}}
 
   _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 

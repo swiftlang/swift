@@ -4,8 +4,8 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct c<d where T : SequenceType> {
+struct c<d where T : Sequence> {
 let a {
-case b = a(x) -> Int -> Any) as a: SequenceType> Self {
+case b = a(x) -> Int -> Any) as a: Sequence> Self {
 }
 p {

@@ -5,6 +5,6 @@
 // Test case found by fuzzing
 
 "A, """
-protocol e = A>, g : SequenceType> [T : b = a)
+protocol e = A>, g : Sequence> [T : b = a)
 if true as a(")
 class A<T where B == b> : k.e =

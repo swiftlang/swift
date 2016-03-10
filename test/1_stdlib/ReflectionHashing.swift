@@ -25,7 +25,7 @@ Reflection.test("Dictionary/Empty") {
   let dict = [Int : Int]()
 
   var output = ""
-  dump(dict, &output)
+  dump(dict, to: &output)
 
   var expected = "- 0 key/value pairs\n"
 
@@ -36,7 +36,7 @@ Reflection.test("Dictionary") {
   let dict = [ "One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5 ]
 
   var output = ""
-  dump(dict, &output)
+  dump(dict, to: &output)
 
 #if arch(i386) || arch(arm)
   var expected = ""
@@ -85,7 +85,7 @@ Reflection.test("Set") {
   let s = Set(1...5)
 
   var output = ""
-  dump(s, &output)
+  dump(s, to: &output)
 
 #if arch(i386) || arch(arm)
   var expected = ""

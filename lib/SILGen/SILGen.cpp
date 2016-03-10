@@ -144,8 +144,8 @@ GET_BRIDGING_FN(Darwin, REQUIRED, Bool, REQUIRED, DarwinBoolean)
 GET_BRIDGING_FN(Darwin, REQUIRED, DarwinBoolean, REQUIRED, Bool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorType)
-GET_BRIDGING_FN(Foundation, REQUIRED, ErrorType, REQUIRED, NSError)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorProtocol)
+GET_BRIDGING_FN(Foundation, REQUIRED, ErrorProtocol, REQUIRED, NSError)
 GET_BRIDGING_FN(Foundation, REQUIRED, String, REQUIRED, NSString)
 GET_BRIDGING_FN(Foundation, OPTIONAL, NSString, REQUIRED, String)
 GET_BRIDGING_FN(Foundation, GENERIC, Array, REQUIRED, NSArray)
@@ -977,8 +977,8 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
   auto argv = new (gen.F.getModule()) SILArgument(
                                   entry, FnTy->getParameters()[1].getSILType());
 
-  // If the standard library provides a _didEnterMain intrinsic, call it first
-  // thing.
+  // If the standard library provides a _stdlib_didEnterMain intrinsic, call it
+  // first thing.
   if (auto didEnterMain = C.getDidEnterMain(nullptr)) {
     ManagedValue params[] = {
       ManagedValue::forUnmanaged(argc),

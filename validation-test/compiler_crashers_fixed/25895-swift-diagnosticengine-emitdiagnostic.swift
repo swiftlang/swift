@@ -7,6 +7,6 @@
 func c
 class c
 enum b{
-class A:CollectionType
+class A:Collection
 }enum b{
 class A:c

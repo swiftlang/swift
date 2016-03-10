@@ -6,4 +6,4 @@
 
 func d<b>() -> [f<b>] {
 }
-struct f<S: SequenceType, e where Optional<e> == S.Generator.Element
+struct f<S: Sequence, e where Optional<e> == S.Iterator.Element

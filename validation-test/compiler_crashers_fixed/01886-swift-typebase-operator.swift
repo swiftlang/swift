@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-var b = a(v: d == a: SequenceType> {
+var b = a(v: d == a: Sequence> {
 func b("a(f(f<H : B<d<d.c(c = { x }
 func f(b
 var d) -> String {

@@ -21,7 +21,7 @@ public func sort(a: String, b: String) -> Bool {
 
 public func demo() {
     var names = ["Sean", "Barry", "Kate"]
-    var sortedNames = names.sort(sort)
+    var sortedNames = names.sorted(isOrderedBefore: sort)
     var sortedNamesAsString : String = String()
     for name in sortedNames {
         sortedNamesAsString += ("\(name), ")

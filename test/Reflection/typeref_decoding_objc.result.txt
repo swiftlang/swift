@@ -759,7 +759,7 @@ TypesToReflect.OC : Swift.AnyObject.Protocol
 TypesToReflect.OC : __ObjC.NSObjectProtocol.Protocol
 TypesToReflect.OC : Swift.Equatable.Protocol
 TypesToReflect.OC : Swift.Hashable.Protocol
-TypesToReflect.OC : Swift.CVarArgType.Protocol
+TypesToReflect.OC : Swift.CVarArg.Protocol
 TypesToReflect.OC : Swift.CustomStringConvertible.Protocol
 TypesToReflect.OC : Swift.CustomDebugStringConvertible.Protocol
 TypesToReflect.C1 : Swift.AnyObject.Protocol
@@ -804,7 +804,7 @@ TypesToReflect.GenericOC : Swift.AnyObject.Protocol
 TypesToReflect.GenericOC : __ObjC.NSObjectProtocol.Protocol
 TypesToReflect.GenericOC : Swift.Equatable.Protocol
 TypesToReflect.GenericOC : Swift.Hashable.Protocol
-TypesToReflect.GenericOC : Swift.CVarArgType.Protocol
+TypesToReflect.GenericOC : Swift.CVarArg.Protocol
 TypesToReflect.GenericOC : Swift.CustomStringConvertible.Protocol
 TypesToReflect.GenericOC : Swift.CustomDebugStringConvertible.Protocol
 

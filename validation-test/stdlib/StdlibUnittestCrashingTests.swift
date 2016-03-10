@@ -11,7 +11,7 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-_setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
+_setOverrideOSVersion(.osx(major: 10, minor: 9, bugFix: 3))
 _setTestSuiteFailedCallback() { print("abort()") }
 
 //
@@ -94,7 +94,7 @@ TestSuiteCrashes.test("fails3") {
 // CHECK: [     FAIL ] TestSuiteCrashes.fails3
 
 TestSuiteCrashes.test("crashesUnexpectedlyXfail")
-  .xfail(.OSXBugFix(10, 9, 3, reason: "")).code {
+  .xfail(.osxBugFix(10, 9, 3, reason: "")).code {
   print("crashesUnexpectedlyXfail")
   fatalError("this should crash")
 }
@@ -104,7 +104,7 @@ TestSuiteCrashes.test("crashesUnexpectedlyXfail")
 // CHECK: [    XFAIL ] TestSuiteCrashes.crashesUnexpectedlyXfail
 
 TestSuiteCrashes.test("crashesAsExpectedXfail")
-  .xfail(.OSXBugFix(10, 9, 3, reason: "")).code {
+  .xfail(.osxBugFix(10, 9, 3, reason: "")).code {
   print("crashesAsExpectedXfail")
   expectCrashLater()
   fatalError("this should crash")

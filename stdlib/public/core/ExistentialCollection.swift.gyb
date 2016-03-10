@@ -19,52 +19,50 @@ internal func _abstract(file: StaticString = #file, line: UInt = #line) {
   fatalError("Method must be overridden", file: file, line: line)
 }
 
-//===--- Generator --------------------------------------------------------===//
+//===--- Iterator ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// A type-erased generator of `Element`.
+/// A type-erased iterator of `Element`.
 ///
-/// This generator forwards its `next()` method to an arbitrary underlying
-/// generator having the same `Element` type, hiding the specifics of the
-/// underlying `GeneratorType`.
+/// This iterator forwards its `next()` method to an arbitrary underlying
+/// iterator having the same `Element` type, hiding the specifics of the
+/// underlying `IteratorProtocol`.
 ///
 /// - seealso:
-///   - `struct AnySequence<S : SequenceType>`
-public struct AnyGenerator<Element> : GeneratorType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
-  /// Create a `GeneratorType` instance that wraps `base` but whose type
-  /// depends only on the type of `G.Element`.
+///   - `struct AnySequence<S : Sequence>`
+public struct AnyIterator<Element> : IteratorProtocol {
+  /// Create a `IteratorProtocol` instance that wraps `base` but whose type
+  /// depends only on the type of `I.Element`.
   ///
   /// Example:
   ///
-  ///     func countStrings() -> AnyGenerator<String> {
+  ///     func digits() -> AnyIterator<String> {
   ///       let lazyStrings = (0..<10).lazy.map { String($0) }
   ///
   ///       // This is a really complicated type of no interest to our
   ///       // clients.
-  ///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
-  ///         = lazyStrings.generate()
-  ///       return AnyGenerator(g)
+  ///       let iterator: MapSequenceIterator<RangeIterator<Int>, String>
+  ///         = lazyStrings.makeIterator()
+  ///       return AnyIterator(iterator)
   ///     }
-  public init<G : GeneratorType where G.Element == Element>(_ base: G) {
-    self._box = _GeneratorBox(base)
+  public // @testable
+  init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
+    self._box = _IteratorBox(base)
   }
 
-  /// Create a `GeneratorType` instance whose `next` method invokes
+  /// Create a `IteratorProtocol` instance whose `next` method invokes
   /// `body` and returns the result.
   ///
   /// Example:
   ///
   ///     var x = 7
-  ///     let g = AnyGenerator { x < 15 ? x++ : nil }
-  ///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
+  ///     let iterator = AnyIterator { x < 15 ? x++ : nil }
+  ///     let a = Array(iterator) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
   public init(body: () -> Element?) {
-    self._box = _GeneratorBox(_ClosureBasedGenerator(body))
+    self._box = _IteratorBox(_ClosureBasedIterator(body))
   }
 
-  internal init(_box: _AnyGeneratorBoxBase<Element>) {
+  internal init(_box: _AnyIteratorBoxBase<Element>) {
     self._box = _box
   }
 
@@ -74,24 +72,14 @@ public struct AnyGenerator<Element> : GeneratorType {
     return _box.next()
   }
 
-  internal let _box: _AnyGeneratorBoxBase<Element>
+  internal let _box: _AnyIteratorBoxBase<Element>
 }
 
-/// Every `GeneratorType` can also be a `SequenceType`.  Note that
-/// traversing the sequence consumes the generator.
-extension AnyGenerator : SequenceType {}
+/// Every `IteratorProtocol` can also be a `Sequence`.  Note that
+/// traversing the sequence consumes the iterator.
+extension AnyIterator : Sequence {}
 
-@available(*, deprecated, renamed="AnyGenerator")
-public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
-  return AnyGenerator(base)
-}
-
-@available(*, deprecated, renamed="AnyGenerator")
-public func anyGenerator<Element>(body: () -> Element?) -> AnyGenerator<Element> {
-  return AnyGenerator(body: body)
-}
-
-internal struct _ClosureBasedGenerator<Element> : GeneratorType {
+internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
   internal init(_ body: () -> Element?) {
     self._body = body
   }
@@ -99,21 +87,21 @@ internal struct _ClosureBasedGenerator<Element> : GeneratorType {
   internal let _body: () -> Element?
 }
 
-internal class _AnyGeneratorBase {}
+internal class _AnyIteratorBase {}
 
-internal class _AnyGeneratorBoxBase<Element>
-  : _AnyGeneratorBase, GeneratorType {
+internal class _AnyIteratorBoxBase<Element>
+  : _AnyIteratorBase, IteratorProtocol {
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
   /// - Note: Subclasses must override this method.
-  internal func next() -> Element? {_abstract()}
+  internal func next() -> Element? { _abstract() }
 }
 
-internal final class _GeneratorBox<
-  Base : GeneratorType
-> : _AnyGeneratorBoxBase<Base.Element> {
+internal final class _IteratorBox<
+  Base : IteratorProtocol
+> : _AnyIteratorBoxBase<Base.Element> {
   internal init(_ base: Base) { self._base = base }
   internal override func next() -> Base.Element? { return _base.next() }
   internal var _base: Base
@@ -128,11 +116,11 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 //===----------------------------------------------------------------------===//
 
 internal class _AnySequenceBox<Element> {
-  internal func generate() -> AnyGenerator<Element> { _abstract() }
+  internal func makeIterator() -> AnyIterator<Element> { _abstract() }
 
-  internal func _underestimateCount() -> Int { _abstract() }
+  internal var _underestimatedCount: Int { _abstract() }
 
-  internal func _initializeTo(ptr: UnsafeMutablePointer<Element>)
+  internal func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
     _abstract()
   }
@@ -148,37 +136,37 @@ internal class _AnySequenceBox<Element> {
 
 internal class _AnyCollectionBoxBase<Element> : _AnySequenceBox<Element> {
   internal init(
-    startIndex: _ForwardIndexBoxType, endIndex: _ForwardIndexBoxType
+    startIndex: _ForwardIndexBoxProtocol, endIndex: _ForwardIndexBoxProtocol
   ) {
     self.startIndex = startIndex
     self.endIndex = endIndex
   }
-  internal let startIndex: _ForwardIndexBoxType
-  internal let endIndex: _ForwardIndexBoxType
+  internal let startIndex: _ForwardIndexBoxProtocol
+  internal let endIndex: _ForwardIndexBoxProtocol
 }
 
 % for Kind in ['Sequence', 'Collection']:
 // FIXME: can't make this a protocol due to <rdar://20209031>
 internal final class _${Kind}Box<
-  S : ${Kind}Type
+  S : ${Kind}
 %   if Kind == 'Sequence':
   where
-    S.SubSequence : ${Kind}Type,
-    S.SubSequence.Generator.Element == S.Generator.Element,
+    S.SubSequence : ${Kind},
+    S.SubSequence.Iterator.Element == S.Iterator.Element,
     S.SubSequence.SubSequence == S.SubSequence
 %   end
-> : _Any${Kind}Box<S.Generator.Element> {
-  typealias Element = S.Generator.Element
+> : _Any${Kind}Box<S.Iterator.Element> {
+  typealias Element = S.Iterator.Element
 
-  override func generate() -> AnyGenerator<Element> {
-    return AnyGenerator(_base.generate())
+  override func makeIterator() -> AnyIterator<Element> {
+    return AnyIterator(_base.makeIterator())
   }
-  override func _underestimateCount() -> Int {
-    return _base.underestimateCount()
+  override var _underestimatedCount: Int {
+    return _base.underestimatedCount
   }
-  override func _initializeTo(ptr: UnsafeMutablePointer<Element>)
+  override func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
-    return _base._initializeTo(ptr)
+    return _base._copyContents(initializing: ptr)
   }
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     return _base._copyToNativeArrayBuffer()._storage
@@ -196,7 +184,7 @@ internal final class _${Kind}Box<
   override func _count() -> IntMax {
     return numericCast(_base.count)
   }
-  override subscript(position: _ForwardIndexBoxType) -> Element {
+  override subscript(position: _ForwardIndexBoxProtocol) -> Element {
     if let i = position._unbox() as S.Index? {
       return _base[i]
     }
@@ -204,8 +192,8 @@ internal final class _${Kind}Box<
   }
   init(
     _ base: S,
-    startIndex: _ForwardIndexBoxType,
-    endIndex: _ForwardIndexBoxType
+    startIndex: _ForwardIndexBoxProtocol,
+    endIndex: _ForwardIndexBoxProtocol
   ) {
     self._base = base
     super.init(startIndex: startIndex, endIndex: endIndex)
@@ -219,60 +207,60 @@ internal final class _${Kind}Box<
 }
 % end
 
-internal struct _ClosureBasedSequence<Generator : GeneratorType>
-  : SequenceType {
+internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
+  : Sequence {
 
-  internal init(_ makeUnderlyingGenerator: () -> Generator) {
-    self._makeUnderlyingGenerator = makeUnderlyingGenerator
+  internal init(_ makeUnderlyingIterator: () -> Iterator) {
+    self._makeUnderlyingIterator = makeUnderlyingIterator
   }
 
-  internal func generate() -> Generator {
-    return _makeUnderlyingGenerator()
+  internal func makeIterator() -> Iterator {
+    return _makeUnderlyingIterator()
   }
 
-  internal var _makeUnderlyingGenerator: () -> Generator
+  internal var _makeUnderlyingIterator: () -> Iterator
 }
 
 /// A type-erased sequence.
 ///
 /// Forwards operations to an arbitrary underlying sequence having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `SequenceType`.
+/// `Sequence`.
 ///
-/// - SeeAlso: `AnyGenerator<Element>`.
-public struct AnySequence<Element> : SequenceType {
+/// - SeeAlso: `AnyIterator<Element>`.
+public struct AnySequence<Element> : Sequence {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
   /// Wrap and forward operations to `base`.
   public init<
-    S: SequenceType
+    S: Sequence
     where
-      S.Generator.Element == Element,
-      S.SubSequence : SequenceType,
-      S.SubSequence.Generator.Element == Element,
+      S.Iterator.Element == Element,
+      S.SubSequence : Sequence,
+      S.SubSequence.Iterator.Element == Element,
       S.SubSequence.SubSequence == S.SubSequence
   >(_ base: S) {
     _box = _SequenceBox(base)
   }
 
-  /// Create a sequence whose `generate()` method forwards to
-  /// `makeUnderlyingGenerator`.
-  public init<G : GeneratorType where G.Element == Element>(
-    _ makeUnderlyingGenerator: () -> G
+  /// Create a sequence whose `makeIterator()` method forwards to
+  /// `makeUnderlyingIterator`.
+  public init<I : IteratorProtocol where I.Element == Element>(
+    _ makeUnderlyingIterator: () -> I
   ) {
-    self.init(_ClosureBasedSequence(makeUnderlyingGenerator))
+    self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
 
   internal init(_ box: _AnySequenceBox<Element>) {
     _box = box
   }
 
-  /// Returns a generator over the elements of this sequence.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func generate() -> AnyGenerator<Element> {
-    return _box.generate()
+  public func makeIterator() -> AnyIterator<Element> {
+    return _box.makeIterator()
   }
 
   internal let _box: _AnySequenceBox<Element>
@@ -292,13 +280,13 @@ extension AnySequence {
 
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
 extension Any${Kind} {
-  public func underestimateCount() -> Int {
-    return _box._underestimateCount()
+  public var underestimatedCount: Int {
+    return _box._underestimatedCount
   }
 
-  public func _initializeTo(ptr: UnsafeMutablePointer<Element>)
+  public func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
-    return _box._initializeTo(ptr)
+    return _box._copyContents(initializing: ptr)
   }
 
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
@@ -311,42 +299,42 @@ extension Any${Kind} {
 //===--- ForwardIndex -----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _ForwardIndexBoxType : class {
+internal protocol _ForwardIndexBoxProtocol : class {
   var typeID: ObjectIdentifier { get }
 
   @warn_unused_result
-  func successor() -> _ForwardIndexBoxType
+  func successor() -> _ForwardIndexBoxProtocol
 
   func _successorInPlace()
 
   @warn_unused_result
-  func equals(other: _ForwardIndexBoxType) -> Bool
+  func equals(other: _ForwardIndexBoxProtocol) -> Bool
 
   @warn_unused_result
-  func _unbox<T : ForwardIndexType>() -> T?
+  func _unbox<T : ForwardIndex>() -> T?
 
   @warn_unused_result
-  func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
+  func _distance(to other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance
 
-  // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
+  // FIXME: Can't return Self from _advanced(by:) pending <rdar://20181253>
   @warn_unused_result
-  func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxType
+  func _advanced(by distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol
 
   @warn_unused_result
-  func _advancedBy(
-    distance: AnyForwardIndex.Distance,
-    _ limit: _ForwardIndexBoxType
-  ) -> _ForwardIndexBoxType
+  func _advanced(
+    by distance: AnyForwardIndex.Distance,
+    limit: _ForwardIndexBoxProtocol
+  ) -> _ForwardIndexBoxProtocol
 }
 
 internal class _ForwardIndexBox<
-  BaseIndex: ForwardIndexType
-> : _ForwardIndexBoxType {
+  BaseIndex: ForwardIndex
+> : _ForwardIndexBoxProtocol {
   required init(_ base: BaseIndex) {
     self.base = base
   }
 
-  func successor() -> _ForwardIndexBoxType {
+  func successor() -> _ForwardIndexBoxProtocol {
     return self.dynamicType.init(self.base.successor())
   }
 
@@ -354,36 +342,36 @@ internal class _ForwardIndexBox<
     self.base._successorInPlace()
   }
 
-  func unsafeUnbox(other: _ForwardIndexBoxType) -> BaseIndex {
-    return (unsafeDowncast(other) as _ForwardIndexBox).base
+  func unsafeUnbox(other: _ForwardIndexBoxProtocol) -> BaseIndex {
+    return unsafeDowncast(other, to: _ForwardIndexBox.self).base
   }
 
-  func equals(other: _ForwardIndexBoxType) -> Bool {
+  func equals(other: _ForwardIndexBoxProtocol) -> Bool {
     return base == unsafeUnbox(other)
   }
 
-  func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance {
-    return numericCast(base.distanceTo(unsafeUnbox(other)))
+  func _distance(to other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance {
+    return numericCast(base.distance(to: unsafeUnbox(other)))
   }
 
-  func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxType {
-    return self.dynamicType.init(base.advancedBy(numericCast(n)))
+  func _advanced(by n: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol {
+    return self.dynamicType.init(base.advanced(by: numericCast(n)))
   }
 
-  func _advancedBy(
-    n: AnyForwardIndex.Distance,
-    _ limit: _ForwardIndexBoxType
-  ) -> _ForwardIndexBoxType {
+  func _advanced(
+    by n: AnyForwardIndex.Distance,
+    limit: _ForwardIndexBoxProtocol
+  ) -> _ForwardIndexBoxProtocol {
     return self.dynamicType.init(
-      base.advancedBy(numericCast(n), limit: unsafeUnbox(limit)))
+      base.advanced(by: numericCast(n), limit: unsafeUnbox(limit)))
   }
 
-  func _unbox<T : ForwardIndexType>() -> T? {
+  func _unbox<T : ForwardIndex>() -> T? {
     if T.self is BaseIndex.Type {
       _sanityCheck(BaseIndex.self is T.Type)
       // This bit cast is really nothing as we have proven they are
       // the same type.
-      return unsafeBitCast(base, T.self)
+      return unsafeBitCast(base, to: T.self)
     }
     return nil
   }
@@ -397,23 +385,23 @@ internal class _ForwardIndexBox<
 //===--- BidirectionalIndex -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
-  func predecessor() -> _BidirectionalIndexBoxType
+internal protocol _BidirectionalIndexBoxProtocol : _ForwardIndexBoxProtocol {
+  func predecessor() -> _BidirectionalIndexBoxProtocol
   func _predecessorInPlace()
 }
 
 internal class _BidirectionalIndexBox<
-  BaseIndex: BidirectionalIndexType
-> : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxType {
+  BaseIndex: BidirectionalIndex
+> : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxProtocol {
   required init(_ base: BaseIndex) {
     super.init(base)
   }
 
-  override func successor() -> _ForwardIndexBoxType {
+  override func successor() -> _ForwardIndexBoxProtocol {
     return self.dynamicType.init(self.base.successor())
   }
 
-  func predecessor() -> _BidirectionalIndexBoxType {
+  func predecessor() -> _BidirectionalIndexBoxProtocol {
     return self.dynamicType.init(self.base.predecessor())
   }
 
@@ -425,11 +413,11 @@ internal class _BidirectionalIndexBox<
 //===--- RandomAccessIndex ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _RandomAccessIndexBoxType : _BidirectionalIndexBoxType {}
+internal protocol _RandomAccessIndexBoxProtocol : _BidirectionalIndexBoxProtocol {}
 
 internal final class _RandomAccessIndexBox<
-  BaseIndex: RandomAccessIndexType
-> : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxType {
+  BaseIndex: RandomAccessIndex
+> : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxProtocol {
   required init(_ base: BaseIndex) {
     super.init(base)
   }
@@ -441,22 +429,22 @@ internal final class _RandomAccessIndexBox<
 % for Traversal in traversals:
 
 %   Self = 'Any%sIndex' % Traversal
-/// A wrapper over an underlying `${Traversal}IndexType` that hides
+/// A wrapper over an underlying `${Traversal}Index` that hides
 /// the specific underlying type.
 ///
 /// - SeeAlso: `Any${Traversal}Collection`
-public struct ${Self} : ${Traversal}IndexType {
+public struct ${Self} : ${Traversal}Index {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: ${Traversal}IndexType>(_ base: BaseIndex) {
+  public init<BaseIndex : ${Traversal}Index>(_ base: BaseIndex) {
     _box = _${Traversal}IndexBox(base)
   }
 
   /// Returns the next consecutive value in a discrete sequence of
   /// `${Self}` values.
   ///
-  /// - Requires: `self` has a well-defined successor.
+  /// - Precondition: `self` has a well-defined successor.
   public func successor() -> ${Self} {
     return ${Self}(_box.successor())
   }
@@ -474,7 +462,7 @@ public struct ${Self} : ${Traversal}IndexType {
   /// Returns the previous consecutive value in a discrete sequence of
   /// `${Self}` values.
   ///
-  /// - Requires: `self` has a well-defined predecessor.
+  /// - Precondition: `self` has a well-defined predecessor.
   public func predecessor() -> ${Self} {
     return ${Self}(_box.predecessor())
   }
@@ -490,16 +478,16 @@ public struct ${Self} : ${Traversal}IndexType {
   % end
 
   % if Traversal == 'RandomAccess':
-  public func distanceTo(other: ${Self}) -> Distance {
-    return _box._distanceTo(other._box)
+  public func distance(to other: ${Self}) -> Distance {
+    return _box._distance(to: other._box)
   }
 
-  public func advancedBy(amount: Distance) -> ${Self} {
-    return ${Self}(_box._advancedBy(amount))
+  public func advanced(by amount: Distance) -> ${Self} {
+    return ${Self}(_box._advanced(by: amount))
   }
 
-  public func advancedBy(amount: Distance, limit: ${Self}) -> ${Self} {
-    return ${Self}(_box._advancedBy(amount, limit._box))
+  public func advanced(by amount: Distance, limit: ${Self}) -> ${Self} {
+    return ${Self}(_box._advanced(by: amount, limit: limit._box))
   }
   % end
 
@@ -509,27 +497,27 @@ public struct ${Self} : ${Traversal}IndexType {
     return _box.typeID
   }
 
-  internal init(_ box: _ForwardIndexBoxType) {
+  internal init(_ box: _ForwardIndexBoxProtocol) {
     self._box = box${
-      '' if Traversal == 'Forward' else ' as! _%sIndexBoxType' % Traversal}
+      '' if Traversal == 'Forward' else ' as! _%sIndexBoxProtocol' % Traversal}
   }
 
   // _box is passed inout to _isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.
-  internal var _box: _${Traversal}IndexBoxType
+  internal var _box: _${Traversal}IndexBoxProtocol
 
-  public func _distanceTo(other: ${Self}) -> ${Self}.Distance {
+  public func _distance(to other: ${Self}) -> ${Self}.Distance {
     precondition(
       self._typeID == other._typeID,
       "distance: base index types differ.")
-    return self._box._distanceTo(other._box)
+    return self._box._distance(to: other._box)
   }
 }
 
 /// Returns `true` iff `lhs` and `rhs` wrap equal underlying
 /// `${Self}`s.
 ///
-/// - Requires: The types of indices wrapped by `lhs` and `rhs` are
+/// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
 ///   identical.
 @warn_unused_result
 public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
@@ -542,14 +530,14 @@ public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
 //===----------------------------------------------------------------------===//
 
 internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
-  subscript(_: _ForwardIndexBoxType) -> Element {_abstract()}
-  func _count() -> IntMax {_abstract()}
+  internal subscript(_: _ForwardIndexBoxProtocol) -> Element { _abstract() }
+  internal func _count() -> IntMax { _abstract() }
 
   // FIXME: should be inherited, but a known bug prevents it since
   // this class is generic.
-  override init(
-    startIndex: _ForwardIndexBoxType,
-    endIndex: _ForwardIndexBoxType
+  internal override init(
+    startIndex: _ForwardIndexBoxProtocol,
+    endIndex: _ForwardIndexBoxProtocol
   ) {
     super.init(startIndex: startIndex, endIndex: endIndex)
   }
@@ -561,7 +549,7 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
 ///
 /// This protocol can be considered an implementation detail of the
 /// `===` and `!==` implementations for these types.
-public protocol AnyCollectionType : CollectionType {
+public protocol AnyCollectionProtocol : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `_underlyingCollectionID`.
   var _underlyingCollectionID: ObjectIdentifier { get }
@@ -570,7 +558,7 @@ public protocol AnyCollectionType : CollectionType {
 /// Returns `true` iff `lhs` and `rhs` store the same underlying collection.
 @warn_unused_result
 public func === <
-  L: AnyCollectionType, R: AnyCollectionType
+  L : AnyCollectionProtocol, R : AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   return lhs._underlyingCollectionID == rhs._underlyingCollectionID
 }
@@ -578,7 +566,7 @@ public func === <
 /// Returns `false` iff `lhs` and `rhs` store the same underlying collection.
 @warn_unused_result
 public func !== <
-  L: AnyCollectionType, R: AnyCollectionType
+  L : AnyCollectionProtocol, R : AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   return lhs._underlyingCollectionID != rhs._underlyingCollectionID
 }
@@ -589,13 +577,10 @@ public func !== <
 ///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// - SeeAlso: ${', '.join('`Any%sType`' % t for t in (2 * traversals)[ti + 1 : ti + 3]) }
-public struct Any${Traversal}Collection<Element> : AnyCollectionType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
+public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
   typealias Box = _AnyCollectionBox<Element>
 
 %   for SubTraversal in traversals[ti:]:
@@ -604,8 +589,9 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   ///
   /// - Complexity: O(1).
   public init<
-    C: CollectionType
-      where C.Index: ${SubTraversal}IndexType, C.Generator.Element == Element
+    C : Collection
+    where
+    C.Index : ${SubTraversal}Index, C.Iterator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
@@ -626,25 +612,25 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
 
 %   for SuperTraversal in traversals[:ti]:
   /// If the indices of the underlying collection stored by `other`
-  /// satisfy `${Traversal}IndexType`, create an
+  /// satisfy `${Traversal}Index`, create an
   /// `Any${Traversal}Collection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///
   /// - Complexity: O(1).
   public init?(_ other: Any${SuperTraversal}Collection<Element>) {
-    if !(other._box.startIndex is _${Traversal}IndexBoxType) {
+    if !(other._box.startIndex is _${Traversal}IndexBoxProtocol) {
       return nil
     }
-    _sanityCheck(other._box.endIndex is _${Traversal}IndexBoxType)
+    _sanityCheck(other._box.endIndex is _${Traversal}IndexBoxProtocol)
     self._box = other._box
   }
 %   end
 
-  /// Returns a generator over the elements of this collection.
+  /// Returns an iterator over the elements of this collection.
   ///
   /// - Complexity: O(1).
-  public func generate() -> AnyGenerator<Element> {
-    return _box.generate()
+  public func makeIterator() -> AnyIterator<Element> {
+    return _box.makeIterator()
   }
 
   /// The position of the first element in a non-empty collection.
@@ -665,7 +651,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
 
   /// Access the element indicated by `position`.
   ///
-  /// - Requires: `position` indicates a valid position in `self` and
+  /// - Precondition: `position` indicates a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Any${Traversal}Index) -> Element {
     return _box[position._box]
@@ -687,3 +673,33 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   internal let _box: Box
 }
 % end
+
+@available(*, unavailable, renamed="AnyIterator")
+public struct AnyGenerator<Element> {}
+
+extension AnyIterator {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> AnyIterator<Element> {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+% for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
+extension Any${Kind} {
+
+  @available(*, unavailable, message="Please use underestimatedCount property instead.")
+  public var underestimateCount: Int {
+    fatalError("unavailable function can't be called")
+  }
+}
+%end
+
+@available(*, unavailable, renamed="AnyCollectionProtocol")
+public typealias AnyCollectionType = AnyCollectionProtocol
+
+extension AnyCollectionProtocol {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> AnyIterator<Iterator.Element> {
+    fatalError("unavailable function can't be called")
+  }
+}
