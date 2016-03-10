@@ -3612,10 +3612,12 @@ class DeclGroupNameContext {
   class GroupNameCollectorFromJson : public GroupNameCollector {
     StringRef RecordPath;
     FileNameToGroupNameMap* pMap = nullptr;
+    ASTContext &Ctx;
 
   public:
-    GroupNameCollectorFromJson(StringRef RecordPath) :
-      GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath) {}
+    GroupNameCollectorFromJson(StringRef RecordPath, ASTContext &Ctx) :
+      GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath),
+      Ctx(Ctx) {}
     StringRef getGroupNameInternal(const ValueDecl *VD) override {
       // We need the file path, so there has to be a location.
       if (VD->getLoc().isInvalid())
@@ -3637,7 +3639,11 @@ class DeclGroupNameContext {
         return NullGroupName;
       StringRef FileName = llvm::sys::path::filename(FullPath);
       auto Found = pMap->find(FileName);
-      return Found == pMap->end() ? NullGroupName : Found->second;
+      if (Found == pMap->end()) {
+        Ctx.Diags.diagnose(SourceLoc(), diag::error_no_group_info, FileName);
+        return NullGroupName;
+      }
+      return Found->second;
     }
   };
 
@@ -3646,8 +3652,8 @@ class DeclGroupNameContext {
   std::unique_ptr<GroupNameCollector> pNameCollector;
 
 public:
-  DeclGroupNameContext(StringRef RecordPath) :
-    pNameCollector(new GroupNameCollectorFromJson(RecordPath)) {}
+  DeclGroupNameContext(StringRef RecordPath, ASTContext &Ctx) :
+    pNameCollector(new GroupNameCollectorFromJson(RecordPath, Ctx)) {}
   uint32_t getGroupSequence(const ValueDecl *VD) {
     return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
                                      Map.size())).first->second;
@@ -4040,7 +4046,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
 }
 
 void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                                  StringRef GroupInfoPath) {
+                                  StringRef GroupInfoPath, ASTContext &Ctx) {
   Serializer S{MODULE_DOC_SIGNATURE, DC};
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();
@@ -4050,7 +4056,7 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeDocHeader();
     {
       BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
-      DeclGroupNameContext GroupContext(GroupInfoPath);
+      DeclGroupNameContext GroupContext(GroupInfoPath, Ctx);
       comment_block::DeclCommentListLayout DeclCommentList(S.Out);
       writeDeclCommentTable(DeclCommentList, S.SF, S.M, GroupContext);
       comment_block::GroupNamesLayout GroupNames(S.Out);
@@ -4130,7 +4136,8 @@ void swift::serialize(ModuleOrSourceFile DC,
     (void)withOutputFile(getContext(DC), options.DocOutputPath,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization (swiftdoc)");
-      Serializer::writeDocToStream(out, DC, options.GroupInfoPath);
+      Serializer::writeDocToStream(out, DC, options.GroupInfoPath,
+                                   getContext(DC));
     });
   }
 }
