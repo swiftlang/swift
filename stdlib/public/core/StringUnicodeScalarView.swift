@@ -165,9 +165,6 @@ extension String {
 
       /// Advance to the next element and return it, or `nil` if no next
       /// element exists.
-      ///
-      /// - Requires: No preceding call to `self.next()` has returned
-      ///   `nil`.
       public mutating func next() -> UnicodeScalar? {
         var result: UnicodeDecodingResult
         if _baseSet {

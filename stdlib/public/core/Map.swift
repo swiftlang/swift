@@ -23,8 +23,7 @@ public struct LazyMapGenerator<
   /// element exists.
   ///
   /// - Requires: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.
+  ///   since the copy was made.
   public mutating func next() -> Element? {
     return _base.next().map(_transform)
   }

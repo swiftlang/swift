@@ -30,10 +30,7 @@ public protocol GeneratorType {
   /// element exists.
   ///
   /// - Requires: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.  Specific implementations of this protocol
-  ///   are encouraged to respond to violations of this requirement by
-  ///   calling `preconditionFailure("...")`.
+  ///   since the copy was made.
   @warn_unused_result
   mutating func next() -> Element?
 }
@@ -639,8 +636,7 @@ public struct GeneratorSequence<
   /// element exists.
   ///
   /// - Requires: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.
+  ///   since the copy was made.
   public mutating func next() -> Base.Element? {
     return _base.next()
   }
