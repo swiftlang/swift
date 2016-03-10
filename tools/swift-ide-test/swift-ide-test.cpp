@@ -1397,9 +1397,10 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   case NodeKind::Enum:
   case NodeKind::Protocol:
   case NodeKind::Structure:
+  case NodeKind::TypeAlias:
     break;
   default:
-    llvm::errs() << "Name does not refer to a nominal type.\n";
+    llvm::errs() << "Name does not refer to a nominal type or typealias.\n";
     return EXIT_FAILURE;
   }
 
@@ -1407,17 +1408,6 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   SmallVector<std::pair<DeclName, Identifier>, 4> identifiers;
   do {
-    switch (node->getKind()) {
-    case NodeKind::Class:
-    case NodeKind::Enum:
-    case NodeKind::Protocol:
-    case NodeKind::Structure:
-      break;
-    default:
-      llvm::errs() << "Name does not refer to a nominal type.\n";
-      return EXIT_FAILURE;
-    }
-
     auto nameNode = node->getChild(1);
     switch (nameNode->getKind()) {
     case NodeKind::Identifier:
@@ -1436,6 +1426,20 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     }
 
     node = node->getChild(0);
+
+    switch (node->getKind()) {
+    case NodeKind::Module:
+      // Will break out of loop below.
+      break;
+    case NodeKind::Class:
+    case NodeKind::Enum:
+    case NodeKind::Protocol:
+    case NodeKind::Structure:
+      break;
+    default:
+      llvm::errs() << "Name does not refer to a nominal type.\n";
+      return EXIT_FAILURE;
+    }
   } while (node->getKind() != NodeKind::Module);
 
   Module *M = getModuleByFullName(ctx, node->getText());

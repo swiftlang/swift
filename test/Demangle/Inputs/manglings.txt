@@ -181,6 +181,7 @@ _TF8manglingoi2qqFTSiSi_T_ ---> mangling.?? infix (Swift.Int, Swift.Int) -> ()
 _TFE11ext_structAV11def_structA1A4testfT_T_ ---> (extension in ext_structA):def_structA.A.test () -> ()
 _TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> devirt_access.(getPrivateClass in _DISC) () -> devirt_access.(PrivateClass in _DISC)
 _TF4mainP5_mainX3wxaFT_T_ ---> main.(λ in _main) () -> ()
+_TF4mainP5_main3abcFT_aS_P5_DISC3xyz ---> main.(abc in _main) () -> main.(xyz in _DISC)
 _TtPMP_ ---> protocol<>.Type
 _TFCs13_NSSwiftArray29canStoreElementsOfDynamicTypefPMP_Sb ---> Swift._NSSwiftArray.canStoreElementsOfDynamicType (protocol<>.Type) -> Swift.Bool
 _TFCs13_NSSwiftArrayg17staticElementTypePMP_ ---> Swift._NSSwiftArray.staticElementType.getter : protocol<>.Type
