@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
 sil_stage canonical
 
-enum Optional<T> { case Some(T), None }
+enum Optional<T> { case some(T), none }
 
 class AClass {
 }
@@ -23,8 +23,8 @@ sil public @switch_singleton_enum_in_optional :
     $@convention(thin) (@in Optional<AnEnum>) -> () {
 entry(%a : $*Optional<AnEnum>):
   switch_enum_addr %a : $*Optional<AnEnum>,
-    case #Optional.Some!enumelt.1: some,
-    case #Optional.None!enumelt: none
+    case #Optional.some!enumelt.1: some,
+    case #Optional.none!enumelt: none
 some:
   unreachable
 none:
