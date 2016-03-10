@@ -3795,6 +3795,9 @@ public:
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       return;
 
+    if (AvailableAttr::isUnavailable(D))
+      return;
+
     if (D->getAttrs().hasAttribute<FinalAttr>())
       return;
 
