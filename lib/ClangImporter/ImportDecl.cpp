@@ -2667,7 +2667,7 @@ namespace {
 
       if (dc->getAsClassOrClassExtensionContext())
         // FIXME: only if the class itself is not marked final
-        result->getAttrs().add(new (SwiftCtx) FinalAttr(/*IsImplicit=*/false));
+        result->getAttrs().add(new (SwiftCtx) FinalAttr(/*IsImplicit=*/true));
 
       // FIXME: Need to either store or communicate selfIdx to SILGen. Or, maybe
       // SILGen recomputes it?
@@ -2814,7 +2814,8 @@ namespace {
       // If this property is in a class or class extension context,
       // add "final".
       if (dc->getAsClassOrClassExtensionContext())
-        property->getAttrs().add(new (Impl.SwiftContext) FinalAttr(true)); 
+        property->getAttrs().add(new (Impl.SwiftContext)
+                                     FinalAttr(/*IsImplicit=*/true));
 
       // Import the getter.
       FuncDecl *swiftGetter =
