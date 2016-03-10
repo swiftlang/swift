@@ -28,6 +28,9 @@
   ],
   "Collection": [
     "Collection.swift",
+    "BidirectionalCollection.swift",
+    "RandomAccessCollection.swift",
+    "MutableCollection.swift",
     "CollectionAlgorithms.swift",
     "EmptyCollection.swift",
     "Stride.swift",
@@ -41,6 +44,7 @@
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
     "Index.swift",
+    "Indices.swift",
     "Existential.swift",
     {
       "Type-erased": [
