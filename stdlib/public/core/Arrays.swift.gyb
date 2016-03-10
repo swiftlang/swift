@@ -325,7 +325,7 @@ public struct ${Self}<Element>
     return Builtin.castToNativeObject(_buffer.owner)
   }
 
-  // FIXME(ABI): move to an initalizer on _Buffer.
+  // FIXME(ABI): move to an initializer on _Buffer.
   static internal func _copyBuffer(buffer: inout _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       uninitializedCount: buffer.count, minimumCapacity: buffer.count)
