@@ -4855,6 +4855,10 @@ namespace {
     const override {
       return Strategy.getFixedExtraInhabitantValue(IGM, bits, index);
     }
+    
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+      return Strategy.getFixedExtraInhabitantMask(IGM);
+    }
   };
 
   /// TypeInfo for loadable enum types.

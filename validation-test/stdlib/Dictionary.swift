@@ -3,7 +3,7 @@
 //
 // RUN: %S/../../utils/gyb %s -o %t/main.swift
 // RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
+// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
 //
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
@@ -3902,10 +3902,12 @@ DictionaryTestSuite.test("removeAt") {
 
 DictionaryTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
+  resetLeaksOfObjCDictionaryKeysValues()
 }
 
 DictionaryTestSuite.tearDown {
   expectNoLeaksOfDictionaryKeysValues()
+  expectNoLeaksOfObjCDictionaryKeysValues()
 }
 
 runAllTests()

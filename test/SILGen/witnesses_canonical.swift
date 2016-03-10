@@ -20,7 +20,7 @@ extension _CDT {
 }
 
 public protocol CT : ST, _CDT {
-  typealias _SS : ST, _CDT
+  associatedtype _SS : ST, _CDT
 
   subscript(_bounds: Int) -> _SS { get }
 }
@@ -34,15 +34,15 @@ public protocol P1 { }
 public protocol P2 { }
 
 public protocol Q1 {
-  typealias Assoc : P1
+  associatedtype Assoc : P1
 }
 
 public protocol Q2 {
-  typealias Assoc : P2
+  associatedtype Assoc : P2
 }
 
 public protocol Q3 : Q1, Q2 {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 struct XP : P1, P2 { }

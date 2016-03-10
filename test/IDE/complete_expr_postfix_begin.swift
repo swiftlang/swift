@@ -54,6 +54,14 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_7 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_8 | FileCheck %s -check-prefix=COMMON
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_1 | FileCheck %s -check-prefix=MY_ALIAS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_2 | FileCheck %s -check-prefix=MY_ALIAS
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_1 | FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_2 | FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_3 | FileCheck %s -check-prefix=IN_FOR_EACH_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_4 | FileCheck %s -check-prefix=IN_FOR_EACH_3
+
 //
 // Test code completion at the beginning of expr-postfix.
 //
@@ -386,4 +394,64 @@ struct TestInInvalid7 {
 func foo() -> Undeclared {
   var fooParam = FooStruct()
   #^IN_INVALID_8^#
+}
+
+func testGenericTypealias1() {
+  typealias MyAlias<T> = (T, T)
+  let x: MyAlias<Int> = (1, 2)
+  var y: (Int, Int)
+  y = #^GENERIC_TYPEALIAS_1^#
+}
+// FIXME: should we use the alias name in the annotation?
+// MY_ALIAS: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
+// MY_ALIAS: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#(Int, Int)#];
+// MY_ALIAS: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#(Int, Int)#];
+func testGenericTypealias2() {
+  typealias MyAlias<T> = (T, T)
+  let x: (Int, Int) = (1, 2)
+  var y: MyAlias<Int>
+  y = #^GENERIC_TYPEALIAS_2^#
+}
+
+func testInForEach1(arg: Int) {
+  let local = 2
+  for index in #^IN_FOR_EACH_1^# {
+    let inBody = 3
+  }
+  let after = 4
+// IN_FOR_EACH_1-NOT: Decl[LocalVar]
+// IN_FOR_EACH_1: Decl[LocalVar]/Local:               local[#Int#];
+// FIXME: shouldn't show 'after' here.
+// IN_FOR_EACH_1: Decl[LocalVar]/Local:               after[#Int#];
+// IN_FOR_EACH_1: Decl[LocalVar]/Local:               arg[#Int#];
+// IN_FOR_EACH_1-NOT: Decl[LocalVar]
+}
+func testInForEach2(arg: Int) {
+  let local = 2
+  for index in 1 ... #^IN_FOR_EACH_2^# {
+    let inBody = 3
+  }
+  let after = 4
+}
+func testInForEach3(arg: Int) {
+  let local = 2
+  for index: Int in 1 ... 2 where #^IN_FOR_EACH_3^# {
+    let inBody = 3
+  }
+  let after = 4
+// IN_FOR_EACH_3-NOT: Decl[LocalVar]
+// IN_FOR_EACH_3: Decl[LocalVar]/Local:               index[#Int#];
+// IN_FOR_EACH_3-NOT: Decl[LocalVar]
+// IN_FOR_EACH_3: Decl[LocalVar]/Local:               local[#Int#];
+// FIXME: shouldn't show 'after' here.
+// IN_FOR_EACH_3: Decl[LocalVar]/Local:               after[#Int#];
+// IN_FOR_EACH_3: Decl[LocalVar]/Local:               arg[#Int#];
+// IN_FOR_EACH_3-NOT: Decl[LocalVar]
+}
+func testInForEach4(arg: Int) {
+  let local = 2
+  for index in 1 ... 2 {
+    #^IN_FOR_EACH_4^#
+  }
+  let after = 4
 }

@@ -1216,7 +1216,7 @@ enum DynamicSinglePayload<T> {
 
 // CHECK: define{{( protected)?}} void @dynamic_single_payload_switch(%O4enum20DynamicSinglePayload* noalias nocapture, %swift.type* %T) {{.*}} {
 // CHECK:   [[OPAQUE_ENUM:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
-// CHECK:   [[CASE_INDEX:%.*]] = call i32 @swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE_ENUM]], %swift.type* %T, i32 3)
+// CHECK:   [[CASE_INDEX:%.*]] = call i32 @rt_swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE_ENUM]], %swift.type* %T, i32 3)
 // CHECK:   switch i32 [[CASE_INDEX]], label {{%.*}} [
 // CHECK:     i32 -1, label {{%.*}}
 // CHECK:     i32 2, label {{%.*}}
@@ -1241,7 +1241,7 @@ end:
 
 // CHECK: define{{( protected)?}} void @dynamic_single_payload_inject_x(%O4enum20DynamicSinglePayload* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T) {{.*}} {
 // CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
-// CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
+// CHECK:   call void @rt_swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
 sil @dynamic_single_payload_inject_x : $<T> (@in T) -> @out DynamicSinglePayload<T> {
 entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
   inject_enum_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.x!enumelt.1
@@ -1251,7 +1251,7 @@ entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
 
 // CHECK: define{{( protected)?}} void @dynamic_single_payload_inject_y(%O4enum20DynamicSinglePayload* noalias nocapture sret, %swift.type* %T) {{.*}} {
 // CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
-// CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
+// CHECK:   call void @rt_swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
 sil @dynamic_single_payload_inject_y : $<T> () -> @out DynamicSinglePayload<T> {
 entry(%r : $*DynamicSinglePayload<T>):
   inject_enum_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.y!enumelt

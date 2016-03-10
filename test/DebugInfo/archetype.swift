@@ -5,7 +5,7 @@ protocol IntegerArithmetic {
 }
 
 protocol RandomAccessIndex : IntegerArithmetic {
-  typealias Distance : IntegerArithmetic
+  associatedtype Distance : IntegerArithmetic
   static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Distance, Bool)
 }
 

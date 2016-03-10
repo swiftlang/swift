@@ -108,4 +108,3 @@ ${stringSubscriptComment}
     fatalError("unavailable function can't be called")
   }
 }
-

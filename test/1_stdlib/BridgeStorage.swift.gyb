@@ -28,8 +28,8 @@ import Swift
 import SwiftShims
 
 protocol BridgeStorage {
-  typealias Native : AnyObject
-  typealias ObjC : AnyObject
+  associatedtype Native : AnyObject
+  associatedtype ObjC : AnyObject
 
   init(native: Native, bits: Int)
   init(native: Native)

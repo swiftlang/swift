@@ -339,7 +339,7 @@ public:
 
   /// Serialize module documentation to the given stream.
   static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               StringRef GroupInfoPath);
+                               StringRef GroupInfoPath, ASTContext &Ctx);
 
   /// Records the use of the given Type.
   ///

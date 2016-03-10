@@ -7,7 +7,7 @@ protocol P {}
 protocol Q {}
 
 protocol Assocked {
-  typealias Assoc : P, Q
+  associatedtype Assoc : P, Q
 }
 
 struct Universal : P, Q {}
@@ -118,13 +118,13 @@ struct Computed<T, U> : Assocked {
 //   Witness table instantiation function for Computed : Assocked.
 // CHECK-LABEL: define hidden i8** @_TWauRx23associated_type_witness1PrGVS_15GenericComputedx_S_22DerivedFromSimpleAssocS_(%swift.type*)
 // CHECK:         entry:
-// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_22DerivedFromSimpleAssocS_, %swift.type* %0, i8** null)
+// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_22DerivedFromSimpleAssocS_, %swift.type* %0, i8** null)
 // CHECK-NEXT:     ret i8** [[WTABLE]]
 
 
 struct PBox<T: P> {}
 protocol HasSimpleAssoc {
-  typealias Assoc
+  associatedtype Assoc
 }
 protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
 
@@ -158,12 +158,12 @@ struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
 //   Witness table instantiation function for GenericComputed : HasSimpleAssoc..
 // CHECK-LABEL: define hidden i8** @_TWauRx23associated_type_witness1PrGVS_15GenericComputedx_S_14HasSimpleAssocS_(%swift.type*)
 // CHECK-NEXT:   entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_14HasSimpleAssocS_, %swift.type* %0, i8** null)
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_14HasSimpleAssocS_, %swift.type* %0, i8** null)
 // CHECK-NEXT:    ret i8** %1
 
 
 protocol HasAssocked {
-  typealias Contents : Assocked
+  associatedtype Contents : Assocked
 }
 struct FulfilledFromAssociatedType<T : HasAssocked> : HasSimpleAssoc {
   typealias Assoc = PBox<T.Contents.Assoc>

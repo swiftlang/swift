@@ -550,7 +550,7 @@ extension Dictionary {
     // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copy(withZone: nil), to: _NSDictionary.self))
+        unsafeBitCast(_cocoaDictionary.copy(with: nil), to: _NSDictionary.self))
   }
 }
 
@@ -762,7 +762,7 @@ extension Set {
     // and watchOS.
     self = Set(
       _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copy(withZone: nil), to: _NSSet.self))
+        unsafeBitCast(_cocoaSet.copy(with: nil), to: _NSSet.self))
   }
 }
 

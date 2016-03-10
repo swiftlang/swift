@@ -215,7 +215,12 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
       break;
   }
 
+  // Promote stack allocations to values and eliminate redundant
+  // loads.
   PM.addMem2Reg();
+  PM.addRedundantLoadElimination();
+  //  Do a round of CFG simplification, followed by peepholes, then
+  //  more CFG simplification.
   AddSimplifyCFGSILCombine(PM);
 
   PM.addPerformanceConstantPropagation();
@@ -230,7 +235,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addSimplifyCFG();
 
   // Perform retain/release code motion and run the first ARC optimizer.
-  PM.addRedundantLoadElimination();
   PM.addCSE();
   PM.addEarlyCodeMotion();
   PM.addARCSequenceOpts();

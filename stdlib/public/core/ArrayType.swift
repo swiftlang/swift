@@ -44,7 +44,7 @@ protocol _ArrayProtocol
   /// - Complexity: O(`self.count`).
   mutating func reserveCapacity(minimumCapacity: Int)
 
-  /// Operator form of `appendContentsOf`.
+  /// Operator form of `append(contentsOf:)`.
   func += <
     S : Sequence where S.Iterator.Element == Iterator.Element
   >(lhs: inout Self, rhs: S)

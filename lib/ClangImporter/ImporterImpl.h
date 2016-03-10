@@ -473,6 +473,8 @@ public:
       if (*moduleOpt)
         moduleName = (*moduleOpt)->getTopLevelModuleName();
     }
+    if (moduleName.empty())
+      moduleName = decl->getASTContext().getLangOpts().CurrentModule;
 
     StringRef enumName =
       decl->getDeclName() ? decl->getName()
@@ -495,7 +497,7 @@ public:
     // If there is no name for linkage, the computation is trivial and we
     // wouldn't be able to perform name-based caching anyway.
     if (!decl->hasNameForLinkage())
-      return importer::EnumInfo(decl, preprocessor);
+      return importer::EnumInfo(SwiftContext, decl, preprocessor);
 
     SmallString<32> keyScratch;
     auto key = getEnumInfoKey(decl, keyScratch);
@@ -503,7 +505,7 @@ public:
     if (known != enumInfos.end())
       return known->second;
 
-    importer::EnumInfo enumInfo(decl, preprocessor);
+    importer::EnumInfo enumInfo(SwiftContext, decl, preprocessor);
     enumInfos[key] = enumInfo;
     return enumInfo;
   }
@@ -793,6 +795,15 @@ public:
     bool ReplaceParamWithVoid;
   };
 
+  /// The kind of accessor that an entity will be imported as.
+  enum class ImportedAccessorKind {
+    None = 0,
+    PropertyGetter,
+    PropertySetter,
+    SubscriptGetter,
+    SubscriptSetter,
+  };
+
   /// Describes a name that was imported from Clang.
   struct ImportedName {
     /// The imported name.
@@ -811,8 +822,8 @@ public:
     /// than refuse to import the initializer.
     bool DroppedVariadic = false;
 
-    /// Whether this declaration is a subscript accessor (getter or setter).
-    bool IsSubscriptAccessor = false;
+    /// What kind of accessor this name refers to, if any.
+    ImportedAccessorKind AccessorKind = ImportedAccessorKind::None;
 
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind InitKind = CtorInitializerKind::Designated;
@@ -837,6 +848,34 @@ public:
 
     /// Whether any name was imported.
     explicit operator bool() const { return static_cast<bool>(Imported); }
+
+    /// Whether this declaration is a property accessor (getter or setter).
+    bool isPropertyAccessor() const {
+      switch (AccessorKind) {
+      case ImportedAccessorKind::None:
+      case ImportedAccessorKind::SubscriptGetter:
+      case ImportedAccessorKind::SubscriptSetter:
+        return false;
+
+      case ImportedAccessorKind::PropertyGetter:
+      case ImportedAccessorKind::PropertySetter:
+        return true;
+      }
+    }
+
+    /// Whether this declaration is a subscript accessor (getter or setter).
+    bool isSubscriptAccessor() const {
+      switch (AccessorKind) {
+      case ImportedAccessorKind::None:
+      case ImportedAccessorKind::PropertyGetter:
+      case ImportedAccessorKind::PropertySetter:
+        return false;
+
+      case ImportedAccessorKind::SubscriptGetter:
+      case ImportedAccessorKind::SubscriptSetter:
+        return true;
+      }
+    }
   };
 
   /// Flags that control the import of names in importFullName.

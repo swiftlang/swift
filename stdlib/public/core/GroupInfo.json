@@ -62,7 +62,7 @@
       "Array": [
         "ArrayBody.swift",
         "ArrayBuffer.swift",
-        "ArrayBufferType.swift",
+        "ArrayBufferProtocol.swift",
         "ArrayCast.swift",
         "ArrayType.swift",
         "Arrays.swift",
@@ -74,6 +74,7 @@
   ],
   "C": [
     "BridgeObjectiveC.swift",
+    "BridgeStorage.swift",
     "Builtin.swift",
     "VarArgs.swift",
     "CTypes.swift"
@@ -81,7 +82,8 @@
   "Reflection": [
     "Mirrors.swift",
     "Mirror.swift",
-    "Reflection.swift"
+    "Reflection.swift",
+    "ObjCMirrors.swift"
   ],
   "Math": [
     "FloatingPoint.swift",
@@ -90,8 +92,8 @@
     "IntegerArithmetic.swift",
     "FixedPoint.swift",
     "IntegerParsing.swift",
-    "Bit.swift",
-    "SetAlgebra.swift"
+    "SetAlgebra.swift",
+    "BuiltinMath.swift"
   ],
   "Optional": [
     "ImplicitlyUnwrappedOptional.swift",

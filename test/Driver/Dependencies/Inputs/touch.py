@@ -27,5 +27,5 @@ timeVal += 946684800
 # Update the output file mtime, or create it if necessary.
 # From http://stackoverflow.com/a/1160227.
 for outputFile in sys.argv[1:]:
-  with open(outputFile, 'a'):
-    os.utime(outputFile, (timeVal, timeVal))
+    with open(outputFile, 'a'):
+        os.utime(outputFile, (timeVal, timeVal))

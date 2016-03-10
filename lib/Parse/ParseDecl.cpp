@@ -1423,10 +1423,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // Determine which attribute it is, and diagnose it if unknown.
   TypeAttrKind attr = TypeAttributes::getAttrKindFromString(Tok.getText());
 
-  // noescape is only valid as a type attribute in SIL mode.
-  if (attr == TAK_noescape && !isInSILMode())
-    attr = TAK_Count;
-
   if (attr == TAK_Count) {
     if (justChecking) return true;
 
@@ -1635,8 +1631,8 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
       Token next = peekToken();
       auto Kind = TypeAttributes::getAttrKindFromString(next.getText());
 
-      // noescape is only valid as a decl attribute and type attribute (in SIL
-      // mode) but we disambiguate it as a decl attribute.
+      // noescape is only valid as a decl attribute and type attribute (in
+      // parameter lists) but we disambiguate it as a decl attribute.
       if (Kind == TAK_noescape)
         Kind = TAK_Count;
 
@@ -1706,10 +1702,11 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_var:
   case tok::pound_if:
   case tok::identifier:
+  case tok::pound_setline:
     return true;
   case tok::pound_line:
-    // #line at the start of the line is a directive, #line within a line is
-    // an expression.
+    // #line at the start of the line is a directive, but it's deprecated.
+    // #line within a line is an expression.
     return Tok.isAtStartOfLine();
 
   case tok::kw_try:
@@ -1736,10 +1733,17 @@ static bool isParenthesizedUnowned(Parser &P) {
 }
 
   
-
 bool Parser::isStartOfDecl() {
   // If this is obviously not the start of a decl, then we're done.
   if (!isKeywordPossibleDeclStart(Tok)) return false;
+
+  // When 'init' appears inside another 'init', it's likely the user wants to
+  // invoke a initializer but forgets to prefix it with 'self.' or 'super.'
+  // Otherwise, expect 'init' to be the start of a declaration (and complain
+  // when the expectation is not fullfilled).
+  if (Tok.is(tok::kw_init)) {
+    return !isa<ConstructorDecl>(CurDeclContext);
+  }
   
   // The protocol keyword needs more checking to reject "protocol<Int>".
   if (Tok.is(tok::kw_protocol)) {
@@ -2093,8 +2097,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       break;
     }
+    case tok::pound_setline:
+      Status = parseLineDirective(false);
+      break;
     case tok::pound_line:
-      Status = parseLineDirective();
+      Status = parseLineDirective(true);
       break;
 
     case tok::kw_func:
@@ -2556,15 +2563,20 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return DCC.fixupParserResult(status, ext);
 }
 
-ParserStatus Parser::parseLineDirective() {
-  SourceLoc Loc = consumeToken(tok::pound_line);
+ParserStatus Parser::parseLineDirective(bool isLine) {
+  SourceLoc Loc = consumeToken(isLine ? tok::pound_line
+                                      : tok::pound_setline);
+  if (isLine) {
+    diagnose(Loc, diag::line_directive_style_deprecated)
+        .fixItReplace(Loc, "#setline");
+  }
   bool WasInPoundLineEnvironment = InPoundLineEnvironment;
   if (WasInPoundLineEnvironment) {
     SourceMgr.closeVirtualFile(Loc);
     InPoundLineEnvironment = false;
   }
 
-  // #line\n returns to the main buffer.
+  // #setline\n returns to the main buffer.
   if (Tok.isAtStartOfLine()) {
     if (!WasInPoundLineEnvironment) {
       diagnose(Tok, diag::unexpected_line_directive);
@@ -2573,7 +2585,7 @@ ParserStatus Parser::parseLineDirective() {
     return makeParserSuccess();
   }
 
-  // #line 42 "file.swift"\n
+  // #setline 42 "file.swift"\n
   if (Tok.isNot(tok::integer_literal)) {
     diagnose(Tok, diag::expected_line_directive_number);
     return makeParserError();
@@ -2594,7 +2606,9 @@ ParserStatus Parser::parseLineDirective() {
     return makeParserError();
   }
 
-  auto Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#line");
+  auto Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
+                                                    isLine ? "#line"
+                                                           : "#setline");
   if (!Filename.hasValue())
     return makeParserError();
 
@@ -2742,6 +2756,48 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
     
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
 
+
+
+  Optional<Scope> GenericsScope;
+  GenericsScope.emplace(this, ScopeKind::Generics);
+
+  // Parse a generic parameter list if it is present.
+  GenericParamList *genericParams = nullptr;
+  if (startsWithLess(Tok)) {
+    auto Result = parseGenericParameters();
+    if (Result.hasCodeCompletion() && !CodeCompletion)
+      return makeParserCodeCompletionStatus();
+    genericParams = Result.getPtrOrNull();
+
+    if (!genericParams) {
+      // If the parser returned null, it is an already diagnosed parse error.
+    } else if (isAssociatedType || !WantDefinition) {
+      // If the parameter list isn't valid here, reject it with a specific
+      // error.  If a constraint is present within the parameter list, reject
+      // that.
+      diagnose(genericParams->getLAngleLoc(),
+               diag::associated_type_generic_parameter_list)
+        .fixItRemove(genericParams->getSourceRange());
+      genericParams = nullptr;
+    } else if (!genericParams->getRequirements().empty()) {
+      // Reject a where clause.
+      diagnose(genericParams->getWhereLoc(),
+               diag::associated_type_generic_parameter_list)
+      .highlight(genericParams->getWhereClauseSourceRange());
+    } else {
+      // Reject inheritance clauses.
+      for (auto *P : genericParams->getParams()) {
+        if (!P->getInherited().empty()) {
+          diagnose(P->getInherited().front().getLoc(),
+                   diag::typealias_generic_list_constraint);
+
+          P->setInvalid();
+          P->setInherited({});
+        }
+      }
+    }
+  }
+
   // Parse optional inheritance clause.
   // FIXME: Allow class requirements here.
   SmallVector<TypeLoc, 2> Inherited;
@@ -2769,6 +2825,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
   // If this is an associated type, build the AST for it.
   if (isAssociatedType) {
+    assert(!genericParams && "Associated types don't allow generic params");
     auto assocType = new (Context) AssociatedTypeDecl(
                                      CurDeclContext,
                                      TypeAliasLoc, Id, IdLoc,
@@ -2781,11 +2838,14 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   }
 
   // Otherwise, build a typealias.
-  TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
-                                UnderlyingTy.getPtrOrNull(),
-                                CurDeclContext);
+  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
+                                          UnderlyingTy.getPtrOrNull(),
+                                          genericParams, CurDeclContext);
   TAD->getAttrs() = Attributes;
+
+  // Exit the scope introduced for the generic parameters.
+  GenericsScope.reset();
+
   addToScope(TAD);
   return DCC.fixupParserResult(Status, TAD);
 }

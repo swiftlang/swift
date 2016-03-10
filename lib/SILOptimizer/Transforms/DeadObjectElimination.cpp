@@ -636,7 +636,7 @@ static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
   SILSSAUpdater SSAUp;
   ValueLifetimeAnalysis::Frontier ArrayFrontier;
   CFGChanged |= !VLA.computeFrontier(ArrayFrontier,
-                                     ValueLifetimeAnalysis::AllowToModifyCFG);
+                                     ValueLifetimeAnalysis::IgnoreExitEdges);
 
   DeadStorage.visitStoreLocations([&] (ArrayRef<StoreInst*> Stores) {
       insertReleases(Stores, ArrayFrontier, SSAUp);

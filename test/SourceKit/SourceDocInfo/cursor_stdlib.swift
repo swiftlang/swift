@@ -30,7 +30,7 @@ func foo2(var a : [S1]) {
 // CHECK-ITERATOR: <Group>Collection/Type-erased</Group>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT1 %s
-// CHECK-REPLACEMENT1: <Group>Collection</Group>
+// CHECK-REPLACEMENT1: <Group>Collection/Array</Group>
 // CHECK-REPLACEMENT1: <Declaration>@warn_unused_result(mutable_variant=&quot;sort&quot;) func sorted() -&gt; [<Type usr="s:Si">Int</Type>]</Declaration>
 // CHECK-REPLACEMENT1: RELATED BEGIN
 // CHECK-REPLACEMENT1: sorted(@noescape isOrderedBefore _: @noescape (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
@@ -43,7 +43,7 @@ func foo2(var a : [S1]) {
 // CHECK-REPLACEMENT2: <Declaration>mutating func append(newElement: <Type usr="s:Si">Int</Type>)</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=15:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT3 %s
-// CHECK-REPLACEMENT3: <Group>Collection</Group>
+// CHECK-REPLACEMENT3: <Group>Collection/Array</Group>
 // CHECK-REPLACEMENT3: func sorted(@noescape isOrderedBefore isOrderedBefore: @noescape (<Type usr="s:V13cursor_stdlib2S1">S1</Type>
 // CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>
 // CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>

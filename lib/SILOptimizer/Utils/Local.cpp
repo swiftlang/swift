@@ -58,6 +58,8 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   // mark_uninitialized is never dead.
   if (isa<MarkUninitializedInst>(I))
     return false;
+  if (isa<MarkUninitializedBehaviorInst>(I))
+    return false;
 
   if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I))
     return false;
@@ -460,7 +462,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   // simply perform an upcast.
   if (SrcTy.getSwiftRValueType()->mayHaveSuperclass() &&
       DestTy.getSwiftRValueType()->mayHaveSuperclass() &&
-      DestTy.isSuperclassOf(SrcTy)) {
+      DestTy.isExactSuperclassOf(SrcTy)) {
     if (CheckOnly)
       return Value;
     CastedValue = B->createUpcast(Loc, Value, DestTy);
@@ -482,7 +484,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     // simply perform an upcast.
     if (OptionalDestTy->mayHaveSuperclass() &&
         OptionalSrcTy->mayHaveSuperclass() &&
-        OptionalDestLoweredTy.isSuperclassOf(OptionalSrcLoweredTy)) {
+        OptionalDestLoweredTy.isExactSuperclassOf(OptionalSrcLoweredTy)) {
       // Insert upcast.
       if (CheckOnly)
         return Value;
@@ -559,7 +561,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     if (CheckOnly)
       return Value;
 
-    if (DestTy.isSuperclassOf(SrcTy)) {
+    if (DestTy.isExactSuperclassOf(SrcTy)) {
       // Insert upcast.
       CastedValue = B->createUpcast(Loc, Value, DestTy);
       return CastedValue;
@@ -576,7 +578,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   if (isa<AnyMetatypeType>(SrcTy.getSwiftRValueType()) &&
       isa<AnyMetatypeType>(DestTy.getSwiftRValueType()) &&
       SrcTy.isClassOrClassMetatype() && DestTy.isClassOrClassMetatype() &&
-      DestTy.getMetatypeInstanceType(M).isSuperclassOf(
+      DestTy.getMetatypeInstanceType(M).isExactSuperclassOf(
           SrcTy.getMetatypeInstanceType(M))) {
     if (CheckOnly)
       return Value;
@@ -1118,8 +1120,8 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
   // a predecessor block but not in the frontier block itself.
   llvm::SmallSetVector<SILBasicBlock *, 16> FrontierBlocks;
 
-  // Blocks where the value is live somewhere inside the block but not at the
-  // end of the block.
+  // Blocks where the value is live at the end of the block and which have
+  // a frontier block as successor.
   llvm::SmallSetVector<SILBasicBlock *, 16> LiveOutBlocks;
 
   /// The lifetime ends if we have a live block and a not-live successor.
@@ -1139,7 +1141,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
       // the last use is part of the frontier.
       SILBasicBlock::iterator Iter(findLastUserInBlock(BB));
       Fr.push_back(&*next(Iter));
-    } else if (DeadInSucc) {
+    } else if (DeadInSucc && mode != IgnoreExitEdges) {
       // The value is not live in some of the successor blocks.
       LiveOutBlocks.insert(BB);
       for (const SILSuccessor &Succ : BB->getSuccessors()) {
@@ -1609,7 +1611,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     // If it is addr cast then store the result.
     auto ConvTy = NewAI->getType();
     auto DestTy = Dest->getType().getObjectType();
-    assert((ConvTy == DestTy || DestTy.isSuperclassOf(ConvTy)) &&
+    assert((ConvTy == DestTy || DestTy.isExactSuperclassOf(ConvTy)) &&
            "Destination should have the same type or be a superclass "
            "of the source operand");
     auto CastedValue = SILValue(
@@ -2167,7 +2169,13 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
     Inst->replaceAllUsesWithUndef();
     EraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
-    Builder.createUnreachable(ArtificialUnreachableLocation());
+    auto *UnreachableInst =
+        Builder.createUnreachable(ArtificialUnreachableLocation());
+
+    // Delete everything after the unreachable except for dealloc_stack which we
+    // move before the trap.
+    deleteInstructionsAfterUnreachable(UnreachableInst, Trap);
+
     WillFailAction();
     return Trap;
   }
@@ -2219,6 +2227,25 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
   return nullptr;
 }
 
+/// Deletes all instructions after \p UnreachableInst except dealloc_stack
+/// instructions are moved before \p TrapInst.
+void CastOptimizer::deleteInstructionsAfterUnreachable(
+    SILInstruction *UnreachableInst, SILInstruction *TrapInst) {
+  auto UnreachableInstIt =
+      std::next(SILBasicBlock::iterator(UnreachableInst));
+  auto *Block = TrapInst->getParent();
+  while (UnreachableInstIt != Block->end()) {
+    SILInstruction *CurInst = &*UnreachableInstIt;
+    ++UnreachableInstIt;
+    if (auto *DeallocStack = dyn_cast<DeallocStackInst>(CurInst))
+      if (!isa<SILUndef>(DeallocStack->getOperand())) {
+        DeallocStack->moveBefore(TrapInst);
+        continue;
+      }
+    CurInst->replaceAllUsesWithUndef();
+    EraseInstAction(CurInst);
+  }
+}
 
 SILInstruction *
 CastOptimizer::
@@ -2247,7 +2274,6 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst);
-    SILInstruction *NewI = Builder.createBuiltinTrap(Loc);
     // mem2reg's invariants get unhappy if we don't try to
     // initialize a loadable result.
     auto DestType = Dest->getType();
@@ -2255,12 +2281,19 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     if (!resultTL.isAddressOnly()) {
       auto undef = SILValue(SILUndef::get(DestType.getObjectType(),
                                           Builder.getModule()));
-      NewI = Builder.createStore(Loc, undef, Dest);
+      Builder.createStore(Loc, undef, Dest);
     }
+    auto *TrapI = Builder.createBuiltinTrap(Loc);
     Inst->replaceAllUsesWithUndef();
     EraseInstAction(Inst);
-    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(NewI)));
-    Builder.createUnreachable(ArtificialUnreachableLocation());
+    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(TrapI)));
+    auto *UnreachableInst =
+        Builder.createUnreachable(ArtificialUnreachableLocation());
+
+    // Delete everything after the unreachable except for dealloc_stack which we
+    // move before the trap.
+    deleteInstructionsAfterUnreachable(UnreachableInst, TrapI);
+
     WillFailAction();
   }
 

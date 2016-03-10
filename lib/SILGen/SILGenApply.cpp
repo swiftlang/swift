@@ -162,7 +162,7 @@ private:
   };
   SILValue SelfValue;
   ArrayRef<Substitution> Substitutions;
-  CanType OrigFormalInterfaceType;
+  CanAnyFunctionType OrigFormalInterfaceType;
   CanAnyFunctionType SubstFormalType;
   Optional<SILLocation> SpecializeLoc;
   bool HasSubstitutions = false;
@@ -174,7 +174,7 @@ private:
 private:
 
   Callee(ManagedValue indirectValue,
-         CanType origFormalType,
+         CanAnyFunctionType origFormalType,
          CanAnyFunctionType substFormalType,
          SILLocation L)
     : kind(Kind::IndirectValue),
@@ -267,13 +267,13 @@ private:
 
     // Add the 'self' parameter back.  We want it to look like a
     // substitution of the appropriate clause from the original type.
-    auto origFormalType = cast<AnyFunctionType>(OrigFormalInterfaceType);
+    auto selfType = OrigFormalInterfaceType.getInput();
     auto substSelfType =
-      buildSubstSelfType(origFormalType.getInput(), protocolSelfType, ctx);
+      buildSubstSelfType(selfType, protocolSelfType, ctx);
 
     auto extInfo = FunctionType::ExtInfo(FunctionType::Representation::Thin,
                                          /*noreturn*/ false,
-                                         /*throws*/ origFormalType->throws());
+                                         /*throws*/ OrigFormalInterfaceType->throws());
 
     SubstFormalType = CanFunctionType::get(substSelfType, SubstFormalType,
                                            extInfo);
@@ -285,8 +285,7 @@ private:
     assert(kind == Kind::DynamicMethod);
 
     // Drop the original self clause.
-    CanType methodType = OrigFormalInterfaceType;
-    methodType = cast<AnyFunctionType>(methodType).getResult();
+    CanType methodType = OrigFormalInterfaceType.getResult();
 
     // Replace it with the dynamic self type.
     OrigFormalInterfaceType
@@ -296,17 +295,16 @@ private:
     assert(!OrigFormalInterfaceType->hasTypeParameter());
 
     // Add a self clause to the substituted type.
-    auto origFormalType = cast<AnyFunctionType>(OrigFormalInterfaceType);
-    auto selfType = origFormalType.getInput();
+    auto selfType = OrigFormalInterfaceType.getInput();
     SubstFormalType
       = CanFunctionType::get(selfType, SubstFormalType,
-                             origFormalType->getExtInfo());
+                             OrigFormalInterfaceType->getExtInfo());
   }
 
 public:
 
   static Callee forIndirect(ManagedValue indirectValue,
-                            CanType origFormalType,
+                            CanAnyFunctionType origFormalType,
                             CanAnyFunctionType substFormalType,
                             SILLocation l) {
     return Callee(indirectValue,
@@ -394,7 +392,7 @@ public:
     return Captures.hasValue();
   }
 
-  CanType getOrigFormalType() const {
+  CanAnyFunctionType getOrigFormalType() const {
     return OrigFormalInterfaceType;
   }
 
@@ -4380,7 +4378,7 @@ SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage,
                     /*foreign*/ false);
 }
 
-std::pair<SILValue, SILValue> SILGenFunction::
+MaterializedLValue SILGenFunction::
 emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                               ArrayRef<Substitution> substitutions,
                               ArgumentSource &&selfValue,
@@ -4402,6 +4400,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   bool hasCaptures = callee.hasCaptures();
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = callee.getSubstFormalType();
+  CanAnyFunctionType origAccessType = callee.getOrigFormalType();
 
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
@@ -4442,7 +4441,16 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   // Project out the optional callback.
   SILValue optionalCallback = results[1].getUnmanagedValue();
 
-  return { address, optionalCallback };
+  CanType origSelfType = origAccessType->getInput()
+      ->getRValueInstanceType()
+      ->getCanonicalType();
+  CanGenericSignature genericSig;
+  if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType))
+    genericSig = genericFnType.getGenericSignature();
+
+  return MaterializedLValue(ManagedValue::forUnmanaged(address),
+                            origSelfType, genericSig,
+                            optionalCallback, callbackStorage);
 }
 
 SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,

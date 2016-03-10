@@ -46,7 +46,7 @@ TYPE_ATTR(in)
 TYPE_ATTR(inout)
 TYPE_ATTR(inout_aliasable)
 TYPE_ATTR(in_guaranteed)
-TYPE_ATTR(noescape)  // Only valid in sil mode.
+TYPE_ATTR(noescape)
 TYPE_ATTR(owned)
 TYPE_ATTR(unowned_inner_pointer)
 TYPE_ATTR(guaranteed)
@@ -241,6 +241,9 @@ SIMPLE_DECL_ATTR(indirect, Indirect,
 
 SIMPLE_DECL_ATTR(warn_unqualified_access, WarnUnqualifiedAccess,
                  OnFunc /*| OnVar*/ | LongAttribute, 61)
+
+SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
+                 OnProtocol | UserInaccessible, 62)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

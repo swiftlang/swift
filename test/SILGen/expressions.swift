@@ -284,7 +284,7 @@ func interpolated_string(x: Int, y: String) -> String {
 }
 
 protocol Runcible {
-  typealias U
+  associatedtype U
   var free:Int { get }
   var associated:U { get }
 

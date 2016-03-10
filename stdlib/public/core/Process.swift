@@ -74,4 +74,3 @@ func _stdlib_didEnterMain(
   Process._argc = CInt(argc)
   Process._unsafeArgv = UnsafeMutablePointer(argv)
 }
-

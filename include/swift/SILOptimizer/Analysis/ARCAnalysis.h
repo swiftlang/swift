@@ -105,16 +105,24 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
                                               SILBasicBlock::iterator End,
                                               AliasAnalysis *AA);
 
-
-/// A class that attempts to match owned return value and corresponding epilogue
-/// retains for a specific function.
+/// A class that attempts to match owned return value and corresponding
+/// epilogue retains for a specific function.
 ///
-/// TODO: This really needs a better name.
-class ConsumedReturnValueToEpilogueRetainMatcher {
+/// If we can not find the retain in the return block, we will try to find
+/// in the predecessors. 
+///
+/// The search stop when we encounter an instruction that may decrement
+/// the return'ed value, as we do not want to create a lifetime gap once the
+/// retain is moved.
+class ConsumedResultToEpilogueRetainMatcher {
 public:
-  enum class ExitKind { Return, Throw };
-
-  enum class FindRetainKind { None, Found, Blocked };
+  /// The state on how retains are found in a basic block.
+  enum class FindRetainKind { 
+    None,      ///< Did not find a retain.
+    Found,     ///< Found a retain.
+    Recursion, ///< Found a retain and its due to self-recursion.
+    Blocked    ///< Found a blocking instructions, i.e. MayDecrement.
+  };
 
   using RetainKindValue = std::pair<FindRetainKind, SILInstruction *>;
 
@@ -122,18 +130,15 @@ private:
   SILFunction *F;
   RCIdentityFunctionInfo *RCFI;
   AliasAnalysis *AA;
-  ExitKind Kind;
   // We use a list of instructions for now so that we can keep the same interface
   // and handle exploded retain_value later.
   RetainList EpilogueRetainInsts;
-  bool HasBlock = false;
 
 public:
   /// Finds matching releases in the return block of the function \p F.
-  ConsumedReturnValueToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
-                                             AliasAnalysis *AA,
-                                             SILFunction *F,
-                                             ExitKind Kind = ExitKind::Return);
+  ConsumedResultToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
+                                        AliasAnalysis *AA,
+                                        SILFunction *F);
 
   /// Finds matching releases in the provided block \p BB.
   void findMatchingRetains(SILBasicBlock *BB);
@@ -143,8 +148,6 @@ public:
   /// Recompute the mapping from argument to consumed arg.
   void recompute();
 
-  bool hasBlock() const { return HasBlock; }
-  
   using iterator = decltype(EpilogueRetainInsts)::iterator;
   using const_iterator = decltype(EpilogueRetainInsts)::const_iterator;
   iterator begin() { return EpilogueRetainInsts.begin(); }
@@ -172,7 +175,7 @@ private:
 /// A class that attempts to match owned arguments and corresponding epilogue
 /// releases for a specific function.
 ///
-/// TODO: This really needs a better name.
+/// Only try to find the epilogue release in the return block.
 class ConsumedArgToEpilogueReleaseMatcher {
 public:
   enum class ExitKind { Return, Throw };
@@ -244,13 +247,13 @@ public:
   void recompute();
 
   bool isSingleReleaseMatchedToArgument(SILInstruction *Inst) {
-    auto Pred = [&Inst](std::pair<SILArgument *,
-                                  ReleaseList> &P) -> bool {
+    auto Pred = [&Inst](const std::pair<SILArgument *,
+                                        ReleaseList> &P) -> bool {
       if (P.second.size() > 1)
         return false;
       return *P.second.begin() == Inst;
     };
-    return std::count_if(ArgInstMap.begin(), ArgInstMap.end(), Pred);
+    return count_if(ArgInstMap, Pred);
   }
 
   using iterator = decltype(ArgInstMap)::iterator;

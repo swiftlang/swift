@@ -1071,7 +1071,7 @@ extension String {
 }
 
 extension Sequence where Iterator.Element == String {
-  @available(*, unavailable, renamed="join")
+  @available(*, unavailable, renamed="joined")
   public func joinWithSeparator(separator: String) -> String {
     fatalError("unavailable function can't be called")
   }

@@ -550,9 +550,9 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   case DeclContextKind::FileUnit:
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
-  case DeclContextKind::NominalTypeDecl: {
+  case DeclContextKind::GenericTypeDecl: {
     auto CachedType = DITypeCache.find(
-        cast<NominalTypeDecl>(DC)->getDeclaredType().getPointer());
+        cast<GenericTypeDecl>(DC)->getDeclaredType().getPointer());
     if (CachedType != DITypeCache.end()) {
       // Verify that the information still exists.
       if (llvm::Metadata *Val = CachedType->second)
@@ -842,7 +842,7 @@ TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
     MetadataTypeDecl = new (IGM.Context) TypeAliasDecl(
         SourceLoc(), IGM.Context.getIdentifier("$swift.type"), SourceLoc(),
         TypeLoc::withoutLoc(IGM.Context.TheRawPointerType),
-        IGM.Context.TheBuiltinModule);
+        /*genericparams*/nullptr, IGM.Context.TheBuiltinModule);
     MetadataTypeDecl->computeType();
   }
   return MetadataTypeDecl;

@@ -6,4 +6,4 @@
 
 struct B<T{protocol A{
 class B<T
-typealias e:B<T>
+associatedtype e:B<T>

@@ -55,7 +55,7 @@ public protocol UnicodeCodec {
   /// Start or continue decoding a UTF sequence.
   ///
   /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
   /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
   /// iterator.
@@ -272,7 +272,7 @@ public struct UTF8 : UnicodeCodec {
   /// Start or continue decoding a UTF sequence.
   ///
   /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
   /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
   /// iterator.
@@ -651,22 +651,20 @@ public func transcode<
 
   var inputDecoder = inputEncoding.init()
   var hadError = false
-  var scalar = inputDecoder.decode(&input)
-  while scalar != .emptyInput {
-    switch scalar {
+  loop:
+  while true {
+    switch inputDecoder.decode(&input) {
     case .scalarValue(let us):
       OutputEncoding.encode(us, sendingOutputTo: processCodeUnit)
     case .emptyInput:
-      _sanityCheckFailure("should not enter the loop when input becomes empty")
+      break loop
     case .error:
+      hadError = true
       if stopOnError {
-        return (hadError: true)
-      } else {
-        OutputEncoding.encode("\u{fffd}", sendingOutputTo: processCodeUnit)
-        hadError = true
+        break loop
       }
+      OutputEncoding.encode("\u{fffd}", sendingOutputTo: processCodeUnit)
     }
-    scalar = inputDecoder.decode(&input)
   }
   return hadError
 }
@@ -935,4 +933,3 @@ extension UTF16 {
     fatalError("unavailable function can't be called")
   }
 }
-

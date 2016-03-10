@@ -1123,6 +1123,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("load_weak", ValueKind::LoadWeakInst)
     .Case("mark_dependence", ValueKind::MarkDependenceInst)
     .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
+    .Case("mark_uninitialized_behavior",
+          ValueKind::MarkUninitializedBehaviorInst)
     .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("objc_existential_metatype_to_object",
@@ -2211,12 +2213,81 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createMarkUninitialized(InstLoc, Val, Kind);
     break;
   }
+  
+  case ValueKind::MarkUninitializedBehaviorInst: {
+    UnresolvedValueName InitStorageFuncName, StorageName,
+                        SetterFuncName, SelfName;
+    SmallVector<ParsedSubstitution, 4> ParsedInitStorageSubs,
+                                       ParsedSetterSubs;
+    GenericParamList *InitStorageParams, *SetterParams;
+    SILType InitStorageTy, SetterTy;
+    
+    // mark_uninitialized_behavior %init<Subs>(%storage) : $T -> U,
+    //                             %set<Subs>(%self) : $V -> W
+    if (parseValueName(InitStorageFuncName)
+        || parseApplySubstitutions(ParsedInitStorageSubs)
+        || P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
+        || parseValueName(StorageName)
+        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || parseSILType(InitStorageTy, InitStorageParams)
+        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+        || parseValueName(SetterFuncName)
+        || parseApplySubstitutions(ParsedSetterSubs)
+        || P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
+        || parseValueName(SelfName)
+        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || parseSILType(SetterTy, SetterParams))
+      return true;
+    
+    // Resolve the types of the operands.
+    SILValue InitStorageFunc = getLocalValue(InitStorageFuncName,
+                                             InitStorageTy, InstLoc, B);
+    SILValue SetterFunc = getLocalValue(SetterFuncName, SetterTy, InstLoc, B);
+    
+    SmallVector<Substitution, 4> InitStorageSubs, SetterSubs;
+    if (getApplySubstitutionsFromParsed(*this, InitStorageParams,
+                                        ParsedInitStorageSubs, InitStorageSubs)
+        || getApplySubstitutionsFromParsed(*this, SetterParams,
+                                           ParsedSetterSubs, SetterSubs))
+      return true;
+    
+    auto SubstInitStorageTy = InitStorageTy.castTo<SILFunctionType>()
+      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
+                         InitStorageSubs);
+    auto SubstSetterTy = SetterTy.castTo<SILFunctionType>()
+      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
+                         SetterSubs);
+    
+    // Derive the storage type from the initStorage method.
+    auto StorageTy = SILType::getPrimitiveAddressType(
+                               SubstInitStorageTy->getSingleResult().getType());
+    auto Storage = getLocalValue(StorageName, StorageTy, InstLoc, B);
+    
+    auto SelfTy = SubstSetterTy->getSelfParameter().getSILType();
+    auto Self = getLocalValue(SelfName, SelfTy, InstLoc, B);
+    
+    auto PropTy = SubstInitStorageTy->getParameters()[0].getSILType()
+      .getAddressType();
+    
+    ResultVal = B.createMarkUninitializedBehavior(InstLoc,
+                                                  InitStorageFunc,
+                                                  InitStorageSubs,
+                                                  Storage,
+                                                  SetterFunc,
+                                                  SetterSubs,
+                                                  Self,
+                                                  PropTy);
+    break;
+  }
+  
   case ValueKind::MarkFunctionEscapeInst: {
     SmallVector<SILValue, 4> OpList;
     do {
       if (parseTypedValueRef(Val, B)) return true;
       OpList.push_back(Val);
-    } while (P.consumeIf(tok::comma));
+    } while (!peekSILDebugLocation(P) && P.consumeIf(tok::comma));
 
     if (parseSILDebugLocation(InstLoc, B))
       return true;
@@ -4328,13 +4399,6 @@ bool Parser::parseSILDefaultWitnessTable() {
   // Parse the protocol.
   ProtocolDecl *protocol = parseProtocolDecl(*this, WitnessState);
 
-  // Parse the minimum witness table size.
-  unsigned minimumWitnessTableSize;
-  if (WitnessState.parseInteger(
-          minimumWitnessTableSize,
-          diag::sil_invalid_minimum_witness_table_size))
-    return true;
-
   // Parse the body.
   SourceLoc LBraceLoc = Tok.getLoc();
   consumeToken(tok::l_brace);
@@ -4349,8 +4413,13 @@ bool Parser::parseSILDefaultWitnessTable() {
       Identifier EntryKeyword;
       SourceLoc KeywordLoc;
       if (parseIdentifier(EntryKeyword, KeywordLoc,
-            diag::expected_tok_in_sil_instr, "method"))
+            diag::expected_tok_in_sil_instr, "method, no_default"))
         return true;
+
+      if (EntryKeyword.str() == "no_default") {
+        witnessEntries.push_back(SILDefaultWitnessTable::Entry());
+        continue;
+      }
 
       if (EntryKeyword.str() != "method") {
         diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "method");
@@ -4382,9 +4451,7 @@ bool Parser::parseSILDefaultWitnessTable() {
   parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                      LBraceLoc);
   
-  SILDefaultWitnessTable::create(*SIL->M, protocol,
-                                 minimumWitnessTableSize,
-                                 witnessEntries);
+  SILDefaultWitnessTable::create(*SIL->M, protocol, witnessEntries);
   BodyScope.reset();
   return false;
 }

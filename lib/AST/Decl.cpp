@@ -427,6 +427,8 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   }
 
   if (auto PD = dyn_cast<ProtocolDecl>(D)) {
+    if (PD->getAttrs().hasAttribute<ShowInInterfaceAttr>())
+      return false;
     StringRef NameStr = PD->getNameStr();
     if (NameStr.startswith("_Builtin"))
       return true;
@@ -952,14 +954,17 @@ SourceRange PatternBindingDecl::getSourceRange() const {
 }
 
 static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
-  if (D->getDeclContext()->getAsClassOrClassExtensionContext())
-    return StaticSpellingKind::KeywordClass;
-  return StaticSpellingKind::KeywordStatic;
+  if (!D->getDeclContext()->getAsClassOrClassExtensionContext())
+    return StaticSpellingKind::KeywordStatic;
+
+  return StaticSpellingKind::KeywordClass;
 }
 
 StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   if (!isStatic())
     return StaticSpellingKind::None;
+  if (getStaticSpelling() != StaticSpellingKind::None)
+    return getStaticSpelling();
 
   return getCorrectStaticSpellingForDecl(this);
 }
@@ -1596,7 +1601,7 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
 
-  // Dynamic lookup can only find [objc] members.
+  // Dynamic lookup can only find @objc members.
   if (!isObjC())
     return false;
 
@@ -1771,18 +1776,6 @@ bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,
 }
 
 
-/// Provide the set of parameters to a generic type, or null if
-/// this function is not generic.
-void NominalTypeDecl::setGenericParams(GenericParamList *params) {
-  assert(!GenericParams && "Already has generic parameters");
-  GenericParams = params;
-  
-  if (params)
-    for (auto Param : *params)
-      Param->setDeclContext(this);
-}
-
-
 bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   // Only known protocols can be derived.
   auto knownProtocol = protocol->getKnownProtocolKind();
@@ -1817,11 +1810,6 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   return false;
 }
 
-void NominalTypeDecl::setGenericSignature(GenericSignature *sig) {
-  assert(!GenericSig && "Already have generic signature");
-  GenericSig = sig;
-}
-
 void NominalTypeDecl::computeType() {
   assert(!hasType() && "Nominal type declaration already has a type");
 
@@ -1848,11 +1836,9 @@ void NominalTypeDecl::computeType() {
   //
   // If this protocol has been deserialized, it already has generic parameters.
   // Don't add them again.
-  if (!getGenericParams()) {
-    if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-      GenericParams = proto->createGenericParams(proto);
-    }
-  }
+  if (!getGenericParams())
+    if (auto proto = dyn_cast<ProtocolDecl>(this))
+      setGenericParams(proto->createGenericParams(proto));
 }
 
 Type NominalTypeDecl::getDeclaredTypeInContext() const {
@@ -1866,7 +1852,7 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
   if (UnboundGenericType *UGT = Ty->getAs<UnboundGenericType>()) {
     // If we have an unbound generic type, bind the type to the archetypes
     // in the type's definition.
-    NominalTypeDecl *D = UGT->getDecl();
+    auto *D = cast<NominalTypeDecl>(UGT->getDecl());
     SmallVector<Type, 4> GenericArgs;
     for (auto Param : *D->getGenericParams()) {
       auto Archetype = Param->getArchetype();
@@ -1957,13 +1943,38 @@ OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
   }
 }
 
+GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
+                                 Identifier name, SourceLoc nameLoc,
+                                 MutableArrayRef<TypeLoc> inherited,
+                                 GenericParamList *GenericParams) :
+    TypeDecl(K, DC, name, nameLoc, inherited),
+    DeclContext(DeclContextKind::GenericTypeDecl, DC) {
+  setGenericParams(GenericParams);
+}
+
+
+void GenericTypeDecl::setGenericParams(GenericParamList *params) {
+  // Set the specified generic parameters onto this type alias, setting
+  // the parameters' context along the way.
+  GenericParams = params;
+  if (params)
+    for (auto Param : *params)
+      Param->setDeclContext(this);
+}
+
+void GenericTypeDecl::setGenericSignature(GenericSignature *sig) {
+  assert(!GenericSig && "Already have generic signature");
+  GenericSig = sig;
+}
+
+
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                             DeclContext *DC)
-  : TypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}),
-    TypeAliasLoc(TypeAliasLoc),
-    UnderlyingTy(UnderlyingTy)
+                             GenericParamList *GenericParams, DeclContext *DC)
+  : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
+    TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy)
 {
+
   // Set the type of the TypeAlias to the right MetatypeType.
   ASTContext &Ctx = getASTContext();
   AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
@@ -1988,8 +1999,8 @@ Type AbstractTypeParamDecl::getSuperclass() const {
   return nullptr;
 }
 
-ArrayRef<ProtocolDecl *> AbstractTypeParamDecl::getConformingProtocols(
-                             LazyResolver *resolver) const {
+ArrayRef<ProtocolDecl *>
+AbstractTypeParamDecl::getConformingProtocols(LazyResolver *resolver) const {
   if (Archetype)
     return Archetype->getConformsTo();
 
@@ -3351,6 +3362,10 @@ bool VarDecl::isAnonClosureParam() const {
 StaticSpellingKind VarDecl::getCorrectStaticSpelling() const {
   if (!isStatic())
     return StaticSpellingKind::None;
+  if (auto *PBD = getParentPatternBinding()) {
+    if (PBD->getStaticSpelling() != StaticSpellingKind::None)
+      return PBD->getStaticSpelling();
+  }
 
   return getCorrectStaticSpellingForDecl(this);
 }
@@ -4079,6 +4094,8 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
   assert(getDeclContext()->isTypeContext());
   if (!isStatic())
     return StaticSpellingKind::None;
+  if (getStaticSpelling() != StaticSpellingKind::None)
+    return getStaticSpelling();
 
   return getCorrectStaticSpellingForDecl(this);
 }

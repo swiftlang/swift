@@ -26,19 +26,27 @@
 
 namespace swift {
 
-struct Metadata;
+struct InProcess;
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
 
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
-enum class MetadataKind : uintptr_t {
+enum class MetadataKind : uint32_t {
 #define METADATAKIND(name, value) name = value,
 #define ABSTRACTMETADATAKIND(name, start, end)                                 \
   name##_Start = start, name##_End = end,
 #include "MetadataKind.def"
 };
 
+template <typename StoredPointer>
+bool metadataKindIsClass(StoredPointer Kind) {
+  return Kind > static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_End) ||
+      Kind < static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_Start);
+}
+
 /// Kinds of Swift nominal type descriptor records.
-enum class NominalTypeKind : uintptr_t {
+enum class NominalTypeKind : uint32_t {
 #define NOMINALTYPEMETADATAKIND(name, value) name = value,
 #include "MetadataKind.def"
 };
@@ -440,8 +448,9 @@ enum class FunctionMetadataConvention: uint8_t {
 };
 
 /// Flags in a function type metadata record.
-class FunctionTypeFlags {
-  typedef size_t int_type;
+template <typename Runtime>
+class TargetFunctionTypeFlags {
+  using int_type = typename Runtime::StoredSize;
   enum : int_type {
     NumArgumentsMask = 0x00FFFFFFU,
     ConventionMask   = 0x0F000000U,
@@ -450,22 +459,24 @@ class FunctionTypeFlags {
   };
   int_type Data;
   
-  constexpr FunctionTypeFlags(int_type Data) : Data(Data) {}
+  constexpr TargetFunctionTypeFlags(int_type Data) : Data(Data) {}
 public:
-  constexpr FunctionTypeFlags() : Data(0) {}
+  constexpr TargetFunctionTypeFlags() : Data(0) {}
 
-  constexpr FunctionTypeFlags withNumArguments(unsigned numArguments) const {
-    return FunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
+  constexpr TargetFunctionTypeFlags withNumArguments(unsigned numArguments) const {
+    return TargetFunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
   }
   
-  constexpr FunctionTypeFlags withConvention(FunctionMetadataConvention c) const {
-    return FunctionTypeFlags((Data & ~ConventionMask)
+  constexpr TargetFunctionTypeFlags<Runtime>
+  withConvention(FunctionMetadataConvention c) const {
+    return TargetFunctionTypeFlags((Data & ~ConventionMask)
                              | (int_type(c) << ConventionShift));
   }
   
-  constexpr FunctionTypeFlags withThrows(bool throws) const {
-    return FunctionTypeFlags((Data & ~ThrowsMask)
-                             | (throws ? ThrowsMask : 0));
+  constexpr TargetFunctionTypeFlags<Runtime>
+  withThrows(bool throws) const {
+    return TargetFunctionTypeFlags<Runtime>((Data & ~ThrowsMask) |
+                                            (throws ? ThrowsMask : 0));
   }
   
   unsigned getNumArguments() const {
@@ -484,17 +495,18 @@ public:
     return Data;
   }
   
-  static FunctionTypeFlags fromIntValue(int_type Data) {
-    return FunctionTypeFlags(Data);
+  static TargetFunctionTypeFlags<Runtime> fromIntValue(int_type Data) {
+    return TargetFunctionTypeFlags(Data);
   }
   
-  bool operator==(FunctionTypeFlags other) const {
+  bool operator==(TargetFunctionTypeFlags<Runtime> other) const {
     return Data == other.Data;
   }
-  bool operator!=(FunctionTypeFlags other) const {
+  bool operator!=(TargetFunctionTypeFlags<Runtime> other) const {
     return Data != other.Data;
   }
 };
+using FunctionTypeFlags = TargetFunctionTypeFlags<InProcess>;
 
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.

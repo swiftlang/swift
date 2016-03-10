@@ -245,8 +245,16 @@ public:
   }
 
   enum Mode {
+    /// Don't split critical edges if the frontier instructions are located on
+    /// a critical edges. Instead fail.
     DontModifyCFG,
-    AllowToModifyCFG
+    
+    /// Split critical edges if the frontier instructions are located on
+    /// a critical edges.
+    AllowToModifyCFG,
+    
+    /// Ignore exit edges from the lifetime region at all.
+    IgnoreExitEdges
   };
 
   /// Computes and returns the lifetime frontier for the value in \p Fr.
@@ -458,6 +466,9 @@ class CastOptimizer {
       Type BridgedTargetTy,
       SILBasicBlock *SuccessBB,
       SILBasicBlock *FailureBB);
+
+  void deleteInstructionsAfterUnreachable(SILInstruction *UnreachableInst,
+                                          SILInstruction *TrapInst);
 
 public:
   CastOptimizer(std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction,

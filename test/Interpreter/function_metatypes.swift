@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 protocol ProtocolHasInOut {
-  typealias Input
+  associatedtype Input
   typealias Mutator = (inout Input) -> ()
   var f: Mutator { get }
 }

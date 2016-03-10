@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -O %s | FileCheck %s
 
 protocol Bar {
-  typealias Element
+  associatedtype Element
 }
 
 class FooImplBase<OutputElement> {

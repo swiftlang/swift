@@ -22,11 +22,11 @@
 from __future__ import print_function
 
 import argparse
+import multiprocessing
 import os
 import re
-import sys
 import subprocess
-import multiprocessing
+import sys
 
 DEFAULT_TARGET_BASED_ON_SDK = {
     'macosx': 'x86_64-apple-macosx10.11',
@@ -65,6 +65,7 @@ SKIPPED_FRAMEWORKS = {
     'vecLib',
 }
 
+
 def create_parser():
     script_path = os.path.dirname(sys.argv[0])
     script_path = os.path.abspath(script_path)
@@ -87,9 +88,11 @@ def create_parser():
     parser.add_argument('-I', '--include-dir', action='append', help='Add additional include directories')
     return parser
 
+
 def output_command_result_to_file(command_args, filename):
     with open(filename, 'w') as output_file:
         subprocess.call(command_args, stdout=output_file)
+
 
 def run_command(args):
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -98,6 +101,8 @@ def run_command(args):
     return (exitcode, out, err)
 
 # Collect the set of submodules for the given module.
+
+
 def collect_submodules(common_args, module):
     # Execute swift-ide-test to print the interface.
     my_args = ['-module-print-submodules', '-module-to-print=%s' % (module)]
@@ -117,6 +122,8 @@ def collect_submodules(common_args, module):
     return sorted(list(submodules))
 
 # Print out the command we're about to execute
+
+
 def print_command(cmd, outfile=""):
     str = " ".join(cmd)
     if outfile != "":
@@ -124,6 +131,8 @@ def print_command(cmd, outfile=""):
     print(str)
 
 # Dump the API for the given module.
+
+
 def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet, verbose)):
     # Collect the submodules
     submodules = collect_submodules(cmd, module)
@@ -158,6 +167,7 @@ def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet, verbose)):
 
     return
 
+
 def pretty_sdk_name(sdk):
     if sdk.find("macosx") == 0:
         return 'OSX'
@@ -170,6 +180,8 @@ def pretty_sdk_name(sdk):
     return 'unknownOS'
 
 # Collect the set of frameworks we should dump
+
+
 def collect_frameworks(sdk):
     (exitcode, sdk_path, err) = run_command(["xcrun", "--show-sdk-path", "-sdk", sdk])
     if exitcode != 0:
@@ -198,6 +210,7 @@ def collect_frameworks(sdk):
 
     return (sorted(list(frameworks)), sdk_path)
 
+
 def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target, source_filename, output_dir, quiet, verbose):
 
     # Determine the SDK root and collect the set of frameworks.
@@ -223,6 +236,7 @@ def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target,
             results.append((cmd, cmd_extra_args, sdk_output_dir, framework, quiet, verbose))
 
     return results
+
 
 def main():
     source_filename = 'swift-api-dump.swift'

@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 protocol Fooable {
-  typealias Bar
+  associatedtype Bar
 
   func foo<T: Fooable where T.Bar == Self.Bar>(x x: T) -> Self.Bar
 }

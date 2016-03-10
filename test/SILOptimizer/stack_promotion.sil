@@ -349,6 +349,7 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
 }
 
 sil [_semantics "array.uninitialized"] @init_array_with_buffer : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
 
 sil @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
 
@@ -359,6 +360,174 @@ bb0(%0 : $Array<Int>):
   return %2 : $()                                 
 }
 
+// CHECK-LABEL: sil @promote_array_withUnsafeMutableBufferPointer_use
+// CHECK: [[ARR:%.*]] = alloc_stack $Array<Int>
+// CHECK: [[AF:%[0-9]+]] = function_ref @swift_bufferAllocateOnStack : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+// CHECK: [[B:%[0-9]+]] = apply [[AF]](
+// CHECK: [[IF:%[0-9]+]] = function_ref @init_array_with_buffer
+// CHECK: [[A:%[0-9]+]] = apply [[IF]]([[B]],
+// CHECK: [[AV:%.*]] = tuple_extract [[A]]{{.*}}, 0
+// CHECK: tuple_extract [[A]]
+// CHECK: store [[AV]] to [[ARR]]
+// CHECK: [[DF:%[0-9]+]] = function_ref @swift_bufferDeallocateFromStack : $@convention(thin) (@guaranteed AnyObject) -> ()
+// CHECK: apply [[DF]]([[B]])
+// CHECK: return
 
+sil @promote_array_withUnsafeMutableBufferPointer_use : $@convention(thin) (Int, Int, Int, Int, @owned @callee_owned (@inout Int) -> (@out (), @error ErrorType)) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int, %closure: $@callee_owned (@inout Int) -> (@out (), @error ErrorType)):
 
+  %the_array = alloc_stack $Array<Int>
 
+  %4 = function_ref @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %5 = metatype $@thick DummyArrayStorage<Int>.Type
+  %6 = init_existential_metatype %5 : $@thick DummyArrayStorage<Int>.Type, $@thick AnyObject.Type
+
+  // allocate the buffer
+  %7 = apply %4(%6, %1, %2) : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+
+  // initialize the buffer
+  %10 = apply %9(%7, %3, %8) : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
+  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int
+
+  // store the 2 elements
+  store %0 to %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to %17 : $*Int
+
+  store %11 to %the_array : $*Array<Int>
+
+  // pass the array to a function
+  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> ()
+  %20 = apply %19(%11) : $@convention(thin) (@owned Array<Int>) -> ()
+
+  // pass the array to the withUnsafeMutableBufferPointer closure.
+  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  %22 = alloc_stack $()
+  %23 = apply [nothrow]%21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  dealloc_stack %22 : $*()
+
+  dealloc_stack %the_array: $*Array<Int>
+  %24 = tuple ()
+  return %24 : $()
+}
+
+sil @array_capture_closure : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+
+// CHECK-LABEL: sil @dont_promote_array_withUnsafeMutableBufferPointer_capture
+// CHECK: [[AF:%[0-9]+]] = function_ref @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+// CHECK: apply [[AF]](
+// CHECK-NOT: swift_bufferDeallocateFromStack
+// CHECK: return
+
+sil @dont_promote_array_withUnsafeMutableBufferPointer_capture : $@convention(thin) (Int, Int, Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
+
+  %the_array = alloc_stack $Array<Int>
+
+  %4 = function_ref @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %5 = metatype $@thick DummyArrayStorage<Int>.Type
+  %6 = init_existential_metatype %5 : $@thick DummyArrayStorage<Int>.Type, $@thick AnyObject.Type
+
+  // allocate the buffer
+  %7 = apply %4(%6, %1, %2) : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+
+  // initialize the buffer
+  %10 = apply %9(%7, %3, %8) : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
+  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int
+
+  // store the 2 elements
+  store %0 to %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to %17 : $*Int
+
+  store %11 to %the_array : $*Array<Int>
+
+  // pass the array to a function
+  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> ()
+  %20 = apply %19(%11) : $@convention(thin) (@owned Array<Int>) -> ()
+
+  // pass the array to the withUnsafeMutableBufferPointer closure.
+  %closure_fun = function_ref @array_capture_closure : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+  %closure = partial_apply %closure_fun(%11) : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+  %closure2 = convert_function %closure : $@callee_owned (@inout Int) -> (@out ()) to $@callee_owned (@inout Int) -> (@out (), @error ErrorType)
+  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  %22 = alloc_stack $()
+  %23 = apply [nothrow]%21(%22, %closure2, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  dealloc_stack %22 : $*()
+
+  dealloc_stack %the_array: $*Array<Int>
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: sil @promote_array_withUnsafeMutableBufferPointer_capture
+// CHECK: [[ARR:%.*]] = alloc_stack $Array<Int>
+// CHECK: [[AF:%[0-9]+]] = function_ref @swift_bufferAllocateOnStack : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+// CHECK: [[B:%[0-9]+]] = apply [[AF]](
+// CHECK: [[IF:%[0-9]+]] = function_ref @init_array_with_buffer
+// CHECK: [[A:%[0-9]+]] = apply [[IF]]([[B]],
+// CHECK: [[AV:%.*]] = tuple_extract [[A]]{{.*}}, 0
+// CHECK: tuple_extract [[A]]
+// CHECK: store [[AV]] to [[ARR]]
+// CHECK: [[DF:%[0-9]+]] = function_ref @swift_bufferDeallocateFromStack : $@convention(thin) (@guaranteed AnyObject) -> ()
+// CHECK: apply [[DF]]([[B]])
+// CHECK: return
+
+sil @promote_array_withUnsafeMutableBufferPointer_capture : $@convention(thin) (Int, Int, Int, Int, @owned Array<Int>) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int, %another: $Array<Int>):
+
+  %the_array = alloc_stack $Array<Int>
+
+  %4 = function_ref @swift_bufferAllocate : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %5 = metatype $@thick DummyArrayStorage<Int>.Type
+  %6 = init_existential_metatype %5 : $@thick DummyArrayStorage<Int>.Type, $@thick AnyObject.Type
+
+  // allocate the buffer
+  %7 = apply %4(%6, %1, %2) : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+
+  // initialize the buffer
+  %10 = apply %9(%7, %3, %8) : $@convention(thin) (@owned AnyObject, Int, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
+  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int
+
+  // store the 2 elements
+  store %0 to %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to %17 : $*Int
+
+  store %11 to %the_array : $*Array<Int>
+
+  // pass the array to a function
+  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> ()
+  %20 = apply %19(%11) : $@convention(thin) (@owned Array<Int>) -> ()
+
+  // pass the array to the withUnsafeMutableBufferPointer closure.
+  %closure_fun = function_ref @array_capture_closure : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+  %closure = partial_apply %closure_fun(%another) : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+  %closure2 = convert_function %closure : $@callee_owned (@inout Int) -> (@out ()) to $@callee_owned (@inout Int) -> (@out (), @error ErrorType)
+  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  %22 = alloc_stack $()
+  %23 = apply [nothrow]%21(%22, %closure2, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error ErrorType), @inout Array<Int>) -> (@out (), @error ErrorType)
+  dealloc_stack %22 : $*()
+
+  dealloc_stack %the_array: $*Array<Int>
+  %24 = tuple ()
+  return %24 : $()
+}

@@ -189,18 +189,21 @@ static void deriveBodyBridgedNSError_enum_nsErrorDomain(
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
-  //     return "\(self)"
+  //     return "ModuleName.SomeEnum"
   //   }
   // }
 
-  auto &C = domainDecl->getASTContext();
+  auto M = domainDecl->getParentModule();
+  auto &C = M->getASTContext();
+  auto TC = domainDecl->getInnermostTypeContext();
+  auto ED = TC->getAsEnumOrEnumExtensionContext();
 
-  auto selfRef = createSelfDeclRef(domainDecl);
-  Expr *segmentElts[] = { selfRef };
-  auto segments = C.AllocateCopy(segmentElts);
-  auto string = new (C) InterpolatedStringLiteralExpr(SourceLoc(), segments);
-  string->setImplicit();
+  std::string buffer = M->getNameStr();
+  buffer += ".";
+  buffer += ED->getNameStr();
+  StringRef value(C.AllocateCopy(buffer));
 
+  auto string = new (C) StringLiteralExpr(value, SourceRange(), /*implicit*/ true);
   auto ret = new (C) ReturnStmt(SourceLoc(), string, /*implicit*/ true);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(ret),

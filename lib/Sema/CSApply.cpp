@@ -660,10 +660,9 @@ namespace {
     static bool isPolymorphicConstructor(AbstractFunctionDecl *fn) {
       if (!isa<ConstructorDecl>(fn))
         return false;
-      DeclContext *parent = fn->getParent();
-      if (auto extension = dyn_cast<ExtensionDecl>(parent))
-        parent = extension->getExtendedType()->getAnyNominal();
-      return (isa<ClassDecl>(parent) || isa<ProtocolDecl>(parent));
+      auto *parent =
+        fn->getParent()->getAsGenericTypeOrGenericTypeExtensionContext();
+      return parent && (isa<ClassDecl>(parent) || isa<ProtocolDecl>(parent));
     }
 
     /// \brief Build a new member reference with the given base and member.
@@ -5892,6 +5891,15 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
         diag.fixItInsertAfter(affected->getEndLoc(), "!");
       }
     }
+    return true;
+  }
+          
+  case FixKind::OptionalChaining: {
+    auto type = solution.simplifyType(TC, affected->getType())
+                ->getRValueObjectType();
+    auto diag = TC.diagnose(affected->getLoc(),
+                            diag::missing_unwrap_optional, type);
+    diag.fixItInsertAfter(affected->getEndLoc(), "?");
     return true;
   }
 

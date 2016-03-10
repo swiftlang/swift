@@ -135,9 +135,9 @@ public extension UIActionSheet {
               delegate: delegate,
               cancelButtonTitle: cancelButtonTitle,
               destructiveButtonTitle: destructiveButtonTitle)
-    self.addButton(title: firstButtonTitle)
+    self.addButton(withTitle: firstButtonTitle)
     for buttonTitle in moreButtonTitles {
-      self.addButton(title: buttonTitle)
+      self.addButton(withTitle: buttonTitle)
     }
   }
 }
@@ -157,9 +157,9 @@ public extension UIAlertView {
               message: message,
               delegate: delegate,
               cancelButtonTitle: cancelButtonTitle)
-    self.addButton(title: firstButtonTitle)
+    self.addButton(withTitle: firstButtonTitle)
     for buttonTitle in moreButtonTitles {
-      self.addButton(title: buttonTitle)
+      self.addButton(withTitle: buttonTitle)
     }
   }
 }

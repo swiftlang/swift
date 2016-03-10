@@ -1456,7 +1456,7 @@ namespace {
                               Impl.importSourceLoc(Decl->getLocation()),
                               TypeLoc::withoutLoc(
                                 primary->getDeclaredInterfaceType()),
-                              DC);
+                              /*genericparams*/nullptr, DC);
             aliasRef->computeType();
 
             // Record this as the alternate declaration.
@@ -1504,7 +1504,7 @@ namespace {
                             Impl.importSourceLoc(Decl->getLocation()),
                             TypeLoc::withoutLoc(
                               underlying->getDeclaredInterfaceType()),
-                            DC);
+                            /*genericparams*/nullptr, DC);
               typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
@@ -1530,7 +1530,7 @@ namespace {
                             Impl.importSourceLoc(Decl->getLocation()),
                             TypeLoc::withoutLoc(
                               proto->getDeclaredInterfaceType()),
-                            DC);
+                            /*genericparams*/nullptr, DC);
               typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
@@ -1591,7 +1591,7 @@ namespace {
                                       Name,
                                       Loc,
                                       TypeLoc::withoutLoc(SwiftType),
-                                      DC);
+                                      /*genericparams*/nullptr, DC);
       Result->computeType();
       return Result;
     }
@@ -3067,7 +3067,7 @@ namespace {
             !Impl.ImportedDecls[decl->getCanonicalDecl()])
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-        if (importedName.IsSubscriptAccessor) {
+        if (importedName.isSubscriptAccessor()) {
           // If this was a subscript accessor, try to create a
           // corresponding subscript declaration.
           (void)importSubscript(result, decl);
@@ -5591,7 +5591,9 @@ ClangImporter::Implementation::importDeclContextOf(
   const clang::Decl *D,
   EffectiveClangContext context)
 {
-  if (const clang::DeclContext *dc = context.dyn_cast<clang::DeclContext *>()) {
+  switch (context.getKind()) {
+  case EffectiveClangContext::DeclContext: {
+    auto dc = context.getAsDeclContext();
     if (dc->isTranslationUnit()) {
       if (auto *M = getClangModuleForDecl(D))
         return M;
@@ -5602,11 +5604,38 @@ ClangImporter::Implementation::importDeclContextOf(
     return importDeclContextImpl(dc);
   }
 
-  // Import the typedef-name as a declaration.
-  auto decl = importDecl(context.get<clang::TypedefNameDecl *>());
-  if (!decl) return nullptr;
+  case EffectiveClangContext::TypedefContext: {
+    // Import the typedef-name as a declaration.
+    auto decl = importDecl(context.getTypedefName());
+    if (!decl) return nullptr;
 
-  return cast_or_null<DeclContext>(decl);
+    return dyn_cast_or_null<DeclContext>(decl);
+  }
+
+  case EffectiveClangContext::UnresolvedContext: {
+    auto submodule = getClangSubmoduleForDecl(D, 
+                                              /*allowForwardDeclaration=*/false);
+    if (!submodule) return nullptr;
+
+    if (auto lookupTable = findLookupTable(*submodule)) {
+      if (auto clangDecl
+            = lookupTable->resolveContext(context.getUnresolvedName())) {
+        // Import the Clang declaration.
+        auto decl = importDecl(clangDecl);
+        if (!decl) return nullptr;
+
+        // Look through typealiases.
+        if (auto typealias = dyn_cast<TypeAliasDecl>(decl))
+          return typealias->getDeclaredInterfaceType()->getAnyNominal();
+
+        // Map to a nominal type declaration.
+        return dyn_cast<NominalTypeDecl>(decl);
+      }
+    }
+
+    return nullptr;
+  }
+  }
 }
 
 ValueDecl *

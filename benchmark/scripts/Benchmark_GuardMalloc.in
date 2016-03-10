@@ -13,8 +13,8 @@
 # ===----------------------------------------------------------------------===//
 
 import os
-import sys
 import subprocess
+import sys
 
 sys.path.append("@PATH_TO_DRIVER_LIBRARY@")
 
@@ -24,15 +24,19 @@ import perf_test_driver
 XFAIL_LIST = [
 ]
 
+
 class GuardMallocResult(perf_test_driver.Result):
 
     def __init__(self, name, status):
         perf_test_driver.Result.__init__(self, name, status, "", XFAIL_LIST)
 
+
 class GuardMallocBenchmarkDriver(perf_test_driver.BenchmarkDriver):
+
     def __init__(self, binary, xfail_list):
-        perf_test_driver.BenchmarkDriver.__init__(self, binary, xfail_list,
-                                                 enable_parallel=True)
+        perf_test_driver.BenchmarkDriver.__init__(
+            self, binary, xfail_list,
+            enable_parallel=True)
         self.new_env = os.environ.copy()
         self.new_env['DYLD_INSERT_LIBRARIES'] = '/usr/lib/libgmalloc.dylib'
 
@@ -41,9 +45,10 @@ class GuardMallocBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
     def process_input(self, data):
         test_name = '({},{})'.format(data['opt'], data['test_name'])
-        print "Running {}...".format(test_name)
+        print("Running {}...".format(test_name))
         sys.stdout.flush()
-        status = subprocess.call([data['path'], data['test_name'], '--num-iters=2'],
+        status = subprocess.call(
+            [data['path'], data['test_name'], '--num-iters=2'],
             env=data['env'], stderr=open('/dev/null', 'w'),
             stdout=open('/dev/null', 'w'))
         return GuardMallocResult(test_name, status)

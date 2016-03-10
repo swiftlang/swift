@@ -80,6 +80,7 @@ import SevenBoom
 import Sim2DArray
 import SortLettersInPlace
 import SortStrings
+import StackPromo
 import StaticArray
 import StrComplexWalk
 import StrToInt
@@ -90,6 +91,7 @@ import StringWalk
 import SuperChars
 import TwoSum
 import TypeFlood
+import UTF8Decode
 import Walsh
 import XorLoop
 
@@ -161,6 +163,7 @@ precommitTests = [
   "Sim2DArray": run_Sim2DArray,
   "SortLettersInPlace": run_SortLettersInPlace,
   "SortStrings": run_SortStrings,
+  "StackPromo": run_StackPromo,
   "StaticArray": run_StaticArray,
   "StrComplexWalk": run_StrComplexWalk,
   "StrToInt": run_StrToInt,
@@ -171,6 +174,7 @@ precommitTests = [
   "SuperChars": run_SuperChars,
   "TwoSum": run_TwoSum,
   "TypeFlood": run_TypeFlood,
+  "UTF8Decode": run_UTF8Decode,
   "Walsh": run_Walsh,
   "XorLoop": run_XorLoop,
 ]

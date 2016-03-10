@@ -230,6 +230,10 @@ public:
         CodeCompletionString::Chunk::ChunkKind::QuestionMark, "?");
   }
 
+  void addEqual() {
+    addChunkWithTextNoCopy(CodeCompletionString::Chunk::ChunkKind::Equal, "=");
+  }
+
   void addDeclAttrParamKeyword(StringRef Name, StringRef Annotation,
                                bool NeedSpecify) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::

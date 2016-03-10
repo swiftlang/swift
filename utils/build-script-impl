@@ -138,13 +138,10 @@ KNOWN_SETTINGS=(
     skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OSX"
-    skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
     skip-test-ios-host          ""               "set to skip testing the host parts of the iOS toolchain"
-    skip-test-tvos              ""               "set to skip testing Swift stdlibs for tvOS"
     skip-test-tvos-simulator    ""               "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
     skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
-    skip-test-watchos           ""               "set to skip testing Swift stdlibs for Apple watchOS"
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
     skip-test-validation        ""               "set to skip validation test suite"
@@ -203,7 +200,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
-    build-jobs ""                                "The number of parallel build jobs to use"
+    build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
     export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
 )
@@ -225,6 +222,60 @@ function join_array_with_delimiter() {
 
 function set_lldb_build_mode() {
     LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
+}
+
+function system_memory_in_bytes() {
+    case "$(uname -s -m)" in
+        Darwin\ x86_64)
+            sysctl hw.memsize | cut -f 2 -d " "
+            ;;
+        *)
+            echo "Unknown operating system"
+            exit 1
+            ;;
+    esac
+}
+
+function float_min() {
+    local LHS=$1
+    local RHS=$2
+    if (( $(echo "${LHS} < ${RHS}" | bc -l) )); then
+        echo ${LHS}
+    else
+        echo ${RHS}
+    fi
+}
+
+function num_llvm_parallel_lto_link_jobs() {
+    case "$(uname -s -m)" in
+        Darwin\ x86_64)
+            # Currently with -gline-tables-only clang is ~3.5GB on Darwin. Use
+            # the formula GB Memory/3.5GB to get the number of parallel link
+            # threads we can support.
+            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000.0/3.5 | bc)
+            echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
+            ;;
+        *)
+            echo "Unknown operating system"
+            exit 1
+            ;;
+    esac
+}
+
+function num_swift_parallel_lto_link_jobs() {
+    case "$(uname -s -m)" in
+        Darwin\ x86_64)
+            # Currently with -gline-tables-only swift is ~5-6GB on Darwin. Use
+            # the formula GB Memory/6GB to get the number of parallel link
+            # threads we can support.
+            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000/6.0 | bc)
+            echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
+            ;;
+        *)
+            echo "Unknown operating system"
+            exit 1
+            ;;
+    esac
 }
 
 function set_deployment_target_based_options() {
@@ -331,6 +382,22 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT_ARCH="armv7"
                     )
                     ;;
+                iphoneos-armv7s)
+                    xcrun_sdk_name="iphoneos"
+                    llvm_host_triple="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="ARM"
+                    cmake_osx_deployment_target=""
+                    cmark_cmake_options=(
+                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${deployment_target})"
+                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${deployment_target})"
+                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                    )
+                    swift_cmake_options=(
+                        -DSWIFT_HOST_VARIANT="iphoneos"
+                        -DSWIFT_HOST_VARIANT_SDK="IOS"
+                        -DSWIFT_HOST_VARIANT_ARCH="armv7s"
+                    )
+                    ;;
                 iphoneos-arm64)
                     xcrun_sdk_name="iphoneos"
                     llvm_host_triple="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
@@ -424,15 +491,35 @@ function set_deployment_target_based_options() {
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
             )
 	    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
+                if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
+                    llvm_cmake_options=(
+                        "${llvm_cmake_options[@]}"
+                        "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                        "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                    )
+                fi
+
 		llvm_cmake_options=(
 		    "${llvm_cmake_options[@]}"
 		    "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
 		    "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
 		    "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
 		    "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
-		    "-DLLVM_PARALLEL_LINK_JOBS=5"
+		    "-DLLVM_PARALLEL_LINK_JOBS=$(num_llvm_parallel_lto_link_jobs)"
 		)
 	    fi
+
+            if [[ $(true_false "${SWIFT_ENABLE_LTO}") = "TRUE" ]]; then
+                if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
+                    swift_cmake_options=(
+                        "${swift_cmake_options[@]}"
+                        "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                        "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                        "-DSWIFT_PARALLEL_LINK_JOBS=$(num_swift_parallel_lto_link_jobs)"
+                    )
+                fi
+            fi
+
             swift_cmake_options=(
                 "${swift_cmake_options[@]}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX="${DARWIN_DEPLOYMENT_VERSION_OSX}"
@@ -575,7 +662,6 @@ if [[ "${SKIP_IOS}" ]] ; then
     SKIP_BUILD_IOS=1
     SKIP_BUILD_IOS_DEVICE=1
     SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_TEST_IOS=1
     SKIP_TEST_IOS_HOST=1
     SKIP_TEST_IOS_SIMULATOR=1
 fi
@@ -584,7 +670,6 @@ if [[ "${SKIP_TVOS}" ]] ; then
     SKIP_BUILD_TVOS=1
     SKIP_BUILD_TVOS_DEVICE=1
     SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_TEST_TVOS=1
     SKIP_TEST_TVOS_HOST=1
     SKIP_TEST_TVOS_SIMULATOR=1
 fi
@@ -593,7 +678,6 @@ if [[ "${SKIP_WATCHOS}" ]] ; then
     SKIP_BUILD_WATCHOS=1
     SKIP_BUILD_WATCHOS_DEVICE=1
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS=1
     SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
@@ -602,7 +686,6 @@ if [[ "${SKIP_BUILD_IOS}" ]] ; then
     SKIP_BUILD_IOS=1
     SKIP_BUILD_IOS_DEVICE=1
     SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_TEST_IOS=1
     SKIP_TEST_IOS_HOST=1
     SKIP_TEST_IOS_SIMULATOR=1
 fi
@@ -611,7 +694,6 @@ if [[ "${SKIP_BUILD_TVOS}" ]] ; then
     SKIP_BUILD_TVOS=1
     SKIP_BUILD_TVOS_DEVICE=1
     SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_TEST_TVOS=1
     SKIP_TEST_TVOS_HOST=1
     SKIP_TEST_TVOS_SIMULATOR=1
 fi
@@ -620,7 +702,6 @@ if [[ "${SKIP_BUILD_WATCHOS}" ]] ; then
     SKIP_BUILD_WATCHOS=1
     SKIP_BUILD_WATCHOS_DEVICE=1
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS=1
     SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
@@ -649,21 +730,6 @@ fi
 
 if [[ "${SKIP_BUILD_WATCHOS_SIMULATOR}" ]] ; then
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TEST_IOS}" ]] ; then
-    SKIP_TEST_IOS_HOST=1
-    SKIP_TEST_IOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TEST_TVOS}" ]] ; then
-    SKIP_TEST_TVOS_HOST=1
-    SKIP_TEST_TVOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TEST_WATCHOS}" ]] ; then
-    SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
@@ -740,6 +806,18 @@ function true_false() {
     esac
 }
 
+function cmake_version() {
+    echo $("${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " ")
+}
+
+function cmake_needs_to_specify_standard_computed_defaults() {
+    if [[ $(cmake_version) = "3.4.0" ]]; then
+        echo "TRUE"
+    else
+        echo "FALSE"
+    fi
+}
+
 # A list of deployment targets to cross-compile the Swift host tools for.
 # We can't run the resulting binaries on the build machine.
 CROSS_TOOLS_DEPLOYMENT_TARGETS=()
@@ -748,7 +826,7 @@ CROSS_TOOLS_DEPLOYMENT_TARGETS=()
 for t in ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS} ; do
     case ${t} in
         iphonesimulator-i386 | iphonesimulator-x86_64 | \
-        iphoneos-arm64 | iphoneos-armv7 | \
+        iphoneos-arm64 | iphoneos-armv7 | iphoneos-armv7s | \
         appletvos-arm64 | appletvsimulator-x86_64 | \
         watchos-armv7k | watchsimulator-i386)
             CROSS_TOOLS_DEPLOYMENT_TARGETS=(
@@ -908,14 +986,16 @@ fi
 if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
-if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" xctest)
-fi
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
 fi
+# XCTest has a dependency on Foundation, so Foundation must be added to the
+# list of build products first.
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
+fi
+if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" xctest)
 fi
 
 SWIFT_STDLIB_TARGETS=()
@@ -1218,6 +1298,9 @@ function common_cross_c_flags() {
         iphoneos-armv7)
             echo "-arch armv7 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
+        iphoneos-armv7s)
+            echo "-arch armv7s -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+            ;;
         iphoneos-arm64)
             echo "-arch arm64 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
@@ -1304,7 +1387,8 @@ function set_swiftpm_bootstrap_command() {
     
     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
     LLBUILD_BIN="$(build_directory_bin ${deployment_target} llbuild)/swift-build-tool"
-    if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
+    if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
+        FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
         XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
     fi
     if [ ! -e "${LLBUILD_BIN}" ]; then
@@ -1318,8 +1402,8 @@ function set_swiftpm_bootstrap_command() {
     swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --swiftc="${SWIFTC_BIN}")
     swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --sbt="${LLBUILD_BIN}")
     swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --build="${build_dir}")
-    if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
-        swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --xctest="${XCTEST_BUILD_DIR}")
+    if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
+        swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --foundation="${FOUNDATION_BUILD_DIR}/Foundation" --xctest="${XCTEST_BUILD_DIR}")
     fi
 }
 
@@ -1816,15 +1900,27 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 continue
                 ;;
             xctest)
+                XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     set -x
-                    xcodebuild -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj -scheme SwiftXCTest SKIP_INSTALL=NO DEPLOYMENT_LOCATION=YES DSTROOT="${build_dir}" INSTALL_PATH="/"
+                    xcodebuild \
+                        -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
+                        -scheme SwiftXCTest \
+                        SKIP_INSTALL=NO \
+                        DEPLOYMENT_LOCATION=YES \
+                        DSTROOT="${XCTEST_BUILD_DIR}" \
+                        INSTALL_PATH="/"
                     { set +x; } 2>/dev/null
                 else
                     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
-                    SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
+                    FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
                     set -x
-                    "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}" --arch="${SWIFT_HOST_VARIANT_ARCH}"
+                    # FIXME: Use XCTEST_BUILD_TYPE (which is never properly
+                    #        set) to build either --debug or --release.
+                    "${XCTEST_SOURCE_DIR}"/build_script.py \
+                        --swiftc="${SWIFTC_BIN}" \
+                        --build-dir="${XCTEST_BUILD_DIR}" \
+                        --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation"
                     { set +x; } 2>/dev/null
                 fi
 
@@ -1832,7 +1928,9 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 continue
                 ;;
             foundation)
-                # the configuration script requires knowing about XCTest's location for building and running the tests
+                # The configuration script requires knowing about XCTest's
+                # location for building and running the tests. Note that XCTest
+                # is not yet built at this point.
                 XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                 SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
                 SWIFT_BIN="$(build_directory_bin ${deployment_target} swift)/swift"
@@ -2060,7 +2158,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 fi
                 echo "--- Running tests for ${product} ---"
                 set -x
-                "${swiftpm_bootstrap_command[@]}" --build-tests test
+                "${swiftpm_bootstrap_command[@]}" test
                 { set +x; } 2>/dev/null
                 # As swiftpm tests itself, we break early here.
                 continue
@@ -2072,15 +2170,19 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 echo "--- Running tests for ${product} ---"
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     set -x
-                    xcodebuild -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj -scheme SwiftXCTestFunctionalTests
+                    xcodebuild \
+                        -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
+                        -scheme SwiftXCTestFunctionalTests
                     { set +x; } 2>/dev/null
                 else
                     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
-                    SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
+                    FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
+                    XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                     set -x
-                    # FIXME: This re-builds swift-corelibs-xctest. Instead, 'build_script.py' should take
-                    # a top-level 'test' command that only tests an already built XCTest.
-                    "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}" --arch="${SWIFT_HOST_VARIANT_ARCH}" --test
+                    "${XCTEST_SOURCE_DIR}"/build_script.py test \
+                        --swiftc="${SWIFTC_BIN}" \
+                        --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
+                        "${XCTEST_BUILD_DIR}"
                     { set +x; } 2>/dev/null
                 fi
                 echo "--- Finished tests for ${product} ---"
@@ -2230,31 +2332,38 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 if [[ -z "${INSTALL_XCTEST}" ]] ; then
                     continue
                 fi
-                if [[ $(uname -s) == "Linux" ]]; then
-                    LIB_TARGET="linux"
-                    ARCH_FLAG="--arch=\"${SWIFT_HOST_VARIANT_ARCH}\""
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "error: --install-destdir is required"
+                    exit 1
                 fi
-                if [[ $(uname -s) == "FreeBSD" ]]; then
-                    LIB_TARGET="freebsd"
-                    ARCH_FLAG="--arch=\"${SWIFT_HOST_VARIANT_ARCH}\""
-                fi
-                if [[ $(uname -s) == "CYGWIN_NT-10.0" ]]; then
-                    LIB_TARGET="windows"
-                fi
-                if [[ $(uname -s) == "Darwin" ]]; then
-                    LIB_TARGET="macosx"
-                    ARCH_FLAG=""
-                fi
-                XCTEST_INSTALL_PREFIX="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"
+                case "$(uname -s)" in
+                    Linux)
+                        LIB_TARGET="linux"
+                        ;;
+                    FreeBSD)
+                        LIB_TARGET="freebsd"
+                        ;;
+                    CYGWIN_NT-10.0)
+                        LIB_TARGET="windows"
+                        ;;
+                    *)
+                        echo "error: --install-xctest is not supported on this platform"
+                        exit 1
+                        ;;
+                esac
+
                 echo "--- Installing ${product} ---"
+                XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
+                XCTEST_INSTALL_PREFIX="${INSTALL_DESTDIR}/${INSTALL_PREFIX}/lib/swift/${LIB_TARGET}"
+                # Note that installing directly to /usr/lib/swift usually
+                # requires root permissions.
                 set -x
-                "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" \
-                                    --build-dir="${build_dir}" \
-                                    --library-install-path="${XCTEST_INSTALL_PREFIX}" \
-                                    --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${SWIFT_HOST_VARIANT_ARCH}" \
-                                    --swift-build-dir="${SWIFT_BUILD_PATH}" ${ARCH_FLAG}
+                "${XCTEST_SOURCE_DIR}"/build_script.py install \
+                    --library-install-path="${XCTEST_INSTALL_PREFIX}" \
+                    --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${SWIFT_HOST_VARIANT_ARCH}" \
+                    "${XCTEST_BUILD_DIR}"
                 { set +x; } 2>/dev/null
-                
+
                 # As XCTest installation is self-contained, we break early here.
                 continue
                 ;;

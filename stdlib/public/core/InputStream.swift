@@ -65,4 +65,3 @@ public func readLine(strippingNewline strippingNewline: Bool = true) -> String? 
   _swift_stdlib_free(linePtr)
   return result
 }
-

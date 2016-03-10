@@ -520,8 +520,8 @@ struct ASTNodeBase {};
       case DeclContextKind::AbstractFunctionDecl:
         return cast<AbstractFunctionDecl>(dc)->getGenericParams();
 
-      case DeclContextKind::NominalTypeDecl:
-        return cast<NominalTypeDecl>(dc)->getGenericParams();
+      case DeclContextKind::GenericTypeDecl:
+        return cast<GenericTypeDecl>(dc)->getGenericParams();
 
       case DeclContextKind::ExtensionDecl:
         return cast<ExtensionDecl>(dc)->getGenericParams();
@@ -1598,7 +1598,7 @@ struct ASTNodeBase {};
         return false;
 
       case DeclContextKind::Initializer:
-      case DeclContextKind::NominalTypeDecl:
+      case DeclContextKind::GenericTypeDecl:
       case DeclContextKind::ExtensionDecl:
       case DeclContextKind::SubscriptDecl:
         return hasEnclosingFunctionContext(dc->getParent());
@@ -1734,6 +1734,10 @@ struct ASTNodeBase {};
       if (!normal)
         return;
 
+      // If the conformance is lazily resolved, don't check it; that can cause
+      // massive deserialization at a point where the compiler cannot handle it.
+      if (normal->isLazilyResolved()) return;
+
       // Translate the owning declaration into a DeclContext.
       NominalTypeDecl *nominal = dyn_cast<NominalTypeDecl>(decl);
       DeclContext *conformingDC;
@@ -1742,7 +1746,7 @@ struct ASTNodeBase {};
       } else {
         auto ext = cast<ExtensionDecl>(decl);
         conformingDC = ext;
-        nominal = ext->getAsNominalTypeOrNominalTypeExtensionContext();
+        nominal = ext->getExtendedType()->getAnyNominal();
       }
 
       auto proto = conformance->getProtocol();
@@ -2463,7 +2467,7 @@ struct ASTNodeBase {};
 
       // If the destination is a class, walk the supertypes of the source.
       if (destTy->getClassOrBoundGenericClass()) {
-        if (!destTy->isSuperclassOf(srcTy, nullptr)) {
+        if (!destTy->isBindableToSuperclassOf(srcTy, nullptr)) {
           srcTy.print(Out);
           Out << " is not a superclass of ";
           destTy.print(Out);

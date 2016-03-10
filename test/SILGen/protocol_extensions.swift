@@ -793,7 +793,7 @@ extension ProtoDelegatesToRequired where Self : RequiredInitClass {
 // ----------------------------------------------------------------------------
 
 protocol P2 {
-  typealias A
+  associatedtype A
   func f1(a: A)
   func f2(a: A)
   var x: A { get }

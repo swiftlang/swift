@@ -88,7 +88,6 @@ namespace swift {
   class IRGenOptions;
   class NormalProtocolConformance;
   class ProtocolConformance;
-  class TypeMetadataRecord;
   class ProtocolCompositionType;
   class ProtocolDecl;
   struct SILDeclRef;
@@ -419,7 +418,9 @@ public:
   unsigned DereferenceableID;   /// !dereferenceable
   llvm::MDNode *InvariantNode;
   
-  llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
+  llvm::CallingConv::ID C_CC;          /// standard C calling convention
+  llvm::CallingConv::ID DefaultCC;     /// default calling convention
+  llvm::CallingConv::ID RegisterPreservingCC; /// lightweight calling convention
 
   llvm::FunctionType *getAssociatedTypeMetadataAccessFunctionTy();
   llvm::FunctionType *getAssociatedTypeWitnessTableAccessFunctionTy();
@@ -714,7 +715,7 @@ public:                             \
   llvm::Constant *get##Id##Fn();    \
 private:                            \
   llvm::Constant *Id##Fn = nullptr;
-#include "RuntimeFunctions.def"
+#include "swift/Runtime/RuntimeFunctions.def"
   
   llvm::Constant *FixLifetimeFn = nullptr;
 

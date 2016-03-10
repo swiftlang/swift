@@ -582,7 +582,7 @@ public:
                               StringRef Name, unsigned ArgNo,
                               Alignment Align = Alignment(0)) {
     auto Ty = Storage->getType();
-    if (IGM.Opts.Optimize ||
+    if (IGM.Opts.Optimize || (ArgNo == 0) ||
         isa<llvm::AllocaInst>(Storage) ||
         isa<llvm::UndefValue>(Storage) ||
         Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
@@ -647,10 +647,20 @@ public:
   template <typename StorageType>
   void emitDebugVariableDeclaration(StorageType Storage,
                                     DebugTypeInfo Ty,
+                                    SILType SILTy,
                                     const SILDebugScope *DS,
                                     StringRef Name,
                                     unsigned ArgNo = 0,
                                     IndirectionKind Indirection = DirectValue) {
+    // Force all archetypes referenced by the type to be bound by this point.
+    // TODO: just make sure that we have a path to them that the debug info
+    //       can follow.
+    if (!IGM.Opts.Optimize && Ty.getType()->hasArchetype())
+      Ty.getType()->getCanonicalType().visit([&](Type t) {
+        if (auto archetype = dyn_cast<ArchetypeType>(CanType(t)))
+          emitTypeMetadataRef(archetype);
+       });
+
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
@@ -709,6 +719,9 @@ public:
   }
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
+  }
+  void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *i) {
+    llvm_unreachable("mark_uninitialized_behavior is not valid in canonical SIL");
   }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *i) {
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
@@ -3187,7 +3200,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   Explosion e = getLoweredExplosion(SILVal);
   unsigned ArgNo = i->getVarInfo().ArgNo;
   emitShadowCopy(e.claimAll(), i->getDebugScope(), Name, ArgNo, Copy);
-  emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name, ArgNo);
+  emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(), Name,
+                               ArgNo);
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -3203,7 +3217,8 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
 
   StringRef Name = getVarName(i);
   auto Addr = getLoweredAddress(SILVal).getAddress();
-  auto RealType = SILVal->getType().getSwiftType();
+  SILType SILTy = SILVal->getType();
+  auto RealType = SILTy.getSwiftType();
   // Unwrap implicitly indirect types and types that are passed by
   // reference only at the SIL level and below.
   bool Unwrap =
@@ -3215,7 +3230,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   unsigned ArgNo = i->getVarInfo().ArgNo;
   emitDebugVariableDeclaration(
       emitShadowCopy(Addr, i->getDebugScope(), Name, ArgNo), DbgTy,
-      i->getDebugScope(), Name, ArgNo,
+      i->getType(), i->getDebugScope(), Name, ArgNo,
       DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
 }
 
@@ -3476,11 +3491,12 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     // is stored in the alloca, emitting it as a reference type would
     // be wrong.
     bool Unwrap = true;
-    auto RealType = i->getType().getSwiftType().getLValueOrInOutObjectType();
+    SILType SILTy = i->getType();
+    auto RealType = SILTy.getSwiftType().getLValueOrInOutObjectType();
     auto DbgTy = DebugTypeInfo(Decl, RealType, type, Unwrap);
     StringRef Name = getVarName(i);
     if (auto DS = i->getDebugScope())
-      emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
+      emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Name,
                                    i->getVarInfo().ArgNo);
   }
 }

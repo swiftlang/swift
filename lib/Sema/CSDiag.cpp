@@ -2835,6 +2835,15 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // UnresolvedType and we'll deal with it.
   if (!convertType || options.contains(TCC_AllowUnresolvedTypeVariables))
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+  
+  // If we're not passing down contextual type information this time, but the
+  // original failure had type info that wasn't an optional type,
+  // then set the flag to prefer fixits with force unwrapping.
+  if (!convertType) {
+    auto previousType = CS->getContextualType();
+    if (previousType && previousType->getOptionalObjectType().isNull())
+      TCEOptions |= TypeCheckExprFlags::PreferForceUnwrapToOptional;
+  }
 
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, convertType,
                                              convertTypePurpose, TCEOptions,
@@ -3861,9 +3870,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   // If we have unviable candidates (e.g. because of access control or some
   // other problem) we should diagnose the problem.
   if (result.ViableCandidates.empty()) {
-    diagnoseUnviableLookupResults(result, baseType, /*no base expr*/nullptr,
-                                  subscriptName, DeclNameLoc(SE->getLoc()),
-                                  SE->getLoc());
+    diagnoseUnviableLookupResults(result, baseType, baseExpr, subscriptName,
+                                  DeclNameLoc(SE->getLoc()), SE->getLoc());
     return true;
   }
 
@@ -5300,6 +5308,41 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   diagnosis.diagnoseAmbiguity(expr);
 }
 
+static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
+                                TypeChecker &tc) {
+  GenericTypeDecl *FoundDecl = nullptr;
+  
+  // Walk the TypeRepr to find the type in question.
+  if (auto typerepr = loc.getTypeRepr()) {
+    struct FindGenericTypeDecl : public ASTWalker {
+      GenericTypeDecl *&FoundDecl;
+      FindGenericTypeDecl(GenericTypeDecl *&FoundDecl) : FoundDecl(FoundDecl) {
+      }
+      
+      bool walkToTypeReprPre(TypeRepr *T) override {
+        // If we already emitted the note, we're done.
+        if (FoundDecl) return false;
+        
+        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T))
+          FoundDecl = dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
+        // Keep walking.
+        return true;
+      }
+    } findGenericTypeDecl(FoundDecl);
+    
+    typerepr->walk(findGenericTypeDecl);
+  }
+  
+  // If we didn't find the type in the TypeRepr, fall back to the type in the
+  // type checked expression.
+  if (!FoundDecl)
+    FoundDecl = loc.getType()->getAnyGeneric();
+  
+  if (FoundDecl)
+    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype,
+                FoundDecl->getDeclaredType());
+}
+
 
 /// Emit an error message about an unbound generic parameter existing, and
 /// emit notes referring to the target of a diagnostic, e.g., the function
@@ -5318,6 +5361,7 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
       .highlight(ECE->getCastTypeLoc().getSourceRange());
 
     // Emit a note specifying where this came from, if we can find it.
+    noteArchetypeSource(ECE->getCastTypeLoc(), archetype, tc);
     if (auto *ND = ECE->getCastTypeLoc().getType()
           ->getNominalOrBoundGenericNominal())
       tc.diagnose(ND, diag::archetype_declared_in_type, archetype,
@@ -5336,9 +5380,8 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
 
 
   if (auto TE = dyn_cast<TypeExpr>(anchor)) {
-    if (auto *ND = TE->getInstanceType()->getNominalOrBoundGenericNominal())
-      tc.diagnose(ND, diag::archetype_declared_in_type, archetype,
-                  ND->getDeclaredType());
+    // Emit a note specifying where this came from, if we can find it.
+    noteArchetypeSource(TE->getTypeLoc(), archetype, tc);
     return;
   }
 

@@ -148,6 +148,9 @@ NOTE(note_in_decl_extension,none,
 WARNING(inout_as_attr_deprecated,none,
         "'inout' before a parameter name is deprecated, place it before the parameter type instead",
         ())
+WARNING(line_directive_style_deprecated,none,
+        "#line directive is deprecated, please use #setline instead",
+        ())
 
 ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())
@@ -277,6 +280,11 @@ ERROR(expected_equal_in_typealias,PointsToFirstBadToken,
       "expected '=' in typealias declaration", ())
 ERROR(expected_type_in_typealias,PointsToFirstBadToken,
       "expected type in typealias declaration", ())
+ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
+      "associated types may not have a generic parameter list", ())
+ERROR(typealias_generic_list_constraint,PointsToFirstBadToken,
+      "type parameters may not be constrained in typealias argument list", ())
+
 
 // Func
 ERROR(func_decl_nonglobal_operator,none,
@@ -343,6 +351,8 @@ ERROR(subscript_static,none,
       "subscript cannot be marked %0", (StaticSpellingKind))
 
 // initializer
+ERROR(invalid_nested_init,none,
+      "missing '%select{super.|self.}0' at initializer invocation", (bool))
 ERROR(initializer_decl_wrong_scope,none,
       "initializers may only be declared within a type", ())
 ERROR(expected_lparen_initializer,PointsToFirstBadToken,
@@ -485,7 +495,7 @@ ERROR(sil_member_decl_not_found,none,
 ERROR(sil_member_decl_type_mismatch,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
 ERROR(sil_substitution_mismatch,none,
-      "substitution conformances dont match archetype", ())
+      "substitution conformances don't match archetype", ())
 ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,none,
@@ -546,10 +556,6 @@ ERROR(sil_witness_assoc_not_found,none,
       "sil associated type decl not found %0", (Identifier))
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
-
-// SIL Default Witness Table
-ERROR(sil_invalid_minimum_witness_table_size,none,
-      "minimum witness table size must be an integer", ())
 
 // SIL Coverage Map
 ERROR(sil_coverage_func_not_found, none,

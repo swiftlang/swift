@@ -6,10 +6,10 @@ import Swift
 sil @retain_release_boxed_existential : $@convention(thin) (ErrorProtocol) -> () {
 entry(%e : $ErrorProtocol):
   // CHECK-objc: @swift_errorRetain
-  // CHECK-native: @swift_retain
+  // CHECK-native: @rt_swift_retain
   strong_retain %e : $ErrorProtocol
   // CHECK-objc: @swift_errorRelease
-  // CHECK-native: @swift_release
+  // CHECK-native: @rt_swift_release
   strong_release %e : $ErrorProtocol
   return undef : $()
 }
@@ -109,7 +109,7 @@ entry(%b : $ErrorProtocol):
   %m = existential_metatype $@thick ErrorProtocol.Type, %b : $ErrorProtocol
 
   // CHECK-objc:   call void @swift_errorRelease(%swift.error* %0)
-  // CHECK-native: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%swift.error*)*)(%swift.error* %0)
+  // CHECK-native: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%swift.error*)*)(%swift.error* %0)
   strong_release %b : $ErrorProtocol
 
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[DYNAMIC_TYPE]], 0

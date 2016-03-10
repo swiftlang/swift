@@ -1,4 +1,5 @@
 add_swift_executable(swift
+  api_notes.cpp
   driver.cpp
   autolink_extract_main.cpp
   frontend_main.cpp
@@ -12,6 +13,7 @@ add_swift_executable(swift
     swiftFrontend
     swiftClangImporter
     swiftOption
+    clangAPINotes
 )
 
 target_link_libraries(swift edit)

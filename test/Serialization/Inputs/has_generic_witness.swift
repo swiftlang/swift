@@ -30,7 +30,7 @@ public struct BarStruct : Barrable {
 
 
 public protocol HasAssociatedType {
-  typealias Foo : Fooable
+  associatedtype Foo : Fooable
 }
 
 public protocol Bassable {
@@ -51,7 +51,7 @@ public struct BasStruct : Bassable {
 prefix operator ~~~ {}
 
 public protocol _CyclicAssociated {
-  typealias Assoc = CyclicImpl
+  associatedtype Assoc = CyclicImpl
 }
 
 public protocol CyclicAssociated : _CyclicAssociated {

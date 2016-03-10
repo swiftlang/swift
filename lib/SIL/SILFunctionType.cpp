@@ -2084,9 +2084,8 @@ CanSILFunctionType SILType::substFuncType(SILModule &silModule,
 /// it has the form of the normal SILFunctionType for the substituted
 /// type, except using the original conventions.
 CanSILFunctionType
-SILFunctionType::substGenericArgs(SILModule &silModule,
-                                           Module *astModule,
-                                           ArrayRef<Substitution> subs) {
+SILFunctionType::substGenericArgs(SILModule &silModule, Module *astModule,
+                                  ArrayRef<Substitution> subs) {
   if (subs.empty()) {
     assert(!isPolymorphic() && "no args for polymorphic substitution");
     return CanSILFunctionType(this);

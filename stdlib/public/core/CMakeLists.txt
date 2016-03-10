@@ -195,4 +195,3 @@ add_swift_library(swiftCore SHARED IS_STDLIB IS_STDLIB_CORE
   PRIVATE_LINK_LIBRARIES ${swift_core_private_link_libraries}
   FRAMEWORK_DEPENDS ${swift_core_framework_depends}
   INSTALL_IN_COMPONENT stdlib)
-

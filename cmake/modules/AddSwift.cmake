@@ -459,6 +459,14 @@ function(_compile_swift_files dependency_target_out_var_name)
       FILES "${module_file}" "${module_doc_file}"
       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
 
+  set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
+  set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
+  set(swift_compiler_tool_dep)
+  if(SWIFT_BUILD_TOOLS)
+    # Depend on the binary itself, in addition to the symlink.
+    set(swift_compiler_tool_dep "swift")
+  endif()
+
   # Generate API notes if requested.
   set(command_create_apinotes)
   set(depends_create_apinotes)
@@ -470,11 +478,10 @@ function(_compile_swift_files dependency_target_out_var_name)
       set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
       set(apinote_input_file
         "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
-      set(CLANG_APINOTES "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
 
       list(APPEND command_create_apinotes
         COMMAND
-        "${CLANG_APINOTES}" "-cc1apinotes" "-yaml-to-binary"
+        "${swift_compiler_tool}" "-apinotes" "-yaml-to-binary"
         "-o" "${apinote_file}"
         "-target" "${SWIFT_SDK_${SWIFTFILE_SDK}_ARCH_${SWIFTFILE_ARCHITECTURE}_TRIPLE}"
         "${apinote_input_file}")
@@ -485,14 +492,6 @@ function(_compile_swift_files dependency_target_out_var_name)
         FILES ${apinote_file}
         DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
     endforeach()
-  endif()
-
-  set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
-  set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
-  set(swift_compiler_tool_dep)
-  if(SWIFT_BUILD_TOOLS)
-    # Depend on the binary itself, in addition to the symlink.
-    set(swift_compiler_tool_dep "swift")
   endif()
 
   # If there are more than one output files, we assume that they are specified
@@ -1814,7 +1813,9 @@ function(_add_swift_executable_single name)
       COMPILE_FLAGS " ${c_compile_flags}")
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
-
+  if (SWIFT_PARALLEL_LINK_JOBS)
+    set_property(TARGET ${name} PROPERTY JOB_POOL_LINK swift_link_job_pool)
+  endif()
   set_output_directory(${name}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})

@@ -374,6 +374,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::ExclamationMark:
     case Chunk::ChunkKind::QuestionMark:
     case Chunk::ChunkKind::Ampersand:
+    case Chunk::ChunkKind::Equal:
     case Chunk::ChunkKind::Whitespace:
       AnnotatedTextChunk = C.isAnnotation();
       SWIFT_FALLTHROUGH;
@@ -819,7 +820,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   if (Ty.getCanonicalTypeOrNull() == ExpectedTy.getCanonicalTypeOrNull())
     return CodeCompletionResult::ExpectedTypeRelation::Identical;
-  if (isConvertibleTo(Ty, ExpectedTy, DC))
+  if (isConvertibleTo(Ty, ExpectedTy, *DC))
     return CodeCompletionResult::ExpectedTypeRelation::Convertible;
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
     if (FT->getResult()->isVoid())
@@ -951,6 +952,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
+    case CodeCompletionString::Chunk::ChunkKind::Equal:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
       return i;
@@ -2919,6 +2921,22 @@ public:
       addPostfixOperatorCompletion(op, *T);
   }
 
+  void addAssignmentOperator(Type RHSType, Type resultType) {
+    CodeCompletionResultBuilder builder(
+        Sink, CodeCompletionResult::ResultKind::Pattern,
+        SemanticContextKind::None, {});
+
+    if (HaveLeadingSpace)
+      builder.addAnnotatedWhitespace(" ");
+    else
+      builder.addWhitespace(" ");
+    builder.addEqual();
+    builder.addWhitespace(" ");
+    assert(RHSType && resultType);
+    builder.addCallParameter(Identifier(), Identifier(), RHSType, false, true);
+    addTypeAnnotation(builder, resultType);
+  }
+
   void addInfixOperatorCompletion(OperatorDecl *op, Type resultType,
                                   Type RHSType) {
     // FIXME: we should get the semantic context of the function, not the
@@ -3067,6 +3085,12 @@ public:
       }
     }
 
+    if (leadingSequence.empty() && LHS->getType() &&
+        LHS->getType()->isAssignableType()) {
+      addAssignmentOperator(LHS->getType()->getRValueType(),
+                            CurrDeclContext->getASTContext().TheEmptyTupleType);
+    }
+
     // FIXME: unify this with the ?.member completions.
     if (auto T = LHS->getType()->getRValueType()->getOptionalObjectType())
       addPostfixBang(T);
@@ -3093,12 +3117,24 @@ public:
       for (auto T : ExpectedTypes) {
         if (!T)
           continue;
+
+        auto typeRelation = CodeCompletionResult::Identical;
+        // Convert through optional types unless we're looking for a protocol
+        // that Optional itself conforms to.
+        if (kind != CodeCompletionLiteralKind::NilLiteral) {
+          if (auto optionalObjT = T->getAnyOptionalObjectType()) {
+            T = optionalObjT;
+            typeRelation = CodeCompletionResult::Convertible;
+          }
+        }
+
+        // Check for conformance to the literal protocol.
         if (auto *NTD = T->getAnyNominal()) {
           SmallVector<ProtocolConformance *, 2> conformances;
           if (NTD->lookupConformance(module, P, conformances)) {
             foundConformance = true;
             addTypeAnnotation(builder, T);
-            builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
+            builder.setExpectedTypeRelation(typeRelation);
           }
         }
       }
@@ -3222,12 +3258,15 @@ public:
       RequestedCachedResults = RequestedResultsTy::toplevelResults();
 
     // Manually add any expected nominal types from imported modules so that
-    // they get their expected type relation.
+    // they get their expected type relation. Don't include protocols, since
+    // they can't be initialized from the type name.
+    // FIXME: this does not include types that conform to an expected protocol.
     // FIXME: this creates duplicate results.
     for (auto T : ExpectedTypes) {
       if (auto NT = T->getAs<NominalType>()) {
         if (auto NTD = NT->getDecl()) {
-          if (NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
+          if (!isa<ProtocolDecl>(NTD) &&
+              NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
             addNominalTypeRef(NT->getDecl(),
                               DeclVisibilityKind::VisibleAtTopLevel);
           }
@@ -3420,7 +3459,7 @@ public:
     for (unsigned I = 0; I < ExprTypes.size(); ++ I) {
       auto Ty = ExprTypes[I];
       if (Ty && !Ty->is<ErrorType>()) {
-        if (!isConvertibleTo(Ty, TupleEles[I], DC)) {
+        if (!isConvertibleTo(Ty, TupleEles[I], *DC)) {
           return false;
         }
       }
@@ -3688,14 +3727,9 @@ public:
       NameOffset = Printer.NameOffset.getValue();
     }
 
-    Accessibility AccessibilityOfContext;
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(CurrDeclContext))
-      AccessibilityOfContext = NTD->getFormalAccess();
-    else
-      AccessibilityOfContext = cast<ExtensionDecl>(CurrDeclContext)
-                                   ->getExtendedType()
-                                   ->getAnyNominal()
-                                   ->getFormalAccess();
+    Accessibility AccessibilityOfContext =
+      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
+        ->getFormalAccess();
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
     bool missingAccess = !isKeywordSpecified("private") &&
@@ -3761,6 +3795,9 @@ public:
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       return;
 
+    if (AvailableAttr::isUnavailable(D))
+      return;
+
     if (D->getAttrs().hasAttribute<FinalAttr>())
       return;
 
@@ -3770,7 +3807,7 @@ public:
     bool hasIntroducer = hasFuncIntroducer || hasVarIntroducer;
 
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      // We can override operators as members.
+      // We cannot override operators as members.
       if (FD->isBinaryOperator() || FD->isUnaryOperator())
         return;
 
@@ -3801,10 +3838,7 @@ public:
   void addDesignatedInitializers(Type CurrTy) {
     if (!CurrTy)
       return;
-    const auto *NTD = CurrTy->getAnyNominal();
-    if (!NTD)
-      return;
-    const auto *CD = dyn_cast<ClassDecl>(NTD);
+    const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
     if (!CD)
       return;
     if (!CD->getSuperclass())
@@ -4719,16 +4753,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::GenericParams: {
-    if (auto NM = ParsedTypeLoc.getType()->getAnyNominal()) {
-      if (auto Params = NM->getGenericParams()) {
+  case CompletionKind::GenericParams:
+    if (auto GT = ParsedTypeLoc.getType()->getAnyGeneric()) {
+      if (auto Params = GT->getGenericParams()) {
         for (auto GP : Params->getParams()) {
-          Lookup.addGenericTypeParamRef(GP, DeclVisibilityKind::GenericParameter);
+          Lookup.addGenericTypeParamRef(GP,
+                                        DeclVisibilityKind::GenericParameter);
         }
       }
     }
     break;
-  }
   }
 
   if (Lookup.RequestedCachedResults) {

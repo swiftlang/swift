@@ -3,7 +3,7 @@
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
 // RUN: echo '#line 1 "%s"' > "%t/main.swift" && cat "%s" >> "%t/main.swift" && chmod -w "%t/main.swift"
-// RUN: %target-build-swift -Xfrontend -disable-access-control -I %S/Inputs/SlurpFastEnumeration/ %t/main.swift %S/Inputs/DictionaryKeyValueTypes.swift -Xlinker %t/SlurpFastEnumeration.o -o %t.out -O
+// RUN: %target-build-swift -Xfrontend -disable-access-control -I %S/Inputs/SlurpFastEnumeration/ %t/main.swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift -Xlinker %t/SlurpFastEnumeration.o -o %t.out -O
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 
@@ -120,10 +120,12 @@ DictionaryTestSuite.test(
 
 DictionaryTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
+  resetLeaksOfObjCDictionaryKeysValues()
 }
 
 DictionaryTestSuite.tearDown {
   expectNoLeaksOfDictionaryKeysValues()
+  expectNoLeaksOfObjCDictionaryKeysValues()
 }
 
 runAllTests()

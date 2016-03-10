@@ -534,8 +534,7 @@ PromotedParamCloner::initCloned(SILFunction *Orig,
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
   unsigned Index = OrigFTI->getNumIndirectResults();
   for (auto &param : OrigFTI->getParameters()) {
-    if (std::count(PromotedParamIndices.begin(), PromotedParamIndices.end(),
-                   Index)) {
+    if (count(PromotedParamIndices, Index)) {
       auto paramTy = param.getType()->castTo<SILBoxType>()
         ->getBoxedAddressType();
       auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
@@ -588,8 +587,7 @@ PromotedParamCloner::populateCloned() {
   unsigned ArgNo = 0;
   auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
   while (I != E) {
-    if (std::count(PromotedParamIndices.begin(),
-                   PromotedParamIndices.end(), ArgNo)) {
+    if (count(PromotedParamIndices, ArgNo)) {
       // Create a new argument with the promoted type.
       auto promotedTy = (*I)->getType().castTo<SILBoxType>()
         ->getBoxedAddressType();
@@ -694,8 +692,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
   // Promote the arguments that need promotion.
   for (auto &O : PartialApply->getArgumentOperands()) {
     auto ParamIndex = getParameterIndexForOperand(&O);
-    if (!std::count(PromotedParamIndices.begin(), PromotedParamIndices.end(),
-                    ParamIndex)) {
+    if (!count(PromotedParamIndices, ParamIndex)) {
       Args.push_back(O.get());
       continue;
     }

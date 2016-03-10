@@ -3,7 +3,7 @@
 //
 // RUN: %S/../../utils/gyb %s -o %t/main.swift
 // RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control
+// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control
 //
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Set
 // REQUIRES: executable_test
@@ -56,10 +56,12 @@ var SetTestSuite = TestSuite("Set")
 
 SetTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
+  resetLeaksOfObjCDictionaryKeysValues()
 }
 
 SetTestSuite.tearDown {
   expectNoLeaksOfDictionaryKeysValues()
+  expectNoLeaksOfObjCDictionaryKeysValues()
 }
 
 func getCOWFastSet(members: [Int] = [1010, 2020, 3030]) -> Set<Int> {

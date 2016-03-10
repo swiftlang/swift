@@ -190,8 +190,8 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
   case DeclContextKind::AbstractClosureExpr:
     // FIXME: What about default functions?
     llvm_unreachable("shouldn't serialize decls from anonymous closures");
-  case DeclContextKind::NominalTypeDecl:
-    return cast<NominalTypeDecl>(DC);
+  case DeclContextKind::GenericTypeDecl:
+    return cast<GenericTypeDecl>(DC);
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC);
   case DeclContextKind::TopLevelCodeDecl:
@@ -1337,13 +1337,13 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
                            addModuleRef(cast<Module>(DC)), pathLen);
     break;
 
-  case DeclContextKind::NominalTypeDecl: {
+  case DeclContextKind::GenericTypeDecl: {
     writeCrossReference(DC->getParent(), pathLen + 1);
 
-    auto nominal = cast<NominalTypeDecl>(DC);
+    auto generic = cast<GenericTypeDecl>(DC);
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addIdentifierRef(nominal->getName()),
+                                        addIdentifierRef(generic->getName()),
                                         false);
     break;
   }
@@ -1810,7 +1810,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::NominalTypeDecl:
+  case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
     declOrDeclContextID = addDeclRef(getDeclForContext(DC));
     isDecl = true;
@@ -2176,6 +2176,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addTypeRef(typeAlias->getInterfaceType()),
                                 typeAlias->isImplicit(),
                                 rawAccessLevel);
+    writeGenericParams(typeAlias->getGenericParams(), DeclTypeAbbrCodes);
     break;
   }
 
@@ -3419,6 +3420,7 @@ struct DeclCommentTableData {
   StringRef Brief;
   RawComment Raw;
   uint32_t Group;
+  uint32_t Order;
 };
 
 class DeclCommentTableInfo {
@@ -3451,6 +3453,9 @@ public:
 
     // Group Id.
     dataLength += numLen;
+
+    // Source order.
+    dataLength += numLen;
     endian::Writer<little> writer(out);
     writer.write<uint32_t>(keyLength);
     writer.write<uint32_t>(dataLength);
@@ -3473,6 +3478,7 @@ public:
       out << C.RawText;
     }
     writer.write<uint32_t>(data.Group);
+    writer.write<uint32_t>(data.Order);
   }
 };
 
@@ -3513,7 +3519,11 @@ class YamlGroupInputParser {
         if (auto *FileEntry= dyn_cast<llvm::yaml::ScalarNode>(&Entry)) {
           llvm::SmallString<16> FileNameStorage;
           StringRef FileName = FileEntry->getValue(FileNameStorage);
-          Map[FileName] = CombinedName;
+          llvm::SmallString<32> GroupNameAndFileName;
+          GroupNameAndFileName.append(CombinedName);
+          GroupNameAndFileName.append(Separator);
+          GroupNameAndFileName.append(llvm::sys::path::stem(FileName));
+          Map[FileName] = GroupNameAndFileName.str();
         } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
           if(parseRoot(Map, &Entry, *pCombined))
             return true;
@@ -3602,10 +3612,12 @@ class DeclGroupNameContext {
   class GroupNameCollectorFromJson : public GroupNameCollector {
     StringRef RecordPath;
     FileNameToGroupNameMap* pMap = nullptr;
+    ASTContext &Ctx;
 
   public:
-    GroupNameCollectorFromJson(StringRef RecordPath) :
-      GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath) {}
+    GroupNameCollectorFromJson(StringRef RecordPath, ASTContext &Ctx) :
+      GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath),
+      Ctx(Ctx) {}
     StringRef getGroupNameInternal(const ValueDecl *VD) override {
       // We need the file path, so there has to be a location.
       if (VD->getLoc().isInvalid())
@@ -3627,7 +3639,11 @@ class DeclGroupNameContext {
         return NullGroupName;
       StringRef FileName = llvm::sys::path::filename(FullPath);
       auto Found = pMap->find(FileName);
-      return Found == pMap->end() ? NullGroupName : Found->second;
+      if (Found == pMap->end()) {
+        Ctx.Diags.diagnose(SourceLoc(), diag::error_no_group_info, FileName);
+        return NullGroupName;
+      }
+      return Found->second;
     }
   };
 
@@ -3636,8 +3652,8 @@ class DeclGroupNameContext {
   std::unique_ptr<GroupNameCollector> pNameCollector;
 
 public:
-  DeclGroupNameContext(StringRef RecordPath) :
-    pNameCollector(new GroupNameCollectorFromJson(RecordPath)) {}
+  DeclGroupNameContext(StringRef RecordPath, ASTContext &Ctx) :
+    pNameCollector(new GroupNameCollectorFromJson(RecordPath, Ctx)) {}
   uint32_t getGroupSequence(const ValueDecl *VD) {
     return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
                                      Map.size())).first->second;
@@ -3681,9 +3697,14 @@ static void writeDeclCommentTable(
     llvm::SmallString<512> USRBuffer;
     llvm::OnDiskChainedHashTableGenerator<DeclCommentTableInfo> generator;
     DeclGroupNameContext &GroupContext;
+    unsigned SourceOrder;
 
     DeclCommentTableWriter(DeclGroupNameContext &GroupContext) :
       GroupContext(GroupContext) {}
+
+    void resetSourceOrder() {
+      SourceOrder = 0;
+    }
 
     StringRef copyString(StringRef String) {
       char *Mem = static_cast<char *>(Arena.Allocate(String.size(), 1));
@@ -3711,7 +3732,8 @@ static void writeDeclCommentTable(
 
       generator.insert(copyString(USRBuffer.str()),
                        { VD->getBriefComment(), Raw,
-                         GroupContext.getGroupSequence(VD) });
+                         GroupContext.getGroupSequence(VD),
+                         SourceOrder ++ });
       return true;
     }
   };
@@ -3719,9 +3741,10 @@ static void writeDeclCommentTable(
   DeclCommentTableWriter Writer(GroupContext);
 
   ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
-  for (auto nextFile : files)
+  for (auto nextFile : files) {
+    Writer.resetSourceOrder();
     const_cast<FileUnit *>(nextFile)->walk(Writer);
-
+  }
   SmallVector<uint64_t, 8> scratch;
   llvm::SmallString<32> hashTableBlob;
   uint32_t tableOffset;
@@ -4023,7 +4046,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
 }
 
 void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                                  StringRef GroupInfoPath) {
+                                  StringRef GroupInfoPath, ASTContext &Ctx) {
   Serializer S{MODULE_DOC_SIGNATURE, DC};
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();
@@ -4033,7 +4056,7 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeDocHeader();
     {
       BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
-      DeclGroupNameContext GroupContext(GroupInfoPath);
+      DeclGroupNameContext GroupContext(GroupInfoPath, Ctx);
       comment_block::DeclCommentListLayout DeclCommentList(S.Out);
       writeDeclCommentTable(DeclCommentList, S.SF, S.M, GroupContext);
       comment_block::GroupNamesLayout GroupNames(S.Out);
@@ -4113,7 +4136,8 @@ void swift::serialize(ModuleOrSourceFile DC,
     (void)withOutputFile(getContext(DC), options.DocOutputPath,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization (swiftdoc)");
-      Serializer::writeDocToStream(out, DC, options.GroupInfoPath);
+      Serializer::writeDocToStream(out, DC, options.GroupInfoPath,
+                                   getContext(DC));
     });
   }
 }

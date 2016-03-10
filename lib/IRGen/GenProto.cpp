@@ -427,7 +427,7 @@ emitWitnessTableAccessorCall(IRGenFunction &IGF,
     call = IGF.Builder.CreateCall(accessor, {});
   }
 
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotAccessMemory();
   call->setDoesNotThrow();
 
@@ -507,7 +507,7 @@ public:
     auto accessor =
       getWitnessTableLazyAccessFunction(IGF.IGM, Conformance, type);
     llvm::CallInst *call = IGF.Builder.CreateCall(accessor, {});
-    call->setCallingConv(IGF.IGM.RuntimeCC);
+    call->setCallingConv(IGF.IGM.DefaultCC);
     call->setDoesNotAccessMemory();
     call->setDoesNotThrow();
 
@@ -1085,7 +1085,6 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   auto call = IGF.Builder.CreateCall(IGM.getGetGenericWitnessTableFn(),
                                      { cache, metadata, instantiationArgs });
-  call->setCallingConv(IGM.RuntimeCC);
   call->setDoesNotThrow();
 
   IGF.Builder.CreateRet(call);
@@ -2613,19 +2612,19 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    GenericRequirement requirement,
                                    llvm::Value *value,
                                    GetTypeParameterInContextFn getInContext) {
-  // Get the corresponding context archetype.
-  auto archetype = cast<ArchetypeType>(getInContext(requirement.TypeParameter));
+  // Get the corresponding context type.
+  auto type = getInContext(requirement.TypeParameter);
 
   if (auto proto = requirement.Protocol) {
+    assert(isa<ArchetypeType>(type));
     assert(value->getType() == IGF.IGM.WitnessTablePtrTy);
-    setProtocolWitnessTableName(IGF.IGM, value, archetype, proto);
+    setProtocolWitnessTableName(IGF.IGM, value, type, proto);
     auto kind = LocalTypeDataKind::forAbstractProtocolWitnessTable(proto);
-    IGF.setUnscopedLocalTypeData(archetype, kind, value);
+    IGF.setUnscopedLocalTypeData(type, kind, value);
   } else {
     assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
-    setTypeMetadataName(IGF.IGM, value, archetype);
-    auto kind = LocalTypeDataKind::forTypeMetadata();
-    IGF.setUnscopedLocalTypeData(archetype, kind, value);
+    setTypeMetadataName(IGF.IGM, value, type);
+    IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value);
   }
 }
 
@@ -2743,7 +2742,7 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
   // Call the accessor.
   auto call = IGF.Builder.CreateCall(witness, { parentMetadata, wtable });
   call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
 
   return call;
 }
@@ -2786,7 +2785,7 @@ irgen::emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
   auto call = IGF.Builder.CreateCall(witness,
                             { associatedTypeMetadata, parentMetadata, wtable });
   call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
 
   return call;
 }

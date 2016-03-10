@@ -5,14 +5,14 @@
 // http://www.openradar.me/18176436
 
 protocol A {
-    typealias E
+    associatedtype E
 }
 struct B<T : A> {
     let h: T
     let i: T.E
 }
 protocol C {
-    typealias F
+    associatedtype F
     func g<T where T.E == F>(f: B<T>)
 }
 struct D : C {

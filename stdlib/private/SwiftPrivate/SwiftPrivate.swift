@@ -99,4 +99,3 @@ public func withArrayOfCStrings<R>(
   }
   */
 }
-

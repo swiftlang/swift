@@ -728,7 +728,7 @@ void ClangImporter::Implementation::addEntryToLookupTable(
       table.addEntry(importedName.Alias, named, importedName.EffectiveContext);
 
     // Also add the subscript entry, if needed.
-    if (importedName.IsSubscriptAccessor)
+    if (importedName.isSubscriptAccessor())
       table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
                               ArrayRef<Identifier>()),
                      named, importedName.EffectiveContext);
@@ -1956,8 +1956,7 @@ auto ClangImporter::Implementation::importFullName(
   // Anything in an Objective-C category or extension is adjusted to the
   // class context.
   if (auto category = dyn_cast_or_null<clang::ObjCCategoryDecl>(
-                         result.EffectiveContext
-                           .dyn_cast<clang::DeclContext *>())) {
+                        result.EffectiveContext.getAsDeclContext())) {
     result.EffectiveContext = category->getClassInterface();
   }
 
@@ -2024,6 +2023,10 @@ auto ClangImporter::Implementation::importFullName(
   if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
     bool skipCustomName = false;
 
+    // Parse the name.
+    ParsedDeclName parsedName = parseDeclName(nameAttr->getName());
+    if (!parsedName) return result;
+
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
     // convention for factory methods), make sure that it can be
@@ -2032,7 +2035,7 @@ auto ClangImporter::Implementation::importFullName(
     auto method = dyn_cast<clang::ObjCMethodDecl>(D);
     if (method) {
       unsigned initPrefixLength;
-      if (nameAttr->getName().startswith("init(")) {
+      if (parsedName.BaseName == "init" && parsedName.IsFunctionName) {
         if (!shouldImportAsInitializer(method, initPrefixLength,
                                        result.InitKind)) {
           // We cannot import this as an initializer anyway.
@@ -2054,29 +2057,35 @@ auto ClangImporter::Implementation::importFullName(
     }
 
     if (!skipCustomName) {
-      SmallVector<StringRef, 4> argumentNames;
-      bool isFunctionName;
-      StringRef baseName = parseDeclName(nameAttr->getName(), argumentNames,
-                                         isFunctionName);
-      if (baseName.empty()) return result;
-      
       result.HasCustomName = true;
-      result.Imported = formDeclName(SwiftContext, baseName, argumentNames,
-                                     isFunctionName);
+      result.Imported = parsedName.formDeclName(SwiftContext);
 
-      if (method) {
+      // Handle globals treated as members.
+      if (parsedName.isMember()) {
+        // FIXME: Make sure this thing is global.
+        result.EffectiveContext = parsedName.ContextName;
+      }
+
+      // Map property getters/setters.
+      if (parsedName.IsGetter)
+        result.AccessorKind = ImportedAccessorKind::PropertyGetter;
+      else if (parsedName.IsSetter)
+        result.AccessorKind = ImportedAccessorKind::PropertySetter;
+
+      if (method && parsedName.IsFunctionName) {
         // Get the parameters.
         ArrayRef<const clang::ParmVarDecl *> params{
           method->param_begin(),
           method->param_end()
         };
 
-        result.ErrorInfo = considerErrorImport(*this, method, baseName,
-                                               argumentNames, params,
+        result.ErrorInfo = considerErrorImport(*this, method,
+                                               parsedName.BaseName,
+                                               parsedName.ArgumentLabels,
+                                               params,
                                                isInitializer,
                                                /*hasCustomName=*/true);
       }
-
 
       return result;
     }
@@ -2225,16 +2234,18 @@ auto ClangImporter::Implementation::importFullName(
 
     // Is this one of the accessors for subscripts?
     if (objcMethod->getMethodFamily() == clang::OMF_None &&
-        objcMethod->isInstanceMethod() &&
-        (isNonNullarySelector(objcMethod->getSelector(),
-                              { "objectAtIndexedSubscript" }) ||
-         isNonNullarySelector(objcMethod->getSelector(),
-                              { "setObject", "atIndexedSubscript" }) ||
-         isNonNullarySelector(objcMethod->getSelector(),
-                              { "objectForKeyedSubscript" }) ||
-         isNonNullarySelector(objcMethod->getSelector(),
-                              { "setObject", "forKeyedSubscript" })))
-      result.IsSubscriptAccessor = true;
+        objcMethod->isInstanceMethod()) {
+      if (isNonNullarySelector(objcMethod->getSelector(),
+                               { "objectAtIndexedSubscript" }) ||
+          isNonNullarySelector(objcMethod->getSelector(),
+                               { "objectForKeyedSubscript" }))
+        result.AccessorKind = ImportedAccessorKind::SubscriptGetter;
+      else if (isNonNullarySelector(objcMethod->getSelector(),
+                                    { "setObject", "atIndexedSubscript" }) ||
+               isNonNullarySelector(objcMethod->getSelector(),
+                                    { "setObject", "forKeyedSubscript" }))
+        result.AccessorKind = ImportedAccessorKind::SubscriptSetter;
+    }
 
     break;
   }
@@ -2388,7 +2399,7 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
-  if (OmitNeedlessWords && !result.IsSubscriptAccessor) {
+  if (OmitNeedlessWords && !result.isSubscriptAccessor()) {
     // Check whether the module in which the declaration resides has a
     // module prefix. If so, strip that prefix off when present.
     if (D->getDeclContext()->getRedeclContext()->isFileContext() &&

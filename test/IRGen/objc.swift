@@ -39,7 +39,7 @@ struct id {
 class MyBlammo : Blammo {
   func foo() {}
 // CHECK:  define hidden void @_TFC4objc8MyBlammo3foofT_T_([[MYBLAMMO]]*) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
+// CHECK:    call {{.*}} @rt_swift_release
 // CHECK:    ret void
 }
 
@@ -83,7 +83,7 @@ func test0(arg: id) -> id {
 
 func test1(cell: Blammo) {}
 // CHECK:  define hidden void @_TF4objc5test1{{.*}}([[BLAMMO]]*) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
+// CHECK:    call {{.*}} @rt_swift_release
 // CHECK:    ret void
 
 

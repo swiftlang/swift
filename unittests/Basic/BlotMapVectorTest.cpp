@@ -253,11 +253,10 @@ bool CtorTesterSet::hasLiveTesters() const {
 }
 
 bool CtorTesterSet::numLiveTesters() const {
-  return std::count_if(Constructed.begin(), Constructed.end(),
-                       [](CtorTester *T) -> bool {
-                         assert(T);
-                         return !T->isIgnorableTester();
-                       });
+  return count_if(Constructed, [](CtorTester *T) -> bool {
+    assert(T);
+    return !T->isIgnorableTester();
+  });
 }
 
 void CtorTesterSet::clearTesters() {

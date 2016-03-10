@@ -73,10 +73,10 @@ namespace {
 
   public:
     TypeMetadataCacheEntry(const llvm::StringRef name,
-                           const struct Metadata *metadata)
+                           const ::Metadata *metadata)
       : Name(name.str()), Metadata(metadata) {}
 
-    const struct Metadata *getMetadata(void) {
+    const ::Metadata *getMetadata(void) {
       return Metadata;
     }
 
@@ -230,6 +230,7 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
 }
 
 // copied from ProtocolConformanceRecord::getCanonicalTypeMetadata()
+template<>
 const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
   case TypeMetadataRecordKind::UniqueDirectType:
@@ -238,7 +239,7 @@ const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
     return swift_getForeignTypeMetadata((ForeignTypeMetadata *)getDirectType());
   case TypeMetadataRecordKind::UniqueDirectClass:
     if (auto *ClassMetadata =
-          static_cast<const struct ClassMetadata *>(getDirectType()))
+          static_cast<const ::ClassMetadata *>(getDirectType()))
       return swift_getObjCClassMetadata(ClassMetadata);
     else
       return nullptr;

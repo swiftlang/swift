@@ -48,6 +48,7 @@ bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
   case ContextKind::ObjCClass:
   case ContextKind::ObjCProtocol:
   case ContextKind::Tag:
+  case ContextKind::Typedef:
     return true;
 
   case ContextKind::TranslationUnit:
@@ -55,13 +56,54 @@ bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
   }
 }
 
-Optional<std::pair<SwiftLookupTable::ContextKind, StringRef>>
+/// Try to translate the given Clang declaration into a context.
+static Optional<SwiftLookupTable::StoredContext>
+translateDeclToContext(clang::NamedDecl *decl) {
+  // Tag declaration.
+  if (auto tag = dyn_cast<clang::TagDecl>(decl)) {
+    if (tag->getIdentifier())
+      return std::make_pair(SwiftLookupTable::ContextKind::Tag, tag->getName());
+    if (auto typedefDecl = tag->getTypedefNameForAnonDecl())
+      return std::make_pair(SwiftLookupTable::ContextKind::Tag,
+                            typedefDecl->getName());
+    return None;
+  }
+
+  // Objective-C class context.
+  if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(decl))
+    return std::make_pair(SwiftLookupTable::ContextKind::ObjCClass,
+                          objcClass->getName());
+
+  // Objective-C protocol context.
+  if (auto objcProtocol = dyn_cast<clang::ObjCProtocolDecl>(decl))
+    return std::make_pair(SwiftLookupTable::ContextKind::ObjCProtocol,
+                          objcProtocol->getName());
+
+  // Typedefs.
+  if (auto typedefName = dyn_cast<clang::TypedefNameDecl>(decl)) {
+    // If this typedef is merely a restatement of a tag declaration's type,
+    // return the result for that tag.
+    if (auto tag = typedefName->getUnderlyingType()->getAsTagDecl())
+      return translateDeclToContext(tag);
+
+    // Otherwise, this must be a typedef mapped to a strong type.
+    return std::make_pair(SwiftLookupTable::ContextKind::Typedef,
+                          typedefName->getName());
+  }
+
+  return None;
+}
+
+Optional<SwiftLookupTable::StoredContext>
 SwiftLookupTable::translateContext(EffectiveClangContext context) {
-  if (auto dc = context.dyn_cast<clang::DeclContext *>()) {
+  switch (context.getKind()) {
+  case EffectiveClangContext::DeclContext: {
+    auto dc = context.getAsDeclContext();
+
     // Translation unit context.
     if (dc->isTranslationUnit())
       return std::make_pair(ContextKind::TranslationUnit, StringRef());
-
+    
     // Tag declaration context.
     if (auto tag = dyn_cast<clang::TagDecl>(dc)) {
       if (tag->getIdentifier())
@@ -82,7 +124,40 @@ SwiftLookupTable::translateContext(EffectiveClangContext context) {
     return None;
   }
 
-  llvm_unreachable("Non-Clang-DeclContexts are not yet handled");
+  case EffectiveClangContext::TypedefContext:
+    return std::make_pair(ContextKind::Typedef,
+                          context.getTypedefName()->getName());
+
+  case EffectiveClangContext::UnresolvedContext:
+    // Resolve the context.
+    if (auto decl = resolveContext(context.getUnresolvedName())) {
+      if (auto context = translateDeclToContext(decl))
+        return context;
+    }
+
+    return None;
+  }
+}
+
+/// Lookup an unresolved context name and resolve it to a Clang
+/// declaration context or typedef name.
+clang::NamedDecl *SwiftLookupTable::resolveContext(StringRef unresolvedName) {
+  // Look for a context with the given Swift name.
+  for (auto entry : lookup(unresolvedName, 
+                           std::make_pair(ContextKind::TranslationUnit,
+                                          StringRef()))) {
+    if (auto decl = entry.dyn_cast<clang::NamedDecl *>()) {
+      if (isa<clang::TagDecl>(decl) ||
+          isa<clang::ObjCInterfaceDecl>(decl) ||
+          isa<clang::ObjCProtocolDecl>(decl) ||
+          isa<clang::TypedefNameDecl>(decl))
+        return decl;
+    }
+  }
+
+  // FIXME: Search imported modules to resolve the context.
+
+  return nullptr;
 }
 
 void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
@@ -169,25 +244,20 @@ auto SwiftLookupTable::findOrCreate(StringRef baseName)
 
 SmallVector<SwiftLookupTable::SingleEntry, 4>
 SwiftLookupTable::lookup(StringRef baseName,
-                         clang::DeclContext *searchContext) {
+                         llvm::Optional<StoredContext> searchContext) {
+
   SmallVector<SwiftLookupTable::SingleEntry, 4> result;
 
   // Find the lookup table entry for this base name.
   auto known = findOrCreate(baseName);
   if (known == LookupTable.end()) return result;
 
-  // Translate context.
-  Optional<std::pair<SwiftLookupTable::ContextKind, StringRef>> context;
-  if (searchContext) {
-    context = translateContext(searchContext);
-    if (!context) return result;
-  }
-
   // Walk each of the entries.
   for (auto &entry : known->second) {
     // If we're looking in a particular context and it doesn't match the
     // entry context, we're done.
-    if (context && *context != entry.Context) continue;
+    if (searchContext && entry.Context != *searchContext)
+      continue;
 
     // Map each of the declarations.
     for (auto &stored : entry.DeclsOrMacros)
@@ -195,6 +265,19 @@ SwiftLookupTable::lookup(StringRef baseName,
   }
 
   return result;
+}
+
+SmallVector<SwiftLookupTable::SingleEntry, 4>
+SwiftLookupTable::lookup(StringRef baseName,
+                         EffectiveClangContext searchContext) {
+  // Translate context.
+  Optional<StoredContext> context;
+  if (searchContext) {
+    context = translateContext(searchContext);
+    if (!context) return { };
+  }
+
+  return lookup(baseName, context);
 }
 
 SmallVector<StringRef, 4> SwiftLookupTable::allBaseNames() {
@@ -228,6 +311,7 @@ SwiftLookupTable::lookupObjCMembers(StringRef baseName) {
 
     case ContextKind::ObjCClass:
     case ContextKind::ObjCProtocol:
+    case ContextKind::Typedef:
       break;
     }
 
@@ -312,7 +396,7 @@ void SwiftLookupTable::deserializeAll() {
   if (!Reader) return;
 
   for (auto baseName : Reader->getBaseNames()) {
-    (void)lookup(baseName, nullptr);
+    (void)lookup(baseName, None);
   }
 
   (void)categories();
@@ -339,6 +423,7 @@ void SwiftLookupTable::dump() const {
       case ContextKind::Tag:
       case ContextKind::ObjCClass:
       case ContextKind::ObjCProtocol:
+      case ContextKind::Typedef:
         llvm::errs() << entry.Context.second;
       }
       llvm::errs() << ": ";

@@ -11,11 +11,11 @@
 # This file contains the data structure that transforms arguments into usable
 # values
 
-import tempfile
 import os
+import tempfile
 
 
-class Config():
+class Config(object):
     """A class to store configuration information specified by command-line
     arguments.
     """

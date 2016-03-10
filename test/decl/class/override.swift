@@ -224,3 +224,18 @@ class IUOTestSubclassOkay : IUOTestBaseClass {
 
   override func result() -> (AnyObject!) { return nil }
 }
+
+class GenericBase<T> {}
+class ConcreteDerived: GenericBase<Int> {}
+
+class OverriddenWithConcreteDerived<T> {
+  func foo() -> GenericBase<T> {}
+}
+class OverridesWithMismatchedConcreteDerived<T>:
+    OverriddenWithConcreteDerived<T> {
+  override func foo() -> ConcreteDerived {} //expected-error{{does not override}}
+}
+class OverridesWithConcreteDerived:
+    OverriddenWithConcreteDerived<Int> {
+  override func foo() -> ConcreteDerived {}
+}

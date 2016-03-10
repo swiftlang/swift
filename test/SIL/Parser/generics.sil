@@ -91,7 +91,7 @@ sil [transparent] @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@convention(thin) (Buil
 
 protocol FooProtoHelper {}
 protocol FooProto {
-  typealias Assoc : FooProtoHelper
+  associatedtype Assoc : FooProtoHelper
   var value: Assoc { get }
 }
 

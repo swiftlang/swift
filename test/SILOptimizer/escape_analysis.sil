@@ -318,6 +318,62 @@ bb0(%0 : $Pointer):
   return %7 : $X
 }
 
+// CHECK-LABEL: CG of copy_addr_content
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @copy_addr_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+bb0(%0: $*Int32, %1: $*Int32):
+  copy_addr %1 to [initialization] %0 : $*Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of copy_addr_take_content
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @copy_addr_take_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+bb0(%0: $*Int32, %1: $*Int32):
+  copy_addr [take] %1 to [initialization] %0 : $*Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of copy_addr_noinit_content
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ:
+// CHECK-NEXT:    Arg %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:  End
+sil @copy_addr_noinit_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+bb0(%0: $*Int32, %1: $*Int32):
+  copy_addr [take] %1 to %0 : $*Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of call_copy_addr_content
+// CHECK-NEXT:    Val %0 Esc: %3, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: %3, Succ: %1.1
+// CHECK-NEXT:    Val %1 Esc: %3, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: %3, Succ:
+// CHECK-NEXT:  End
+sil @call_copy_addr_content : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int32
+  %1 = alloc_stack $Int32
+  %2 = function_ref @copy_addr_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32
+  %3 = apply %2(%0, %1) : $@convention(thin) (@in_guaranteed Int32) -> @out Int32
+  %4 = tuple()
+  %6 = dealloc_stack %1 : $*Int32
+  %5 = dealloc_stack %0 : $*Int32
+  return %4 : $()
+}
+
 // Test partial_apply. The partial_apply and the boxes do not escape.
 // The X parameter does escape because it is stored in Y and the release
 // of Y's box _could_ capture Y.x in Y's deinit.
@@ -1127,6 +1183,28 @@ bb0(%0 : $Array<X>):
   return %r : $()
 }
 
+// CHECK-LABEL: CG of arraysemantics_withUnsafeMutableBufferPointer
+// CHECK-NEXT:   Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:   Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:   Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:   Con %0.3 Esc: G, Succ:
+// CHECK-NEXT:   Arg %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:   Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %3 Esc: %4, Succ:
+// CHECK-NEXT: End
+sil @arraysemantics_withUnsafeMutableBufferPointer : $@convention(thin) (@inout Array<X>, @owned @callee_owned (@inout X) -> (@out (), @error ErrorType)) -> () {
+bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error ErrorType)):
+
+  %2 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
+  %3 = alloc_stack $()
+  %4 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
+  dealloc_stack %3 : $*()
+
+  %r = tuple()
+  return %r : $()
+}
+
+sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
 sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
 sil [_semantics "array.check_index"] @check_index : $@convention(method) (Int32, @guaranteed Array<X>) -> ()

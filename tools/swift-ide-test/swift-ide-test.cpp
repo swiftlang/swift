@@ -1588,6 +1588,15 @@ public:
   void printDeclPost(const Decl *D) override {
     OS << "</decl>";
   }
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
+    if (D)
+      printDeclPre(D);
+  }
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
+    if (D)
+      printDeclPost(D);
+  }
+
 
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     const NominalTypeDecl *NTD) override {
@@ -2361,7 +2370,8 @@ class TypeReconstructWalker : public SourceEntityWalker {
   llvm::raw_ostream &Stream;
 
 public:
-  TypeReconstructWalker(ASTContext &Ctx,llvm::raw_ostream &Stream) : Ctx(Ctx), Stream(Stream) {}
+  TypeReconstructWalker(ASTContext &Ctx, llvm::raw_ostream &Stream)
+      : Ctx(Ctx), Stream(Stream) {}
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, Type T) override {
@@ -2375,15 +2385,15 @@ public:
     Type ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
                                                         Error);
     if (ReconstructedType) {
-      Stream << "reconstructed type from usr for \'" << Range.str() <<"\' is ";
+      Stream << "reconstructed type from usr for \'" << Range.str() << "\' is ";
       Stream << "\'";
       ReconstructedType->print(Stream);
-      Stream << "\'";
-      Stream << '\n';
+      Stream << "\'\n";
     } else {
       ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
                                                      Error);
-      Stream << "cannot reconstruct type from usr for \'" << Range.str() << "\'" << '\n';
+      Stream << "cannot reconstruct type from usr for \'" << Range.str()
+             << "\'\n";
     }
     return true;
   }

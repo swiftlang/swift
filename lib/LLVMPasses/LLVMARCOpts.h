@@ -13,9 +13,14 @@
 #define SWIFT_LLVMPASSES_LLVMARCOPTS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Runtime/Config.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Function.h"
 #include "llvm/ADT/StringSwitch.h"
+
+#if defined(SWIFT_WRAPPER_PREFIX)
+#define SWIFT_WRAPPER_NAME(Name) SWIFT_WRAPPER_PREFIX Name
+#endif
 
 namespace swift {
 
@@ -115,9 +120,27 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
     .Case("swift_unknownRelease", RT_UnknownRelease)
     .Case("swift_unknownRelease_n", RT_UnknownReleaseN)
     .Case("__swift_fixLifetime", RT_FixLifetime)
-    .Default(RT_Unknown);
+#if defined(SWIFT_WRAPPER_PREFIX)
+    .Case(SWIFT_WRAPPER_NAME("swift_retain"), RT_Retain)
+    .Case(SWIFT_WRAPPER_NAME("swift_retain_n"), RT_RetainN)
+    .Case(SWIFT_WRAPPER_NAME("swift_release"), RT_Release)
+    .Case(SWIFT_WRAPPER_NAME("swift_release_n"), RT_ReleaseN)
+    .Case(SWIFT_WRAPPER_NAME("swift_allocObject"), RT_AllocObject)
+    .Case(SWIFT_WRAPPER_NAME("objc_release"), RT_ObjCRelease)
+    .Case(SWIFT_WRAPPER_NAME("objc_retain"), RT_ObjCRetain)
+    .Case(SWIFT_WRAPPER_NAME("swift_retainUnowned"), RT_RetainUnowned)
+    .Case(SWIFT_WRAPPER_NAME("swift_checkUnowned"), RT_CheckUnowned)
+    .Case(SWIFT_WRAPPER_NAME("swift_bridgeObjectRetain"), RT_BridgeRetain)
+    .Case(SWIFT_WRAPPER_NAME("swift_bridgeObjectRetain_n"), RT_BridgeRetainN)
+    .Case(SWIFT_WRAPPER_NAME("swift_bridgeObjectRelease"), RT_BridgeRelease)
+    .Case(SWIFT_WRAPPER_NAME("swift_bridgeObjectRelease_n"), RT_BridgeReleaseN)
+    .Case(SWIFT_WRAPPER_NAME("swift_unknownRetain"), RT_UnknownRetain)
+    .Case(SWIFT_WRAPPER_NAME("swift_unknownRetain_n"), RT_UnknownRetainN)
+    .Case(SWIFT_WRAPPER_NAME("swift_unknownRelease"), RT_UnknownRelease)
+    .Case(SWIFT_WRAPPER_NAME("swift_unknownRelease_n"), RT_UnknownReleaseN)
+#endif
+      .Default(RT_Unknown);
 }
 
 } // end namespace swift
 #endif
-

@@ -18,31 +18,29 @@
 #ifndef SWIFT_REFLECTION_READER_H
 #define SWIFT_REFLECTION_READER_H
 
-#include "swift/Reflection/Buffer.h"
-#include "swift/Reflection/Records.h"
+#include "swift/SwiftReflection/MemoryReaderInterface.h"
 
 #include <cstdint>
 #include <memory>
 #include <vector>
 
-class BufferImpl;
-
 namespace swift {
 namespace reflection {
-
-using CopyFunction = size_t (*)(uintptr_t Source, void *Dest, size_t Size);
 
 template <typename Iterator>
 class ReflectionSection {
   using const_iterator = Iterator;
-  const std::string ImageFilename;
   const void * const Begin;
   const void * const End;
 
 public:
-  ReflectionSection(const char *ImageFilename, const void * const Begin,
+  ReflectionSection(const void * const Begin,
                     const void * const End)
-  : ImageFilename(ImageFilename), Begin(Begin), End(End) {}
+  : Begin(Begin), End(End) {}
+
+  ReflectionSection(uint64_t Begin, uint64_t End)
+  : Begin(reinterpret_cast<const void * const>(Begin)),
+  End(reinterpret_cast<const void * const>(End)) {}
 
   const_iterator begin() const {
     return const_iterator(Begin, End);
@@ -51,54 +49,59 @@ public:
   const_iterator end() const {
     return const_iterator(End, End);
   }
-
-  const std::string getImageFilename() const {
-    return ImageFilename;
-  }
-};
-
-using FieldSection = ReflectionSection<FieldDescriptorIterator>;
-using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
-
-struct ReflectionInfo {
-  FieldSection Fields;
-  AssociatedTypeSection AssociatedTypes;
 };
 
 class MemoryReader {
-  CopyFunction copy;
-  std::vector<ReflectionInfo> Info;
+  std::unique_ptr<MemoryReaderImpl> Impl;
 
 public:
-  MemoryReader() : copy(nullptr) {}
+  MemoryReader() : Impl(nullptr) {}
 
-  template <typename T>
-  Buffer<T> read(const T *Source) {
-    using External = ExternalBuffer<T>;
-    using Internal = InternalBuffer<T>;
-    if (copy) {
-      auto external = std::unique_ptr<External>(new External());
-      auto bytesCopied = copy(reinterpret_cast<uintptr_t>(Source),
-                              const_cast<void *>(external->getPointer()),
-                              sizeof(T));
+  MemoryReader(std::unique_ptr<MemoryReaderImpl> &&Impl)
+    : Impl(std::move(Impl)) {
+      assert(this->Impl && "No Memory reader implementation given!");
+      assert(this->Impl->getPointerSize && "No getPointerSize implementation");
+      assert(this->Impl->readInteger && "No readInteger implementation");
+      assert(this->Impl->getStringLength && "No stringLength implementation");
+      assert(this->Impl->readBytes && "No readBytes implementation");
+      assert(this->Impl->getPointerSize() != 0 && "Invalid target pointer size");
+  }
 
-      if (bytesCopied != sizeof(T))
-        return Buffer<T>();
+  uint8_t getPointerSize() {
+    return Impl->getPointerSize();
+  }
 
-      return Buffer<T>(std::move(external));
-    } else {
-      auto internal = new Internal(Source);
-      return Buffer<T>(std::unique_ptr<Internal>(internal));
+  template <typename IntegerType>
+  bool readInteger(addr_t Address, IntegerType *Dest,
+                   size_t Size = sizeof(IntegerType)) {
+    assert(sizeof(IntegerType) == Size);
+    uint64_t Temp;
+    if (Impl->readInteger(Address, &Temp, Size)) {
+      *Dest = (IntegerType)Temp;
+      return true;
     }
+    return false;
   }
 
-  void addReflectionInfo(ReflectionInfo I) {
-    Info.push_back(I);
+  size_t getStringLength(addr_t Address) {
+    return Impl->getStringLength(Address);
   }
 
-  const std::vector<ReflectionInfo> &getInfo() const {
-    return Info;
+  std::string readString(addr_t Address) {
+    auto NameSize = getStringLength(Address);
+    if (!NameSize)
+      return "";
+
+    auto NameBuffer = std::unique_ptr<uint8_t>(new uint8_t[NameSize + 1]);
+    if (!readBytes(Address, NameBuffer.get(), NameSize + 1))
+      return "";
+    return std::string(reinterpret_cast<const char *>(NameBuffer.get()));
   }
+
+  bool readBytes(addr_t Address, uint8_t *Dest, uint64_t Size) {
+    return Impl->readBytes(Address, Dest, Size);
+  }
+
 };
 
 } // end namespace reflection

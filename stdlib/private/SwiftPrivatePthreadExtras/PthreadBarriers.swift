@@ -129,4 +129,3 @@ public func _stdlib_pthread_barrier_wait(
     return _stdlib_PTHREAD_BARRIER_SERIAL_THREAD
   }
 }
-

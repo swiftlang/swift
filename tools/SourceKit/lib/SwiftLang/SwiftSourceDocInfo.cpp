@@ -24,6 +24,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -40,6 +41,7 @@ using namespace SourceKit;
 using namespace swift;
 using namespace swift::ide;
 
+namespace {
 class AnnotatedDeclarationPrinter : public XMLEscapingPrinter {
 public:
   AnnotatedDeclarationPrinter(raw_ostream &OS)
@@ -54,6 +56,7 @@ private:
     printXML("</Type>");
   }
 };
+} // end anonymous namespace
 
 static StringRef getTagForDecl(const Decl *D, bool isRef) {
   auto UID = SwiftLangSupport::getUIDForDecl(D, isRef);
@@ -62,18 +65,33 @@ static StringRef getTagForDecl(const Decl *D, bool isRef) {
   return UID.getName().drop_front(strlen(prefix));
 }
 
-static StringRef ExternalParamNameTag = "decl.var.parameter.name.external";
-static StringRef LocalParamNameTag = "decl.var.parameter.name.local";
+static StringRef ExternalParamNameTag = "decl.var.parameter.argument_label";
+static StringRef LocalParamNameTag = "decl.var.parameter.name";
+static StringRef GenericParamNameTag = "decl.generic_type_param.name";
+static StringRef SyntaxKeywordTag = "syntaxtype.keyword";
 
-static StringRef getTagForPrintNameContext(PrintNameContext context) {
+static StringRef getTagForParameter(PrintStructureKind context) {
   switch (context) {
-  case PrintNameContext::FunctionParameterExternal:
-    return ExternalParamNameTag;
-  case PrintNameContext::FunctionParameterLocal:
-    return LocalParamNameTag;
-  default:
+  case PrintStructureKind::FunctionParameter:
+    return "decl.var.parameter";
+  case PrintStructureKind::FunctionReturnType:
+    return "decl.function.returntype";
+  case PrintStructureKind::FunctionType:
     return "";
+  case PrintStructureKind::TupleElement:
+    return "tuple.element";
+  case PrintStructureKind::GenericParameter:
+    return "decl.generic_type_param";
+  case PrintStructureKind::GenericRequirement:
+    return "decl.generic_type_requirement";
+  case PrintStructureKind::BuiltinAttribute:
+    return "syntaxtype.attribute.builtin";
+  case PrintStructureKind::NumberLiteral:
+    return "syntaxtype.number";
+  case PrintStructureKind::StringLiteral:
+    return "syntaxtype.string";
   }
+  llvm_unreachable("unexpected parameter kind");
 }
 
 static StringRef getDeclNameTagForDecl(const Decl *D) {
@@ -82,10 +100,59 @@ static StringRef getDeclNameTagForDecl(const Decl *D) {
     // When we're examining the parameter itself, it is the local name that is
     // the name of the variable.
     return LocalParamNameTag;
+  case DeclKind::GenericTypeParam:
+    return ""; // Handled by printName.
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::Subscript:
+    // The names 'init'/'deinit'/'subscript' are actually keywords.
+    return SyntaxKeywordTag;
   default:
     return "decl.name";
   }
 }
+
+namespace {
+/// A typesafe union of contexts that the printer can be inside.
+/// Currently: Decl, PrintStructureKind
+class PrintContext {
+  // Use the low bit to determine the type; store the enum value shifted left
+  // to leave the low bit free.
+  const uintptr_t value;
+  static constexpr unsigned declTag = 0;
+  static constexpr unsigned PrintStructureKindTag = 1;
+  static constexpr unsigned typeTag = 2;
+  static constexpr unsigned tagMask = 3;
+  static constexpr unsigned tagShift = 2;
+  bool hasTag(unsigned tag) const { return (value & tagMask) == tag; }
+
+public:
+  PrintContext(const Decl *D) : value(uintptr_t(D)) {
+    static_assert(llvm::PointerLikeTypeTraits<Decl *>::NumLowBitsAvailable >=
+                      tagShift,
+                  "missing spare bit in Decl *");
+  }
+  PrintContext(PrintStructureKind K)
+      : value((uintptr_t(K) << tagShift) | PrintStructureKindTag) {}
+  PrintContext(TypeLoc unused) : value(typeTag) {}
+
+  /// Get the context as a Decl, or nullptr.
+  const Decl *getDecl() const {
+    return hasTag(declTag) ? (const Decl *)value : nullptr;
+  }
+  /// Get the context as a PrintStructureKind, or None.
+  Optional<PrintStructureKind> getPrintStructureKind() const {
+    if (!hasTag(PrintStructureKindTag))
+      return None;
+    return PrintStructureKind(value >> tagShift);
+  }
+  /// Whether this is a PrintStructureKind context of the given \p kind.
+  bool is(PrintStructureKind kind) const {
+    auto storedKind = getPrintStructureKind();
+    return storedKind && *storedKind == kind;
+  }
+  bool isType() const { return hasTag(typeTag); }
+};
 
 /// An ASTPrinter for annotating declarations with XML tags that describe the
 /// key substructure of the declaration for CursorInfo/DocInfo.
@@ -99,10 +166,11 @@ static StringRef getDeclNameTagForDecl(const Decl *D) {
 ///     func <decl.name>foo</decl.name>
 ///     (
 ///     <decl.var.parameter>
-///       <decl.var.parameter.name.local>x</decl.var.parameter.name.local>:
+///       <decl.var.parameter.name>x</decl.var.parameter.name>:
 ///       <ref.struct usr="Si">Int</ref.struct>
 ///     </decl.var.parameter>
-///     ) -> <ref.struct usr="Si">Int</ref.struct>
+///     ) -> <decl.function.returntype>
+///            <ref.struct usr="Si">Int</ref.struct></decl.function.returntype>
 ///  </decl.function.free>
 /// \endverbatim
 class FullyAnnotatedDeclarationPrinter final : public XMLEscapingPrinter {
@@ -114,29 +182,68 @@ private:
   // MARK: The ASTPrinter callback interface.
 
   void printDeclPre(const Decl *D) override {
-    DeclStack.emplace_back(D);
+    contextStack.emplace_back(PrintContext(D));
     openTag(getTagForDecl(D, /*isRef=*/false));
   }
   void printDeclPost(const Decl *D) override {
-    assert(DeclStack.back() == D && "unmatched printDeclPre");
-    DeclStack.pop_back();
+    assert(contextStack.back().getDecl() == D && "unmatched printDeclPre");
+    contextStack.pop_back();
     closeTag(getTagForDecl(D, /*isRef=*/false));
   }
 
   void printDeclLoc(const Decl *D) override {
-    openTag(getDeclNameTagForDecl(D));
+    auto tag = getDeclNameTagForDecl(D);
+    if (!tag.empty())
+      openTag(tag);
   }
   void printDeclNameEndLoc(const Decl *D) override {
-    closeTag(getDeclNameTagForDecl(D));
+    auto tag = getDeclNameTagForDecl(D);
+    if (!tag.empty())
+      closeTag(tag);
   }
 
   void printTypePre(const TypeLoc &TL) override {
-    auto tag = getTypeTagForCurrentDecl();
+    auto tag = getTypeTagForCurrentContext();
+    contextStack.emplace_back(PrintContext(TL));
     if (!tag.empty())
       openTag(tag);
   }
   void printTypePost(const TypeLoc &TL) override {
-    auto tag = getTypeTagForCurrentDecl();
+    assert(contextStack.back().isType());
+    contextStack.pop_back();
+    auto tag = getTypeTagForCurrentContext();
+    if (!tag.empty())
+      closeTag(tag);
+  }
+
+  void printStructurePre(PrintStructureKind kind, const Decl *D) override {
+    if (kind == PrintStructureKind::TupleElement)
+      fixupTupleElement(kind);
+
+    contextStack.emplace_back(PrintContext(kind));
+    auto tag = getTagForParameter(kind);
+    if (tag.empty())
+      return;
+
+    if (D && kind == PrintStructureKind::GenericParameter) {
+      assert(isa<ValueDecl>(D) && "unexpected non-value decl for param");
+      openTagWithUSRForDecl(tag, cast<ValueDecl>(D));
+    } else {
+      openTag(tag);
+    }
+  }
+  void printStructurePost(PrintStructureKind kind, const Decl *D) override {
+    if (kind == PrintStructureKind::TupleElement) {
+      auto prev = contextStack.pop_back_val();
+      (void)prev;
+      fixupTupleElement(kind);
+      assert(prev.is(kind) && "unmatched printStructurePre");
+    } else {
+      assert(contextStack.back().is(kind) && "unmatched printStructurePre");
+      contextStack.pop_back();
+    }
+
+    auto tag = getTagForParameter(kind);
     if (!tag.empty())
       closeTag(tag);
   }
@@ -154,10 +261,10 @@ private:
 
   void printTypeRef(const TypeDecl *TD, Identifier name) override {
     auto tag = getTagForDecl(TD, /*isRef=*/true);
-    OS << "<" << tag << " usr=\"";
-    SwiftLangSupport::printUSR(TD, OS);
-    OS << "\">";
+    openTagWithUSRForDecl(tag, TD);
+    insideRef = true;
     XMLEscapingPrinter::printTypeRef(TD, name);
+    insideRef = false;
     closeTag(tag);
   }
 
@@ -166,32 +273,97 @@ private:
   void openTag(StringRef tag) { OS << "<" << tag << ">"; }
   void closeTag(StringRef tag) { OS << "</" << tag << ">"; }
 
+  void openTagWithUSRForDecl(StringRef tag, const ValueDecl *VD) {
+    OS << "<" << tag << " usr=\"";
+    SwiftLangSupport::printUSR(VD, OS);
+    OS << "\">";
+  }
+
   // MARK: Misc.
 
-  StringRef getTypeTagForCurrentDecl() const {
-    if (const Decl *D = currentDecl()) {
-      switch (D->getKind()) {
-      case DeclKind::Param:
-        return "decl.var.parameter.type";
-      case DeclKind::Subscript:
-      case DeclKind::Func:
-        return "decl.function.returntype";
-      default:
+  StringRef getTypeTagForCurrentContext() const {
+    if (contextStack.empty())
+      return "";
+
+    static StringRef parameterTypeTag = "decl.var.parameter.type";
+    static StringRef genericParamTypeTag = "decl.generic_type_param.constraint";
+
+    auto context = contextStack.back();
+    if (context.is(PrintStructureKind::FunctionParameter))
+      return parameterTypeTag;
+    if (context.is(PrintStructureKind::GenericParameter))
+      return genericParamTypeTag;
+    if (context.is(PrintStructureKind::TupleElement))
+      return "tuple.element.type";
+    if (context.getPrintStructureKind().hasValue() || context.isType())
+      return "";
+
+    assert(context.getDecl() && "unexpected context kind");
+    switch (context.getDecl()->getKind()) {
+    case DeclKind::Param:
+      return parameterTypeTag;
+    case DeclKind::GenericTypeParam:
+      return genericParamTypeTag;
+    case DeclKind::Var:
+      return "decl.var.type";
+    case DeclKind::Subscript:
+    case DeclKind::Func:
+    default:
+      return "";
+    }
+  }
+
+  StringRef getTagForPrintNameContext(PrintNameContext context) {
+    if (insideRef)
+      return "";
+
+    bool insideParam =
+        !contextStack.empty() &&
+        contextStack.back().is(PrintStructureKind::FunctionParameter);
+
+    switch (context) {
+    case PrintNameContext::FunctionParameterExternal:
+      return ExternalParamNameTag;
+    case PrintNameContext::FunctionParameterLocal:
+      return LocalParamNameTag;
+    case PrintNameContext::TupleElement:
+      if (insideParam)
+        return ExternalParamNameTag;
+      return "tuple.element.argument_label";
+    case PrintNameContext::Keyword:
+      return SyntaxKeywordTag;
+    case PrintNameContext::GenericParameter:
+      return GenericParamNameTag;
+    case PrintNameContext::Attribute:
+      return "syntaxtype.attribute.name";
+    default:
+      return "";
+    }
+  }
+
+  /// 'Fix' a tuple element structure kind to be a function parameter if we are
+  /// currently inside a function type. This simplifies functions that need to
+  /// differentiate a tuple from the input part of a function type.
+  void fixupTupleElement(PrintStructureKind &kind) {
+    assert(kind == PrintStructureKind::TupleElement);
+    // Skip over 'type's in the context stack.
+    for (auto I = contextStack.rbegin(), E = contextStack.rend(); I != E; ++I) {
+      if (I->is(PrintStructureKind::FunctionType)) {
+        kind = PrintStructureKind::FunctionParameter;
+        break;
+      } else if (!I->isType()) {
         break;
       }
     }
-    return "";
-  }
-
-  const Decl *currentDecl() const {
-    return DeclStack.empty() ? nullptr : DeclStack.back();
   }
 
 private:
-  /// A stack of declarations being printed, used to determine the context for
-  /// other ASTPrinter callbacks.
-  llvm::SmallVector<const Decl *, 3> DeclStack;
+  /// A stack of contexts being printed, used to determine the context for
+  /// subsequent ASTPrinter callbacks.
+  llvm::SmallVector<PrintContext, 3> contextStack;
+  bool insideRef = false;
 };
+} // end anonymous namespace
 
 static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty) {
   if (Ty.isNull())
@@ -209,7 +381,7 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
   Ty.visit([&](Type T) {
     if (!Result && (T->getAnyNominal() == NTD ||
                     isConvertibleTo(T, NTD->getDeclaredType(),
-                                    VD->getDeclContext()))) {
+                                    *VD->getDeclContext()))) {
       Result = T;
     }
   });
@@ -419,6 +591,14 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
 
   SmallString<64> SS;
   auto BaseType = findBaseTypeForReplacingArchetype(VD, Ty);
+  bool InSynthesizedExtension = false;
+  if (BaseType) {
+    if(auto Target = BaseType->getAnyNominal()) {
+      SynthesizedExtensionAnalyzer Analyzer(Target);
+      InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
+    }
+  }
+
   unsigned NameBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
@@ -430,11 +610,9 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   {
     llvm::raw_svector_ostream OS(SS);
     SwiftLangSupport::printUSR(VD, OS);
-    if (BaseType){
-      if(auto Target = BaseType->getAnyNominal()) {
+    if (InSynthesizedExtension) {
         OS << LangSupport::SynthesizedUSRSeparator;
-        SwiftLangSupport::printUSR(Target, OS);
-      }
+        SwiftLangSupport::printUSR(BaseType->getAnyNominal(), OS);
     }
   }
   unsigned USREnd = SS.size();
@@ -470,7 +648,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned GroupBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
-    if (auto OP = VD->getGroupName())
+    auto *GroupVD = InSynthesizedExtension ? BaseType->getAnyNominal() : VD;
+    if (auto OP = GroupVD->getGroupName())
       OS << OP.getValue();
   }
   unsigned GroupEnd = SS.size();
@@ -602,9 +781,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.AnnotatedRelatedDeclarations = AnnotatedRelatedDecls;
   Info.GroupName = GroupName;
   Info.IsSystem = IsSystem;
-  Info.TypeInterface = ASTPrinter::printTypeInterface(Ty, VD->getDeclContext(),
-                                                      TypeInterface) ?
-    StringRef(TypeInterface) : StringRef();
+  Info.TypeInterface = StringRef();
   Receiver(Info);
   return false;
 }

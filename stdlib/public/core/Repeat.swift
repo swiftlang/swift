@@ -68,4 +68,3 @@ extension Repeated {
     fatalError("unavailable function can't be called")
   }
 }
-

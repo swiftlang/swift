@@ -536,8 +536,14 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
     NewParameterInfoList.push_back(NewPInfo);
   }
 
+  // The specialized function is always a thin function. This is important
+  // because we may add additional parameters after the Self parameter of
+  // witness methods. In this case the new function is not a method anymore.
+  auto ExtInfo = ClosureUserFunTy->getExtInfo();
+  ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+
   auto ClonedTy = SILFunctionType::get(
-      ClosureUserFunTy->getGenericSignature(), ClosureUserFunTy->getExtInfo(),
+      ClosureUserFunTy->getGenericSignature(), ExtInfo,
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
       ClosureUserFunTy->getAllResults(),
       ClosureUserFunTy->getOptionalErrorResult(),

@@ -729,13 +729,12 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 }
 
-static void markInvalidGenericSignature(ValueDecl *VD,
-                                        TypeChecker &TC) {
+static void markInvalidGenericSignature(ValueDecl *VD, TypeChecker &TC) {
   GenericParamList *genericParams;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
     genericParams = AFD->getGenericParams();
   else
-    genericParams = cast<NominalTypeDecl>(VD)->getGenericParams();
+    genericParams = cast<GenericTypeDecl>(VD)->getGenericParams();
   
   // If there aren't any generic parameters at this level, we're done.
   if (genericParams == nullptr)
@@ -764,8 +763,7 @@ static void markInvalidGenericSignature(ValueDecl *VD,
 /// the generic parameters.
 static void finalizeGenericParamList(ArchetypeBuilder &builder,
                                      GenericParamList *genericParams,
-                                     DeclContext *dc,
-                                     TypeChecker &TC) {
+                                     DeclContext *dc, TypeChecker &TC) {
   Accessibility access;
   if (auto *fd = dyn_cast<FuncDecl>(dc))
     access = fd->getFormalAccess();
@@ -1489,11 +1487,11 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::FileUnit:
       D->setAccessibility(Accessibility::Internal);
       break;
-    case DeclContextKind::NominalTypeDecl: {
-      auto nominal = cast<NominalTypeDecl>(DC);
-      validateAccessibility(nominal);
-      Accessibility access = nominal->getFormalAccess();
-      if (!isa<ProtocolDecl>(nominal))
+    case DeclContextKind::GenericTypeDecl: {
+      auto generic = cast<GenericTypeDecl>(DC);
+      validateAccessibility(generic);
+      Accessibility access = generic->getFormalAccess();
+      if (!isa<ProtocolDecl>(generic))
         access = std::min(access, Accessibility::Internal);
       D->setAccessibility(access);
       break;
@@ -2946,7 +2944,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                 behaviorProto->getName());
   }
   
-  // If the property was declared with an parameter, but the behavior didn't
+  // If the property was declared with a parameter, but the behavior didn't
   // use it, complain.
   // TODO: The initializer could eventually be consumed by DI-style
   // initialization.
@@ -3461,26 +3459,12 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (TAD->isBeingTypeChecked()) {
-      
-      if (!TAD->hasUnderlyingType()) {
-        TAD->setInvalid();
-        TAD->overwriteType(ErrorType::get(TC.Context));
-        TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-        
-        TC.diagnose(TAD->getLoc(), diag::circular_type_alias, TAD->getName());
-      }
-      return;
-    }
-    
-    TAD->setIsBeingTypeChecked();
-    
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessibility(TAD);
     if (!IsSecondPass) {
       if (!TAD->hasType())
-        TAD->computeType();
-
+        TC.validateDecl(TAD);
+      
       TypeResolutionOptions options;
       if (!TAD->getDeclContext()->isTypeContext())
         options |= TR_GlobalTypeAlias;
@@ -3511,8 +3495,6 @@ public:
       checkAccessibility(TC, TAD);
 
     TC.checkDeclAttributes(TAD);
-    
-    TAD->setIsBeingTypeChecked(false);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
@@ -3560,7 +3542,9 @@ public:
                       NTD->getName(),
                       DC->getDeclaredTypeOfContext());
         return true;
-      } else if (DC->isLocalContext() && DC->isGenericContext()) {
+      }
+      
+      if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
           TC.diagnose(NTD->getLoc(),
@@ -5103,6 +5087,7 @@ public:
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
+    UNINTERESTING_ATTR(ShowInInterface)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(AutoClosure)
@@ -5153,8 +5138,19 @@ public:
       }
 
       // FIXME: Customize message to the kind of thing.
-      TC.diagnose(Override, diag::override_final, 
-                  Override->getDescriptiveKind());
+      auto baseKind = Base->getDescriptiveKind();
+      switch (baseKind) {
+      case DescriptiveDeclKind::StaticLet:
+      case DescriptiveDeclKind::StaticVar:
+      case DescriptiveDeclKind::StaticMethod:
+        TC.diagnose(Override, diag::override_static, baseKind);
+        break;
+      default:
+        TC.diagnose(Override, diag::override_final,
+                    Override->getDescriptiveKind(), baseKind);
+        break;
+      }
+
       TC.diagnose(Base, diag::overridden_here);
     }
 
@@ -5909,17 +5905,15 @@ bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
 }
 
 bool TypeChecker::isAvailabilitySafeForConformance(
-    ValueDecl *witness, ValueDecl *requirement,
-    NormalProtocolConformance *conformance,
-    AvailabilityContext &requirementInfo) {
-  DeclContext *DC = conformance->getDeclContext();
+    ProtocolDecl *proto, ValueDecl *requirement, ValueDecl *witness,
+    DeclContext *dc, AvailabilityContext &requirementInfo) {
 
   // We assume conformances in
   // non-SourceFiles have already been checked for availability.
-  if (!DC->getParentSourceFile())
+  if (!dc->getParentSourceFile())
     return true;
 
-  NominalTypeDecl *conformingDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *conformingDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   assert(conformingDecl && "Must have conforming declaration");
 
   // Make sure that any access of the witness through the protocol
@@ -5944,10 +5938,8 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   witnessInfo.constrainWith(infoForConformingDecl);
   requirementInfo.constrainWith(infoForConformingDecl);
 
-  ProtocolDecl *protocolDecl = conformance->getProtocol();
   AvailabilityContext infoForProtocolDecl =
-      overApproximateAvailabilityAtLocation(protocolDecl->getLoc(),
-                                            protocolDecl);
+      overApproximateAvailabilityAtLocation(proto->getLoc(), proto);
 
   witnessInfo.constrainWith(infoForProtocolDecl);
   requirementInfo.constrainWith(infoForProtocolDecl);
@@ -6175,27 +6167,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
   case DeclKind::Module:
     return;
-
-  case DeclKind::TypeAlias: {
-    // Type aliases may not have an underlying type yet.
-    auto typeAlias = cast<TypeAliasDecl>(D);
-
-    if (typeAlias->getDeclContext()->isModuleScopeContext()) {
-      IterativeTypeChecker ITC(*this);
-      ITC.satisfy(requestResolveTypeDecl(typeAlias));
-    } else {
-      // Compute the declared type.
-      if (!typeAlias->hasType())
-        typeAlias->computeType();
-
-      if (typeAlias->getUnderlyingTypeLoc().getTypeRepr() &&
-          !typeAlias->getUnderlyingTypeLoc().wasValidated())
-        typeCheckDecl(typeAlias, true);
-    }
-
-    break;
-  }
-
+      
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType: {
     auto typeParam = cast<AbstractTypeParamDecl>(D);
@@ -6227,8 +6199,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::SubscriptDecl:
       llvm_unreachable("cannot have type params");
 
-    case DeclContextKind::NominalTypeDecl: {
-      auto nominal = cast<NominalTypeDecl>(DC);
+    case DeclContextKind::GenericTypeDecl: {
+      auto nominal = cast<GenericTypeDecl>(DC);
       typeCheckDecl(nominal, true);
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
         if (!assocType->hasType())
@@ -6262,6 +6234,54 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     break;
   }
   
+
+  case DeclKind::TypeAlias: {
+    // Type aliases may not have an underlying type yet.
+    auto typeAlias = cast<TypeAliasDecl>(D);
+    
+    // Compute the declared type.
+    if (typeAlias->hasType()) {
+      
+      // If we have are recursing into validation and already have a type set...
+      // but also don't have the underlying type computed, then we are are
+      // recursing into interface validation while checking the body of the
+      // type.  Reject this with a circularity diagnostic.
+      if (!typeAlias->hasUnderlyingType()) {
+        diagnose(typeAlias->getLoc(), diag::circular_type_alias,
+                 typeAlias->getName());
+        typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
+        typeAlias->setInvalid();
+        typeAlias->overwriteType(ErrorType::get(Context));
+      }
+      return;
+    }
+    typeAlias->computeType();
+
+    // Check generic parameters, if needed.
+    if (auto gp = typeAlias->getGenericParams()) {
+      // Validate the generic type parameters.
+      if (validateGenericTypeSignature(typeAlias)) {
+        markInvalidGenericSignature(typeAlias, *this);
+        return;
+      }
+      
+      // If we're already validating the type declaration's generic signature,
+      // avoid a potential infinite loop by not re-validating the generic
+      // parameter list.
+      if (!typeAlias->IsValidatingGenericSignature()) {
+        revertGenericParamList(gp);
+        
+        auto builder = createArchetypeBuilder(typeAlias->getModuleContext());
+        checkGenericParamList(&builder, gp, nullptr/*parentSig*/);
+        finalizeGenericParamList(builder, gp, typeAlias, *this);
+      }
+    }
+    
+    // Otherwise, perform the heavy lifting now.
+    typeCheckDecl(typeAlias, true);
+    break;
+  }
+
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class: {
@@ -6648,7 +6668,7 @@ static Type checkExtensionGenericParams(
   NominalTypeDecl *nominal;
   if (auto unbound = type->getAs<UnboundGenericType>()) {
     parentType = unbound->getParent();
-    nominal = unbound->getDecl();
+    nominal = cast<NominalTypeDecl>(unbound->getDecl());
   } else if (auto bound = type->getAs<BoundGenericType>()) {
     parentType = bound->getParent();
     nominal = bound->getDecl();

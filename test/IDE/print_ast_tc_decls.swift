@@ -422,6 +422,26 @@ class d0120_TestClassBase {
     return 0
   }
 // PASS_COMMON-NEXT: {{^}}  subscript(i: Int) -> Int { get }{{$}}
+
+  class var baseClassVar1: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  class var baseClassVar1: Int { get }{{$}}
+
+  // FIXME: final class var not allowed to have storage, but static is?
+  // final class var baseClassVar2: Int = 0
+
+  final class var baseClassVar3: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  final class var baseClassVar3: Int { get }{{$}}
+  static var baseClassVar4: Int = 0
+// PASS_COMMON-NEXT: {{^}}  static var baseClassVar4: Int{{$}}
+  static var baseClassVar5: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  static var baseClassVar5: Int { get }{{$}}
+
+  class func baseClassFunc1() {}
+// PASS_COMMON-NEXT: {{^}}  class func baseClassFunc1(){{$}}
+  final class func baseClassFunc2() {}
+// PASS_COMMON-NEXT: {{^}}  final class func baseClassFunc2(){{$}}
+  static func baseClassFunc3() {}
+// PASS_COMMON-NEXT: {{^}}  static func baseClassFunc3(){{$}}
 }
 
 class d0121_TestClassDerived : d0120_TestClassBase {
@@ -1319,3 +1339,18 @@ protocol ProtocolToExtend {
 
 extension ProtocolToExtend where Self.Assoc == Int {}
 // PREFER_TYPE_REPR_PRINTING: extension ProtocolToExtend where Self.Assoc == Int {
+
+#if true
+#elseif false
+#else
+#endif
+// PASS_PRINT_AST: #if
+// PASS_PRINT_AST: #elseif
+// PASS_PRINT_AST: #else
+// PASS_PRINT_AST: #endif
+
+public struct MyPair<A, B> { var a: A, b: B }
+public typealias MyPairI<B> = MyPair<Int, B>
+// PASS_PRINT_AST: public typealias MyPairI<B> = MyPair<Int, B>
+public typealias MyPairAlias<T, U> = MyPair<T, U>
+// PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>

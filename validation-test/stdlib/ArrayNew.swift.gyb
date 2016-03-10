@@ -3,7 +3,7 @@
 //
 // RUN: %S/../../utils/gyb %s -o %t/main.swift
 // RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
+// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Array
 // REQUIRES: executable_test
 
@@ -1759,6 +1759,7 @@ ArrayTestSuite.test("${array_type}<Void>/map") {
 
 ArrayTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
+  resetLeaksOfObjCDictionaryKeysValues()
   TestBridgedValueTy.bridgeOperations = 0
 }
 
@@ -1766,6 +1767,7 @@ ArrayTestSuite.tearDown {
   if _isDebugAssertConfiguration() {
     // The return autorelease optimization does not happen reliable.
     expectNoLeaksOfDictionaryKeysValues()
+    expectNoLeaksOfObjCDictionaryKeysValues()
   }
 }
 

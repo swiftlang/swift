@@ -1276,7 +1276,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
+  if (options.contains(TypeCheckExprFlags::PreferForceUnwrapToOptional))
+    csOptions |= ConstraintSystemFlags::PreferForceUnwrapToOptional;
+  ConstraintSystem cs(*this, dc, csOptions);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
   ExprCleanser cleanup2(expr);
 

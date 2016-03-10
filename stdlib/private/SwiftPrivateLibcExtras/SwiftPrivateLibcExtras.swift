@@ -127,4 +127,3 @@ public func WEXITSTATUS(status: CInt) -> CInt {
 public func WTERMSIG(status: CInt) -> CInt {
   return _WSTATUS(status)
 }
-

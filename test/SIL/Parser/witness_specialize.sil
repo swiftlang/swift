@@ -11,7 +11,7 @@ struct GenericAssocType<T> : AssocReqt {
 }
 
 protocol AssocTypeWithReqt {
-  typealias AssocType : AssocReqt
+  associatedtype AssocType : AssocReqt
 }
 
 struct ConformsWithDependentAssocType2<DD> : AssocTypeWithReqt {

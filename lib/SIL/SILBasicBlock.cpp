@@ -141,6 +141,8 @@ SILArgument *SILBasicBlock::insertBBArg(bbarg_iterator Iter, SILType Ty,
 }
 
 void SILBasicBlock::eraseBBArg(int Index) {
+  assert(getBBArg(Index)->use_empty() &&
+         "Erasing block argument that has uses!");
   // Notify the delete handlers that this BB argument is going away.
   getModule().notifyDeleteHandlers(getBBArg(Index));
   BBArgList.erase(BBArgList.begin() + Index);

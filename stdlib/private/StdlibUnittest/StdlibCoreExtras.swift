@@ -177,4 +177,3 @@ public func forAllPermutations<S : Sequence>(
     return ()
   }
 }
-

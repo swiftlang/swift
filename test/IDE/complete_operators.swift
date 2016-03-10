@@ -38,6 +38,8 @@
 // RUN: FileCheck %s -check-prefix=S4_EXT_INFIX_NEG < %t.ext_infix_2
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_3 | FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_4 | FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_1| FileCheck %s -check-prefix=ASSIGN_TUPLE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_2| FileCheck %s -check-prefix=ASSIGN_TUPLE_2
 
 struct S {}
 postfix operator ++ {}
@@ -98,7 +100,7 @@ func testPostfix8(x: S) {
 // POSTFIX_8-NOT: ***
 
 protocol P {
-  typealias T
+  associatedtype T
   func foo() -> T
 }
 
@@ -146,6 +148,7 @@ func testInfix1(x: S2) {
 // S2_INFIX-DAG-NOT: ??
 // S2_INFIX-DAG-NOT: ~=
 // S2_INFIX-DAG-NOT: ~>
+// S2_INFIX-DAG-NOT: = {#
 // S2_INFIX: End completions
 
 func testInfix2(var x: S2) {
@@ -156,6 +159,7 @@ func testInfix2(var x: S2) {
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   **= {#Int#}[#Void#]
+// S2_INFIX_LVALUE-DAG: Pattern/None:                             = {#S2#}[#Void#]
 // S2_INFIX_LVALUE-DAG-NOT: +=
 // S2_INFIX_LVALUE-DAG-NOT: *
 // S2_INFIX_LVALUE-DAG-NOT: ??
@@ -320,3 +324,15 @@ func testExtInfix3(x: S4) {
 func testExtInfix4(x: S4) {
    1 + 1.0 + x#^EXT_INFIX_4^#
 }
+
+func testAssignTuple1() {
+  ()#^ASSIGN_TUPLE_1^#
+}
+// ASSIGN_TUPLE_1: Pattern/None:                        = {#()#}[#Void#];
+
+func testAssignTuple2() {
+  var x: S2
+  var y: S2
+  (x, y)#^ASSIGN_TUPLE_2^#
+}
+// ASSIGN_TUPLE_2: Pattern/None:                        = {#(S2, S2)#}[#Void#];

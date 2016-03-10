@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -82,6 +83,13 @@ private:
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                      const NominalTypeDecl *NTD) override {
     return OtherPrinter.printSynthesizedExtensionPost(ED, NTD);
+  }
+
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
+    return OtherPrinter.printStructurePre(Kind, D);
+  }
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
+    return OtherPrinter.printStructurePost(Kind, D);
   }
 
   void printNamePre(PrintNameContext Context) override {
@@ -158,35 +166,6 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   AdjustedOptions.VarInitializers = false;
 
   AdjustedOptions.PrintDefaultParameterPlaceholder = true;
-}
-
-void findExtensionsFromConformingProtocols(Decl *D,
-                                           llvm::SmallPtrSetImpl<ExtensionDecl*> &Results) {
-  NominalTypeDecl* NTD = dyn_cast<NominalTypeDecl>(D);
-  if (!NTD || NTD->getKind() == DeclKind::Protocol)
-    return;
-  std::vector<NominalTypeDecl*> Unhandled;
-  auto addTypeLocNominal = [&](TypeLoc TL){
-    if (TL.getType()) {
-      if (auto D = TL.getType()->getAnyNominal()) {
-        Unhandled.push_back(D);
-      }
-    }
-  };
-  for (auto TL : NTD->getInherited()) {
-    addTypeLocNominal(TL);
-  }
-  while(!Unhandled.empty()) {
-    NominalTypeDecl* Back = Unhandled.back();
-    Unhandled.pop_back();
-    for (ExtensionDecl *E : Back->getExtensions()) {
-      if(E->isConstrainedExtension())
-        Results.insert(E);
-      for (auto TL : Back->getInherited()) {
-        addTypeLocNominal(TL);
-      }
-    }
-  }
 }
 
 ArrayRef<StringRef>
@@ -280,7 +259,7 @@ void swift::ide::printSubmoduleInterface(
       NoImportSubModules.insert(*It);
     }
   }
-
+  llvm::StringMap<std::vector<Decl*>> FileRangedDecls;
   // Separate the declarations that we are going to print into different
   // buckets.
   for (Decl *D : Decls) {
@@ -349,8 +328,10 @@ void swift::ide::printSubmoduleInterface(
       if (!GroupNames.empty()){
         if (auto Target = D->getGroupName()) {
           if (std::find(GroupNames.begin(), GroupNames.end(),
-                        Target.getValue()) != GroupNames.end())
-             SwiftDecls.push_back(D);
+                        Target.getValue()) != GroupNames.end()) {
+            FileRangedDecls.insert(std::make_pair(D->getSourceFileName().getValue(),
+              std::vector<Decl*>())).first->getValue().push_back(D);
+          }
         }
         continue;
       }
@@ -358,6 +339,37 @@ void swift::ide::printSubmoduleInterface(
       SwiftDecls.push_back(D);
     }
   }
+
+  llvm::SetVector<Decl*> PrintLineAfter;
+  if (!GroupNames.empty()) {
+    assert(SwiftDecls.empty());
+    for (auto &Entry : FileRangedDecls) {
+      auto &DeclsInFile = Entry.getValue();
+      std::sort(DeclsInFile.begin(), DeclsInFile.end(),
+                [](Decl* LHS, Decl *RHS) {
+                  assert(LHS->getSourceOrder().hasValue());
+                  assert(RHS->getSourceOrder().hasValue());
+                  return LHS->getSourceOrder().getValue() <
+                         RHS->getSourceOrder().getValue();
+                });
+
+      for (auto D : DeclsInFile) {
+        SwiftDecls.push_back(D);
+      }
+      PrintLineAfter.insert(DeclsInFile.back());
+    }
+  }
+  if (!PrintLineAfter.empty())
+    PrintLineAfter.pop_back();
+
+  llvm::SmallString<128> DelineatorBuilder;
+  if (!PrintLineAfter.empty()) {
+    DelineatorBuilder.append("// MARK: -\n");
+    DelineatorBuilder.append("// ");
+    DelineatorBuilder.append(77, '=');
+    DelineatorBuilder.append(2, '\n');
+  }
+  StringRef DelineatorAfterFile = DelineatorBuilder.str();
 
   // Create the missing import decls and add to the collector.
   for (auto *SM : NoImportSubModules) {
@@ -467,16 +479,16 @@ void swift::ide::printSubmoduleInterface(
             continue;
 
           // Print synthesized extensions.
-          llvm::SmallPtrSet<ExtensionDecl *, 10> ExtensionsFromConformances;
-          findExtensionsFromConformingProtocols(D, ExtensionsFromConformances);
-          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD);
-          for (auto ET : ExtensionsFromConformances) {
+          SynthesizedExtensionAnalyzer Analyzer(NTD);
+          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
+                                                                    &Analyzer);
+          Analyzer.forEachSynthesizedExtension([&](ExtensionDecl *ET){
             if (!shouldPrint(ET, AdjustedOptions))
-              continue;
+              return;
             Printer << "\n";
             ET->print(Printer, AdjustedOptions);
             Printer << "\n";
-          }
+          });
           AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
         }
       }
@@ -516,6 +528,8 @@ void swift::ide::printSubmoduleInterface(
     for (auto *D : SwiftDecls) {
       if (PrintDecl(D))
         Printer << "\n";
+      if (PrintLineAfter.count(D) != 0)
+        Printer << DelineatorAfterFile;
     }
   }
 }

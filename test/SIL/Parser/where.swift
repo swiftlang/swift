@@ -2,7 +2,7 @@
 
 import Swift
 protocol P {
-  typealias CodeUnit
+  associatedtype CodeUnit
   mutating func decode<
     G : IteratorProtocol where G.Element == CodeUnit
   >(next: inout G) -> Int
