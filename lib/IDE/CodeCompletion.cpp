@@ -3795,6 +3795,9 @@ public:
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       return;
 
+    if (AvailableAttr::isUnavailable(D))
+      return;
+
     if (D->getAttrs().hasAttribute<FinalAttr>())
       return;
 
@@ -3804,7 +3807,7 @@ public:
     bool hasIntroducer = hasFuncIntroducer || hasVarIntroducer;
 
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      // We can override operators as members.
+      // We cannot override operators as members.
       if (FD->isBinaryOperator() || FD->isUnaryOperator())
         return;
 

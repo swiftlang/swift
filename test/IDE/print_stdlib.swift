@@ -84,3 +84,4 @@ func foo(x: _Pointer) {} // Checks that this protocol actually exists.
 // RUN: %target-swift-ide-test -print-module -module-group "Collection/Type-erased" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
 
 // CHECK-FREQUENT-WORD: ///
+// CHECK-FREQUENT-WORD-NOT: where Slice<Dictionary<Key, Value>> == Slice<Self>

@@ -45,6 +45,8 @@ ERROR(not_implemented,none,
 ERROR(error_opening_output,none,
       "error opening '%0' for output: %1", (StringRef, StringRef))
 
+ERROR(error_no_group_info,none,
+      "no group info found for file: '%0'", (StringRef))
 
 NOTE(previous_decldef,none,
      "previous %select{declaration|definition}0 of %1 is here", 
