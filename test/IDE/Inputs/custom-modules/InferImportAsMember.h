@@ -86,6 +86,18 @@ extern struct IAMStruct1 IAMFuzzyStruct1CreateFuzzyName();
 
 extern double __IAMStruct1IgnoreMe(struct IAMStruct1 s);
 
+/// Mutable
+struct IAMMutableStruct1 {};
+struct IAMMutableStruct1
+IAMStruct1CreateMutable(struct IAMStruct1 withIAMStruct1);
+
+typedef struct MyStruct2 MyStruct2;
+struct MyStruct2 {
+	double x;
+};
+// FIXME: the below doesn't appear in the output
+const MyStruct2 MyStruct2CreateWithFloat(float f);
+
 // typedef __attribute__((objc_bridge(id))) void *IAMClassRef;
 struct IAMClass {
   float x, y, z;

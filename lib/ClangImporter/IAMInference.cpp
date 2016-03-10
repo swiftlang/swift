@@ -66,7 +66,7 @@ STATISTIC(InvalidPropertyInstanceNoSelf,
 
 // Omit needless words stats
 STATISTIC(OmitNumTimes,
-  "# of times omitNeedlessWords was able to fire on an API");
+          "# of times omitNeedlessWords was able to fire on an API");
 
 using namespace swift;
 
@@ -165,6 +165,13 @@ static void formHumbleCamelName(StringRef left, StringRef right,
 
   formHumbleCamelName(left, out);
   camel_case::appendSentenceCase(out, wI.getRestOfStr());
+}
+
+static bool hasWord(StringRef s, StringRef matchWord) {
+  for (auto word : camel_case::getWords(s))
+    if (word == matchWord)
+      return true;
+  return false;
 }
 
 // Drops the specified word, and returns the number of times it was dropped.
@@ -424,7 +431,15 @@ private:
   bool match(StringRef str, StringRef toMatch, NameBuffer &outStr) {
     // TODO: let options dictate fuzzy matching...
 
-    // FIXME: drop mutable...
+    // Special case: Mutable can appear in both and may screw up word order
+    NameBuffer nonMutableStr;
+    NameBuffer nonMutableToMatch;
+    if (hasWord(str, "Mutable") && hasWord(toMatch, "Mutable")) {
+      dropWordUniq(str, "Mutable", nonMutableStr);
+      dropWordUniq(toMatch, "Mutable", nonMutableToMatch);
+      str = nonMutableStr;
+      toMatch = nonMutableToMatch;
+    }
 
     auto strWords = camel_case::getWords(str);
     auto matchWords = camel_case::getWords(toMatch);
@@ -574,13 +589,6 @@ static EffectiveClangContext getEffectiveDC(const clang::TypeDecl *tyDecl) {
 
   assert("expected valid Clang context");
   return {};
-}
-
-static bool hasWord(StringRef s, StringRef matchWord) {
-  for (auto word : camel_case::getWords(s))
-    if (word == matchWord)
-      return true;
-  return false;
 }
 
 IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
