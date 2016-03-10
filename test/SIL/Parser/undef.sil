@@ -184,10 +184,10 @@ bb0:
   init_existential_metatype undef : $@thick C.Type, $@thick P.Type
   // CHECK: open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
   open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
-  // CHECK: open_existential_box undef : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-000000000003") ErrorType
-  open_existential_box undef : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-000000000003") ErrorType
-  // CHECK: dealloc_existential_box undef : $ErrorType, $()
-  dealloc_existential_box undef : $ErrorType, $()
+  // CHECK: open_existential_box undef : $ErrorProtocol to $*@opened("01234567-89AB-CDEF-0123-000000000003") ErrorProtocol
+  open_existential_box undef : $ErrorProtocol to $*@opened("01234567-89AB-CDEF-0123-000000000003") ErrorProtocol
+  // CHECK: dealloc_existential_box undef : $ErrorProtocol, $()
+  dealloc_existential_box undef : $ErrorProtocol, $()
 
   // Blocks
 
@@ -363,11 +363,11 @@ bb2:
 
 sil @try_apply_test : $() -> () {
 bb0:
-  // CHECK: try_apply undef(undef) : $@convention(thin) (()) -> @error ErrorType, normal bb1, error bb2
-  try_apply undef(undef) : $@convention(thin) (()) -> @error ErrorType, normal bb1, error bb2
+  // CHECK: try_apply undef(undef) : $@convention(thin) (()) -> @error ErrorProtocol, normal bb1, error bb2
+  try_apply undef(undef) : $@convention(thin) (()) -> @error ErrorProtocol, normal bb1, error bb2
 bb1(%1 : $()):
   br bb3
-bb2(%2 : $ErrorType):
+bb2(%2 : $ErrorProtocol):
   br bb3
 bb3:
   return undef : $()
