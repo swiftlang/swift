@@ -771,7 +771,7 @@ static TypeBase *FixCallingConv(Decl *in_decl, TypeBase *in_type) {
 static void
 VisitNode(ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
           VisitNodeResult &result,
-          const VisitNodeResult &generic_context); // set by GenericType case
+          const VisitNodeResult &genericContext); // set by GenericType case
 
 static void VisitNodeAddressor(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
@@ -2142,10 +2142,177 @@ static void VisitAllChildNodes(
   }
 }
 
+static void visitNodeImpl(
+    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
+    Demangle::NodePointer node, VisitNodeResult &result,
+    const VisitNodeResult &genericContext) { // set by GenericType case
+  assert(result._error.empty());
+  assert(nodes.back() == node);
+
+  const Demangle::Node::Kind nodeKind = node->getKind();
+
+  switch (nodeKind) {
+  case Demangle::Node::Kind::OwningAddressor:
+  case Demangle::Node::Kind::OwningMutableAddressor:
+  case Demangle::Node::Kind::UnsafeAddressor:
+  case Demangle::Node::Kind::UnsafeMutableAddressor:
+    VisitNodeAddressor(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Generics:
+    VisitNodeGenerics(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::ArchetypeRef:
+    VisitNodeArchetypeRef(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Archetype:
+    VisitNodeArchetype(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::ArgumentTuple:
+    VisitFirstChildNode(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::AssociatedTypeRef:
+    VisitNodeAssociatedTypeRef(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::BoundGenericClass:
+  case Demangle::Node::Kind::BoundGenericStructure:
+  case Demangle::Node::Kind::BoundGenericEnum:
+    VisitNodeBoundGeneric(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::BuiltinTypeName:
+    VisitNodeBuiltinTypeName(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::Class:
+  case Demangle::Node::Kind::Enum:
+  case Demangle::Node::Kind::Global:
+  case Demangle::Node::Kind::Static:
+  case Demangle::Node::Kind::TypeAlias:
+  case Demangle::Node::Kind::Type:
+  case Demangle::Node::Kind::TypeMangling:
+  case Demangle::Node::Kind::ReturnType:
+  case Demangle::Node::Kind::Protocol:
+    VisitAllChildNodes(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Constructor:
+    VisitNodeConstructor(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Destructor:
+    VisitNodeDestructor(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::DeclContext:
+    VisitNodeDeclContext(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::ErrorType:
+    result._error = "error type encountered while demangling name";
+    break;
+
+  case Demangle::Node::Kind::Extension:
+    VisitNodeExtension(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::ExplicitClosure:
+    VisitNodeExplicitClosure(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Function:
+  case Demangle::Node::Kind::Allocator:
+  case Demangle::Node::Kind::Variable: // Out of order on purpose
+    VisitNodeFunction(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::FunctionType:
+  case Demangle::Node::Kind::UncurriedFunctionType: // Out of order on
+                                                    // purpose.
+    VisitNodeFunctionType(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::GenericType:
+    VisitNodeGenericType(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::DidSet:
+  case Demangle::Node::Kind::Getter:
+  case Demangle::Node::Kind::Setter:
+  case Demangle::Node::Kind::WillSet: // out of order on purpose
+    VisitNodeSetterGetter(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::LocalDeclName:
+    VisitNodeLocalDeclName(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Identifier:
+    VisitNodeIdentifier(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::InOut:
+    VisitNodeInOut(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Metatype:
+    VisitNodeMetatype(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Module:
+    VisitNodeModule(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::NonVariadicTuple:
+    VisitNodeNonVariadicTuple(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::PrivateDeclName:
+    VisitNodePrivateDeclName(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::ProtocolList:
+    VisitNodeProtocolList(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::QualifiedArchetype:
+    VisitNodeQualifiedArchetype(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::SelfTypeRef:
+    VisitNodeSelfTypeRef(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::TupleElement:
+    VisitNodeTupleElement(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::TypeList:
+    VisitNodeTypeList(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Unowned:
+    VisitNodeUnowned(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::Weak:
+    VisitNodeWeak(ast, nodes, node, result, genericContext);
+    break;
+  default:
+    break;
+  }
+}
+
 static void
 VisitNode(ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
           VisitNodeResult &result,
-          const VisitNodeResult &generic_context) { // set by GenericType case
+          const VisitNodeResult &genericContext) { // set by GenericType case
   if (nodes.empty())
     result._error = "no node";
   else if (nodes.back() == nullptr)
@@ -2153,167 +2320,9 @@ VisitNode(ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
   else
     result._error = "";
 
-  if (result._error.empty()) {
-    Demangle::NodePointer node = nodes.back();
-    const Demangle::Node::Kind node_kind = node->getKind();
+  if (result._error.empty())
+    visitNodeImpl(ast, nodes, nodes.back(), result, genericContext);
 
-    switch (node_kind) {
-    case Demangle::Node::Kind::OwningAddressor:
-    case Demangle::Node::Kind::OwningMutableAddressor:
-    case Demangle::Node::Kind::UnsafeAddressor:
-    case Demangle::Node::Kind::UnsafeMutableAddressor:
-      VisitNodeAddressor(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Generics:
-      VisitNodeGenerics(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::ArchetypeRef:
-      VisitNodeArchetypeRef(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Archetype:
-      VisitNodeArchetype(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::ArgumentTuple:
-      VisitFirstChildNode(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::AssociatedTypeRef:
-      VisitNodeAssociatedTypeRef(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::BoundGenericClass:
-    case Demangle::Node::Kind::BoundGenericStructure:
-    case Demangle::Node::Kind::BoundGenericEnum:
-      VisitNodeBoundGeneric(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::BuiltinTypeName:
-      VisitNodeBuiltinTypeName(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Structure:
-    case Demangle::Node::Kind::Class:
-    case Demangle::Node::Kind::Enum:
-    case Demangle::Node::Kind::Global:
-    case Demangle::Node::Kind::Static:
-    case Demangle::Node::Kind::TypeAlias:
-    case Demangle::Node::Kind::Type:
-    case Demangle::Node::Kind::TypeMangling:
-    case Demangle::Node::Kind::ReturnType:
-    case Demangle::Node::Kind::Protocol:
-      VisitAllChildNodes(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Constructor:
-      VisitNodeConstructor(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Destructor:
-      VisitNodeDestructor(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::DeclContext:
-      VisitNodeDeclContext(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::ErrorType:
-      result._error = "error type encountered while demangling name";
-      break;
-
-    case Demangle::Node::Kind::Extension:
-      VisitNodeExtension(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::ExplicitClosure:
-      VisitNodeExplicitClosure(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Function:
-    case Demangle::Node::Kind::Allocator:
-    case Demangle::Node::Kind::Variable: // Out of order on purpose
-      VisitNodeFunction(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::FunctionType:
-    case Demangle::Node::Kind::UncurriedFunctionType: // Out of order on
-                                                      // purpose.
-      VisitNodeFunctionType(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::GenericType:
-      VisitNodeGenericType(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::DidSet:
-    case Demangle::Node::Kind::Getter:
-    case Demangle::Node::Kind::Setter:
-    case Demangle::Node::Kind::WillSet: // out of order on purpose
-      VisitNodeSetterGetter(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::LocalDeclName:
-      VisitNodeLocalDeclName(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Identifier:
-      VisitNodeIdentifier(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::InOut:
-      VisitNodeInOut(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Metatype:
-      VisitNodeMetatype(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Module:
-      VisitNodeModule(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::NonVariadicTuple:
-      VisitNodeNonVariadicTuple(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::PrivateDeclName:
-      VisitNodePrivateDeclName(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::ProtocolList:
-      VisitNodeProtocolList(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::QualifiedArchetype:
-      VisitNodeQualifiedArchetype(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::SelfTypeRef:
-      VisitNodeSelfTypeRef(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::TupleElement:
-      VisitNodeTupleElement(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::TypeList:
-      VisitNodeTypeList(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Unowned:
-      VisitNodeUnowned(ast, nodes, node, result, generic_context);
-      break;
-
-    case Demangle::Node::Kind::Weak:
-      VisitNodeWeak(ast, nodes, node, result, generic_context);
-      break;
-    default:
-      break;
-    }
-  }
   nodes.pop_back();
 }
 
