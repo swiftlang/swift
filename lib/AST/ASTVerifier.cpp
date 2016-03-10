@@ -1781,6 +1781,10 @@ struct ASTNodeBase {};
             .verifyChecked(replacementType);
           continue;
         }
+          
+        // No witness necessary for type aliases
+        if (isa<TypeAliasDecl>(member))
+          continue;
         
         // If this is an accessor for something, ignore it.
         if (auto *FD = dyn_cast<FuncDecl>(member))

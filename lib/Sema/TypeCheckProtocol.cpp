@@ -3711,6 +3711,10 @@ void ConformanceChecker::checkConformance() {
     if (isa<AssociatedTypeDecl>(requirement))
       continue;
 
+    // Type aliases don't have requirements themselves.
+    if (isa<TypeAliasDecl>(requirement))
+      continue;
+      
     // If we've already determined this witness, skip it.
     if (Conformance->hasWitness(requirement)) {
       // If this is an unsatisfied @objc optional requirement,

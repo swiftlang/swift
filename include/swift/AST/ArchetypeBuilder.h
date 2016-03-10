@@ -387,8 +387,10 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief The name of this potential archetype or, for an
   /// associated type, the declaration of the associated type to which
-  /// this potential archetype has been resolved.
-  llvm::PointerUnion<Identifier, AssociatedTypeDecl *> NameOrAssociatedType;
+  /// this potential archetype has been resolved. Or, for a type alias,
+  /// the type alias decl.
+  llvm::PointerUnion3<Identifier, AssociatedTypeDecl *,
+                      TypeAliasDecl *> NameOrAssociatedType;
 
   /// \brief The representative of the equivalent class of potential archetypes
   /// to which this potential archetype belongs.
@@ -466,6 +468,17 @@ class ArchetypeBuilder::PotentialArchetype {
     EquivalenceClass.push_back(this);
   }
 
+  /// \brief Construct a new potential archetype for a type alias.
+  PotentialArchetype(PotentialArchetype *Parent, TypeAliasDecl *TypeAlias)
+    : ParentOrParam(Parent), NameOrAssociatedType(TypeAlias),
+      Representative(this), IsRecursive(false), Invalid(false),
+      SubstitutingConcreteType(false), RecursiveConcreteType(false),
+      RecursiveSuperclassType(false), Renamed(false)
+  {
+    assert(Parent != nullptr && "Not an associated type?");
+    EquivalenceClass.push_back(this);
+  }
+
   /// \brief Construct a new potential archetype for a generic parameter.
   PotentialArchetype(GenericTypeParamType *GenericParam, 
                      ProtocolDecl *RootProtocol,
@@ -523,6 +536,11 @@ public:
   /// archetype, if it corresponds to a generic parameter.
   GenericTypeParamType *getGenericParam() const {
     return ParentOrParam.dyn_cast<GenericTypeParamType *>(); 
+  }
+  
+  /// Retrieve the type alias.
+  TypeAliasDecl *getTypeAliasDecl() const {
+    return NameOrAssociatedType.dyn_cast<TypeAliasDecl *>();
   }
 
   /// Retrieve the set of protocols to which this type conforms.

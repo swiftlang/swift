@@ -469,9 +469,9 @@ func h<T : C3>(x : T) {
 
 
 protocol P4 {
-  associatedtype T
+  associatedtype T // expected-note {{protocol requires nested type 'T'}}
 }
 
-class C4 : P4 {
-  associatedtype T = Int  // expected-error {{associated types can only be defined in a protocol}} {{3-17=typealias}}
+class C4 : P4 { // expected-error {{type 'C4' does not conform to protocol 'P4'}}
+  associatedtype T = Int  // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}} {{3-17=typealias}}
 }

@@ -69,8 +69,7 @@ internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
 public protocol CollectionBuilder {
   associatedtype Destination : Collection
     
-  // FIXME: should really be a typealias once that is supported
-  associatedtype Element = Destination.Iterator.Element
+  typealias Element = Destination.Iterator.Element
 
   init()
 
