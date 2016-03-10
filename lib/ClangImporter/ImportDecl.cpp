@@ -1394,6 +1394,16 @@ namespace {
                             ? UnconditionalAvailabilityKind::UnavailableInSwift
                             : UnconditionalAvailabilityKind::Deprecated);
             aliasRef->getAttrs().add(attr);
+            aliasRef->getAttrs().add(
+              new (Impl.SwiftContext) Swift3MigrationAttr(
+                                                     SourceLoc(),
+                                                     SourceLoc(),
+                                                     SourceLoc(),
+                                                     primary->getName(),
+                                                     /*isRenamedToProperty=*/false,
+                                                     "",
+                                                     SourceLoc(),
+                                                     /*implicit=*/true));
           };
 
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
