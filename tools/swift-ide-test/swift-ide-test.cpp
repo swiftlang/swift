@@ -2405,9 +2405,6 @@ public:
 
 private:
   void tryDemangleDecl(ValueDecl *VD, CharSourceRange range) {
-    Mangle::Mangler mangler(/*DWARFMangling=*/true);
-    mangler.mangleDeclName(VD);
-
     std::string mangledName;
     {
       llvm::raw_string_ostream OS(mangledName);
