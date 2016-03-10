@@ -207,7 +207,8 @@ SILLocation::DebugLoc getDeserializedLoc(Decl *D) {
 
 /// Use the SM to figure out the actual line/column of a SourceLoc.
 template <typename WithLoc>
-SILLocation::DebugLoc getDebugLoc(SourceManager &SM, WithLoc *S, bool End = false) {
+SILLocation::DebugLoc getDebugLoc(SourceManager &SM, WithLoc *S,
+                                  bool End = false) {
   SILLocation::DebugLoc L;
   if (S == nullptr)
     return L;
@@ -273,8 +274,6 @@ static bool isAbstractClosure(const SILLocation &Loc) {
   return false;
 }
 
-/// Construct an LLVM inlined-at location from a SILDebugScope,
-/// reversing the order in the process.
 llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
   llvm::MDNode *InlinedAt = nullptr;
   if (DS) {
@@ -372,7 +371,6 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   Builder.SetCurrentDebugLocation(DL);
 }
 
-/// getOrCreateScope - Translate a SILDebugScope into an llvm::DIDescriptor.
 llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
   if (DS == 0)
     return MainFile;
@@ -424,7 +422,6 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
   return DScope;
 }
 
-/// getOrCreateFile - Translate filenames into DIFiles.
 llvm::DIFile *IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   if (!Filename)
     return MainFile;
@@ -461,7 +458,6 @@ llvm::DIFile *IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   return F;
 }
 
-/// Attempt to figure out the unmangled name of a function.
 StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
   // Getters and Setters are anonymous functions, so we forge a name
   // using its parent declaration.
@@ -490,7 +486,6 @@ StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
   return StringRef();
 }
 
-/// Attempt to figure out the unmangled name of a function.
 StringRef IRGenDebugInfo::getName(SILLocation L) {
   if (L.isNull())
     return StringRef();
@@ -521,7 +516,6 @@ static CanSILFunctionType getFunctionType(SILType SILTy) {
   return FnTy;
 }
 
-/// Build the context chain for a given DeclContext.
 llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   if (!DC)
     return TheCU;
@@ -575,7 +569,6 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   return TheCU;
 }
 
-/// Create a single parameter type and push it.
 void IRGenDebugInfo::createParameterType(
     llvm::SmallVectorImpl<llvm::Metadata *> &Parameters, SILType type,
     DeclContext *DeclCtx) {
@@ -584,7 +577,6 @@ void IRGenDebugInfo::createParameterType(
   Parameters.push_back(getOrCreateType(DbgTy));
 }
 
-/// Create the array of function parameters for FnTy. SIL Version.
 llvm::DITypeRefArray
 IRGenDebugInfo::createParameterTypes(SILType SILTy, DeclContext *DeclCtx) {
   if (!SILTy)
@@ -607,7 +599,6 @@ static SILType getResultTypeForDebugInfo(CanSILFunctionType fnTy) {
   }
 }
 
-/// Create the array of function parameters for a function type.
 llvm::DITypeRefArray
 IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
                                      DeclContext *DeclCtx) {
@@ -751,15 +742,6 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
 /// TODO: This is no longer needed.
 void IRGenDebugInfo::eraseFunction(llvm::Function *Fn) {}
 
-/// The DWARF output for import decls is similar to that of a using
-/// directive in C++:
-///   import Foundation
-///   -->
-///   0: DW_TAG_imported_module
-///        DW_AT_import(*1)
-///   1: DW_TAG_module // instead of DW_TAG_namespace.
-///        DW_AT_name("Foundation")
-///
 void IRGenDebugInfo::emitImport(ImportDecl *D) {
   if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return;
@@ -800,7 +782,6 @@ IRGenDebugInfo::getOrCreateModule(ModuleDecl::ImportedModule M) {
   return cast<llvm::DIModule>(Scope);
 }
 
-/// Return a cached module for an access path or create a new one.
 llvm::DIModule *IRGenDebugInfo::getOrCreateModule(StringRef Key,
                                                   llvm::DIScope *Parent,
                                                   StringRef Name,
@@ -1046,8 +1027,6 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                 Var->hasInternalLinkage(), Var, nullptr);
 }
 
-/// Return the mangled name of any nominal type, including the global
-/// _Tt prefix, which marks the Swift namespace for types in DWARF.
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
     return BumpAllocatedString(DbgTy.getDecl()->getName().str());
@@ -1057,7 +1036,6 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   return BumpAllocatedString(M.finalize());
 }
 
-/// Create a member of a struct, class, tuple, or enum.
 llvm::DIDerivedType *
 IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
                                  unsigned &OffsetInBits, llvm::DIScope *Scope,
@@ -1073,7 +1051,6 @@ IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
   return DITy;
 }
 
-/// Return an array with the DITypes for each of a tuple's elements.
 llvm::DINodeArray IRGenDebugInfo::getTupleElements(
     TupleType *TupleTy, llvm::DIScope *Scope, llvm::DIFile *File,
     unsigned Flags, DeclContext *DeclContext, unsigned &SizeInBits) {
@@ -1093,7 +1070,6 @@ llvm::DINodeArray IRGenDebugInfo::getTupleElements(
   return DBuilder.getOrCreateArray(Elements);
 }
 
-/// Return an array with the DITypes for each of a struct's elements.
 llvm::DINodeArray
 IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
                                  llvm::DIScope *Scope, llvm::DIFile *File,
@@ -1114,8 +1090,6 @@ IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
   return DBuilder.getOrCreateArray(Elements);
 }
 
-/// Create a temporary forward declaration for a struct and add it to
-/// the type cache so we can safely build recursive types.
 llvm::DICompositeType *IRGenDebugInfo::createStructType(
     DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
     llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
@@ -1147,7 +1121,6 @@ llvm::DICompositeType *IRGenDebugInfo::createStructType(
   return DITy;
 }
 
-/// Return an array with the DITypes for each of an enum's elements.
 llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
                                                   EnumDecl *ED,
                                                   llvm::DIScope *Scope,
@@ -1192,8 +1165,6 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
   return DBuilder.getOrCreateArray(Elements);
 }
 
-/// Create a temporary forward declaration for an enum and add it to
-/// the type cache so we can safely build recursive types.
 llvm::DICompositeType *IRGenDebugInfo::createEnumType(
     DebugTypeInfo DbgTy, EnumDecl *Decl, StringRef MangledName,
     llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line, unsigned Flags) {
@@ -1221,7 +1192,6 @@ llvm::DICompositeType *IRGenDebugInfo::createEnumType(
   return DITy;
 }
 
-/// Return a DIType for Ty reusing any DeclContext found in DbgTy.
 llvm::DIType *IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
                                                        DebugTypeInfo DbgTy) {
   DebugTypeInfo BlandDbgTy(Ty, DbgTy.StorageType, DbgTy.size, DbgTy.align,
@@ -1245,7 +1215,6 @@ uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
   return BitWidth;
 }
 
-/// Convenience function that creates a forward declaration for PointeeTy.
 llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
     unsigned Flags, StringRef MangledName) {
@@ -1256,8 +1225,6 @@ llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
                                   MangledName);
 }
 
-/// Create a pointer-sized struct with a mangled name and a single
-/// member of PointeeTy.
 llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
     llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName) {
@@ -1274,8 +1241,6 @@ llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
       llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
 }
 
-/// Create a 2*pointer-sized struct with a mangled name and a single
-/// member of PointeeTy.
 llvm::DIType *IRGenDebugInfo::createDoublePointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
     llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName) {
@@ -1294,7 +1259,6 @@ llvm::DIType *IRGenDebugInfo::createDoublePointerSizedStruct(
       llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
 }
 
-/// Create an opaque struct with a mangled name.
 llvm::DIType *
 IRGenDebugInfo::createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
                                    llvm::DIFile *File, unsigned Line,
@@ -1307,18 +1271,6 @@ IRGenDebugInfo::createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
       llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
 }
 
-/// Construct a DIType from a DebugTypeInfo object.
-///
-/// At this point we do not plan to emit full DWARF for all swift
-/// types, the goal is to emit only the name and provenance of the
-/// type, where possible. A can import the type definition directly
-/// from the module/framework/source file the type is specified in.
-/// For this reason we emit the fully qualified (=mangled) name for
-/// each type whenever possible.
-///
-/// The ultimate goal is to emit something like a
-/// DW_TAG_APPLE_ast_ref_type (an external reference) instead of a
-/// local reference to the type.
 llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                          StringRef MangledName,
                                          llvm::DIScope *Scope,
@@ -1783,10 +1735,6 @@ static bool canMangle(TypeBase *Ty) {
   }
 }
 
-/// Get the DIType corresponding to this DebugTypeInfo from the cache,
-/// or build a fresh DIType otherwise.  There is the underlying
-/// assumption that no two types that share the same canonical type
-/// can have different storage size or alignment.
 llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
   // Is this an empty type?
   if (DbgTy.isNull())
