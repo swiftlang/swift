@@ -197,9 +197,6 @@ public:
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
 
-  /// Removes the function from the Functions map again.
-  void eraseFunction(llvm::Function *Fn);
-
 private:
   StringRef BumpAllocatedString(const char *Data, size_t Length);
   StringRef BumpAllocatedString(std::string S);

@@ -739,9 +739,6 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   return SP;
 }
 
-/// TODO: This is no longer needed.
-void IRGenDebugInfo::eraseFunction(llvm::Function *Fn) {}
-
 void IRGenDebugInfo::emitImport(ImportDecl *D) {
   if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return;
