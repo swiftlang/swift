@@ -34,7 +34,7 @@ public struct DefaultIndices<
   }
 
   public var endIndex: Elements.Index {
-    return _startIndex
+    return _endIndex
   }
 
   public subscript(i: Index) -> Elements.Index {
