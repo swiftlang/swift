@@ -99,8 +99,6 @@ public protocol ResilientStorage {
   var mutableGenericPropertyWithDefault: T { get set }
 
   subscript(x: T) -> T { get set }
-
-  var mutatingGetterWithNonMutatingDefault: Int { mutating get set }
 }
 
 extension ResilientStorage {
@@ -153,18 +151,6 @@ extension ResilientStorage {
     set { }
   }
 
-// CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStorageg36mutatingGetterWithNonMutatingDefaultSi
-// CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientStorageg36mutatingGetterWithNonMutatingDefaultSi
-// CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStorages36mutatingGetterWithNonMutatingDefaultSi
-// CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientStorages36mutatingGetterWithNonMutatingDefaultSi
-// CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStoragem36mutatingGetterWithNonMutatingDefaultSi
-// CHECK-LABEL: sil [transparent] @_TFFP19protocol_resilience16ResilientStoragem36mutatingGetterWithNonMutatingDefaultSiU_T_
-  public var mutatingGetterWithNonMutatingDefault: Int {
-    get {
-      return 0
-    }
-    set { }
-  }
 }
 
 
@@ -262,9 +248,6 @@ protocol InternalProtocol {
 // CHECK-NEXT:   method #ResilientStorage.subscript!getter.1: @_TFP19protocol_resilience16ResilientStorageg9subscriptFwx1TwxS1_
 // CHECK-NEXT:   method #ResilientStorage.subscript!setter.1: @_TFP19protocol_resilience16ResilientStorages9subscriptFwx1TwxS1_
 // CHECK-NEXT:   method #ResilientStorage.subscript!materializeForSet.1: @_TFP19protocol_resilience16ResilientStoragem9subscriptFwx1TwxS1_
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!getter.1: @_TFP19protocol_resilience16ResilientStorageg36mutatingGetterWithNonMutatingDefaultSi
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!setter.1: @_TFP19protocol_resilience16ResilientStorages36mutatingGetterWithNonMutatingDefaultSi
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!materializeForSet.1: @_TFP19protocol_resilience16ResilientStoragem36mutatingGetterWithNonMutatingDefaultSi
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientOperators {
