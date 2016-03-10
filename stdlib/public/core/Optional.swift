@@ -45,6 +45,11 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
     }
   }
 
+  /// If `self == nil`, does nothing. Otherwise, run `f(self!)`.
+  public func ifPresent(@noescape f: (Wrapped) throws -> Void) rethrows {
+    _ = try map(f)
+  }
+
   /// Create an instance initialized with `nil`.
   @_transparent
   public init(nilLiteral: ()) {
