@@ -69,7 +69,6 @@ class IRGenDebugInfo {
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
   TrackingDIRefMap DIRefMap;
-  llvm::SmallPtrSet<const llvm::DIType *, 16> IndirectEnumCases;
 
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;                    /// The current working directory.

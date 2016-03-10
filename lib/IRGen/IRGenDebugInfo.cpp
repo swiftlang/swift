@@ -1155,8 +1155,6 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
       auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
                                   Scope, File, Flags);
       Elements.push_back(MTy);
-      if (ED->isIndirect() || ElemDecl->isIndirect())
-        IndirectEnumCases.insert(MTy);
     }
   }
   return DBuilder.getOrCreateArray(Elements);
