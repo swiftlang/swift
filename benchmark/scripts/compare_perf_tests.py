@@ -20,6 +20,7 @@
 #     column -s, -t
 
 from __future__ import print_function
+
 import re
 import sys
 
@@ -134,8 +135,8 @@ def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
     print (("%+d" % (bestscore2 - bestscore1)).rjust(9), end="")
 
     if bestscore1 != 0 and bestscore2 != 0:
-        print (("%+.1f%%" %
-            (((float(bestscore2) / bestscore1) - 1) * 100)).rjust(9), end="")
+        print(("%+.1f%%" %
+               (((float(bestscore2) / bestscore1) - 1) * 100)).rjust(9), end="")
         if ShowSpeedup:
             Num, Den = float(bestscore2), float(bestscore1)
             if IsTime:
