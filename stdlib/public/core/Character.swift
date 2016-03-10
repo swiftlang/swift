@@ -93,7 +93,7 @@ public struct Character :
     _precondition(
       s._core.count != 0, "Can't form a Character from an empty String")
     _precondition(
-      s.characters.next(s.startIndex) == s.endIndex,
+      s.next(s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
     let (count, initialUTF8) = s._core._encodeSomeUTF8(from: 0)
@@ -290,8 +290,7 @@ extension String {
         UTF8.self, input: smallUTF8)
     case let .large(value):
       let buf = String(_StringCore(_StringBuffer(value)))
-      let startIndex = buf.startIndex
-      self = buf[startIndex..<buf.characters.next(startIndex)]
+      self = buf[buf.startIndex..<buf.next(buf.startIndex)]
     }
   }
 }
