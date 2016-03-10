@@ -119,8 +119,7 @@ void appendUniq(NameBuffer &src, StringRef toAppend) {
   auto appendWords = camel_case::getWords(toAppend);
   StringRef lastWord = *camel_case::getWords(src).rbegin();
   auto wI = appendWords.begin();
-  while (wI != appendWords.end() &&
-         camel_case::sameWordIgnoreFirstCase(*wI, lastWord))
+  while (wI != appendWords.end() && wI->equals_lower(lastWord))
     ++wI;
   src.append(wI.getRestOfStr());
 }
@@ -159,8 +158,7 @@ static void formHumbleCamelName(StringRef left, StringRef right,
   StringRef lastWord = *camel_case::getWords(left).rbegin();
   auto rightWords = camel_case::getWords(right);
   auto wI = rightWords.begin();
-  while (wI != rightWords.end() &&
-         camel_case::sameWordIgnoreFirstCase(*wI, lastWord))
+  while (wI != rightWords.end() && wI->equals_lower(lastWord))
     ++wI;
 
   formHumbleCamelName(left, out);

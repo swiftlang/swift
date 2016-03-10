@@ -79,6 +79,7 @@ import InferImportAsMember
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension IAMMutableStruct1 {
 // PRINT-NEXT:    init(with withIAMStruct1: IAMStruct1)
+// PRINT-NEXT:    init(withURL url: UnsafePointer<Int8>)
 // PRINT-NEXT:  }
 // FIXME: get the class working
 

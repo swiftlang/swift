@@ -90,6 +90,7 @@ extern double __IAMStruct1IgnoreMe(struct IAMStruct1 s);
 struct IAMMutableStruct1 {};
 struct IAMMutableStruct1
 IAMStruct1CreateMutable(struct IAMStruct1 withIAMStruct1);
+struct IAMMutableStruct1 IAMStruct1CreateMutableWithURL(const char *url);
 
 typedef struct MyStruct2 MyStruct2;
 struct MyStruct2 {
