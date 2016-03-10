@@ -2546,18 +2546,15 @@ public:
       SILValue casevalue;
       SILValue result;
       std::tie(casevalue, result) = I->getCase(i);
-      
-      if (!isa<SILUndef>(casevalue)) {
-        auto  *il = dyn_cast<IntegerLiteralInst>(casevalue);
-        require(il,
-                "select_value case operands should refer to integer literals");
-        APInt elt = il->getValue();
+      auto  *il = dyn_cast<IntegerLiteralInst>(casevalue);
+      require(il,
+              "select_value case operands should refer to integer literals");
+      APInt elt = il->getValue();
 
-        require(!seenCaseValues.count(elt),
-                "select_value dispatches on same case value more than once");
+      require(!seenCaseValues.count(elt),
+              "select_value dispatches on same case value more than once");
 
-        seenCaseValues.insert(elt);
-      }
+      seenCaseValues.insert(elt);
 
       requireSameType(I->getOperand()->getType(), casevalue->getType(),
                       "select_value case value must match type of operand");
