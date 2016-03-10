@@ -167,6 +167,7 @@ _TF8manglingoi2qqFTSiSi_T_ ---> ?? infix(Int, Int) -> ()
 _TFE11ext_structAV11def_structA1A4testfT_T_ ---> A.test() -> ()
 _TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> (getPrivateClass in _DISC)() -> (PrivateClass in _DISC)
 _TF4mainP5_mainX3wxaFT_T_ ---> (λ in _main)() -> ()
+_TF4mainP5_main3abcFT_aS_P5_DISC3xyz ---> (abc in _main)() -> (xyz in _DISC)
 _TtPMP_ ---> protocol<>.Type
 _TFCs13_NSSwiftArray29canStoreElementsOfDynamicTypefPMP_Sb ---> _NSSwiftArray.canStoreElementsOfDynamicType(protocol<>.Type) -> Bool
 _TFCs13_NSSwiftArrayg17staticElementTypePMP_ ---> _NSSwiftArray.staticElementType.getter
