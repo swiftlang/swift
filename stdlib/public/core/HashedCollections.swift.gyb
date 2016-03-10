@@ -1237,7 +1237,7 @@ public func == <Key : Equatable, Value : Equatable>(
     return _stdlib_NSObject_isEqual(
       lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
 #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
+    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
 #endif
 
   case (.native(let lhsNativeOwner), .cocoa(let rhsCocoa)):
@@ -1265,14 +1265,14 @@ public func == <Key : Equatable, Value : Equatable>(
     }
     return true
 #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
+    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
 #endif
 
   case (.cocoa, .native):
 #if _runtime(_ObjC)
     return rhs == lhs
 #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
+    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
 #endif
   }
 }
