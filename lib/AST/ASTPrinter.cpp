@@ -272,7 +272,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     if (Arg.isNull())
       return GenericType;
     Arguments.push_back(Arg);
-
     auto GenericParams = NTD->getInnermostGenericParamTypes();
     assert(Arguments.size() == GenericParams.size());
     TypeSubstitutionMap Map;
@@ -281,7 +280,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       Map[(*It)->getCanonicalType()->castTo<SubstitutableType>()] =
         Arguments[Index];
     }
-    return NTD->getDeclaredTypeInContext().subst(DC->getParentModule(), Map, None);
+    auto MType = NTD->getInterfaceType().subst(DC->getParentModule(), Map, None);
+    return MType->getAs<AnyMetatypeType>()->getInstanceType();
   }
 
   SynthesizedExtensionInfo isApplicable(ExtensionDecl *Ext) {
