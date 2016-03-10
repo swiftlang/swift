@@ -101,7 +101,8 @@ class ReflectionContext {
 
   const AssociatedTypeDescriptor *
   lookupAssociatedTypes(const StoredPointer MetadataAddress,
-                        const std::string &MangledTypeName) {
+                        const std::string &MangledTypeName,
+                        const DependentMemberTypeRef *DependentMember) {
     auto AssocTys = AssociatedTypeCache.find(MetadataAddress);
     if (AssocTys != AssociatedTypeCache.end())
       return AssocTys->second;
@@ -113,9 +114,17 @@ class ReflectionContext {
         std::string ConformingTypeName(AssocTyDescriptor.ConformingTypeName);
         if (ConformingTypeName.compare(MangledTypeName) != 0)
           continue;
+        std::string ProtocolMangledName(AssocTyDescriptor.ProtocolTypeName);
+        auto DemangledProto = Demangle::demangleTypeAsNode(ProtocolMangledName);
+        auto TR = TypeRef::fromDemangleNode(DemangledProto);
 
-        AssociatedTypeCache.insert({MetadataAddress, &AssocTyDescriptor});
-        return &AssocTyDescriptor;
+        auto &Conformance = *DependentMember->getProtocol();
+        if (auto Protocol = dyn_cast<ProtocolTypeRef>(TR.get())) {
+          if (*Protocol != Conformance)
+            continue;
+          AssociatedTypeCache.insert({MetadataAddress, &AssocTyDescriptor});
+          return &AssocTyDescriptor;
+        }
       }
     }
     return nullptr;
@@ -175,12 +184,13 @@ public:
   TypeRefPointer
   getDependentMemberTypeRef(const StoredPointer MetadataAddress,
                             const std::string &MangledTypeName,
-                            const std::string &Member) {
+                            const DependentMemberTypeRef *DependentMember) {
 
     if (auto AssocTys = lookupAssociatedTypes(MetadataAddress,
-                                              MangledTypeName)) {
+                                              MangledTypeName,
+                                              DependentMember)) {
       for (auto &AssocTy : *AssocTys) {
-        if (Member.compare(AssocTy.getName()) != 0)
+        if (DependentMember->getMember().compare(AssocTy.getName()) != 0)
           continue;
 
         auto SubstitutedTypeName = AssocTy.getMangledSubstitutedTypeName();

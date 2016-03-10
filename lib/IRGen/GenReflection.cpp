@@ -30,7 +30,9 @@ using namespace irgen;
 class ReflectionMetadataBuilder : public ConstantBuilder<> {
 protected:
   void addTypeRef(Module *ModuleContext, CanType type) {
-    Mangle::Mangler mangler;
+    Mangle::Mangler mangler(/*DWARFMangling*/false,
+                            /*usePunyCode*/ true,
+                            /*OptimizeProtocolNames*/ false);
     mangler.setModuleContext(ModuleContext);
     mangler.mangleType(type, 0);
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
@@ -67,7 +69,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
       auto ModuleContext = Decl->getModuleContext();
       addTypeRef(ModuleContext, Decl->getDeclaredType()->getCanonicalType());
 
-      auto ProtoTy = Conformance->getProtocol()->getInterfaceType();
+      auto ProtoTy = Conformance->getProtocol()->getDeclaredType();
       addTypeRef(ModuleContext, ProtoTy->getCanonicalType());
 
       Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);

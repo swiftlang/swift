@@ -260,6 +260,14 @@ public:
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Protocol;
   }
+
+  bool operator==(const ProtocolTypeRef &Other) {
+    return ModuleName.compare(Other.ModuleName) == 0 &&
+           Name.compare(Other.Name) == 0;
+  }
+  bool operator!=(const ProtocolTypeRef &Other) {
+    return !(*this == Other);
+  }
 };
 
 class ProtocolCompositionTypeRef final : public TypeRef {
@@ -364,13 +372,16 @@ public:
 class DependentMemberTypeRef final : public TypeRef {
   std::string Member;
   TypeRefPointer Base;
+  TypeRefPointer Protocol;
 
 public:
-  DependentMemberTypeRef(std::string Member, TypeRefPointer Base)
-    : TypeRef(TypeRefKind::DependentMember), Member(Member), Base(Base) {}
+  DependentMemberTypeRef(std::string Member, TypeRefPointer Base,
+                         TypeRefPointer Protocol)
+    : TypeRef(TypeRefKind::DependentMember), Member(Member), Base(Base),
+      Protocol(Protocol) {}
   static std::shared_ptr<DependentMemberTypeRef>
-  create(std::string Member, TypeRefPointer Base) {
-    return std::make_shared<DependentMemberTypeRef>(Member, Base);
+  create(std::string Member, TypeRefPointer Base, TypeRefPointer Protocol) {
+    return std::make_shared<DependentMemberTypeRef>(Member, Base, Protocol);
   }
 
   const std::string &getMember() const {
@@ -383,6 +394,10 @@ public:
 
   ConstTypeRefPointer getBase() const {
     return Base;
+  }
+
+  const ProtocolTypeRef *getProtocol() const {
+    return cast<ProtocolTypeRef>(Protocol.get());
   }
 
   static bool classof(const TypeRef *TR) {
@@ -550,14 +565,14 @@ public:
       auto Nominal = cast<NominalTypeRef>(SubstBase.get());
       TypeWitness = RC.getDependentMemberTypeRef(MetadataAddress,
                                                  Nominal->getMangledName(),
-                                                 DM->getMember());
+                                                 DM);
       break;
     }
     case TypeRefKind::BoundGeneric: {
       auto BG = cast<BoundGenericTypeRef>(SubstBase.get());
       TypeWitness = RC.getDependentMemberTypeRef(MetadataAddress,
                                                  BG->getMangledName(),
-                                                 DM->getMember());
+                                                 DM);
       break;
     }
     default:

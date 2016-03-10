@@ -139,6 +139,7 @@ public:
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     printHeader("dependent-member");
+    printRec(DM->getProtocol());
     printRec(DM->getBase().get());
     printField("member", DM->getMember());
     OS << ')';
@@ -351,8 +352,12 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     case NodeKind::DependentMemberType: {
       auto base = fromDemangleNode(Node->getChild(0));
       auto member = Node->getChild(1)->getText();
-      return DependentMemberTypeRef::create(member, base);
+      auto protocol = fromDemangleNode(Node->getChild(1));
+      cast<ProtocolTypeRef>(protocol.get());
+      return DependentMemberTypeRef::create(member, base, protocol);
     }
+    case NodeKind::DependentAssociatedTypeRef:
+      return fromDemangleNode(Node->getChild(0));
     default:
       return nullptr;
   }

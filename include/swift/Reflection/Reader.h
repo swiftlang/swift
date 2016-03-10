@@ -92,7 +92,8 @@ public:
   }
 
   addr_t getSymbolAddress(std::string Name) {
-    return Impl->getSymbolAddress(Name.c_str(), Name.size());
+    auto Address = Impl->getSymbolAddress(Name.c_str(), Name.size());
+    return static_cast<addr_t>(Address);
   }
 
   size_t getStringLength(addr_t Address) {
