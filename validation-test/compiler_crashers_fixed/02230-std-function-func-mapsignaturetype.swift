@@ -9,7 +9,7 @@ struct c: a {
 class func a(Any) -> (Any) -> () -> {
 }
 struct c {
-func n: b(c: CollectionType where B : e : BooleanType)
+func n: b(c: Collection where B : e : Boolean)
 func a<T> {
 class a {
 }

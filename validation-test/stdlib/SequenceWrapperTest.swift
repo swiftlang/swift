@@ -22,8 +22,8 @@ import ObjectiveC
 #endif
 
 struct BasicSequenceWrapper<
-  Base_: SequenceType
-> : _SequenceWrapperType, SequenceType {
+  Base_: Sequence
+> : _SequenceWrapper, Sequence {
   var _base: Base_
 }
 
@@ -55,15 +55,15 @@ func expectWrapperDispatch<R1, R2>(
     message(), stackTrace: newTrace)
 }
 
-sequenceWrapperTests.test("Dispatch/generate") {
+sequenceWrapperTests.test("Dispatch/makeIterator()") {
   expectWrapperDispatch(
-    direct.generate(), indirect.generate(), dispatchLog.generate)
+    direct.makeIterator(), indirect.makeIterator(), dispatchLog.makeIterator)
 }
 
-sequenceWrapperTests.test("Dispatch/underestimateCount") {
+sequenceWrapperTests.test("Dispatch/underestimatedCount") {
   expectWrapperDispatch(
-    direct.underestimateCount(), indirect.underestimateCount(),
-    dispatchLog.underestimateCount)
+    direct.underestimatedCount, indirect.underestimatedCount,
+    dispatchLog.underestimatedCount)
 }
 
 sequenceWrapperTests.test("Dispatch/map") {

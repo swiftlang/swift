@@ -7,7 +7,7 @@
 lass func i: a {
 class A<c) {
 var _ = b: a {
-let foo as BooleanType, e? = B<() -> Int = ")
+let foo as Boolean, e? = B<() -> Int = ")
 self)?) {
 protocol P {
 }

@@ -76,10 +76,10 @@ void BuiltinUnit::LookupCache::lookupValue(
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
-      TypeAliasDecl *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name,
-                                                   SourceLoc(),
-                                                   TypeLoc::withoutLoc(Ty),
-                                                   const_cast<BuiltinUnit*>(&M));
+      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
+                                          TypeLoc::withoutLoc(Ty),
+                                          /*genericparams*/nullptr,
+                                          const_cast<BuiltinUnit*>(&M));
       TAD->computeType();
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;
@@ -1583,11 +1583,12 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 
   StringRef name = getFilename();
   if (name.empty()) {
-    assert(1 == std::count_if(getParentModule()->getFiles().begin(),
-                              getParentModule()->getFiles().end(),
-                              [](const FileUnit *FU) -> bool {
-      return isa<SourceFile>(FU) && cast<SourceFile>(FU)->getFilename().empty();
-    }) && "can't promise uniqueness if multiple source files are nameless");
+    assert(1 == count_if(getParentModule()->getFiles(),
+                         [](const FileUnit *FU) -> bool {
+                           return isa<SourceFile>(FU) &&
+                                  cast<SourceFile>(FU)->getFilename().empty();
+                         }) &&
+           "can't promise uniqueness if multiple source files are nameless");
 
     // We still need a discriminator, so keep going.
   }

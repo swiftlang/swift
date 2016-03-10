@@ -537,6 +537,10 @@ public:
     return *this;
   }
 
+  /// Create a path of AddrProjection or ValueProjection with the given VA
+  /// and Path.
+  SILValue createExtract(SILValue VA, SILInstruction *Inst, bool IsVal) const;
+
   /// Create a new projection path from the SILValue Start to End.  Returns
   /// Nothing::None if there is no such path.
   ///
@@ -560,15 +564,6 @@ public:
   /// NOTE: this function returns a single empty projection path if the BaseType
   /// is a leaf node in the type tree.
   static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
-                                                SILModule *Mod,
-                                                ProjectionPathList &P);
-
-  /// Given the SILType Base, expand every intermediate and leaf nodes in the
-  /// type tree.
-  ///
-  /// NOTE: this function returns a single empty projection path if the BaseType
-  /// is a leaf node in the type tree.
-  static void expandTypeIntoNodeProjectionPaths(SILType BaseType,
                                                 SILModule *Mod,
                                                 ProjectionPathList &P);
 
@@ -724,8 +719,8 @@ class ProjectionTreeNode {
 
   /// Constructor for the root of the tree.
   ProjectionTreeNode(SILType NodeTy)
-    : Index(0), NodeType(NodeTy), Proj(), Parent(),
-      NonProjUsers(), ChildProjections(), Initialized(false), IsLive(false) {}
+    : Index(0), NodeType(NodeTy), Proj(), Parent(), NonProjUsers(),
+      ChildProjections(), Initialized(false), IsLive(false) {}
 
   // Normal constructor for non-root nodes.
   ProjectionTreeNode(ProjectionTreeNode *Parent, unsigned Index, SILType NodeTy,
@@ -735,6 +730,11 @@ class ProjectionTreeNode {
       Initialized(false), IsLive(false) {}
 
 public:
+  enum LivenessKind : unsigned {
+    NormalUseLiveness = 0,
+    IgnoreEpilogueReleases = 1,
+  };
+
   class NewAggregateBuilder;
 
   ~ProjectionTreeNode() = default;
@@ -745,6 +745,10 @@ public:
   }
 
   llvm::Optional<Projection> &getProjection() { return Proj; }
+
+  llvm::SmallVector<Operand *, 4> getNonProjUsers() const {
+    return NonProjUsers;
+  };
 
   SILType getType() const { return NodeType; }
 
@@ -793,8 +797,8 @@ private:
 
   void processUsersOfValue(ProjectionTree &Tree,
                            llvm::SmallVectorImpl<ValueNodePair> &Worklist,
-                           SILValue Value);
-
+                           SILValue Value, ProjectionTreeNode::LivenessKind Kind,
+                           llvm::DenseSet<SILInstruction *> &Releases);
 
   void createNextLevelChildren(ProjectionTree &Tree);
 
@@ -810,6 +814,11 @@ class ProjectionTree {
 
   llvm::BumpPtrAllocator &Allocator;
 
+  /// The way we compute what is live and what is dead.
+  ProjectionTreeNode::LivenessKind Kind;
+
+  llvm::DenseSet<SILInstruction *> EpilogueReleases;
+
   // A common pattern is a 3 field struct.
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
   llvm::SmallVector<unsigned, 3> LiveLeafIndices;
@@ -820,6 +829,9 @@ public:
   /// Construct a projection tree from BaseTy.
   ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
                  SILType BaseTy);
+  ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
+                 SILType BaseTy, ProjectionTreeNode::LivenessKind Kind, 
+                 llvm::DenseSet<SILInstruction*> Insts);
   ~ProjectionTree();
   ProjectionTree(const ProjectionTree &) = delete;
   ProjectionTree(ProjectionTree &&) = default;
@@ -891,11 +903,21 @@ public:
     return false;
   }
 
+
   void getLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
     for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
       assert(Node->IsLive && "We are only interested in leafs that are live");
       OutArray.push_back(Node->getType());
+    }
+  }
+
+  void
+  getLeafNodes(llvm::SmallVectorImpl<const ProjectionTreeNode *> &Out) const {
+    for (unsigned LeafIndex : LiveLeafIndices) {
+      const ProjectionTreeNode *Node = getNode(LeafIndex);
+      assert(Node->IsLive && "We are only interested in leafs that are live");
+      Out.push_back(Node);
     }
   }
 

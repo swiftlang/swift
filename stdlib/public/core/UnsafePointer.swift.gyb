@@ -16,13 +16,14 @@
 %  Self = 'UnsafeMutablePointer' if mutable else 'UnsafePointer'
 %  a_Self = 'an `UnsafeMutablePointer`' if mutable else 'an `UnsafePointer`'
 
-/// A pointer to an object of type `Memory`.  This type provides no automated
-/// memory management, and therefore the user must take care to allocate
-/// and free memory appropriately.
+/// A raw pointer for accessing data of type `Pointee`.  This type
+/// provides no automated memory management, and therefore must
+/// be handled with great care to ensure safety.
 ///
-/// The pointer should be aligned to `alignof(Memory.self)`.
+/// Instances must be aligned to `alignof(Pointee.self)`, i.e.
+/// `(UnsafePointer<Int8>(self) - nil) % alignof(Pointee.self) == 0`
 ///
-/// The pointer can be in one of the following states:
+/// The memory referenced by an instance can be in one of the following states:
 ///
 /// - Memory is not allocated (for example, pointer is null, or memory has
 ///   been deallocated previously).
@@ -30,23 +31,14 @@
 /// - Memory is allocated, but value has not been initialized.
 ///
 /// - Memory is allocated and value is initialized.
-public struct ${Self}<Memory>
-  : RandomAccessIndexType, Hashable,
-    NilLiteralConvertible, _PointerType {
-
-  @available(*, unavailable, renamed="Memory")
-  public typealias T = Memory
+public struct ${Self}<Pointee>
+  : RandomAccessIndex, Hashable,
+    NilLiteralConvertible, _Pointer {
 
   public typealias Distance = Int
 
   /// The underlying raw (untyped) pointer.
-  public var _rawValue : Builtin.RawPointer
-
-  /// Construct a null pointer.
-  @_transparent
-  public init() {
-    self._rawValue = _nilRawPointer
-  }
+  public let _rawValue: Builtin.RawPointer
 
   /// Construct ${a_Self} from a builtin raw pointer.
   @_transparent
@@ -54,90 +46,80 @@ public struct ${Self}<Memory>
     self._rawValue = _rawValue
   }
 
-  /// Convert from an opaque C pointer to a typed pointer.
-  ///
-  /// This is a fundamentally unsafe conversion.
+  /// Convert from an opaque pointer to a typed pointer.
   @_transparent
-  public init(_ other : COpaquePointer) {
+  public init(_ other : OpaquePointer) {
     _rawValue = other._rawValue
   }
 
-  /// Construct ${a_Self} from a given address in memory.
-  ///
-  /// This is a fundamentally unsafe conversion.
+  /// Construct ${a_Self} with a given pattern of bits.
   @_transparent
   public init(bitPattern: Int) {
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Construct ${a_Self} from a given address in memory.
-  ///
-  /// This is a fundamentally unsafe conversion.
+  /// Construct ${a_Self} with a given pattern of bits.
   @_transparent
   public init(bitPattern: UInt) {
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Convert from an `UnsafeMutablePointer` of a different type.
+  /// Convert from any `UnsafeMutablePointer`, possibly with a
+  /// different `Pointee`.
   ///
-  /// This is a fundamentally unsafe conversion.
+  /// - Warning: the behavior of accesses to pointee as a type
+  ///   different from that to which it was initialized is undefined.
   @_transparent
   public init<U>(_ from : UnsafeMutablePointer<U>) {
     _rawValue = from._rawValue
   }
 
-  /// Convert from a `UnsafePointer` of a different type.
+  /// Convert from any `UnsafePointer`, possibly with a
+  /// different `Pointee`.
   ///
-  /// This is a fundamentally unsafe conversion.
+  /// - Warning: the behavior of accesses to pointee as a type
+  ///   different from that to which it was initialized is undefined.
   @_transparent
   public init<U>(_ from : UnsafePointer<U>) {
     _rawValue = from._rawValue
   }
 
   /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
-    self = ${Self}()
+  @_transparent
+  public init(nilLiteral: ()) {
+    self._rawValue = _nilRawPointer
   }
 
 %  if mutable:
-  /// Allocate memory for `num` objects of type `Memory`.
+  /// Allocate and point at uninitialized aligned memory for `count`
+  /// instances of `Pointee`.
   ///
-  /// - Postcondition: The memory is allocated, but not initialized.
+  /// - Postcondition: The pointee is allocated, but not initialized.
   @warn_unused_result
-  public static func alloc(num: Int) -> ${Self} {
-    let size = strideof(Memory.self) * num
-    return ${Self}(
-      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Memory.self)))
+  public init(allocatingCapacity count: Int) {
+    let size = strideof(Pointee.self) * count
+    self._rawValue =
+      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
   }
 
-  /// Deallocate `num` objects.
-  ///
-  /// - parameter num: Number of objects to deallocate.  Should match exactly
-  ///   the value that was passed to `alloc()` (partial deallocations are not
-  ///   possible).
+  /// Deallocate uninitialized memory allocated for `count` instances
+  /// of `Pointee`.
   ///
   /// - Precondition: The memory is not initialized.
   ///
   /// - Postcondition: The memory has been deallocated.
-  public func dealloc(num: Int) {
-    let size = strideof(Memory.self) * num
+  public func deallocateCapacity(num: Int) {
+    let size = strideof(Pointee.self) * num
     Builtin.deallocRaw(
-      _rawValue, size._builtinWordValue, Builtin.alignof(Memory.self))
+      _rawValue, size._builtinWordValue, Builtin.alignof(Pointee.self))
   }
 %  end
 
-%{
-if mutable:
-    comment = """\
-  /// Access the underlying raw memory, getting and setting values."""
-else:
-    comment = """\
-  /// Access the underlying raw memory, getting values."""
-}%
-
-${comment}
-  public var memory: Memory {
+  /// Access the `Pointee` instance referenced by `self`.
+  ///
+  /// - Precondition: the pointee has been initialized with an instance of
+  ///   type `Pointee`.
+  public var pointee: Pointee {
 %  if mutable:
     @_transparent unsafeAddress {
       return UnsafePointer(self)
@@ -153,38 +135,53 @@ ${comment}
   }
 
 %  if mutable:
-  /// Initialize the value the pointer points to, to construct
-  /// an object where there was no object previously stored.
+  /// Initialize `self.pointee` with `count` consecutive copies of `newValue`
   ///
-  /// - Precondition: The memory is not initialized.
+  /// - Precondition: The pointee is not initialized.
+  ///             `count` is non-negative.
   ///
-  /// - Postcondition: The memory is initialized; the value should eventually
+  /// - Postcondition: The pointee is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  public func initialize(newvalue: Memory) {
-    Builtin.initialize(newvalue, _rawValue)
+  // FIXME: add tests (since the `count` has been added)
+  public func initialize(with newValue: Pointee, count: Int = 1) {
+    _stdlibAssert(count >= 0,
+      "${Self}.initialize(with:): negative count")
+    // Must not use `initializeFrom` with a `Collection` as that will introduce
+    // a cycle.
+    for offset in 0..<count {
+      Builtin.initialize(newValue, (self + offset)._rawValue)
+    }
   }
 
-  /// Retrieve the value the pointer points to, moving it away
-  /// from the location referenced in memory.
+  /// Retrieve the `pointee`, returning the referenced memory to an
+  /// uninitialized state.
   ///
-  /// Equivalent to reading `memory` property and calling `destroy()`,
-  /// but more efficient.
+  /// Equivalent to `{ defer { deinitialize() }; return pointee }()`, but
+  /// more efficient.
   ///
-  /// - Precondition: The memory is initialized.
+  /// - Precondition: The pointee is initialized.
   ///
-  /// - Postcondition: The value has been destroyed and the memory must
-  ///   be initialized before being used again.
+  /// - Postcondition: The memory is uninitialized.
   @warn_unused_result
-  public func move() -> Memory {
+  public func move() -> Pointee {
     return Builtin.take(_rawValue)
   }
 
-  /// Assign from `count` values beginning at source into initialized
-  /// memory, proceeding from the first element to the last.
+  /// Replace `count` initialized `Pointee`s starting at `self` with
+  /// the `count` `Pointee`s at `source`, proceeding forward from
+  /// `self` to `self + count - 1`.
+  ///
+  /// - Precondition: `count >= 0`
+  ///
+  /// - Precondition: `self` either precedes `source` or follows
+  ///   `source + count - 1`.
+  ///
+  /// - Precondition: The `Pointee`s at `self..<self + count` and
+  ///   `source..<source + count` are initialized.
   public func assignFrom(source: ${Self}, count: Int) {
-    _debugPrecondition(
-      count >= 0, "assignFrom with negative count")
-    _debugPrecondition(
+    _stdlibAssert(
+      count >= 0, "${Self}.assignFrom with negative count")
+    _stdlibAssert(
       self < source || self >= source + count,
       "assignFrom non-following overlapping range; use assignBackwardFrom")
     for i in 0..<count {
@@ -192,16 +189,24 @@ ${comment}
     }
   }
 
-  /// Assign from `count` values beginning at `source` into
-  /// initialized memory, proceeding from the last value to the first.
-  /// Use this for assigning ranges into later memory that may overlap
-  /// with the source range.
+  /// Replace `count` initialized `Pointee`s starting at `self` with
+  /// the `count` `Pointee`s at `source`, proceeding backward from
+  /// `self + count - 1` to `self`.
   ///
-  /// - Requires: Either `source` precedes `self` or follows `self + count`.
+  /// Use `assignBackwardFrom` when copying elements into later memory
+  /// that may overlap with the source range.
+  ///
+  /// - Precondition: `count >= 0`
+  ///
+  /// - Precondition: `source` either precedes `self` or follows
+  ///   `self + count - 1`.
+  ///
+  /// - Precondition: The `Pointee`s at `self..<self + count` and
+  ///   `source..<source + count` are initialized.
   public func assignBackwardFrom(source: ${Self}, count: Int) {
-    _debugPrecondition(
+    _stdlibAssert(
       count >= 0, "${Self}.assignBackwardFrom with negative count")
-    _debugPrecondition(
+    _stdlibAssert(
       source < self || source >= self + count,
       "${Self}.assignBackwardFrom non-preceding overlapping range; use assignFrom instead")
     var i = count-1
@@ -211,109 +216,153 @@ ${comment}
     }
   }
 
-  /// Move `count` values beginning at source into raw memory,
-  /// transforming the source values into raw memory.
+  /// Initialize memory starting at `self` with `count` `Pointee`s
+  /// beginning at `source`, proceeding forward from `self` to `self +
+  /// count - 1`, and returning the source memory to an uninitialized
+  /// state.
+  ///
+  /// - Precondition: `count >= 0`
+  ///
+  /// - Precondition: `self` either precedes `source` or follows `source +
+  ///   count - 1`.
+  ///
+  /// - Precondition: The memory at `self..<self + count` is uninitialized
+  ///   and the `Pointees` at `source..<source + count` are
+  ///   initialized.
+  ///
+  /// - Postcondition: The `Pointee`s at `self..<self + count` are
+  ///   initialized and the memory at `source..<source + count` is
+  ///   uninitialized.
   public func moveInitializeFrom(source: ${Self}, count: Int) {
-    _debugPrecondition(
+    _stdlibAssert(
       count >= 0, "${Self}.moveInitializeFrom with negative count")
-    _debugPrecondition(
+    _stdlibAssert(
       self < source || self >= source + count,
       "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
     Builtin.takeArrayFrontToBack(
-      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initialize((source + i).move())
+    //   (self + i).initialize(with: (source + i).move())
     // }
   }
 
-  /// Move `count` values beginning at `source` into uninitialized memory,
-  /// transforming the source values into raw memory, proceeding from
-  /// the last value to the first.  Use this for copying ranges into
-  /// later memory that may overlap with the source range.
+  /// Initialize memory starting at `self` with `count` `Pointee`s
+  /// beginning at `source`, proceeding backward from `self + count - 1`
+  /// to `self`, and returning the source memory to an uninitialized
+  /// state.
   ///
-  /// - Requires: Either `source` precedes `self` or follows `self + count`.
+  /// - Precondition: `count >= 0`
+  ///
+  /// - Precondition: `source` either precedes `self` or follows
+  ///   `self + count - 1`.
+  ///
+  /// - Precondition: The memory at `self..<self + count` is uninitialized
+  ///   and the `Pointees` at `source..<source + count` are
+  ///   initialized.
+  ///
+  /// - Postcondition: The `Pointee`s at `self..<self + count` are
+  ///   initialized and the memory at `source..<source + count` is
+  ///   uninitialized.
   public func moveInitializeBackwardFrom(source: ${Self}, count: Int) {
-    _debugPrecondition(
+    _stdlibAssert(
       count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
-    _debugPrecondition(
+    _stdlibAssert(
       source < self || source >= self + count,
       "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
     Builtin.takeArrayBackToFront(
-      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // var src = source + count
     // var dst = self + count
     // while dst != self {
-    //   (--dst).initialize((--src).move())
+    //   (--dst).initialize(with: (--src).move())
     // }
   }
 
-  /// Copy `count` values beginning at source into raw memory.
+  /// Initialize memory starting at `self` with `count` `Pointee`s
+  /// beginning at `source`, proceeding forward from `self` to `self +
+  /// count - 1`.
   ///
-  /// - Precondition: The memory is not initialized.
+  /// - Precondition: `count >= 0`
   ///
-  /// - Requires: `self` and `source` may not overlap.
+  /// - Precondition: `self` either precedes `source` or follows `source +
+  ///   count - 1`.
+  ///
+  /// - Precondition: The memory at `self..<self + count` is uninitialized
+  ///   and the `Pointees` at `source..<source + count` are
+  ///   initialized.
+  ///
+  /// - Postcondition: The `Pointee`s at `self..<self + count` and
+  ///   `source..<source + count` are initialized.
   public func initializeFrom(source: ${Self}, count: Int) {
-    _debugPrecondition(
+    _stdlibAssert(
       count >= 0, "${Self}.initializeFrom with negative count")
-    _debugPrecondition(
+    _stdlibAssert(
       self + count <= source || source + count <= self,
       "${Self}.initializeFrom non-following overlapping range")
     Builtin.copyArray(
-      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initialize(source[i])
+    //   (self + i).initialize(with: source[i])
     // }
   }
 
-  /// Copy the elements of `C` into raw memory.
+  /// Initialize memory starting at `self` with the elements of `source`.
   ///
-  /// - Precondition: The memory is not initialized.
+  /// - Precondition: The memory at `self..<self + count` is
+  ///   uninitialized.
+  ///
+  /// - Postcondition: The `Pointee`s at `self..<self + count` are
+  ///   initialized.
   public func initializeFrom<
-    C : CollectionType where C.Generator.Element == Memory
+    C : Collection where C.Iterator.Element == Pointee
   >(source: C) {
-    source._initializeTo(self)
+    source._copyContents(initializing: self)
   }
 
-  /// Assign from `count` values beginning at `source` into initialized
-  /// memory, transforming the source values into raw memory.
+  /// Replace `count` initialized `Pointee`s starting at `self` with
+  /// the `count` `Pointee`s starting at `source`, returning the
+  /// source memory to an uninitialized state.
   ///
-  /// - Requires: The `self` and `source` ranges may not overlap.
+  /// - Precondition: `count >= 0`
+  ///
+  /// - Precondition: The source and destination ranges do not overlap
+  ///
+  /// - Precondition: The `Pointee`s at `self..<self + count` and
+  ///   `source..<source + count` are initialized.
+  ///
+  /// - Postcondition: The `Pointee`s at `self..<self + count` are
+  ///   initialized and the `Pointees` at `source..<source + count`
+  ///   are uninitialized.
   public func moveAssignFrom(source: ${Self}, count: Int) {
-    _debugPrecondition(
-      count >= 0, "moveAssignFrom with negative count")
-    _debugPrecondition(
+    _stdlibAssert(
+      count >= 0, "${Self}.moveAssignFrom with negative count")
+    _stdlibAssert(
       self + count <= source || source + count <= self,
       "moveAssignFrom overlapping range")
-    Builtin.destroyArray(Memory.self, self._rawValue, count._builtinWordValue)
+    Builtin.destroyArray(Pointee.self, self._rawValue, count._builtinWordValue)
     Builtin.takeArrayFrontToBack(
-      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // These builtins are equivalent to:
     // for i in 0..<count {
     //   self[i] = (source + i).move()
     // }
   }
 
-  /// Destroy the object the pointer points to.
+  /// De-initialize the `count` `Pointee`s starting at `self`, returning
+  /// their memory to an uninitialized state.
   ///
-  /// - Precondition: The memory is initialized.
+  /// - Precondition: The `Pointee`s at `self..<self + count` are
+  ///   initialized.
   ///
-  /// - Postcondition: The value has been destroyed and the memory must
-  ///   be initialized before being used again.
-  public func destroy() {
-    Builtin.destroy(Memory.self, _rawValue)
-  }
-
-  /// Destroy the `count` objects the pointer points to.
-  /// - Precondition: The memory is initialized.
-  ///
-  /// - Postcondition: The value has been destroyed and the memory must
-  ///   be initialized before being used again.
-  public func destroy(count: Int) {
-    _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
-    Builtin.destroyArray(Memory.self, _rawValue, count._builtinWordValue)
+  /// - Postcondition: The memory is uninitialized.
+  public func deinitialize(count count: Int = 1) {
+    _stdlibAssert(count >= 0, "${Self}.deinitialize with negative count")
+    // FIXME: optimization should be implemented, where if the `count` value
+    // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
+    Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
   }
 %  end
 
@@ -322,8 +371,10 @@ ${comment}
     return self == nil
   }
 
-  /// Access the `i`th element of the raw array starting at `self`.
-  public subscript(i: Int) -> Memory {
+  /// Access the pointee at `self + i`.
+  ///
+  /// - Precondition: the pointee at `self + i` is initialized.
+  public subscript(i: Int) -> Pointee {
 %  if mutable:
     @_transparent
     unsafeAddress {
@@ -345,16 +396,16 @@ ${comment}
   /// If self was converted from `nil`, writes the result of invoking body into
   /// the pointee.
   public // SPI(Foundation)
-  func _setIfNonNil(@noescape body: () -> Memory) {
+  func _setIfNonNil(@noescape body: () -> Pointee) {
     if self != nil {
-      memory = body()
+      pointee = body()
     }
   }
 
 #if _runtime(_ObjC)
   /// Returns the result of invoking body.  If self was converted from
   /// `nil`, passes `nil` as the argument.  Otherwise, passes the address
-  /// of a `Memory` which is written into buffer before this method returns.
+  /// of a `Pointee` which is written into buffer before this method returns.
   @_transparent public
   func _withBridgeObject<U : AnyObject, R>(
     buffer: inout U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
@@ -388,24 +439,24 @@ ${comment}
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
   }
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Requires: The next value is representable.
+
+  /// Returns the next consecutive position.
   public func successor() -> ${Self} {
     return self + 1
   }
-  /// Returns the previous consecutive value before `self`.
-  ///
-  /// - Requires: The previous value is representable.
+
+  /// Returns the previous consecutive position.
   public func predecessor() -> ${Self} {
     return self - 1
   }
 
-  public func distanceTo(x: ${Self}) -> Int {
+  /// Return `end - self`.
+  public func distance(to x: ${Self}) -> Int {
     return x - self
   }
 
-  public func advancedBy(n: Int) -> ${Self} {
+  /// Return `self + n`.
+  public func advanced(by n: Int) -> ${Self} {
     return self + n
   }
 }
@@ -418,7 +469,7 @@ extension ${Self} : CustomDebugStringConvertible {
 }
 
 extension ${Self} : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return Mirror(self, children: ["pointerValue": ptrValue])
   }
@@ -431,70 +482,116 @@ extension ${Self} : CustomPlaygroundQuickLookable {
     return ptrValue == 0 ? "\(selfType)(nil)" : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .Text(summary)
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(summary)
   }
 }
 
 @_transparent
 @warn_unused_result
-public func == <Memory>(
-  lhs: ${Self}<Memory>, rhs: ${Self}<Memory>
+public func == <Pointee>(
+  lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>
 ) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @_transparent
 @warn_unused_result
-public func < <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Bool {
+public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @_transparent
 @warn_unused_result
-public func + <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
+public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, (rhs &* strideof(Memory.self))._builtinWordValue))
+    lhs._rawValue, (rhs &* strideof(Pointee.self))._builtinWordValue))
 }
 
 @_transparent
 @warn_unused_result
-public func + <Memory>(lhs: Int,
-           rhs: ${Self}<Memory>) -> ${Self}<Memory> {
+public func + <Pointee>(lhs: Int,
+           rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
   return rhs + lhs
 }
 
 @_transparent
 @warn_unused_result
-public func - <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
+public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return lhs + -rhs
 }
 
 @_transparent
 @warn_unused_result
-public func - <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Int {
+public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
                          Builtin.ptrtoint_Word(rhs._rawValue)))
-    / strideof(Memory.self)
+    / strideof(Pointee.self)
 }
 
 @_transparent
-public func += <Memory>(lhs: inout ${Self}<Memory>, rhs: Int) {
+public func += <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
   lhs = lhs + rhs
 }
 
 @_transparent
-public func -= <Memory>(lhs: inout ${Self}<Memory>, rhs: Int) {
+public func -= <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
   lhs = lhs - rhs
+}
+
+extension ${Self} {
+  @available(*, unavailable, renamed="Pointee")
+  public typealias Memory = Pointee
+
+  @available(*, unavailable, message="use 'nil' literal")
+  public init() {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="use the '${Self}(allocatingCapacity:)' initializer")
+  public static func alloc(num: Int) -> ${Self} {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="deallocateCapacity")
+  public func dealloc(num: Int) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="pointee")
+  public var memory: Pointee {
+    get {
+      fatalError("unavailable function can't be called")
+    }
+    set {
+      fatalError("unavailable function can't be called")
+    }
+  }
+
+  @available(*, unavailable, renamed="initialize(with:)")
+  public func initialize(newvalue: Pointee) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="deinitialize(count:)")
+  public func destroy() {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="deinitialize(count:)")
+  public func destroy(count: Int) {
+    fatalError("unavailable function can't be called")
+  }
 }
 % end # for mutable
 
 /// A byte-sized thing that isn't designed to interoperate with
 /// any other types; it makes a decent parameter to
-/// `UnsafeMutablePointer<Memory>` when you just want to do bytewise
+/// `UnsafeMutablePointer<Pointee>` when you just want to do bytewise
 /// pointer arithmetic.
-public struct RawByte {
+public // @testable
+struct _RawByte {
   let _inaccessible: UInt8
 }
 

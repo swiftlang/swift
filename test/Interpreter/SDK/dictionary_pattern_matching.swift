@@ -58,12 +58,12 @@ let invalidStatePlist3: Dictionary<String, AnyObject> = [
   "population": 38_040_000,
 ]
 
-// CHECK-LABEL: Some:
+// CHECK-LABEL: some:
 // CHECK:         name: "California"
 // CHECK:         population: 38040000
 // CHECK:         abbrev: "CA"
 dump(stateFromPlistLame(goodStatePlist))
-// CHECK-LABEL: Some:
+// CHECK-LABEL: some:
 // CHECK:         name: "California"
 // CHECK:         population: 38040000
 // CHECK:         abbrev: "CA"
@@ -90,10 +90,14 @@ enum Statistic : CustomReflectable {
   case ForState(State)
   case ForCountry(Country)
 
-  func customMirror() -> Mirror {
+  var customMirror: Mirror {
     switch self {
-      case .ForState(let state): return Mirror(self, children: ["State": state], displayStyle: .Enum)
-      case .ForCountry(let country): return Mirror(self, children: ["Country": country], displayStyle: .Enum)
+      case .ForState(let state):
+        return Mirror(
+          self, children: ["State": state], displayStyle: .`enum`)
+      case .ForCountry(let country):
+        return Mirror(
+          self, children: ["Country": country], displayStyle: .`enum`)
     }
   }
 }
@@ -105,7 +109,7 @@ func statisticFromPlist(plist: Dictionary<String, AnyObject>) -> Statistic? {
     return Statistic.ForState(State(name: name,
                                     population: population,
                                     abbrev: abbrev))
-  case let ("country" as String, name as String, population as Int, .None):
+  case let ("country" as String, name as String, population as Int, .none):
     return Statistic.ForCountry(Country(name: name,
                                         population: population))
   default:

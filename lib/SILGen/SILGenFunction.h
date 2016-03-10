@@ -268,6 +268,34 @@ enum class CaptureEmission {
   PartialApplication,
 };
 
+/// Represents an LValue opened for mutating access.
+///
+/// This is used by LogicalPathComponent::getMaterialized() and
+/// SILGenFunction::emitMaterializeForSetAccessor().
+struct MaterializedLValue {
+  ManagedValue temporary;
+
+  // Only set if a callback is required
+  CanType origSelfType;
+  CanGenericSignature genericSig;
+  SILValue callback;
+  SILValue callbackStorage;
+
+  MaterializedLValue() {}
+  explicit MaterializedLValue(ManagedValue temporary)
+    : temporary(temporary) {}
+  MaterializedLValue(ManagedValue temporary,
+                     CanType origSelfType,
+                     CanGenericSignature genericSig,
+                     SILValue callback,
+                     SILValue callbackStorage)
+    : temporary(temporary),
+      origSelfType(origSelfType),
+      genericSig(genericSig),
+      callback(callback),
+      callbackStorage(callbackStorage) {}
+};
+
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction>
@@ -592,12 +620,9 @@ public:
   /// Generate a protocol witness entry point, invoking 'witness' at the
   /// abstraction level of 'requirement'.
   ///
-  /// \param conformance Either a concrete conformance, or nullptr if emitting
-  /// a default witness method.
-  ///
-  /// FIXME: Shouldn't take a conformance
-  void emitProtocolWitness(ProtocolConformance *conformance,
-                           Type selfType,
+  /// This is used for both concrete witness thunks and default witness
+  /// thunks.
+  void emitProtocolWitness(Type selfType,
                            AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
@@ -1074,7 +1099,7 @@ public:
 
   SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl,
                                          bool isDirectAccessorUse);  
-  std::pair<SILValue, SILValue>
+  MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 ArrayRef<Substitution> substitutions,
                                 ArgumentSource &&optionalSelfValue,
@@ -1084,8 +1109,7 @@ public:
   bool maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
                                        FuncDecl *requirement,
                                        FuncDecl *witness,
-                                       ArrayRef<Substitution> witnessSubs,
-                                       ArrayRef<ManagedValue> params);
+                                       ArrayRef<Substitution> witnessSubs);
   void emitMaterializeForSet(FuncDecl *decl);
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
@@ -1359,11 +1383,11 @@ public:
                                         SILFunctionTypeRepresentation srcRep,
                                         CanType nativeTy);
 
-  /// Convert a bridged error type to the native Swift ErrorType
+  /// Convert a bridged error type to the native Swift ErrorProtocol
   /// representation.  The value may be optional.
   ManagedValue emitBridgedToNativeError(SILLocation loc, ManagedValue v);
 
-  /// Convert a value in the native Swift ErrorType representation to
+  /// Convert a value in the native Swift ErrorProtocol representation to
   /// a bridged error type representation.
   ManagedValue emitNativeToBridgedError(SILLocation loc, ManagedValue v,
                                         CanType bridgedType);

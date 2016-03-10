@@ -10,7 +10,7 @@ protocol a {
 class b: a {
     c T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func f() {
     ({})
 }
@@ -22,7 +22,7 @@ func c<d {
         var _ = e
     }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<enum b {

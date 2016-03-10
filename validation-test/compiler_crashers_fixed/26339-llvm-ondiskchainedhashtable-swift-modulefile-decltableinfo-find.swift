@@ -7,8 +7,8 @@ typealias e : d where h: AnyObject
 protocol A {
 enum S<c {
 typealias e : AnyObject
-struct B<d where B : BooleanType, A : A}
-protocol c : BooleanType, A : a
+struct B<d where B : Boolean, A : A}
+protocol c : Boolean, A : a
 protocol A {enum S<T {
 struct Q<T where h: a {
 }
@@ -22,7 +22,7 @@ typealias e =[Void
 class d<T where h: A{
 protocol A : a
 }
-protocol A : BooleanType, A {
+protocol A : Boolean, A {
 func < {
 let a {
 typealias e : B<T where B :
@@ -55,7 +55,7 @@ class A : B
 case c
 }
 func c,
-protocol A : BooleanType, A : Int -> {struct B<c : a {
+protocol A : Boolean, A : Int -> {struct B<c : a {
 struct A : A : A}
 case c
 protocol A : AnyObject
@@ -68,7 +68,7 @@ class b: A {
 enum a
 class d
 class b<c {
-class A : BooleanType, A {
+class A : Boolean, A {
 typealias e)"\() -> {
 let t: A {
 let a {
@@ -78,7 +78,7 @@ for ( )"[Void{
 }
 struct B
 func a{
-struct B<T where h: e)"[]struct Q<T where H : BooleanType, A : P {enum a
+struct B<T where h: e)"[]struct Q<T where H : Boolean, A : P {enum a
 struct X<T {
 let a {
 class a {{
@@ -98,7 +98,7 @@ protocol c
 typealias e : T:A
 class a {
 class A : Int -> {
-let t: BooleanType, A {
+let t: Boolean, A {
 enum S<T where h: Int = []struct S<h {
 extension String {
 struct Q<h where h: A
@@ -127,7 +127,7 @@ let t: C {
 }
 struct B<T where T
 class A {}
-typealias e : BooleanType, A {
+typealias e : Boolean, A {
 extension String {
 struct B
 let f = c<T where B :a
@@ -157,7 +157,7 @@ case,
 func c
 var b {
 typealias e : a=[Void{
-typealias e : BooleanType, A {
+typealias e : Boolean, A {
 protocol A {
 class b<T where g
 protocol A : e)

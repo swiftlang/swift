@@ -13,7 +13,7 @@ import gizmo
     // CHECK:   strong_retain [[NSSET]] : $NSSet
     // CHECK:   strong_retain [[SELF]] : $Foo
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertNSSetToSet{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
-    // CHECK: [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.Some!enumelt.1, [[NSSET]] : $NSSet
+    // CHECK: [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET]] : $NSSet
     // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]]) : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foo16bridge_Set_param{{.*}} : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
     // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[SET]], [[SELF]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
@@ -50,7 +50,7 @@ import gizmo
   // CHECK:   strong_retain [[NSSET]] : $NSSet
   // CHECK:   strong_retain [[SELF]] : $Foo
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertNSSetToSet{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
-  // CHECK: [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.Some!enumelt.1, [[NSSET]] : $NSSet
+  // CHECK: [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET]] : $NSSet
   // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]]) : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
   // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foos8property{{.*}} : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[SET]], [[SELF]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()

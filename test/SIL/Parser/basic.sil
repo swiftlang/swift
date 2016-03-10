@@ -516,7 +516,7 @@ isa(%6 : $Builtin.Int1):
 }
 
 sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp17utf8CodeUnitCountBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
 
 
 sil @_T5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
@@ -913,13 +913,13 @@ bb0(%0 : $Builtin.Word):
   %1 = integer_literal $Builtin.Word, 0
   %2 = integer_literal $Builtin.Word, 1
   %3 = enum $IntEnum, #IntEnum.E1!enumelt
-  %4 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %3 : $IntEnum
+  %4 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %3 : $IntEnum
   %5 = integer_literal $Builtin.Word, 2
   %6 = enum $IntEnum, #IntEnum.E2!enumelt
-  %7 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %6 : $IntEnum
+  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %6 : $IntEnum
   %8 = enum $IntEnum, #IntEnum.E0!enumelt
-  %9 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %8 : $IntEnum
-  %10 = enum $Optional<IntEnum>, #Optional.None!enumelt
+  %9 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %8 : $IntEnum
+  %10 = enum $Optional<IntEnum>, #Optional.none!enumelt
 
   // CHECK: select_value %{{.*}} : $Builtin.Word, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, default %{{.*}} : $Optional<IntEnum>
   %11 = select_value %0 : $Builtin.Word, case %2: %4, case %5: %7, case %1: %9, default %10 : $Optional<IntEnum>
@@ -1257,7 +1257,7 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
-struct SomeError: ErrorType {
+struct SomeError: ErrorProtocol {
   var _domain: String { get }
   var _code: Int { get }
 }
@@ -1265,18 +1265,18 @@ struct SomeError: ErrorType {
 // CHECK-LABEL: sil @existential_box : $@convention(thin) (SomeError) -> () {
 sil @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
-  // CHECK: %1 = alloc_existential_box $ErrorType, $SomeError
-  %1 = alloc_existential_box $ErrorType, $SomeError
-  // CHECK: %2 = project_existential_box $SomeError in %1 : $ErrorType
-  %2 = project_existential_box $SomeError in %1 : $ErrorType
+  // CHECK: %1 = alloc_existential_box $ErrorProtocol, $SomeError
+  %1 = alloc_existential_box $ErrorProtocol, $SomeError
+  // CHECK: %2 = project_existential_box $SomeError in %1 : $ErrorProtocol
+  %2 = project_existential_box $SomeError in %1 : $ErrorProtocol
   // CHECK: store %0 to %2 : $*SomeError
   store %0 to %2 : $*SomeError
-  // CHECK: %4 = open_existential_box %1 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  %4 = open_existential_box %1 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: dealloc_existential_box %1 : $ErrorType, $SomeError
-  dealloc_existential_box %1 : $ErrorType, $SomeError
+  // CHECK: %4 = open_existential_box %1 : $ErrorProtocol to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
+  %4 = open_existential_box %1 : $ErrorProtocol to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
+  // CHECK: destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
+  // CHECK: dealloc_existential_box %1 : $ErrorProtocol, $SomeError
+  dealloc_existential_box %1 : $ErrorProtocol, $SomeError
   return undef : $()
 }
 
@@ -1312,26 +1312,26 @@ entry:
 }
 
 
-// CHECK-LABEL: sil @error_result : $@convention(thin) () -> @error ErrorType
-sil @error_result : $@convention(thin) () -> @error ErrorType {
+// CHECK-LABEL: sil @error_result : $@convention(thin) () -> @error ErrorProtocol
+sil @error_result : $@convention(thin) () -> @error ErrorProtocol {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result2 : $@convention(thin) () -> (Int, @error ErrorType)
-sil @error_result2 : $@convention(thin) () -> (Int, @error ErrorType) {
+// CHECK-LABEL: sil @error_result2 : $@convention(thin) () -> (Int, @error ErrorProtocol)
+sil @error_result2 : $@convention(thin) () -> (Int, @error ErrorProtocol) {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error ErrorType)
-sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error ErrorType) {
+// CHECK-LABEL: sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error ErrorProtocol)
+sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error ErrorProtocol) {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
-sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType) {
+// CHECK-LABEL: sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorProtocol)
+sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorProtocol) {
 entry(%0 : $Class1):
   return %0 : $Class1
 }
@@ -1339,15 +1339,15 @@ entry(%0 : $Class1):
 // CHECK-LABEL: sil @try_apply : $@convention(thin) (@owned Class1) -> ()
 sil @try_apply : $@convention(thin) (@owned Class1) -> () {
 entry(%0 : $Class1):
-  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
-  // CHECK: try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType), normal bb1, error bb2
-  try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType),
+  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorProtocol)
+  // CHECK: try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorProtocol), normal bb1, error bb2
+  try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorProtocol),
     normal bb1, error bb2
 bb1(%2 : $Class1):
   strong_release %2 : $Class1
   br bb3
-bb2(%3 : $ErrorType):
-  release_value %3 : $ErrorType
+bb2(%3 : $ErrorProtocol):
+  release_value %3 : $ErrorProtocol
   br bb3
 bb3:
   %4 = tuple ()
@@ -1357,9 +1357,9 @@ bb3:
 // CHECK-LABEL: sil @apply_nothrow : $@convention(thin) (@owned Class1) -> ()
 sil @apply_nothrow : $@convention(thin) (@owned Class1) -> () {
 entry(%0 : $Class1):
-  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
-  // CHECK: apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
-  %2 = apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
+  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorProtocol)
+  // CHECK: apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorProtocol)
+  %2 = apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorProtocol)
   strong_release %2 : $Class1
   %3 = tuple ()
   return %3 : $()

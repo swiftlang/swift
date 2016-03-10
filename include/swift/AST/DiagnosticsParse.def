@@ -280,6 +280,11 @@ ERROR(expected_equal_in_typealias,PointsToFirstBadToken,
       "expected '=' in typealias declaration", ())
 ERROR(expected_type_in_typealias,PointsToFirstBadToken,
       "expected type in typealias declaration", ())
+ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
+      "associated types may not have a generic parameter list", ())
+ERROR(typealias_generic_list_constraint,PointsToFirstBadToken,
+      "type parameters may not be constrained in typealias argument list", ())
+
 
 // Func
 ERROR(func_decl_nonglobal_operator,none,
@@ -872,7 +877,7 @@ ERROR(expected_var_decl_for_stmt,PointsToFirstBadToken,
 ERROR(expected_foreach_in,none,
       "expected 'in' after for-each pattern", ())
 ERROR(expected_foreach_container,none,
-      "expected SequenceType expression for for-each loop", ())
+      "expected Sequence expression for for-each loop", ())
 ERROR(expected_foreach_lbrace,none,
       "expected '{' to start the body of for-each loop", ())
 ERROR(expected_foreach_where_expr,PointsToFirstBadToken,

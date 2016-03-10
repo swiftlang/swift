@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 extension String {
-case A, a)) -> T -> [self[c] as BooleanType)
+case A, a)) -> T -> [self[c] as Boolean)
 func x("\(b: String {
 func d: Int) {
 typealias b in a {

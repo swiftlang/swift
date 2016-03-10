@@ -7,5 +7,5 @@
 // Test case found by fuzzing
 
 struct g
-struct c{}protocol c{typealias e:d
+struct c{}protocol c{associatedtype e:d
 class d<T where g:e.T

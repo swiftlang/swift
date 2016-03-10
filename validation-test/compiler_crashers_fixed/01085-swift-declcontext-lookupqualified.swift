@@ -28,4 +28,4 @@ func}
 func b((Any, c))(Any, AnyObject
 func g<T where T.E == F>(f: B<T>) {
 }
-struct c<S: SequenceType, T where Optional<T> == S.Generator.Element>
+struct c<S: Sequence, T where Optional<T> == S.Iterator.Element>

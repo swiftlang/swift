@@ -2,6 +2,10 @@
 
 // REQUIRES: objc_interop
 
+// This test does not make sense when the new Clang importer rules are turned
+// on by default.
+// XFAIL: *
+
 import Foundation
 import AppKit
 

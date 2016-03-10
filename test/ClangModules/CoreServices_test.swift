@@ -7,7 +7,7 @@ import CoreServices
 func test(url: CFURL, ident: CSIdentity) {
   _ = CSBackupIsItemExcluded(url, nil) // okay
 
-  _ = nil as Collection? // expected-error {{use of undeclared type 'Collection'}}
+  _ = nil as TypeThatDoesNotExist? // expected-error {{use of undeclared type 'TypeThatDoesNotExist'}}
   _ = nil as CoreServices.Collection? // okay
 
   _ = kCollectionNoAttributes // expected-error{{use of unresolved identifier 'kCollectionNoAttributes'}}

@@ -14,8 +14,8 @@
 extension String {
   /// Construct an instance that is the concatenation of `count` copies
   /// of `repeatedValue`.
-  public init(count: Int, repeatedValue c: Character) {
-    let s = String(c)
+  public init(repeating repeatedValue: Character, count: Int) {
+    let s = String(repeatedValue)
     self = String(_storage: _StringBuffer(
         capacity: s._core.count * count,
         initialSize: 0,
@@ -27,17 +27,18 @@ extension String {
 
   /// Construct an instance that is the concatenation of `count` copies
   /// of `Character(repeatedValue)`.
-  public init(count: Int, repeatedValue c: UnicodeScalar) {
-    self = String._fromWellFormedCodeUnitSequence(UTF32.self,
-        input: Repeat(count: count, repeatedValue: c.value))
+  public init(repeating repeatedValue: UnicodeScalar, count: Int) {
+    self = String._fromWellFormedCodeUnitSequence(
+      UTF32.self,
+      input: repeatElement(repeatedValue.value, count: count))
   }
   
   public var _lines : [String] {
-    return _split("\n")
+    return _split(separator: "\n")
   }
   
   @warn_unused_result
-  public func _split(separator: UnicodeScalar) -> [String] {
+  public func _split(separator separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
   }
@@ -50,7 +51,7 @@ extension String {
 
 extension String {
   public init(_ _c: UnicodeScalar) {
-    self = String(count: 1, repeatedValue: _c)
+    self = String(repeating: _c, count: 1)
   }
 }
 
@@ -90,12 +91,12 @@ extension String {
   // need these single-arg overloads <rdar://problem/17775455>
   
   /// Create an instance representing `v` in base 10.
-  public init<T : _SignedIntegerType>(_ v: T) {
+  public init<T : _SignedInteger>(_ v: T) {
     self = _int64ToString(v.toIntMax())
   }
   
   /// Create an instance representing `v` in base 10.
-  public init<T : UnsignedIntegerType>(_ v: T) {
+  public init<T : UnsignedInteger>(_ v: T) {
     self = _uint64ToString(v.toUIntMax())
   }
 
@@ -103,7 +104,7 @@ extension String {
   ///
   /// Numerals greater than 9 are represented as roman letters,
   /// starting with `a` if `uppercase` is `false` or `A` otherwise.
-  public init<T : _SignedIntegerType>(
+  public init<T : _SignedInteger>(
     _ v: T, radix: Int, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
@@ -115,7 +116,7 @@ extension String {
   ///
   /// Numerals greater than 9 are represented as roman letters,
   /// starting with `a` if `uppercase` is `false` or `A` otherwise.
-  public init<T : UnsignedIntegerType>(
+  public init<T : UnsignedInteger>(
     _ v: T, radix: Int, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
@@ -124,22 +125,11 @@ extension String {
   }
 }
 
-// Conversions from string to other types.
-extension String {
-  /// If the string represents an integer that fits into an Int, returns
-  /// the corresponding integer.  This accepts strings that match the regular
-  /// expression "[-+]?[0-9]+" only.
-  @available(*, unavailable, message="Use Int() initializer")
-  public func toInt() -> Int? {
-    fatalError("unavailable function can't be called")
-  }
-}
-
 extension String {
   /// Split the given string at the given delimiter character, returning the
   /// strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
-  public func _splitFirst(delim: UnicodeScalar)
+  public func _splitFirst(separator delim: UnicodeScalar)
     -> (before: String, after: String, wasFound : Bool)
   {
     let rng = unicodeScalars
@@ -170,5 +160,17 @@ extension String {
       }
     }
     return (self, "🎃", String(), false)
+  }
+}
+
+extension String {
+  @available(*, unavailable, message="Renamed to init(repeating:count:) and reordered parameters")
+  public init(count: Int, repeatedValue c: Character) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="Renamed to init(repeating:count:) and reordered parameters")
+  public init(count: Int, repeatedValue c: UnicodeScalar) {
+    fatalError("unavailable function can't be called")
   }
 }

@@ -15,7 +15,7 @@ import Foundation
 
 @available(iOS 8.2, *)
 extension WatchKitErrorCode : _BridgedNSError {
-  public static var _NSErrorDomain: String { return WatchKitErrorDomain }
+  public static var _nsErrorDomain: String { return WatchKitErrorDomain }
 }
 
 @available(iOS, introduced=8.2)
@@ -25,8 +25,8 @@ extension WKInterfaceController {
   public class func reloadRootControllers(
     namesAndContexts: [(name: String, context: AnyObject)]
   ) {
-    WKInterfaceController.reloadRootControllersWithNames(
-      namesAndContexts.map { $0.name },
+    WKInterfaceController.reloadRootControllers(
+      names: namesAndContexts.map { $0.name },
       contexts: namesAndContexts.map { $0.context })
   }
 
@@ -35,8 +35,8 @@ extension WKInterfaceController {
   public func presentController(
     namesAndContexts: [(name: String, context: AnyObject)]
   ) {
-    self.presentControllerWithNames(
-      namesAndContexts.map { $0.name },
+    self.present(
+      names: namesAndContexts.map { $0.name },
       contexts: namesAndContexts.map { $0.context })
   }
 }

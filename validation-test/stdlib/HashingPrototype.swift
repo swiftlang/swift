@@ -29,14 +29,14 @@ below.
 */
 
 protocol NewHashable /*: Equatable*/ {
-  func combineIntoHash<Hasher : HasherType>(hasher: inout Hasher)
+  func combineIntoHash<H : Hasher>(hasher: inout H)
 }
 
 struct UserTypeA : NewHashable {
   var a1: Int
   var a2: Float
 
-  func combineIntoHash<Hasher : HasherType>(hasher: inout Hasher) {
+  func combineIntoHash<H : Hasher>(hasher: inout H) {
     hasher.combine(a1)
     hasher.combine(a2)
   }
@@ -47,7 +47,7 @@ struct UserTypeB : NewHashable {
   var b2: UserTypeA // User-defined hashable type
   var b3: [Int]
 
-  func combineIntoHash<Hasher : HasherType>(hasher: inout Hasher) {
+  func combineIntoHash<H : Hasher>(hasher: inout H) {
     hasher.combine(b1)
     hasher.combine(b2)
     hasher.combineSequence(b3)
@@ -58,7 +58,7 @@ class UserClassA : NSObject {
   var a1: Int = 0
 
   // error: declarations from extensions cannot be overridden yet
-  //func combineIntoHash<Hasher : HasherType>(hasher: inout Hasher) {
+  //func combineIntoHash<H : Hasher>(hasher: inout H) {
   //  hasher.combine(a1)
   //}
 
@@ -72,10 +72,10 @@ class UserClassA : NSObject {
 
 /// A hasher object computes a hash value.
 ///
-/// Requirement: two hasher objects compute the same hash value when
+/// Precondition: two hasher objects compute the same hash value when
 /// the same sequence of `combine(...)` calls with equal arguments is
 /// performed on both of them.
-protocol HasherType {
+protocol Hasher {
   //
   // Primary APIs
   //
@@ -84,9 +84,9 @@ protocol HasherType {
   mutating func combine(value: Float)
   // ... overloads for other primitive types...
 
-  mutating func squeezeHashValue<I : SignedIntegerType>(
+  mutating func squeezeHashValue<I : SignedInteger>(
     resultRange: Range<I>) -> I
-  mutating func squeezeHashValue<I : UnsignedIntegerType>(
+  mutating func squeezeHashValue<I : UnsignedInteger>(
     resultRange: Range<I>) -> I
 
   //
@@ -97,15 +97,16 @@ protocol HasherType {
   // This handles arrays, UnsafeBufferPointer, user-defined
   // collections.
   mutating func combineSequence<
-    S : SequenceType
-  where
-    S.Generator.Element : NewHashable>(s: S)
+    S : Sequence
+    where
+    S.Iterator.Element : NewHashable
+  >(s: S)
 
   mutating func combine<H : NewHashable>(value: H)
 }
 
 /// A hasher for in-process, non-persistent hashtables.
-struct InProcessHashtableHasher : HasherType {
+struct InProcessHashtableHasher : Hasher {
   // Only for exposition.
   var _state: Int
 
@@ -125,9 +126,10 @@ struct InProcessHashtableHasher : HasherType {
   }
 
   mutating func combineSequence<
-    S : SequenceType
-  where
-    S.Generator.Element : NewHashable>(s: S) {
+    S : Sequence
+    where
+    S.Iterator.Element : NewHashable
+  >(s: S) {
     for v in s {
       v.combineIntoHash(&self)
     }
@@ -137,12 +139,12 @@ struct InProcessHashtableHasher : HasherType {
     value.combineIntoHash(&self)
   }
 
-  mutating func squeezeHashValue<I : SignedIntegerType>(
+  mutating func squeezeHashValue<I : SignedInteger>(
     resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
     return I(IntMax(_state)) // Should actually clamp the value
   }
-  mutating func squeezeHashValue<I : UnsignedIntegerType>(
+  mutating func squeezeHashValue<I : UnsignedInteger>(
     resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
     return I(UIntMax(_state)) // Should actually clamp the value
@@ -152,10 +154,10 @@ struct InProcessHashtableHasher : HasherType {
 /// A hasher with 128-bit output and a well-defined algorithm stable
 /// *across platforms*; useful for on-disk or distributed hash tables.
 /// Not a cryptographic hash.
-// struct StableFingerprint128Hasher : HasherType {}
+// struct StableFingerprint128Hasher : Hasher {}
 
 extension Int : NewHashable {
-  func combineIntoHash<Hasher : HasherType>(hasher: inout Hasher) {
+  func combineIntoHash<H : Hasher>(hasher: inout H) {
     hasher.combine(self)
   }
 }
@@ -167,7 +169,7 @@ extension Int : NewHashable {
 import Foundation
 
 extension NSObject : NewHashable {
-  func combineIntoHash<Hasher : HasherType>(hasher: inout Hasher) {
+  func combineIntoHash<H : Hasher>(hasher: inout H) {
     hasher.combine(self.hash)
   }
 }

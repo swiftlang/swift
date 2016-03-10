@@ -607,7 +607,7 @@ private:
 
   void addPred(LoopRegion *LNR) {
     assert(!isFunction() && "Functions cannot have predecessors");
-    if (std::count(pred_begin(), pred_end(), LNR->getID()))
+    if (count(getPreds(), LNR->getID()))
       return;
     Preds.push_back(LNR->ID);
   }
@@ -620,7 +620,7 @@ private:
   void replacePred(unsigned OldPredID, unsigned NewPredID) {
     // Check if we already have NewPred in our list. If so, we just delete
     // OldPredID.
-    if (std::count(Preds.begin(), Preds.end(), NewPredID)) {
+    if (count(Preds, NewPredID)) {
       // If this becomes a performance issue due to copying/moving/etc (which it
       // most likely will not), just use the marked dead model like successor
       // does.

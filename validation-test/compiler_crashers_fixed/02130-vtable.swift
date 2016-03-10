@@ -26,6 +26,6 @@ class func f: [c> {
 public class func i> : () {
 }
 typealias f = a()
-let i: T> Any, T : SequenceType> (b<T, f()
+let i: T> Any, T : Sequence> (b<T, f()
 class A")
 func i(t: A : Any) -> (A, f,

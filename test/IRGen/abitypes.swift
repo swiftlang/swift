@@ -377,14 +377,14 @@ class Foo {
 
   // x86_64-macosx: define hidden i64 @_TToFC8abitypes3Foo17returnNSEnumValue{{.*}}(i8*, i8*) unnamed_addr {{.*}} {
   dynamic func returnNSEnumValue() -> NSByteCountFormatterCountStyle {
-    return .File
+    return .file
   }
 
   // x86_64-macosx: define hidden zeroext i16 @_TToFC8abitypes3Foo20returnOtherEnumValue{{.*}}(i8*, i8*, i16 zeroext) unnamed_addr {{.*}} {
   dynamic func returnOtherEnumValue(choice: ChooseTo) -> ChooseTo {
     switch choice {
-      case .TakeIt: return .LeaveIt
-      case .LeaveIt: return .TakeIt
+      case .takeIt: return .leaveIt
+      case .leaveIt: return .takeIt
     }
   }
 

@@ -33,7 +33,7 @@ class A {
 })
 }
 protocol d {
-self.b.Generator.dynamicType.Generator.Element == {
+self.b.Iterator.dynamicType.Iterator.Element == {
 }
 func g: b = a
-typealias B : BooleanType, f
+typealias B : Boolean, f

@@ -20,7 +20,7 @@ func e<U.h : Hashable> U, e: C> S {
 }
 }
 }
-typealias e : SequenceType, e?
+typealias e : Sequence, e?
 protocol P {
 extension NSSet {
 func b: a {

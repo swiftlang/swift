@@ -20,7 +20,7 @@ let i()
 a(self.<b: () {
 func a: b {
 }
-func g<j : CollectionType where H) {
+func g<j : Collection where H) {
 }
 import Foundation
 class a {

@@ -10,7 +10,7 @@ print(i(({
 class c: a {
 class b> Int {
 }
-struct X<h: T : SequenceType> {
+struct X<h: T : Sequence> {
 struct A, k : e = g, e? {
 convenience init("""
 }

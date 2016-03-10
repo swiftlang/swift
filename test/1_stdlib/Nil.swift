@@ -6,7 +6,7 @@
 
 import Foundation
 
-let opaqueNil: COpaquePointer = nil
+let opaqueNil: OpaquePointer = nil
 if opaqueNil == nil {
   print("ok opaqueNil == nil")
   // CHECK: ok opaqueNil == nil
@@ -25,7 +25,7 @@ if unsafeNil == (nil as UnsafeMutablePointer<Int>) {
 }
 
 do {
-  try NSFileManager.defaultManager().removeItemAtURL(NSURL(string:"/this/file/does/not/exist")!)
+  try NSFileManager.defaultManager().removeItem(at: NSURL(string:"/this/file/does/not/exist")!)
 } catch {
   print("ok !removed")
   // CHECK: ok !removed

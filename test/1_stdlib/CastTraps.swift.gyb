@@ -62,7 +62,7 @@ var CastTrapsTestSuite = TestSuite("CastTraps")
 %   for (_, t2) in types:
 
 CastTrapsTestSuite.test("${t1}__${t2}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches("Could not cast value of type '${t1}' ")
@@ -84,7 +84,7 @@ CastTrapsTestSuite.test("${t1}__${t2}")
 %   for (t2) in protocolTypes:
 
 CastTrapsTestSuite.test("${t1}__${t2}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches("Could not cast value of type '${t1}' ")

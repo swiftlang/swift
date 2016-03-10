@@ -14,30 +14,23 @@
 /// of a value.
 public enum Optional<Wrapped> : NilLiteralConvertible {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
-  // that it is an `enum` with cases named `None` and `Some`.
+  // that it is an `enum` with cases named `none` and `some`.
   
-  case None
-  case Some(Wrapped)
-
-  @available(*, unavailable, renamed="Wrapped")
-  public typealias T = Wrapped
-
-  /// Construct a `nil` instance.
-  @_transparent
-  public init() { self = .None }
+  case none
+  case some(Wrapped)
 
   /// Construct a non-`nil` instance that stores `some`.
   @_transparent
-  public init(_ some: Wrapped) { self = .Some(some) }
+  public init(_ some: Wrapped) { self = .some(some) }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   @warn_unused_result
   public func map<U>(@noescape f: (Wrapped) throws -> U) rethrows -> U? {
     switch self {
-    case .Some(let y):
-      return .Some(try f(y))
-    case .None:
-      return .None
+    case .some(let y):
+      return .some(try f(y))
+    case .none:
+      return .none
     }
   }
 
@@ -45,17 +38,52 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   @warn_unused_result
   public func flatMap<U>(@noescape f: (Wrapped) throws -> U?) rethrows -> U? {
     switch self {
-    case .Some(let y):
+    case .some(let y):
       return try f(y)
-    case .None:
-      return .None
+    case .none:
+      return .none
     }
   }
 
   /// Create an instance initialized with `nil`.
   @_transparent
   public init(nilLiteral: ()) {
-    self = .None
+    self = .none
+  }
+
+  /// - Returns: `nonEmpty!`.
+  ///
+  /// - Precondition: `nonEmpty != nil`.  In particular, in -O builds, no test
+  ///   is performed to ensure that `nonEmpty` actually is non-nil.
+  ///
+  /// - Warning: Trades safety for performance.  Use `unsafelyUnwrapped`
+  ///   only when `nonEmpty!` has proven to be a performance problem and
+  ///   you are confident that, always, `nonEmpty != nil`.  It is better
+  ///   than an `unsafeBitCast` because it's more restrictive, and
+  ///   because checking is still performed in debug builds.
+  public var unsafelyUnwrapped: Wrapped {
+    @inline(__always)
+    get {
+      if let x = self {
+        return x
+      }
+      _stdlibAssertionFailure("unsafelyUnwrapped of nil optional")
+    }
+  }
+
+  /// - Returns: `unsafelyUnwrapped`.
+  ///
+  /// This version is for internal stdlib use; it avoids any checking
+  /// overhead for users, even in Debug builds.
+  public // SPI(SwiftExperimental)
+  var _unsafelyUnwrappedUnchecked: Wrapped {
+    @inline(__always)
+    get {
+      if let x = self {
+        return x
+      }
+      _sanityCheckFailure("_unsafelyUnwrappedUnchecked of nil optional")
+    }
   }
 }
 
@@ -63,64 +91,44 @@ extension Optional : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     switch self {
-    case .Some(let value):
+    case .some(let value):
       var result = "Optional("
-      debugPrint(value, terminator: "", toStream: &result)
+      debugPrint(value, terminator: "", to: &result)
       result += ")"
       return result
-    case .None:
+    case .none:
       return "nil"
     }
   }
 }
 
-// While this free function may seem obsolete, since an optional is
-// often expressed as (x as Wrapped), it can lead to cleaner usage, i.e.
-//
-//   map(x as Wrapped) { ... }
-// vs
-//   (x as Wrapped).map { ... }
-//
-/// Haskell's fmap for Optionals.
-@available(*, unavailable, message="call the 'map()' method on the optional value")
-public func map<T, U>(x: T?, @noescape _ f: (T) -> U) -> U? {
-  fatalError("unavailable function can't be called")
-}
-
-
-/// Returns `f(self)!` iff `self` and `f(self)` are not `nil`.
-@available(*, unavailable, message="call the 'flatMap()' method on the optional value")
-public func flatMap<T, U>(x: T?, @noescape _ f: (T) -> U?) -> U? {
-  fatalError("unavailable function can't be called")
-}
-
-// Intrinsics for use by language features.
 @_transparent
+@warn_unused_result
 public // COMPILER_INTRINSIC
-func _doesOptionalHaveValueAsBool<Wrapped>(v: Wrapped?) -> Bool {
-  return v != nil
+func _stdlib_Optional_isSome<Wrapped>(`self`: Wrapped?) -> Bool {
+  return `self` != nil
+}
+
+@_transparent
+@warn_unused_result
+public // COMPILER_INTRINSIC
+func _stdlib_Optional_unwrapped<Wrapped>(`self`: Wrapped?) -> Wrapped {
+  switch `self` {
+  case let wrapped?:
+    return wrapped
+  case .none:
+    _preconditionFailure(
+      "unexpectedly found nil while unwrapping an Optional value")
+  }
 }
 
 @_transparent
 public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional() {
   _preconditionFailure(
-                "unexpectedly found nil while unwrapping an Optional value")
+    "unexpectedly found nil while unwrapping an Optional value")
 }
 
-@_transparent
-public // COMPILER_INTRINSIC
-func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
-  switch v {
-  case let x?:
-    return x
-  case .None:
-    _preconditionFailure(
-      "unexpectedly found nil while unwrapping an Optional value")
-  }
-}
-
-// Comparisons
 @warn_unused_result
 public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
@@ -150,9 +158,9 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
 @warn_unused_result
 public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
-  case .Some(_):
+  case .some(_):
     return false
-  case .None:
+  case .none:
     return true
   }
 }
@@ -162,9 +170,9 @@ public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 @warn_unused_result
 public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
-  case .Some(_):
+  case .some(_):
     return false
-  case .None:
+  case .none:
     return true
   }
 }
@@ -172,9 +180,9 @@ public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
 @warn_unused_result
 public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
-  case .Some(_):
+  case .some(_):
     return true
-  case .None:
+  case .none:
     return false
   }
 }
@@ -182,9 +190,9 @@ public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
 @warn_unused_result
 public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
-  case .Some(_):
+  case .some(_):
     return false
-  case .None:
+  case .none:
     return true
   }
 }
@@ -192,9 +200,9 @@ public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 @warn_unused_result
 public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
-  case .Some(_):
+  case .some(_):
     return true
-  case .None:
+  case .none:
     return false
   }
 }
@@ -246,9 +254,9 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
     rethrows -> T {
   switch optional {
-  case .Some(let value):
+  case .some(let value):
     return value
-  case .None:
+  case .none:
     return try defaultValue()
   }
 }
@@ -258,9 +266,9 @@ public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
 public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T?)
     rethrows -> T? {
   switch optional {
-  case .Some(let value):
+  case .some(let value):
     return value
-  case .None:
+  case .none:
     return try defaultValue()
   }
 }

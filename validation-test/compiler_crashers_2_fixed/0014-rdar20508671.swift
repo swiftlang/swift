@@ -1,35 +1,35 @@
 // RUN: not %target-swift-frontend %s -parse
 
-protocol MyGeneratorType {
+protocol MyIteratorProtocol {
   typealias Element
   mutating func next() -> Element?
 }
 
-protocol MySequenceType {
-  typealias Generator : MyGeneratorType
-  func generate() -> Generator
+protocol MySequence {
+  typealias Iterator : MyIteratorProtocol
+  func makeIterator() -> Iterator
 }
 
-protocol MyCollectionDefaultsType : MySequenceType {}
-extension MyCollectionDefaultsType {
-  final func generate() -> DefaultGenerator<Self> {
-    return DefaultGenerator()
+protocol MyCollectionDefaults : MySequence {}
+extension MyCollectionDefaults {
+  final func makeIterator() -> DefaultIterator<Self> {
+    return DefaultIterator()
   }
 }
 
-protocol MyCollectionType
-  : MySequenceType, MyCollectionDefaultsType {}
+protocol MyCollection
+  : MySequence, MyCollectionDefaults {}
 
-struct DefaultGenerator<C : MyCollectionDefaultsType> : MyGeneratorType {
-  mutating func next() -> C.Generator.Element {
+struct DefaultIterator<C : MyCollectionDefaults> : MyIteratorProtocol {
+  mutating func next() -> C.Iterator.Element {
     fatalError("")
   }
 }
 
-struct FooGeneratorWrapper<Base : MyGeneratorType> {
+struct FooIteratorWrapper<Base : MyIteratorProtocol> {
   init(_ base: Base) {}
 }
 
-func f<C : MyCollectionType>(c: C) {
-  FooGeneratorWrapper(c.generate())
+func f<C : MyCollection>(c: C) {
+  FooIteratorWrapper(c.makeIterator())
 }

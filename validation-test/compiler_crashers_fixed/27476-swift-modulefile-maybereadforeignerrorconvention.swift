@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-if{struct T{enum S<T where g:a{class A{class a{let f:CollectionType
+if{struct T{enum S<T where g:a{class A{class a{let f:Collection

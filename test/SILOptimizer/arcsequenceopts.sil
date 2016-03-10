@@ -41,8 +41,8 @@ class Cls {
 }
 
 public enum FakeOptional<T> {
-  case None
-  case Some(T)
+  case none
+  case some(T)
 }
 
 class C {
@@ -85,7 +85,7 @@ struct StaticString {
   var _flags: Builtin.Int8
 }
 
-public protocol ErrorType {
+public protocol ErrorProtocol {
   var _domain: Builtin.Int32 { get }
   var _code: Builtin.Int32 { get }
 }
@@ -95,7 +95,7 @@ sil [fragile] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeOb
 
 sil [fragile] @owned_return : $@convention(thin) () -> (@owned @box Builtin.Int32)
 
-sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType
+sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
 
 /////////////////
 // Basic Tests //
@@ -1427,7 +1427,7 @@ bb0(%0 : $S, %1 : $FakeOptional<Builtin.NativeObject>):
   %2 = struct_extract %0 : $S, #S.x
   strong_retain %2 : $Builtin.NativeObject
   release_value %0 : $S
-  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1
+  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1
   strong_retain %3 : $Builtin.NativeObject
   release_value %1 : $FakeOptional<Builtin.NativeObject>
   %5 = tuple()
@@ -1439,7 +1439,7 @@ bb0(%0 : $S, %1 : $FakeOptional<Builtin.NativeObject>):
 // CHECK-NOT: strong_release
 sil @strip_off_single_pred_args : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
-  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%1 : $Builtin.NativeObject):
   retain_value %0 : $FakeOptional<Builtin.NativeObject>
@@ -1534,7 +1534,7 @@ bb0(%0 : $S2, %1 : $S3):
 // CHECK-NOT: strong_release
 sil @strip_off_enum_from_payload : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.NativeObject
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1, %0 : $Builtin.NativeObject
   strong_retain %0 : $Builtin.NativeObject
   release_value %1 : $FakeOptional<Builtin.NativeObject>
   %2 = tuple()
@@ -2026,29 +2026,29 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+// CHECK-LABEL: sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
 // CHECK: bb0
 // CHECK: strong_retain
 // CHECK: bb1
 // CHECK: strong_release
 // CHECK: bb2
 // CHECK: strong_release
-sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType
-  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType, normal bb1, error bb2
+  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
+  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol, normal bb1, error bb2
 
 bb1(%2 : $()):
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 
-bb2(%3 : $ErrorType):
+bb2(%3 : $ErrorProtocol):
   strong_release %0 : $Builtin.NativeObject
-  throw %3 : $ErrorType
+  throw %3 : $ErrorProtocol
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+// CHECK-LABEL: sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
 // CHECK: bb0(
 // CHECK: strong_retain
 // CHECK: try_apply
@@ -2056,21 +2056,21 @@ bb2(%3 : $ErrorType):
 // CHECK: strong_release
 // CHECK: bb2(
 // CHECK: strong_release
-sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
   %1 = function_ref @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %2 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType
-  try_apply %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType, normal bb1, error bb2
+  %2 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
+  try_apply %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol, normal bb1, error bb2
 
 bb1(%3 : $()):
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 
-bb2(%4 : $ErrorType):
+bb2(%4 : $ErrorProtocol):
   strong_release %0 : $Builtin.NativeObject
-  throw %4 : $ErrorType
+  throw %4 : $ErrorProtocol
 }
 
 // In this control flow, ARC runs multiple iterations to get rid of and move the retain and releases.
@@ -2116,4 +2116,3 @@ bb2:
   %5 = tuple()
   return %5 : $()
 }
-

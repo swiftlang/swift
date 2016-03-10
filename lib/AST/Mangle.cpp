@@ -249,9 +249,10 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
   }
 
   case DeclContextKind::GenericTypeDecl:
-    assert(isa<NominalTypeDecl>(ctx) &&
-           "Only nominal types are contexts for mangleable entities");
-    mangleNominalType(cast<NominalTypeDecl>(ctx), shouldBind);
+    if (auto nomctx = dyn_cast<NominalTypeDecl>(ctx))
+      mangleNominalType(nomctx, shouldBind);
+    else
+      mangleContext(ctx->getParent(), shouldBind);
     return;
 
   case DeclContextKind::ExtensionDecl: {
@@ -1071,8 +1072,8 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     // are several occasions in which we'd like to mangle them in the
     // abstract.
     ContextStack context(*this);
-    mangleNominalType(cast<UnboundGenericType>(tybase)->getDecl(),
-                      BindGenerics::None);
+    auto decl = cast<UnboundGenericType>(tybase)->getDecl();
+    mangleNominalType(cast<NominalTypeDecl>(decl), BindGenerics::None);
     return;
   }
 

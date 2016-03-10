@@ -311,7 +311,7 @@ ResilientEnumTestSuite.test("DynamicLayoutMetatype") {
   do {
     var output = ""
     let expected = "- resilient_enum.Shape #0\n"
-    dump(getMetadata(), &output)
+    dump(getMetadata(), to: &output)
     expectEqual(output, expected)
   }
   do {

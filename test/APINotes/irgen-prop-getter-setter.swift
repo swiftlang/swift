@@ -11,7 +11,7 @@ class MyView: NSView {
         var x = self.superview
         var l = self.layer
         self.layer = CALayer()
-        self.nextKeyView = nil
+        self.nextKey = nil
         subviews = []
     }    
 }

@@ -20,14 +20,14 @@ set(SWIFTLIB_ESSENTIAL
   Algorithm.swift
   ArrayBody.swift
   ArrayBuffer.swift
-  ArrayBufferType.swift
+  ArrayBufferProtocol.swift
   ArrayCast.swift
   Arrays.swift.gyb
   ArrayType.swift
   Assert.swift
   AssertCommon.swift
   Bool.swift
-  BooleanType.swift
+  Boolean.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift
@@ -75,7 +75,7 @@ set(SWIFTLIB_ESSENTIAL
   Policy.swift
   Print.swift
   Range.swift
-  RangeReplaceableCollectionType.swift
+  RangeReplaceableCollection.swift
   Reflection.swift
   Repeat.swift
   REPL.swift
@@ -117,7 +117,6 @@ set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Availability.swift
-  Bit.swift
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
   Mirror.swift

@@ -6,7 +6,7 @@
 
 class b<T where T: A = 0] = nil
 func a<Y> {
-return b: SequenceType> Bool {
+return b: Sequence> Bool {
 func b> Self {
 () {
 }

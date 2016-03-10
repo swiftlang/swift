@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-let:SequenceType{{class S<T{func a<h{func b<T where h.g=a
+let:Sequence{{class S<T{func a<h{func b<T where h.g=a

@@ -12,12 +12,12 @@
 
 /// An index that traverses the same positions as an underlying index, 
 /// with inverted traversal direction.
-public protocol ReverseIndexType : BidirectionalIndexType {
-  associatedtype Base : BidirectionalIndexType
-  
+public protocol ReverseIndexProtocol : BidirectionalIndex {
+  associatedtype Base : BidirectionalIndex
+
   /// A type that can represent the number of steps between pairs of
   /// `ReverseIndex` values where one value is reachable from the other.
-  associatedtype Distance: _SignedIntegerType = Base.Distance
+  associatedtype Distance : _SignedInteger = Base.Distance
 
   /// The successor position in the underlying (un-reversed)
   /// collection.
@@ -31,26 +31,26 @@ public protocol ReverseIndexType : BidirectionalIndexType {
   init(_ base: Base)
 }
 
-extension BidirectionalIndexType where Self : ReverseIndexType {
+extension BidirectionalIndex where Self : ReverseIndexProtocol {
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   public func successor() -> Self {
     return Self(base.predecessor())
   }
 
   /// Returns the previous consecutive value before `self`.
   ///
-  /// - Requires: The previous value is representable.
+  /// - Precondition: The previous value is representable.
   public func predecessor() -> Self {
     return Self(base.successor())
   }
 }
 
-/// A wrapper for a `BidirectionalIndexType` that reverses its
+/// A wrapper for a `BidirectionalIndex` that reverses its
 /// direction of traversal.
-public struct ReverseIndex<Base: BidirectionalIndexType>
-: BidirectionalIndexType, ReverseIndexType {
+public struct ReverseIndex<Base : BidirectionalIndex>
+: BidirectionalIndex, ReverseIndexProtocol {
   public typealias Distance = Base.Distance
   
   public init(_ base: Base) { self.base = base }
@@ -63,9 +63,6 @@ public struct ReverseIndex<Base: BidirectionalIndexType>
   /// - if `n` != `c.count`, then `c.reverse[self]` is 
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
-
-  @available(*, unavailable, renamed="Base")
-  public typealias I = Base
 }
 
 @warn_unused_result
@@ -75,10 +72,10 @@ public func == <Base> (
   return lhs.base == rhs.base
 }
 
-/// A wrapper for a `RandomAccessIndexType` that reverses its
+/// A wrapper for a `RandomAccessIndex` that reverses its
 /// direction of traversal.
-public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
-  : RandomAccessIndexType, ReverseIndexType {
+public struct ReverseRandomAccessIndex<Base: RandomAccessIndex>
+  : RandomAccessIndex, ReverseIndexProtocol {
 
   public typealias Distance = Base.Distance
   
@@ -93,37 +90,34 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
 
-  public func distanceTo(other: ReverseRandomAccessIndex) -> Distance {
-    return other.base.distanceTo(base)
+  public func distance(to other: ReverseRandomAccessIndex) -> Distance {
+    return other.base.distance(to: base)
   }
 
-  public func advancedBy(n: Distance) -> ReverseRandomAccessIndex {
-    return ReverseRandomAccessIndex(base.advancedBy(-n))
+  public func advanced(by n: Distance) -> ReverseRandomAccessIndex {
+    return ReverseRandomAccessIndex(base.advanced(by: -n))
   }
-
-  @available(*, unavailable, renamed="Base")
-  public typealias I = Base
 }
 
-public protocol _ReverseCollectionType : CollectionType {
-  associatedtype Index : ReverseIndexType
-  associatedtype Base : CollectionType
+public protocol _ReverseCollection : Collection {
+  associatedtype Index : ReverseIndexProtocol
+  associatedtype Base : Collection
   var _base: Base { get }
 }
 
-extension CollectionType
-  where Self : _ReverseCollectionType, Self.Base.Index : RandomAccessIndexType {
+extension Collection
+  where Self : _ReverseCollection, Self.Base.Index : RandomAccessIndex {
   public var startIndex : ReverseRandomAccessIndex<Self.Base.Index> {
     return ReverseRandomAccessIndex(_base.endIndex)
   }
 }
 
-extension _ReverseCollectionType
-  where Self : CollectionType, Self.Index.Base == Self.Base.Index
+extension _ReverseCollection
+  where Self : Collection, Self.Index.Base == Self.Base.Index
 {
   public var startIndex : Index { return Self.Index(_base.endIndex) }
   public var endIndex : Index { return Self.Index(_base.startIndex) }
-  public subscript(position: Index) -> Self.Base.Generator.Element {
+  public subscript(position: Index) -> Self.Base.Iterator.Element {
     return _base[position.base.predecessor()]
   }
 }
@@ -131,28 +125,28 @@ extension _ReverseCollectionType
 /// A Collection that presents the elements of its `Base` collection
 /// in reverse order.
 ///
-/// - Note: This type is the result of `x.reverse()` where `x` is a
+/// - Note: This type is the result of `x.reversed()` where `x` is a
 ///   collection having bidirectional indices.
 ///
-/// The `reverse()` method is always lazy when applied to a collection
+/// The `reversed()` method is always lazy when applied to a collection
 /// with bidirectional indices, but does not implicitly confer
 /// laziness on algorithms applied to its result.  In other words, for
 /// ordinary collections `c` having bidirectional indices:
 ///
-/// * `c.reverse()` does not create new storage
-/// * `c.reverse().map(f)` maps eagerly and returns a new array
-/// * `c.lazy.reverse().map(f)` maps lazily and returns a `LazyMapCollection`
+/// * `c.reversed()` does not create new storage
+/// * `c.reversed().map(f)` maps eagerly and returns a new array
+/// * `c.lazy.reversed().map(f)` maps lazily and returns a `LazyMapCollection`
 ///
 /// - See also: `ReverseRandomAccessCollection`
 public struct ReverseCollection<
-  Base : CollectionType where Base.Index : BidirectionalIndexType
-> : CollectionType, _ReverseCollectionType {
+  Base : Collection where Base.Index : BidirectionalIndex
+> : Collection, _ReverseCollection {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  public init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   /// A type that represents a valid position in the collection.
@@ -163,29 +157,26 @@ public struct ReverseCollection<
 
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  public typealias Generator = IndexingGenerator<ReverseCollection>
+  public typealias Iterator = IndexingIterator<ReverseCollection>
   
   public let _base: Base
-
-  @available(*, unavailable, renamed="Base")
-  public typealias T = Base
 }
 
 /// A Collection that presents the elements of its `Base` collection
 /// in reverse order.
 ///
-/// - Note: This type is the result of `x.reverse()` where `x` is a
+/// - Note: This type is the result of `x.reversed()` where `x` is a
 ///   collection having random access indices.
 /// - See also: `ReverseCollection`
 public struct ReverseRandomAccessCollection<
-  Base : CollectionType where Base.Index : RandomAccessIndexType
-> : _ReverseCollectionType {
+  Base : Collection where Base.Index : RandomAccessIndex
+> : _ReverseCollection {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  public init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   /// A type that represents a valid position in the collection.
@@ -196,80 +187,110 @@ public struct ReverseRandomAccessCollection<
   
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  public typealias Generator = IndexingGenerator<
+  public typealias Iterator = IndexingIterator<
     ReverseRandomAccessCollection
   >
 
   public let _base: Base
-
-  @available(*, unavailable, renamed="Base")
-  public typealias T = Base
 }
 
-extension CollectionType where Index : BidirectionalIndexType {
+extension Collection where Index : BidirectionalIndex {
   /// Returns the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
   @warn_unused_result
+  public func reversed() -> ReverseCollection<Self> {
+    return ReverseCollection(_base: self)
+  }
+}
+
+extension Collection where Index : RandomAccessIndex {
+  /// Returns the elements of `self` in reverse order.
+  ///
+  /// - Complexity: O(1)
+  @warn_unused_result
+  public func reversed() -> ReverseRandomAccessCollection<Self> {
+    return ReverseRandomAccessCollection(_base: self)
+  }
+}
+
+extension LazyCollectionProtocol
+  where Index : BidirectionalIndex,
+  Elements.Index : BidirectionalIndex {
+
+  /// Returns the elements of `self` in reverse order.
+  ///
+  /// - Complexity: O(1)
+  @warn_unused_result
+  public func reversed() -> LazyCollection<
+    ReverseCollection<Elements>
+  > {
+    return ReverseCollection(_base: elements).lazy
+  }
+}
+
+extension LazyCollectionProtocol
+  where Index : RandomAccessIndex,
+  Elements.Index : RandomAccessIndex {
+
+  /// Returns the elements of `self` in reverse order.
+  ///
+  /// - Complexity: O(1)
+  @warn_unused_result
+  public func reversed() -> LazyCollection<
+    ReverseRandomAccessCollection<Elements>
+  > {
+    return ReverseRandomAccessCollection(_base: elements).lazy
+  }
+}
+
+extension ReverseCollection {
+  @available(*, unavailable, message="use the 'reversed()' method on the collection")
+  public init(_ base: Base) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension ReverseRandomAccessCollection {
+  @available(*, unavailable, message="use the 'reversed()' method on the collection")
+  public init(_ base: Base) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Collection where Index : BidirectionalIndex {
+  @available(*, unavailable, renamed="reversed")
   public func reverse() -> ReverseCollection<Self> {
-    return ReverseCollection(self)
+    fatalError("unavailable function can't be called")
   }
 }
 
-extension CollectionType where Index : RandomAccessIndexType {
-  /// Returns the elements of `self` in reverse order.
-  ///
-  /// - Complexity: O(1)
-  @warn_unused_result
+extension Collection where Index : RandomAccessIndex {
+  @available(*, unavailable, renamed="reversed")
   public func reverse() -> ReverseRandomAccessCollection<Self> {
-    return ReverseRandomAccessCollection(self)
+    fatalError("unavailable function can't be called")
   }
 }
 
-extension LazyCollectionType
-where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
-  /// Returns the elements of `self` in reverse order.
-  ///
-  /// - Complexity: O(1)
-  @warn_unused_result
+extension LazyCollectionProtocol
+where Index : BidirectionalIndex, Elements.Index : BidirectionalIndex {
+  @available(*, unavailable, renamed="reversed")
   public func reverse() -> LazyCollection<
     ReverseCollection<Elements>
   > {
-    return ReverseCollection(elements).lazy
+    fatalError("unavailable function can't be called")
   }
 }
 
-extension LazyCollectionType
-where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
-  /// Returns the elements of `self` in reverse order.
-  ///
-  /// - Complexity: O(1)
-  @warn_unused_result
+extension LazyCollectionProtocol
+where Index : RandomAccessIndex, Elements.Index : RandomAccessIndex {
+  @available(*, unavailable, renamed="reversed")
   public func reverse() -> LazyCollection<
     ReverseRandomAccessCollection<Elements>
   > {
-    return ReverseRandomAccessCollection(elements).lazy
+    fatalError("unavailable function can't be called")
   }
 }
-
-/// Returns an `Array` containing the elements of `source` in reverse
-/// order.
-@available(*, unavailable, message="call the 'reverse()' method on the collection")
-public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
-  source: C
-) -> [C.Generator.Element] {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="ReverseCollection")
-public struct BidirectionalReverseView<
-  Base : CollectionType where Base.Index : BidirectionalIndexType
-> {}
-
-@available(*, unavailable, renamed="ReverseRandomAccessCollection")
-public struct RandomAccessReverseView<
-  Base : CollectionType where Base.Index : RandomAccessIndexType
-> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

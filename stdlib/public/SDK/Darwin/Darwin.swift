@@ -23,7 +23,7 @@ public var noErr: OSStatus { return 0 }
 /// Foundation.
 ///
 /// The C type is a typedef for `unsigned char`.
-public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
+public struct DarwinBoolean : Boolean, BooleanLiteralConvertible {
   var _value: UInt8
 
   public init(_ value: Bool) {
@@ -44,7 +44,7 @@ public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
 
 extension DarwinBoolean : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: boolValue)
   }
 }
@@ -78,7 +78,7 @@ func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
 // for DarwinBoolean.
 @_transparent
 @warn_unused_result
-public func && <T : BooleanType>(
+public func && <T : Boolean>(
   lhs: T,
   @autoclosure rhs: () -> DarwinBoolean
 ) -> Bool {
@@ -87,7 +87,7 @@ public func && <T : BooleanType>(
 
 @_transparent
 @warn_unused_result
-public func || <T : BooleanType>(
+public func || <T : Boolean>(
   lhs: T,
   @autoclosure rhs: () -> DarwinBoolean
 ) -> Bool {
@@ -101,10 +101,10 @@ public func || <T : BooleanType>(
 
 public var errno : Int32 {
   get {
-    return __error().memory
+    return __error().pointee
   }
   set {
-    __error().memory = newValue
+    __error().pointee = newValue
   }
 }
 
@@ -293,9 +293,9 @@ public func vfork() -> Int32 {
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 public var SIG_DFL: sig_t? { return nil }
-public var SIG_IGN: sig_t { return unsafeBitCast(1, sig_t.self) }
-public var SIG_ERR: sig_t { return unsafeBitCast(-1, sig_t.self) }
-public var SIG_HOLD: sig_t { return unsafeBitCast(5, sig_t.self) }
+public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
+public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
+public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
 #else
 internal var _ignore = _UnsupportedPlatformError()
 #endif

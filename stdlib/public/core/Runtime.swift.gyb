@@ -24,13 +24,13 @@ import SwiftShims
 @warn_unused_result
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtrImpl(
-  object target: UnsafeMutablePointer<COpaquePointer>,
-  expected: UnsafeMutablePointer<COpaquePointer>,
-  desired: COpaquePointer) -> Bool {
+  object target: UnsafeMutablePointer<OpaquePointer>,
+  expected: UnsafeMutablePointer<OpaquePointer>,
+  desired: OpaquePointer) -> Bool {
 
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_RawPointer(
-    target._rawValue, expected.memory._rawValue, desired._rawValue)
-  expected.memory._rawValue = oldValue
+    target._rawValue, expected.pointee._rawValue, desired._rawValue)
+  expected.pointee._rawValue = oldValue
   return Bool(won)
 }
 
@@ -71,7 +71,7 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
   return _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
-    desired: COpaquePointer(desired))
+    desired: OpaquePointer(desired))
 }
 
 @_transparent
@@ -79,8 +79,8 @@ public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
-  var expected = COpaquePointer()
-  let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
+  var expected: OpaquePointer = nil
+  let desiredPtr = OpaquePointer(bitPattern: Unmanaged.passRetained(desired))
   let wonRace = _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
     expected: &expected,
@@ -104,8 +104,8 @@ func _stdlib_atomicCompareExchangeStrongUInt${bits}(
   desired: UInt${bits}) -> Bool {
 
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int${bits}(
-    target._rawValue, expected.memory._value, desired._value)
-  expected.memory._value = oldValue
+    target._rawValue, expected.pointee._value, desired._value)
+  expected.pointee._value = oldValue
   return Bool(won)
 }
 
@@ -235,10 +235,10 @@ public func _swift_stdlib_atomicLoadInt(
 @_transparent
 public // @testable
 func _swift_stdlib_atomicLoadPtrImpl(
-  object target: UnsafeMutablePointer<COpaquePointer>
-) -> COpaquePointer {
+  object target: UnsafeMutablePointer<OpaquePointer>
+) -> OpaquePointer {
   let value = Builtin.atomicload_seqcst_RawPointer(target._rawValue)
-  return COpaquePointer(value)
+  return OpaquePointer(value)
 }
 
 @_transparent
@@ -463,7 +463,7 @@ func _uint64ToString(
 @warn_unused_result
 func _rawPointerToString(value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
-    UInt64(unsafeBitCast(value, UInt.self)), radix: 16, uppercase: false)
+    UInt64(unsafeBitCast(value, to: UInt.self)), radix: 16, uppercase: false)
   for _ in 0..<(2 * sizeof(Builtin.RawPointer) - result.utf16.count) {
     result = "0" + result
   }

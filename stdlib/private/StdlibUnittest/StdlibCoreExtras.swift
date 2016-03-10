@@ -32,7 +32,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
     return string.startIndex
   }
 #if _runtime(_ObjC)
-  return string.rangeOfString(substring)?.startIndex
+  return string.range(of: substring)?.startIndex
 #else
   // FIXME(performance): This is a very non-optimal algorithm, with a worst
   // case of O((n-m)*m). When non-objc String has a match function that's better,
@@ -48,7 +48,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
     while true {
       if needleIndex == needle.endIndex {
         // if we hit the end of the search string, we found the needle
-        return matchStartIndex.samePositionIn(string)
+        return matchStartIndex.samePosition(in: string)
       }
       if matchIndex == haystack.endIndex {
         // if we hit the end of the string before finding the end of the needle,
@@ -74,7 +74,7 @@ public func createTemporaryFile(
 ) -> String {
 #if _runtime(_ObjC)
   let tempDir: NSString = NSTemporaryDirectory()
-  var fileName = tempDir.stringByAppendingPathComponent(
+  var fileName = tempDir.appendingPathComponent(
     fileNamePrefix + "XXXXXX" + fileNameSuffix)
 #else
   var fileName = fileNamePrefix + "XXXXXX" + fileNameSuffix
@@ -101,8 +101,8 @@ infix operator <=> {}
 
 public func <=> <T: Comparable>(lhs: T, rhs: T) -> ExpectedComparisonResult {
   return lhs < rhs
-    ? .LT
-    : lhs > rhs ? .GT : .EQ
+    ? .lt
+    : lhs > rhs ? .gt : .eq
 }
 
 public struct TypeIdentifier : Hashable, Comparable {
@@ -161,14 +161,14 @@ public func forAllPermutations(size: Int, body: ([Int]) -> Void) {
     return
   }
 
-  var permutation = [Int](count: size, repeatedValue: 0)
-  var visited = [Bool](count: size, repeatedValue: false)
+  var permutation = [Int](repeating: 0, count: size)
+  var visited = [Bool](repeating: false, count: size)
   _forAllPermutationsImpl(0, size, &permutation, &visited, body)
 }
 
 /// Generate all permutations.
-public func forAllPermutations<S : SequenceType>(
-  sequence: S, body: ([S.Generator.Element]) -> Void
+public func forAllPermutations<S : Sequence>(
+  sequence: S, body: ([S.Iterator.Element]) -> Void
 ) {
   let data = Array(sequence)
   forAllPermutations(data.count) {

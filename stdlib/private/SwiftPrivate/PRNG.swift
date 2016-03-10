@@ -40,7 +40,7 @@ public func randInt() -> Int {
 }
 
 public func randArray64(count: Int) -> [UInt64] {
-  var result = [UInt64](count: count, repeatedValue: 0)
+  var result = [UInt64](repeating: 0, count: count)
   for i in result.indices {
     result[i] = rand64()
   }
@@ -48,7 +48,7 @@ public func randArray64(count: Int) -> [UInt64] {
 }
 
 public func randArray(count: Int) -> [Int] {
-  var result = [Int](count: count, repeatedValue: 0)
+  var result = [Int](repeating: 0, count: count)
   for i in result.indices {
     result[i] = randInt()
   }
@@ -56,8 +56,8 @@ public func randArray(count: Int) -> [Int] {
 }
 
 public func pickRandom<
-  C : CollectionType where C.Index : RandomAccessIndexType
->(c: C) -> C.Generator.Element {
+  C : Collection where C.Index : RandomAccessIndex
+>(c: C) -> C.Iterator.Element {
   let i = Int(rand32(exclusiveUpperBound: numericCast(c.count)))
-  return c[c.startIndex.advancedBy(numericCast(i))]
+  return c[c.startIndex.advanced(by: numericCast(i))]
 }

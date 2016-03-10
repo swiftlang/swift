@@ -8,8 +8,8 @@ protocol AnyObject: class {}
 // CHECK:         i16 0,
 // CHECK:         i32 0 }
 
-protocol ErrorType {}
-// CHECK-LABEL: @_TMps9ErrorType = {{(protected )?}}constant %swift.protocol {
+protocol ErrorProtocol {}
+// CHECK-LABEL: @_TMps13ErrorProtocol = {{(protected )?}}constant %swift.protocol {
 // --                 0x0000_0087: special protocol 02, non-class, witness, swift
 // CHECK:         i32 135,
 // CHECK:         i16 0,

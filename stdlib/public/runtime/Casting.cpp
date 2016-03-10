@@ -711,7 +711,7 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
     }
     
     case ExistentialTypeRepresentation::Opaque:
-    case ExistentialTypeRepresentation::ErrorType: {
+    case ExistentialTypeRepresentation::ErrorProtocol: {
       OpaqueValue *innerValue
         = existentialType->projectValue(value);
       const Metadata *innerType = existentialType->getDynamicType(value);
@@ -767,7 +767,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
       // Nothing to clean up.
       break;
       
-    case ExistentialTypeRepresentation::ErrorType:
+    case ExistentialTypeRepresentation::ErrorProtocol:
       // TODO: We could clean up from a reclaimed uniquely-referenced error box.
       break;
       
@@ -1018,10 +1018,10 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     maybeDeallocateSourceAfterSuccess();
     return true;
   }
-  case ExistentialTypeRepresentation::ErrorType: {
+  case ExistentialTypeRepresentation::ErrorProtocol: {
     auto destBoxAddr =
       reinterpret_cast<SwiftError**>(dest);
-    // Check for the ErrorType protocol conformance, which should be the only
+    // Check for the ErrorProtocol protocol conformance, which should be the only
     // one we need.
     assert(targetType->Protocols.NumProtocols == 1);
     const WitnessTable *errorWitness;
@@ -1458,13 +1458,13 @@ static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
 }
 
 #if SWIFT_OBJC_INTEROP
-extern "C" const ProtocolDescriptor _TMps9ErrorType;
+extern "C" const ProtocolDescriptor _TMps13ErrorProtocol;
 
-static const WitnessTable *findErrorTypeWitness(const Metadata *srcType) {
-  return swift_conformsToProtocol(srcType, &_TMps9ErrorType);
+static const WitnessTable *findErrorProtocolWitness(const Metadata *srcType) {
+  return swift_conformsToProtocol(srcType, &_TMps13ErrorProtocol);
 }
 
-static const Metadata *getNSErrorTypeMetadata() {
+static const Metadata *getNSErrorProtocolMetadata() {
   return SWIFT_LAZY_CONSTANT(
     swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass()));
 }
@@ -1485,7 +1485,7 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
 #if SWIFT_OBJC_INTEROP
     // If we're casting to NSError, we may need a representation change,
     // so fall into the general swift_dynamicCast path.
-    if (targetType == getNSErrorTypeMetadata()) {
+    if (targetType == getNSErrorProtocolMetadata()) {
       return swift_dynamicCast(dest, src, swift_getObjectType((HeapObject*)obj),
                                targetType, flags);
     }
@@ -1507,7 +1507,7 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
       _maybeDeallocateOpaqueExistential(src, result, flags);
     return result;
   }
-  case ExistentialTypeRepresentation::ErrorType: {
+  case ExistentialTypeRepresentation::ErrorProtocol: {
     const SwiftError *errorBox =
       *reinterpret_cast<const SwiftError * const *>(src);
     auto srcCapturedType = errorBox->getType();
@@ -1564,7 +1564,7 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
     canTake = true;
     break;
   }
-  case ExistentialTypeRepresentation::ErrorType: {
+  case ExistentialTypeRepresentation::ErrorProtocol: {
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(src);
     
@@ -1693,7 +1693,7 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
         _maybeDeallocateOpaqueExistential(src, result, flags);
       return result;
     }
-    case ExistentialTypeRepresentation::ErrorType: {
+    case ExistentialTypeRepresentation::ErrorProtocol: {
       const SwiftError *srcBox
         = *reinterpret_cast<const SwiftError * const *>(src);
       
@@ -1863,7 +1863,7 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
         _maybeDeallocateOpaqueExistential(src, result, flags);
       return result;
     }
-    case ExistentialTypeRepresentation::ErrorType: {
+    case ExistentialTypeRepresentation::ErrorProtocol: {
       const SwiftError *srcBox
         = *reinterpret_cast<const SwiftError * const *>(src);
       
@@ -1978,11 +1978,11 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
 #if SWIFT_OBJC_INTEROP
 static id dynamicCastValueToNSError(OpaqueValue *src,
                                     const Metadata *srcType,
-                                    const WitnessTable *srcErrorTypeWitness,
+                                    const WitnessTable *srcErrorProtocolWitness,
                                     DynamicCastFlags flags) {
-  BoxPair errorBox = swift_allocError(srcType, srcErrorTypeWitness, src,
+  BoxPair errorBox = swift_allocError(srcType, srcErrorProtocolWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  return swift_bridgeErrorTypeToNSError((SwiftError*)errorBox.first);
+  return swift_bridgeErrorProtocolToNSError((SwiftError*)errorBox.first);
 }
 #endif
 
@@ -2028,12 +2028,12 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
   int enumCase =
     swift_getEnumCaseSinglePayload(src, payloadType, 1 /*emptyCases=*/);
   if (enumCase != -1) {
-    // Allow Optional<T>.None -> Optional<U>.None
+    // Allow Optional<T>.none -> Optional<U>.none
     if (targetType->getKind() != MetadataKind::Optional) {
       _fail(src, srcType, targetType, flags);
       return {false, nullptr};
     }
-    // Inject the .None tag
+    // Inject the .none tag
     swift_storeEnumTagSinglePayload(dest, payloadType, enumCase,
                                     1 /*emptyCases=*/);
     _succeed(dest, src, srcType, flags);
@@ -2078,16 +2078,16 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
   case MetadataKind::ObjCClassWrapper:
 #if SWIFT_OBJC_INTEROP
     // If the destination type is an NSError, and the source type is an
-    // ErrorType, then the cast can succeed by NSError bridging.
-    if (targetType == getNSErrorTypeMetadata()) {
+    // ErrorProtocol, then the cast can succeed by NSError bridging.
+    if (targetType == getNSErrorProtocolMetadata()) {
       // Don't rebridge if the source is already some kind of NSError.
       if (srcType->isAnyClass()
           && swift_dynamicCastObjCClass(*reinterpret_cast<id*>(src),
                static_cast<const ObjCClassWrapperMetadata*>(targetType)->Class))
         return _succeed(dest, src, srcType, flags);
-      if (auto srcErrorTypeWitness = findErrorTypeWitness(srcType)) {
+      if (auto srcErrorProtocolWitness = findErrorProtocolWitness(srcType)) {
         auto error = dynamicCastValueToNSError(src, srcType,
-                                               srcErrorTypeWitness, flags);
+                                               srcErrorProtocolWitness, flags);
         *reinterpret_cast<id *>(dest) = error;
         return true;
       }
@@ -2177,8 +2177,8 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                                                          flags);
       }
       
-      // If the source is an NSError, and the target is a bridgeable ErrorType,
-      // try to bridge.
+      // If the source is an NSError, and the target is a bridgeable
+      // ErrorProtocol, try to bridge.
       if (tryDynamicCastNSErrorToValue(dest, src, srcType, targetType, flags)) {
         return true;
       }

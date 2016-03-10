@@ -13,8 +13,8 @@ struct Int32 {
 }
 
 enum Optional<T> {
-case None
-case Some(T)
+  case none
+  case some(T)
 }
 
 // CHECK-LABEL: @index_addr_inst_with_unknown_index

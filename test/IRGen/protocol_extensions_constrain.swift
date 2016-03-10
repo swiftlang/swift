@@ -7,7 +7,7 @@ public protocol P1 {
 }
 
 public protocol P2 {
-  typealias Index : P1
+  associatedtype Index : P1
 
   var startIndex: Index {get}
 }

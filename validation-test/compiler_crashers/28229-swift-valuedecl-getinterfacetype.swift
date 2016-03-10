@@ -5,4 +5,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol c{typealias e:a:protocol a{typealias a}func b:e.c
+protocol c{associatedtype e:a:protocol a{associatedtype a}func b:e.c

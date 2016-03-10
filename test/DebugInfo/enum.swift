@@ -17,28 +17,28 @@ enum Color : UInt64 {
 // CHECK-SAME:             size: 136, align: 64{{[,)]}}
 // CHECK-SAME:             identifier: "_TtO4enum12MaybeIntPair"
 enum MaybeIntPair {
-// CHECK: !DIDerivedType(tag: DW_TAG_member, name: "None"
+// CHECK: !DIDerivedType(tag: DW_TAG_member, name: "none"
 // CHECK-SAME:           baseType: !"_TtSi"
 // CHECK-SAME:           size: 136, align: 64{{[,)]}}
-case None
-// CHECK: !DIDerivedType(tag: DW_TAG_member, name: "Just"
+  case none
+// CHECK: !DIDerivedType(tag: DW_TAG_member, name: "just"
 // CHECK-SAME:           baseType: !"_TtTVs5Int64S__"
 // CHECK-SAME:           size: 136, align: 64{{[,)]}}
-  case Just(Int64, Int64)
+  case just(Int64, Int64)
 }
 
 enum Maybe<T> {
-  case None
-  case Just(T)
+  case none
+  case just(T)
 }
 
 let r = Color.Red
-let c = MaybeIntPair.Just(74, 75)
+let c = MaybeIntPair.just(74, 75)
 // CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Maybe",
 // CHECK-SAME:             line: [[@LINE-8]],
 // CHECK-SAME:             size: 8, align: 8{{[,)]}}
 // CHECK-SAME:             identifier: "_TtGO4enum5MaybeOS_5Color_"
-let movie : Maybe<Color> = .None
+let movie : Maybe<Color> = .none
 
 public enum Nothing { }
 public func foo(empty : Nothing) { }

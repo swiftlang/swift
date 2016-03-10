@@ -21,20 +21,20 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 /// The set of possible IEEE 754 "classes"
 public enum FloatingPointClassification {
-  case SignalingNaN
-  case QuietNaN
-  case NegativeInfinity
-  case NegativeNormal
-  case NegativeSubnormal
-  case NegativeZero
-  case PositiveZero
-  case PositiveSubnormal
-  case PositiveNormal
-  case PositiveInfinity
+  case signalingNaN
+  case quietNaN
+  case negativeInfinity
+  case negativeNormal
+  case negativeSubnormal
+  case negativeZero
+  case positiveZero
+  case positiveSubnormal
+  case positiveNormal
+  case positiveInfinity
 }
 
 /// A set of common requirements for Swift's floating point types.
-public protocol FloatingPointType : Strideable {
+public protocol FloatingPoint : Strideable {
   associatedtype _BitsType
 
   @warn_unused_result
@@ -54,7 +54,7 @@ public protocol FloatingPointType : Strideable {
   static var infinity: Self { get }
 
   /// A quiet NaN.
-  static var NaN: Self { get }
+  static var nan: Self { get }
 
   /// A quiet NaN.
   static var quietNaN: Self { get }
@@ -96,3 +96,6 @@ public protocol FloatingPointType : Strideable {
   // Binary floating point numbers are always canonical.
   // func isCanonical() -> Bool
 }
+
+@available(*, unavailable, renamed="FloatingPoint")
+public typealias FloatingPointType = FloatingPoint

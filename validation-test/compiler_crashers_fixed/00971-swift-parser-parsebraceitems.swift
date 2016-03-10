@@ -7,7 +7,7 @@
 {
 var d : c](t: (h> T) {
 }
-case b : SequenceType, AnyObject)
+case b : Sequence, AnyObject)
 (s: AnyObject, U) -> Int {
 public subscript ([c: A, x in x = Swift...c : S.A"")) {
 class func g> {

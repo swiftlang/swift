@@ -6,6 +6,6 @@
 
 class a<T where T: A : b.Type) -> T : (n: b {
 """
-enum A : CollectionType where S() -> {
+enum A : Collection where S() -> {
 }
 typealias e = b(a)

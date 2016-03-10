@@ -24,6 +24,6 @@ protocol b {
 }
 struct c<h : b> : b {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 }
 func a<d>() -> [c<d>] {

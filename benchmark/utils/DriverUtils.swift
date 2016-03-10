@@ -96,7 +96,7 @@ struct TestConfig {
 
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
-  var afterRunSleep: Int? = .None
+  var afterRunSleep: Int? = nil
 
   /// The list of tests to run.
   var tests = [Test]()
@@ -104,7 +104,7 @@ struct TestConfig {
   mutating func processArguments() -> TestAction {
     let validOptions=["--iter-scale", "--num-samples", "--num-iters",
       "--verbose", "--delim", "--run-all", "--list", "--sleep"]
-    let maybeBenchArgs: Arguments? = parseArgs(.Some(validOptions))
+    let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
       return .Fail("Failed to parse arguments")
     }
@@ -161,11 +161,11 @@ struct TestConfig {
 
   mutating func findTestsToRun() {
     var i = 1
-    for benchName in precommitTests.keys.sort() {
+    for benchName in precommitTests.keys.sorted() {
       tests.append(Test(name: benchName, n: i, f: precommitTests[benchName]!))
       i += 1
     }
-    for benchName in otherTests.keys.sort() {
+    for benchName in otherTests.keys.sorted() {
       tests.append(Test(name: benchName, n: i, f: otherTests[benchName]!))
       i += 1
     }
@@ -212,7 +212,7 @@ func internalMeanSD(inputs: [UInt64]) -> (UInt64, UInt64) {
 }
 
 func internalMedian(inputs: [UInt64]) -> UInt64 {
-  return inputs.sort()[inputs.count / 2]
+  return inputs.sorted()[inputs.count / 2]
 }
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
@@ -252,7 +252,7 @@ class SampleRunner {
 /// Invoke the benchmark entry point and return the run time in milliseconds.
 func runBench(name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResults {
 
-  var samples = [UInt64](count: c.numSamples, repeatedValue: 0)
+  var samples = [UInt64](repeating: 0, count: c.numSamples)
 
   if c.verbose {
     print("Running \(name) for \(c.numSamples) samples.")
@@ -292,7 +292,7 @@ func runBench(name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResult
 
   // Return our benchmark results.
   return BenchResults(delim: c.delim, sampleCount: UInt64(samples.count),
-                      min: samples.minElement()!, max: samples.maxElement()!,
+                      min: samples.min()!, max: samples.max()!,
                       mean: mean, sd: sd, median: internalMedian(samples))
 }
 

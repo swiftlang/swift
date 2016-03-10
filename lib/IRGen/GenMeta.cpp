@@ -4852,13 +4852,13 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   switch (*known) {
   case KnownProtocolKind::AnyObject:
     return SpecialProtocol::AnyObject;
-  case KnownProtocolKind::ErrorType:
-    return SpecialProtocol::ErrorType;
+  case KnownProtocolKind::ErrorProtocol:
+    return SpecialProtocol::ErrorProtocol;
     
   // The other known protocols aren't special at runtime.
-  case KnownProtocolKind::SequenceType:
-  case KnownProtocolKind::GeneratorType:
-  case KnownProtocolKind::BooleanType:
+  case KnownProtocolKind::Sequence:
+  case KnownProtocolKind::IteratorProtocol:
+  case KnownProtocolKind::Boolean:
   case KnownProtocolKind::RawRepresentable:
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:
@@ -4885,7 +4885,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::BuiltinStringLiteralConvertible:
   case KnownProtocolKind::BuiltinUTF16StringLiteralConvertible:
   case KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible:
-  case KnownProtocolKind::OptionSetType:
+  case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
     return SpecialProtocol::None;
   }

@@ -64,56 +64,56 @@ infix operator ⊉ { associativity left precedence 130 }
 
 /// - Returns: The relative complement of `lhs` with respect to `rhs`.
 public func ∖ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
   return lhs.subtract(rhs)
 }
 
 /// Assigns the relative complement between `lhs` and `rhs` to `lhs`.
 public func ∖= <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: inout Set<T>, rhs: S) {
   lhs.subtractInPlace(rhs)
 }
 
 /// - Returns: The union of `lhs` and `rhs`.
 public func ∪ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
   return lhs.union(rhs)
 }
 
 /// Assigns the union of `lhs` and `rhs` to `lhs`.
 public func ∪= <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: inout Set<T>, rhs: S) {
   lhs.unionInPlace(rhs)
 }
 
 /// - Returns: The intersection of `lhs` and `rhs`.
 public func ∩ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
   return lhs.intersect(rhs)
 }
 
 /// Assigns the intersection of `lhs` and `rhs` to `lhs`.
 public func ∩= <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: inout Set<T>, rhs: S) {
   lhs.intersectInPlace(rhs)
 }
 
 /// - Returns: A set with elements in `lhs` or `rhs` but not in both.
 public func ⨁ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
   return lhs.exclusiveOr(rhs)
 }
 
 /// Assigns to `lhs` the set with elements in `lhs` or `rhs` but not in both.
 public func ⨁= <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: inout Set<T>, rhs: S) {
   lhs.exclusiveOrInPlace(rhs)
 }
@@ -130,56 +130,56 @@ public func ∉ <T>(x: T, rhs: Set<T>) -> Bool {
 
 /// - Returns: True if `lhs` is a strict subset of `rhs`.
 public func ⊂ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return lhs.isStrictSubsetOf(rhs)
 }
 
 /// - Returns: True if `lhs` is not a strict subset of `rhs`.
 public func ⊄ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return !lhs.isStrictSubsetOf(rhs)
 }
 
 /// - Returns: True if `lhs` is a subset of `rhs`.
 public func ⊆ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return lhs.isSubsetOf(rhs)
 }
 
 /// - Returns: True if `lhs` is not a subset of `rhs`.
 public func ⊈ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return !lhs.isSubsetOf(rhs)
 }
 
 /// - Returns: True if `lhs` is a strict superset of `rhs`.
 public func ⊃ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return lhs.isStrictSupersetOf(rhs)
 }
 
 /// - Returns: True if `lhs` is not a strict superset of `rhs`.
 public func ⊅ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return !lhs.isStrictSupersetOf(rhs)
 }
 
 /// - Returns: True if `lhs` is a superset of `rhs`.
 public func ⊇ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return lhs.isSupersetOf(rhs)
 }
 
 /// - Returns: True if `lhs` is not a superset of `rhs`.
 public func ⊉ <
-  T, S: SequenceType where S.Generator.Element == T
+  T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return !lhs.isSupersetOf(rhs)
 }

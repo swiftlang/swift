@@ -65,7 +65,8 @@ class SynthesizedExtensionAnalyzer {
   Implementation &Impl;
 
 public:
-  SynthesizedExtensionAnalyzer(NominalTypeDecl *Target);
+  SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
+                               bool IncludeUnconditional = true);
   ~SynthesizedExtensionAnalyzer();
   void forEachSynthesizedExtension(
     llvm::function_ref<void(ExtensionDecl*)> Fn);
@@ -155,6 +156,7 @@ struct PrintOptions {
   bool SkipPrivateStdlibDecls = false;
 
   /// Whether to skip underscored stdlib protocols.
+  /// Protocols marked with @_show_in_interface are still printed.
   bool SkipUnderscoredStdlibProtocols = false;
 
   /// Whether to skip extensions that don't add protocols or no members.
@@ -301,6 +303,7 @@ struct PrintOptions {
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
     result.SkipPrivateStdlibDecls = true;
+    result.SkipUnderscoredStdlibProtocols = true;
     result.SkipDeinit = true;
     return result;
   }

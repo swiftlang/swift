@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 class A {
-let end = a() -> U : SequenceType> {
+let end = a() -> U : Sequence> {
 typealias R = ")
 protocol a {
 typealias B : B

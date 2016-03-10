@@ -4,5 +4,5 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func e{enum k:A}protocol A{typealias B:A
-typealias n
+func e{enum k:A}protocol A{associatedtype B:A
+associatedtype n

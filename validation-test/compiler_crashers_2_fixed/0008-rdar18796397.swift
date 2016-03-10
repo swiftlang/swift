@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -o /dev/null
 public protocol OurProtocol {
 
-  typealias T
+  associatedtype T
   var myVar: T? {get set}
   var validator: (Int) -> (T) { get set }
 }

@@ -22,15 +22,15 @@
 import StdlibUnittest
 
 /// State that is created every time a fresh generator is created with
-/// `MinimalSequence.generate()`.
-internal class _MinimalGeneratorPrivateState<T> {
+/// `MinimalSequence.makeIterator()`.
+internal class _MinimalIteratorPrivateState<T> {
   internal init() {}
 
   internal var returnedNilCounter: Int = 0
 }
 
 /// State shared by all generators of a MinimalSequence.
-internal class _MinimalGeneratorSharedState<T> {
+internal class _MinimalIteratorSharedState<T> {
   internal init(_ data: [T]) {
     self.data = data
   }
@@ -41,23 +41,23 @@ internal class _MinimalGeneratorSharedState<T> {
 }
 
 //===----------------------------------------------------------------------===//
-// MinimalGenerator
+// MinimalIterator
 //===----------------------------------------------------------------------===//
 
-/// A GeneratorType that implements the protocol contract in the most
+/// An IteratorProtocol that implements the protocol contract in the most
 /// narrow way possible.
 ///
 /// This generator will return `nil` only once.
-public struct MinimalGenerator<T> : GeneratorType {
-  public init<S : SequenceType where S.Generator.Element == T>(_ s: S) {
-    self._sharedState = _MinimalGeneratorSharedState(Array(s))
+public struct MinimalIterator<T> : IteratorProtocol {
+  public init<S : Sequence where S.Iterator.Element == T>(_ s: S) {
+    self._sharedState = _MinimalIteratorSharedState(Array(s))
   }
 
   public init(_ data: [T]) {
-    self._sharedState = _MinimalGeneratorSharedState(data)
+    self._sharedState = _MinimalIteratorSharedState(data)
   }
 
-  internal init(_ _sharedState: _MinimalGeneratorSharedState<T>) {
+  internal init(_ _sharedState: _MinimalIteratorSharedState<T>) {
     self._sharedState = _sharedState
   }
 
@@ -81,100 +81,100 @@ public struct MinimalGenerator<T> : GeneratorType {
     return _privateState.returnedNilCounter
   }
 
-  internal let _privateState: _MinimalGeneratorPrivateState<T> =
-    _MinimalGeneratorPrivateState()
-  internal let _sharedState: _MinimalGeneratorSharedState<T>
+  internal let _privateState: _MinimalIteratorPrivateState<T> =
+    _MinimalIteratorPrivateState()
+  internal let _sharedState: _MinimalIteratorSharedState<T>
 }
 
-// A protocol to identify MinimalGenerator.
-public protocol _MinimalGeneratorType {}
-extension MinimalGenerator : _MinimalGeneratorType {}
+// A protocol to identify MinimalIterator.
+public protocol _MinimalIterator {}
+extension MinimalIterator : _MinimalIterator {}
 
 //===----------------------------------------------------------------------===//
 // MinimalSequence
 //===----------------------------------------------------------------------===//
 
-public enum UnderestimateCountBehavior {
+public enum UnderestimatedCountBehavior {
   /// Return the actual number of elements.
-  case Precise
+  case precise
 
   /// Return the actual number of elements divided by 2.
-  case Half
+  case half
 
   /// Return an overestimated count.  Useful to test how algorithms reserve
   /// memory.
-  case Overestimate
+  case overestimate
 
   /// Return the provided value.
-  case Value(Int)
+  case value(Int)
 }
 
-public protocol StrictSequenceType : SequenceType {
+public protocol StrictSequence : Sequence {
   associatedtype Element
   init(base: MinimalSequence<Element>)
   var base: MinimalSequence<Element> { get }
 }
 
-extension StrictSequenceType {
-  public init<S : SequenceType where S.Generator.Element == Element>(
+extension StrictSequence {
+  public init<S : Sequence where S.Iterator.Element == Element>(
     elements: S,
-    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     self.init(base: MinimalSequence(
       elements: elements, underestimatedCount: underestimatedCount))
   }
 
-  public func underestimateCount() -> Int {
-    return base.underestimateCount()
+  public var underestimatedCount: Int {
+    return base.underestimatedCount
   }
 }
 
-extension StrictSequenceType where Generator : _MinimalGeneratorType {
-  public func generate() -> MinimalGenerator<Element> {
-    return base.generate()
+extension StrictSequence where Iterator : _MinimalIterator {
+  public func makeIterator() -> MinimalIterator<Element> {
+    return base.makeIterator()
   }
 }
 
-/// A SequenceType that implements the protocol contract in the most
+/// A Sequence that implements the protocol contract in the most
 /// narrow way possible.
 ///
 /// This sequence is consumed when its generator is advanced.
-public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
-  public init<S : SequenceType where S.Generator.Element == T>(
+public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
+  public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
-    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     let data = Array(elements)
-    self._sharedState = _MinimalGeneratorSharedState(data)
+    self._sharedState = _MinimalIteratorSharedState(data)
 
     switch underestimatedCount {
-    case .Precise:
+    case .precise:
       self._sharedState.underestimatedCount = data.count
 
-    case .Half:
+    case .half:
       self._sharedState.underestimatedCount = data.count / 2
 
-    case .Overestimate:
+    case .overestimate:
       self._sharedState.underestimatedCount = data.count * 3 + 5
 
-    case .Value(let count):
+    case .value(let count):
       self._sharedState.underestimatedCount = count
     }
   }
 
-  public func generate() -> MinimalGenerator<T> {
-    return MinimalGenerator(_sharedState)
+  public func makeIterator() -> MinimalIterator<T> {
+    return MinimalIterator(_sharedState)
   }
 
-  public func underestimateCount() -> Int {
-    return max(0, self._sharedState.underestimatedCount - self._sharedState.i)
+  public var underestimatedCount: Int {
+    return Swift.max(0, self._sharedState.underestimatedCount - self._sharedState.i)
   }
 
   public var debugDescription: String {
     return "MinimalSequence(\(_sharedState.data[_sharedState.i..<_sharedState.data.count]))"
   }
 
-  internal let _sharedState: _MinimalGeneratorSharedState<T>
+  internal let _sharedState: _MinimalIteratorSharedState<T>
 }
 
 //===----------------------------------------------------------------------===//
@@ -182,83 +182,83 @@ public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
 //===----------------------------------------------------------------------===//
 
 internal enum _CollectionOperation : Equatable {
-  case ReserveCapacity(capacity: Int)
-  case Append
-  case AppendContentsOf(count: Int)
-  case ReplaceRange(subRange: Range<Int>, replacementCount: Int)
-  case Insert(atIndex: Int)
-  case InsertContentsOf(atIndex: Int, count: Int)
-  case RemoveAtIndex(index: Int)
-  case RemoveLast
-  case RemoveRange(subRange: Range<Int>)
-  case RemoveAll(keepCapacity: Bool)
+  case reserveCapacity(capacity: Int)
+  case append
+  case appendContentsOf(count: Int)
+  case replaceRange(subRange: Range<Int>, replacementCount: Int)
+  case insert(atIndex: Int)
+  case insertContentsOf(atIndex: Int, count: Int)
+  case removeAtIndex(index: Int)
+  case removeLast
+  case removeRange(subRange: Range<Int>)
+  case removeAll(keepCapacity: Bool)
 
   internal func _applyTo(
     elementsLastMutatedStateIds: [Int], nextStateId: Int) -> [Int] {
     var result = elementsLastMutatedStateIds
     switch self {
-    case ReserveCapacity:
+    case reserveCapacity:
       let invalidIndices = result.indices
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case Append:
+    case append:
       result.append(nextStateId)
 
-    case AppendContentsOf(let count):
-      result.appendContentsOf(
-        Repeat(count: count, repeatedValue: nextStateId))
+    case appendContentsOf(let count):
+      result.append(contentsOf:
+        repeatElement(nextStateId, count: count))
 
-    case ReplaceRange(let subRange, let replacementCount):
-      result.replaceRange(
+    case replaceRange(let subRange, let replacementCount):
+      result.replaceSubrange(
         subRange,
-        with: Repeat(count: replacementCount, repeatedValue: nextStateId))
+        with: repeatElement(nextStateId, count: replacementCount))
 
       let invalidIndices = subRange.startIndex..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case Insert(let atIndex):
-      result.insert(nextStateId, atIndex: atIndex)
+    case insert(let atIndex):
+      result.insert(nextStateId, at: atIndex)
 
       let invalidIndices = atIndex..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case InsertContentsOf(let atIndex, let count):
-      result.insertContentsOf(
-        Repeat(count: count, repeatedValue: nextStateId),
+    case insertContentsOf(let atIndex, let count):
+      result.insert(
+        contentsOf: repeatElement(nextStateId, count: count),
         at: atIndex)
 
       let invalidIndices = atIndex..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case RemoveAtIndex(let index):
-      result.removeAtIndex(index)
+    case removeAtIndex(let index):
+      result.remove(at: index)
 
       let invalidIndices = index..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case RemoveLast:
+    case removeLast:
       result.removeLast()
 
-    case RemoveRange(let subRange):
-      result.removeRange(subRange)
+    case removeRange(let subRange):
+      result.removeSubrange(subRange)
 
       let invalidIndices = subRange.startIndex..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case RemoveAll(let keepCapacity):
-      result.removeAll(keepCapacity: keepCapacity)
+    case removeAll(let keepCapacity):
+      result.removeAll(keepingCapacity: keepCapacity)
     }
     return result
   }
@@ -269,41 +269,41 @@ internal func == (
   rhs: _CollectionOperation
 ) -> Bool {
   switch (lhs, rhs) {
-  case (.ReserveCapacity(let lhsCapacity), .ReserveCapacity(let rhsCapacity)):
+  case (.reserveCapacity(let lhsCapacity), .reserveCapacity(let rhsCapacity)):
     return lhsCapacity == rhsCapacity
 
-  case (.Append, .Append):
+  case (.append, .append):
     return true
 
-  case (.AppendContentsOf(let lhsCount), .AppendContentsOf(let rhsCount)):
+  case (.appendContentsOf(let lhsCount), .appendContentsOf(let rhsCount)):
     return lhsCount == rhsCount
 
   case (
-    .ReplaceRange(let lhsSubRange, let lhsReplacementCount),
-    .ReplaceRange(let rhsSubRange, let rhsReplacementCount)):
+    .replaceRange(let lhsSubRange, let lhsReplacementCount),
+    .replaceRange(let rhsSubRange, let rhsReplacementCount)):
 
     return lhsSubRange == rhsSubRange &&
       lhsReplacementCount == rhsReplacementCount
 
-  case (.Insert(let lhsAtIndex), .Insert(let rhsAtIndex)):
+  case (.insert(let lhsAtIndex), .insert(let rhsAtIndex)):
     return lhsAtIndex == rhsAtIndex
 
   case (
-    .InsertContentsOf(let lhsAtIndex, let lhsCount),
-    .InsertContentsOf(let rhsAtIndex, let rhsCount)):
+    .insertContentsOf(let lhsAtIndex, let lhsCount),
+    .insertContentsOf(let rhsAtIndex, let rhsCount)):
 
     return lhsAtIndex == rhsAtIndex && lhsCount == rhsCount
 
-  case (.RemoveAtIndex(let lhsIndex), .RemoveAtIndex(let rhsIndex)):
+  case (.removeAtIndex(let lhsIndex), .removeAtIndex(let rhsIndex)):
     return lhsIndex == rhsIndex
 
-  case (.RemoveLast, .RemoveLast):
+  case (.removeLast, .removeLast):
     return true
 
-  case (.RemoveRange(let lhsSubRange), .RemoveRange(let rhsSubRange)):
+  case (.removeRange(let lhsSubRange), .removeRange(let rhsSubRange)):
     return lhsSubRange == rhsSubRange
 
-  case (.RemoveAll(let lhsKeepCapacity), .RemoveAll(let rhsKeepCapacity)):
+  case (.removeAll(let lhsKeepCapacity), .removeAll(let rhsKeepCapacity)):
     return lhsKeepCapacity == rhsKeepCapacity
 
   default:
@@ -327,7 +327,7 @@ public struct _CollectionState : Equatable, Hashable {
     self._id = _CollectionState._nextUnusedState
     _CollectionState._nextUnusedState += 1
     self._elementsLastMutatedStateIds =
-      Array(Repeat(count: count, repeatedValue: self._id))
+      Array(repeatElement(self._id, count: count))
   }
 
   internal init(name: String, elementCount: Int) {
@@ -367,7 +367,7 @@ internal struct _CollectionStateTransition {
       transitions = Box<[_CollectionStateTransition]>([])
       _CollectionStateTransition._allTransitions[previousState] = transitions
     }
-    if let i = transitions!.value.indexOf({ $0._operation == operation }) {
+    if let i = transitions!.value.index(where: { $0._operation == operation }) {
       self = transitions!.value[i]
       return
     }
@@ -400,7 +400,7 @@ internal struct _CollectionStateTransition {
 
 /// Asserts that the two indices are allowed to participate in a binary
 /// operation.
-internal func _expectCompatibleIndices<Index : _MinimalIndexType>(
+internal func _expectCompatibleIndices<Index : _MinimalIndex>(
   first: Index,
   _ second: Index,
   ${TRACE}
@@ -444,7 +444,7 @@ internal func _expectCompatibleIndices<Index : _MinimalIndexType>(
   }
 }
 
-public protocol _MinimalIndexType {
+public protocol _MinimalIndex {
   /// Distance from start index.
   var _offset: Int { get }
 
@@ -454,7 +454,7 @@ public protocol _MinimalIndexType {
 % for Distance in [ '', 'Int32' ]:
 %   Index = 'MinimalForward%sIndex' % Distance
 
-public struct ${Index} : ForwardIndexType {
+public struct ${Index} : ForwardIndex {
 % if Distance != '':
   public typealias Distance = ${Distance}
 % else:
@@ -504,7 +504,7 @@ public struct ${Index} : ForwardIndexType {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart: ${Index}, rangeEnd: ${Index},
+    rangeStart rangeStart: ${Index}, rangeEnd: ${Index},
     boundsStart: ${Index}, boundsEnd: ${Index}
   ) {
     let range = rangeStart..<rangeEnd
@@ -516,7 +516,7 @@ public struct ${Index} : ForwardIndexType {
 
     if ${Index}.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck2(
-        rangeStart.position,
+        rangeStart: rangeStart.position,
         rangeEnd: rangeEnd.position,
         boundsStart: boundsStart.position,
         boundsEnd: boundsEnd.position)
@@ -537,7 +537,7 @@ public func == (lhs: ${Index}, rhs: ${Index}) -> Bool {
   return lhs.position == rhs.position
 }
 
-extension ${Index} : _MinimalIndexType {
+extension ${Index} : _MinimalIndex {
   public var _offset: Int {
     return position - startIndex
   }
@@ -549,7 +549,7 @@ extension ${Index} : _MinimalIndexType {
 // MinimalBidirectionalIndex
 //===----------------------------------------------------------------------===//
 
-public struct MinimalBidirectionalIndex : BidirectionalIndexType {
+public struct MinimalBidirectionalIndex : BidirectionalIndex {
   public typealias Distance = Int
 
   public init(position: Int, startIndex: Int, endIndex: Int) {
@@ -603,7 +603,7 @@ public struct MinimalBidirectionalIndex : BidirectionalIndexType {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart: MinimalBidirectionalIndex,
+    rangeStart rangeStart: MinimalBidirectionalIndex,
     rangeEnd: MinimalBidirectionalIndex,
     boundsStart: MinimalBidirectionalIndex,
     boundsEnd: MinimalBidirectionalIndex
@@ -617,7 +617,7 @@ public struct MinimalBidirectionalIndex : BidirectionalIndexType {
 
     if MinimalBidirectionalIndex.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck2(
-        rangeStart.position,
+        rangeStart: rangeStart.position,
         rangeEnd: rangeEnd.position,
         boundsStart: boundsStart.position,
         boundsEnd: boundsEnd.position)
@@ -641,7 +641,7 @@ public func == (
   return lhs.position == rhs.position
 }
 
-extension MinimalBidirectionalIndex : _MinimalIndexType {
+extension MinimalBidirectionalIndex : _MinimalIndex {
   public var _offset: Int {
     return position - startIndex
   }
@@ -652,10 +652,10 @@ extension MinimalBidirectionalIndex : _MinimalIndexType {
 //===----------------------------------------------------------------------===//
 
 % for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
-%   StrictIndexType = 'Strict{}IndexType'.format(Traversal)
+%   StrictIndex = 'Strict{}Index'.format(Traversal)
 
-public protocol ${StrictIndexType} : ${Traversal}IndexType {
-  associatedtype Base : ${Traversal}IndexType
+public protocol ${StrictIndex} : ${Traversal}Index {
+  associatedtype Base : ${Traversal}Index
   init(_ base: Base)
   var base: Base { get set }
 
@@ -663,7 +663,7 @@ public protocol ${StrictIndexType} : ${Traversal}IndexType {
   func logPredecessor()
 }
 
-extension ${StrictIndexType} {
+extension ${StrictIndex} {
   public func successor() -> Self {
     logSuccessor()
     return Self(base.successor())
@@ -682,10 +682,10 @@ extension ${StrictIndexType} {
 // Defaulted Index Types
 //===----------------------------------------------------------------------===//
 % for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
-%   StrictIndexType = 'Strict{}IndexType'.format(Traversal)
+%   StrictIndex = 'Strict{}Index'.format(Traversal)
 %   DefaultedIndex = 'Defaulted{}Index'.format(Traversal)
 
-public struct ${DefaultedIndex}: ${StrictIndexType} {
+public struct ${DefaultedIndex}: ${StrictIndex} {
   public typealias Distance = Int
   public typealias Base = Int
   public var base: Base
@@ -711,11 +711,11 @@ public struct ${DefaultedIndex}: ${StrictIndexType} {
   }
 
 % if Traversal == 'RandomAccess':
-  public func distanceTo(n: ${DefaultedIndex}) -> Distance {
+  public func distance(to n: ${DefaultedIndex}) -> Distance {
     return n.base - base
   }
 
-  public func advancedBy(n: Distance) -> ${DefaultedIndex} {
+  public func advanced(by n: Distance) -> ${DefaultedIndex} {
     return ${DefaultedIndex}(base + n)
   }
 % end
@@ -733,7 +733,7 @@ public func == (lhs: ${DefaultedIndex}, rhs: ${DefaultedIndex}) -> Bool {
 // MinimalRandomAccessIndex
 //===----------------------------------------------------------------------===//
 
-public struct MinimalRandomAccessIndex : RandomAccessIndexType {
+public struct MinimalRandomAccessIndex : RandomAccessIndex {
   public typealias Distance = Int
   public init(position: Int, startIndex: Int, endIndex: Int) {
     self = MinimalRandomAccessIndex(
@@ -774,12 +774,12 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
       position: position - 1, startIndex: startIndex, endIndex: endIndex)
   }
 
-  public func distanceTo(other: MinimalRandomAccessIndex) -> Int {
+  public func distance(to other: MinimalRandomAccessIndex) -> Int {
     _expectCompatibleIndices(self, other)
     return other.position - position
   }
 
-  public func advancedBy(n: Int) -> MinimalRandomAccessIndex {
+  public func advanced(by n: Int) -> MinimalRandomAccessIndex {
     let newPosition = position + n
     expectLE(startIndex, newPosition)
     expectGE(
@@ -805,7 +805,7 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart: MinimalRandomAccessIndex,
+    rangeStart rangeStart: MinimalRandomAccessIndex,
     rangeEnd: MinimalRandomAccessIndex,
     boundsStart: MinimalRandomAccessIndex,
     boundsEnd: MinimalRandomAccessIndex
@@ -819,7 +819,7 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
 
     if MinimalRandomAccessIndex.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck2(
-        rangeStart.position,
+        rangeStart: rangeStart.position,
         rangeEnd: rangeEnd.position,
         boundsStart: boundsStart.position,
         boundsEnd: boundsEnd.position)
@@ -843,7 +843,7 @@ public func == (
   return lhs.position == rhs.position
 }
 
-extension MinimalRandomAccessIndex : _MinimalIndexType {
+extension MinimalRandomAccessIndex : _MinimalIndex {
   public var _offset: Int {
     return position - startIndex
   }
@@ -856,11 +856,11 @@ extension MinimalRandomAccessIndex : _MinimalIndexType {
 % for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 %   for mutable in [ False, True ]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%     Protocol = 'Strict%s%sCollectionType' % (traversal, 'Mutable' if mutable else '')
+%     Protocol = 'Strict%s%sCollection' % (traversal, 'Mutable' if mutable else '')
 %     Self = 'Minimal%s%sCollection' % (traversal, 'Mutable' if mutable else '')
 %     Index = 'Minimal%sIndex' % traversal
 
-public protocol ${Protocol} : ${'MutableCollectionType' if mutable else 'CollectionType'} {
+public protocol ${Protocol} : ${'MutableCollection' if mutable else 'Collection'} {
   associatedtype Element
   init(base: ${Self}<Element>)
 %     if mutable:
@@ -871,26 +871,26 @@ public protocol ${Protocol} : ${'MutableCollectionType' if mutable else 'Collect
 }
 
 extension ${Protocol} {
-  public init<S : SequenceType where S.Generator.Element == Element>(
+  public init<S : Sequence where S.Iterator.Element == Element>(
     elements: S,
-    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     self.init(base:
       ${Self}(elements: elements, underestimatedCount: underestimatedCount))
   }
 
-  public func underestimateCount() -> Int {
-    return base.underestimateCount()
+  public var underestimatedCount: Int {
+    return base.underestimatedCount
   }
 }
 
-extension ${Protocol} where Generator : _MinimalGeneratorType {
-  public func generate() -> MinimalGenerator<Element> {
-    return base.generate()
+extension ${Protocol} where Iterator : _MinimalIterator {
+  public func makeIterator() -> MinimalIterator<Element> {
+    return base.makeIterator()
   }
 }
 
-extension ${Protocol} where Index : _MinimalIndexType {
+extension ${Protocol} where Index : _MinimalIndex {
   public var startIndex: ${Index} {
     return base.startIndex
   }
@@ -913,11 +913,11 @@ extension ${Protocol} where Index : _MinimalIndexType {
   }
 }
 
-/// A minimal implementation of `CollectionType` with extra checks.
-public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'CollectionType'} {
-  public init<S : SequenceType where S.Generator.Element == T>(
+/// A minimal implementation of `Collection` with extra checks.
+public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
+  public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
-    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     self._elements = Array(elements)
 
@@ -925,22 +925,22 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
       newRootStateForElementCount: self._elements.count)
 
     switch underestimatedCount {
-    case .Precise:
+    case .precise:
       self.underestimatedCount = _elements.count
 
-    case .Half:
+    case .half:
       self.underestimatedCount = _elements.count / 2
 
-    case .Overestimate:
+    case .overestimate:
       self.underestimatedCount = _elements.count * 3 + 5
 
-    case .Value(let count):
+    case .value(let count):
       self.underestimatedCount = count
     }
   }
 
-  public func generate() -> MinimalGenerator<T> {
-    return MinimalGenerator(_elements)
+  public func makeIterator() -> MinimalIterator<T> {
+    return MinimalIterator(_elements)
   }
 
   public var startIndex: ${Index} {
@@ -972,10 +972,6 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 %     end
   }
 
-  public func underestimateCount() -> Int {
-    return underestimatedCount
-  }
-
   public var underestimatedCount: Int
 
   internal var _elements: [T]
@@ -986,26 +982,26 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 % end
 
 //===----------------------------------------------------------------------===//
-// Minimal***RangeReplaceableCollectionType
+// Minimal***RangeReplaceableCollection
 //===----------------------------------------------------------------------===//
 
 % for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%   Protocol = 'Strict%sRangeReplaceableCollectionType' % traversal
+%   Protocol = 'Strict%sRangeReplaceableCollection' % traversal
 %   Self = 'Minimal%sRangeReplaceableCollection' % traversal
 %   Index = 'Minimal%sIndex' % traversal
 
-public protocol ${Protocol} : RangeReplaceableCollectionType {
+public protocol ${Protocol} : RangeReplaceableCollection {
   associatedtype Element
   init(base: ${Self}<Element>)
   var base: ${Self}<Element> { get set }
 }
 
 extension ${Protocol} {
-  public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == Element
+  public mutating func replaceSubrange<
+    C: Collection where C.Iterator.Element == Element
   >(subRange: Range<${Self}<Element>.Index>,
     with newElements: C) {
-    base.replaceRange(subRange, with: newElements)
+    base.replaceSubrange(subRange, with: newElements)
   }
 
   public mutating func removeLast() -> Element {
@@ -1013,13 +1009,13 @@ extension ${Protocol} {
   }
 }
 
-extension ${Protocol} where Generator : _MinimalGeneratorType {
-  public func generate() -> MinimalGenerator<Element> {
-    return base.generate()
+extension ${Protocol} where Iterator : _MinimalIterator {
+  public func makeIterator() -> MinimalIterator<Element> {
+    return base.makeIterator()
   }
 }
 
-extension ${Protocol} where Index : _MinimalIndexType {
+extension ${Protocol} where Index : _MinimalIndex {
   public var startIndex: ${Index} {
     return base.startIndex
   }
@@ -1030,24 +1026,24 @@ extension ${Protocol} where Index : _MinimalIndexType {
 
   public subscript(i: ${Index}) -> Element {
     get {
-      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      _expectCompatibleIndices(self.startIndex.advanced(by: i.position), i)
       return base[i]
     }
     set {
-      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      _expectCompatibleIndices(self.startIndex.advanced(by: i.position), i)
       base[i] = newValue
     }
   }
 }
 
-/// A minimal implementation of `RangeReplaceableCollectionType` with extra
+/// A minimal implementation of `RangeReplaceableCollection` with extra
 /// checks.
-public struct ${Self}<T> : RangeReplaceableCollectionType {
+public struct ${Self}<T> : RangeReplaceableCollection {
   /// Creates a collection with given contents, but a unique modification
   /// history.  No other instance has the same modification history.
-  public init<S : SequenceType where S.Generator.Element == T>(
+  public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
-    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     self.elements = Array(elements)
 
@@ -1055,16 +1051,16 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
       newRootStateForElementCount: self.elements.count)
 
     switch underestimatedCount {
-    case .Precise:
+    case .precise:
       self.underestimatedCount = self.elements.count
 
-    case .Half:
+    case .half:
       self.underestimatedCount = self.elements.count / 2
 
-    case .Overestimate:
+    case .overestimate:
       self.underestimatedCount = self.elements.count * 3 + 5
 
-    case .Value(let count):
+    case .value(let count):
       self.underestimatedCount = count
     }
   }
@@ -1076,7 +1072,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   }
 
   public init<
-    S : SequenceType where S.Generator.Element == T
+    S : Sequence where S.Iterator.Element == T
   >(_ elements: S) {
     self.underestimatedCount = 0
     self.elements = Array(elements)
@@ -1084,12 +1080,8 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
       _CollectionState(newRootStateForElementCount: self.elements.count)
   }
 
-  public func generate() -> MinimalGenerator<T> {
-    return MinimalGenerator(elements)
-  }
-
-  public func underestimateCount() -> Int {
-    return underestimatedCount
+  public func makeIterator() -> MinimalIterator<T> {
+    return MinimalIterator(elements)
   }
 
   public var startIndex: ${Index} {
@@ -1110,93 +1102,93 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
 
   public subscript(i: ${Index}) -> T {
     get {
-      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      _expectCompatibleIndices(self.startIndex.advanced(by: i.position), i)
       return elements[i.position]
     }
     set {
-      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      _expectCompatibleIndices(self.startIndex.advanced(by: i.position), i)
       elements[i.position] = newValue
     }
   }
 
   public mutating func reserveCapacity(n: Int) {
-    _willMutate(.ReserveCapacity(capacity: n))
+    _willMutate(.reserveCapacity(capacity: n))
     elements.reserveCapacity(n)
-    reservedCapacity = max(reservedCapacity, n)
+    reservedCapacity = Swift.max(reservedCapacity, n)
   }
 
   public mutating func append(x: T) {
-    _willMutate(.Append)
+    _willMutate(.append)
     elements.append(x)
   }
 
-  public mutating func appendContentsOf<
-    S : SequenceType where S.Generator.Element == T
-  >(newElements: S) {
+  public mutating func append<
+    S : Sequence where S.Iterator.Element == T
+  >(contentsOf newElements: S) {
     let oldCount = count
-    elements.appendContentsOf(newElements)
+    elements.append(contentsOf: newElements)
     let newCount = count
-    _willMutate(.AppendContentsOf(count: newCount - oldCount))
+    _willMutate(.appendContentsOf(count: newCount - oldCount))
   }
 
-  public mutating func replaceRange<
-    C : CollectionType where C.Generator.Element == T
+  public mutating func replaceSubrange<
+    C : Collection where C.Iterator.Element == T
   >(
     subRange: Range<${Index}>, with newElements: C
   ) {
     let oldCount = count
-    elements.replaceRange(
+    elements.replaceSubrange(
       subRange.startIndex.position..<subRange.endIndex.position,
       with: newElements)
     let newCount = count
-    _willMutate(.ReplaceRange(
+    _willMutate(.replaceRange(
       subRange: subRange.startIndex._offset..<subRange.endIndex._offset,
       replacementCount: subRange.count + newCount - oldCount))
   }
 
-  public mutating func insert(newElement: T, atIndex i: ${Index}) {
-    _willMutate(.Insert(atIndex: i._offset))
-    elements.insert(newElement, atIndex: i.position)
+  public mutating func insert(newElement: T, at i: ${Index}) {
+    _willMutate(.insert(atIndex: i._offset))
+    elements.insert(newElement, at: i.position)
   }
 
-  public mutating func insertContentsOf<
-    S : CollectionType where S.Generator.Element == T
-  >(newElements: S, at i: ${Index}) {
+  public mutating func insert<
+    S : Collection where S.Iterator.Element == T
+  >(contentsOf newElements: S, at i: ${Index}) {
     let oldCount = count
-    elements.insertContentsOf(newElements, at: i.position)
+    elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
 
     if newCount - oldCount != 0 {
-      _willMutate(.InsertContentsOf(
+      _willMutate(.insertContentsOf(
         atIndex: i._offset,
         count: newCount - oldCount))
     }
   }
 
-  public mutating func removeAtIndex(i: ${Index}) -> T {
-    _willMutate(.RemoveAtIndex(index: i._offset))
-    return elements.removeAtIndex(i.position)
+  public mutating func remove(at i: ${Index}) -> T {
+    _willMutate(.removeAtIndex(index: i._offset))
+    return elements.remove(at: i.position)
   }
 
   public mutating func removeLast() -> T {
-    _willMutate(.RemoveLast)
+    _willMutate(.removeLast)
     return elements.removeLast()
   }
 
-  public mutating func removeRange(subRange: Range<${Index}>) {
+  public mutating func removeSubrange(subRange: Range<${Index}>) {
     if !subRange.isEmpty {
-      _willMutate(.RemoveRange(
+      _willMutate(.removeRange(
         subRange: subRange.startIndex._offset..<subRange.endIndex._offset))
     }
-    elements.removeRange(
+    elements.removeSubrange(
       subRange.startIndex.position..<subRange.endIndex.position
     )
   }
 
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    _willMutate(.RemoveAll(keepCapacity: keepCapacity))
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+    _willMutate(.removeAll(keepCapacity: keepCapacity))
     // Ignore the value of `keepCapacity`.
-    elements.removeAll(keepCapacity: false)
+    elements.removeAll(keepingCapacity: false)
   }
 
   internal mutating func _willMutate(operation: _CollectionOperation) {
@@ -1215,8 +1207,8 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
 % end
 
 /// A Sequence that uses as many default implementations as
-/// `SequenceType` can provide.
-public struct DefaultedSequence<Element> : StrictSequenceType {
+/// `Sequence` can provide.
+public struct DefaultedSequence<Element> : StrictSequence {
   public let base: MinimalSequence<Element>
 
   public init(base: MinimalSequence<Element>) {
@@ -1227,12 +1219,12 @@ public struct DefaultedSequence<Element> : StrictSequenceType {
 % for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 
 /// A Collection that uses as many default implementations as
-/// `CollectionType` can provide.
+/// `Collection` can provide.
 public struct Defaulted${traversal}Collection<Element>
-  : Strict${traversal}CollectionType {
+  : Strict${traversal}Collection {
 
   public typealias Base = Minimal${traversal}Collection<Element>
-  public typealias Generator = MinimalGenerator<Element>
+  public typealias Iterator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public let base: Base
@@ -1251,10 +1243,10 @@ public struct Defaulted${traversal}Collection<Element>
 }
 
 public struct Defaulted${traversal}MutableCollection<Element>
-  : Strict${traversal}MutableCollectionType {
+  : Strict${traversal}MutableCollection {
 
   public typealias Base = Minimal${traversal}MutableCollection<Element>
-  public typealias Generator = MinimalGenerator<Element>
+  public typealias Iterator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public var base: Base
@@ -1273,10 +1265,10 @@ public struct Defaulted${traversal}MutableCollection<Element>
 }
 
 public struct Defaulted${traversal}RangeReplaceableCollection<Element>
-  : Strict${traversal}RangeReplaceableCollectionType {
+  : Strict${traversal}RangeReplaceableCollection {
 
   public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
-  public typealias Generator = MinimalGenerator<Element>
+  public typealias Iterator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public var base: Base
@@ -1299,11 +1291,11 @@ public struct Defaulted${traversal}RangeReplaceableCollection<Element>
 }
 
 public struct Defaulted${traversal}RangeReplaceableSlice<Element>
-  : RangeReplaceableCollectionType {
+  : RangeReplaceableCollection {
 
   public typealias Self_ = Defaulted${traversal}RangeReplaceableSlice<Element>
   public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
-  public typealias Generator = MinimalGenerator<Element>
+  public typealias Iterator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public var base: Base
@@ -1340,8 +1332,8 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
       base: Base(elements: elements))
   }
 
-  public func generate() -> MinimalGenerator<Element> {
-    return MinimalGenerator(Array(self))
+  public func makeIterator() -> MinimalIterator<Element> {
+    return MinimalIterator(Array(self))
   }
 
   public subscript(index: Index) -> Element {
@@ -1351,14 +1343,16 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
 
   public subscript(bounds: Range<Index>) -> Self_ {
     Index._failEarlyRangeCheck2(
-      bounds.startIndex, rangeEnd: bounds.endIndex,
-      boundsStart: startIndex, boundsEnd: endIndex)
+      rangeStart: bounds.startIndex,
+      rangeEnd: bounds.endIndex,
+      boundsStart: startIndex,
+      boundsEnd: endIndex)
     return Defaulted${traversal}RangeReplaceableSlice(
       base: base, bounds: bounds)
   }
 
-  public mutating func replaceRange<
-    C : CollectionType where C.Generator.Element == Element
+  public mutating func replaceSubrange<
+    C : Collection where C.Iterator.Element == Element
   >(
     subRange: Range<Index>,
     with newElements: C
@@ -1369,11 +1363,13 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
       - subRange.count
       + numericCast(newElements.count) as Int
     Index._failEarlyRangeCheck2(
-      subRange.startIndex, rangeEnd: subRange.endIndex,
-      boundsStart: startIndex, boundsEnd: endIndex)
-    base.replaceRange(subRange, with: newElements)
-    startIndex = base.startIndex.advancedBy(startOffset)
-    endIndex = base.startIndex.advancedBy(endOffset)
+      rangeStart: subRange.startIndex,
+      rangeEnd: subRange.endIndex,
+      boundsStart: startIndex,
+      boundsEnd: endIndex)
+    base.replaceSubrange(subRange, with: newElements)
+    startIndex = base.startIndex.advanced(by: startOffset)
+    endIndex = base.startIndex.advanced(by: endOffset)
   }
 }
 

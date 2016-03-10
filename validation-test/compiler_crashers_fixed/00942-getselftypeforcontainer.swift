@@ -9,5 +9,5 @@ class func i: a: (z(f()
 }))
 protocol a {
 func c) -> [T>(Any, U>() -> : ({
-init<B : d : SequenceType where A>("
+init<B : d : Sequence where A>("
 typealias d: d

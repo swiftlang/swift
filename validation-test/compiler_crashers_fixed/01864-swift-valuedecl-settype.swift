@@ -9,7 +9,7 @@ var _ = f)
 func f: U {
 }
 }
-func i> : SequenceType where T> (A
+func i> : Sequence where T> (A
 return "foo""A("ab")!(b<l : I) {
 protocol A {
 func b(A, b {

@@ -105,8 +105,8 @@ struct Test4 {
 
 // CONTEXT_SORT_2: Results for filterText: myVa [
 // CONTEXT_SORT_2-NEXT: myVarTest4
-// CONTEXT_SORT_2-NEXT: myLocalVar
 // CONTEXT_SORT_2-NEXT: myVar
+// CONTEXT_SORT_2-NEXT: myLocalVar
 
 // CONTEXT_SORT_3: Results for filterText: myVa [
 // CONTEXT_SORT_3-NEXT: myVar

@@ -12,4 +12,4 @@ typealias d
 struct c<h : b> : b {
 typealias e = a<c<h>, d>
 }
-struct c<S: SequenceType, T where Optional<T> == S.Generator.Element
+struct c<S: Sequence, T where Optional<T> == S.Iterator.Element

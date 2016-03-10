@@ -4,6 +4,6 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol d : BooleanType))
+protocol d : Boolean))
 protocol A {
 func a<T : a

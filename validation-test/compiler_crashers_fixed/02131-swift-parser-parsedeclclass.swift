@@ -18,7 +18,7 @@ f<j {
 }
 }
 }
-struct S : SequenceType where T {
+struct S : Sequence where T {
 }
 class func d: C = { class C<Q<T? {
 }

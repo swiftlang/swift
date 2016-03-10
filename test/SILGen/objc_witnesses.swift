@@ -49,7 +49,7 @@ extension Gizmo : Bells {
 // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<Gizmo>
 // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<Gizmo>
 
-// CHECK:   [[UNWRAP_FUNC:%[0-9]+]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+// CHECK:   [[UNWRAP_FUNC:%[0-9]+]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:   [[UNWRAPPED_RESULT_TEMP:%[0-9]+]] = alloc_stack $Gizmo
 // CHECK:   apply [[UNWRAP_FUNC]]<Gizmo>([[UNWRAPPED_RESULT_TEMP]], [[IUO_RESULT_TEMP]]) : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
 // CHECK:   [[UNWRAPPED_RESULT:%[0-9]+]] = load [[UNWRAPPED_RESULT_TEMP]] : $*Gizmo

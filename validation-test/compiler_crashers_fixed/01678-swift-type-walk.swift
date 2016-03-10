@@ -28,7 +28,7 @@ return nil
 }
 [B<S {
 import CoreData
-func ^() -> T, let foo as BooleanType, object2: BooleanType)
+func ^() -> T, let foo as Boolean, object2: Boolean)
 protocol C {
 0)
 public var b

@@ -427,6 +427,8 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   }
 
   if (auto PD = dyn_cast<ProtocolDecl>(D)) {
+    if (PD->getAttrs().hasAttribute<ShowInInterfaceAttr>())
+      return false;
     StringRef NameStr = PD->getNameStr();
     if (NameStr.startswith("_Builtin"))
       return true;
@@ -1599,7 +1601,7 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
 
-  // Dynamic lookup can only find [objc] members.
+  // Dynamic lookup can only find @objc members.
   if (!isObjC())
     return false;
 
@@ -1780,8 +1782,8 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   if (!knownProtocol)
     return false;
 
-  // All nominal types can derive their ErrorType conformance.
-  if (*knownProtocol == KnownProtocolKind::ErrorType)
+  // All nominal types can derive their ErrorProtocol conformance.
+  if (*knownProtocol == KnownProtocolKind::ErrorProtocol)
     return true;
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
@@ -1850,7 +1852,7 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
   if (UnboundGenericType *UGT = Ty->getAs<UnboundGenericType>()) {
     // If we have an unbound generic type, bind the type to the archetypes
     // in the type's definition.
-    NominalTypeDecl *D = UGT->getDecl();
+    auto *D = cast<NominalTypeDecl>(UGT->getDecl());
     SmallVector<Type, 4> GenericArgs;
     for (auto Param : *D->getGenericParams()) {
       auto Archetype = Param->getArchetype();
@@ -1968,8 +1970,8 @@ void GenericTypeDecl::setGenericSignature(GenericSignature *sig) {
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                             DeclContext *DC)
-  : TypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}),
+                             GenericParamList *GenericParams, DeclContext *DC)
+  : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
     TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy)
 {
 

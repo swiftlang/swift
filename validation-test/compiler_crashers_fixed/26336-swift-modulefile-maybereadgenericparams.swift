@@ -3,7 +3,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct A:BooleanType
+struct A:Boolean
 let p
 {
 struct X<T where h:a{

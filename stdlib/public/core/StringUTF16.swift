@@ -13,7 +13,7 @@
 extension String {
   /// A collection of UTF-16 code units that encodes a `String` value.
   public struct UTF16View
-    : CollectionType, CustomStringConvertible, CustomDebugStringConvertible {
+    : Collection, CustomStringConvertible, CustomDebugStringConvertible {
 
     /// A position in a string's collection of UTF-16 code units.
     public struct Index {
@@ -41,20 +41,20 @@ extension String {
     }
 
     @warn_unused_result
-    func _toInternalIndex(i: Int) -> Int {
+    func _internalIndex(at i: Int) -> Int {
       return _core.startIndex + _offset + i
     }
 
     /// Access the element at `position`.
     ///
-    /// - Requires: `position` is a valid position in `self` and
+    /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     public subscript(i: Index) -> UTF16.CodeUnit {
       let position = i._offset
       _precondition(position >= 0 && position < _length,
           "out-of-range access on a UTF16View")
 
-      let index = _toInternalIndex(position)
+      let index = _internalIndex(at: position)
       let u = _core[index]
       if _fastPath((u >> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
@@ -63,7 +63,7 @@ extension String {
       }
 
       if (u >> 10) == 0b1101_10 {
-        // `u` is a high-surrogate.  SequenceType is well-formed if it
+        // `u` is a high-surrogate.  Sequence is well-formed if it
         // is followed by a low-surrogate.
         if _fastPath(
                index + 1 < _core.count &&
@@ -73,7 +73,7 @@ extension String {
         return 0xfffd
       }
 
-      // `u` is a low-surrogate.  SequenceType is well-formed if
+      // `u` is a low-surrogate.  Sequence is well-formed if
       // previous code unit is a high-surrogate.
       if _fastPath(index != 0 && (_core[index - 1] >> 10) == 0b1101_10) {
         return u
@@ -94,20 +94,20 @@ extension String {
     @available(
       *, unavailable,
       message="Slicing a String's UTF16View requires a Range<String.UTF16View.Index>, String.UTF16View.Index can be constructed from Int when Foundation is imported")
-    public subscript(subRange: Range<Int>) -> UTF16View {
+    public subscript(bounds: Range<Int>) -> UTF16View {
       fatalError("unavailable function can't be called")
     }
 #endif
 
-    /// Access the elements delimited by the given half-open range of
-    /// indices.
+    /// Get the contiguous subrange of elements enclosed by `bounds`.
     ///
     /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.
-    public subscript(subRange: Range<Index>) -> UTF16View {
+    public subscript(bounds: Range<Index>) -> UTF16View {
       return UTF16View(
-        _core, offset: _toInternalIndex(subRange.startIndex._offset),
-          length: subRange.endIndex._offset - subRange.startIndex._offset)
+        _core,
+        offset: _internalIndex(at: bounds.startIndex._offset),
+        length: bounds.endIndex._offset - bounds.startIndex._offset)
     }
 
     internal init(_ _core: _StringCore) {
@@ -123,8 +123,8 @@ extension String {
     }
 
     public var description: String {
-      let start = _toInternalIndex(0)
-      let end = _toInternalIndex(_length)
+      let start = _internalIndex(at: 0)
+      let end = _internalIndex(at: _length)
       return String(_core[start..<end])
     }
 
@@ -132,14 +132,19 @@ extension String {
       return "StringUTF16(\(self.description.debugDescription))"
     }
 
-    var _offset: Int
-    var _length: Int
-    let _core: _StringCore
+    internal var _offset: Int
+    internal var _length: Int
+    internal let _core: _StringCore
   }
 
   /// A UTF-16 encoding of `self`.
   public var utf16: UTF16View {
-    return UTF16View(_core)
+    get {
+      return UTF16View(_core)
+    }
+    set {
+      self = String(newValue)
+    }
   }
 
   /// Construct the `String` corresponding to the given sequence of
@@ -150,10 +155,10 @@ extension String {
 
     if let start = UTF16Index(
       _offset: utf16._offset
-    ).samePositionIn(wholeString) {
+    ).samePosition(in: wholeString) {
       if let end = UTF16Index(
         _offset: utf16._offset + utf16._length
-      ).samePositionIn(wholeString) {
+      ).samePosition(in: wholeString) {
         self = wholeString[start..<end]
         return
       }
@@ -165,9 +170,9 @@ extension String {
   public typealias UTF16Index = UTF16View.Index
 }
 
-// Conformance to RandomAccessIndexType intentionally only appears
+// Conformance to RandomAccessIndex intentionally only appears
 // when Foundation is loaded
-extension String.UTF16View.Index : BidirectionalIndexType {
+extension String.UTF16View.Index : BidirectionalIndex {
   public typealias Distance = Int
 
   @warn_unused_result
@@ -198,26 +203,25 @@ public func < (
 }
 
 // We can do some things more efficiently, even if we don't promise to
-// by conforming to RandomAccessIndexType.
+// by conforming to RandomAccessIndex.
 
-/// Do not use this operator directly; call distance(start, end) instead.
 extension String.UTF16View.Index {
   @warn_unused_result
-  public func distanceTo(end: String.UTF16View.Index)
+  public func distance(to end: String.UTF16View.Index)
     -> String.UTF16View.Index.Distance {
-    return self._offset.distanceTo(end._offset)
+    return self._offset.distance(to: end._offset)
   }
 
   @warn_unused_result
-  public func advancedBy(n: Distance) -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset: self._offset.advancedBy(n))
+  public func advanced(by n: Distance) -> String.UTF16View.Index {
+    return String.UTF16View.Index(_offset: self._offset.advanced(by: n))
   }
 
   @warn_unused_result
-  public func advancedBy(n: Distance, limit: String.UTF16View.Index)
+  public func advanced(by n: Distance, limit: String.UTF16View.Index)
     -> String.UTF16View.Index {
     return String.UTF16View.Index(
-      _offset: self._offset.advancedBy(n, limit: limit._offset))
+      _offset: self._offset.advanced(by: n, limit: limit._offset))
   }
 }
 
@@ -226,7 +230,7 @@ extension String.UTF16View.Index {
   /// Construct the position in `utf16` that corresponds exactly to
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `utf8Index` is an element of
+  /// - Precondition: `utf8Index` is an element of
   ///   `String(utf16)!.utf8.indices`.
   public init?(
     _ utf8Index: String.UTF8Index, within utf16: String.UTF16View
@@ -247,7 +251,7 @@ extension String.UTF16View.Index {
   /// Construct the position in `utf16` that corresponds exactly to
   /// `unicodeScalarIndex`.
   ///
-  /// - Requires: `unicodeScalarIndex` is an element of
+  /// - Precondition: `unicodeScalarIndex` is an element of
   ///   `String(utf16)!.unicodeScalars.indices`.
   public init(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
@@ -258,7 +262,7 @@ extension String.UTF16View.Index {
   /// Construct the position in `utf16` that corresponds exactly to
   /// `characterIndex`.
   ///
-  /// - Requires: `characterIndex` is an element of
+  /// - Precondition: `characterIndex` is an element of
   ///   `String(utf16)!.indices`.
   public init(_ characterIndex: String.Index, within utf16: String.UTF16View) {
     _offset = characterIndex._utf16Index
@@ -267,11 +271,11 @@ extension String.UTF16View.Index {
   /// Returns the position in `utf8` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of
+  /// - Precondition: `self` is an element of
   ///   `String(utf8)!.utf16.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf8: String.UTF8View
+  public func samePosition(
+    in utf8: String.UTF8View
   ) -> String.UTF8View.Index? {
     return String.UTF8View.Index(self, within: utf8)
   }
@@ -279,11 +283,11 @@ extension String.UTF16View.Index {
   /// Returns the position in `unicodeScalars` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of
+  /// - Precondition: `self` is an element of
   ///   `String(unicodeScalars).utf16.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    unicodeScalars: String.UnicodeScalarView
+  public func samePosition(
+    in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
     return String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
@@ -291,10 +295,10 @@ extension String.UTF16View.Index {
   /// Returns the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of `characters.utf16.indices`.
+  /// - Precondition: `self` is an element of `characters.utf16.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    characters: String
+  public func samePosition(
+    in characters: String
   ) -> String.Index? {
     return String.Index(self, within: characters)
   }
@@ -303,14 +307,13 @@ extension String.UTF16View.Index {
 // Reflection
 extension String.UTF16View : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  @warn_unused_result
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: self)
   }
 }
 
 extension String.UTF16View : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .Text(description)
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(description)
   }
 }

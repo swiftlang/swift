@@ -10,7 +10,7 @@ class C) {
 }
 }
 class A<T -> {
-func x(seq: Int = Swift.Generator.d(b<f == A<S {
+func x(seq: Int = Swift.Iterator.d(b<f == A<S {
 convenience init({
 func a: T.f = """""""]()
 }

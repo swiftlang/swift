@@ -4,6 +4,6 @@
 // Test case found by fuzzing
 
 protocol c
-let a{protocol A:BooleanType,enum S<T where h:a{
+let a{protocol A:Boolean,enum S<T where h:a{
 class d{class d:A{
 let f=c

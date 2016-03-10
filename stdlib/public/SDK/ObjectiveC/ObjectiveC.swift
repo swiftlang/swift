@@ -17,12 +17,13 @@ import ObjectiveC
 // Objective-C Primitive Types
 //===----------------------------------------------------------------------===//
 
+public typealias Boolean = Swift.Boolean
 /// The Objective-C BOOL type.
 ///
 /// On 64-bit iOS, the Objective-C BOOL type is a typedef of C/C++
 /// bool. Elsewhere, it is "signed char". The Clang importer imports it as
 /// ObjCBool.
-public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
+public struct ObjCBool : Boolean, BooleanLiteralConvertible {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var _value: Int8
@@ -62,7 +63,7 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
 
 extension ObjCBool : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: boolValue)
   }
 }
@@ -96,7 +97,7 @@ func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
 ///
 /// The compiler has special knowledge of this type.
 public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
-  var ptr : COpaquePointer
+  var ptr : OpaquePointer
 
   /// Create a selector from a string.
   public init(_ str : String) {
@@ -120,13 +121,9 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
     self = sel_registerName(value)
   }
 
-  public init() {
-    ptr = nil
-  }
-  
   /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
+  @_transparent
+  public init(nilLiteral: ()) {
     ptr = nil
   }
 }
@@ -152,10 +149,11 @@ extension Selector : Equatable, Hashable {
 extension Selector : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
-    if let s = String.fromCStringRepairingIllFormedUTF8(sel_getName(self)).0 {
-      return s
+    let name = sel_getName(self)
+    if name == nil {
+      return "<NULL>"
     }
-    return "<NULL>"
+    return String(cString: name)
   }
 }
 
@@ -163,13 +161,13 @@ extension String {
   /// Construct the C string representation of an Objective-C selector.
   public init(_sel: Selector) {
     // FIXME: This misses the ASCII optimization.
-    self = String.fromCString(sel_getName(_sel))!
+    self = String(cString: sel_getName(_sel))
   }
 }
 
 extension Selector : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: String(_sel: self))
   }
 }
@@ -179,13 +177,13 @@ extension Selector : CustomReflectable {
 //===----------------------------------------------------------------------===//
 
 public struct NSZone : NilLiteralConvertible {
-  var pointer : COpaquePointer
+  var pointer : OpaquePointer
 
   public init() { pointer = nil }
 
   /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
+  @_transparent
+  public init(nilLiteral: ()) {
     pointer = nil
   }
 }
@@ -199,10 +197,10 @@ typealias Zone = NSZone
 
 @warn_unused_result
 @_silgen_name("objc_autoreleasePoolPush")
-func __pushAutoreleasePool() -> COpaquePointer
+func __pushAutoreleasePool() -> OpaquePointer
 
 @_silgen_name("objc_autoreleasePoolPop")
-func __popAutoreleasePool(pool: COpaquePointer)
+func __popAutoreleasePool(pool: OpaquePointer)
 
 public func autoreleasepool(@noescape code: () -> Void) {
   let pool = __pushAutoreleasePool()
@@ -228,7 +226,7 @@ public var NO: ObjCBool {
 // for ObjCBool
 @_transparent
 @warn_unused_result
-public func && <T : BooleanType>(
+public func && <T : Boolean>(
   lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
@@ -236,7 +234,7 @@ public func && <T : BooleanType>(
 
 @_transparent
 @warn_unused_result
-public func || <T : BooleanType>(
+public func || <T : Boolean>(
   lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
@@ -268,7 +266,7 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
-extension NSObject : CVarArgType {
+extension NSObject : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
   public var _cVarArgEncoding: [Int] {

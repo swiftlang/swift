@@ -6,7 +6,7 @@
 // Test case found by fuzzing
 
 enum S<e<T -> : d {
-func a(f: C = B, length: (A.Generator.c] == [self, Any) -> : Array) as String)
+func a(f: C = B, length: (A.Iterator.c] == [self, Any) -> : Array) as String)
 typealias R = "
 class a {
 func i: S) -> Bool {

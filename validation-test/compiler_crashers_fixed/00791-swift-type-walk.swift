@@ -37,7 +37,7 @@ typealias A {
 }
 }
 }
-var f : SequenceType where A, U) -> Bool {
+var f : Sequence where A, U) -> Bool {
 print()
 }
 class A {

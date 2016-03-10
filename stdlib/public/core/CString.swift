@@ -15,39 +15,65 @@
 import SwiftShims
 
 extension String {
-  /// Creates a new `String` by copying the nul-terminated UTF-8 data
-  /// referenced by a `CString`.
+
+  /// Create a new `String` by copying the nul-terminated UTF-8 data
+  /// referenced by a `cString`.
   ///
-  /// Returns `nil` if the `CString` is `NULL` or if it contains ill-formed
-  /// UTF-8 code unit sequences.
-  @warn_unused_result
-  public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
-    if cs._isNull {
-      return nil
-    }
-    let len = Int(_swift_stdlib_strlen(cs))
-    return String._fromCodeUnitSequence(UTF8.self,
-        input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
+  /// If `cString` contains ill-formed UTF-8 code unit sequences, replaces them
+  /// with replacement characters (U+FFFD).
+  ///
+  /// - Precondition: `cString != nil`
+  public init(cString: UnsafePointer<CChar>) {
+    _precondition(cString != nil, "cString must not be nil")
+    self = String.decodeCString(UnsafePointer(cString), as: UTF8.self,
+      repairingInvalidCodeUnits: true)!.result
   }
 
-  /// Creates a new `String` by copying the nul-terminated UTF-8 data
-  /// referenced by a `CString`.
+  /// Create a new `String` by copying the nul-terminated UTF-8 data
+  /// referenced by a `cString`.
   ///
-  /// Returns `nil` if the `CString` is `NULL`.  If `CString` contains
-  /// ill-formed UTF-8 code unit sequences, replaces them with replacement
-  /// characters (U+FFFD).
-  @warn_unused_result
-  public static func fromCStringRepairingIllFormedUTF8(
-    cs: UnsafePointer<CChar>)
-      -> (String?, hadError: Bool) {
-    if cs._isNull {
-      return (nil, hadError: false)
+  /// Does not try to repair ill-formed UTF-8 code unit sequences, fails if any
+  /// such sequences are found.
+  ///
+  /// - Precondition: `cString != nil`
+  public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
+    _precondition(cString != nil, "cString must not be nil")
+    guard let (result, _) = String.decodeCString(
+      UnsafePointer(cString),
+        as: UTF8.self,
+        repairingInvalidCodeUnits: false) else {
+      return nil
     }
-    let len = Int(_swift_stdlib_strlen(cs))
-    let (result, hadError) = String._fromCodeUnitSequenceWithRepair(UTF8.self,
-        input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
-    return (result, hadError: hadError)
+    self = result
   }
+
+  /// Create a new `String` by copying the nul-terminated data
+  /// referenced by a `cString` using `encoding`.
+  ///
+  /// Returns `nil` if the `cString` is `NULL` or if it contains ill-formed code
+  /// units and no repairing has been requested. Otherwise replaces
+  /// ill-formed code units with replacement characters (U+FFFD).
+  @warn_unused_result
+  public static func decodeCString<Encoding : UnicodeCodec>(
+    cString: UnsafePointer<Encoding.CodeUnit>,
+    as encoding: Encoding.Type,
+    repairingInvalidCodeUnits isReparing: Bool = true)
+      -> (result: String, repairsMade: Bool)? {
+
+    if cString._isNull {
+      return nil
+    }
+    let len = Int(_swift_stdlib_strlen(UnsafePointer(cString)))
+    let buffer = UnsafeBufferPointer<Encoding.CodeUnit>(
+      start: cString, count: len)
+
+    let (stringBuffer, hadError) = _StringBuffer.fromCodeUnits(
+      buffer, encoding: encoding, repairIllFormedSequences: isReparing)
+    return stringBuffer.map {
+      (result: String(_storage: $0), repairsMade: hadError)
+    }
+  }
+
 }
 
 /// From a non-`nil` `UnsafePointer` to a null-terminated string
@@ -58,10 +84,26 @@ public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
   if s == nil {
     return nil
   }
-  let length = Int(_swift_stdlib_strlen(s))
-  var result = [CChar](count: length + 1, repeatedValue: 0)
-  for i in 0..<length {
+  let count = Int(_swift_stdlib_strlen(s))
+  var result = [CChar](repeating: 0, count: count + 1)
+  for i in 0..<count {
     result[i] = s[i]
   }
   return result
+}
+
+extension String {
+  @available(*, unavailable, message="Please use String.init?(validatingUTF8:) instead. Note that it no longer accepts NULL as a valid input. Also consider using String(cString:), that will attempt to repair ill-formed code units.")
+  @warn_unused_result
+  public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="Please use String.init(cString:) instead. Note that it no longer accepts NULL as a valid input. See also String.decodeCString if you need more control.")
+  @warn_unused_result
+  public static func fromCStringRepairingIllFormedUTF8(
+    cs: UnsafePointer<CChar>
+  ) -> (String?, hadError: Bool) {
+    fatalError("unavailable function can't be called")
+  }
 }

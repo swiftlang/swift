@@ -28,12 +28,12 @@ import Foundation
 @objc protocol B : A {}
 
 // CHECK: @protocol CustomName2;
-// CHECK-LABEL: SWIFT_PROTOCOL_NAMED("CustomNameType")
+// CHECK-LABEL: SWIFT_PROTOCOL_NAMED("CustomName")
 // CHECK-NEXT: @protocol CustomName{{$}}
 // CHECK-NEXT: - (void)forwardCustomName:(id <CustomName2> _Nonnull)_;
 // CHECK-NEXT: @end
 @objc(CustomName)
-protocol CustomNameType {
+protocol CustomName {
   func forwardCustomName(_: CustomNameType2)
 }
 

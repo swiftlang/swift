@@ -9,4 +9,4 @@ func b((Any, c))(Any, AnyObject
 }
 struct A<T> {
 }
-struct c<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs
+struct c<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs

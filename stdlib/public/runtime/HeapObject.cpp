@@ -542,15 +542,47 @@ extern "C" void swift_deallocPartialClassInstance(HeapObject *object,
     return;
 
   // Destroy ivars
-  auto *objectMetadata = _swift_getClassOfAllocated(object);
-  while (objectMetadata != metadata) {
-    auto classMetadata = objectMetadata->getClassObject();
-    assert(classMetadata && "Not a class?");
+  auto *classMetadata = _swift_getClassOfAllocated(object)->getClassObject();
+  assert(classMetadata && "Not a class?");
+  while (classMetadata != metadata) {
+#if SWIFT_OBJC_INTEROP
+    // If we have hit a pure Objective-C class, we won't see another ivar
+    // destroyer.
+    if (classMetadata->isPureObjC()) {
+      // Set the class to the pure Objective-C superclass, so that when dealloc
+      // runs, it starts at that superclass.
+      object_setClass((id)object, (Class)classMetadata);
+
+      // Release the object.
+      objc_release((id)object);
+      return;
+    }
+#endif
+
     if (auto fn = classMetadata->getIVarDestroyer())
       fn(object);
-    objectMetadata = classMetadata->SuperClass;
-    assert(objectMetadata && "Given metatype not a superclass of object type?");
+
+    classMetadata = classMetadata->SuperClass->getClassObject();
+    assert(classMetadata && "Given metatype not a superclass of object type?");
   }
+
+#if SWIFT_OBJC_INTEROP
+  // If this class doesn't use Swift-native reference counting, use
+  // objc_release instead.
+  if (!usesNativeSwiftReferenceCounting(classMetadata)) {
+    // Find the pure Objective-C superclass.
+    while (!classMetadata->isPureObjC())
+      classMetadata = classMetadata->SuperClass->getClassObject();
+
+    // Set the class to the pure Objective-C superclass, so that when dealloc
+    // runs, it starts at that superclass.
+    object_setClass((id)object, (Class)classMetadata);
+
+    // Release the object.
+    objc_release((id)object);
+    return;
+  }
+#endif
 
   // The strong reference count should be +1 -- tear down the object
   bool shouldDeallocate = object->refCount.decrementShouldDeallocate();

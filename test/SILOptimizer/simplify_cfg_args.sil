@@ -437,7 +437,7 @@ bb0(%0 : $Optional<Int32>):
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: select_enum
 // CHECK-NEXT: return
-  %1 = select_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, default %f : $Builtin.Int1
+  %1 = select_enum %0 : $Optional<Int32>, case #Optional.some!enumelt.1: %t, default %f : $Builtin.Int1
   cond_br %1, bb1(%0 : $Optional<Int32>), bb2(%0 : $Optional<Int32>)
 
 bb1(%2 : $Optional<Int32>):

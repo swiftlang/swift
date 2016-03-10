@@ -84,7 +84,7 @@ func a<T>() -> (T, T -> T) -> T {
 }
 class A<T : A> {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
@@ -117,7 +117,7 @@ class Foo<T>: NSObject {
         super.init()
     }
 }
-func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
+func some<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
     for (mx : T?) in xs {
         if let x = mx {
             return x

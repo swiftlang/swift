@@ -64,7 +64,7 @@ ${stringSubscriptComment}
   @available(
     *, unavailable,
     message="cannot subscript String with a Range<Int>, see the documentation comment for discussion")
-  public subscript(subRange: Range<Int>) -> String {
+  public subscript(bounds: Range<Int>) -> String {
     fatalError("unavailable function can't be called")
   }
 

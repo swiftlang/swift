@@ -15,14 +15,14 @@ final class Foo<T: NSCoding>: NSObject, NSCoding {
   }
 
   @objc required convenience init(coder: NSCoder) {
-    let one = coder.decodeObjectForKey("one") as! T
-    let two = coder.decodeObjectForKey("two") as! T
+    let one = coder.decodeObject(forKey: "one") as! T
+    let two = coder.decodeObject(forKey :"two") as! T
     self.init(one: one, two: two)
   }
 
-  @objc func encodeWithCoder(encoder: NSCoder) {
-    encoder.encodeObject(one, forKey: "one")
-    encoder.encodeObject(two, forKey: "two")
+  @objc(encodeWithCoder:) func encode(with encoder: NSCoder) {
+    encoder.encode(one, forKey: "one")
+    encoder.encode(two, forKey: "two")
   }
 }
 
@@ -39,7 +39,7 @@ func WEXITSTATUS(status: Int32) -> Int32 {
 func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
 
 var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
-  return _NSGetEnviron().memory
+  return _NSGetEnviron().pointee
 }
 
 func driver() {
@@ -55,7 +55,7 @@ func driver() {
 
   do {
     // Set up the archiver's stdout to feed into our pipe.
-    var archiverActions = posix_spawn_file_actions_t()
+    var archiverActions: posix_spawn_file_actions_t = nil
     guard posix_spawn_file_actions_init(&archiverActions) == 0 else {
       fatalError("posix_spawn_file_actions_init failed")
     }
@@ -84,7 +84,7 @@ func driver() {
 
   do {
     // Set up the unarchiver's stdin to read from our pipe.
-    var unarchiverActions = posix_spawn_file_actions_t()
+    var unarchiverActions: posix_spawn_file_actions_t = nil
     guard posix_spawn_file_actions_init(&unarchiverActions) == 0 else {
       fatalError("posix_spawn_file_actions_init failed")
     }
@@ -138,11 +138,9 @@ func driver() {
 
 func archive() {
   let data = NSMutableData()
-  let archiver = NSKeyedArchiver(forWritingWithMutableData: data)
-  archiver.encodeObject(Foo<NSString>(one: "one", two: "two"),
-                        forKey: "strings")
-  archiver.encodeObject(Foo<NSNumber>(one: 1, two: 2),
-                        forKey: "numbers")
+  let archiver = NSKeyedArchiver(forWritingWith: data)
+  archiver.encode(Foo<NSString>(one: "one", two: "two"), forKey: "strings")
+  archiver.encode(Foo<NSNumber>(one: 1, two: 2), forKey: "numbers")
   archiver.finishEncoding()
 
   // Output the archived data over stdout, which should be piped to stdin
@@ -165,7 +163,7 @@ func unarchive() {
   // written it.
   var rawData: [UInt8] = []
 
-  var buffer = [UInt8](count: 4096, repeatedValue: 0)
+  var buffer = [UInt8](repeating: 0, count: 4096)
 
   while true {
     let count = read(STDIN_FILENO, &buffer, 4096)
@@ -179,14 +177,14 @@ func unarchive() {
 
   // Feed it into an unarchiver.
   let data = NSData(bytes: rawData, length: rawData.count)
-  let unarchiver = NSKeyedUnarchiver(forReadingWithData: data)
+  let unarchiver = NSKeyedUnarchiver(forReadingWith: data)
 
   guard let strings
-      = unarchiver.decodeObjectForKey("strings") as? Foo<NSString> else {
+      = unarchiver.decodeObject(forKey: "strings") as? Foo<NSString> else {
     fatalError("unable to unarchive Foo<NSString>")
   }
   guard let numbers
-      = unarchiver.decodeObjectForKey("numbers") as? Foo<NSNumber> else {
+      = unarchiver.decodeObject(forKey: "numbers") as? Foo<NSNumber> else {
     fatalError("unable to unarchive Foo<NSNumber>")
   }
 

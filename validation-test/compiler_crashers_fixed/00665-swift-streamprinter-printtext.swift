@@ -10,4 +10,4 @@ protocol b = {
 }
 }
 class A {
-class b: SequenceType, A, 3):
+class b: Sequence, A, 3):

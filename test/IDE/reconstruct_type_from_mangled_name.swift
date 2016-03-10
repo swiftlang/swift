@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="cannot reconstruct"
 
 class Mystruct1 {
   func s1f1() -> Int { return 0 }

@@ -27,7 +27,7 @@ let OptionalTests = TestSuite("Optional")
 
 protocol TestProtocol1 {}
 
-// Check that the generic parameter is called 'Memory'.
+// Check the generic parameter name.
 extension Optional where Wrapped : TestProtocol1 {
   var _wrappedIsTestProtocol1: Bool {
     fatalError("not implemented")
@@ -45,30 +45,30 @@ OptionalTests.test("nil comparison") {
   expectFalse(x != nil)
 
   switch x {
-  case .Some(let y): expectUnreachable()
-  case .None: break
+  case .some(let y): expectUnreachable()
+  case .none: break
   }
 
-  x = .Some(1)
+  x = .some(1)
   expectTrue(x != nil)
 
   if true {
-    var y1: Int? = .None
+    var y1: Int? = .none
     expectTrue(y1 == nil)
 
-    var y2: Int? = .None
+    var y2: Int? = .none
     expectTrue(y2 == nil)
   }
 
   let x1: Int? = nil
-  let x2: Int? = .None
+  let x2: Int? = .none
 
   expectTrue(x1 == nil)
   expectTrue(x2 == nil)
 
   switch x {
-    case .Some(let y): expectEqual("1", "\(y)")
-    case .None: assert(false)
+    case .some(let y): expectEqual("1", "\(y)")
+    case .none: assert(false)
   }
 
   expectEqual("forced extraction: 1.", "forced extraction: \(x!).")
@@ -79,7 +79,7 @@ func testRelation(p: (Int?, Int?) -> Bool) -> [Bool] {
   typealias optPair = (Int?, Int?)
   
   let relationships: [optPair] = [
-    (1, 1), (1, 2), (2, 1), (1, .None), (.None, 1), (.None, .None)
+    (1, 1), (1, 2), (2, 1), (1, .none), (.none, 1), (.none, .none)
   ]
 
   return relationships.map { p($0, $1) }
@@ -180,12 +180,12 @@ OptionalTests.test("??") {
 
 OptionalTests.test("flatMap") {
   let half: Int32 -> Int16? =
-    { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .None } }
+    { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .none } }
 
   expectOptionalEqual(2 as Int16, half(4))
   expectEmpty(half(3))
 
-  expectEmpty((.None as Int32?).flatMap(half))
+  expectEmpty((.none as Int32?).flatMap(half))
   expectOptionalEqual(2 as Int16, (4 as Int32?).flatMap(half))
   expectEmpty((3 as Int32?).flatMap(half))
 }
@@ -253,14 +253,14 @@ class TestString : CustomStringConvertible, CustomDebugStringConvertible {
   }
 }
 class TestStream : Streamable {
-  func writeTo<Target : OutputStreamType>(target: inout Target) {
+  func write<Target : OutputStream>(to target: inout Target) {
     target.write("AStream")
   }
 }
 
 func debugPrintStr<T>(a: T) -> String {
   var s = ""
-  debugPrint(a, terminator: "", toStream: &s)
+  debugPrint(a, terminator: "", to: &s)
   return s
 }
 // Optional should not conform to output stream protocols itself, but is
@@ -322,6 +322,14 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(String(TestStream()), "AStream")
   expectEqual(String(optStream), "Optional(AStream)")
   expectEqual(debugPrintStr(optStream), "Optional(AStream)")
+}
+
+OptionalTests.test("unsafelyUnwrapped") {
+  let empty: Int? = nil
+  let nonEmpty: Int? = 3
+  expectEqual(3, nonEmpty.unsafelyUnwrapped)
+  expectCrashLater()
+  empty.unsafelyUnwrapped
 }
 
 runAllTests()

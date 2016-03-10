@@ -41,19 +41,19 @@ enum FooComparisonResult : Int {
   var rawValue: Int { get }
   
   // This is ascending
-  case OrderedAscending
-  case OrderedSame // But this is the same.
-  case OrderedDescending
+  case orderedAscending
+  case orderedSame // But this is the same.
+  case orderedDescending
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
-struct FooRuncingOptions : OptionSetType {
+struct FooRuncingOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
   
   // This is mince.
-  static var EnableMince: FooRuncingOptions { get }
-  static var EnableQuince: FooRuncingOptions { get } /* But this is quince */
+  static var enableMince: FooRuncingOptions { get }
+  static var enableQuince: FooRuncingOptions { get } /* But this is quince */
 }
 
 struct FooStruct1 {
@@ -277,7 +277,7 @@ class FooClassPropertyOwnership : FooClassBase {
 class FooUnavailableMembers : FooClassBase {
   convenience init!(int i: Int32)
   @available(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")
-  class func unavailableMembersWithInt(i: Int32) -> Self!
+  class func withInt(i: Int32) -> Self!
   
   @available(*, unavailable, message="x")
   func unavailable() // This comment should not show without decl. rdar://20092567
@@ -309,7 +309,7 @@ class FooUnavailableMembers : FooClassBase {
 
 class FooCFType {
 }
-@available(*, deprecated, renamed="FooCFType")
+@available(*, unavailable, renamed="FooCFType", message="Not available in Swift")
 typealias FooCFTypeRef = FooCFType
 @available(*, unavailable, message="Core Foundation objects are automatically memory managed")
 func FooCFTypeRelease(_: FooCFType!)
@@ -335,9 +335,9 @@ enum SCNFilterMode : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
   
-  case None
-  case Nearest
-  case Linear
+  case none
+  case nearest
+  case linear
   @available(*, unavailable)
   case SCNNoFiltering // This comment should not show without decl.
 }

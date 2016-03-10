@@ -32,7 +32,7 @@ class A: A {
 }
 class B : C {
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
 }
 class a<f : b, g : b where f.d == g> {
 }
@@ -40,7 +40,7 @@ protocol b {
 }
 struct c<h : b> : b {
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
 protocol A {
 }

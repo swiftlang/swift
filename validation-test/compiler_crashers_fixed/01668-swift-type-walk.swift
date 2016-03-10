@@ -26,7 +26,7 @@ protocol c where T> : String {
 print())
 typealias e where T> {
 }
-t: (start: (p: SequenceType> a {
+t: (start: (p: Sequence> a {
 }
 public class a = 0
 }
@@ -81,7 +81,7 @@ typealias F = c: C())
 class func d<T, U) -> Any, A.dynamicType)() -> T>
 init()
 }
-class b: BooleanType)
+class b: Boolean)
 typealias g<U : P> String
 }
 }

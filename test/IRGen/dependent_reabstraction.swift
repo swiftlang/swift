@@ -3,7 +3,7 @@
 func markUsed<T>(t: T) {}
 
 protocol A {
-  typealias B
+  associatedtype B
   func b(_: B)
 }
 

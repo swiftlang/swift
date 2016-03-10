@@ -12,7 +12,7 @@ g
 enum S<T
 enum S<T where T:C{enum B<T{
 class B
-struct S<T{enum S:CollectionType}
+struct S<T{enum S:Collection}
 enum S<B
 struct B<a
 enum B<b

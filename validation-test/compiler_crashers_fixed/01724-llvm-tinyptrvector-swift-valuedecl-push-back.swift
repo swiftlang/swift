@@ -7,6 +7,6 @@
 struct d>({
 typealias F = B? = """)
 public class A : A<d) -> ())
-}(f<I : SequenceType where f)
+}(f<I : Sequence where f)
 class A<S : d where h: d where T>: Hashable> {
 fu

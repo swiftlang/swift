@@ -9,5 +9,5 @@ typealias F = b: A> {
 }
 typealias b {
 }
-0.Generator.c<T : SequenceType where T, Any, g, x }
+0.Iterator.c<T : Sequence where T, Any, g, x }
 enum A : d whe

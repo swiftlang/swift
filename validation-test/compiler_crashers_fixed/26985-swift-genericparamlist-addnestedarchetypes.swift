@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-{protocol a{typealias d:CollectionType}{struct A<T:T.h
+{protocol a{typealias d:Collection}{struct A<T:T.h

@@ -21,7 +21,7 @@ return z: e where g(".startIndex, Any] {
 func g: U : d) {
 }
 }
-protocol b : BooleanType>
+protocol b : Boolean>
 typealias e = {
 typealias R = D> [T) -> T -> {
 convenience init("[0x31] = h: Array<1 {

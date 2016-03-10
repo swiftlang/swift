@@ -265,7 +265,7 @@ todo_include_todos = True
 #
 
 # Pull in the Swift lexers
-from os.path import dirname, abspath, join as join_paths
+from os.path import abspath, dirname, join as join_paths
 sys.path = [
     join_paths(dirname(dirname(abspath(__file__))), 'utils', 'pygments')
 ] + sys.path
@@ -276,6 +276,7 @@ sys.path.pop(0)
 
 # Monkeypatch pygments.lexers.get_lexer_by_name to return our lexers
 from pygments.lexers import get_lexer_by_name as original_get_lexer_by_name
+
 
 def swift_get_lexer_by_name(_alias, *args, **kw):
     if _alias == 'swift':

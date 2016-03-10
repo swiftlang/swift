@@ -75,7 +75,7 @@ public func strideofValue<T>(_:T) -> Int {
 }
 
 @warn_unused_result
-func _roundUpToAlignment(offset: Int, _ alignment: Int) -> Int {
+internal func _roundUp(offset: Int, toAlignment alignment: Int) -> Int {
   _sanityCheck(offset >= 0)
   _sanityCheck(alignment > 0)
   _sanityCheck(_isPowerOf2(alignment))
@@ -103,7 +103,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///
 @_transparent
 @warn_unused_result
-public func unsafeBitCast<T, U>(x: T, _: U.Type) -> U {
+public func unsafeBitCast<T, U>(x: T, to: U.Type) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
     "can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
@@ -113,13 +113,13 @@ public func unsafeBitCast<T, U>(x: T, _: U.Type) -> U {
 @_transparent
 @warn_unused_result
 public func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
-  return unsafeBitCast(x, AnyObject.self)
+  return unsafeBitCast(x, to: AnyObject.self)
 }
 
 @_transparent
 @warn_unused_result
 func ==(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
-  return unsafeBitCast(lhs, Int.self) == unsafeBitCast(rhs, Int.self)
+  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
@@ -131,7 +131,7 @@ func !=(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
 @_transparent
 @warn_unused_result
 func ==(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
-  return unsafeBitCast(lhs, Int.self) == unsafeBitCast(rhs, Int.self)
+  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
@@ -144,7 +144,7 @@ func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 /// `nil` or they both represent the same type.
 @warn_unused_result
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
-  return unsafeBitCast(t0, Int.self) == unsafeBitCast(t1, Int.self)
+  return unsafeBitCast(t0, to: Int.self) == unsafeBitCast(t1, to: Int.self)
 }
 
 /// Returns `false` iff `t0` is identical to `t1`; i.e. if they are both
@@ -202,8 +202,13 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
 /// object.
 @_transparent
 @warn_unused_result
-public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
+public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
+}
+
+@available(*, unavailable, renamed="unsafeAddress(of:)")
+public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
+  fatalError("unavailable function can't be called")
 }
 
 /// Converts a reference of type `T` to a reference of type `U` after
@@ -214,13 +219,13 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
 /// optional references.
 @_transparent
 @warn_unused_result
-public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
+public func _unsafeReferenceCast<T, U>(x: T, to: U.Type) -> U {
   return Builtin.castReference(x)
 }
 
 /// - returns: `x as T`.
 ///
-/// - Requires: `x is T`.  In particular, in -O builds, no test is
+/// - Precondition: `x is T`.  In particular, in -O builds, no test is
 ///   performed to ensure that `x` actually has dynamic type `T`.
 ///
 /// - Warning: Trades safety for performance.  Use `unsafeDowncast`
@@ -230,50 +235,18 @@ public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
 ///   checking is still performed in debug builds.
 @_transparent
 @warn_unused_result
-public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
-  _debugPrecondition(x is T, "invalid unsafeDowncast")
+public func unsafeDowncast<T : AnyObject>(x: AnyObject, to: T.Type) -> T {
+  _stdlibAssert(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
-}
-
-/// - Returns: `nonEmpty!`.
-///
-/// - Requires: `nonEmpty != nil`.  In particular, in -O builds, no test
-///   is performed to ensure that `nonEmpty` actually is non-nil.
-///
-/// - Warning: Trades safety for performance.  Use `unsafeUnwrap`
-///   only when `nonEmpty!` has proven to be a performance problem and
-///   you are confident that, always, `nonEmpty != nil`.  It is better
-///   than an `unsafeBitCast` because it's more restrictive, and
-///   because checking is still performed in debug builds.
-@inline(__always)
-@warn_unused_result
-public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
-  if let x = nonEmpty {
-    return x
-  }
-  _debugPreconditionFailure("unsafeUnwrap of nil optional")
-}
-
-/// - Returns: `unsafeUnwrap(nonEmpty)`.
-///
-/// This version is for internal stdlib use; it avoids any checking
-/// overhead for users, even in Debug builds.
-@inline(__always)
-@warn_unused_result
-public // SPI(SwiftExperimental)
-func _unsafeUnwrap<T>(nonEmpty: T?) -> T {
-  if let x = nonEmpty {
-    return x
-  }
-  _sanityCheckFailure("_unsafeUnwrap of nil optional")
 }
 
 @inline(__always)
 @warn_unused_result
 public func _getUnsafePointerToStoredProperties(x: AnyObject)
   -> UnsafeMutablePointer<UInt8> {
-  let storedPropertyOffset = _roundUpToAlignment(
-    sizeof(_HeapObject.self), alignof(Optional<AnyObject>.self))
+  let storedPropertyOffset = _roundUp(
+    sizeof(_HeapObject.self),
+    toAlignment: alignof(Optional<AnyObject>.self))
   return UnsafeMutablePointer<UInt8>(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
 }
@@ -289,7 +262,7 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
 @_transparent
 @_semantics("branchhint")
 @warn_unused_result
-internal func _branchHint<C : BooleanType>(actual: C, _ expected: Bool)
+internal func _branchHint<C : Boolean>(actual: C, expected: Bool)
   -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.boolValue._value, expected._value))
 }
@@ -298,16 +271,16 @@ internal func _branchHint<C : BooleanType>(actual: C, _ expected: Bool)
 @_transparent
 @_semantics("fastpath")
 @warn_unused_result
-public func _fastPath<C: BooleanType>(x: C) -> Bool {
-  return _branchHint(x.boolValue, true)
+public func _fastPath<C: Boolean>(x: C) -> Bool {
+  return _branchHint(x.boolValue, expected: true)
 }
 
 /// Optimizer hint that `x` is expected to be `false`.
 @_transparent
 @_semantics("slowpath")
 @warn_unused_result
-public func _slowPath<C : BooleanType>(x: C) -> Bool {
-  return _branchHint(x.boolValue, false)
+public func _slowPath<C : Boolean>(x: C) -> Bool {
+  return _branchHint(x.boolValue, expected: false)
 }
 
 //===--- Runtime shim wrappers --------------------------------------------===//
@@ -319,7 +292,7 @@ public func _slowPath<C : BooleanType>(x: C) -> Bool {
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
   return swift_objc_class_usesNativeSwiftReferenceCounting(
-    unsafeAddressOf(theClass)
+    unsafeAddress(of: theClass)
   )
 #else
   return true
@@ -429,7 +402,7 @@ internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
 /// Reference-counting and other operations on this
 /// object will have access to the knowledge that it is native.
 ///
-/// - Requires: `bits & _objectPointerIsObjCBit == 0`,
+/// - Precondition: `bits & _objectPointerIsObjCBit == 0`,
 ///   `bits & _objectPointerSpareBits == bits`.
 @inline(__always)
 @warn_unused_result
@@ -458,7 +431,7 @@ func _makeObjCBridgeObject(
 /// Create a `BridgeObject` around the given `object` with the
 /// given spare bits.
 ///
-/// - Requires:
+/// - Precondition:
 ///
 ///   1. `bits & _objectPointerSpareBits == bits`
 ///   2. if `object` is a tagged pointer, `bits == 0`.  Otherwise,
@@ -495,8 +468,8 @@ internal func _makeBridgeObject(
 public // @testable
 func _getSuperclass(t: AnyClass) -> AnyClass? {
   return unsafeBitCast(
-    swift_class_getSuperclass(unsafeBitCast(t, COpaquePointer.self)),
-    AnyClass.self)
+    swift_class_getSuperclass(unsafeBitCast(t, to: OpaquePointer.self)),
+    to: AnyClass.self)
 }
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
@@ -589,4 +562,9 @@ func _isPOD<T>(type: T.Type) -> Bool {
 public // @testable
 func _isOptional<T>(type: T.Type) -> Bool {
   return Bool(Builtin.isOptional(type))
+}
+
+@available(*, unavailable, message="Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
+public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
+  fatalError("unavailable function can't be called")
 }

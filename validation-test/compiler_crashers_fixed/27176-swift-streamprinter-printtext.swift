@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-{struct Q{class B:CollectionType}class B<T{struct Q<T where T:B{class A:B<T>
+{struct Q{class B:Collection}class B<T{struct Q<T where T:B{class A:B<T>

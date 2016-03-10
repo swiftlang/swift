@@ -39,7 +39,7 @@ class w: r, n {
 class n<x : n>
 func a<d>() -> [c{    enum b {
         case c
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }

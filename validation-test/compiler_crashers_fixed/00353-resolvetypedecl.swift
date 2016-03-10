@@ -18,5 +18,5 @@ c i: i {
 c otocol m : o h = h
 }
 deinit
-struct c<d: SequenceType, b where Optional<b> == d.{
+struct c<d: Sequence, b where Optional<b> == d.{
 f

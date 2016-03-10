@@ -60,7 +60,6 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILValueProjection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
@@ -68,6 +67,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/LSBase.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/DenseSet.h"
@@ -939,7 +939,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     }
 
     // Try to create as few aggregated stores as possible out of the locations.
-    LSLocation::reduce(L, Mod, Alives, TE);
+    LSLocation::reduce(L, Mod, Alives);
 
     // Oops, we have too many smaller stores generated, bail out.
     if (Alives.size() > MaxPartialDeadStoreCountLimit)
@@ -960,10 +960,8 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     // We merely setup the remaining live stores, but do not materialize in IR
     // yet, These stores will be materialized before the algorithm exits.
     for (auto &X : Alives) {
-      SILValue Value =
-          SILValueProjection::createExtract(Val, X.getPath(), I, true);
-      SILValue Addr =
-          SILValueProjection::createExtract(Mem, X.getPath(), I, false);
+      SILValue Value = X.getPath()->createExtract(Val, I, true);
+      SILValue Addr = X.getPath()->createExtract(Mem, I, false);
       S->LiveStores[Addr] = Value;
     }
 

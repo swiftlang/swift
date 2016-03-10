@@ -12,7 +12,7 @@ class A {
 {
 }
 1
-struct B:BooleanType w
+struct B:Boolean w
 }
 }protocol A{
 struct B<g:a

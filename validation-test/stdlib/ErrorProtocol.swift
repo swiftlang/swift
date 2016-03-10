@@ -15,15 +15,15 @@ import SwiftPrivatePthreadExtras
 import ObjectiveC
 #endif
 
-enum SomeError : ErrorType {
+enum SomeError : ErrorProtocol {
   case GoneToFail
 }
 
-struct ErrorTypeAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
+struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialData {
   class RaceData {
-    let error: ErrorType
+    let error: ErrorProtocol
 
-    init(error: ErrorType) {
+    init(error: ErrorProtocol) {
       self.error = error
     }
   }
@@ -38,9 +38,9 @@ struct ErrorTypeAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
     let ns = raceData.error as NSError
     // Use valueForKey to bypass bridging, so we can verify that the identity
     // of the unbridged NSString object is stable.
-    let domainInt: Int = unsafeBitCast(ns.valueForKey("domain"), Int.self)
+    let domainInt: Int = unsafeBitCast(ns.value(forKey: "domain"), to: Int.self)
     let code: Int = ns.code
-    let userInfoInt: Int = unsafeBitCast(ns.valueForKey("userInfo"), Int.self)
+    let userInfoInt: Int = unsafeBitCast(ns.value(forKey: "userInfo"), to: Int.self)
     return Observation3Int(domainInt, code, userInfoInt)
   }
 
@@ -52,8 +52,8 @@ struct ErrorTypeAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
   }
 }
 
-var ErrorTypeRaceTestSuite = TestSuite("ErrorType races")
-ErrorTypeRaceTestSuite.test("NSError bridging") {
-  runRaceTest(ErrorTypeAsNSErrorRaceTest.self, operations: 1000)
+var ErrorProtocolRaceTestSuite = TestSuite("ErrorProtocol races")
+ErrorProtocolRaceTestSuite.test("NSError bridging") {
+  runRaceTest(ErrorProtocolAsNSErrorRaceTest.self, operations: 1000)
 }
 runAllTests()

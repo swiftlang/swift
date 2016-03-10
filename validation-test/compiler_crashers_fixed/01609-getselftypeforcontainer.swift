@@ -10,7 +10,7 @@ func b: X<T> {
 func a)] {
 }
 }
-return b(t: CollectionType where I.b {
+return b(t: Collection where I.b {
 }
 }
 protocol c : a {

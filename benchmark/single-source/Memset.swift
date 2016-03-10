@@ -21,7 +21,7 @@ func memset(a: inout [Int], _ c: Int) {
 
 @inline(never)
 public func run_Memset(N: Int) {
-  var a = [Int](count: 10_000, repeatedValue: 0)
+  var a = [Int](repeating: 0, count: 10_000)
   for _ in 1...50*N {
     memset(&a, 1)
     memset(&a, 0)

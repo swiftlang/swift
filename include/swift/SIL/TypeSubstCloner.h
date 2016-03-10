@@ -208,7 +208,7 @@ protected:
       CanType Ty = Conformance.getConcrete()->getType()->getCanonicalType();
 
       if (Ty != newLookupType) {
-        assert(Ty->isSuperclassOf(newLookupType, nullptr) &&
+        assert(Ty->isExactSuperclassOf(newLookupType, nullptr) &&
                "Should only create upcasts for sub class.");
 
         // We use the super class as the new look up type.

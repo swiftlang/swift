@@ -1,4 +1,4 @@
-//===--- CollectionOfOne.swift - A CollectionType with one element --------===//
+//===--- CollectionOfOne.swift - A Collection with one element --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,73 +10,64 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator that produces one or fewer instances of `Element`.
-public struct GeneratorOfOne<Element> : GeneratorType, SequenceType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
-  /// Construct an instance that generates `element!`, or an empty
-  /// sequence if `element == nil`.
-  public init(_ element: Element?) {
-    self.elements = element
+/// An iterator that produces one or fewer instances of `Element`.
+public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
+  /// Construct an instance that generates `_element!`, or an empty
+  /// sequence if `_element == nil`.
+  public // @testable
+  init(_elements: Element?) {
+    self._elements = _elements
   }
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
+  /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Element? {
-    let result = elements
-    elements = nil
+    let result = _elements
+    _elements = nil
     return result
   }
-  var elements: Element?
+
+  internal var _elements: Element?
 }
 
 /// A collection containing a single element of type `Element`.
-public struct CollectionOfOne<Element> : CollectionType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
-  /// A type that represents a valid position in the collection.
-  ///
-  /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = Bit
+public struct CollectionOfOne<Element> : Collection {
 
   /// Construct an instance containing just `element`.
   public init(_ element: Element) {
-    self.element = element
+    self._element = element
   }
 
   /// The position of the first element.
-  public var startIndex: Index {
-    return .Zero
+  public var startIndex: Int {
+    return 0
   }
 
   /// The "past the end" position; always identical to
   /// `startIndex.successor()`.
   ///
   /// - Note: `endIndex` is not a valid argument to `subscript`.
-  public var endIndex: Index {
-    return .One
+  public var endIndex: Int {
+    return 1
   }
 
-  /// Returns a generator over the elements of this sequence.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func generate() -> GeneratorOfOne<Element> {
-    return GeneratorOfOne(element)
+  public func makeIterator() -> IteratorOverOne<Element> {
+    return IteratorOverOne(_elements: _element)
   }
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position == .Zero`.
-  public subscript(position: Index) -> Element {
-    _precondition(position == .Zero, "Index out of range")
-    return element
+  /// - Precondition: `position == 0`.
+  public subscript(position: Int) -> Element {
+    _precondition(position == 0, "Index out of range")
+    return _element
   }
 
   /// The number of elements (always one).
@@ -84,11 +75,21 @@ public struct CollectionOfOne<Element> : CollectionType {
     return 1
   }
 
-  let element: Element
+  internal let _element: Element
 }
 
 extension CollectionOfOne : CustomReflectable {
-  public func customMirror() -> Mirror {
-    return Mirror(self, children: ["element": element])
+  public var customMirror: Mirror {
+    return Mirror(self, children: ["element": _element])
+  }
+}
+
+@available(*, unavailable, renamed="IteratorOverOne")
+public struct GeneratorOfOne<Element> {}
+
+extension IteratorOverOne {
+  @available(*, unavailable, renamed="iterator")
+  public func generate() -> IteratorOverOne<Element> {
+    fatalError("unavailable function can't be called")
   }
 }

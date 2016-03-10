@@ -71,7 +71,8 @@ struct SourceCompleteResult {
       IndentLevel(0) {}
 };
 
-SourceCompleteResult isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
+SourceCompleteResult
+isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 SourceCompleteResult isSourceInputComplete(StringRef Text);
 
 bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
@@ -99,8 +100,8 @@ struct PlaceholderOccurrence {
   StringRef IdentifierReplacement;
 };
 
-/// Replaces Xcode editor placeholders (<#such as this#>) with dollar identifiers
-/// and returns a new memory buffer.
+/// Replaces Xcode editor placeholders (<#such as this#>) with dollar
+/// identifiers and returns a new memory buffer.
 ///
 /// The replacement identifier will be the same size as the placeholder so that
 /// the new buffer will have the same size as the input buffer.
@@ -112,9 +113,10 @@ std::unique_ptr<llvm::MemoryBuffer>
   replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
                       bool *HadPlaceholder = nullptr);
 
-void getLocationInfo(const ValueDecl *VD,
-                     llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
-                     StringRef &Filename);
+void getLocationInfo(
+    const ValueDecl *VD,
+    llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
+    StringRef &Filename);
 
 void getLocationInfoForClangNode(ClangNode ClangNode,
                                  ClangImporter *Importer,

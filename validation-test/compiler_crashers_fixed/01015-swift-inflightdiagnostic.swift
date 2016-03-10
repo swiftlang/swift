@@ -14,7 +14,7 @@ protocol C {
 func a<I : a {
 var a(")(self)
 }
-protocol B : SequenceType> Any, range.C> V {
+protocol B : Sequence> Any, range.C> V {
 struct c(a: T> U) {
 }
 class B {

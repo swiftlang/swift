@@ -2077,7 +2077,7 @@ public:
       require(toCanTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
       require(SILType::getPrimitiveObjectType(fromCanTy).
-              isSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
+              isBindableToSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
               "downcast must convert to a subclass");
     }
   }
@@ -2231,7 +2231,7 @@ public:
                          ->getInstanceType());
       require(instTy->getClassOrBoundGenericClass(),
               "upcast must convert a class metatype to a class metatype");
-      require(instTy->isSuperclassOf(opInstTy, nullptr),
+      require(instTy->isExactSuperclassOf(opInstTy, nullptr),
               "upcast must cast to a superclass or an existential metatype");
       return;
     }
@@ -2257,7 +2257,7 @@ public:
 
     require(ToTy.getClassOrBoundGenericClass(),
             "upcast must convert a class instance to a class type");
-    require(ToTy.isSuperclassOf(FromTy),
+    require(ToTy.isExactSuperclassOf(FromTy),
             "upcast must cast to a superclass");
   }
 

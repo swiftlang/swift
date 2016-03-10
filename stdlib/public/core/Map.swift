@@ -1,4 +1,4 @@
-//===--- Map.swift - Lazily map over a SequenceType -----------------------===//
+//===--- Map.swift - Lazily map over a Sequence ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,19 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The `GeneratorType` used by `MapSequence` and `MapCollection`.
+/// The `IteratorProtocol` used by `MapSequence` and `MapCollection`.
 /// Produces each element by passing the output of the `Base`
-/// `GeneratorType` through a transform function returning `Element`.
-public struct LazyMapGenerator<
-  Base : GeneratorType, Element
-> : GeneratorType, SequenceType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
+/// `IteratorProtocol` through a transform function returning `Element`.
+public struct LazyMapIterator<
+  Base : IteratorProtocol, Element
+> : IteratorProtocol, Sequence {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
+  /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Element? {
@@ -35,52 +32,49 @@ public struct LazyMapGenerator<
   internal let _transform: (Base.Element) -> Element
 }
 
-/// A `SequenceType` whose elements consist of those in a `Base`
-/// `SequenceType` passed through a transform function returning `Element`.
+/// A `Sequence` whose elements consist of those in a `Base`
+/// `Sequence` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct LazyMapSequence<Base : SequenceType, Element>
-  : LazySequenceType {
+public struct LazyMapSequence<Base : Sequence, Element>
+  : LazySequenceProtocol {
   
   public typealias Elements = LazyMapSequence
   
-  /// Returns a generator over the elements of this sequence.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyMapGenerator<Base.Generator, Element> {
-    return LazyMapGenerator(_base: _base.generate(), _transform: _transform)
+  public func makeIterator() -> LazyMapIterator<Base.Iterator, Element> {
+    return LazyMapIterator(_base: _base.makeIterator(), _transform: _transform)
   }
 
   /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  public func underestimateCount() -> Int {
-    return _base.underestimateCount()
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
   }
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  public init(_ base: Base, transform: (Base.Generator.Element) -> Element) {
-    self._base = base
+  internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
+    self._base = _base
     self._transform = transform
   }
-  
-  public var _base: Base
-  internal let _transform: (Base.Generator.Element) -> Element
 
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
+  internal var _base: Base
+  internal let _transform: (Base.Iterator.Element) -> Element
 }
 
 //===--- Collections ------------------------------------------------------===//
 
-/// A `CollectionType` whose elements consist of those in a `Base`
-/// `CollectionType` passed through a transform function returning `Element`.
+/// A `Collection` whose elements consist of those in a `Base`
+/// `Collection` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct LazyMapCollection<Base : CollectionType, Element>
-  : LazyCollectionType {
+public struct LazyMapCollection<Base : Collection, Element>
+  : LazyCollectionProtocol {
 
   // FIXME: Should be inferrable.
   public typealias Index = Base.Index
@@ -90,7 +84,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Base.Index) -> Element {
     return _transform(_base[position])
@@ -102,20 +96,20 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   public var first: Element? { return _base.first.map(_transform) }
   
 
-  /// Returns a generator over the elements of this sequence.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyMapGenerator<Base.Generator, Element> {
-    return LazyMapGenerator(_base: _base.generate(), _transform: _transform)
+  public func makeIterator() -> LazyMapIterator<Base.Iterator, Element> {
+    return LazyMapIterator(_base: _base.makeIterator(), _transform: _transform)
   }
 
-  public func underestimateCount() -> Int {
-    return _base.underestimateCount()
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
   }
 
   /// Returns the number of elements.
   ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
   public var count: Base.Index.Distance {
     return _base.count
@@ -123,70 +117,57 @@ public struct LazyMapCollection<Base : CollectionType, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  public init(_ base: Base, transform: (Base.Generator.Element) -> Element) {
-    self._base = base
+  internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
+    self._base = _base
     self._transform = transform
   }
-  
-  public var _base: Base
-  let _transform: (Base.Generator.Element) -> Element
 
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
+  internal var _base: Base
+  internal let _transform: (Base.Iterator.Element) -> Element
 }
 
 //===--- Support for s.lazy -----------------------------------------------===//
 
-extension LazySequenceType {
+extension LazySequenceProtocol {
   /// Returns a `LazyMapSequence` over this `Sequence`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   @warn_unused_result
   public func map<U>(
-    transform: (Elements.Generator.Element) -> U
+    transform: (Elements.Iterator.Element) -> U
   ) -> LazyMapSequence<Self.Elements, U> {
-    return LazyMapSequence(self.elements, transform: transform)
+    return LazyMapSequence(_base: self.elements, transform: transform)
   }
 }
 
-extension LazyCollectionType {
+extension LazyCollectionProtocol {
   /// Returns a `LazyMapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   @warn_unused_result
   public func map<U>(
-    transform: (Elements.Generator.Element) -> U
+    transform: (Elements.Iterator.Element) -> U
   ) -> LazyMapCollection<Self.Elements, U> {
-    return LazyMapCollection(self.elements, transform: transform)
+    return LazyMapCollection(_base: self.elements, transform: transform)
   }
 }
 
-/// Returns an `Array` containing the results of mapping `transform`
-/// over `source`.
-@available(*, unavailable, message="call the 'map()' method on the sequence")
-public func map<C : CollectionType, T>(
-  source: C, _ transform: (C.Generator.Element) -> T
-) -> [T] {
-  fatalError("unavailable function can't be called")
+@available(*, unavailable, renamed="LazyMapIterator")
+public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
+
+extension LazyMapSequence {
+  @available(*, unavailable, message="use '.lazy.map' on the sequence")
+  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
+    fatalError("unavailable function can't be called")
+  }
 }
 
-/// Returns an `Array` containing the results of mapping `transform`
-/// over `source` and flattening the result.
-@available(*, unavailable, message="call the 'flatMap()' method on the sequence")
-public func flatMap<C : CollectionType, T>(
-  source: C, _ transform: (C.Generator.Element) -> [T]
-) -> [T] {
-  fatalError("unavailable function can't be called")
+extension LazyMapCollection {
+  @available(*, unavailable, message="use '.lazy.map' on the collection")
+  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
+    fatalError("unavailable function can't be called")
+  }
 }
-
-@available(*, unavailable, renamed="LazyMapGenerator")
-public struct MapSequenceGenerator<Base : GeneratorType, T> {}
-
-@available(*, unavailable, renamed="LazyMapSequence")
-public struct MapSequenceView<Base : SequenceType, T> {}
-
-@available(*, unavailable, renamed="LazyMapCollection")
-public struct MapCollectionView<Base : CollectionType, T> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

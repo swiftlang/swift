@@ -31,7 +31,7 @@ import ObjectiveC
 var RangeTraps = TestSuite("RangeTraps")
 
 RangeTraps.test("HalfOpen")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -43,7 +43,7 @@ RangeTraps.test("HalfOpen")
 }
 
 RangeTraps.test("Closed")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -55,7 +55,7 @@ RangeTraps.test("Closed")
 }
 
 RangeTraps.test("OutOfRange")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

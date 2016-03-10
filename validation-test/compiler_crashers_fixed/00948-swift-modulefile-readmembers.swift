@@ -13,7 +13,7 @@ extension String {
 struct c: a {
 }
 get
-func a: BooleanType)
+func a: Boolean)
 }(g, y: Any] = B<T
 func a: T) {
 }

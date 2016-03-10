@@ -1286,12 +1286,12 @@ struct d2900_TypeSugar1 {
 
 // @warn_unused_result attribute
 public struct ArrayThingy {
-    // PASS_PRINT_AST: @warn_unused_result(mutable_variant="sortInPlace")
+    // PASS_PRINT_AST: @warn_unused_result(mutable_variant="sort")
     // PASS_PRINT_AST-NEXT: public func sort() -> ArrayThingy
-    @warn_unused_result(mutable_variant="sortInPlace")
+    @warn_unused_result(mutable_variant="sort")
     public func sort() -> ArrayThingy { return self }
 
-    public mutating func sortInPlace() { }
+    public mutating func sort() { }
 
     // PASS_PRINT_AST: @warn_unused_result(message="dummy", mutable_variant="reverseInPlace")
     // PASS_PRINT_AST-NEXT: public func reverse() -> ArrayThingy
@@ -1348,3 +1348,9 @@ extension ProtocolToExtend where Self.Assoc == Int {}
 // PASS_PRINT_AST: #elseif
 // PASS_PRINT_AST: #else
 // PASS_PRINT_AST: #endif
+
+public struct MyPair<A, B> { var a: A, b: B }
+public typealias MyPairI<B> = MyPair<Int, B>
+// PASS_PRINT_AST: public typealias MyPairI<B> = MyPair<Int, B>
+public typealias MyPairAlias<T, U> = MyPair<T, U>
+// PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>

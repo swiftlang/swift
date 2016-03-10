@@ -458,7 +458,7 @@ func testSingleQuoteStringLiterals() {
 
 // <rdar://problem/17128913>
 var s = ""
-s.appendContentsOf(["x"])
+s.append(contentsOf: ["x"])
 
 //===----------------------------------------------------------------------===//
 // InOut arguments
@@ -674,8 +674,8 @@ func invalidDictionaryLiteral() {
 
     
 // FIXME: The issue here is a type compatibility problem, there is no ambiguity.
-[4].joinWithSeparator([1]) // expected-error {{type of expression is ambiguous without more context}}
-[4].joinWithSeparator([[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
+[4].joined(separator: [1]) // expected-error {{type of expression is ambiguous without more context}}
+[4].joined(separator: [[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
@@ -691,10 +691,10 @@ nil != Int.self // expected-error {{binary operator '!=' cannot be applied to op
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
   a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{4-5=}}
-  a?.customMirror()
+  a?.customMirror
 
   b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
-  b?.customMirror()
+  b?.customMirror
 
   var _: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
 }
@@ -732,7 +732,7 @@ func testParenExprInTheWay() {
   if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
   
-  if x & x {} // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+  if x & x {} // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization

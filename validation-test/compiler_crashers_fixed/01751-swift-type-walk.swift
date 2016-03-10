@@ -8,10 +8,10 @@
 struct Q<f = {
 protocol a {
 class A {
-func b: SequenceType where H) -> Int -> {
+func b: Sequence where H) -> Int -> {
 }
 }
-func c<T: c] = f: CollectionType where I.C) {
+func c<T: c] = f: Collection where I.C) {
 protocol A {
 }
 func call() {

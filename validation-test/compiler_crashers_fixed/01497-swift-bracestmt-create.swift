@@ -36,7 +36,7 @@ func b() -> Bool {
 case A<1 {
 protocol b = b.a<T> T> String {
 }
-}("[1, length: CollectionType where d<Q<T -> (T> S.substringWithRange(T] in
+}("[1, length: Collection where d<Q<T -> (T> S.substringWithRange(T] in
 protocol a {
 }
 enum A : Hashable> Int {

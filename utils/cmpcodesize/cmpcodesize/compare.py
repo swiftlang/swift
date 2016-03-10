@@ -10,10 +10,11 @@
 
 from __future__ import print_function
 
-import re
-import os
-import subprocess
 import collections
+import os
+import re
+import subprocess
+
 from operator import itemgetter
 
 prefixes = {
@@ -60,9 +61,9 @@ def add_function(sizes, function, start_addr, end_addr, group_by_prefix):
     if group_by_prefix:
         for infix in sorted_infixes:
             if infix in function:
-               if generic_function_prefix not in function:
-                   sizes[infixes[infix]] += size
-                   return
+                if generic_function_prefix not in function:
+                    sizes[infixes[infix]] += size
+                    return
         for prefix in sorted_prefixes:
             if function.startswith(prefix):
                 # Special handling for function signature specializations
@@ -99,9 +100,9 @@ def read_sizes(sizes, file_name, function_details, group_by_prefix):
             if "arm64" in arch:
                 arch = "arm64"
     if arch is not None:
-      arch_params = ["-arch", arch]
+        arch_params = ["-arch", arch]
     else:
-      arch_params = []
+        arch_params = []
 
     if function_details:
         content = subprocess.check_output(flatten(["otool", arch_params, "-l", "-v", "-t", file_name])).split("\n")

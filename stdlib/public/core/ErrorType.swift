@@ -12,12 +12,12 @@
 
 // TODO: API review
 /// A type representing an error value that can be thrown.
-public protocol ErrorType {
+public protocol ErrorProtocol {
   var _domain: String { get }
   var _code: Int { get }
 }
 
-extension ErrorType {
+extension ErrorProtocol {
   public var _domain: String {
     return String(reflecting: self.dynamicType)
   }
@@ -28,33 +28,36 @@ extension ErrorType {
 // code as Objective-C values.
 @warn_unused_result
 @_silgen_name("swift_stdlib_getErrorDomainNSString")
-public func _stdlib_getErrorDomainNSString<T : ErrorType>(x: UnsafePointer<T>)
+public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>(x: UnsafePointer<T>)
 -> AnyObject {
-  return x.memory._domain._bridgeToObjectiveCImpl()
+  return x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
 @warn_unused_result
 @_silgen_name("swift_stdlib_getErrorCode")
-public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int {
-  return x.memory._code
+public func _stdlib_getErrorCode<T : ErrorProtocol>(x: UnsafePointer<T>) -> Int {
+  return x.pointee._code
 }
 
-// Known function for the compiler to use to coerce `ErrorType` instances to
-// `NSError`.
+// Known function for the compiler to use to coerce `ErrorProtocol` instances
+// to `NSError`.
 @warn_unused_result
-@_silgen_name("swift_bridgeErrorTypeToNSError")
-public func _bridgeErrorTypeToNSError(e: ErrorType) -> AnyObject
+@_silgen_name("swift_bridgeErrorProtocolToNSError")
+public func _bridgeErrorProtocolToNSError(error: ErrorProtocol) -> AnyObject
 #endif
 
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
 @_silgen_name("swift_unexpectedError")
-public func _unexpectedError(error: ErrorType) {
+public func _unexpectedError(error: ErrorProtocol) {
   preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.
 @_silgen_name("swift_errorInMain")
-public func _errorInMain(error: ErrorType) {
+public func _errorInMain(error: ErrorProtocol) {
   fatalError("Error raised at top level: \(String(reflecting: error))")
 }
+
+@available(*, unavailable, renamed="ErrorProtocol")
+public typealias ErrorType = ErrorProtocol

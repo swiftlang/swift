@@ -12,7 +12,7 @@ var b {
 protocol C {
 typealias d: S<d>(AnyObject> Any)() {
 struct c]("))"")
-typealias F = { _, let foo as BooleanType, A, g == T>()) {
+typealias F = { _, let foo as Boolean, A, g == T>()) {
 }
 }
 enum S<U) -

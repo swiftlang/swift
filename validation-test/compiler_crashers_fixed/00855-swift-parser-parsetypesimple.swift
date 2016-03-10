@@ -36,7 +36,7 @@ c(n: AnyObject, e: T) -> Any {
 case b where Optional<A, x in a {
 }
 i() -> {
-func g<I : c> T>: BooleanType, Any) {
+func g<I : c> T>: Boolean, Any) {
 }
 protocol A {
 }

@@ -521,7 +521,7 @@ found_inherited:
                                  subMap, conformanceMap);
   }
   assert((getType()->isEqual(foundInherited->getType()) ||
-          foundInherited->getType()->isSuperclassOf(getType(), nullptr))
+          foundInherited->getType()->isExactSuperclassOf(getType(), nullptr))
          && "inherited conformance does not match type");
   return foundInherited;
 }

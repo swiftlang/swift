@@ -6,7 +6,7 @@
 
 struct S<H : Int {
 protocol a {
-if c : A : SequenceType> () {
+if c : A : Sequence> () {
 print("").C> {
 enum B {
 }

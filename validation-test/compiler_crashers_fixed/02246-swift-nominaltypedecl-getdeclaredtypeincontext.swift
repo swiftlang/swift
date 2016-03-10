@@ -7,6 +7,6 @@
 func g<T : a {
 struct c> T -> <u, e = {
 }
-struct A<b, T where A: SequenceType> {
+struct A<b, T where A: Sequence> {
 typealias B = A"
 enum S

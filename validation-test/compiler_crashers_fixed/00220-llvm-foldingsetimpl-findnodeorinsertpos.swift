@@ -16,9 +16,9 @@ func a<T>() -> (T, T -> T) -> T {
     var b: ((T, T -> T) -> T)!
     return b
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 protocol a {
     class func c()
 }
@@ -57,13 +57,13 @@ class C: B, A {
 func e<T where T: A, T: B>(t: T) {
     t.c()
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
     return []
 }
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }

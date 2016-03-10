@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func a: BooleanType, U>, Any] as String)
+func a: Boolean, U>, Any] as String)
 let a {
 protocol d : a {
 func a

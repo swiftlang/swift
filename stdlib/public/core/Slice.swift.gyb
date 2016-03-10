@@ -40,7 +40,7 @@ def get_slice_doc_comment(Self):
 }%
 
 ${get_slice_doc_comment('Slice')}
-public struct Slice<Base : Indexable> : CollectionType {
+public struct Slice<Base : Indexable> : Collection {
 
   public typealias Index = Base.Index
 
@@ -54,16 +54,17 @@ public struct Slice<Base : Indexable> : CollectionType {
 
   public subscript(bounds: Range<Index>) -> Slice {
     Index._failEarlyRangeCheck2(
-      bounds.startIndex, rangeEnd: bounds.endIndex,
+      rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
       boundsStart: startIndex, boundsEnd: endIndex)
-    return Slice(base: _base, bounds: bounds)
+    return Slice(_base: _base, bounds: bounds)
   }
 
   /// Create a view into collection `base` that allows access within `bounds`.
   ///
   /// - Complexity: O(1).
-  public init(base: Base, bounds: Range<Index>) {
-    self._base = base
+  public // @testable
+  init(_base: Base, bounds: Range<Index>) {
+    self._base = _base
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
   }
@@ -77,7 +78,7 @@ ${get_slice_doc_comment('MutableSlice')}
 ///   to not invalidate indices.  If you are writing a collection and mutations
 ///   need to invalidate indices, don't use `MutableSlice`, use `Slice` or
 ///   define your own `Base.SubSequence` type that takes that into account.
-public struct MutableSlice<Base : MutableIndexable> : MutableCollectionType {
+public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
 
   public typealias Index = Base.Index
 
@@ -106,17 +107,18 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollectionType {
   public subscript(bounds: Range<Index>) -> MutableSlice {
     get {
       Index._failEarlyRangeCheck2(
-        bounds.startIndex, rangeEnd: bounds.endIndex,
+        rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
         boundsStart: startIndex, boundsEnd: endIndex)
-      return MutableSlice(base: _base, bounds: bounds)
+      return MutableSlice(_base: _base, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
   }
 
-  public init(base: Base, bounds: Range<Index>) {
-    self._base = base
+  public // @testable
+  init(_base: Base, bounds: Range<Index>) {
+    self._base = _base
     self._startIndex = bounds.startIndex
     self._endIndex = bounds.endIndex
   }
@@ -124,4 +126,18 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollectionType {
   internal var _base: Base
   internal var _startIndex: Index
   internal var _endIndex: Index
+}
+
+extension Slice {
+  @available(*, unavailable, message="use the slicing syntax")
+  public init(base: Base, bounds: Range<Index>) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension MutableSlice {
+  @available(*, unavailable, message="use the slicing syntax")
+  public init(base: Base, bounds: Range<Index>) {
+    fatalError("unavailable function can't be called")
+  }
 }

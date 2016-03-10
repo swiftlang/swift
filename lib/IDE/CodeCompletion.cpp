@@ -2694,12 +2694,12 @@ public:
     return false;
   }
 
-  void handleOptionSetType(Decl *D, DeclVisibilityKind Reason) {
+  void handleOptionSet(Decl *D, DeclVisibilityKind Reason) {
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      if (isOptionSetTypeDecl(NTD)) {
+      if (isOptionSetDecl(NTD)) {
         for (auto M : NTD->getMembers()) {
           if (auto *VD = dyn_cast<VarDecl>(M)) {
-            if (isOptionSetType(VD->getType()) && VD->isStatic()) {
+            if (isOptionSet(VD->getType()) && VD->isStatic()) {
               addVarDeclRef(VD, Reason);
             }
           }
@@ -2708,8 +2708,8 @@ public:
     }
   }
 
-  bool isOptionSetTypeDecl(NominalTypeDecl *D) {
-    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetTypeDecl());
+  bool isOptionSetDecl(NominalTypeDecl *D) {
+    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetDecl());
     if (!optionSetType)
       return false;
 
@@ -2718,10 +2718,10 @@ public:
                                 optionSetType, conformances);
   }
 
-  bool isOptionSetType(Type Ty) {
+  bool isOptionSet(Type Ty) {
     return Ty &&
            Ty->getNominalOrBoundGenericNominal() &&
-           isOptionSetTypeDecl(Ty->getNominalOrBoundGenericNominal());
+           isOptionSetDecl(Ty->getNominalOrBoundGenericNominal());
   }
 
   void getTupleExprCompletions(TupleType *ExprType) {
@@ -3117,12 +3117,24 @@ public:
       for (auto T : ExpectedTypes) {
         if (!T)
           continue;
+
+        auto typeRelation = CodeCompletionResult::Identical;
+        // Convert through optional types unless we're looking for a protocol
+        // that Optional itself conforms to.
+        if (kind != CodeCompletionLiteralKind::NilLiteral) {
+          if (auto optionalObjT = T->getAnyOptionalObjectType()) {
+            T = optionalObjT;
+            typeRelation = CodeCompletionResult::Convertible;
+          }
+        }
+
+        // Check for conformance to the literal protocol.
         if (auto *NTD = T->getAnyNominal()) {
           SmallVector<ProtocolConformance *, 2> conformances;
           if (NTD->lookupConformance(module, P, conformances)) {
             foundConformance = true;
             addTypeAnnotation(builder, T);
-            builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
+            builder.setExpectedTypeRelation(typeRelation);
           }
         }
       }
@@ -3246,12 +3258,15 @@ public:
       RequestedCachedResults = RequestedResultsTy::toplevelResults();
 
     // Manually add any expected nominal types from imported modules so that
-    // they get their expected type relation.
+    // they get their expected type relation. Don't include protocols, since
+    // they can't be initialized from the type name.
+    // FIXME: this does not include types that conform to an expected protocol.
     // FIXME: this creates duplicate results.
     for (auto T : ExpectedTypes) {
       if (auto NT = T->getAs<NominalType>()) {
         if (auto NTD = NT->getDecl()) {
-          if (NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
+          if (!isa<ProtocolDecl>(NTD) &&
+              NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
             addNominalTypeRef(NT->getDecl(),
                               DeclVisibilityKind::VisibleAtTopLevel);
           }
@@ -3304,7 +3319,7 @@ public:
         if (HandledDecls.count(NTD) == 0) {
           auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
           if (!Lookup.handleEnumElement(NTD, Reason)) {
-            Lookup.handleOptionSetType(NTD, Reason);
+            Lookup.handleOptionSet(NTD, Reason);
           }
           HandledDecls.insert(NTD);
         }
@@ -3347,7 +3362,7 @@ public:
       if (T && T->getNominalOrBoundGenericNominal()) {
         auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
         if (!handleEnumElement(T->getNominalOrBoundGenericNominal(), Reason)) {
-          handleOptionSetType(T->getNominalOrBoundGenericNominal(), Reason);
+          handleOptionSet(T->getNominalOrBoundGenericNominal(), Reason);
         }
       }
     }
@@ -3712,14 +3727,9 @@ public:
       NameOffset = Printer.NameOffset.getValue();
     }
 
-    Accessibility AccessibilityOfContext;
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(CurrDeclContext))
-      AccessibilityOfContext = NTD->getFormalAccess();
-    else
-      AccessibilityOfContext = cast<ExtensionDecl>(CurrDeclContext)
-                                   ->getExtendedType()
-                                   ->getAnyNominal()
-                                   ->getFormalAccess();
+    Accessibility AccessibilityOfContext =
+      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
+        ->getFormalAccess();
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
     bool missingAccess = !isKeywordSpecified("private") &&
@@ -3785,6 +3795,9 @@ public:
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       return;
 
+    if (AvailableAttr::isUnavailable(D))
+      return;
+
     if (D->getAttrs().hasAttribute<FinalAttr>())
       return;
 
@@ -3794,7 +3807,7 @@ public:
     bool hasIntroducer = hasFuncIntroducer || hasVarIntroducer;
 
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      // We can override operators as members.
+      // We cannot override operators as members.
       if (FD->isBinaryOperator() || FD->isUnaryOperator())
         return;
 
@@ -3825,10 +3838,7 @@ public:
   void addDesignatedInitializers(Type CurrTy) {
     if (!CurrTy)
       return;
-    const auto *NTD = CurrTy->getAnyNominal();
-    if (!NTD)
-      return;
-    const auto *CD = dyn_cast<ClassDecl>(NTD);
+    const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
     if (!CD)
       return;
     if (!CD->getSuperclass())
@@ -4404,7 +4414,7 @@ public:
          if (auto SEQ = FES->getSequence()) {
            if (SM.rangeContains(SEQ->getSourceRange(),
                                 ParsedExpr->getSourceRange())) {
-             Callback(Context.getSequenceTypeDecl()->getDeclaredInterfaceType());
+             Callback(Context.getSequenceDecl()->getDeclaredInterfaceType());
            }
          }
          break;
@@ -4743,16 +4753,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::GenericParams: {
-    if (auto NM = ParsedTypeLoc.getType()->getAnyNominal()) {
-      if (auto Params = NM->getGenericParams()) {
+  case CompletionKind::GenericParams:
+    if (auto GT = ParsedTypeLoc.getType()->getAnyGeneric()) {
+      if (auto Params = GT->getGenericParams()) {
         for (auto GP : Params->getParams()) {
-          Lookup.addGenericTypeParamRef(GP, DeclVisibilityKind::GenericParameter);
+          Lookup.addGenericTypeParamRef(GP,
+                                        DeclVisibilityKind::GenericParameter);
         }
       }
     }
     break;
-  }
   }
 
   if (Lookup.RequestedCachedResults) {

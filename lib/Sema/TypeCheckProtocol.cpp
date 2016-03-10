@@ -2026,6 +2026,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     assocType->getName(),
                                                     SourceLoc(),
                                                     TypeLoc::withoutLoc(type),
+                                                    /*genericparams*/nullptr, 
                                                     DC);
     Type metaType = MetatypeType::get(type);
     aliasDecl->computeType();
@@ -4107,8 +4108,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Hashable:
     return DerivedConformance::deriveHashable(*this, Decl, TypeDecl, Requirement);
     
-  case KnownProtocolKind::ErrorType:
-    return DerivedConformance::deriveErrorType(*this, Decl, TypeDecl, Requirement);
+  case KnownProtocolKind::ErrorProtocol:
+    return DerivedConformance::deriveErrorProtocol(*this, Decl, TypeDecl, Requirement);
 
   case KnownProtocolKind::BridgedNSError:
     return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,

@@ -211,13 +211,15 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   Type BaseType;
   DeclContext *DC;
   std::unique_ptr<ArchetypeSelfTransformer> pTransform;
+  bool IncludeUnconditional;
   std::unique_ptr<ExtMap> Results;
 
-  Implementation(NominalTypeDecl *Target):
+  Implementation(NominalTypeDecl *Target, bool IncludeUnconditional):
     Target(Target),
     BaseType(Target->getDeclaredTypeInContext()),
     DC(Target),
     pTransform(new ArchetypeSelfTransformer(Target)),
+    IncludeUnconditional(IncludeUnconditional),
     Results(collectSynthesizedExtensionInfo()) {}
 
   Type checkElementType(StringRef Text) {
@@ -270,7 +272,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     if (Arg.isNull())
       return GenericType;
     Arguments.push_back(Arg);
-
     auto GenericParams = NTD->getInnermostGenericParamTypes();
     assert(Arguments.size() == GenericParams.size());
     TypeSubstitutionMap Map;
@@ -279,12 +280,18 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       Map[(*It)->getCanonicalType()->castTo<SubstitutableType>()] =
         Arguments[Index];
     }
-    return NTD->getDeclaredTypeInContext().subst(DC->getParentModule(), Map, None);
+    auto MType = NTD->getInterfaceType().subst(DC->getParentModule(), Map, None);
+    return MType->getAs<AnyMetatypeType>()->getInstanceType();
   }
 
   SynthesizedExtensionInfo isApplicable(ExtensionDecl *Ext) {
-    assert(Ext->getGenericParams() && "Have no generic params.");
     SynthesizedExtensionInfo Result;
+    if (!Ext->isConstrainedExtension()) {
+      if (IncludeUnconditional)
+        Result.Ext = Ext;
+      return Result;
+    }
+    assert(Ext->getGenericParams() && "No generic params.");
     for (auto Req : Ext->getGenericParams()->getRequirements()){
       auto TupleOp = Req.getAsAnalyzedWrittenString();
       if (!TupleOp)
@@ -340,10 +347,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       NominalTypeDecl* Back = Unhandled.back();
       Unhandled.pop_back();
       for (ExtensionDecl *E : Back->getExtensions()) {
-        if(E->isConstrainedExtension()) {
-          if (auto Info = isApplicable(E))
-            (*pMap)[E] = Info;
-        }
+        if (auto Info = isApplicable(E))
+          (*pMap)[E] = Info;
         for (auto TL : Back->getInherited()) {
           addTypeLocNominal(TL);
         }
@@ -354,8 +359,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 };
 
 SynthesizedExtensionAnalyzer::
-SynthesizedExtensionAnalyzer(NominalTypeDecl *Target):
-  Impl(*(new Implementation(Target))) {}
+SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
+                             bool IncludeUnconditional):
+  Impl(*(new Implementation(Target, IncludeUnconditional))) {}
 
 SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 
@@ -1094,8 +1100,8 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       } else {
         Printer << ", ";
       }
-      auto NM = Arg->getAnyNominal();
-      assert(NM && "Cannot get nominal type.");
+      auto NM = Arg->getAnyGeneric();
+      assert(NM && "Cannot get generic type.");
       Printer.callPrintStructurePre(PrintStructureKind::GenericParameter, NM);
       Printer << NM->getNameStr(); // FIXME: PrintNameContext::GenericParameter
       Printer.printStructurePost(PrintStructureKind::GenericParameter, NM);
@@ -1915,6 +1921,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
+    }, [&]{ // Signature
+      printGenericParams(decl->getGenericParams());
     });
   bool ShouldPrint = true;
   Type Ty;
@@ -2384,7 +2392,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
         Printer << " -> ";
         // Use the non-repr external type, but reuse the TypeLoc printing code.
-        Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+        Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
         printTypeLoc(TypeLoc::withoutLoc(ResultTy));
         Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
       }
@@ -2475,7 +2483,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   });
   Printer << " -> ";
 
-  Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   printTypeLoc(decl->getElementTypeLoc());
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
 
@@ -3004,11 +3012,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!Options.FullyQualifiedTypesIfAmbiguous)
       return false;
 
-    Decl *D = nullptr;
-    if (auto *NAT = dyn_cast<NameAliasType>(T))
-      D = NAT->getDecl();
-    else
-      D = T->getAnyNominal();
+    Decl *D = T->getAnyGeneric();
 
     // If we cannot find the declaration, be extra careful and print
     // the type qualified.
@@ -3376,7 +3380,7 @@ public:
     
     Printer << " -> ";
 
-    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
@@ -3394,7 +3398,7 @@ public:
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
-    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
@@ -3548,7 +3552,7 @@ public:
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
-    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }

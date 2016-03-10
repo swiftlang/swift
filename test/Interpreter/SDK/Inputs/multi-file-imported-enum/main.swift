@@ -4,7 +4,7 @@ class B {
   func f() -> Bool {
     let now = NSDate()
     let later = NSDate.distantFuture() as! NSDate
-    return now.compare(later) != .OrderedDescending
+    return now.compare(later) != .orderedDescending
   }
 }
 

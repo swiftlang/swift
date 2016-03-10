@@ -11,7 +11,7 @@ struct d<f : e, g: e where g.h == f.h> {
 protocol e {
     typealias h
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
@@ -48,19 +48,19 @@ class B {
    B) {
     }
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 var f = 1
 var e: Int -> Int = {
     return $0
 }
 let d: Int =  { c, b in
 }(f, e)
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }

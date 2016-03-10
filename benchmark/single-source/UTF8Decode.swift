@@ -27,11 +27,20 @@ public func run_UTF8Decode(N: Int) {
 
   let strings = [ ascii, russian, japanese, emoji ].map { Array($0.utf8) }
 
+  func isEmpty(result: UnicodeDecodingResult) -> Bool {
+    switch result {
+    case .emptyInput:
+      return true
+    default:
+      return false
+    }
+  }
+
   for _ in 1...200*N {
     for string in strings {
-      var generator = string.generate()
+      var it = string.makeIterator()
       var utf8 = UTF8()
-      while !utf8.decode(&generator).isEmptyInput() { }
+      while !isEmpty(utf8.decode(&it)) { }
     }
   }
 }

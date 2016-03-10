@@ -1,19 +1,19 @@
 // RUN: not %target-swift-frontend %s -parse
 
 public protocol Indexable {
-  typealias Index : ForwardIndexType
+  typealias Index : ForwardIndex
   var startIndex: Index {get}
   var endIndex: Index {get}
   typealias _Element
   subscript(_i: Index) -> _Element {get}
 }
 
-protocol CollectionType : Indexable, SequenceType {}
+protocol Collection : Indexable, Sequence {}
 
-public struct IndexingGenerator<Elements : Indexable>
-  : GeneratorType, SequenceType {
+public struct IndexingIterator<Elements : Indexable>
+  : IteratorProtocol, Sequence {
   
-  public func generate() -> IndexingGenerator {
+  public func makeIterator() -> IndexingIterator {
     return self
   }
   
@@ -22,9 +22,9 @@ public struct IndexingGenerator<Elements : Indexable>
   }
 }
 
-extension SequenceType where Self : CollectionType {
-  func generate() -> IndexingGenerator<Self> {
-    return IndexingGenerator(self)
+extension Sequence where Self : Collection {
+  func makeIterator() -> IndexingIterator<Self> {
+    return IndexingIterator(self)
   }
 }
 

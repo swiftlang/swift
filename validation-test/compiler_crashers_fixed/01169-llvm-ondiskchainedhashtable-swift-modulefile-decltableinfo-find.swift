@@ -28,7 +28,7 @@ func q() {
 }
 func f() {
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
 c i<k : i> {
 }

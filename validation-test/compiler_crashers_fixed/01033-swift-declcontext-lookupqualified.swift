@@ -18,4 +18,4 @@ h  }
 }
 protocol f {
 }}
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>

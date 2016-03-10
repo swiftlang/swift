@@ -19,7 +19,7 @@ extension NSSet {
 static let c] = {
 }
 }
-var f: b[0x31] as BooleanType, range.C: String {
+var f: b[0x31] as Boolean, range.C: String {
 class A {
 }
 return "".Type) -> {

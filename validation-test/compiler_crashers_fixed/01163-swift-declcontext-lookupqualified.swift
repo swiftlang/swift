@@ -29,4 +29,4 @@ struct d<f : e, g: e where g.h == f.h> {
 protocol e {
 tyb
 }
-struct c<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S)
+struct c<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S)

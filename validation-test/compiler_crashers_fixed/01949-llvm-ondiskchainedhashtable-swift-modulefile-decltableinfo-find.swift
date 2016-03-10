@@ -11,5 +11,5 @@ class A {
 return x in x in 0) -> S) {
 }
 class A : S.startIndex)
-struct S<T where h: Bool) { self.Generator.<d
+struct S<T where h: Bool) { self.Iterator.<d
 class B = [$0.a

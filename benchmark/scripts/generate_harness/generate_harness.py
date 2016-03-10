@@ -14,10 +14,11 @@
 
 # Generate CMakeLists.txt and utils/main.swift from templates.
 
-import jinja2
-import os
 import glob
+import os
 import re
+
+import jinja2
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 perf_dir = os.path.realpath(os.path.join(script_dir, '../..'))
@@ -81,7 +82,7 @@ if __name__ == '__main__':
     for template_file in template_map:
         template_path = os.path.join(script_dir, template_file)
         template = template_env.get_template(template_path)
-        print template_map[template_file]
+        print(template_map[template_file])
         open(template_map[template_file], 'w').write(
             template.render(tests=tests,
                             multisource_benches=multisource_benches,

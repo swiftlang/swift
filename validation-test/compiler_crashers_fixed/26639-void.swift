@@ -3,6 +3,6 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class A{var:CollectionType}
+class A{var:Collection}
 }{class
 case,

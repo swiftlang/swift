@@ -103,7 +103,7 @@ Type TypeChecker::getUInt8Type(DeclContext *dc) {
 /// We call this the "exception type" to try to avoid confusion with
 /// the AST's ErrorType node.
 Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
-  if (NominalTypeDecl *decl = Context.getExceptionTypeDecl())
+  if (NominalTypeDecl *decl = Context.getErrorProtocolDecl())
     return decl->getDeclaredType();
 
   // Not really sugar, but the actual diagnostic text is fine.
@@ -450,6 +450,22 @@ Type TypeChecker::applyUnboundGenericArguments(
       return nullptr;
 
     genericArgTypes.push_back(genericArg.getType());
+  }
+  
+  // If we're completing a generic TypeAlias, then we map the types provided
+  // onto the underlying type.
+  if (auto *TAD = dyn_cast<TypeAliasDecl>(unbound->getDecl())) {
+    assert(TAD->getGenericParams()->getAllArchetypes().size()
+             == genericArgs.size() &&
+           "argument arity mismatch");
+
+    SmallVector<Substitution, 4> subs;
+    subs.reserve(genericArgs.size());
+    for (auto t : genericArgs)
+      subs.push_back(Substitution(t.getType(), {}));
+  
+    auto subst = TAD->getGenericParams()->getSubstitutionMap(subs);
+    return TAD->getUnderlyingType().subst(TAD->getParentModule(), subst, None);
   }
   
   // Form the bound generic type.
@@ -3302,7 +3318,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
 
   SmallVector<Identifier, 32> StdlibTypeNames;
 
-  StdlibTypeNames.push_back(Context.getIdentifier("COpaquePointer"));
+  StdlibTypeNames.push_back(Context.getIdentifier("OpaquePointer"));
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
   StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
 #include "swift/ClangImporter/BuiltinMappedTypes.def"

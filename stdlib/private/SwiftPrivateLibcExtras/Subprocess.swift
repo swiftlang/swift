@@ -64,7 +64,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 /// stderr.
 public func spawnChild(args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
-  var fileActions = posix_spawn_file_actions_t()
+  var fileActions: posix_spawn_file_actions_t = _make_posix_spawn_file_actions_t()
   if swift_posix_spawn_file_actions_init(&fileActions) != 0 {
     preconditionFailure("swift_posix_spawn_file_actions_init() failed")
   }
@@ -114,7 +114,7 @@ public func spawnChild(args: [String])
       &pid, Process.arguments[0], &fileActions, nil, $0, _getEnviron())
   }
   if spawnResult != 0 {
-    print(String.fromCString(strerror(spawnResult)))
+    print(String(cString: strerror(spawnResult)))
     preconditionFailure("swift_posix_spawn() failed")
   }
 
@@ -140,8 +140,16 @@ public func spawnChild(args: [String])
   return (pid, childStdin.writeFD, childStdout.readFD, childStderr.readFD)
 }
 
+internal func _make_posix_spawn_file_actions_t() -> posix_spawn_file_actions_t {
+#if os(Linux) || os(FreeBSD)
+  return posix_spawn_file_actions_t()
+#else
+  return nil
+#endif
+}
+
 internal func _readAll(fd: CInt) -> String {
-  var buffer = [UInt8](count: 1024, repeatedValue: 0)
+  var buffer = [UInt8](repeating: 0, count: 1024)
   var usedBytes = 0
   while true {
     let readResult: ssize_t = buffer.withUnsafeMutableBufferPointer {
@@ -177,14 +185,14 @@ internal func _signalToString(signal: Int) -> String {
 }
 
 public enum ProcessTerminationStatus : CustomStringConvertible {
-  case Exit(Int)
-  case Signal(Int)
+  case exit(Int)
+  case signal(Int)
 
   public var description: String {
     switch self {
-    case .Exit(let status):
+    case .exit(let status):
       return "Exit(\(status))"
-    case .Signal(let signal):
+    case .signal(let signal):
       return "Signal(\(_signalToString(signal)))"
     }
   }
@@ -196,10 +204,10 @@ public func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
     preconditionFailure("waitpid() failed")
   }
   if (WIFEXITED(status)) {
-    return .Exit(Int(WEXITSTATUS(status)))
+    return .exit(Int(WEXITSTATUS(status)))
   }
   if (WIFSIGNALED(status)) {
-    return .Signal(Int(WTERMSIG(status)))
+    return .signal(Int(WTERMSIG(status)))
   }
   preconditionFailure("did not understand what happened to child process")
 }
@@ -231,7 +239,7 @@ func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutableP
 
 internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
-  return _NSGetEnviron().memory
+  return _NSGetEnviron().pointee
 #elseif os(FreeBSD)
   return environ;
 #else

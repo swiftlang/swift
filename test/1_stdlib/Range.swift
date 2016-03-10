@@ -22,7 +22,7 @@ extension Range where Element : TestProtocol1 {
   }
 }
 
-extension RangeGenerator where Element : TestProtocol1 {
+extension RangeIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -33,14 +33,14 @@ var RangeTestSuite = TestSuite("Range")
 RangeTestSuite.test("ReverseRange") {
   // We no longer have a ReverseRange, but we can still make sure that
   // lazy reversal works correctly.
-  expectEqualSequence((0..<10).lazy.reverse(), [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
+  expectEqualSequence((0..<10).lazy.reversed(), [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
 }
 
 func isEquatable<E : Equatable>(e: E) {}
 
 RangeTestSuite.test("Range/Equatable") {
-  let r1 = Range(start: 0, end: 0)
-  let r2 = Range(start: 0, end: 1)
+  let r1: Range<Int> = 0..<0
+  let r2: Range<Int> = 0..<1
   isEquatable(r1)
   expectTrue(r1 == r1)
   expectFalse(r1 != r1)
@@ -49,7 +49,7 @@ RangeTestSuite.test("Range/Equatable") {
 }
 
 // Something to test with that distinguishes debugDescription from description
-struct X<T : ForwardIndexType> : ForwardIndexType, CustomStringConvertible, CustomDebugStringConvertible {
+struct X<T : ForwardIndex> : ForwardIndex, CustomStringConvertible, CustomDebugStringConvertible {
   init(_ a: T) {
     self.a = a
   }
@@ -69,7 +69,7 @@ struct X<T : ForwardIndexType> : ForwardIndexType, CustomStringConvertible, Cust
   var a: T
 }
 
-func == <T : ForwardIndexType>(lhs: X<T>, rhs: X<T>) -> Bool {
+func == <T : ForwardIndex>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 
@@ -95,7 +95,7 @@ RangeTestSuite.test("Pattern matching") {
 
 RangeTestSuite.test("stride") {
   var result = [Double]()
-  for i in (1.4).stride(through: 3.4, by: 1) {
+  for i in stride(from: 1.4, through: 3.4, by: 1) {
     result.append(i)
   }
   expectEqual([ 1.4, 2.4, 3.4 ], result)

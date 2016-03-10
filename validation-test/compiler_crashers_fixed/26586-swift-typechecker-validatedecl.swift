@@ -4,5 +4,5 @@
 // Test case found by fuzzing
 
 protocol A{
-typealias h:CollectionType
+typealias h:Collection
 typealias h}extension A

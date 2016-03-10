@@ -6,5 +6,5 @@
 
 struct S<d {
 init() {
-class a: SequenceType, c()
+class a: Sequence, c()
 typealias F = b(a)(2, 3)

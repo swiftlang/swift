@@ -1,6 +1,7 @@
 
 public enum Optional<T> {
-  case Some(T), None
+  case none
+  case some(T)
 }
 
 public struct B {

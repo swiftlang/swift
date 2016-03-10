@@ -18,17 +18,9 @@
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
 
-/// Unavailable; use `AnyGenerator<T>` instead.
-@available(*, unavailable, renamed="AnyGenerator")
-public struct GeneratorOf<T> {}
-
-/// Unavailable; use `AnySequence<T>` instead.
-@available(*, unavailable, renamed="AnySequence")
-public struct SequenceOf<T> {}
-
 internal struct _CollectionOf<
-  IndexType_ : ForwardIndexType, T
-> : CollectionType {
+  IndexType_ : ForwardIndex, T
+> : Collection {
   init(startIndex: IndexType_, endIndex: IndexType_,
       _ subscriptImpl: (IndexType_) -> T) {
     self.startIndex = startIndex
@@ -36,12 +28,12 @@ internal struct _CollectionOf<
     _subscriptImpl = subscriptImpl
   }
 
-  /// Returns a generator over the elements of this sequence.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  func generate() -> AnyGenerator<T> {
+  func makeIterator() -> AnyIterator<T> {
     var index = startIndex
-    return AnyGenerator {
+    return AnyIterator {
       () -> T? in
       if _fastPath(index != self.endIndex) {
         index._successorInPlace()
@@ -60,6 +52,3 @@ internal struct _CollectionOf<
 
   let _subscriptImpl: (IndexType_) -> T
 }
-
-@available(*, unavailable, message="SinkOf has been removed. Use (T) -> () closures directly instead.")
-public struct SinkOf<T> {}

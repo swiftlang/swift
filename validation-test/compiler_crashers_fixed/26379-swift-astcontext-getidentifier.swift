@@ -4,4 +4,4 @@
 // Test case found by fuzzing
 
 class a
-struct S<T where T:BooleanType typealias{a{{
+struct S<T where T:Boolean typealias{a{{

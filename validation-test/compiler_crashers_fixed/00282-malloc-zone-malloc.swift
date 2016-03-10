@@ -20,7 +20,7 @@ func n<q>() {
 }
     k {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b:  [c<d>] {
     return []
 }
@@ -28,7 +28,7 @@ protocol a {
 }
 class b: a {
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
 func a(x: Any, y: Any) -> (((Any, Any) -> Any) -> A  var d: b.Type
 protocol c : b { func b

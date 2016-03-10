@@ -24,7 +24,7 @@ for c : a {
 }
 }
 extension NSSet {
-private class A : SequenceType, b {
+private class A : Sequence, b {
 }
 class C<T) -> U -> U {
 }(x)

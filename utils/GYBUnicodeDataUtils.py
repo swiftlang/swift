@@ -8,26 +8,33 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-import re
 import codecs
+import re
+
 
 class UnicodeProperty(object):
     """Abstract base class for Unicode properties."""
 
     def __init__(self):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.__init__ is not implemented.")
 
     def get_default_value(self):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.get_default_value is not implemented.")
 
     def get_value(self, cp):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.get_value is not implemented.")
 
     def to_numeric_value(self, value):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.to_numeric_value is not implemented.")
 
     def get_numeric_value(self, cp):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.get_numeric_value is not implemented.")
+
 
 class GraphemeClusterBreakPropertyTable(UnicodeProperty):
     """Grapheme_Cluster_Break property."""
@@ -37,7 +44,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
 
     property_values = [None for i in range(0, 0x110000)]
 
-    # Note: Numeric values should be consistent with
+    # Note: Numeric values (including the names) should be consistent with
     # '_GraphemeClusterBreakPropertyValue' enum on the Swift side, and with
     # 'GraphemeClusterBreakProperty' in the compiler C++ code.  If there is a
     # reason for either of those to differ, then this mapping can be overridden
@@ -217,10 +224,12 @@ class UnicodeTrieGenerator(object):
         return cp & ((1 << self.bmp_data_offset_bits) - 1)
 
     def get_supp_first_level_index(self, cp):
-        return cp >> (self.supp_second_level_index_bits + self.supp_data_offset_bits)
+        return cp >> \
+            (self.supp_second_level_index_bits + self.supp_data_offset_bits)
 
     def get_supp_second_level_index(self, cp):
-        return (cp >> self.supp_data_offset_bits) & ((1 << self.supp_second_level_index_bits) - 1)
+        return (cp >> self.supp_data_offset_bits) & \
+            ((1 << self.supp_second_level_index_bits) - 1)
 
     def get_supp_data_offset(self, cp):
         return cp & ((1 << self.supp_data_offset_bits) - 1)
@@ -246,8 +255,8 @@ class UnicodeTrieGenerator(object):
         # maximum Unicode code point value is not 2^21-1 (0x1fffff), it is
         # 0x10ffff.
         self.supp_first_level_index_max = \
-            0x10ffff >> (self.supp_second_level_index_bits +
-                self.supp_data_offset_bits)
+            0x10ffff >> \
+            (self.supp_second_level_index_bits + self.supp_data_offset_bits)
 
         # A mapping from BMP first-level index to BMP data block index.
         self.bmp_lookup = [i for i in range(0, 1 << self.bmp_first_level_index_bits)]
@@ -359,8 +368,7 @@ class UnicodeTrieGenerator(object):
                     self.supp_data.pop(j)
                     for k in range(0, len(self.supp_lookup2)):
                         self.supp_lookup2[k] = \
-                            remap_indexes(self.supp_lookup2[k], old_idx=j,
-                                new_idx=i)
+                            remap_indexes(self.supp_lookup2[k], old_idx=j, new_idx=i)
                 else:
                     j += 1
             i += 1
@@ -444,6 +452,7 @@ class UnicodeTrieGenerator(object):
         self.supp_data_bytes_offset = len(self.trie_bytes)
         self.trie_bytes += supp_data_bytes
 
+
 def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_table):
     any_value = \
         grapheme_cluster_break_property_table.symbolic_values
@@ -492,8 +501,7 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
         row = rules_matrix[first]
 
         # Change strings into bits.
-        bits = [row[second] == 'no_boundary'
-            for second in any_value]
+        bits = [row[second] == 'no_boundary' for second in any_value]
 
         # Pack bits into an integer.
         packed = sum([bits[i] * pow(2, i) for i in range(0, len(bits))])
@@ -501,6 +509,7 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
         result += [packed]
 
     return result
+
 
 def get_grapheme_cluster_break_tests_as_utf8(grapheme_break_test_file_name):
     def _convert_line(line):
@@ -552,6 +561,7 @@ def get_grapheme_cluster_break_tests_as_utf8(grapheme_break_test_file_name):
                 result += [test]
 
     return result
+
 
 def get_grapheme_cluster_break_tests_as_unicode_scalars(grapheme_break_test_file_name):
     def _convert_line(line):

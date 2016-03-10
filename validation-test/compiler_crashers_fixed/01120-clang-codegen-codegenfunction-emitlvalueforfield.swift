@@ -49,7 +49,7 @@ protocol b = {
 }
 return p: a {
 }
-func d, d: SequenceType> {
+func d, d: Sequence> {
 }
 f = b> : Any, Any) {}
 extension String = b
@@ -123,7 +123,7 @@ protocol a {
 }
 extension A {
 }
-typealias g, U.Generator.<c<T>()
+typealias g, U.Iterator.<c<T>()
 import Foundation
 }
 (h> String {
@@ -175,4 +175,4 @@ import Foundation
 public var b, V, Bool) {
 struct X.E
 }
-let foo as BooleanType, AnyObject, T : B<Q<h
+let foo as Boolean, AnyObject, T : B<Q<h

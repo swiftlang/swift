@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class A : CollectionType where H) {
+class A : Collection where H) {
 }
 protocol a {
 enum A = {

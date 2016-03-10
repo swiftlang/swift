@@ -15,6 +15,6 @@ var _ = A.E == b: Int
 protocol P {
 struct A {
 }(b(Any) -> String {
-if true as BooleanType>(i("](B)
+if true as Boolean>(i("](B)
 typealias f : d where H) + seq
 func d

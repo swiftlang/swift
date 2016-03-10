@@ -88,7 +88,7 @@ Subsequent Parameters
 
   .. parsed-literal::
 
-    x.replaceRange(r, **with:** someElements)
+    x.replaceSubrange(r, **with:** someElements)
 
     p.initializeFrom(q, **count:** n)
   
@@ -200,7 +200,7 @@ Acceptable Short or Non-Descriptive Names
 
     func map<U>(transformation: T->U) -> [U] // not this one
 
-    func forEach<S: SequenceType>(body: (S.Generator.Element) -> ())
+    func forEach<S: SequenceType>(body: (S.Iterator.Element) -> ())
 
 Prefixes and Suffixes
 ---------------------

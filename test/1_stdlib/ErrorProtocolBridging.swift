@@ -16,7 +16,7 @@ import Foundation
 import CoreLocation
 import Darwin
 
-var ErrorTypeBridgingTests = TestSuite("ErrorTypeBridging")
+var ErrorProtocolBridgingTests = TestSuite("ErrorProtocolBridging")
 
 var NoisyErrorLifeCount = 0
 var NoisyErrorDeathCount = 0
@@ -30,7 +30,7 @@ protocol OtherClassProtocol : class {
   var otherClassProperty: String { get }
 }
 
-class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
+class NoisyError : ErrorProtocol, OtherProtocol, OtherClassProtocol {
   init() { NoisyErrorLifeCount += 1 }
   deinit { NoisyErrorDeathCount += 1 }
 
@@ -41,12 +41,12 @@ class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
   let otherClassProperty = "otherClassProperty"
 }
 
-@objc enum EnumError : Int, ErrorType {
+@objc enum EnumError : Int, ErrorProtocol {
   case BadError = 9000
   case ReallyBadError = 9001
 }
 
-ErrorTypeBridgingTests.test("NSError") {
+ErrorProtocolBridgingTests.test("NSError") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   autoreleasepool {
@@ -55,7 +55,7 @@ ErrorTypeBridgingTests.test("NSError") {
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
-    let e: ErrorType = ns
+    let e: ErrorProtocol = ns
     expectEqual(e._domain, "SomeDomain")
     expectEqual(e._code, 321)
 
@@ -67,7 +67,7 @@ ErrorTypeBridgingTests.test("NSError") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
+ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   autoreleasepool {
@@ -78,14 +78,14 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
   
-    let e: ErrorType = ns
+    let e: ErrorProtocol = ns
 
     let cocoaCode: Int?
     switch e {
     case let x as NSCocoaError:
       cocoaCode = x._code
       expectTrue(x.isFileError)
-      expectEqual(x, NSCocoaError.FileNoSuchFileError)
+      expectEqual(x, NSCocoaError.fileNoSuchFileError)
       expectEqual(x.hashValue, NSFileNoSuchFileError)
     default:
       cocoaCode = nil
@@ -98,7 +98,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
 
     let isNoSuchFileError: Bool
     switch e {
-    case NSCocoaError.FileNoSuchFileError:
+    case NSCocoaError.fileNoSuchFileError:
       isNoSuchFileError = true
     default:
       isNoSuchFileError = false
@@ -110,10 +110,10 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     let nsURL = NSError(domain: NSURLErrorDomain,
                         code: NSURLErrorBadURL,
                         userInfo: nil)
-    let eURL: ErrorType = nsURL
+    let eURL: ErrorProtocol = nsURL
     let isBadURLError: Bool
     switch eURL {
-    case NSURLError.BadURL:
+    case NSURLError.badURL:
       isBadURLError = true
     default:
       isBadURLError = false
@@ -123,12 +123,12 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
 
     // CoreLocation error domain
     let nsCL = NSError(domain: kCLErrorDomain,
-                       code: CLError.HeadingFailure.rawValue,
+                       code: CLError.headingFailure.rawValue,
                        userInfo: [:])
-    let eCL: ErrorType = nsCL
+    let eCL: ErrorProtocol = nsCL
     let isHeadingFailure: Bool
     switch eCL {
-    case CLError.HeadingFailure:
+    case CLError.headingFailure:
       isHeadingFailure = true
     default:
       isHeadingFailure = false
@@ -140,7 +140,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     let nsPOSIX = NSError(domain: NSPOSIXErrorDomain,
                           code: Int(EDEADLK),
                           userInfo: [:])
-    let ePOSIX: ErrorType = nsPOSIX
+    let ePOSIX: ErrorProtocol = nsPOSIX
     let isDeadlock: Bool
     switch ePOSIX {
     case POSIXError.EDEADLK:
@@ -155,7 +155,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     let nsMach = NSError(domain: NSMachErrorDomain,
                          code: Int(KERN_MEMORY_FAILURE),
                          userInfo: [:])
-    let eMach: ErrorType = nsMach
+    let eMach: ErrorProtocol = nsMach
     let isMemoryFailure: Bool
     switch eMach {
     case MachError.KERN_MEMORY_FAILURE:
@@ -174,23 +174,23 @@ func opaqueUpcastToAny<T>(x: T) -> Any {
   return x
 }
 
-struct StructError: ErrorType {
+struct StructError: ErrorProtocol {
   var _domain: String { return "StructError" }
   var _code: Int { return 4812 }
 }
 
-ErrorTypeBridgingTests.test("ErrorType-to-NSError bridging") {
+ErrorProtocolBridgingTests.test("ErrorProtocol-to-NSError bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   autoreleasepool {
-    let e: ErrorType = NoisyError()
+    let e: ErrorProtocol = NoisyError()
     let ns = e as NSError
     let ns2 = e as NSError
     expectTrue(ns === ns2)
     expectEqual(ns._domain, "NoisyError")
     expectEqual(ns._code, 123)
 
-    let e3: ErrorType = ns
+    let e3: ErrorProtocol = ns
     expectEqual(e3._domain, "NoisyError")
     expectEqual(e3._code, 123)
     let ns3 = e3 as NSError
@@ -203,7 +203,7 @@ ErrorTypeBridgingTests.test("ErrorType-to-NSError bridging") {
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
-    let nativeE: ErrorType = nativeNS
+    let nativeE: ErrorProtocol = nativeNS
     let nativeNS2 = nativeE as NSError
     expectTrue(nativeNS === nativeNS2)
     expectEqual(nativeNS2._domain, NSCocoaErrorDomain)
@@ -227,7 +227,7 @@ ErrorTypeBridgingTests.test("ErrorType-to-NSError bridging") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-ErrorTypeBridgingTests.test("enum-to-NSError round trip") {
+ErrorProtocolBridgingTests.test("enum-to-NSError round trip") {
   autoreleasepool {
     // Emulate throwing an error from Objective-C.
     func throwNSError(error: EnumError) throws {
@@ -267,7 +267,7 @@ ErrorTypeBridgingTests.test("enum-to-NSError round trip") {
 class SomeNSErrorSubclass: NSError {}
 
 
-ErrorTypeBridgingTests.test("Thrown NSError identity is preserved") {
+ErrorProtocolBridgingTests.test("Thrown NSError identity is preserved") {
   do {
     let e = NSError(domain: "ClericalError", code: 219,
                     userInfo: ["yeah": "yeah"])

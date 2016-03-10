@@ -13,23 +13,23 @@
 import StdlibUnittest
 
 extension TestSuite {
-  /// Adds a set of tests for `RangeReplaceableCollectionType` that is also a
+  /// Adds a set of tests for `RangeReplaceableCollection` that is also a
   /// slice type.
   public func addForwardRangeReplaceableSliceTests<
-    Collection : RangeReplaceableCollectionType,
-    CollectionWithEquatableElement : RangeReplaceableCollectionType
+    C : RangeReplaceableCollection,
+    CollectionWithEquatableElement : RangeReplaceableCollection
     where
-    Collection.SubSequence == Collection,
-    CollectionWithEquatableElement.Generator.Element : Equatable
+    C.SubSequence == C,
+    CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Generator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
-    extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([C.Iterator.Element]) -> C,
+    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
+    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Generator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -55,11 +55,11 @@ extension TestSuite {
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> Collection {
+    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(Collection.Type)
+    testNamePrefix += String(C.Type)
 
     //===------------------------------------------------------------------===//
     // removeFirst()
@@ -102,7 +102,7 @@ extension TestSuite {
         var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let survivingIndices =
           Array(
-            c.startIndex.advancedBy(numericCast(test.numberToRemove)) ..<
+            c.startIndex.advanced(by: numericCast(test.numberToRemove)) ..<
             c.endIndex
           )
         c.removeFirst(test.numberToRemove)
@@ -144,23 +144,23 @@ extension TestSuite {
   } // addForwardRangeReplaceableSliceTests
 
   public func addBidirectionalRangeReplaceableSliceTests<
-    Collection : RangeReplaceableCollectionType,
-    CollectionWithEquatableElement : RangeReplaceableCollectionType
+    C : RangeReplaceableCollection,
+    CollectionWithEquatableElement : RangeReplaceableCollection
     where
-    Collection.Index : BidirectionalIndexType,
-    Collection.SubSequence == Collection,
-    CollectionWithEquatableElement.Index : BidirectionalIndexType,
+    C.Index : BidirectionalIndex,
+    C.SubSequence == C,
+    CollectionWithEquatableElement.Index : BidirectionalIndex,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
-    CollectionWithEquatableElement.Generator.Element : Equatable
+    CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Generator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
-    extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([C.Iterator.Element]) -> C,
+    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
+    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Generator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -198,11 +198,11 @@ extension TestSuite {
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> Collection {
+    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(Collection.Type)
+    testNamePrefix += String(C.Type)
 
     //===------------------------------------------------------------------===//
     // removeLast()
@@ -248,7 +248,7 @@ extension TestSuite {
         let survivingIndices =
           Array(
             c.startIndex ..<
-            c.endIndex.advancedBy(numericCast(-test.numberToRemove))
+            c.endIndex.advanced(by: numericCast(-test.numberToRemove))
           )
         c.removeLast(test.numberToRemove)
         expectEqualSequence(
@@ -289,23 +289,23 @@ extension TestSuite {
   } // addBidirectionalRangeReplaceableSliceTests
 
   public func addRandomAccessRangeReplaceableSliceTests<
-    Collection : RangeReplaceableCollectionType,
-    CollectionWithEquatableElement : RangeReplaceableCollectionType
+    C : RangeReplaceableCollection,
+    CollectionWithEquatableElement : RangeReplaceableCollection
     where
-    Collection.Index : RandomAccessIndexType,
-    Collection.SubSequence == Collection,
-    CollectionWithEquatableElement.Index : RandomAccessIndexType,
+    C.Index : RandomAccessIndex,
+    C.SubSequence == C,
+    CollectionWithEquatableElement.Index : RandomAccessIndex,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
-    CollectionWithEquatableElement.Generator.Element : Equatable
+    CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Generator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
-    extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([C.Iterator.Element]) -> C,
+    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
+    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Generator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -343,7 +343,7 @@ extension TestSuite {
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
-    testNamePrefix += String(Collection.Type)
+    testNamePrefix += String(C.Type)
 
     // No tests yet.
   } // addRandomAccessRangeReplaceableCollectionTests

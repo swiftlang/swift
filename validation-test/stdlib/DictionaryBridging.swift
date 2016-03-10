@@ -22,7 +22,7 @@ import SwiftPrivatePthreadExtras
 import ObjectiveC
 #endif
 
-struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
+struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialData {
   class RaceData {
     var nsd: NSDictionary
     init(nsd: NSDictionary) {
@@ -49,8 +49,8 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
     raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsd = raceData.nsd
-    let v: AnyObject? = nsd.objectForKey(key)
-    return Observation(unsafeBitCast(v, UInt.self))
+    let v: AnyObject? = nsd.object(forKey: key)
+    return Observation(unsafeBitCast(v, to: UInt.self))
   }
 
   func evaluateObservations(
@@ -62,7 +62,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
 }
 
 struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
-  RaceTestWithPerTrialDataType {
+  RaceTestWithPerTrialData {
   class RaceData {
     var nsd: NSDictionary
     init(nsd: NSDictionary) {
@@ -90,10 +90,10 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
     let objcPairs = NSMutableArray()
     slurpFastEnumerationOfDictionaryFromObjCImpl(nsd, nsd, objcPairs)
     return Observation(
-      unsafeBitCast(objcPairs[0], UInt.self),
-      unsafeBitCast(objcPairs[1], UInt.self),
-      unsafeBitCast(objcPairs[2], UInt.self),
-      unsafeBitCast(objcPairs[3], UInt.self))
+      unsafeBitCast(objcPairs[0], to: UInt.self),
+      unsafeBitCast(objcPairs[1], to: UInt.self),
+      unsafeBitCast(objcPairs[2], to: UInt.self),
+      unsafeBitCast(objcPairs[3], to: UInt.self))
   }
 
   func evaluateObservations(

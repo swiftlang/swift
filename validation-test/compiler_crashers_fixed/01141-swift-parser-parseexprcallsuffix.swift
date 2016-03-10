@@ -23,14 +23,14 @@ func f<T>() -> T -> T {
 protocol P {
 }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b:  [c<d>] {
 }
 protocol a {
 }
 class b: a {
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
 func e() {
 }

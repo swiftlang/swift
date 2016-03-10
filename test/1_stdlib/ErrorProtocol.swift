@@ -11,7 +11,7 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-var ErrorTypeTests = TestSuite("ErrorType")
+var ErrorProtocolTests = TestSuite("ErrorProtocol")
 
 var NoisyErrorLifeCount = 0
 var NoisyErrorDeathCount = 0
@@ -24,7 +24,7 @@ protocol OtherClassProtocol : class {
   var otherClassProperty: String { get }
 }
 
-class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
+class NoisyError : ErrorProtocol, OtherProtocol, OtherClassProtocol {
   init() { NoisyErrorLifeCount += 1 }
   deinit { NoisyErrorDeathCount += 1 }
 
@@ -35,11 +35,11 @@ class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
   let otherClassProperty = "otherClassProperty"
 }
 
-ErrorTypeTests.test("erasure") {
+ErrorProtocolTests.test("erasure") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   do {
-    let e: ErrorType = NoisyError()
+    let e: ErrorProtocol = NoisyError()
 
     expectEqual(e._domain, "NoisyError")
     expectEqual(e._code, 123)
@@ -47,71 +47,71 @@ ErrorTypeTests.test("erasure") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-ErrorTypeTests.test("reflection") {
+ErrorProtocolTests.test("reflection") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   do {
     let ne = NoisyError()
-    let e: ErrorType = ne
+    let e: ErrorProtocol = ne
 
     var neDump = "", eDump = ""
-    dump(ne, &neDump)
-    dump(e, &eDump)
+    dump(ne, to: &neDump)
+    dump(e, to: &eDump)
 
     expectEqual(eDump, neDump)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-ErrorTypeTests.test("dynamic casts") {
+ErrorProtocolTests.test("dynamic casts") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   do {
     let ne = NoisyError()
-    let e: ErrorType = ne
+    let e: ErrorProtocol = ne
 
     expectTrue(e as! NoisyError === ne)
     expectEqual((e as! OtherClassProtocol).otherClassProperty, "otherClassProperty")
     expectEqual((e as! OtherProtocol).otherProperty, "otherProperty")
 
     let op: OtherProtocol = ne
-    expectEqual((op as! ErrorType)._domain, "NoisyError")
-    expectEqual((op as! ErrorType)._code, 123)
+    expectEqual((op as! ErrorProtocol)._domain, "NoisyError")
+    expectEqual((op as! ErrorProtocol)._code, 123)
 
     let ocp: OtherClassProtocol = ne
-    expectEqual((ocp as! ErrorType)._domain, "NoisyError")
-    expectEqual((ocp as! ErrorType)._code, 123)
+    expectEqual((ocp as! ErrorProtocol)._domain, "NoisyError")
+    expectEqual((ocp as! ErrorProtocol)._code, 123)
 
     // Do the same with rvalues, so we exercise the
     // take-on-success/destroy-on-failure paths.
 
-    expectEqual(((NoisyError() as ErrorType) as! NoisyError)._domain, "NoisyError")
-    expectEqual(((NoisyError() as ErrorType) as! OtherClassProtocol).otherClassProperty, "otherClassProperty")
-    expectEqual(((NoisyError() as ErrorType) as! OtherProtocol).otherProperty, "otherProperty")
+    expectEqual(((NoisyError() as ErrorProtocol) as! NoisyError)._domain, "NoisyError")
+    expectEqual(((NoisyError() as ErrorProtocol) as! OtherClassProtocol).otherClassProperty, "otherClassProperty")
+    expectEqual(((NoisyError() as ErrorProtocol) as! OtherProtocol).otherProperty, "otherProperty")
 
-    expectEqual(((NoisyError() as OtherProtocol) as! ErrorType)._domain, "NoisyError")
-    expectEqual(((NoisyError() as OtherProtocol) as! ErrorType)._code, 123)
+    expectEqual(((NoisyError() as OtherProtocol) as! ErrorProtocol)._domain, "NoisyError")
+    expectEqual(((NoisyError() as OtherProtocol) as! ErrorProtocol)._code, 123)
 
-    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorType)._domain, "NoisyError")
-    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorType)._code, 123)
+    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorProtocol)._domain, "NoisyError")
+    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorProtocol)._code, 123)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-struct DefaultStruct : ErrorType { }
-class DefaultClass : ErrorType { }
+struct DefaultStruct : ErrorProtocol { }
+class DefaultClass : ErrorProtocol { }
 
-ErrorTypeTests.test("default domain and code") {
+ErrorProtocolTests.test("default domain and code") {
   expectEqual(DefaultStruct()._domain, "main.DefaultStruct")
   expectEqual(DefaultStruct()._code, 1)
   expectEqual(DefaultClass()._domain, "main.DefaultClass")
   expectEqual(DefaultClass()._code, 1)
 }
 
-enum SillyError: ErrorType { case JazzHands }
+enum SillyError: ErrorProtocol { case JazzHands }
 
-ErrorTypeTests.test("try!")
-  .skip(.Custom({ _isFastAssertConfiguration() },
+ErrorProtocolTests.test("try!")
+  .skip(.custom({ _isFastAssertConfiguration() },
                 reason: "trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration()
                         ? "'try!' expression unexpectedly raised an error: "
@@ -122,7 +122,7 @@ ErrorTypeTests.test("try!")
     let _: () = try! { throw SillyError.JazzHands }()
   }
 
-ErrorTypeTests.test("try?") {
+ErrorProtocolTests.test("try?") {
   var value = try? { () throws -> Int in return 1 }()
   expectType(Optional<Int>.self, &value)
   expectEqual(Optional(1), value)
@@ -130,14 +130,14 @@ ErrorTypeTests.test("try?") {
   expectEmpty(try? { () throws -> Int in throw SillyError.JazzHands }())
 }
 
-enum LifetimeError : ErrorType {
+enum LifetimeError : ErrorProtocol {
   case MistakeOfALifetime(LifetimeTracked, yearsIncarcerated: Int)
 }
 
-ErrorTypeTests.test("existential in lvalue") {
+ErrorProtocolTests.test("existential in lvalue") {
   expectEqual(0, LifetimeTracked.instances)
   do {
-    var e: ErrorType? = nil
+    var e: ErrorProtocol? = nil
     do {
       throw LifetimeError.MistakeOfALifetime(LifetimeTracked(0),
                                              yearsIncarcerated: 25)

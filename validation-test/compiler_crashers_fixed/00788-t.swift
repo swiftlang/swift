@@ -25,5 +25,5 @@ protocol b {
 () {
 return self.A"a: H) ->())
 }
-func d.Generator.Element>(Any, let end = ")
+func d.Iterator.Element>(Any, let end = ")
 typealias h: d == c

@@ -14,14 +14,14 @@
 
 /// A type that represents a Boolean value.
 ///
-/// Types that conform to the `BooleanType` protocol can be used as
+/// Types that conform to the `Boolean` protocol can be used as
 /// the condition in control statements (`if`, `while`, C-style `for`)
 /// and other logical value contexts (e.g., `case` statement guards).
 ///
 /// Only three types provided by Swift, `Bool`, `DarwinBoolean`, and `ObjCBool`,
-/// conform to `BooleanType`. Expanding this set to include types that
+/// conform to `Boolean`. Expanding this set to include types that
 /// represent more than simple boolean values is discouraged.
-public protocol BooleanType {
+public protocol Boolean {
   /// The value of `self`, expressed as a `Bool`.
   var boolValue: Bool { get }
 }
@@ -129,7 +129,7 @@ public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
 
   init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1)
 }
 
@@ -149,7 +149,7 @@ public protocol _BuiltinStringLiteralConvertible
 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1)
 }
 
@@ -158,7 +158,7 @@ public protocol _BuiltinUTF16StringLiteralConvertible
 
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    numberOfCodeUnits: Builtin.Word)
+    utf16CodeUnitCount: Builtin.Word)
 }
 
 /// Conforming types can be initialized with arbitrary string literals.
@@ -225,3 +225,6 @@ public protocol _FileReferenceLiteralConvertible {
 /// destructor may store to memory on destruction.
 public protocol _DestructorSafeContainer {
 }
+
+@available(*, unavailable, renamed="Boolean")
+public typealias BooleanType = Boolean

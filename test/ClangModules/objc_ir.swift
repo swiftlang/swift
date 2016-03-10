@@ -20,10 +20,10 @@ import ObjCIRExtras
 func instanceMethods(b: B) {
   // CHECK: load i8*, i8** @"\01L_selector(method:withFloat:)"
   // CHECK: call i32 bitcast (void ()* @objc_msgSend to i32
-  var i = b.method(1, withFloat:2.5)
+  var i = b.method(1, with: 2.5 as Float)
   // CHECK: load i8*, i8** @"\01L_selector(method:withDouble:)"
   // CHECK: call i32 bitcast (void ()* @objc_msgSend to i32
-  i = i + b.method(1, withDouble:2.5)
+  i = i + b.method(1, with: 2.5 as Double)
 }
 
 // CHECK: define hidden void @_TF7objc_ir16extensionMethodsFT1bCSo1B_T_
@@ -88,7 +88,7 @@ func almostSubscriptable(as1 as1: AlmostSubscriptable, a: A) {
 // CHECK: define hidden void @_TF7objc_ir13protocolTypesFT1aCSo7NSMince1bPSo9NSRuncing__T_(%CSo7NSMince*, %objc_object*) {{.*}} {
 func protocolTypes(a a: NSMince, b: NSRuncing) {
   // - (void)eatWith:(id <NSRuncing>)runcer;
-  a.eatWith(b)
+  a.eat(with: b)
   // CHECK: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(eatWith:)", align 8
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE:%.*]]*, i8*, i8*)*)([[OPAQUE:%.*]]* {{%.*}}, i8* [[SEL]], i8* {{%.*}})
 }
@@ -106,9 +106,9 @@ func pointerProperties(obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIntPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIdPtr:)"
-  obj.voidPtr = UnsafeMutablePointer()
-  obj.intPtr = UnsafeMutablePointer()
-  obj.idPtr = AutoreleasingUnsafeMutablePointer()
+  obj.voidPtr = nil as UnsafeMutablePointer
+  obj.intPtr = nil as UnsafeMutablePointer
+  obj.idPtr = nil as AutoreleasingUnsafeMutablePointer
 }
 
 // CHECK-LABEL: define hidden void @_TF7objc_ir20customFactoryMethodsFT_T_() {{.*}} {

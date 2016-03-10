@@ -209,13 +209,12 @@ func callMin(x: Int, y: Int, a: Float, b: Float) {
 }
 
 func rangeOfIsBefore<
-  R : GeneratorType where R.Element : IsBefore
->(range : R) { }
-
+  R : IteratorProtocol where R.Element : IsBefore
+>(range: R) { }
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
-  rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{ambiguous reference to member 'generate()'}}
+  rangeOfIsBefore(ia.makeIterator())
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{ambiguous reference to member 'makeIterator()'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -273,8 +272,8 @@ protocol Bool_ {}
 struct False : Bool_ {}
 struct True : Bool_ {}
 
-postfix func <*> <B:Bool_>(_: Test<B>) -> Int? { return .None }
-postfix func <*> (_: Test<True>) -> String? { return .None }
+postfix func <*> <B:Bool_>(_: Test<B>) -> Int? { return .none }
+postfix func <*> (_: Test<True>) -> String? { return .none }
 
 class Test<C: Bool_> : MetaFunction {
   typealias Result = Int
@@ -291,7 +290,7 @@ class DeducePropertyParams {
 // SR-69
 struct A {}
 func foo() {
-    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'SequenceType'}}
+    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'Sequence'}}
     }
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
     let k = min(A(), A()) // expected-error{{argument type 'A' does not conform to expected type 'Comparable'}}

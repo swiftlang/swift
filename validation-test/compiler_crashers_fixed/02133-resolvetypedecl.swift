@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class b<T : I.b where B : AnyObject, (A, g = b> : S.Generator.sr {
+class b<T : I.b where B : AnyObject, (A, g = b> : S.Iterator.sr {
 var b> ("],
 if true {
 class A : Any, AnyObject) -> U) {

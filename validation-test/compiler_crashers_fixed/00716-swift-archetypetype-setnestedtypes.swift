@@ -7,5 +7,5 @@
 func a<l : T) {
 protocol a {
 struct d: a = c(start: B
-case s(seq: SequenceType, T>()"foo"")
+case s(seq: Sequence, T>()"foo"")
 func a<e: d

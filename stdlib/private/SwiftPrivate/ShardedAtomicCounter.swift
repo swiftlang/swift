@@ -33,17 +33,17 @@ public struct _stdlib_ShardedAtomicCounter {
   public init() {
     let hardwareConcurrency = _stdlib_getHardwareConcurrency()
     let count = max(8, hardwareConcurrency * hardwareConcurrency)
-    let shards = UnsafeMutablePointer<Int>.alloc(count)
+    let shards = UnsafeMutablePointer<Int>(allocatingCapacity: count)
     for i in 0..<count {
-      (shards + i).initialize(0)
+      (shards + i).initialize(with: 0)
     }
     self._shardsPtr = shards
     self._shardsCount = count
   }
 
   public func `deinit`() {
-    self._shardsPtr.destroy(self._shardsCount)
-    self._shardsPtr.dealloc(self._shardsCount)
+    self._shardsPtr.deinitialize(count: self._shardsCount)
+    self._shardsPtr.deallocateCapacity(self._shardsCount)
   }
 
   public func add(operand: Int, randomInt: Int) {

@@ -35,7 +35,7 @@ protocol XStreamable {
 /// declare conformance: simply give the type a debugFormat().
 protocol XDebugPrintable {
 
-  typealias DebugRepresentation : XStreamable // = String
+  associatedtype DebugRepresentation : XStreamable // = String
 
   /// \brief Produce a textual representation for the REPL and
   /// Debugger.
@@ -89,7 +89,7 @@ func ~> <T:XDebugPrintable> (x: T, _: __PrintedFormat) -> T.DebugRepresentation 
 /// to do is declare conformance to XPrintable, and there's nothing to
 /// implement.
 protocol XPrintable: XDebugPrintable {
-  typealias PrintRepresentation: XStreamable = DebugRepresentation
+  associatedtype PrintRepresentation: XStreamable = DebugRepresentation
 
   /// \brief produce a "pretty" textual representation that can be
   /// distinct from the debug format.  For example,
@@ -132,7 +132,7 @@ struct EscapedStringFormat : XStreamable {
   func writeTo<Target: XOutputStream>(target: inout Target) {
     target.append("\"")
     for c in _value.unicodeScalars {
-      target.append(c.escape(asASCII: true))
+      target.append(c.escaped(asASCII: true))
     }
     target.append("\"")
   }
@@ -154,7 +154,7 @@ extension String : XPrintable {
 }
 
 /// \brief An integral type that can be printed
-protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumberType, XPrintable {
+protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber, XPrintable {
   func %(lhs: Self, rhs: Self) -> Self
   func /(lhs: Self, rhs: Self) -> Self
 

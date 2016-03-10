@@ -8,7 +8,7 @@ class n<t>: j {
     init(h: t) {
         u. j {
 }
-struct c<j : SequenceType> {
+struct c<j : Sequence> {
     var b:  [c<j>] {
     k []
 }
@@ -16,7 +16,7 @@ protocol m {
 }
 class b: m {
 }
-func h<o : BooleanType>(b: o) {
+func h<o : Boolean>(b: o) {
 }
 func m(b: q, e: r) -> (((r -> r) -> c  var j: b.Type
 protocol c : b { func b

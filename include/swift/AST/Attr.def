@@ -242,6 +242,9 @@ SIMPLE_DECL_ATTR(indirect, Indirect,
 SIMPLE_DECL_ATTR(warn_unqualified_access, WarnUnqualifiedAccess,
                  OnFunc /*| OnVar*/ | LongAttribute, 61)
 
+SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
+                 OnProtocol | UserInaccessible, 62)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

@@ -60,7 +60,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ClosureResult:
     case ParentType:
     case InstanceType:
-    case SequenceGeneratorType:
+    case SequenceIteratorProtocol:
     case GeneratorElementType:
     case ArrayElementType:
     case ScalarToTuple:
@@ -196,8 +196,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "scalar to tuple";
       break;
 
-    case SequenceGeneratorType:
-      out << "sequence generator type";
+    case SequenceIteratorProtocol:
+      out << "sequence iterator type";
       break;
 
     case SubscriptIndex:

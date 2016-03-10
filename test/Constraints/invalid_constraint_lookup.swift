@@ -2,12 +2,12 @@
 
 protocol P {
   associatedtype A
-  func generate() -> Int
+  func makeIterator() -> Int
 }
 func f<U: P>(rhs: U) -> X<U.A> { // expected-error {{use of undeclared type 'X'}}
   // FIXME: This diagnostic isn't great, it happens because the generic constraint
   // 'U' from the invalid type signature never gets resolved.
-  let g = rhs.generate() // expected-error {{cannot invoke 'generate' with no arguments}}
+  let iter = rhs.makeIterator() // expected-error {{cannot invoke 'makeIterator' with no arguments}}
 }
 
 struct Zzz<T> {
@@ -18,15 +18,15 @@ struct Zzz<T> {
   }
 }
 
-protocol _CollectionType {
+protocol _Collection {
   associatedtype Index
   associatedtype _Element
   subscript(i: Index) -> _Element {get}
 }
 
-protocol CollectionType : _CollectionType, SequenceType {
-  subscript(i: Index) -> Generator.Element {get set }
+protocol Collection : _Collection, Sequence {
+  subscript(i: Index) -> Iterator.Element {get set }
 }
 func insertionSort<C: Mutable> (elements: inout C, i: C.Index) { // expected-error {{use of undeclared type 'Mutable'}} expected-error {{'Index' is not a member type of 'C'}}
-  var x: C.Generator.Element = elements[i] // expected-error {{'Generator' is not a member type of 'C'}}
+  var x: C.Iterator.Element = elements[i] // expected-error {{'Iterator' is not a member type of 'C'}}
 }

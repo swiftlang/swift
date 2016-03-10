@@ -9,7 +9,7 @@ class A {
 }
 protocol P {
 let h == e<S : C {
-"""a(x, U) -> T : CollectionType where l.B : A<h == e!)
+"""a(x, U) -> T : Collection where l.B : A<h == e!)
 func b
 typealias B : b> T) {
 static let x in a {

@@ -22,7 +22,7 @@ k q<n : t> {
 }
 func p<n>() ->(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 f> {
  c(d ())
 }

@@ -10,7 +10,7 @@ typealias h: b = g: (g: b = 1
 return ")
 let foo as a: H.b = {
 }
-func b: BooleanType>(A>(".advance(f).b = a(i<()
+func b: Boolean>(A>(".advance(f).b = a(i<()
 }
 init() {
 class A.init(i(A.f = a(x: Int

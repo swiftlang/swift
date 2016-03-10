@@ -35,6 +35,7 @@ callbacks = {}
 
 # Structures and Utility Classes
 
+
 class CachedProperty(object):
     """Decorator that lazy-loads the value of a property.
 
@@ -47,7 +48,7 @@ class CachedProperty(object):
         self.wrapped = wrapped
         try:
             self.__doc__ = wrapped.__doc__
-        except:
+        except AttributeError:
             pass
 
     def __get__(self, instance, instance_type=None):
@@ -61,6 +62,7 @@ class CachedProperty(object):
 
 
 class Object(object):
+
     def __init__(self, obj):
         if isinstance(obj, Object):
             self._obj = conf.lib.sourcekitd_request_retain(obj)
@@ -75,14 +77,16 @@ class Object(object):
                 POINTER(c_void_p)(), POINTER(c_void_p)(), 0)
             self._as_parameter_ = self._obj
             for k, v in obj.iteritems():
-                conf.lib.sourcekitd_request_dictionary_set_value(self,
+                conf.lib.sourcekitd_request_dictionary_set_value(
+                    self,
                     UIdent(k), Object(v))
         elif isinstance(obj, (list, tuple)):
             self._obj = conf.lib.sourcekitd_request_array_create(
                 POINTER(c_void_p)(), 0)
             self._as_parameter_ = self._obj
             for v in obj:
-                conf.lib.sourcekitd_request_array_set_value(self, -1, Object(v))
+                conf.lib.sourcekitd_request_array_set_value(
+                    self, -1, Object(v))
         else:
             raise ValueError("wrong init parameter (%s)" % type(obj))
         self._as_parameter_ = self._obj
@@ -100,7 +104,9 @@ class Object(object):
         conf.free(ptr)
         return s
 
+
 class Response(object):
+
     def __init__(self, obj):
         if isinstance(obj, c_object_p):
             self._obj = self._as_parameter_ = obj
@@ -123,7 +129,9 @@ class Response(object):
         conf.free(ptr)
         return s
 
+
 class UIdent(object):
+
     def __init__(self, obj):
         if isinstance(obj, c_object_p):
             self._obj = obj
@@ -155,6 +163,7 @@ class UIdent(object):
 
     def __hash__(self):
         return hash(self._ptr())
+
 
 class ErrorKind(object):
     """Describes the kind of type."""
@@ -199,6 +208,7 @@ ErrorKind.REQUEST_INVALID = ErrorKind(2)
 ErrorKind.REQUEST_FAILED = ErrorKind(3)
 ErrorKind.REQUEST_CANCELLED = ErrorKind(4)
 
+
 class Variant(Structure):
     _fields_ = [
         ("data", c_uint64 * 3)]
@@ -227,7 +237,8 @@ class Variant(Structure):
             # continue
             return 1
         arr = []
-        conf.lib.sourcekitd_variant_array_apply_f(self, callbacks['array_applier'](applier), arr)
+        conf.lib.sourcekitd_variant_array_apply_f(
+            self, callbacks['array_applier'](applier), arr)
         return arr
 
     def to_python_dictionary(self):
@@ -236,8 +247,10 @@ class Variant(Structure):
             # continue
             return 1
         d = {}
-        conf.lib.sourcekitd_variant_dictionary_apply_f(self, callbacks['dictionary_applier'](applier), d)
+        conf.lib.sourcekitd_variant_dictionary_apply_f(
+            self, callbacks['dictionary_applier'](applier), d)
         return d
+
 
 class VariantType(object):
     """Describes the kind of type."""
@@ -248,7 +261,8 @@ class VariantType(object):
 
     def __init__(self, value):
         if value >= len(VariantType._kinds):
-            VariantType._kinds += [None] * (value - len(VariantType._kinds) + 1)
+            VariantType._kinds += [None] * \
+                (value - len(VariantType._kinds) + 1)
         if VariantType._kinds[value] is not None:
             raise ValueError('VariantType already loaded')
         self.value = value
@@ -289,227 +303,223 @@ VariantType.BOOL = VariantType(6)
 
 # Register callback types in common container.
 callbacks['array_applier'] = CFUNCTYPE(c_int, c_size_t, Variant, py_object)
-callbacks['dictionary_applier'] = CFUNCTYPE(c_int, c_object_p, Variant, py_object)
+callbacks['dictionary_applier'] = CFUNCTYPE(
+    c_int, c_object_p, Variant, py_object)
 
 # Functions strictly alphabetical order.
 functionList = [
-  # FIXME: Fix PEP8 violation "continuation line under-indented for hanging
-  #        indent" (E121) and remove "noqa" marker.
-  ("sourcekitd_cancel_request",  # noqa
-  	[c_void_p]),
+    ("sourcekitd_cancel_request",
+     [c_void_p]),
 
-  ("sourcekitd_initialize",
-  	None),
+    ("sourcekitd_initialize",
+     None),
 
-  ("sourcekitd_request_array_create",
-  	[POINTER(c_object_p), c_size_t],
-  	c_object_p),
+    ("sourcekitd_request_array_create",
+     [POINTER(c_object_p), c_size_t],
+     c_object_p),
 
-  ("sourcekitd_request_array_set_int64",
-  	[Object, c_size_t, c_int64]),
+    ("sourcekitd_request_array_set_int64",
+     [Object, c_size_t, c_int64]),
 
-  ("sourcekitd_request_array_set_string",
-  	[Object, c_size_t, c_char_p]),
+    ("sourcekitd_request_array_set_string",
+     [Object, c_size_t, c_char_p]),
 
-  ("sourcekitd_request_array_set_stringbuf",
-  	[Object, c_size_t, c_char_p, c_size_t]),
+    ("sourcekitd_request_array_set_stringbuf",
+     [Object, c_size_t, c_char_p, c_size_t]),
 
-  ("sourcekitd_request_array_set_uid",
-  	[Object, c_size_t, UIdent]),
+    ("sourcekitd_request_array_set_uid",
+     [Object, c_size_t, UIdent]),
 
-  ("sourcekitd_request_array_set_value",
-  	[Object, c_size_t, Object]),
+    ("sourcekitd_request_array_set_value",
+     [Object, c_size_t, Object]),
 
-  ("sourcekitd_request_create_from_yaml",
-  	[c_char_p, POINTER(c_char_p)],
-  	c_object_p),
+    ("sourcekitd_request_create_from_yaml",
+     [c_char_p, POINTER(c_char_p)],
+     c_object_p),
 
-  ("sourcekitd_request_description_copy",
-  	[Object],
-  	c_void_p),
+    ("sourcekitd_request_description_copy",
+     [Object],
+     c_void_p),
 
-  ("sourcekitd_request_description_dump",
-  	[Object]),
+    ("sourcekitd_request_description_dump",
+     [Object]),
 
-  ("sourcekitd_request_dictionary_create",
-  	[POINTER(c_object_p), POINTER(c_object_p), c_size_t],
-  	c_object_p),
+    ("sourcekitd_request_dictionary_create",
+     [POINTER(c_object_p), POINTER(c_object_p), c_size_t],
+     c_object_p),
 
-  ("sourcekitd_request_dictionary_set_int64",
-  	[Object, UIdent, c_int64]),
+    ("sourcekitd_request_dictionary_set_int64",
+     [Object, UIdent, c_int64]),
 
-  ("sourcekitd_request_dictionary_set_string",
-  	[Object, UIdent, c_char_p]),
+    ("sourcekitd_request_dictionary_set_string",
+     [Object, UIdent, c_char_p]),
 
-  ("sourcekitd_request_dictionary_set_stringbuf",
-  	[Object, UIdent, c_char_p, c_size_t]),
+    ("sourcekitd_request_dictionary_set_stringbuf",
+     [Object, UIdent, c_char_p, c_size_t]),
 
-  ("sourcekitd_request_dictionary_set_uid",
-  	[Object, UIdent, UIdent]),
+    ("sourcekitd_request_dictionary_set_uid",
+     [Object, UIdent, UIdent]),
 
-  ("sourcekitd_request_dictionary_set_value",
-  	[Object, UIdent, Object]),
+    ("sourcekitd_request_dictionary_set_value",
+     [Object, UIdent, Object]),
 
-  ("sourcekitd_request_int64_create",
-  	[c_int64],
-  	c_object_p),
+    ("sourcekitd_request_int64_create",
+     [c_int64],
+     c_object_p),
 
-  ("sourcekitd_request_retain",
-  	[Object],
-  	c_object_p),
+    ("sourcekitd_request_retain",
+     [Object],
+     c_object_p),
 
-  ("sourcekitd_request_release",
-  	[Object]),
+    ("sourcekitd_request_release",
+     [Object]),
 
-  ("sourcekitd_request_string_create",
-  	[c_char_p],
-  	c_object_p),
+    ("sourcekitd_request_string_create",
+     [c_char_p],
+     c_object_p),
 
-  ("sourcekitd_request_uid_create",
-  	[UIdent],
-  	c_object_p),
+    ("sourcekitd_request_uid_create",
+     [UIdent],
+     c_object_p),
 
-  ("sourcekitd_response_description_copy",
-  	[Response],
-  	c_char_p),
+    ("sourcekitd_response_description_copy",
+     [Response],
+     c_char_p),
 
-  ("sourcekitd_response_description_dump",
-  	[Response]),
+    ("sourcekitd_response_description_dump",
+     [Response]),
 
-  ("sourcekitd_response_description_dump_filedesc",
-  	[Response, c_int]),
+    ("sourcekitd_response_description_dump_filedesc",
+     [Response, c_int]),
 
-  ("sourcekitd_response_dispose",
-  	[Response]),
+    ("sourcekitd_response_dispose",
+     [Response]),
 
-  ("sourcekitd_response_error_get_description",
-  	[Response],
-  	c_char_p),
+    ("sourcekitd_response_error_get_description",
+     [Response],
+     c_char_p),
 
-  ("sourcekitd_response_error_get_kind",
-  	[Response],
-  	ErrorKind.from_id),
+    ("sourcekitd_response_error_get_kind",
+     [Response],
+     ErrorKind.from_id),
 
-  ("sourcekitd_response_get_value",
-  	[Response],
-  	Variant),
+    ("sourcekitd_response_get_value",
+     [Response],
+     Variant),
 
-  ("sourcekitd_response_is_error",
-  	[Response],
-  	c_bool),
+    ("sourcekitd_response_is_error",
+     [Response],
+     c_bool),
 
-  #  ("sourcekitd_send_request",
+    ("sourcekitd_send_request_sync",
+     [Object],
+     c_object_p),
 
-  ("sourcekitd_send_request_sync",
-  	[Object],
-  	c_object_p),
+    ("sourcekitd_shutdown",
+     None),
 
-  # ("sourcekitd_set_interrupted_connection_handler",
+    ("sourcekitd_uid_get_from_buf",
+     [c_char_p, c_size_t],
+     c_object_p),
 
-  ("sourcekitd_shutdown",
-  	None),
+    ("sourcekitd_uid_get_from_cstr",
+     [c_char_p],
+     c_object_p),
 
-  ("sourcekitd_uid_get_from_buf",
-  	[c_char_p, c_size_t],
-  	c_object_p),
+    ("sourcekitd_uid_get_length",
+     [UIdent],
+     c_size_t),
 
-  ("sourcekitd_uid_get_from_cstr",
-  	[c_char_p],
-  	c_object_p),
+    ("sourcekitd_uid_get_string_ptr",
+     [UIdent],
+     c_char_p),
 
-  ("sourcekitd_uid_get_length",
-  	[UIdent],
-  	c_size_t),
+    ("sourcekitd_variant_array_apply_f",
+     [Variant, callbacks['array_applier'], py_object],
+     c_bool),
 
-  ("sourcekitd_uid_get_string_ptr",
-  	[UIdent],
-  	c_char_p),
+    ("sourcekitd_variant_array_get_bool",
+     [Variant, c_size_t],
+     c_bool),
 
-  ("sourcekitd_variant_array_apply_f",
-  	[Variant, callbacks['array_applier'], py_object],
-  	c_bool),
+    ("sourcekitd_variant_array_get_count",
+     [Variant],
+     c_size_t),
 
+    ("sourcekitd_variant_array_get_int64",
+     [Variant, c_size_t],
+     c_int64),
 
-  ("sourcekitd_variant_array_get_bool",
-  	[Variant, c_size_t],
-  	c_bool),
+    ("sourcekitd_variant_array_get_string",
+     [Variant, c_size_t],
+     c_char_p),
 
-  ("sourcekitd_variant_array_get_count",
-  	[Variant],
-  	c_size_t),
+    ("sourcekitd_variant_array_get_uid",
+     [Variant, c_size_t],
+     c_object_p),
 
-  ("sourcekitd_variant_array_get_int64",
-  	[Variant, c_size_t],
-  	c_int64),
+    ("sourcekitd_variant_array_get_value",
+     [Variant, c_size_t],
+     Variant),
 
-  ("sourcekitd_variant_array_get_string",
-  	[Variant, c_size_t],
-  	c_char_p),
+    ("sourcekitd_variant_bool_get_value",
+     [Variant],
+     c_bool),
 
-  ("sourcekitd_variant_array_get_uid",
-  	[Variant, c_size_t],
-  	c_object_p),
+    ("sourcekitd_variant_dictionary_apply_f",
+     [Variant, callbacks['dictionary_applier'], py_object],
+     c_bool),
 
-  ("sourcekitd_variant_array_get_value",
-  	[Variant, c_size_t],
-  	Variant),
+    ("sourcekitd_variant_dictionary_get_bool",
+     [Variant, UIdent],
+     c_bool),
 
-  ("sourcekitd_variant_bool_get_value",
-  	[Variant],
-  	c_bool),
+    ("sourcekitd_variant_dictionary_get_int64",
+     [Variant, UIdent],
+     c_int64),
 
-  ("sourcekitd_variant_dictionary_apply_f",
-  	[Variant, callbacks['dictionary_applier'], py_object],
-  	c_bool),
+    ("sourcekitd_variant_dictionary_get_string",
+     [Variant, UIdent],
+     c_char_p),
 
-  ("sourcekitd_variant_dictionary_get_bool",
-  	[Variant, UIdent],
-  	c_bool),
+    ("sourcekitd_variant_dictionary_get_value",
+     [Variant, UIdent],
+     Variant),
 
-  ("sourcekitd_variant_dictionary_get_int64",
-  	[Variant, UIdent],
-  	c_int64),
+    ("sourcekitd_variant_dictionary_get_uid",
+     [Variant, UIdent],
+     c_object_p),
 
-  ("sourcekitd_variant_dictionary_get_string",
-  	[Variant, UIdent],
-  	c_char_p),
+    ("sourcekitd_variant_get_type",
+     [Variant],
+     VariantType.from_id),
 
-  ("sourcekitd_variant_dictionary_get_value",
-  	[Variant, UIdent],
-  	Variant),
+    ("sourcekitd_variant_string_get_length",
+     [Variant],
+     c_size_t),
 
-  ("sourcekitd_variant_dictionary_get_uid",
-  	[Variant, UIdent],
-  	c_object_p),
+    ("sourcekitd_variant_string_get_ptr",
+     [Variant],
+     c_char_p),
 
-  ("sourcekitd_variant_get_type",
-  	[Variant],
-  	VariantType.from_id),
+    ("sourcekitd_variant_int64_get_value",
+     [Variant],
+     c_int64),
 
-  ("sourcekitd_variant_string_get_length",
-  	[Variant],
-  	c_size_t),
-
-  ("sourcekitd_variant_string_get_ptr",
-  	[Variant],
-  	c_char_p),
-
-  ("sourcekitd_variant_int64_get_value",
-  	[Variant],
-  	c_int64),
-
-  ("sourcekitd_variant_uid_get_value",
-  	[Variant],
-  	c_object_p),
+    ("sourcekitd_variant_uid_get_value",
+     [Variant],
+     c_object_p),
 ]
 
 
 class LibsourcekitdError(Exception):
+
     def __init__(self, message):
         self.m = message
 
     def __str__(self):
         return self.m
+
 
 def register_function(lib, item, ignore_errors):
     # A function may not exist, if these bindings are used with an older or
@@ -532,6 +542,7 @@ def register_function(lib, item, ignore_errors):
     if len(item) == 4:
         func.errcheck = item[3]
 
+
 def register_functions(lib, ignore_errors):
     """Register function prototypes with a sourcekitd library instance.
 
@@ -543,7 +554,8 @@ def register_functions(lib, ignore_errors):
 
     map(register, functionList)
 
-class Config:
+
+class Config(object):
     library_path = None
     library_file = None
     loaded = False
