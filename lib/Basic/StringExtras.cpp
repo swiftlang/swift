@@ -875,7 +875,7 @@ camel_case::toLowercaseInitialisms(StringRef string,
   }
 
   scratch = scratchStr;
-  return scratchStr;
+  return {scratch.begin(), scratch.size()};
 }
 
 /// Determine whether the given word occurring before the given
