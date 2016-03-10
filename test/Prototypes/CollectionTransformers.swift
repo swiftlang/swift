@@ -67,8 +67,10 @@ internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
 /// Using a builder can be more efficient than creating an empty collection
 /// instance and adding elements one by one.
 public protocol CollectionBuilder {
-  typealias Destination : Collection
-  typealias Element = Destination.Iterator.Element
+  associatedtype Destination : Collection
+    
+  // FIXME: should really be a typealias once that is supported
+  associatedtype Element = Destination.Iterator.Element
 
   init()
 
@@ -118,7 +120,7 @@ public protocol CollectionBuilder {
 }
 
 public protocol BuildableCollectionProtocol : Collection {
-  typealias Builder : CollectionBuilder
+  associatedtype Builder : CollectionBuilder
 }
 
 extension Array : SplittableCollection {
@@ -518,7 +520,7 @@ final class _ForkJoinWorkerThread {
 }
 
 internal protocol _Future {
-  typealias Result
+  associatedtype Result
 
   /// Establishes a happens-before relation between completing the future and
   /// the call to wait().
@@ -827,8 +829,8 @@ final public class ForkJoinPool {
 //===----------------------------------------------------------------------===//
 
 internal protocol _CollectionTransformerStepProtocol /*: class*/ {
-  typealias PipelineInputElement
-  typealias OutputElement
+  associatedtype PipelineInputElement
+  associatedtype OutputElement
 
   func transform<
     InputCollection : Collection,
@@ -1070,7 +1072,7 @@ struct _ElementCollectorOneToMaybeOne<
 }
 
 protocol _ElementCollector {
-  typealias Element
+  associatedtype Element
 
   mutating func sizeHint(approximateSize: Int)
 

@@ -100,7 +100,7 @@ func testPostfix8(x: S) {
 // POSTFIX_8-NOT: ***
 
 protocol P {
-  typealias T
+  associatedtype T
   func foo() -> T
 }
 

@@ -13,7 +13,7 @@ public enum SomeEnum {
   case Foo
 }
 public protocol SomeProtocol {
-  typealias Foo
+  associatedtype Foo
 }
 public protocol SomeExistential {
 }

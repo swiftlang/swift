@@ -16,7 +16,7 @@ func ~> <Target, Args, Result> (
 }
 
 protocol Runcible {
-  typealias Element
+  associatedtype Element
 }
 
 struct Mince {}

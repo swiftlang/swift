@@ -87,7 +87,7 @@ protocol X {
 protocol Y {}
 
 protocol WithAssoc {
-  typealias AssocType
+  associatedtype AssocType
   func useAssocType(x x: AssocType) -> Self
 }
 
@@ -422,12 +422,12 @@ final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassR
 }
 
 protocol HasAssoc {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 protocol GenericParameterNameCollisionProtocol {
   func foo<T>(x: T)
-  typealias Assoc2
+  associatedtype Assoc2
   func bar<T>(x: T -> Assoc2)
 }
 

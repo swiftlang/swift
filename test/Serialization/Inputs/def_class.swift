@@ -76,8 +76,8 @@ public typealias Cacheable = protocol<Resettable, Computable>
 public protocol SpecialResettable : Resettable, Computable {}
 
 public protocol PairLike {
-  typealias FirstType
-  typealias SecondType
+  associatedtype FirstType
+  associatedtype SecondType
   func getFirst() -> FirstType
   func getSecond() -> SecondType
 }

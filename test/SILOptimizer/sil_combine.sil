@@ -2117,7 +2117,7 @@ protocol AnForwardIndexType {
 }
 
 protocol AnIndexable {
-  typealias Index = AnForwardIndexType
+  associatedtype Index = AnForwardIndexType
 }
 
 struct GenContainer2<T : AnIndexable> {

@@ -17,14 +17,14 @@ extension Float : ApproximateReal {}
 // Abstraction of a mathematical vector
 protocol Vector {
   init()
-  typealias Element : ApproximateReal
+  associatedtype Element : ApproximateReal
   func dotProduct(Self) -> Element
 
 
   // Extras
   var count: Int {get}
   subscript(Int) -> Element {get set}
-  typealias Tail
+  associatedtype Tail
 }
 
 struct EmptyVector<T: ApproximateReal> : Vector {

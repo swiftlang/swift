@@ -4,5 +4,5 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-if{func b:a protocol a{{}typealias d:d
+if{func b:a protocol a{{}associatedtype d:d
 func b->Self

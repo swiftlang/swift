@@ -36,7 +36,7 @@ public protocol FloatingPoint : Comparable, SignedNumber,
 FloatLiteralConvertible {
   
   /// An unsigned integer type large enough to hold the significand field.
-  typealias SignificandBits: FloatingPointRepresentation
+  associatedtype SignificandBits: FloatingPointRepresentation
   
   /// Positive infinity.
   ///
@@ -841,7 +841,7 @@ extension BinaryFloatingPoint {
 public protocol FloatingPointInterchange: FloatingPoint {
   
   /// An unsigned integer type used to represent floating-point encodings.
-  typealias BitPattern: FloatingPointRepresentation
+  associatedtype BitPattern: FloatingPointRepresentation
   
   /// Interpret `encoding` as a little-endian encoding of `Self`.
   init(littleEndian encoding: BitPattern)

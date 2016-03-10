@@ -8,5 +8,5 @@
 
 enum A
 protocol A{
-typealias f:a
+associatedtype f:a
 func a<T where f:d

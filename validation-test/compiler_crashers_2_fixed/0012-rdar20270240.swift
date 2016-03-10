@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend %s -emit-silgen
 
 protocol FooProtocol {
-  typealias Element
+  associatedtype Element
 }
 
 protocol Bar {
-  typealias Foo : FooProtocol
+  associatedtype Foo : FooProtocol
   typealias Element = Foo.Element
 
   mutating func extend<

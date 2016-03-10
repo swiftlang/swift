@@ -6,7 +6,7 @@
 // https://twitter.com/rob_rix/status/483456023773315073
 
 protocol A {
-    typealias B
+    associatedtype B
     func b(_: B)
 }
 struct X<Y> : A {

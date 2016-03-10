@@ -5,4 +5,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol A{class A}protocol a:A{protocol P{typealias e:A}}a
+protocol A{class A}protocol a:A{protocol P{associatedtype e:A}}a

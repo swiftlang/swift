@@ -187,7 +187,7 @@ public protocol IntegerType
   // possible, and we really need to factor IntegerType differently
   // than it currently is so we can remove the constraints on
   // AbsoluteValue in the multiprecision multiplication routines.
-  typealias AbsoluteValue : Comparable, ArithmeticType, 
+  associatedtype AbsoluteValue : Comparable, ArithmeticType,
     IntegerLiteralConvertible, CustomStringConvertible 
 
   var absoluteValue: AbsoluteValue { get }
@@ -649,7 +649,7 @@ public func &${x.operator} <T: FixedWidthIntegerType>(lhs: T, rhs: T) -> T {
 //===--- UnsignedIntegerType ----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 public protocol UnsignedIntegerType : IntegerType {
-  typealias AbsoluteValue : IntegerType  
+  associatedtype AbsoluteValue : IntegerType
 }
 
 extension UnsignedIntegerType {
@@ -731,7 +731,7 @@ extension UnsignedIntegerType where Self : FixedWidthIntegerType {
 //===----------------------------------------------------------------------===//
 
 public protocol SignedIntegerType : IntegerType {
-  typealias AbsoluteValue : IntegerType
+  associatedtype AbsoluteValue : IntegerType
 }
 
 extension SignedIntegerType {

@@ -167,7 +167,7 @@ func testArchetypeReplacement3 (a : [Int]) {
 
 
 protocol P2 {
-  typealias MyElement
+  associatedtype MyElement
 }
 
 extension P2 {

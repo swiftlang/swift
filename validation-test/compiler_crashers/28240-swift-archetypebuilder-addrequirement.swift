@@ -5,4 +5,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct B<g:a{}protocol a{typealias e:a{}typealias f:a
+struct B<g:a{}protocol a{associatedtype e:a{}associatedtype f:a
