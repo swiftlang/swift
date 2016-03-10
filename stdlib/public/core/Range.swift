@@ -50,6 +50,15 @@ public struct RangeOfStrideable<
     return position
   }
 
+  // FIXME(compiler limitation): this typealias should be inferred.
+  public typealias SubSequence = RangeOfStrideable<Element>
+
+  public subscript(bounds: Range<Element>) -> RangeOfStrideable<Element> {
+    // FIXME: swift-3-indexing-model: range check.
+    return RangeOfStrideable(bounds)
+  }
+
+
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -73,6 +82,13 @@ public struct RangeOfStrideable<
   @warn_unused_result
   public func next(i: Element) -> Element {
     fatalError("FIXME: swift-3-indexing-model implement")
+  }
+
+  // FIXME(compiler limitation): this typealias should be inferred.
+  public typealias Indices = RangeOfStrideable<Element>
+
+  public var indices: Indices {
+    return self
   }
 
   @warn_unused_result
