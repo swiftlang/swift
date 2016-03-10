@@ -17,29 +17,15 @@
 #ifndef SWIFT_IRGEN_DEBUGINFO_H
 #define SWIFT_IRGEN_DEBUGINFO_H
 
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/IR/DIBuilder.h"
-#include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/ValueHandle.h"
-#include "llvm/Support/Allocator.h"
-
-#include "swift/AST/Module.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILLocation.h"
-
 #include "DebugTypeInfo.h"
-#include "GenType.h"
 #include "IRBuilder.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "swift/SIL/SILLocation.h"
+#include "llvm/IR/DIBuilder.h"
+#include "llvm/Support/Allocator.h"
 
 #include <set>
-
-namespace llvm {
-class DIBuilder;
-}
 
 namespace swift {
 
