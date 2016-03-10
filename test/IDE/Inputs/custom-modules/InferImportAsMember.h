@@ -76,7 +76,9 @@ extern double IAMStruct1StaticGetProperty();
 extern double IAMStruct1StaticSetProperty(double);
 extern double IAMStruct1StaticGetOnlyProperty();
 
-// FIXME: when no parameters, make a () and attach a parameter name
+/// Omit needless words
+extern double IAMStruct1ONWNeedlessTypeArgLabel(double Double);
+
 /// Fuzzy
 extern struct IAMStruct1 IAMFuzzyStruct1Create();
 extern struct IAMStruct1 IAMFuzzyStruct1CreateWithFuzzyName();

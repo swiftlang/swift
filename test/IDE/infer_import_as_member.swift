@@ -62,6 +62,9 @@ import InferImportAsMember
 // PRINT-NEXT:   static var staticProperty: Double
 // PRINT-NEXT:   static var staticOnlyProperty: Double { get }
 //
+// PRINT-LABEL:  /// Omit needless words
+// PRINT-NEXT:   static func onwNeedlessTypeArgLabel( Double: Double) -> Double
+//
 // PRINT-LABEL:  /// Fuzzy
 // PRINT-NEXT:   init(fuzzy fuzzy: ())
 // PRINT-NEXT:   init(fuzzyWithFuzzyName fuzzyWithFuzzyName: ())

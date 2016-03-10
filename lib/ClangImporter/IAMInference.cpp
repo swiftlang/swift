@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "IAMInference.h"
+#include "ImporterImpl.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/Basic/StringExtras.h"
@@ -35,7 +36,8 @@ STATISTIC(FailInferVar, "# of variables unable to infer");
 STATISTIC(FailInferFunction, "# of functions unable to infer");
 
 // Specifically skipped/avoided
-STATISTIC(SkipLeadingUnderscore, "# of globals skipped due to leading underscore");
+STATISTIC(SkipLeadingUnderscore,
+          "# of globals skipped due to leading underscore");
 
 // Success statistics
 STATISTIC(SuccessImportAsTypeID, "# imported as 'typeID'");
@@ -61,6 +63,10 @@ STATISTIC(InvalidPropertyInstanceGetterSetterType,
           "couldn't infer as instance property: getter/setter type mismatch");
 STATISTIC(InvalidPropertyInstanceNoSelf,
           "couldn't infer as instance property: couldn't find self");
+
+// Omit needless words stats
+STATISTIC(OmitNumTimes,
+  "# of times omitNeedlessWords was able to fire on an API");
 
 using namespace swift;
 
@@ -120,11 +126,9 @@ void appendUniq(NameBuffer &src, StringRef toAppend) {
 }
 
 StringRef skipLeadingUnderscores(StringRef str) {
-  unsigned numToDrop = 0;
-  for (/*empty*/; numToDrop < str.size(); ++numToDrop)
-    if (str[numToDrop] != '_')
-      break;
-  return str.drop_front(numToDrop);
+  while (!str.empty() && str.startswith("_"))
+    str = str.drop_front(1);
+  return str;
 }
 
 // Form a humble camel name from a string. Skips leading underscores.
@@ -355,15 +359,21 @@ private:
   DeclName formDeclName(StringRef baseName,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         StringRef firstPrefix = "") {
-    SmallVector<Identifier, 8> argLabels;
+
+    // TODO: redesign from a SmallString to a StringScratchBuffer design for all
+    // of this name mangling, since we have to use one for omit needless words
+    // anyways
 
     if (params.empty() && firstPrefix != "") {
       // We need to form an argument label, despite there being no argument
       NameBuffer paramName;
       formHumbleCamelName(firstPrefix, paramName);
-      argLabels.push_back(context.getIdentifier(paramName));
+      return {context, getHumbleIdentifier(baseName),
+              context.getIdentifier(paramName)};
     }
 
+    StringScratchSpace scratch;
+    SmallVector<StringRef, 8> argStrs;
     for (unsigned i = 0; i < params.size(); ++i) {
       NameBuffer paramName;
       if (i == 0 && firstPrefix != "") {
@@ -373,10 +383,42 @@ private:
         formHumbleCamelName(params[i]->getName(), paramName);
       }
 
-      argLabels.push_back(context.getIdentifier(paramName));
+      argStrs.push_back(scratch.copyString(paramName));
     }
 
-    return {context, getHumbleIdentifier(baseName), argLabels};
+    DeclName beforeOmit;
+    (void)beforeOmit;
+    {
+      SmallVector<Identifier, 8> argLabels;
+      for (auto str : argStrs)
+        argLabels.push_back(context.getIdentifier(str));
+      DEBUG((beforeOmit = {context, getHumbleIdentifier(baseName), argLabels}));
+    }
+
+    SmallVector<OmissionTypeName, 8> paramTypeNames;
+    for (auto param : params) {
+      paramTypeNames.push_back(
+          ClangImporter::Implementation::getClangTypeNameForOmission(
+              clangSema.getASTContext(), param->getType()));
+    }
+
+    baseName = getHumbleIdentifier(baseName).str();
+    bool didOmit =
+        omitNeedlessWords(baseName, argStrs, "", "", "", paramTypeNames, false,
+                          false, nullptr, scratch);
+    SmallVector<Identifier, 8> argLabels;
+    for (auto str : argStrs)
+      argLabels.push_back(context.getIdentifier(str));
+
+    DeclName ret = {context, getHumbleIdentifier(baseName), argLabels};
+
+    if (didOmit) {
+      ++OmitNumTimes;
+      DEBUG(llvm::dbgs() << "omission detected: " << beforeOmit << " ==> "
+                         << ret << "\n");
+    }
+
+    return ret;
   }
 
   bool match(StringRef str, StringRef toMatch, NameBuffer &outStr) {
