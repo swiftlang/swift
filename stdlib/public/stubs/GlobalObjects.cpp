@@ -40,7 +40,7 @@ extern "C" _SwiftEmptyArrayStorage _swiftEmptyArrayStorage = {
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
-uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride = 0;
+__swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride = 0;
 
 }
 
