@@ -426,46 +426,80 @@ private:
     return ret;
   }
 
-  bool match(StringRef str, StringRef toMatch, NameBuffer &outStr) {
-    // TODO: let options dictate fuzzy matching...
-
-    // Special case: Mutable can appear in both and may screw up word order
-    NameBuffer nonMutableStr;
-    NameBuffer nonMutableToMatch;
-    if (hasWord(str, "Mutable") && hasWord(toMatch, "Mutable")) {
-      dropWordUniq(str, "Mutable", nonMutableStr);
-      dropWordUniq(toMatch, "Mutable", nonMutableToMatch);
-      str = nonMutableStr;
-      toMatch = nonMutableToMatch;
-    }
-
-    auto strWords = camel_case::getWords(str);
-    auto matchWords = camel_case::getWords(toMatch);
-
-    auto strIter = strWords.begin();
-    auto matchIter = matchWords.begin();
-
-    // Match in order, but allowing interjected words
-    while (strIter != strWords.end()) {
-      if (matchIter == matchWords.end()) {
-        // We matched them all!
-        appendUniq(outStr, strIter.getRestOfStr());
-        return true;
-      }
-      if (*strIter == *matchIter) {
-        // It's a match!
-        ++strIter;
-        ++matchIter;
-        continue;
-      }
-      // Move on to the next one
-      appendUniq(outStr, *strIter);
-      ++strIter;
-    }
-
-    return false;
-  }
+  bool matchTypeName(StringRef str, clang::QualType qt, NameBuffer &outStr);
+  bool match(StringRef str, StringRef toMatch, NameBuffer &outStr);
 };
+}
+
+static StringRef getTypeName(clang::QualType qt) {
+  if (auto typedefTy = qt->getAs<clang::TypedefType>()) {
+    // Use the sugar-ed, but un-ref-ed name
+    auto name = typedefTy->getDecl()->getName();
+    if (name.endswith("Ref") &&
+        (isCFTypeName(name) ||
+         typedefTy->getDecl()->hasAttr<clang::ObjCBridgeAttr>()))
+      return name.drop_back(3);
+  }
+
+  auto identInfo = qt.getBaseTypeIdentifier();
+  if (identInfo)
+    return identInfo->getName();
+
+  // Otherwise, no name
+  return {};
+}
+
+bool IAMInference::matchTypeName(StringRef str, clang::QualType qt,
+                                 NameBuffer &outStr) {
+  StringRef typeName = getTypeName(qt);
+  if (typeName == "")
+    return false;
+
+  // Special case: Mutable can appear in both and may screw up word order. Or,
+  // Mutable can occur in the type name only. Either way, we want to have the
+  // potential of successfully matching the type.
+  NameBuffer nonMutableStr;
+  NameBuffer nonMutableTypeName;
+  if (hasWord(typeName, "Mutable")) {
+    dropWordUniq(typeName, "Mutable", nonMutableTypeName);
+    typeName = nonMutableTypeName;
+    if (hasWord(str, "Mutable")) {
+      dropWordUniq(str, "Mutable", nonMutableStr);
+      str = nonMutableStr;
+    }
+  }
+
+  return match(str, typeName, outStr);
+}
+
+bool IAMInference::match(StringRef str, StringRef toMatch, NameBuffer &outStr) {
+  // TODO: let options dictate fuzzy matching...
+
+  auto strWords = camel_case::getWords(str);
+  auto matchWords = camel_case::getWords(toMatch);
+
+  auto strIter = strWords.begin();
+  auto matchIter = matchWords.begin();
+
+  // Match in order, but allowing interjected words
+  while (strIter != strWords.end()) {
+    if (matchIter == matchWords.end()) {
+      // We matched them all!
+      appendUniq(outStr, strIter.getRestOfStr());
+      return true;
+    }
+    if (*strIter == *matchIter) {
+      // It's a match!
+      ++strIter;
+      ++matchIter;
+      continue;
+    }
+    // Move on to the next one
+    appendUniq(outStr, *strIter);
+    ++strIter;
+  }
+
+  return false;
 }
 
 // A loose type equality check that disregards all sugar, qualification, looks
@@ -536,24 +570,6 @@ bool IAMInference::validToImportAsProperty(
   }
 
   return true;
-}
-
-static StringRef getTypeName(clang::QualType qt) {
-  if (auto typedefTy = qt->getAs<clang::TypedefType>()) {
-    // Use the sugar-ed, but un-ref-ed name
-    auto name = typedefTy->getDecl()->getName();
-    if (name.endswith("Ref") &&
-        (isCFTypeName(name) ||
-         typedefTy->getDecl()->hasAttr<clang::ObjCBridgeAttr>()))
-      return name.drop_back(3);
-  }
-
-  auto identInfo = qt.getBaseTypeIdentifier();
-  if (identInfo)
-    return identInfo->getName();
-
-  // Otherwise, no name
-  return {};
 }
 
 // Get the canonical, but still sugar-ed, effective decl context
@@ -666,15 +682,13 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   //
   if (!retTy->isVoidType()) {
     NameBuffer remainingName;
-    StringRef typeName = getTypeName(retTy);
-    if (typeName != StringRef())
-      if (match(workingName, typeName, remainingName))
-        for (auto initSpec : InitSpecifiers)
-          if (hasWord(remainingName, initSpec))
-            return importAsConstructor(
-                remainingName, initSpec,
-                {funcDecl->param_begin(), funcDecl->param_end()},
-                getEffectiveDC(retTy));
+    if (matchTypeName(workingName, retTy, remainingName))
+      for (auto initSpec : InitSpecifiers)
+        if (hasWord(remainingName, initSpec))
+          return importAsConstructor(
+              remainingName, initSpec,
+              {funcDecl->param_begin(), funcDecl->param_end()},
+              getEffectiveDC(retTy));
   }
 
   // 2) If we find a likely self reference in the parameters, make an instance
@@ -686,28 +700,25 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
        paramI != paramE; ++paramI, ++selfIdx) {
     auto param = *paramI;
     NameBuffer remainingName;
-    StringRef typeName = getTypeName(param->getType());
-    if (typeName != StringRef()) {
-      if (match(workingName, typeName, remainingName)) {
-        auto effectiveDC = getEffectiveDC(param->getType());
-        nonSelfParams.append(funcDecl->param_begin(), paramI);
-        nonSelfParams.append(++paramI, paramE);
-        // See if it's a property
-        for (auto propSpec : PropertySpecifiers) {
-          NameBuffer propName;
-          if (match(remainingName, propSpec, propName)) {
-            const clang::FunctionDecl *pairedAccessor;
-            if (validToImportAsProperty(funcDecl, propSpec, selfIdx,
-                                        pairedAccessor))
-              return importAsInstanceProperty(propName, propSpec, selfIdx,
-                                              nonSelfParams, pairedAccessor,
-                                              effectiveDC);
-          }
+    if (matchTypeName(workingName, param->getType(), remainingName)) {
+      auto effectiveDC = getEffectiveDC(param->getType());
+      nonSelfParams.append(funcDecl->param_begin(), paramI);
+      nonSelfParams.append(++paramI, paramE);
+      // See if it's a property
+      for (auto propSpec : PropertySpecifiers) {
+        NameBuffer propName;
+        if (match(remainingName, propSpec, propName)) {
+          const clang::FunctionDecl *pairedAccessor;
+          if (validToImportAsProperty(funcDecl, propSpec, selfIdx,
+                                      pairedAccessor))
+            return importAsInstanceProperty(propName, propSpec, selfIdx,
+                                            nonSelfParams, pairedAccessor,
+                                            effectiveDC);
         }
-
-        return importAsInstanceMethod(remainingName, selfIdx, nonSelfParams,
-                                      effectiveDC);
       }
+
+      return importAsInstanceMethod(remainingName, selfIdx, nonSelfParams,
+                                    effectiveDC);
     }
   }
 

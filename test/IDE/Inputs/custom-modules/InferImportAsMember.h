@@ -91,6 +91,7 @@ struct IAMMutableStruct1 {};
 struct IAMMutableStruct1
 IAMStruct1CreateMutable(struct IAMStruct1 withIAMStruct1);
 struct IAMMutableStruct1 IAMStruct1CreateMutableWithURL(const char *url);
+static void IAMStruct1DoSomething(struct IAMMutableStruct1 iamStruct1);
 
 typedef struct MyStruct2 MyStruct2;
 struct MyStruct2 {
