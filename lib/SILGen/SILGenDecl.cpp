@@ -1913,10 +1913,6 @@ public:
     ConcreteDeclRef witness = Proto->getDefaultWitness(d);
     if (!witness) {
       addMissingDefault();
-      if (d->isSettable(d->getDeclContext()))
-        addMissingDefault();
-      if (d->getMaterializeForSetFunc())
-        addMissingDefault();
       return;
     }
 

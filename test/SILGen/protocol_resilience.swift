@@ -94,7 +94,6 @@ public protocol ResilientStorage {
   associatedtype T : ResilientConstructors
 
   var propertyWithDefault: Int { get }
-  var propertyWithNoDefault: Int { get }
   var mutablePropertyWithDefault: Int { get set }
   var mutablePropertyNoDefault: Int { get set }
   var mutableGenericPropertyWithDefault: T { get set }
@@ -250,15 +249,12 @@ protocol InternalProtocol {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientStorage {
-// CHECK-NEXT:   no_default
-// CHECK-NEXT:   no_default
+// CHECK-NEXT:  no_default
+// CHECK-NEXT:  no_default
 // CHECK-NEXT:   method #ResilientStorage.propertyWithDefault!getter.1: @_TFP19protocol_resilience16ResilientStorageg19propertyWithDefaultSi
-// CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!getter.1: @_TFP19protocol_resilience16ResilientStorageg26mutablePropertyWithDefaultSi
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!setter.1: @_TFP19protocol_resilience16ResilientStorages26mutablePropertyWithDefaultSi
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!materializeForSet.1: @_TFP19protocol_resilience16ResilientStoragem26mutablePropertyWithDefaultSi
-// CHECK-NEXT:   no_default
-// CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!getter.1: @_TFP19protocol_resilience16ResilientStorageg33mutableGenericPropertyWithDefaultwx1T
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!setter.1: @_TFP19protocol_resilience16ResilientStorages33mutableGenericPropertyWithDefaultwx1T
