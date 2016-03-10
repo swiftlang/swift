@@ -1227,37 +1227,43 @@ llvm::DICompositeType *IRGenDebugInfo::createStructType(
 
 /// Return an array with the DITypes for each of an enum's elements.
 llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
-                                                  EnumDecl *D,
+                                                  EnumDecl *ED,
                                                   llvm::DIScope *Scope,
                                                   llvm::DIFile *File,
                                                   unsigned Flags) {
   SmallVector<llvm::Metadata *, 16> Elements;
 
-  for (auto *ElemDecl : D->getAllElements()) {
+  for (auto *ElemDecl : ED->getAllElements()) {
     // FIXME <rdar://problem/14845818> Support enums.
-    // Swift Enums can be both like DWARF enums and DWARF unions.
-    // They should probably be emitted as DW_TAG_variant_type.
+    // Swift Enums can be both like DWARF enums and discriminated unions.
     if (ElemDecl->hasType()) {
-      // Use Decl as DeclContext.
       DebugTypeInfo ElemDbgTy;
-      if (ElemDecl->hasArgumentType())
-        ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(),
-                                  DbgTy.StorageType,
-                                  DbgTy.size, DbgTy.align, D);
-      else
-        if (D->hasRawType())
-          ElemDbgTy = DebugTypeInfo(D->getRawType(), DbgTy.StorageType,
-                                    DbgTy.size, DbgTy.align, D);
-        else
-          // Fallback to Int as the element type.
-          ElemDbgTy = DebugTypeInfo(IGM.Context.getIntDecl()->getDeclaredType(),
-                                    DbgTy.StorageType,
-                                    DbgTy.size, DbgTy.align, D);
+      if (ED->hasRawType())
+        // An enum with a raw type (enum E : Int {}), similar to a
+        // DWARF enum.
+        //
+        // The storage occupied by the enum may be smaller than the
+        // one of the raw type as long as it is large enough to hold
+        // all enum values. Use the raw type for the debug type, but
+        // the storage size from the enum.
+        ElemDbgTy = DebugTypeInfo(ED->getRawType(), DbgTy.StorageType,
+                                  DbgTy.size, DbgTy.align, ED);
+      else if (ElemDecl->hasArgumentType()) {
+        // A discriminated union. This should really be described as a
+        // DW_TAG_variant_type. For now only describing the data.
+        auto &TI = IGM.getTypeInfoForUnlowered(ElemDecl->getArgumentType());
+        ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(), TI, ED);
+      } else {
+        // Discriminated union case without argument. Fallback to Int
+        // as the element type; there is no storage here.
+        Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
+        ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, 0, 1, ED);
+      }
       unsigned Offset = 0;
       auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
                                   Scope, File, Flags);
       Elements.push_back(MTy);
-      if (D->isIndirect() || ElemDecl->isIndirect())
+      if (ED->isIndirect() || ElemDecl->isIndirect())
         IndirectEnumCases.insert(MTy);
     }
   }
