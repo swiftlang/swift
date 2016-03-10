@@ -2391,15 +2391,14 @@ public:
     Type ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
                                                         Error);
     if (ReconstructedType) {
-      Stream << "reconstructed type from usr for \'" << Range.str() << "\' is ";
-      Stream << "\'";
+      Stream << "reconstructed type from usr for '" << Range.str() << "' is '";
       ReconstructedType->print(Stream);
-      Stream << "\'\n";
+      Stream << "'\n";
     } else {
       ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
                                                      Error);
-      Stream << "cannot reconstruct type from usr for \'" << Range.str()
-             << "\'\n";
+      Stream << "cannot reconstruct type from usr for '" << Range.str()
+             << "'\n";
     }
     return true;
   }
