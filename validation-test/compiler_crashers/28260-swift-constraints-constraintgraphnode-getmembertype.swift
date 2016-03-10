@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 protocol A{func<
-typealias f:A
+associatedtype f:A
 protocol A{
 class a
-typealias f:a
+associatedtype f:a
