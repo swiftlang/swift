@@ -66,12 +66,14 @@ template <>
 struct RuntimeTarget<4> {
   using StoredPointer = uint32_t;
   using StoredSize = uint32_t;
+  static constexpr size_t PointerSize = 4;
 };
 
 template <>
 struct RuntimeTarget<8> {
   using StoredPointer = uint64_t;
   using StoredSize = uint64_t;
+  static constexpr size_t PointerSize = 8;
 };
 
 /// In-process native runtime target.
@@ -108,6 +110,7 @@ template <typename Runtime>
 struct External {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
+  static constexpr size_t PointerSize = Runtime::PointerSize;
   const StoredPointer PointerValue;
   
   template <typename T>
