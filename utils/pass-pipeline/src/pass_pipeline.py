@@ -1,4 +1,5 @@
 class Pass(object):
+
     def __init__(self, name):
         self.name = name
 
@@ -9,6 +10,7 @@ PassListId = 0
 
 
 class PassList(object):
+
     def __init__(self, transforms):
         global PassListId
         self.pass_id = PassListId
@@ -39,7 +41,9 @@ class PassList(object):
                 stack.append(child)
         return result
 
+
 class PassPipeline(object):
+
     def __init__(self, identifier, action):
         self.identifier = identifier
         self.action = action

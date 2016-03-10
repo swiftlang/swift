@@ -1150,6 +1150,25 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
                           ConGraph->getContentNode(SelfNode));
         }
         return;
+      case ArrayCallKind::kWithUnsafeMutableBufferPointer:
+        // Model this like an escape of the elements of the array and a capture
+        // of anything captured by the closure.
+        // Self is passed inout.
+        if (CGNode *AddrArrayStruct = ConGraph->getNode(ASC.getSelf(), this)) {
+          CGNode *ArrayStructValueNode =
+              ConGraph->getContentNode(AddrArrayStruct);
+          // One content node for going from the array buffer pointer to
+          // the element address (like ref_element_addr).
+          CGNode *RefElement = ConGraph->getContentNode(ArrayStructValueNode);
+          // Another content node to actually load the element.
+          CGNode *ArrayContent = ConGraph->getContentNode(RefElement);
+          ConGraph->setEscapesGlobal(ArrayContent);
+          // The first non indirect result is the closure.
+          auto Args = FAS.getArgumentsWithoutIndirectResults();
+          setEscapesGlobal(ConGraph, Args[0]);
+          return;
+        }
+        break;
       default:
         break;
     }
@@ -1248,6 +1267,35 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         ConGraph->setNode(I, PointsTo);
       }
       return;
+    case ValueKind::CopyAddrInst: {
+      // Be conservative if the dest may be the final release.
+      if (!cast<CopyAddrInst>(I)->isInitializationOfDest()) {
+        setAllEscaping(I, ConGraph);
+        break;
+      }
+
+      // A copy_addr is like a 'store (load src) to dest'.
+      CGNode *SrcAddrNode = ConGraph->getNode(I->getOperand(CopyAddrInst::Src),
+                                              this);
+      if (!SrcAddrNode) {
+        setAllEscaping(I, ConGraph);
+        break;
+      }
+
+      CGNode *LoadedValue = ConGraph->getContentNode(SrcAddrNode);
+      CGNode *DestAddrNode = ConGraph->getNode(
+        I->getOperand(CopyAddrInst::Dest), this);
+      if (DestAddrNode) {
+        // Create a defer-edge from the loaded to the stored value.
+        CGNode *PointsTo = ConGraph->getContentNode(DestAddrNode);
+        ConGraph->defer(PointsTo, LoadedValue);
+      } else {
+        // A store to an address we don't handle -> be conservative.
+        ConGraph->setEscapesGlobal(LoadedValue);
+      }
+      return;
+    }
+    break;
     case ValueKind::StoreInst:
     case ValueKind::StoreWeakInst:
       if (CGNode *ValueNode = ConGraph->getNode(I->getOperand(StoreInst::Src),

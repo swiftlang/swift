@@ -369,9 +369,11 @@ swift::classifyDynamicCast(Module *M,
   auto targetClass = target.getClassOrBoundGenericClass();
   if (sourceClass) {
     if (targetClass) {
-      if (target->isSuperclassOf(source, nullptr))
+      if (target->isExactSuperclassOf(source, nullptr))
         return DynamicCastFeasibility::WillSucceed;
-      if (source->isSuperclassOf(target, nullptr))
+      if (target->isBindableToSuperclassOf(source, nullptr))
+        return DynamicCastFeasibility::MaySucceed;
+      if (source->isBindableToSuperclassOf(target, nullptr))
         return DynamicCastFeasibility::MaySucceed;
 
       // FIXME: bridged types, e.g. CF <-> NS (but not for metatypes).
@@ -896,7 +898,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
     // If we statically know the target is an NSError subclass, then the cast
     // can go through the scalar path (and it's trivially true so can be
     // killed).
-    return targetType->isSuperclassOf(objectType, nullptr);
+    return targetType->isExactSuperclassOf(objectType, nullptr);
   }
   
   // Three supported cases:

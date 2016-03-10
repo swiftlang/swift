@@ -493,7 +493,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
     return false;
 
   // Classes with separate class hierarchies do not alias.
-  if (!LTy.isSuperclassOf(RTy) && !RTy.isSuperclassOf(LTy))
+  if (!LTy.isBindableToSuperclassOf(RTy) && !RTy.isBindableToSuperclassOf(LTy))
     return false;
 
   // Otherwise be conservative and return that the two types may alias.

@@ -62,7 +62,7 @@
       "Array": [
         "ArrayBody.swift",
         "ArrayBuffer.swift",
-        "ArrayBufferType.swift",
+        "ArrayBufferProtocol.swift",
         "ArrayCast.swift",
         "ArrayType.swift",
         "Arrays.swift",
@@ -90,7 +90,6 @@
     "IntegerArithmetic.swift",
     "FixedPoint.swift",
     "IntegerParsing.swift",
-    "Bit.swift",
     "SetAlgebra.swift"
   ],
   "Optional": [

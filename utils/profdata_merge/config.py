@@ -15,7 +15,7 @@ import os
 import tempfile
 
 
-class Config():
+class Config(object):
     """A class to store configuration information specified by command-line
     arguments.
     """

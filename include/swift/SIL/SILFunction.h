@@ -366,7 +366,7 @@ public:
 
   /// \returns True if the function has the semantics flag \p Value;
   bool hasSemanticsAttr(StringRef Value) const {
-    return std::count(SemanticsAttrSet.begin(), SemanticsAttrSet.end(), Value);
+    return count(SemanticsAttrSet, Value);
   }
 
   /// Add the given semantics attribute to the attr list set.

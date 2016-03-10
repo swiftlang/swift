@@ -1133,6 +1133,8 @@ std::vector<UIdent> UIDsFromDeclAttributes(const DeclAttributes &Attrs) {
     // We handle accessibility explicitly.
     case DAK_Accessibility:
     case DAK_SetterAccessibility:
+    // Ignore these.
+    case DAK_ShowInInterface:
       continue;
     default:
       break;

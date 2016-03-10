@@ -19,12 +19,15 @@ import sys
 
 VERBOSE = True
 
+
 def verbose_print_command(command):
     if VERBOSE:
-        print " ".join(pipes.quote(c) for c in command)
+        print(" ".join(pipes.quote(c) for c in command))
         sys.stdout.flush()
 
+
 class ResilienceTest(object):
+
     def __init__(self, target_build_swift, target_run, tmp_dir, test_dir,
                  test_src, additional_compile_flags_library,
                  no_backward_deployment):
@@ -89,8 +92,7 @@ class ResilienceTest(object):
             for config2 in self.config_dir_map:
                 # --no-backward-deployment skips testing a new application
                 # linked against an old library.
-                if config1 == "BEFORE" and config2 == "AFTER" and \
-                  self.no_backward_deployment:
+                if config1 == "BEFORE" and config2 == "AFTER" and self.no_backward_deployment:
                     continue
 
                 yield (config1, config2)
@@ -123,6 +125,7 @@ class ResilienceTest(object):
             verbose_print_command(command)
             returncode = subprocess.call(command)
             assert returncode == 0, str(command)
+
 
 def main():
     parser = argparse.ArgumentParser(description='Resilience test helper')

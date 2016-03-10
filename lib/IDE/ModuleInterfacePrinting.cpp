@@ -259,7 +259,7 @@ void swift::ide::printSubmoduleInterface(
       NoImportSubModules.insert(*It);
     }
   }
-
+  llvm::StringMap<std::vector<Decl*>> FileRangedDecls;
   // Separate the declarations that we are going to print into different
   // buckets.
   for (Decl *D : Decls) {
@@ -328,8 +328,10 @@ void swift::ide::printSubmoduleInterface(
       if (!GroupNames.empty()){
         if (auto Target = D->getGroupName()) {
           if (std::find(GroupNames.begin(), GroupNames.end(),
-                        Target.getValue()) != GroupNames.end())
-             SwiftDecls.push_back(D);
+                        Target.getValue()) != GroupNames.end()) {
+            FileRangedDecls.insert(std::make_pair(D->getSourceFileName().getValue(),
+              std::vector<Decl*>())).first->getValue().push_back(D);
+          }
         }
         continue;
       }
@@ -337,6 +339,37 @@ void swift::ide::printSubmoduleInterface(
       SwiftDecls.push_back(D);
     }
   }
+
+  llvm::SetVector<Decl*> PrintLineAfter;
+  if (!GroupNames.empty()) {
+    assert(SwiftDecls.empty());
+    for (auto &Entry : FileRangedDecls) {
+      auto &DeclsInFile = Entry.getValue();
+      std::sort(DeclsInFile.begin(), DeclsInFile.end(),
+                [](Decl* LHS, Decl *RHS) {
+                  assert(LHS->getSourceOrder().hasValue());
+                  assert(RHS->getSourceOrder().hasValue());
+                  return LHS->getSourceOrder().getValue() <
+                         RHS->getSourceOrder().getValue();
+                });
+
+      for (auto D : DeclsInFile) {
+        SwiftDecls.push_back(D);
+      }
+      PrintLineAfter.insert(DeclsInFile.back());
+    }
+  }
+  if (!PrintLineAfter.empty())
+    PrintLineAfter.pop_back();
+
+  llvm::SmallString<128> DelineatorBuilder;
+  if (!PrintLineAfter.empty()) {
+    DelineatorBuilder.append("// MARK: -\n");
+    DelineatorBuilder.append("// ");
+    DelineatorBuilder.append(77, '=');
+    DelineatorBuilder.append(2, '\n');
+  }
+  StringRef DelineatorAfterFile = DelineatorBuilder.str();
 
   // Create the missing import decls and add to the collector.
   for (auto *SM : NoImportSubModules) {
@@ -495,6 +528,8 @@ void swift::ide::printSubmoduleInterface(
     for (auto *D : SwiftDecls) {
       if (PrintDecl(D))
         Printer << "\n";
+      if (PrintLineAfter.count(D) != 0)
+        Printer << DelineatorAfterFile;
     }
   }
 }

@@ -3208,9 +3208,9 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   return CS.solveSingle().hasValue();
 }
 
-bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
-                bool ReplaceArchetypeWithVariables,
-                bool AllowFreeVariables) {
+static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
+                       bool ReplaceArchetypeWithVariables,
+                       bool AllowFreeVariables) {
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());

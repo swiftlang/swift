@@ -618,7 +618,10 @@ public:
                                        uint64_t contextData) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
+  Optional<StringRef> getSourceFileNameById(unsigned Id) const;
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
+  Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
+  Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
   void collectAllGroups(std::vector<StringRef> &Names) const;
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
   Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;

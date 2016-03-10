@@ -29,13 +29,14 @@ def _output(args):
 
 
 def print_xcodebuild_versions(sdks, file=sys.stdout):
-	"""
-	Print the host machine's `xcodebuild` version, as well as version
-	information for each of the given SDKs (for a full list of available
-	SDKs, invoke `xcodebuild -showsdks` on the command line).
-	"""
-	print(u'--- SDK versions ---', file=file)
-	print(u'{}\n'.format(_output(['xcodebuild', '-version'])), file=file)
-	for sdk in sdks:
-		print(u'{}\n'.format(_output(['xcodebuild', '-version', '-sdk', sdk])),
-			  file=file)
+    """
+    Print the host machine's `xcodebuild` version, as well as version
+    information for each of the given SDKs (for a full list of available
+    SDKs, invoke `xcodebuild -showsdks` on the command line).
+    """
+    print(u'--- SDK versions ---', file=file)
+    print(u'{}\n'.format(_output(['xcodebuild', '-version'])), file=file)
+    for sdk in sdks:
+        print(
+            u'{}\n'.format(_output(['xcodebuild', '-version', '-sdk', sdk])),
+            file=file)

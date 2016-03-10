@@ -2467,7 +2467,7 @@ struct ASTNodeBase {};
 
       // If the destination is a class, walk the supertypes of the source.
       if (destTy->getClassOrBoundGenericClass()) {
-        if (!destTy->isSuperclassOf(srcTy, nullptr)) {
+        if (!destTy->isBindableToSuperclassOf(srcTy, nullptr)) {
           srcTy.print(Out);
           Out << " is not a superclass of ";
           destTy.print(Out);

@@ -224,14 +224,37 @@ function set_lldb_build_mode() {
     LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
 }
 
+function system_memory_in_bytes() {
+    case "$(uname -s -m)" in
+        Darwin\ x86_64)
+            sysctl hw.memsize | cut -f 2 -d " "
+            ;;
+        *)
+            echo "Unknown operating system"
+            exit 1
+            ;;
+    esac
+}
+
+function float_min() {
+    local LHS=$1
+    local RHS=$2
+    if (( $(echo "${LHS} < ${RHS}" | bc -l) )); then
+        echo ${LHS}
+    else
+        echo ${RHS}
+    fi
+}
+
 function num_llvm_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
             # Currently with -gline-tables-only clang is ~3.5GB on Darwin. Use
             # the formula GB Memory/3.5GB to get the number of parallel link
             # threads we can support.
-            echo $(sysctl hw.memsize | cut -f 2 -d " ")/1000000000.0/3.5 | bc
-        ;;
+            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000.0/3.5 | bc)
+            echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
+            ;;
         *)
             echo "Unknown operating system"
             exit 1
@@ -245,15 +268,15 @@ function num_swift_parallel_lto_link_jobs() {
             # Currently with -gline-tables-only swift is ~5-6GB on Darwin. Use
             # the formula GB Memory/6GB to get the number of parallel link
             # threads we can support.
-            echo $(sysctl hw.memsize | cut -f 2 -d " ")/1000000000/6.0 | bc
-        ;;
+            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000/6.0 | bc)
+            echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
+            ;;
         *)
             echo "Unknown operating system"
             exit 1
             ;;
     esac
 }
-
 
 function set_deployment_target_based_options() {
     llvm_cmake_options=()
@@ -357,6 +380,22 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT="iphoneos"
                         -DSWIFT_HOST_VARIANT_SDK="IOS"
                         -DSWIFT_HOST_VARIANT_ARCH="armv7"
+                    )
+                    ;;
+                iphoneos-armv7s)
+                    xcrun_sdk_name="iphoneos"
+                    llvm_host_triple="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="ARM"
+                    cmake_osx_deployment_target=""
+                    cmark_cmake_options=(
+                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${deployment_target})"
+                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${deployment_target})"
+                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                    )
+                    swift_cmake_options=(
+                        -DSWIFT_HOST_VARIANT="iphoneos"
+                        -DSWIFT_HOST_VARIANT_SDK="IOS"
+                        -DSWIFT_HOST_VARIANT_ARCH="armv7s"
                     )
                     ;;
                 iphoneos-arm64)
@@ -787,7 +826,7 @@ CROSS_TOOLS_DEPLOYMENT_TARGETS=()
 for t in ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS} ; do
     case ${t} in
         iphonesimulator-i386 | iphonesimulator-x86_64 | \
-        iphoneos-arm64 | iphoneos-armv7 | \
+        iphoneos-arm64 | iphoneos-armv7 | iphoneos-armv7s | \
         appletvos-arm64 | appletvsimulator-x86_64 | \
         watchos-armv7k | watchsimulator-i386)
             CROSS_TOOLS_DEPLOYMENT_TARGETS=(
@@ -1258,6 +1297,9 @@ function common_cross_c_flags() {
             ;;
         iphoneos-armv7)
             echo "-arch armv7 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+            ;;
+        iphoneos-armv7s)
+            echo "-arch armv7s -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
         iphoneos-arm64)
             echo "-arch arm64 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"

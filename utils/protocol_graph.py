@@ -50,6 +50,8 @@ operator = r'''
 '''
 
 # substitute local variables into the string
+
+
 def interpolate(string):
     import inspect
     frame = inspect.currentframe()
@@ -57,6 +59,8 @@ def interpolate(string):
 
 # Given the body_text of a protocol definition, return a list of
 # associated type and operator requirements.
+
+
 def body_lines(body_text):
     return [
         cgi.escape(b.group(0)) for b in
@@ -82,6 +86,7 @@ with open(args[1]) as src:
 
 generic_parameter_constraint = interpolate(r' (%(identifier)s) \s* : \s* (%(identifier)s) ')
 
+
 def parse_generic_operator(m):
     generic_params = m.group(5)
     generic_operator = cgi.escape(m.group(0).strip())
@@ -103,6 +108,7 @@ def parse_generic_operator(m):
             re.sub(r'\b%s\b' % type_parameter, letter_tau, generic_operator))
 
         generic_operators.setdefault(protocol, set()).add(abbreviated_signature)
+
 
 def parse_protocol(m):
     child = m.group(1)

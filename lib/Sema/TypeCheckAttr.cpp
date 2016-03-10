@@ -77,6 +77,7 @@ public:
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(WarnUnusedResult)
+  IGNORED_ATTR(ShowInInterface)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -647,6 +648,7 @@ public:
     IGNORED_ATTR(Swift3Migration)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
+    IGNORED_ATTR(ShowInInterface)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

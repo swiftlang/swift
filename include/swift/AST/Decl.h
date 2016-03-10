@@ -761,6 +761,10 @@ public:
 
   Optional<StringRef> getGroupName() const;
 
+  Optional<StringRef> getSourceFileName() const;
+
+  Optional<unsigned> getSourceOrder() const;
+
   /// \returns the brief comment attached to this declaration.
   StringRef getBriefComment() const;
 
@@ -2451,6 +2455,13 @@ public:
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TypeAlias;
+  }
+  static bool classof(const GenericTypeDecl *D) {
+    return D->getKind() == DeclKind::TypeAlias;
+  }
+  static bool classof(const DeclContext *C) {
+    auto GTD = dyn_cast<GenericTypeDecl>(C);
+    return GTD && classof(GTD);
   }
 };
 

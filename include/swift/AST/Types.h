@@ -623,14 +623,34 @@ public:
   ///          superclass.
   Type getSuperclass(LazyResolver *resolver);
   
-  /// \brief True if this type is a superclass of another type.
+  /// \brief True if this type is the exact superclass of another type.
   ///
   /// \param ty       The potential subclass.
   /// \param resolver The resolver for lazy type checking, or null if the
   ///                 AST is already type-checked.
   ///
   /// \returns True if this type is \c ty or a superclass of \c ty.
-  bool isSuperclassOf(Type ty, LazyResolver *resolver);
+  ///
+  /// If this type is a bound generic class \c Foo<T>, the method only
+  /// returns true if the generic parameters of \c ty exactly match the
+  /// superclass of \c ty. For instance, if \c ty is a
+  /// class DerivedClass: Base<Int>, then \c Base<T> (where T is an archetype)
+  /// will return false. `isBindableToSuperclassOf` should be used
+  /// for queries that care whether a generic class type can be substituted into
+  /// a type's subclass.
+  bool isExactSuperclassOf(Type ty, LazyResolver *resolver);
+
+  /// \brief True if this type is the superclass of another type, or a generic
+  /// type that could be bound to the superclass.
+  ///
+  /// \param ty       The potential subclass.
+  /// \param resolver The resolver for lazy type checking, or null if the
+  ///                 AST is already type-checked.
+  ///
+  /// \returns True if this type is \c ty, a superclass of \c ty, or an
+  ///          archetype-parameterized type that can be bound to a superclass
+  ///          of \c ty.
+  bool isBindableToSuperclassOf(Type ty, LazyResolver *resolver);
 
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.

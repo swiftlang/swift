@@ -72,7 +72,7 @@ public protocol UnicodeCodec {
   /// calling `output` on each `CodeUnit`.
   static func encode(
     input: UnicodeScalar,
-    @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   )
 }
 
@@ -396,7 +396,7 @@ public struct UTF8 : UnicodeCodec {
   /// calling `output` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
-    @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
@@ -563,7 +563,7 @@ public struct UTF16 : UnicodeCodec {
   /// calling `output` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
-    @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     let scalarValue: UInt32 = UInt32(input)
 
@@ -619,7 +619,7 @@ public struct UTF32 : UnicodeCodec {
   /// calling `output` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
-    @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     processCodeUnit(UInt32(input))
   }
@@ -641,7 +641,7 @@ public func transcode<
   from inputEncoding: InputEncoding.Type,
   to outputEncoding: OutputEncoding.Type,
   stoppingOnError stopOnError: Bool,
-  @noescape sendingOutputTo processCodeUnit: (OutputEncoding.CodeUnit) -> Void
+  sendingOutputTo processCodeUnit: (OutputEncoding.CodeUnit) -> Void
 ) -> Bool {
   var input = input
 
@@ -651,22 +651,20 @@ public func transcode<
 
   var inputDecoder = inputEncoding.init()
   var hadError = false
-  var scalar = inputDecoder.decode(&input)
-  while scalar != .emptyInput {
-    switch scalar {
+  loop:
+  while true {
+    switch inputDecoder.decode(&input) {
     case .scalarValue(let us):
       OutputEncoding.encode(us, sendingOutputTo: processCodeUnit)
     case .emptyInput:
-      _sanityCheckFailure("should not enter the loop when input becomes empty")
+      break loop
     case .error:
+      hadError = true
       if stopOnError {
-        return (hadError: true)
-      } else {
-        OutputEncoding.encode("\u{fffd}", sendingOutputTo: processCodeUnit)
-        hadError = true
+        break loop
       }
+      OutputEncoding.encode("\u{fffd}", sendingOutputTo: processCodeUnit)
     }
-    scalar = inputDecoder.decode(&input)
   }
   return hadError
 }

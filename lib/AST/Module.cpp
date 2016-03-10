@@ -1583,11 +1583,12 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 
   StringRef name = getFilename();
   if (name.empty()) {
-    assert(1 == std::count_if(getParentModule()->getFiles().begin(),
-                              getParentModule()->getFiles().end(),
-                              [](const FileUnit *FU) -> bool {
-      return isa<SourceFile>(FU) && cast<SourceFile>(FU)->getFilename().empty();
-    }) && "can't promise uniqueness if multiple source files are nameless");
+    assert(1 == count_if(getParentModule()->getFiles(),
+                         [](const FileUnit *FU) -> bool {
+                           return isa<SourceFile>(FU) &&
+                                  cast<SourceFile>(FU)->getFilename().empty();
+                         }) &&
+           "can't promise uniqueness if multiple source files are nameless");
 
     // We still need a discriminator, so keep going.
   }

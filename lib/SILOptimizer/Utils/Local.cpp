@@ -462,7 +462,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   // simply perform an upcast.
   if (SrcTy.getSwiftRValueType()->mayHaveSuperclass() &&
       DestTy.getSwiftRValueType()->mayHaveSuperclass() &&
-      DestTy.isSuperclassOf(SrcTy)) {
+      DestTy.isExactSuperclassOf(SrcTy)) {
     if (CheckOnly)
       return Value;
     CastedValue = B->createUpcast(Loc, Value, DestTy);
@@ -484,7 +484,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     // simply perform an upcast.
     if (OptionalDestTy->mayHaveSuperclass() &&
         OptionalSrcTy->mayHaveSuperclass() &&
-        OptionalDestLoweredTy.isSuperclassOf(OptionalSrcLoweredTy)) {
+        OptionalDestLoweredTy.isExactSuperclassOf(OptionalSrcLoweredTy)) {
       // Insert upcast.
       if (CheckOnly)
         return Value;
@@ -561,7 +561,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     if (CheckOnly)
       return Value;
 
-    if (DestTy.isSuperclassOf(SrcTy)) {
+    if (DestTy.isExactSuperclassOf(SrcTy)) {
       // Insert upcast.
       CastedValue = B->createUpcast(Loc, Value, DestTy);
       return CastedValue;
@@ -578,7 +578,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   if (isa<AnyMetatypeType>(SrcTy.getSwiftRValueType()) &&
       isa<AnyMetatypeType>(DestTy.getSwiftRValueType()) &&
       SrcTy.isClassOrClassMetatype() && DestTy.isClassOrClassMetatype() &&
-      DestTy.getMetatypeInstanceType(M).isSuperclassOf(
+      DestTy.getMetatypeInstanceType(M).isExactSuperclassOf(
           SrcTy.getMetatypeInstanceType(M))) {
     if (CheckOnly)
       return Value;
@@ -1611,7 +1611,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     // If it is addr cast then store the result.
     auto ConvTy = NewAI->getType();
     auto DestTy = Dest->getType().getObjectType();
-    assert((ConvTy == DestTy || DestTy.isSuperclassOf(ConvTy)) &&
+    assert((ConvTy == DestTy || DestTy.isExactSuperclassOf(ConvTy)) &&
            "Destination should have the same type or be a superclass "
            "of the source operand");
     auto CastedValue = SILValue(
