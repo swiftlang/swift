@@ -87,7 +87,7 @@ def is_max_score(newscore, maxscore, invert):
 
 
 def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
-    print(num.rjust(3), end="")
+    print(num.rjust(3), end=" ")
     print(key.ljust(25), end="")
     bestscore1 = None
     bestscore2 = None
@@ -202,7 +202,7 @@ if __name__ == '__main__':
         else:
             print(file2, "/", file1)
 
-    print("#".rjust(3), end="")
+    print("#".rjust(3), end=" ")
     print("TEST".ljust(25), end="")
     if PrintAllScores:
         for i in range(0, runs):
@@ -210,8 +210,8 @@ if __name__ == '__main__':
         for i in range(0, runs):
             print(("NEW_RUN%d" % i).rjust(9), end="")
     else:
-        print("BEST_OLD_MIN(μs)".rjust(17), end="")
-        print("BEST_NEW_MIN(μs)".rjust(17), end="")
+        print("BEST_OLD_MIN(μs)".rjust(17), end=" ")
+        print("BEST_NEW_MIN(μs)".rjust(17), end=" ")
     print('DELTA'.rjust(9), '%DELTA'.rjust(9), 'SPEEDUP'.rjust(9))
 
     for key in keys:
