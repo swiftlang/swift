@@ -13,7 +13,7 @@
 /// A type that provides subscript access to its elements.
 ///
 /// - Important: In most cases, it's best to ignore this protocol and use
-///   `CollectionType` instead, as it has a more complete interface.
+///   `Collection` instead, as it has a more complete interface.
 public protocol Indexable {
   // This protocol is almost an implementation detail of the standard
   // library; it is used to deduce things like the `SubSequence` and
@@ -24,6 +24,8 @@ public protocol Indexable {
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
+  ///
+  /// You SHOULD use the Collection's API to advance (+/-) an Index.
   associatedtype Index : Comparable
 
   /// The position of the first element in a non-empty collection.
@@ -31,6 +33,9 @@ public protocol Indexable {
   /// In an empty collection, `startIndex == endIndex`.
   ///
   /// - Complexity: O(1)
+  ///
+  /// - Default Implementation: 
+  ///   - Conforming collections must provide.
   var startIndex: Index { get }
 
   /// The collection's "past the end" position.
@@ -40,6 +45,9 @@ public protocol Indexable {
   /// `successor()`.
   ///
   /// - Complexity: O(1)
+  ///
+  /// - Default Implementation:
+  ///   - Conforming collections must provide.
   var endIndex: Index { get }
 
   // The declaration of _Element and subscript here is a trick used to
@@ -68,11 +76,10 @@ public protocol Indexable {
   /// memory safety is not a concern.  Do not rely on this range check for
   /// memory safety.
   ///
-  /// The default implementation for forward and bidirectional indices is a
-  /// no-op.  The default implementation for random access indices performs a
-  /// range check.
-  ///
   /// - Complexity: O(1).
+  ///
+  /// - Default Implementation:
+  ///   - Using `Comparable` conformance of `Collection.Index`
   func _failEarlyRangeCheck(index: Index, bounds: Range<Index>)
 
   /// Performs a range check in O(1), or a no-op when a range check is not
@@ -91,17 +98,20 @@ public protocol Indexable {
   /// memory safety is not a concern.  Do not rely on this range check for
   /// memory safety.
   ///
-  /// The default implementation for forward and bidirectional indices is a
-  /// no-op.  The default implementation for random access indices performs a
-  /// range check.
-  ///
   /// - Complexity: O(1).
+  ///
+  /// - Default Implementation:
+  ///   - Using `Comparable` conformance of `Collection.Index`
   func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
 
   /// Returns the next consecutive `Index` in a discrete sequence of
   /// `Index` values.
   ///
   /// - Precondition: `i` has a well-defined successor.
+  ///
+  /// - Default Implementation:
+  ///   - Using `Strideable`'s `advanced(by:1) where Index : Strideable.
+  ///   - Otherwise conforming collections must provide
   @warn_unused_result
   func next(i: Index) -> Index
 
@@ -240,12 +250,18 @@ public protocol Collection : Indexable, Sequence {
   func prefix(through position: Index) -> SubSequence
 
   /// Returns `true` iff `self` is empty.
+  ///
+  /// - Default Implementation:
+  ///   - Using `self.startIndex == self.endIndex` (e.g. Equality)
   var isEmpty: Bool { get }
 
   /// Returns the number of elements.
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
+  ///
+  /// - Default Implementation:
+  ///   - Using `self.distance(from: self.startIndex, to: self.endIndex)`
   var count: IndexDistance { get }
 
   // The following requirement enables dispatching for indexOf when
@@ -274,6 +290,10 @@ public protocol Collection : Indexable, Sequence {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessCollection`
   ///   - O(`abs(n)`) otherwise
+  ///
+  /// - Default Implementation:
+  ///   - Using `self.next(Index)` `n` times unless at `self.endIndex`.
+  ///   - Using `Strideable`'s `advanced(by:) where Index : Strideable.
   @warn_unused_result
   func advance(i: Index, by n: IndexDistance) -> Index
 
@@ -292,6 +312,10 @@ public protocol Collection : Indexable, Sequence {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessCollection`
   ///   - O(`abs(n)`) otherwise
+  ///
+  /// - Default Implementation:
+  ///   - Using `self.next(Index)` `n` times unless at `limit` or `self.endIndex`.
+  ///   - Using `Strideable`'s `advanced(by:) where Index : Strideable.
   @warn_unused_result
   func advance(i: Index, by n: IndexDistance, limit: Index) -> Index
 
@@ -305,6 +329,10 @@ public protocol Collection : Indexable, Sequence {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`n`) otherwise, where `n` is the function's result.
+  ///
+  /// - Default Implementation:
+  ///   - Using `self.next(Index)` to count from `self.start` to `self.end`.
+  ///   - Using `Strideable`'s `distance(to:) where Index : Strideable.
   @warn_unused_result
   func distance(from start: Index, to end: Index) -> IndexDistance
 }
