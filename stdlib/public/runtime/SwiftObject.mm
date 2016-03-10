@@ -472,6 +472,15 @@ static uintptr_t const objectPointerIsObjCBit = 0x00000002U;
 
 static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
   assert(!isObjCTaggedPointerOrNull(object));
+#if SWIFT_HAS_OPAQUE_ISAS
+  // Fast path for opaque ISAs.  We don't want to call _swift_getClassOfAllocated
+  // as that will call object_getClass.  Instead we can look at the bits in the
+  // ISA and tell if its a non-pointer opaque ISA which means it is definately
+  // an ObjC object and doesn't use native swift reference counting.
+  if (_swift_isNonPointerIsaObjCClass(object))
+    return false;
+  return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocatedFromPointer(object));
+#endif
   return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
 }
 

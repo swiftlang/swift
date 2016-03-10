@@ -22,6 +22,11 @@
 #include "swift/Runtime/Metadata.h"
 #include "llvm/Support/Compiler.h"
 
+// Opaque ISAs need to use object_getClass which is in runtime.h
+#if SWIFT_HAS_OPAQUE_ISAS
+#include <objc/runtime.h>
+#endif
+
 namespace swift {
 
 #if SWIFT_HAS_ISA_MASKING
@@ -50,21 +55,6 @@ namespace swift {
     return (mask & (mask + 1)) == 0;
   }
 
-  /// Return the class of an object which is known to be an allocated
-  /// heap object.
-  static inline const ClassMetadata *_swift_getClassOfAllocated(const void *object) {
-    // Load the isa field.
-    uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
-
-#if SWIFT_HAS_ISA_MASKING
-    // Apply the mask.
-    bits &= swift_isaMask;
-#endif
-
-    // The result is a class pointer.
-    return reinterpret_cast<const ClassMetadata *>(bits);
-  }
-
   /// Is the given value an Objective-C tagged pointer?
   static inline bool isObjCTaggedPointer(const void *object) {
 #if SWIFT_OBJC_INTEROP
@@ -78,6 +68,53 @@ namespace swift {
   static inline bool isObjCTaggedPointerOrNull(const void *object) {
     return object == nullptr || isObjCTaggedPointer(object);
   }
+
+  /// Return the class of an object which is known to be an allocated
+  /// heap object.
+  /// Note, in this case, the object may or may not have a non-pointer ISA.
+  /// Masking, or otherwise, may be required to get a class pointer.
+  static inline const ClassMetadata *_swift_getClassOfAllocated(const void *object) {
+#if SWIFT_HAS_OPAQUE_ISAS
+    // The ISA is opaque so masking it will not return a pointer.  We instead
+    // need to call the objc runtime to get the class.
+    return reinterpret_cast<const ClassMetadata*>(object_getClass((id)object));
+#else
+    // Load the isa field.
+    uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
+
+#if SWIFT_HAS_ISA_MASKING
+    // Apply the mask.
+    bits &= swift_isaMask;
+#endif
+
+    // The result is a class pointer.
+    return reinterpret_cast<const ClassMetadata *>(bits);
+#endif
+  }
+
+  /// Return the class of an object which is known to be an allocated
+  /// heap object.
+  /// Note, in this case, the object is known to have a pointer ISA, and no
+  /// masking is required to convert from non-pointer to pointer ISA.
+  static inline const ClassMetadata *
+  _swift_getClassOfAllocatedFromPointer(const void *object) {
+    // Load the isa field.
+    uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
+
+    // The result is a class pointer.
+    return reinterpret_cast<const ClassMetadata *>(bits);
+  }
+
+#if SWIFT_OBJC_INTEROP && SWIFT_HAS_OPAQUE_ISAS
+  /// Return whether this object is of a class which uses non-pointer ISAs.
+  static inline bool _swift_isNonPointerIsaObjCClass(const void *object) {
+    // Load the isa field.
+    uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
+    // If the low bit is set, then we are definately an objc object.
+    // FIXME: Use a variable for this.
+    return bits & 1;
+  }
+#endif
 
   LLVM_LIBRARY_VISIBILITY
   const ClassMetadata *_swift_getClass(const void *object);

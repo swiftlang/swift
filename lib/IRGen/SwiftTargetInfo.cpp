@@ -90,6 +90,10 @@ static void configureARM(IRGenModule &IGM, const llvm::Triple &triple,
   // ARM requires marker assembly for objc_retainAutoreleasedReturnValue.
   target.ObjCRetainAutoreleasedReturnValueMarker =
     "mov\tr7, r7\t\t@ marker for objc_retainAutoreleaseReturnValue";
+
+  // armv7k has opaque ISAs which must go through the ObjC runtime.
+  if (triple.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7k)
+    target.ObjCHasOpaqueISAs = true;
 }
 
 /// Configures target-specific information for powerpc64 platforms.
