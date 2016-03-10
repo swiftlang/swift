@@ -164,12 +164,12 @@ extension String {
 }
 
 extension String {
-  @available(*, unavailable, message="Renamed to init(repeating:count:) and reordered parameters")
+  @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
   public init(count: Int, repeatedValue c: Character) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="Renamed to init(repeating:count:) and reordered parameters")
+  @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
   public init(count: Int, repeatedValue c: UnicodeScalar) {
     fatalError("unavailable function can't be called")
   }

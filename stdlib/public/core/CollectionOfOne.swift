@@ -84,11 +84,11 @@ extension CollectionOfOne : CustomReflectable {
   }
 }
 
-@available(*, unavailable, renamed="IteratorOverOne")
+@available(*, unavailable, renamed: "IteratorOverOne")
 public struct GeneratorOfOne<Element> {}
 
 extension IteratorOverOne {
-  @available(*, unavailable, renamed="iterator")
+  @available(*, unavailable, renamed: "iterator")
   public func generate() -> IteratorOverOne<Element> {
     fatalError("unavailable function can't be called")
   }

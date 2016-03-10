@@ -905,10 +905,10 @@ extension UTF16 {
   }
 }
 
-@available(*, unavailable, renamed="UnicodeCodec")
+@available(*, unavailable, renamed: "UnicodeCodec")
 public typealias UnicodeCodecType = UnicodeCodec
 
-@available(*, unavailable, message="use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)'")
+@available(*, unavailable, message: "use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)'")
 public func transcode<
   Input : IteratorProtocol,
   InputEncoding : UnicodeCodec,
@@ -923,7 +923,7 @@ public func transcode<
 }
 
 extension UTF16 {
-  @available(*, unavailable, message="use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'")
+  @available(*, unavailable, message: "use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'")
   public static func measure<
     Encoding : UnicodeCodec, Input : IteratorProtocol
     where Encoding.CodeUnit == Input.Element

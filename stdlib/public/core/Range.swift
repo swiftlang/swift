@@ -229,18 +229,18 @@ public func ~= <I : ForwardIndex where I : Comparable> (
   return pattern.contains(value)
 }
 
-@available(*, unavailable, renamed="RangeIterator")
+@available(*, unavailable, renamed: "RangeIterator")
 public struct RangeGenerator<Element : ForwardIndex> {}
 
 extension RangeIterator {
-  @available(*, unavailable, message="use the 'makeIterator()' method on the collection")
+  @available(*, unavailable, message: "use the 'makeIterator()' method on the collection")
   public init(_ bounds: Range<Element>) {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension Range {
-  @available(*, unavailable, message="use the '..<' operator")
+  @available(*, unavailable, message: "use the '..<' operator")
   public init(start: Element, end: Element) {
     fatalError("unavailable function can't be called")
   }

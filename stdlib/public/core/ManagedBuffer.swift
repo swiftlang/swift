@@ -539,7 +539,7 @@ public func isUniquelyReferencedNonObjC<T : AnyObject>(
 }
 
 extension ManagedBufferPointer {
-  @available(*, unavailable, renamed="capacity")
+  @available(*, unavailable, renamed: "capacity")
   public var allocatedElementCount: Int {
     fatalError("unavailable function can't be called")
   }

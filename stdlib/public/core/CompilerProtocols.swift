@@ -226,5 +226,5 @@ public protocol _FileReferenceLiteralConvertible {
 public protocol _DestructorSafeContainer {
 }
 
-@available(*, unavailable, renamed="Boolean")
+@available(*, unavailable, renamed: "Boolean")
 public typealias BooleanType = Boolean

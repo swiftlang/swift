@@ -242,6 +242,6 @@ extension SetAlgebra {
   }
 }
 
-@available(*, unavailable, renamed="SetAlgebra")
+@available(*, unavailable, renamed: "SetAlgebra")
 public typealias SetAlgebraType = SetAlgebra
 

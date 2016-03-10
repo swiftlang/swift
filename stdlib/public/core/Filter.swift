@@ -255,11 +255,11 @@ extension LazyCollectionProtocol {
   }
 }
 
-@available(*, unavailable, renamed="LazyFilterIterator")
+@available(*, unavailable, renamed: "LazyFilterIterator")
 public struct LazyFilterGenerator<Base : IteratorProtocol> {}
 
 extension LazyFilterIterator {
-  @available(*, unavailable, message="use '.lazy.filter' on the sequence")
+  @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
   public init(
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Element) -> Bool
@@ -269,7 +269,7 @@ extension LazyFilterIterator {
 }
 
 extension LazyFilterSequence {
-  @available(*, unavailable, message="use '.lazy.filter' on the sequence")
+  @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
   public init(
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
@@ -277,14 +277,14 @@ extension LazyFilterSequence {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="iterator")
+  @available(*, unavailable, renamed: "iterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension LazyFilterCollection {
-  @available(*, unavailable, message="use '.lazy.filter' on the collection")
+  @available(*, unavailable, message: "use '.lazy.filter' on the collection")
   public init(
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
@@ -292,7 +292,7 @@ extension LazyFilterCollection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="iterator")
+  @available(*, unavailable, renamed: "iterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }

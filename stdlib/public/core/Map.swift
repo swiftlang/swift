@@ -152,18 +152,18 @@ extension LazyCollectionProtocol {
   }
 }
 
-@available(*, unavailable, renamed="LazyMapIterator")
+@available(*, unavailable, renamed: "LazyMapIterator")
 public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
 
 extension LazyMapSequence {
-  @available(*, unavailable, message="use '.lazy.map' on the sequence")
+  @available(*, unavailable, message: "use '.lazy.map' on the sequence")
   public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension LazyMapCollection {
-  @available(*, unavailable, message="use '.lazy.map' on the collection")
+  @available(*, unavailable, message: "use '.lazy.map' on the collection")
   public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
     fatalError("unavailable function can't be called")
   }

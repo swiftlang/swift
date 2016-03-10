@@ -622,56 +622,56 @@ public func cross(x: ${ctype[type]}3,
 // Integer vector types only support wrapping arithmetic. Make the non-wrapping
 // operators unavailable so that fixits guide users to the unchecked operations.
 
-@available(*, unavailable, renamed="&+",
-           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+@available(*, unavailable, renamed: "&+",
+           message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
 public func +(x: ${vectype}, y: ${vectype}) -> ${vectype} {
   fatalError("unavailable function cannot be called")
 }
 
-@available(*, unavailable, renamed="&-",
-           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+@available(*, unavailable, renamed: "&-",
+           message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
 public func -(x: ${vectype}, y: ${vectype}) -> ${vectype} {
   fatalError("unavailable function cannot be called")
 }
 
-@available(*, unavailable, renamed="&*",
-           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+@available(*, unavailable, renamed: "&*",
+           message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
 public func *(x: ${vectype}, y: ${vectype}) -> ${vectype} {
   fatalError("unavailable function cannot be called")
 }
 
-@available(*, unavailable, renamed="&*",
-           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+@available(*, unavailable, renamed: "&*",
+           message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
 public func *(x: ${vectype}, y: ${type}) -> ${vectype} {
   fatalError("unavailable function cannot be called")
 }
 
-@available(*, unavailable, renamed="&*",
-           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+@available(*, unavailable, renamed: "&*",
+           message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
 public func *(x: ${type}, y: ${vectype}) -> ${vectype} {
   fatalError("unavailable function cannot be called")
 }
 
 @available(*, unavailable,
-           message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &+ y' instead")
+           message: "integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &+ y' instead")
 public func +=(x: inout ${vectype}, y: ${vectype}) {
   fatalError("unavailable function cannot be called")
 }
 
 @available(*, unavailable,
-           message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &- y' instead")
+           message: "integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &- y' instead")
 public func -=(x: inout ${vectype}, y: ${vectype}) {
   fatalError("unavailable function cannot be called")
 }
 
 @available(*, unavailable,
-           message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
+           message: "integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
 public func *=(x: inout ${vectype}, y: ${vectype}) {
   fatalError("unavailable function cannot be called")
 }
 
 @available(*, unavailable,
-           message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
+           message: "integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
 public func *=(x: inout ${vectype}, y: ${type}) {
   fatalError("unavailable function cannot be called")
 }

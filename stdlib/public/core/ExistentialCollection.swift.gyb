@@ -229,7 +229,7 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
 ///
 /// - SeeAlso: `AnyIterator<Element>`.
 public struct AnySequence<Element> : Sequence {
-  @available(*, unavailable, renamed="Element")
+  @available(*, unavailable, renamed: "Element")
   public typealias T = Element
 
   /// Wrap and forward operations to `base`.
@@ -674,11 +674,11 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
 }
 % end
 
-@available(*, unavailable, renamed="AnyIterator")
+@available(*, unavailable, renamed: "AnyIterator")
 public struct AnyGenerator<Element> {}
 
 extension AnyIterator {
-  @available(*, unavailable, renamed="iterator")
+  @available(*, unavailable, renamed: "iterator")
   public func generate() -> AnyIterator<Element> {
     fatalError("unavailable function can't be called")
   }
@@ -687,18 +687,18 @@ extension AnyIterator {
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
 extension Any${Kind} {
 
-  @available(*, unavailable, message="Please use underestimatedCount property instead.")
+  @available(*, unavailable, message: "Please use underestimatedCount property instead.")
   public var underestimateCount: Int {
     fatalError("unavailable function can't be called")
   }
 }
 %end
 
-@available(*, unavailable, renamed="AnyCollectionProtocol")
+@available(*, unavailable, renamed: "AnyCollectionProtocol")
 public typealias AnyCollectionType = AnyCollectionProtocol
 
 extension AnyCollectionProtocol {
-  @available(*, unavailable, renamed="iterator")
+  @available(*, unavailable, renamed: "iterator")
   public func generate() -> AnyIterator<Iterator.Element> {
     fatalError("unavailable function can't be called")
   }

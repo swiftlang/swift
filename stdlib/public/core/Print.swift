@@ -159,21 +159,21 @@ internal func _debugPrint<Target : OutputStream>(
 //===----------------------------------------------------------------------===//
 //===--- Migration Aids ---------------------------------------------------===//
 
-@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false': 'print((...), terminator: \"\")'")
+@available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false': 'print((...), terminator: \"\")'")
 public func print<T>(_: T, appendNewline: Bool = true) {}
-@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false': 'debugPrint((...), terminator: \"\")'")
+@available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false': 'debugPrint((...), terminator: \"\")'")
 public func debugPrint<T>(_: T, appendNewline: Bool = true) {}
 
 
 //===--- FIXME: Not working due to <rdar://22101775> ----------------------===//
-@available(*, unavailable, message="Please use the 'to' label for the target stream: 'print((...), to: &...)'")
+@available(*, unavailable, message: "Please use the 'to' label for the target stream: 'print((...), to: &...)'")
 public func print<T>(_: T, _: inout OutputStream) {}
-@available(*, unavailable, message="Please use the 'to' label for the target stream: 'debugPrint((...), to: &...))'")
+@available(*, unavailable, message: "Please use the 'to' label for the target stream: 'debugPrint((...), to: &...))'")
 public func debugPrint<T>(_: T, _: inout OutputStream) {}
 
-@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'print((...), terminator: \"\", toStream: &...)'")
+@available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'print((...), terminator: \"\", toStream: &...)'")
 public func print<T>(_: T, _: inout OutputStream, appendNewline: Bool = true) {}
-@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'debugPrint((...), terminator: \"\", toStream: &...)'")
+@available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'debugPrint((...), terminator: \"\", toStream: &...)'")
 public func debugPrint<T>(
   _: T, _: inout OutputStream, appendNewline: Bool = true
 ) {}

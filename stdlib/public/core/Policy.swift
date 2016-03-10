@@ -445,6 +445,6 @@ infix operator  |= { associativity right precedence 90 assignment }
 // from users.
 infix operator ~> { associativity left precedence 255 }
 
-@available(*, unavailable, renamed="BitwiseOperations")
+@available(*, unavailable, renamed: "BitwiseOperations")
 public typealias BitwiseOperationsType = BitwiseOperations
 

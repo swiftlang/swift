@@ -188,5 +188,5 @@ func _memcpy(
     /*volatile:*/ false._value)
 }
 
-@available(*, unavailable, renamed="OpaquePointer")
+@available(*, unavailable, renamed: "OpaquePointer")
 public struct COpaquePointer {}

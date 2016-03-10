@@ -59,5 +59,5 @@ public func _errorInMain(error: ErrorProtocol) {
   fatalError("Error raised at top level: \(String(reflecting: error))")
 }
 
-@available(*, unavailable, renamed="ErrorProtocol")
+@available(*, unavailable, renamed: "ErrorProtocol")
 public typealias ErrorType = ErrorProtocol

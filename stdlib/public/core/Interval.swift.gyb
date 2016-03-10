@@ -196,18 +196,18 @@ public func ~= <I: Interval>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)
 }
 
-@available(*, unavailable, renamed="Interval")
+@available(*, unavailable, renamed: "Interval")
 public typealias IntervalType = Interval
 
 extension HalfOpenInterval {
-  @available(*, unavailable, message="Please use the '..<' operator instead.")
+  @available(*, unavailable, message: "Please use the '..<' operator instead.")
   public init(_ start: Bound, _ end: Bound) {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension ClosedInterval {
-  @available(*, unavailable, message="Please use the '...' operator instead.")
+  @available(*, unavailable, message: "Please use the '...' operator instead.")
   public init(_ start: Bound, _ end: Bound) {
     fatalError("unavailable function can't be called")
   }

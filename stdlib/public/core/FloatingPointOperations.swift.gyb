@@ -97,5 +97,5 @@ public protocol FloatingPoint : Strideable {
   // func isCanonical() -> Bool
 }
 
-@available(*, unavailable, renamed="FloatingPoint")
+@available(*, unavailable, renamed: "FloatingPoint")
 public typealias FloatingPointType = FloatingPoint

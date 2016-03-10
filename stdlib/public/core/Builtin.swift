@@ -206,7 +206,7 @@ public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
 }
 
-@available(*, unavailable, renamed="unsafeAddress(of:)")
+@available(*, unavailable, renamed: "unsafeAddress(of:)")
 public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
   fatalError("unavailable function can't be called")
 }
@@ -564,7 +564,7 @@ func _isOptional<T>(type: T.Type) -> Bool {
   return Bool(Builtin.isOptional(type))
 }
 
-@available(*, unavailable, message="Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
+@available(*, unavailable, message: "Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
 public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
   fatalError("unavailable function can't be called")
 }
