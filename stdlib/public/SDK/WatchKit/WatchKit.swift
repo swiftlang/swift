@@ -26,7 +26,7 @@ extension WKInterfaceController {
     namesAndContexts: [(name: String, context: AnyObject)]
   ) {
     WKInterfaceController.reloadRootControllers(
-      names: namesAndContexts.map { $0.name },
+      withNames: namesAndContexts.map { $0.name },
       contexts: namesAndContexts.map { $0.context })
   }
 
@@ -36,7 +36,7 @@ extension WKInterfaceController {
     namesAndContexts: [(name: String, context: AnyObject)]
   ) {
     self.present(
-      names: namesAndContexts.map { $0.name },
+      withNames: namesAndContexts.map { $0.name },
       contexts: namesAndContexts.map { $0.context })
   }
 }

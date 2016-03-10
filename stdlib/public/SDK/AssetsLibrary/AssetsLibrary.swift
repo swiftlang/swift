@@ -27,7 +27,7 @@ extension ALAssetsLibrary {
               ALAssetsGroupPhotoStream
     }
     return enumerateGroups(
-      types: ALAssetsGroupType(types), 
+      withTypes: ALAssetsGroupType(types),
       using: enumerationBlock, 
       failureBlock: failureBlock)
   }
