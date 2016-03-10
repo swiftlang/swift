@@ -2169,7 +2169,13 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
     Inst->replaceAllUsesWithUndef();
     EraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
-    Builder.createUnreachable(ArtificialUnreachableLocation());
+    auto *UnreachableInst =
+        Builder.createUnreachable(ArtificialUnreachableLocation());
+
+    // Delete everything after the unreachable except for dealloc_stack which we
+    // move before the trap.
+    deleteInstructionsAfterUnreachable(UnreachableInst, Trap);
+
     WillFailAction();
     return Trap;
   }
@@ -2221,6 +2227,25 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
   return nullptr;
 }
 
+/// Deletes all instructions after \p UnreachableInst except dealloc_stack
+/// instructions are moved before \p TrapInst.
+void CastOptimizer::deleteInstructionsAfterUnreachable(
+    SILInstruction *UnreachableInst, SILInstruction *TrapInst) {
+  auto UnreachableInstIt =
+      std::next(SILBasicBlock::iterator(UnreachableInst));
+  auto *Block = TrapInst->getParent();
+  while (UnreachableInstIt != Block->end()) {
+    SILInstruction *CurInst = &*UnreachableInstIt;
+    ++UnreachableInstIt;
+    if (auto *DeallocStack = dyn_cast<DeallocStackInst>(CurInst))
+      if (!isa<SILUndef>(DeallocStack->getOperand())) {
+        DeallocStack->moveBefore(TrapInst);
+        continue;
+      }
+    CurInst->replaceAllUsesWithUndef();
+    EraseInstAction(CurInst);
+  }
+}
 
 SILInstruction *
 CastOptimizer::
@@ -2249,7 +2274,6 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst);
-    SILInstruction *NewI = Builder.createBuiltinTrap(Loc);
     // mem2reg's invariants get unhappy if we don't try to
     // initialize a loadable result.
     auto DestType = Dest->getType();
@@ -2257,12 +2281,19 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     if (!resultTL.isAddressOnly()) {
       auto undef = SILValue(SILUndef::get(DestType.getObjectType(),
                                           Builder.getModule()));
-      NewI = Builder.createStore(Loc, undef, Dest);
+      Builder.createStore(Loc, undef, Dest);
     }
+    auto *TrapI = Builder.createBuiltinTrap(Loc);
     Inst->replaceAllUsesWithUndef();
     EraseInstAction(Inst);
-    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(NewI)));
-    Builder.createUnreachable(ArtificialUnreachableLocation());
+    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(TrapI)));
+    auto *UnreachableInst =
+        Builder.createUnreachable(ArtificialUnreachableLocation());
+
+    // Delete everything after the unreachable except for dealloc_stack which we
+    // move before the trap.
+    deleteInstructionsAfterUnreachable(UnreachableInst, TrapI);
+
     WillFailAction();
   }
 
