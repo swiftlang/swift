@@ -631,9 +631,8 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
     result._decls.clear();
     result._types.clear();
     if (parent_decl) {
-      auto nominal_decl = dyn_cast<NominalTypeDecl>(parent_decl);
 
-      if (nominal_decl) {
+      if (auto nominal_decl = dyn_cast<NominalTypeDecl>(parent_decl)) {
         DeclsLookupSource lookup(
             DeclsLookupSource::GetDeclsLookupSource(nominal_decl));
         SmallVector<ValueDecl *, 4> decls;
@@ -659,6 +658,27 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
           }
           return result._types.size();
         }
+
+      } else if (auto FD = dyn_cast<AbstractFunctionDecl>(parent_decl)) {
+
+        // Do a local lookup into the function, using the end loc to approximate
+        // being able to see all the local variables.
+        // FIXME: Need a more complete/robust lookup mechanism that can handle
+        // declarations in sub-stmts, etc.
+        UnqualifiedLookup lookup(ast->getIdentifier(name), FD,
+                                 ast->getLazyResolver(),
+                                 /*isKnownPrivate=*/false, FD->getEndLoc());
+        if (!lookup.isSuccess()) {
+          result._error = "no decl found in function";
+        } else {
+          for (auto decl : lookup.Results) {
+            auto *VD = decl.getValueDecl();
+            result._decls.push_back(VD);
+            result._types.push_back(VD->getType());
+          }
+        }
+        return result._decls.size();
+
       } else {
         result._error = stringWithFormat(
             "decl is not a nominal_decl (DeclKind=%u), lookup for '%s' failed",
@@ -1333,7 +1353,8 @@ static void VisitNodeFunction(
   for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
     if (found_univocous)
       break;
-    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    auto child = *pos;
+    const Demangle::Node::Kind child_node_kind = child->getKind();
     switch (child_node_kind) {
     default:
       result._error =
@@ -1342,6 +1363,7 @@ static void VisitNodeFunction(
       break;
 
     // TODO: any other possible containers?
+    case Demangle::Node::Kind::Function:
     case Demangle::Node::Kind::Class:
     case Demangle::Node::Kind::Enum:
     case Demangle::Node::Kind::Module:
@@ -1350,6 +1372,33 @@ static void VisitNodeFunction(
       VisitNode(ast, nodes, decl_scope_result, generic_context);
       break;
 
+    case Demangle::Node::Kind::LocalDeclName: {
+      if (child->getNumChildren() != 2 || !child->getChild(1)->hasText()) {
+        if (result._error.empty())
+          result._error =
+              "unable to retrieve content for Node::Kind::LocalDeclName";
+        break;
+      }
+
+      auto name = child->getChild(1); // First child is number.
+      FindNamedDecls(ast, name->getText(), decl_scope_result);
+      if (decl_scope_result._decls.size() == 0) {
+        llvm::raw_string_ostream OS(result._error);
+        OS << "demangled identifier " << name->getText()
+           << " could not be found by name lookup";
+        break;
+      }
+      std::copy(decl_scope_result._decls.begin(),
+                decl_scope_result._decls.end(),
+                back_inserter(identifier_result._decls));
+      std::copy(decl_scope_result._types.begin(),
+                decl_scope_result._types.end(),
+                back_inserter(identifier_result._types));
+      identifier_result._module = decl_scope_result._module;
+      if (decl_scope_result._decls.size() == 1)
+        found_univocous = true;
+      break;
+    }
     case Demangle::Node::Kind::Identifier:
     case Demangle::Node::Kind::InfixOperator:
     case Demangle::Node::Kind::PrefixOperator:
