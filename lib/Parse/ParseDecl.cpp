@@ -1738,9 +1738,9 @@ bool Parser::isStartOfDecl() {
   if (!isKeywordPossibleDeclStart(Tok)) return false;
 
   // When 'init' appears inside another 'init', it's likely the user wants to
-  // invoke a initializer but forgets to prefix it with 'self.' or 'super.'
+  // invoke an initializer but forgets to prefix it with 'self.' or 'super.'
   // Otherwise, expect 'init' to be the start of a declaration (and complain
-  // when the expectation is not fullfilled).
+  // when the expectation is not fulfilled).
   if (Tok.is(tok::kw_init)) {
     return !isa<ConstructorDecl>(CurDeclContext);
   }

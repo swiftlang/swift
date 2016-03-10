@@ -1314,7 +1314,7 @@ extension String {
   /// characters.
   @warn_unused_result
   public func addingPercentEncoding(
-    withAllowedCharaters allowedCharacters: NSCharacterSet
+    withAllowedCharacters allowedCharacters: NSCharacterSet
   ) -> String? {
     // FIXME: the documentation states that this method can return nil if the
     // transformation is not possible, without going into further details.  The

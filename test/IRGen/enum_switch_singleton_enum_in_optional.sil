@@ -6,7 +6,7 @@ enum Optional<T> { case some(T), none }
 class AClass {
 }
 
-protocol  AProto {
+protocol AProto {
 }
 
 enum AnEnum {
