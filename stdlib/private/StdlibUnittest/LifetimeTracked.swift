@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-public final class LifetimeTracked : ForwardIndex, CustomStringConvertible {
+// TODO: swift-3-indexing-model - this conformed to ForwardIndex but not sure why it did.
+
+public final class LifetimeTracked : Equatable, CustomStringConvertible {
   public init(_ value: Int, identity: Int = 0) {
     LifetimeTracked.instances += 1
     LifetimeTracked._nextSerialNumber += 1
@@ -28,13 +30,6 @@ public final class LifetimeTracked : ForwardIndex, CustomStringConvertible {
   public var description: String {
     assert(serialNumber > 0, "dead Tracked!")
     return value.description
-  }
-
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// Precondition: the next value is representable.
-  public func successor() -> LifetimeTracked {
-    return LifetimeTracked(self.value.successor())
   }
 
   public static var instances: Int = 0
