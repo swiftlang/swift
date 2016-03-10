@@ -44,7 +44,11 @@ extension LazyCollectionProtocol {
   }
 }
 
-extension LazyCollectionProtocol where Elements : BidirectionalCollection {
+extension LazyCollectionProtocol
+  where
+  Self : BidirectionalCollection,
+  Elements : BidirectionalCollection
+{
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
@@ -59,7 +63,7 @@ extension LazyCollectionProtocol where Elements : BidirectionalCollection {
     transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenBidirectionalCollection<
-      LazyMapCollection<Elements, SegmentOfResult>
+      LazyMapBidirectionalCollection<Elements, SegmentOfResult>
   >> {
     return self.map(transform).flatten()
   }
