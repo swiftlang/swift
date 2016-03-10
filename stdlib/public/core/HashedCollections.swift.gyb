@@ -210,6 +210,11 @@ internal protocol _HashStorage {
   var endIndex: Index { get }
 
   @warn_unused_result
+  func next(i: Index) -> Index
+
+  func _nextInPlace(i: inout Index)
+
+  @warn_unused_result
   func index(forKey key: Key) -> Index?
 
   @warn_unused_result
@@ -1254,13 +1259,13 @@ public func == <Key : Equatable, Value : Equatable>(
       let (key, value) = lhsNative.assertingGet(index)
       let optRhsValue: AnyObject? =
         rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
+      // TODO: swift-3-indexing-model: change 'if' into 'guard'.
       if let rhsValue = optRhsValue {
         if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
-          index._successorInPlace()
+          lhsNative._nextInPlace(&index)
           continue
         }
       }
-      index._successorInPlace()
       return false
     }
     return true
@@ -2175,6 +2180,16 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @warn_unused_result
+  internal func next(i: Index) -> Index {
+    return i.successor()
+  }
+
+  internal func _nextInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: optimize if possible.
+    i = i.successor()
+  }
+
+  @warn_unused_result
   internal func index(forKey key: Key) -> Index? {
     if count == 0 {
       // Fast path that avoids computing the hash of the key.
@@ -2428,7 +2443,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
       return nil
     }
     let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
-    nextIndex._successorInPlace()
+    nativeStorageOwner.nativeStorage._nextInPlace(&nextIndex)
     return bridgedKey
   }
 
@@ -2453,7 +2468,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
     let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
-    nextIndex._successorInPlace()
+    nativeStorageOwner.nativeStorage._nextInPlace(&nextIndex)
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = bridgedKey
@@ -2808,7 +2823,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
       let bridgedKey: AnyObject = _getBridgedKey(currIndex)
       unmanagedObjects[i] = bridgedKey
       stored += 1
-      currIndex._successorInPlace()
+      nativeStorage._nextInPlace(&currIndex)
     }
     theState.extra.0 = CUnsignedLong(currIndex.offset)
     state.pointee = theState
@@ -2834,6 +2849,16 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 
   internal var endIndex: Index {
     return Index(cocoa${Self}, endIndex: ())
+  }
+
+  @warn_unused_result
+  internal func next(i: Index) -> Index {
+    return i.successor()
+  }
+
+  internal func _nextInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: optimize if possible.
+    i = i.successor()
   }
 
   @warn_unused_result
@@ -3126,6 +3151,29 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
+  }
+
+  @warn_unused_result
+  func next(i: Index) -> Index {
+    if _fastPath(guaranteedNative) {
+      return ._native(asNative.next(i._nativeIndex))
+    }
+
+    switch self {
+    case .native:
+      return ._native(asNative.next(i._nativeIndex))
+    case .cocoa(let cocoaStorage):
+#if _runtime(_ObjC)
+      return ._cocoa(cocoaStorage.next(i._cocoaIndex))
+#else
+      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
+#endif
+    }
+  }
+
+  func _nextInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: optimize if possible.
+    i = next(i)
   }
 
   @warn_unused_result
@@ -3567,6 +3615,8 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
   internal typealias NativeStorage = _Native${Self}Storage<${TypeParameters}>
   internal typealias NativeIndex = _Native${Self}Index<${TypeParameters}>
 
+  // FIXME: swift-3-indexing-model: remove `nativeStorage`, we don't need it in
+  // the new model.
   internal var nativeStorage: NativeStorage
   internal var offset: Int
 
@@ -3580,6 +3630,7 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
   /// - Precondition: The next value is representable.
   @warn_unused_result
   internal func successor() -> NativeIndex {
+    // FIXME: swift-3-indexing-model: remove this method.
     var i = offset + 1
     // FIXME: Can't write the simple code pending
     // <rdar://problem/15484639> Refcounting bug
@@ -3610,6 +3661,7 @@ internal func < <${TypeParametersDecl}> (
   // FIXME: assert that lhs and rhs are from the same dictionary.
   return lhs.offset < rhs.offset
 }
+// TODO: swift-3-indexing-model: forward all Comparable operations.
 
 #if _runtime(_ObjC)
 internal struct _Cocoa${Self}Index : Comparable {
@@ -3621,6 +3673,9 @@ internal struct _Cocoa${Self}Index : Comparable {
   /// A reference to the NS${Self}, which owns members in `allObjects`,
   /// or `allKeys`, for NSSet and NSDictionary respectively.
   internal let cocoa${Self}: _NS${Self}
+  // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but make
+  // sure that we have a safety check for accessing `allKeys`.  Maybe move both
+  // into the dictionary/set itself.
 
   /// An unowned array of keys.
   internal var allKeys: _HeapBuffer<Int, AnyObject>
@@ -3662,6 +3717,7 @@ internal struct _Cocoa${Self}Index : Comparable {
   /// - Precondition: The next value is representable.
   @warn_unused_result
   internal func successor() -> _Cocoa${Self}Index {
+    // FIXME: swift-3-indexing-model: remove this method.
     _precondition(
       currentKeyIndex < allKeys.value, "cannot increment endIndex")
     return _Cocoa${Self}Index(cocoa${Self}, allKeys, currentKeyIndex + 1)
