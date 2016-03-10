@@ -796,7 +796,10 @@ extension ${Self} : _ArrayProtocol {
 extension ${Self} : CustomReflectable {
   /// Returns a mirror that reflects `self`.
   public var customMirror: Mirror {
-    return Mirror(self, unlabeledChildren: self, displayStyle: .collection)
+    return Mirror(
+      self,
+      unlabeledChildren: self,
+      displayStyle: .collection)
   }
 }
 

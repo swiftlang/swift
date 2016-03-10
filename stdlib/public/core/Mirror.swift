@@ -214,7 +214,7 @@ public struct Mirror {
     where
     C.Iterator.Element == Child,
 
-    // FIXME(compiler limitation): these constraints should be applied to
+    // FIXME(ABI)(compiler limitation): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : Collection,
     C.SubSequence.Iterator.Element == Child,
@@ -270,7 +270,18 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    Subject, C: Collection
+    Subject,
+    C : Collection
+    where
+
+    // FIXME(ABI)(compiler limitation): these constraints should be applied to
+    // associated types of Collection.
+    C.SubSequence : Collection,
+    C.SubSequence.SubSequence == C.SubSequence,
+    C.Indices : Collection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices
   >(
     _ subject: Subject,
     unlabeledChildren: C,
@@ -437,7 +448,7 @@ extension Mirror {
 // FIXME: swift-3-indexing-model - Review what we need to do here
 //        position = children.advance(children.startIndex,
 //          by: offset, limit: children.endIndex)
-        fatalError("FIXME: swift-3-indexing-model")
+        fatalError("FIXME: swift-3-indexing-model \(offset)")
       }
       else {
         _preconditionFailure(
