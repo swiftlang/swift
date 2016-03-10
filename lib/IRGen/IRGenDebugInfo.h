@@ -65,9 +65,9 @@ typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
 enum IndirectionKind : bool { DirectValue = false, IndirectValue = true };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
-/// IRGenDebugInfo - Helper object that keeps track of the current
-/// CompileUnit, File, LexicalScope, and translates SILLocations into
-/// <llvm::DebugLoc>s.
+/// Helper object that keeps track of the current CompileUnit, File,
+/// LexicalScope, and knows how to translate a \c SILLocation into an
+/// \c llvm::DebugLoc.
 class IRGenDebugInfo {
   friend class ArtificialLocation;
   const IRGenOptions &Opts;
