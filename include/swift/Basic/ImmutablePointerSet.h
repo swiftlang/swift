@@ -199,6 +199,8 @@ public:
   // statically.
   static PtrSet *getEmptySet() { return &EmptyPtrSet; }
 
+  void clear() { Set.clear(); }
+
   /// Given a sorted and uniqued list \p Array, return the ImmutablePointerSet
   /// containing Array. Asserts if \p Array is not sorted and uniqued.
   PtrSet *get(ArrayRef<PtrTy> Array) {
