@@ -21,7 +21,8 @@ import textwrap
 
 # FIXME: Instead of modifying the system path in order to enable imports from
 #        other directories, all Python modules related to the build script
-#        should be moved to the `swift_build_support` module.
+#        should be moved to the `swift_build_support` module. Remove "noqa"
+#        markers when this is fixed.
 #        For additional information, see: https://bugs.swift.org/browse/SR-237.
 sys.path.append(os.path.dirname(__file__))
 from SwiftBuildSupport import (
@@ -34,17 +35,17 @@ from SwiftBuildSupport import (
     get_preset_options,
     print_with_argv0,
     quote_shell_command,
-)
+)  # noqa (E402 module level import not at top of file)
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 
-import swift_build_support.clang
-import swift_build_support.cmake
-import swift_build_support.debug
-from swift_build_support.migration import migrate_impl_args
-import swift_build_support.ninja
-import swift_build_support.tar
-import swift_build_support.targets
+import swift_build_support.clang    # noqa (E402 module level import not at top of file)
+import swift_build_support.cmake    # noqa (E402)
+import swift_build_support.debug    # noqa (E402)
+from swift_build_support.migration import migrate_impl_args  # noqa (E402)
+import swift_build_support.ninja    # noqa (E402)
+import swift_build_support.tar      # noqa (E402)
+import swift_build_support.targets  # noqa (E402)
 
 
 # Main entry point for the preset mode.

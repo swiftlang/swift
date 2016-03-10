@@ -10,9 +10,9 @@ import textwrap
 sys.path.append(os.path.join(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))), 'src'))
 
-import pass_pipeline_library
+import pass_pipeline_library  # noqa (E402 module level import not at top of file)
 
-import passes
+import passes                 # noqa (E402)
 
 normal_pipeline = list(pass_pipeline_library.normal_passpipelines())
 pass_pipelines = [x.identifier for x in normal_pipeline]

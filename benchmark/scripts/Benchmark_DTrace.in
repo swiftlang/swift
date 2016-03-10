@@ -21,7 +21,7 @@ DRIVER_LIBRARY_PATH = "@PATH_TO_DRIVER_LIBRARY@"
 sys.path.append(DRIVER_LIBRARY_PATH)
 DTRACE_PATH = os.path.join(DRIVER_LIBRARY_PATH, 'swift_stats.d')
 
-import perf_test_driver
+import perf_test_driver  # noqa (E402 module level import not at top of file)
 
 # Regexes for the XFAIL_LIST. Matches against '([Onone|O|Ounchecked],TestName)'
 XFAIL_LIST = [
