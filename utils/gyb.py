@@ -317,8 +317,10 @@ def split_gyb_lines(source_lines):
 
     dedents = 0
     try:
-        for token_kind, token_text, token_start, (token_end_line, token_end_col), line_text \
-                in tokenize.generate_tokens(lambda i=iter(source_lines): next(i)):
+        for token_kind, token_text, token_start, \
+            (token_end_line, token_end_col), line_text \
+            in tokenize.generate_tokens(lambda i=iter(source_lines):
+                                        next(i)):
 
             if token_kind in (tokenize.COMMENT, tokenize.ENDMARKER):
                 continue
@@ -356,9 +358,9 @@ def code_starts_with_dedent_keyword(source_lines):
 
     >>> code_starts_with_dedent_keyword(split_lines('if x in y: pass'))
     False
-    >>> code_starts_with_dedent_keyword(split_lines('except ifSomethingElseHappens:'))
+    >>> code_starts_with_dedent_keyword(split_lines('except ifSomethingElse:'))
     True
-    >>> code_starts_with_dedent_keyword(split_lines('\n# this is a comment\nelse: # yes'))
+    >>> code_starts_with_dedent_keyword(split_lines('\n# comment\nelse: # yes'))
     True
     """
     token_text = None
@@ -447,7 +449,7 @@ class ParseContext(object):
         ... '''% for x in [1, 2, 3]:
         ... %   if x == 1:
         ... literal1
-        ... %   elif x > 1:   # add an output line after this line to fix the bug
+        ... %   elif x > 1:  # add an output line after this line to fix the bug
         ... %     if x == 2:
         ... literal2
         ... %     end
@@ -460,7 +462,7 @@ class ParseContext(object):
         ('gybLinesOpen', 'for x in [1, 2, 3]:\n')
         ('gybLinesOpen', '  if x == 1:\n')
         ('literal', 'literal1\n')
-        ('gybLinesOpen', 'elif x > 1:   # add an output line after this line to fix the bug\n')
+        ('gybLinesOpen', 'elif x > 1: # add output line here to fix bug\n')
         ('gybLinesOpen', '  if x == 2:\n')
         ('literal', 'literal2\n')
         ('gybLinesClose', '%     end')
@@ -633,7 +635,8 @@ class Literal(ASTNode):
 
     def __str__(self, indent=''):
         return '\n'.join(
-            [indent + x for x in ['Literal:'] + strip_trailing_nl(self.text).split('\n')])
+            [indent + x for x in ['Literal:'] +
+             strip_trailing_nl(self.text).split('\n')])
 
 
 class Code(ASTNode):
@@ -750,7 +753,7 @@ def parse_template(filename, text=None):
                 {
                     if x == 1:
                         __children__[0].execute(__context__)
-                    elif x > 1:   # add an output line after this line to fix the bug
+                    elif x > 1: # add output line after this line to fix the bug
                         __children__[1].execute(__context__)
                 }
                 [
@@ -779,7 +782,8 @@ def parse_template(filename, text=None):
         ]
     ]
 
-    >>> print parse_template('dummy.file', text='%for x in range(10):\n%  print x\n%end\njuicebox')
+    >>> print parse_template(
+    >>> 'dummy.file', text='%for x in range(10):\n%  print x\n%end\njuicebox')
     Block:
     [
         Code:

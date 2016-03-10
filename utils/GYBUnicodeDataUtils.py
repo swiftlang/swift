@@ -74,7 +74,10 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
             self.symbolic_values[v] = k
 
         # Load the data file.
-        with codecs.open(grapheme_break_property_file_name, encoding='utf-8', errors='strict') as f:
+        with codecs.open(
+                grapheme_break_property_file_name,
+                encoding='utf-8',
+                errors='strict') as f:
             for line in f:
                 # Strip comments.
                 line = re.sub('#.*', '', line)
@@ -89,7 +92,8 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
                     continue
 
                 # Range of code points?
-                m = re.match('([0-9A-F]+)..([0-9A-F]+) +; +([a-zA-Z_]+) ', line)
+                m = re.match(
+                    '([0-9A-F]+)..([0-9A-F]+) +; +([a-zA-Z_]+) ', line)
                 if m:
                     start_code_point = int(m.group(1), 16)
                     end_code_point = int(m.group(2), 16)
@@ -101,9 +105,9 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         for cp in range(0, 0x110000):
             self.property_values[cp] = self.get_default_value()
 
-        for start_code_point, end_code_point, value in self.property_value_ranges:
+        for start_code_point, end_code_point, val in self.property_value_ranges:
             for cp in range(start_code_point, end_code_point + 1):
-                self.property_values[cp] = value
+                self.property_values[cp] = val
 
     def get_default_value(self):
         return 'Other'
@@ -259,7 +263,8 @@ class UnicodeTrieGenerator(object):
             (self.supp_second_level_index_bits + self.supp_data_offset_bits)
 
         # A mapping from BMP first-level index to BMP data block index.
-        self.bmp_lookup = [i for i in range(0, 1 << self.bmp_first_level_index_bits)]
+        self.bmp_lookup = \
+            [i for i in range(0, 1 << self.bmp_first_level_index_bits)]
 
         # An array of BMP data blocks.
         self.bmp_data = [
@@ -269,20 +274,23 @@ class UnicodeTrieGenerator(object):
 
         # A mapping from supp first-level index to an index of the second-level
         # lookup table.
-        self.supp_lookup1 = [i for i in range(0, self.supp_first_level_index_max + 1)]
+        self.supp_lookup1 = \
+            [i for i in range(0, self.supp_first_level_index_max + 1)]
 
         # An array of second-level lookup tables.  Each second-level lookup
         # table is a mapping from a supp second-level index to supp data block
         # index.
         self.supp_lookup2 = [
-            [j for j in range(i << self.supp_second_level_index_bits, (i + 1) << self.supp_second_level_index_bits)]
+            [j for j in range(i << self.supp_second_level_index_bits,
+                              (i + 1) << self.supp_second_level_index_bits)]
             for i in range(0, self.supp_first_level_index_max + 1)
         ]
 
         # An array of supp data blocks.
         self.supp_data = [
             [-1 for i in range(0, 1 << self.supp_data_offset_bits)]
-            for i in range(0, (self.supp_first_level_index_max + 1) * (1 << self.supp_second_level_index_bits))
+            for i in range(0, (self.supp_first_level_index_max + 1) *
+                           (1 << self.supp_second_level_index_bits))
         ]
 
     def splat(self, value):
@@ -296,21 +304,30 @@ class UnicodeTrieGenerator(object):
 
     def set_value(self, cp, value):
         if cp <= 0xffff:
-            data_block_index = self.bmp_lookup[self.get_bmp_first_level_index(cp)]
-            self.bmp_data[data_block_index][self.get_bmp_data_offset(cp)] = value
+            data_block_index = self.bmp_lookup[
+                self.get_bmp_first_level_index(cp)]
+            self.bmp_data[data_block_index][
+                self.get_bmp_data_offset(cp)] = value
         else:
-            second_lookup_index = self.supp_lookup1[self.get_supp_first_level_index(cp)]
-            data_block_index = self.supp_lookup2[second_lookup_index][self.get_supp_second_level_index(cp)]
-            self.supp_data[data_block_index][self.get_supp_data_offset(cp)] = value
+            second_lookup_index = self.supp_lookup1[
+                self.get_supp_first_level_index(cp)]
+            data_block_index = self.supp_lookup2[second_lookup_index][
+                self.get_supp_second_level_index(cp)]
+            self.supp_data[data_block_index][
+                self.get_supp_data_offset(cp)] = value
 
     def get_value(self, cp):
         if cp <= 0xffff:
-            data_block_index = self.bmp_lookup[self.get_bmp_first_level_index(cp)]
+            data_block_index = self.bmp_lookup[
+                self.get_bmp_first_level_index(cp)]
             return self.bmp_data[data_block_index][self.get_bmp_data_offset(cp)]
         else:
-            second_lookup_index = self.supp_lookup1[self.get_supp_first_level_index(cp)]
-            data_block_index = self.supp_lookup2[second_lookup_index][self.get_supp_second_level_index(cp)]
-            return self.supp_data[data_block_index][self.get_supp_data_offset(cp)]
+            second_lookup_index = self.supp_lookup1[
+                self.get_supp_first_level_index(cp)]
+            data_block_index = self.supp_lookup2[second_lookup_index][
+                self.get_supp_second_level_index(cp)]
+            return self.supp_data[data_block_index][
+                self.get_supp_data_offset(cp)]
 
     def fill_from_unicode_property(self, unicode_property):
         self.splat(unicode_property.get_default_value())
@@ -343,8 +360,8 @@ class UnicodeTrieGenerator(object):
             return list(map(map_index, indexes))
 
         # If self.bmp_data contains identical data blocks, keep the first one,
-        # remove duplicates and change the indexes in self.bmp_lookup to point to
-        # the first one.
+        # remove duplicates and change the indexes in self.bmp_lookup to point
+        # to the first one.
         i = 0
         while i < len(self.bmp_data):
             j = i + 1
@@ -368,7 +385,8 @@ class UnicodeTrieGenerator(object):
                     self.supp_data.pop(j)
                     for k in range(0, len(self.supp_lookup2)):
                         self.supp_lookup2[k] = \
-                            remap_indexes(self.supp_lookup2[k], old_idx=j, new_idx=i)
+                            remap_indexes(self.supp_lookup2[k],
+                                          old_idx=j, new_idx=i)
                 else:
                     j += 1
             i += 1
@@ -406,8 +424,10 @@ class UnicodeTrieGenerator(object):
         self.bmp_lookup_bytes_per_entry = 1 if len(self.bmp_data) < 256 else 2
         self.bmp_data_bytes_per_entry = 1
 
-        self.supp_lookup1_bytes_per_entry = 1 if len(self.supp_lookup2) < 256 else 2
-        self.supp_lookup2_bytes_per_entry = 1 if len(self.supp_data) < 256 else 2
+        self.supp_lookup1_bytes_per_entry = 1 if len(self.supp_lookup2) < 256 \
+            else 2
+        self.supp_lookup2_bytes_per_entry = 1 if len(self.supp_data) < 256 \
+            else 2
         self.supp_data_bytes_per_entry = 1
 
         bmp_lookup_words = list(self.bmp_lookup)
@@ -417,7 +437,8 @@ class UnicodeTrieGenerator(object):
             for elt in block]
 
         supp_lookup1_words = list(self.supp_lookup1)
-        supp_lookup2_words = [elt for block in self.supp_lookup2 for elt in block]
+        supp_lookup2_words = [
+            elt for block in self.supp_lookup2 for elt in block]
         supp_data_words = [
             unicode_property.to_numeric_value(elt)
             for block in self.supp_data
@@ -453,9 +474,9 @@ class UnicodeTrieGenerator(object):
         self.trie_bytes += supp_data_bytes
 
 
-def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_table):
+def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_table):
     any_value = \
-        grapheme_cluster_break_property_table.symbolic_values
+        grapheme_cluster_break_table.symbolic_values
 
     # Rules to determine extended grapheme cluster boundaries, as defined in
     # 'Grapheme Break Chart',
@@ -533,28 +554,36 @@ def get_grapheme_cluster_break_tests_as_utf8(grapheme_break_test_file_name):
                 code_point = int(token, 16)
                 # Tests from Unicode spec have isolated surrogates in them.  Our
                 # segmentation algorithm works on UTF-8 sequences, so encoding a
-                # surrogate would produce an invalid code unit sequence.  Instead
-                # of trying to emulate the maximal subpart algorithm for inserting
-                # U+FFFD in Python, we just replace every isolated surrogate with
-                # U+200B, which also has Grapheme_Cluster_Break equal to 'Control'
-                # and test separately that we handle ill-formed UTF-8 sequences.
+                # surrogate would produce an invalid code unit sequence.
+                # Instead of trying to emulate the maximal subpart algorithm for
+                # inserting U+FFFD in Python, we just replace every isolated
+                # surrogate with U+200B, which also has Grapheme_Cluster_Break
+                # equal to 'Control' and test separately that we handle
+                # ill-formed UTF-8 sequences.
                 if code_point >= 0xd800 and code_point <= 0xdfff:
                     code_point = 0x200b
-                code_point = (b'\U%(cp)08x' % {b'cp': code_point}).decode('unicode_escape', 'strict')
+                code_point = (b'\U%(cp)08x' % {b'cp': code_point}).decode(
+                    'unicode_escape', 'strict')
                 as_utf8_bytes = bytearray(code_point.encode('utf8', 'strict'))
-                as_utf8_escaped = ''.join(['\\x%(byte)02x' % {'byte': byte} for byte in as_utf8_bytes])
+                as_utf8_escaped = ''.join(
+                    ['\\x%(byte)02x' % {'byte': byte}
+                     for byte in as_utf8_bytes])
                 test += as_utf8_escaped
                 curr_bytes += len(as_utf8_bytes)
 
         return (test, boundaries)
 
     # Self-test.
-    assert(_convert_line(u'÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ('\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [0, 5, 8]))
+    assert(_convert_line(u'÷ 0903 × 0308 ÷ AC01 ÷ # abc') == (
+        '\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [0, 5, 8]))
     assert(_convert_line(u'÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [0, 3]))
 
     result = []
 
-    with codecs.open(grapheme_break_test_file_name, encoding='utf-8', errors='strict') as f:
+    with codecs.open(
+            grapheme_break_test_file_name,
+            encoding='utf-8',
+            errors='strict') as f:
         for line in f:
             test = _convert_line(line)
             if test:
@@ -563,7 +592,8 @@ def get_grapheme_cluster_break_tests_as_utf8(grapheme_break_test_file_name):
     return result
 
 
-def get_grapheme_cluster_break_tests_as_unicode_scalars(grapheme_break_test_file_name):
+def get_grapheme_cluster_break_tests_as_unicode_scalars(
+        grapheme_break_test_file_name):
     def _convert_line(line):
         # Strip comments.
         line = re.sub('#.*', '', line).strip()
@@ -584,12 +614,13 @@ def get_grapheme_cluster_break_tests_as_unicode_scalars(grapheme_break_test_file
             else:
                 code_point = int(token, 16)
                 # Tests from Unicode spec have isolated surrogates in them.  Our
-                # segmentation algorithm works on UTF-16 sequences, so encoding a
-                # surrogate would produce an invalid code unit sequence.  Instead
-                # of trying to emulate the maximal subpart algorithm for inserting
-                # U+FFFD in Python, we just replace every isolated surrogate with
-                # U+200B, which also has Grapheme_Cluster_Break equal to 'Control'
-                # and test separately that we handle ill-formed UTF-8 sequences.
+                # segmentation algorithm works on UTF-16 sequences, so encoding
+                # a surrogate would produce an invalid code unit sequence.
+                # Instead of trying to emulate the maximal subpart algorithm for
+                # inserting U+FFFD in Python, we just replace every isolated
+                # surrogate with U+200B, which also has Grapheme_Cluster_Break
+                # equal to 'Control' and test separately that we handle
+                # ill-formed UTF-8 sequences.
                 if code_point >= 0xd800 and code_point <= 0xdfff:
                     code_point = 0x200b
                 test += [code_point]
@@ -598,7 +629,8 @@ def get_grapheme_cluster_break_tests_as_unicode_scalars(grapheme_break_test_file
         return (test, boundaries)
 
     # Self-test.
-    assert(_convert_line('÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ([0x0903, 0x0308, 0xac01], [0, 2, 3]))
+    assert(_convert_line('÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ([
+        0x0903, 0x0308, 0xac01], [0, 2, 3]))
     assert(_convert_line('÷ D800 ÷ # abc') == ([0x200b], [0, 1]))
 
     result = []

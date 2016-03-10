@@ -31,17 +31,21 @@ XFAIL_LIST = [
 class DTraceResult(perf_test_driver.Result):
 
     def __init__(self, name, status, output, csv_output):
-        perf_test_driver.Result.__init__(self, name, status, output, XFAIL_LIST)
+        perf_test_driver.Result.__init__(
+            self, name, status, output, XFAIL_LIST)
         self.csv_output = csv_output
 
     @classmethod
     def data_headers(cls):
-        return ['Name', 'Result', 'strong_retain', 'strong_retain/iter', 'strong_release', 'strong_release/iter']
+        return [
+            'Name', 'Result', 'strong_retain', 'strong_retain/iter',
+            'strong_release', 'strong_release/iter']
 
     @classmethod
     def data_format(cls, max_test_len):
         non_name_headers = DTraceResult.data_headers()[1:]
-        fmt = ('{:<%d}' % (max_test_len + 5)) + ''.join(['{:<%d}' % (len(h) + 2) for h in non_name_headers])
+        fmt = ('{:<%d}' % (max_test_len + 5)) + \
+            ''.join(['{:<%d}' % (len(h) + 2) for h in non_name_headers])
         return fmt
 
     @classmethod
@@ -82,10 +86,15 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
         sys.stdout.flush()
 
         def get_results_with_iters(iters):
-            p = subprocess.Popen(['sudo', 'dtrace', '-s', DTRACE_PATH, '-c', '%s %s %s' % (data['path'], data['test_name'], '--num-iters=%d' % iters)],
-                                 stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'))
+            p = subprocess.Popen([
+                'sudo', 'dtrace', '-s', DTRACE_PATH,
+                '-c', '%s %s %s' % (data['path'], data['test_name'],
+                                    '--num-iters=%d' % iters)
+            ], stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'))
             results = [x for x in p.communicate()[0].split("\n") if len(x) > 0]
-            return [x.split(',')[1] for x in results[results.index('DTRACE RESULTS') + 1:]]
+            return [
+                x.split(',')[1] for x in
+                results[results.index('DTRACE RESULTS') + 1:]]
         iter_2_results = get_results_with_iters(2)
         iter_3_results = get_results_with_iters(3)
 
@@ -101,10 +110,17 @@ SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-filter', type=str, default=None,
-                        help='Filter out any test that does not match the given regex')
-    parser.add_argument('-csv', default=False, action='store_true',
-                        help="Emit csv output", dest='csv_output')
+    parser.add_argument(
+        '-filter',
+        type=str,
+        default=None,
+        help='Filter out any test that does not match the given regex')
+    parser.add_argument(
+        '-csv',
+        default=False,
+        action='store_true',
+        help="Emit csv output",
+        dest='csv_output')
     return parser.parse_args()
 
 if __name__ == "__main__":

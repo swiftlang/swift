@@ -42,6 +42,7 @@ if __name__ == '__main__':
 
     # CMakeList multi-source
     class MultiSourceBench(object):
+
         def __init__(self, path):
             self.name = os.path.basename(path)
             self.files = [x for x in os.listdir(path)
