@@ -134,7 +134,7 @@ def indexConfromsToForTraversal(traversal):
     assert False, "unknown traversal"
 }%
 
-% for traversal in ('Forward', 'Bidirectional'):
+% for traversal in ['Forward', 'Bidirectional']:
 %   t = '' if traversal == 'Forward' else traversal
 %   Collection = 'Flatten%sCollection' % t
 %   if traversal == 'Forward':
@@ -386,7 +386,10 @@ extension ${collectionForTraversal(traversal)}
 }
 
 extension LazyCollectionProtocol
-  where ${constraints % {'Base': ''}}, 
+  where
+  Self : ${collectionForTraversal(traversal)},
+  Elements : ${collectionForTraversal(traversal)},
+  ${constraints % {'Base': ''}},
   ${constraints % {'Base': 'Elements.'}},
   Iterator.Element == Elements.Iterator.Element {
   /// A concatenation of the elements of `self`.
