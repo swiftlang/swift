@@ -113,7 +113,7 @@ extension LazySequenceProtocol
 }
 
 %{
-def baseCollectionForTraversal(traversal):
+def collectionForTraversal(traversal):
     if traversal == 'Forward':
         return 'Collection'
     if traversal == 'Bidirectional':
@@ -144,7 +144,7 @@ def indexConfromsToForTraversal(traversal):
 %   Index = Collection + 'Index'
 /// A position in a `${Collection}`.
 public struct ${Index}<
-  BaseElements : ${baseCollectionForTraversal(traversal)}
+  BaseElements : ${collectionForTraversal(traversal)}
   where
   ${constraints % {'Base': 'BaseElements.'}}
 > : ${indexConfromsToForTraversal(traversal)} {
@@ -196,6 +196,8 @@ public struct ${Index}<
 
   /// Construct the `startIndex` for a flattened view of `base`.
   internal init(_startIndexOfFlattened base: BaseElements) {
+    fatalError("FIXME: swift-3-indexing-model")
+    /*
     for outer in base.indices {
       let innerCollection = base[outer]
       if !innerCollection.isEmpty {
@@ -207,6 +209,7 @@ public struct ${Index}<
       }
     }
     self = ${Index}(_endIndexOfFlattened: base)
+    */
   }
 
   /// Construct the `endIndex` for a flattened view of `base`.
@@ -273,10 +276,10 @@ public func < <BaseElements> (
 ///
 /// - See also: `FlattenSequence`
 public struct ${Collection}<
-  Base : ${baseCollectionForTraversal(traversal)}
+  Base : ${collectionForTraversal(traversal)}
   where
   ${constraints % {'Base': 'Base.'}}
-> : ${baseCollectionForTraversal(traversal)} {
+> : ${collectionForTraversal(traversal)} {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -373,7 +376,7 @@ public struct ${Collection}<
   internal var _base: Base
 }
 
-extension ${baseCollectionForTraversal(traversal)}
+extension ${collectionForTraversal(traversal)}
   where ${constraints % {'Base': ''}} {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
