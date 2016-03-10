@@ -19,6 +19,8 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/DenseMap.h"
@@ -78,13 +80,28 @@ public:
   }
 
   EffectiveClangContext(clang::DeclContext *dc) : TheKind(DeclContext) {
-    DC = dc;
+    assert(dc != nullptr && "use null constructor instead");
+    if (auto tagDecl = dyn_cast<clang::TagDecl>(dc)) {
+      DC = tagDecl->getCanonicalDecl();
+    } else if (auto oiDecl = dyn_cast<clang::ObjCInterfaceDecl>(dc)) {
+      DC = oiDecl->getCanonicalDecl();
+    } else if (auto opDecl = dyn_cast<clang::ObjCProtocolDecl>(dc)) {
+      DC = opDecl->getCanonicalDecl();
+    } else if (auto omDecl = dyn_cast<clang::ObjCMethodDecl>(dc)) {
+      DC = omDecl->getCanonicalDecl();
+    } else if (auto fDecl = dyn_cast<clang::FunctionDecl>(dc)) {
+      DC = fDecl->getCanonicalDecl();
+    } else {
+      assert(isa<clang::TranslationUnitDecl>(dc) &&
+             "No other kinds of effective Clang contexts");
+      DC = dc;
+    }
   }
 
   EffectiveClangContext(clang::TypedefNameDecl *typedefName)
     : TheKind(TypedefContext)
   {
-    Typedef = typedefName;
+    Typedef = typedefName->getCanonicalDecl();
   }
 
   EffectiveClangContext(StringRef unresolved) : TheKind(UnresolvedContext) {
