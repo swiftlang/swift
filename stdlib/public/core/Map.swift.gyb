@@ -10,6 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+%{
+traversals = ['Forward', 'Bidirectional', 'RandomAccess']
+
+def collectionForTraversal(traversal):
+    if traversal == 'Forward':
+        return 'Collection'
+    if traversal == 'Bidirectional':
+        return 'BidirectionalCollection'
+    if traversal == 'RandomAccess':
+        return 'RandomAccessCollection'
+    assert False, "unknown traversal"
+}%
+
 /// The `IteratorProtocol` used by `MapSequence` and `MapCollection`.
 /// Produces each element by passing the output of the `Base`
 /// `IteratorProtocol` through a transform function returning `Element`.
@@ -27,7 +40,7 @@ public struct LazyMapIterator<
   }
 
   public var base: Base { return _base }
-  
+
   internal var _base: Base
   internal let _transform: (Base.Element) -> Element
 }
@@ -38,9 +51,9 @@ public struct LazyMapIterator<
 /// calling the transform function on a base element.
 public struct LazyMapSequence<Base : Sequence, Element>
   : LazySequenceProtocol {
-  
+
   public typealias Elements = LazyMapSequence
-  
+
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -69,19 +82,21 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
 //===--- Collections ------------------------------------------------------===//
 
-// FIXME: swift-3-indexing-model - need to gyb three variants of 
-//        LazyMapCollection now, for forward, bidirectional and random access
-//        traversal, so that the mapped collection preserves the traversal of
-//        the base collection.
+// FIXME(ABI)(compiler limitation): `LazyMap*Collection` types should be
+// collapsed into one `LazyMapCollection` using conditional conformances.
+// Maybe even combined with `LazyMapSequence`.
+
+% for Traversal in traversals:
 
 /// A `Collection` whose elements consist of those in a `Base`
 /// `Collection` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct LazyMapCollection<Base : Collection, Element>
-  : LazyCollectionProtocol {
+public struct LazyMap${collectionForTraversal(Traversal)}<
+  Base : ${collectionForTraversal(Traversal)}, Element
+> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
 
-  // FIXME: Should be inferrable.
+  // FIXME(compiler limitation): should be inferrable.
   public typealias Index = Base.Index
 
   public var startIndex: Base.Index { return _base.startIndex }
@@ -89,6 +104,19 @@ public struct LazyMapCollection<Base : Collection, Element>
 
   @warn_unused_result
   public func next(i: Index) -> Index { return _base.next(i) }
+
+  public func _nextInPlace(i: inout Index) {
+    _base._nextInPlace(&i)
+  }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  @warn_unused_result
+  public func previous(i: Index) -> Index { return _base.previous(i) }
+
+  public func _previousInPlace(i: inout Index) {
+    _base._previousInPlace(&i)
+  }
+%   end
 
   /// Access the element at `position`.
   ///
@@ -98,10 +126,31 @@ public struct LazyMapCollection<Base : Collection, Element>
     return _transform(_base[position])
   }
 
+  public typealias IndexDistance = Base.IndexDistance
+
+  public typealias Indices = Base.Indices
+
+  public var indices: Indices {
+    return _base.indices
+  }
+
   /// Returns `true` iff `self` is empty.
   public var isEmpty: Bool { return _base.isEmpty }
 
+  /// Returns the number of elements.
+  ///
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
+  ///   O(N) otherwise.
+  public var count: Base.IndexDistance {
+    return _base.count
+  }
+
+
   public var first: Element? { return _base.first.map(_transform) }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  public var last: Element? { return _base.last.map(_transform) }
+%   end
 
   @warn_unused_result
   public func advance(i: Index, by n: Base.IndexDistance) -> Index {
@@ -129,14 +178,6 @@ public struct LazyMapCollection<Base : Collection, Element>
     return _base.underestimatedCount
   }
 
-  /// Returns the number of elements.
-  ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
-  ///   O(N) otherwise.
-  public var count: Base.IndexDistance {
-    return _base.count
-  }
-
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
   internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
@@ -147,6 +188,8 @@ public struct LazyMapCollection<Base : Collection, Element>
   internal var _base: Base
   internal let _transform: (Base.Iterator.Element) -> Element
 }
+
+% end
 
 //===--- Support for s.lazy -----------------------------------------------===//
 
@@ -162,17 +205,27 @@ extension LazySequenceProtocol {
   }
 }
 
-extension LazyCollectionProtocol {
+% for Traversal in traversals:
+
+extension LazyCollectionProtocol
+  where
+  Self : ${collectionForTraversal(Traversal)},
+  Elements : ${collectionForTraversal(Traversal)}
+{
   /// Returns a `LazyMapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   @warn_unused_result
   public func map<U>(
     transform: (Elements.Iterator.Element) -> U
-  ) -> LazyMapCollection<Self.Elements, U> {
-    return LazyMapCollection(_base: self.elements, transform: transform)
+  ) -> LazyMap${collectionForTraversal(Traversal)}<Self.Elements, U> {
+    return LazyMap${collectionForTraversal(Traversal)}(
+      _base: self.elements,
+      transform: transform)
   }
 }
+
+% end
 
 @available(*, unavailable, renamed="LazyMapIterator")
 public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
