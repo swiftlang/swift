@@ -232,8 +232,6 @@ func logical_struct_in_reftype_set(value: inout Val, z1: Int) {
   // CHECK: store [[VAL_REF]] to [[REF_MAT]]
   // CHECK: [[T0:%.*]] = metatype $@thick Ref.Type
   // CHECK: [[T1:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_MAT]]
-  // CHECK: [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> () to $Builtin.RawPointer
-  // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> ()
   // CHECK: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[REF_MAT]], [[T0]])
   // CHECK: br [[CONT]]
   // CHECK: [[CONT]]:
