@@ -125,6 +125,9 @@ void getLocationInfoForClangNode(ClangNode ClangNode,
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 
+Decl *getDeclFromMangledSymbolName(ASTContext &context, StringRef mangledName,
+                                   std::string &error);
+
 Type getTypeFromMangledTypename(ASTContext &Ctx,
                                 const char *mangled_typename,
                                 std::string &error);

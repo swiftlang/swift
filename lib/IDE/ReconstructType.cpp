@@ -2356,6 +2356,26 @@ VisitNode(ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
   nodes.pop_back();
 }
 
+Decl *ide::getDeclFromMangledSymbolName(ASTContext &context,
+                                        StringRef mangledName,
+                                        std::string &error) {
+  std::vector<Demangle::NodePointer> nodes;
+  nodes.push_back(
+      Demangle::demangleSymbolAsNode(mangledName.data(), mangledName.size()));
+  VisitNodeResult emptyGenericContext;
+  VisitNodeResult result;
+  VisitNode(&context, nodes, result, emptyGenericContext, nullptr);
+  error = result._error;
+  if (error.empty() && result._decls.size() == 1) {
+    return result._decls.front();
+  } else {
+    llvm::raw_string_ostream OS(error);
+    OS << "decl for symbol name '" << mangledName << "' was not found";
+    return nullptr;
+  }
+  return nullptr;
+}
+
 Type ide::getTypeFromMangledTypename(ASTContext &Ctx,
                                      const char *mangled_typename,
                                      std::string &error) {

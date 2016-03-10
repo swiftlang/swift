@@ -2373,6 +2373,12 @@ public:
   TypeReconstructWalker(ASTContext &Ctx, llvm::raw_ostream &Stream)
       : Ctx(Ctx), Stream(Stream) {}
 
+  bool walkToDeclPre(Decl *D, CharSourceRange range) override {
+    if (auto *VD = dyn_cast<ValueDecl>(D))
+      tryDemangleDecl(VD, range);
+    return true;
+  }
+
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, Type T) override {
     if (T.isNull())
@@ -2396,6 +2402,33 @@ public:
              << "\'\n";
     }
     return true;
+  }
+
+private:
+  void tryDemangleDecl(ValueDecl *VD, CharSourceRange range) {
+    Mangle::Mangler mangler(/*DWARFMangling=*/true);
+    mangler.mangleDeclName(VD);
+
+    std::string mangledName;
+    {
+      llvm::raw_string_ostream OS(mangledName);
+      printDeclUSR(VD, OS);
+    }
+
+    // Put the expected symbol _T prefix on the name by replacing the s:.
+    assert(StringRef(mangledName).startswith("s:"));
+    mangledName[0] = '_';
+    mangledName[1] = 'T';
+
+    std::string error;
+    if (Decl *reDecl = getDeclFromMangledSymbolName(Ctx, mangledName, error)) {
+      Stream << "reconstructed decl from usr for '" << range.str() << "' is '";
+      reDecl->print(Stream, PrintOptions());
+      Stream << "'\n";
+    } else {
+      Stream << "cannot reconstruct decl from usr for '" << range.str()
+             << "'\n";
+    }
   }
 };
 
