@@ -12,14 +12,12 @@
 
 public struct DefaultIndices<
   Elements : Indexable
-  // FIXME(compiler limitation):
+  // FIXME(ABI)(compiler limitation):
   // Elements : Collection
 > : Collection {
 
-  public typealias Index = Elements.Index
   // FIXME(compiler limitation): this typealias should be inferred.
-
-  //public typealias Indices = DefaultIndices<Elements>
+  public typealias Index = Elements.Index
 
   internal init(
     _elements: Elements,
@@ -44,6 +42,9 @@ public struct DefaultIndices<
     return i
   }
 
+  // FIXME(compiler limitation): this typealias should be inferred.
+  public typealias SubSequence = DefaultIndices<Elements>
+
   public subscript(bounds: Range<Index>) -> DefaultIndices<Elements> {
     // FIXME: swift-3-indexing-model: range check.
     return DefaultIndices(
@@ -61,6 +62,13 @@ public struct DefaultIndices<
   public func _nextInPlace(i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _elements._nextInPlace(&i)
+  }
+
+  // FIXME(compiler limitation): this typealias should be inferred.
+  public typealias Indices = DefaultIndices<Elements>
+
+  public var indices: Indices {
+    return self
   }
 
   internal var _elements: Elements
