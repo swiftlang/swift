@@ -1814,13 +1814,10 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     if (conformance) {
       selfType = conformance->getType();
 
-    // For default implementations, Self is the contextual type of the
-    // extension (or, once we add default implementations inside protocols,
-    // the protocol's Self type).
+    // For default implementations, Self is the protocol archetype.
     } else {
-      DeclContext *dc = witness.getDecl()->getDeclContext();
-      assert(dc->getAsProtocolOrProtocolExtensionContext());
-      selfType = dc->getDeclaredTypeOfContext();
+      auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
+      selfType = proto->getProtocolSelf()->getArchetype();
     }
   }
 
