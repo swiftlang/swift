@@ -87,7 +87,7 @@ public:
     return std::make_shared<BuiltinTypeRef>(MangledName);
   }
 
-  std::string getMangledName() const {
+  const std::string &getMangledName() const {
     return MangledName;
   }
 
@@ -109,7 +109,7 @@ public:
     return std::make_shared<NominalTypeRef>(MangledName, Parent);
   }
 
-  std::string getMangledName() const {
+  const std::string &getMangledName() const {
     return MangledName;
   }
 
@@ -152,7 +152,7 @@ public:
                                                  Parent);
   }
 
-  std::string getMangledName() const {
+  const std::string &getMangledName() const {
     return MangledName;
   }
 
@@ -249,11 +249,11 @@ public:
     return std::make_shared<ProtocolTypeRef>(ModuleName, Name);
   }
 
-  std::string getName() const {
+  const std::string &getName() const {
     return Name;
   }
 
-  std::string getModuleName() const {
+  const std::string &getModuleName() const {
     return ModuleName;
   }
 
@@ -412,7 +412,7 @@ public:
     : TypeRef(TypeRefKind::ForeignClass), Name(Name) {}
   static const std::shared_ptr<ForeignClassTypeRef> Unnamed;
 
-  std::string getName() const {
+  const std::string &getName() const {
     return Name;
   }
 
@@ -428,7 +428,7 @@ public:
     : TypeRef(TypeRefKind::ObjCClass), Name(Name) {}
   static const std::shared_ptr<ObjCClassTypeRef> Unnamed;
 
-  std::string getName() const {
+  const std::string &getName() const {
     return Name;
   }
 
