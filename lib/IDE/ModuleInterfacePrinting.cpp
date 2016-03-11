@@ -479,15 +479,22 @@ void swift::ide::printSubmoduleInterface(
             continue;
 
           // Print synthesized extensions.
-          SynthesizedExtensionAnalyzer Analyzer(NTD);
+          SynthesizedExtensionAnalyzer Analyzer(NTD, AdjustedOptions);
           AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
                                                                     &Analyzer);
-          Analyzer.forEachSynthesizedExtension([&](ExtensionDecl *ET){
-            if (!shouldPrint(ET, AdjustedOptions))
-              return;
-            Printer << "\n";
-            ET->print(Printer, AdjustedOptions);
-            Printer << "\n";
+          Analyzer.forEachSynthesizedExtensionMergeGroup(
+            [&](ArrayRef<ExtensionDecl*> Decls){
+              for (auto ET : Decls) {
+                AdjustedOptions.TransformContext->shouldOpenExtension =
+                  Decls.front() == ET;
+                AdjustedOptions.TransformContext->shouldCloseExtension =
+                  Decls.back() == ET;
+                if (AdjustedOptions.TransformContext->shouldOpenExtension)
+                  Printer << "\n";
+                ET->print(Printer, AdjustedOptions);
+                if (AdjustedOptions.TransformContext->shouldCloseExtension)
+                  Printer << "\n";
+            }
           });
           AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
         }
