@@ -61,6 +61,7 @@ public struct EmptyCollection<Element> :
   /// possible to advance indices.
   @warn_unused_result
   public func next(i: Index) -> Index {
+    // TODO: swift-3-indexing-model: tests for traps.
     fatalError("EmptyCollection can't advance indices")
   }
 
@@ -70,6 +71,7 @@ public struct EmptyCollection<Element> :
   /// possible to advance indices.
   @warn_unused_result
   public func previous(i: Index) -> Index {
+    // TODO: swift-3-indexing-model: tests for traps.
     fatalError("EmptyCollection can't advance indices")
   }
 
@@ -84,6 +86,7 @@ public struct EmptyCollection<Element> :
   ///
   /// Should never be called, since this collection is always empty.
   public subscript(position: Index) -> Element {
+    // TODO: swift-3-indexing-model: tests for traps.
     _preconditionFailure("Index out of range")
   }
 
@@ -98,6 +101,7 @@ public struct EmptyCollection<Element> :
   /// possible to advance indices.
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
+    // TODO: swift-3-indexing-model: tests for traps.
     fatalError("EmptyCollection can't advance indices")
   }
 
@@ -107,12 +111,14 @@ public struct EmptyCollection<Element> :
   /// possible to advance indices.
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    // TODO: swift-3-indexing-model: tests for traps.
     fatalError("EmptyCollection can't advance indices")
   }
 
   /// The distance between two indexes (always zero).
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
+    // TODO: swift-3-indexing-model: tests for traps.
     _precondition(start == 0, "From must be startIndex (or endIndex)")
     _precondition(end == 0, "To must be endIndex (or startIndex)")
     return 0
