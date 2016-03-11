@@ -2116,3 +2116,18 @@ bb2:
   %5 = tuple()
   return %5 : $()
 }
+
+// CHECK-LABEL: sil @guaranteed_always_known_safe_bu : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @guaranteed_always_known_safe_bu : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @use : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  return undef : $()
+}
