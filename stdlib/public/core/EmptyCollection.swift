@@ -62,7 +62,7 @@ public struct EmptyCollection<Element> :
   @warn_unused_result
   public func next(i: Index) -> Index {
     // TODO: swift-3-indexing-model: tests for traps.
-    fatalError("EmptyCollection can't advance indices")
+    _preconditionFailure("EmptyCollection can't advance indices")
   }
 
   /// Always traps.
@@ -72,7 +72,7 @@ public struct EmptyCollection<Element> :
   @warn_unused_result
   public func previous(i: Index) -> Index {
     // TODO: swift-3-indexing-model: tests for traps.
-    fatalError("EmptyCollection can't advance indices")
+    _preconditionFailure("EmptyCollection can't advance indices")
   }
 
   /// Returns an empty iterator.
@@ -102,7 +102,7 @@ public struct EmptyCollection<Element> :
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
     // TODO: swift-3-indexing-model: tests for traps.
-    fatalError("EmptyCollection can't advance indices")
+    _preconditionFailure("EmptyCollection can't advance indices")
   }
 
   /// Always traps.
@@ -112,7 +112,7 @@ public struct EmptyCollection<Element> :
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
     // TODO: swift-3-indexing-model: tests for traps.
-    fatalError("EmptyCollection can't advance indices")
+    _preconditionFailure("EmptyCollection can't advance indices")
   }
 
   /// The distance between two indexes (always zero).
