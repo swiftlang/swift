@@ -2392,14 +2392,14 @@ public:
     Man.mangleType(T, 0);
     std::string MangledName(Man.finalize());
     std::string Error;
-    Type ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
+    Type ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName,
                                                         Error);
     if (ReconstructedType) {
       Stream << "reconstructed type from usr for '" << Range.str() << "' is '";
       ReconstructedType->print(Stream);
       Stream << "'\n";
     } else {
-      ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
+      ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName,
                                                      Error);
       Stream << "cannot reconstruct type from usr for '" << Range.str()
              << "'\n";
