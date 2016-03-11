@@ -73,6 +73,7 @@ func _fatalErrorFlags() -> UInt32 {
 #endif
 }
 
+// FIXME(ABI): add argument labels to conform to API guidelines.
 @_silgen_name("_swift_stdlib_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
@@ -80,12 +81,14 @@ func _reportFatalErrorInFile(
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt, flags: UInt32)
 
+// FIXME(ABI): add argument labels to conform to API guidelines.
 @_silgen_name("_swift_stdlib_reportFatalError")
 func _reportFatalError(
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
   flags: UInt32)
 
+// FIXME(ABI): add argument labels to conform to API guidelines.
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
@@ -94,6 +97,7 @@ func _reportUnimplementedInitializerInFile(
   _ line: UInt, _ column: UInt,
   flags: UInt32)
 
+// FIXME(ABI): add argument labels to conform to API guidelines.
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
@@ -105,6 +109,7 @@ func _reportUnimplementedInitializer(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
+// FIXME(ABI): add argument labels to conform to API guidelines.
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
@@ -135,6 +140,7 @@ func _assertionFailed(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
+// FIXME(ABI): add argument labels to conform to API guidelines.
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
@@ -165,6 +171,7 @@ func _assertionFailed(
 ///
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
+// FIXME(ABI): add argument labels to conform to API guidelines.
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")
@@ -204,6 +211,7 @@ func _fatalErrorMessage(
   Builtin.int_trap()
 }
 
+// FIXME(ABI): rename to lower camel case to conform to API guidelines.
 /// Prints a fatal error message when an unimplemented initializer gets
 /// called by the Objective-C runtime.
 @_transparent @noreturn
@@ -249,6 +257,7 @@ func _unimplemented_initializer(className className: StaticString,
   Builtin.int_trap()
 }
 
+// FIXME(ABI): rename to something descriptive.
 @noreturn
 public // COMPILER_INTRINSIC
 func _undefined<T>(
