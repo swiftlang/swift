@@ -88,7 +88,7 @@ classes.  This will give us C-like performance for array operations on ``Int``,
 To implement this, we'll need to implement a new generic builtin,
 something along the lines of "``Builtin.couldBeObjCType<T>()``", which
 returns a ``Builtin.Int1`` value.  SILCombine and IRGen should eagerly
-fold this to "0" iff ``T`` is known to be a protocol other than
+fold this to "0" if and only if ``T`` is known to be a protocol other than
 AnyObject, if it is known to be a non-\ ``@objc`` class, or if it is
 known to be any struct, enum or tuple.  Otherwise, the builtin is left
 alone, and if it reaches IRGen, IRGen should conservatively fold it to

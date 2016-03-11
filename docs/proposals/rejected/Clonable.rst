@@ -87,7 +87,7 @@ Implications for Equality
 
 We think the programming model suggested for generics has some pretty
 strong implications for equality of ``class``\ es: ``a == b`` must
-return true iff ``a`` and ``b`` refer to the same object.
+return true if and only if ``a`` and ``b`` refer to the same object.
 
 Details *(unchanged from Revision 1)*
 =====================================

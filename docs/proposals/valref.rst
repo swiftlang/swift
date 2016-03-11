@@ -284,7 +284,7 @@ type parameter, as follows::
 
    ref x : T // always declares a ref
    val x : T // always declares a val
-   var x : T // declares a val iff T is a val
+   var x : T // declares a val if and only if T is a val
 
 ``ref`` and ``val`` can be specified as protocol constraints for type
 parameters::
