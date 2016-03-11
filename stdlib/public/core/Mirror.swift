@@ -435,7 +435,7 @@ extension Mirror {
   }
 }
 
-//===--- Legacy _Mirror Support ---------------------------------------===//
+//===--- Legacy _Mirror Support -------------------------------------------===//
 extension Mirror.DisplayStyle {
   /// Construct from a legacy `_MirrorDisposition`
   internal init?(legacy: _MirrorDisposition) {

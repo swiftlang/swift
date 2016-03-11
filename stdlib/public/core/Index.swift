@@ -1,4 +1,4 @@
-//===--- Index.swift - A position in a Collection ---------------------===//
+//===--- Index.swift - A position in a Collection -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-//===--- ForwardIndex -------------------------------------------------===//
+//===--- ForwardIndex -----------------------------------------------------===//
 
 /// This protocol is an implementation detail of `ForwardIndex`; do
 /// not use it directly.
@@ -249,7 +249,7 @@ extension ForwardIndex {
 }
 
 //===----------------------------------------------------------------------===//
-//===--- BidirectionalIndex -------------------------------------------===//
+//===--- BidirectionalIndex -----------------------------------------------===//
 
 
 /// An index that can step backwards via application of its
