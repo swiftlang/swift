@@ -1473,6 +1473,7 @@ static raw_ostream &operator<<(raw_ostream &os, AccessSemantics accessKind) {
   case AccessSemantics::Ordinary: return os;
   case AccessSemantics::DirectToStorage: return os << " direct_to_storage";
   case AccessSemantics::DirectToAccessor: return os << " direct_to_accessor";
+  case AccessSemantics::BehaviorInitialization: return os << " behavior_init";
   }
   llvm_unreachable("bad access kind");
 }

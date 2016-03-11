@@ -1720,3 +1720,19 @@ void Mangler::mangleGlobalInit(const VarDecl *decl, int counter,
   Buffer << (isInitFunc ? "_func" : "_token");
   Buffer << counter;
 }
+
+void Mangler::mangleBehaviorInitThunk(const VarDecl *decl) {
+  auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
+  auto fileUnit = cast<FileUnit>(topLevelContext);
+  Identifier discriminator = fileUnit->getDiscriminatorForPrivateValue(decl);
+  assert(!discriminator.empty());
+  assert(!isNonAscii(discriminator.str()) &&
+         "discriminator contains non-ASCII characters");
+  assert(!clang::isDigit(discriminator.str().front()) &&
+         "not a valid identifier");
+  
+  Buffer << "_TTB";
+  mangleIdentifier(discriminator);
+  mangleContextOf(decl);
+  mangleIdentifier(decl->getName());
+}

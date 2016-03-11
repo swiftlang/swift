@@ -1051,16 +1051,6 @@ public:
     auto InitStorageTy = InitStorage->getType().getAs<SILFunctionType>();
     require(InitStorageTy,
             "mark_uninitialized initializer must be a function");
-    if (auto sig = InitStorageTy->getGenericSignature()) {
-      require(sig->getGenericParams().size()
-              == MU->getInitStorageSubstitutions().size(),
-              "mark_uninitialized initializer must be given right number "
-              "of substitutions");
-    } else {
-      require(MU->getInitStorageSubstitutions().size() == 0,
-              "mark_uninitialized initializer must be given right number "
-              "of substitutions");
-    }
     auto SubstInitStorageTy = InitStorageTy->substGenericArgs(F.getModule(),
                                              F.getModule().getSwiftModule(),
                                              MU->getInitStorageSubstitutions());
@@ -1076,16 +1066,6 @@ public:
     auto SetterTy = Setter->getType().getAs<SILFunctionType>();
     require(SetterTy,
             "mark_uninitialized setter must be a function");
-    if (auto sig = SetterTy->getGenericSignature()) {
-      require(sig->getGenericParams().size()
-              == MU->getSetterSubstitutions().size(),
-              "mark_uninitialized initializer must be given right number "
-              "of substitutions");
-    } else {
-      require(MU->getSetterSubstitutions().size() == 0,
-              "mark_uninitialized initializer must be given right number "
-              "of substitutions");
-    }
     auto SubstSetterTy = SetterTy->substGenericArgs(F.getModule(),
                                                F.getModule().getSwiftModule(),
                                                MU->getSetterSubstitutions());

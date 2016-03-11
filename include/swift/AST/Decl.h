@@ -3670,6 +3670,10 @@ enum class AccessStrategy : unsigned char {
   /// The decl is a VarDecl with its own backing storage; evaluate its
   /// address directly.
   Storage,
+  
+  /// The decl is a VarDecl with storage defined by a property behavior;
+  /// this access may initialize or reassign the storage based on dataflow.
+  BehaviorStorage,
 
   /// The decl has addressors; call the appropriate addressor for the
   /// access kind.  These calls are currently always direct.
@@ -3699,6 +3703,12 @@ struct BehaviorRecord {
   // Storage declaration and initializer for use by definite initialization.
   VarDecl *StorageDecl = nullptr;
   ConcreteDeclRef InitStorageDecl = nullptr;
+  
+  bool needsInitialization() const {
+    assert((bool)StorageDecl == (bool)InitStorageDecl
+           && "DI state not consistent");
+    return StorageDecl != nullptr;
+  }
   
   BehaviorRecord(TypeRepr *ProtocolName,
                  Expr *Param)
@@ -4144,6 +4154,15 @@ public:
   /// Does the storage use a behavior?
   bool hasBehavior() const {
     return BehaviorInfo.getPointer() != nullptr;
+  }
+  
+  /// Does the storage use a behavior, and require definite initialization
+  /// analysis.
+  bool hasBehaviorNeedingInitialization() const {
+    if (auto behavior = getBehavior()) {
+      return behavior->needsInitialization();
+    }
+    return false;
   }
   
   /// Get the behavior info.

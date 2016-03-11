@@ -135,6 +135,8 @@ public:
   /// \param isInitFunc If true it's a globalinit_func, otherwise a
   /// globalinit_token.
   void mangleGlobalInit(const VarDecl *decl, int counter, bool isInitFunc);
+  
+  void mangleBehaviorInitThunk(const VarDecl *decl);
 
   void mangleIdentifier(StringRef ref,
                         OperatorFixity fixity = OperatorFixity::NotOperator,
