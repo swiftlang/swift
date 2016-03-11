@@ -173,7 +173,7 @@ operations. For example, let's try to write a Comparable protocol that could be
 used to search for a generic find() operation::
 
   protocol Comparable {
-    func isEqual(other : ???) -> bool
+    func isEqual(other : ???) -> Bool
   }
 
 Our options for filling in ??? are currently very poor. We could use the syntax
@@ -216,7 +216,7 @@ allows one to refer to the eventual type of 'self' (which we call
 Comparable protocol in a natural way::
 
   protocol Comparable {
-    func isEqual(other : Self) -> bool
+    func isEqual(other : Self) -> Bool
   }
 
 By expressing Comparable in this way, we know that if we have two objects of
