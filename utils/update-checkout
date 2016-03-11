@@ -52,6 +52,7 @@ NEXT_BRANCHES = {
     'swift-integration-tests': 'master',
 }
 
+
 def update_working_copy(repo_path, branch):
     if not os.path.isdir(repo_path):
         return
@@ -150,7 +151,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
             if branch == "stable-next" or branch == "master-next":
                 repo_branch = NEXT_BRANCHES[dir_name]
 
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name), repo_branch)
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
+                            repo_branch)
 
     return 0
 
