@@ -339,8 +339,6 @@ void swift::ide::printSubmoduleInterface(
       SwiftDecls.push_back(D);
     }
   }
-
-  llvm::SetVector<Decl*> PrintLineAfter;
   if (!GroupNames.empty()) {
     assert(SwiftDecls.empty());
     for (auto &Entry : FileRangedDecls) {
@@ -356,20 +354,8 @@ void swift::ide::printSubmoduleInterface(
       for (auto D : DeclsInFile) {
         SwiftDecls.push_back(D);
       }
-      PrintLineAfter.insert(DeclsInFile.back());
     }
   }
-  if (!PrintLineAfter.empty())
-    PrintLineAfter.pop_back();
-
-  llvm::SmallString<128> DelineatorBuilder;
-  if (!PrintLineAfter.empty()) {
-    DelineatorBuilder.append("// MARK: -\n");
-    DelineatorBuilder.append("// ");
-    DelineatorBuilder.append(77, '=');
-    DelineatorBuilder.append(2, '\n');
-  }
-  StringRef DelineatorAfterFile = DelineatorBuilder.str();
 
   // Create the missing import decls and add to the collector.
   for (auto *SM : NoImportSubModules) {
@@ -535,8 +521,6 @@ void swift::ide::printSubmoduleInterface(
     for (auto *D : SwiftDecls) {
       if (PrintDecl(D))
         Printer << "\n";
-      if (PrintLineAfter.count(D) != 0)
-        Printer << DelineatorAfterFile;
     }
   }
 }
