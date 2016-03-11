@@ -1904,8 +1904,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
 void PrintAST::
 printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
   if (Options.TransformContext->shouldOpenExtension) {
-    Printer << "/// Synthesized extension from " <<
-    ExtDecl->getExtendedType()->getAnyNominal()->getName().str() << "\n";
+    Printer << "// synthesized\n";
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";
