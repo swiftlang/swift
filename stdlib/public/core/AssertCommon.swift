@@ -144,8 +144,7 @@ func _assertionFailed(
 ) {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
-    let messageUTF8 = message.nulTerminatedUTF8
-    messageUTF8.withUnsafeBufferPointer {
+    message._withUnsafeBufferPointerToUTF8 {
       (messageUTF8) -> Void in
       file.withUTF8Buffer {
         (file) -> Void in

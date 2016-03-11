@@ -298,6 +298,16 @@ extension String {
     return result
   }
 
+  internal func _withUnsafeBufferPointerToUTF8<R>(
+    @noescape body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
+  ) rethrows -> R {
+    let ptr = _contiguousUTF8
+    if ptr != nil {
+      return try body(UnsafeBufferPointer(start: ptr, count: _core.count))
+    }
+    return try nulTerminatedUTF8.withUnsafeBufferPointer(body)
+  }
+
   /// Construct the `String` corresponding to the given sequence of
   /// UTF-8 code units.  If `utf8` contains unpaired surrogates, the
   /// result is `nil`.
