@@ -108,7 +108,6 @@ public protocol Indexable {
   func _nextInPlace(i: inout Index)
 }
 
-// TODO: swift-3-indexing-model - deal with IndexingIterator
 /// The iterator used for collections that don't specify one.
 public struct IndexingIterator<
   Elements : Indexable
