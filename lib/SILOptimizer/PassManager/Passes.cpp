@@ -239,8 +239,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addEarlyCodeMotion();
   PM.addARCSequenceOpts();
 
-  PM.addSILLinker();
-
   PM.addSimplifyCFG();
   // Only hoist releases very late.
   if (OpLevel == OptimizationLevelKind::LowLevel)
@@ -264,7 +262,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
     return;
   }
 
-  SILPassManager PM(&Module, "PreSpecialize");
+  SILPassManager PM(&Module, "EarlyModulePasses");
 
   // Get rid of apparently dead functions as soon as possible so that
   // we do not spend time optimizing them.
@@ -275,15 +273,15 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.resetAndRemoveTransformations();
 
   // Run an iteration of the high-level SSA passes.
-  PM.setStageName("HighLevel");
+  PM.setStageName("HighLevel+EarlyLoopOpt");
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
+  AddHighLevelLoopOptPasses(PM);
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
-  PM.setStageName("EarlyLoopOpt");
-  AddHighLevelLoopOptPasses(PM);
-
+  PM.setStageName("MidModulePasses+StackPromote");
   PM.addDeadFunctionElimination();
+  PM.addSILLinker();
   PM.addDeadObjectElimination();
   PM.addGlobalPropertyOpt();
 
