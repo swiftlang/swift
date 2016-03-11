@@ -3977,6 +3977,8 @@ static llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
     metadata = IGF.Builder.CreateAnd(metadata, mask);
     metadata = IGF.Builder.CreateIntToPtr(metadata, IGF.IGM.TypeMetadataPtrTy);
     return metadata;
+  } else if (IGF.IGM.TargetInfo.hasOpaqueISAs()) {
+    return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
   } else {
     object = IGF.Builder.CreateBitCast(object,
                                   IGF.IGM.TypeMetadataPtrTy->getPointerTo());

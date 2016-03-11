@@ -605,7 +605,8 @@ public:
   clang::Selector setObjectForKeyedSubscript;
 
 private:
-  Optional<Module *> checkedFoundationModule, checkedSIMDModule;
+  /// Records those modules that we have looked up.
+  llvm::DenseMap<Identifier, Module *> checkedModules;
 
   /// External Decls that we have imported but not passed to the ASTContext yet.
   SmallVector<Decl *, 4> RegisteredExternalDecls;
@@ -1098,7 +1099,16 @@ public:
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///
-  /// \param module The name of the module in which the type should occur.
+  /// \param moduleName The name of the module in which the type should occur.
+  ///
+  /// \param name The name of the type to find.
+  ///
+  /// \returns The named type, or null if the type could not be found.
+  Type getNamedSwiftType(StringRef moduleName, StringRef name);
+
+  /// \brief Retrieve the named Swift type, e.g., Int32.
+  ///
+  /// \param module The module in which the type should occur.
   ///
   /// \param name The name of the type to find.
   ///

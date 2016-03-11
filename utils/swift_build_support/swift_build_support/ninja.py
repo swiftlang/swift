@@ -12,7 +12,8 @@ from .which import which
 
 
 def is_ninja_installed():
-    """Return whether `ninja` or `ninja-build` are available on the host machine."""
+    """Return whether `ninja` or `ninja-build` are available on the host
+    machine."""
     if which('ninja') or which('ninja-build'):
         return True
     else:

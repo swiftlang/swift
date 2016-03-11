@@ -63,17 +63,9 @@ namespace {
       /// The source type is 'Boolean'.
       Boolean,
 
-      /// The source type is 'NSString'.
-      NSString,
-
-      /// The source type is 'NSArray'.
-      NSArray,
-
-      /// The source type is 'NSDictionary'.
-      NSDictionary,
-
-      /// The source type is 'NSSet'.
-      NSSet,
+      /// The source type an Objective-C class type bridged to a Swift
+      /// type.
+      ObjCBridged,
 
       /// The source type is 'NSUInteger'.
       NSUInteger,
@@ -100,52 +92,21 @@ namespace {
 
     ImportHintKind Kind;
 
-    // Type arguments, if provided.
-    Type TypeArgs[2];
+    /// The type to which the imported type is bridged.
+    Type BridgedType;
 
     /// Allow conversion from an import hint to an import hint kind,
     /// which is useful for switches and comparisons.
     operator ImportHintKind() const { return Kind; }
 
-    /// Determine the number of type arguments we expect.
-    static unsigned getNumTypeArgs(ImportHintKind kind) {
-      switch (kind) {
-      case None:
-      case Void:
-      case BOOL:
-      case Boolean:
-      case NSString:
-      case NSUInteger:
-      case ObjCPointer:
-      case CFPointer:
-      case Reference:
-      case Block:
-      case CFunctionPointer:
-      case CustomNullablePointer:
-        return 0;
-
-      case NSArray:
-      case NSSet:
-        return 1;
-
-      case NSDictionary:
-        return 2;
-      }
-    }
-
     ImportHint(ImportHintKind kind) : Kind(kind) {
-      assert(getNumTypeArgs(kind) == 0 && "Wrong number of arguments");
+      assert(kind != ObjCBridged &&
+             "Bridged entry point requires a bridged type");
     }
 
-    ImportHint(ImportHintKind kind, Type typeArg1) : Kind(kind) {
-      assert(getNumTypeArgs(kind) == 1 && "Wrong number of arguments");
-      TypeArgs[0] = typeArg1;
-    }
-
-    ImportHint(ImportHintKind kind, Type typeArg1, Type typeArg2) : Kind(kind) {
-      assert(getNumTypeArgs(kind) == 2 && "Wrong number of arguments");
-      TypeArgs[0] = typeArg1;
-      TypeArgs[1] = typeArg2;
+    ImportHint(ImportHintKind kind, Type bridgedType)
+        : Kind(kind), BridgedType(bridgedType) {
+      assert(kind == ImportHint::ObjCBridged && "Wrong kind for bridged type");
     }
   };
 
@@ -162,10 +123,7 @@ namespace {
 
     case ImportHint::Block:
     case ImportHint::CFPointer:
-    case ImportHint::NSArray:
-    case ImportHint::NSDictionary:
-    case ImportHint::NSSet:
-    case ImportHint::NSString:
+    case ImportHint::ObjCBridged:
     case ImportHint::ObjCPointer:
     case ImportHint::CFunctionPointer:
     case ImportHint::CustomNullablePointer:
@@ -688,6 +646,31 @@ namespace {
       return nullptr;
     }
 
+    /// Map the Clang swift_bridge attribute to a specific type.
+    Type mapSwiftBridgeAttr(const clang::NamedDecl *clangDecl) {
+      // Check whether there is a swift_bridge attribute.
+      auto bridgeAttr = clangDecl->getAttr<clang::SwiftBridgeAttr>();
+      if (!bridgeAttr) return Type();
+
+      // Determine the module and Swift declaration names.
+      StringRef moduleName;
+      StringRef name = bridgeAttr->getSwiftType();
+      auto dotPos = name.find('.');
+      if (dotPos == StringRef::npos) {
+        // Determine the module name from the Clang declaration.
+        if (auto module = clangDecl->getImportedOwningModule())
+          moduleName = module->getTopLevelModuleName();
+        else
+          moduleName = clangDecl->getASTContext().getLangOpts().CurrentModule;
+      } else {
+        // The string is ModuleName.TypeName.
+        moduleName = name.substr(0, dotPos);
+        name = name.substr(dotPos + 1);
+      }
+
+      return Impl.getNamedSwiftType(moduleName, name);
+    }
+
     ImportResult
     VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
       // If this object pointer refers to an Objective-C class (possibly
@@ -724,76 +707,82 @@ namespace {
           }
         }
 
-        if (imported->hasName() &&
-            imported->getName()
-              == Impl.SwiftContext.getSwiftId(KnownFoundationEntity::NSString)){
-          return { importedType, ImportHint::NSString };
-        }
+        // Determine whether this Objective-C class type is bridged to
+        // a Swift type.
+        Type bridgedType;
+        if (auto objcClassDef = objcClass->getDefinition())
+          bridgedType = mapSwiftBridgeAttr(objcClassDef);
+        else
+          bridgedType = mapSwiftBridgeAttr(objcClass);
 
-        if (imported->hasName() &&
-            imported->getName()
-              == Impl.SwiftContext.getSwiftId(KnownFoundationEntity::NSArray)) {
-          // If we have type arguments, import them.
+        if (bridgedType) {
+          // Gather the type arguments.
+          SmallVector<Type, 2> importedTypeArgs;
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
-          if (typeArgs.size() == 1) {
-            Type elementType = Impl.importType(typeArgs[0],
-                                               ImportTypeKind::BridgedValue,
-                                               AllowNSUIntegerAsInt,
-                                               CanFullyBridgeTypes,
-                                               OTK_None);
-            return { importedType,
-                     ImportHint(ImportHint::NSArray, elementType) };
+          SmallVector<clang::QualType, 2> typeArgsScratch;
+
+          // If we have an unspecialized form of a parameterized
+          // Objective-C class type, fill in the defaults.
+          if (typeArgs.empty()) {
+            if (auto objcGenericParams = objcClass->getTypeParamList()) {
+              objcGenericParams->gatherDefaultTypeArgs(typeArgsScratch);
+              typeArgs = typeArgsScratch;
+            }
           }
 
-          return { importedType, ImportHint(ImportHint::NSArray, Type()) };
-        }
-
-        if (imported->hasName() &&
-            imported->getName()
-              == Impl.SwiftContext.getSwiftId(
-                   KnownFoundationEntity::NSDictionary)) {
-          // If we have type arguments, import them.
-          ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
-          if (typeArgs.size() == 2) {
-            Type keyType = Impl.importType(typeArgs[0],
-                                           ImportTypeKind::BridgedValue,
-                                           AllowNSUIntegerAsInt,
-                                           CanFullyBridgeTypes,
-                                           OTK_None);
-            Type objectType = Impl.importType(typeArgs[1],
-                                              ImportTypeKind::BridgedValue,
-                                              AllowNSUIntegerAsInt,
-                                              CanFullyBridgeTypes,
-                                              OTK_None);
-            if (keyType.isNull() != objectType.isNull()) {
-              keyType = nullptr;
-              objectType = nullptr;
+          // Convert the type arguments.
+          for (auto typeArg : typeArgs) {
+            Type importedTypeArg = Impl.importType(typeArg,
+                                                   ImportTypeKind::BridgedValue,
+                                                   AllowNSUIntegerAsInt,
+                                                   CanFullyBridgeTypes,
+                                                   OTK_None);
+            if (!importedTypeArg) {
+              importedTypeArgs.clear();
+              break;
             }
 
-            return { importedType,
-                     ImportHint(ImportHint::NSDictionary,
-                                keyType, objectType) };
+            importedTypeArgs.push_back(importedTypeArg);
           }
+
+          // If we have an unbound generic bridged type, get the arguments.
+          if (auto unboundType = bridgedType->getAs<UnboundGenericType>()) {
+            auto unboundDecl = unboundType->getDecl();
+            auto bridgedSig = unboundDecl->getGenericSignature();
+            assert(bridgedSig && "Bridged signature");
+            unsigned numExpectedTypeArgs = bridgedSig->getGenericParams().size();
+            if (importedTypeArgs.size() != numExpectedTypeArgs)
+              return Type();
+
+            // The first type argument for Dictionary or Set needs
+            // to be NSObject-bound.
+            if (unboundDecl == Impl.SwiftContext.getDictionaryDecl() ||
+                unboundDecl == Impl.SwiftContext.getSetDecl()) {
+              auto &keyType = importedTypeArgs[0];
+              if (!Impl.matchesNSObjectBound(keyType))
+                keyType = Impl.getNSObjectType();
+            }
+
+            // Form the specialized type.
+            if (unboundDecl == Impl.SwiftContext.getArrayDecl()) {
+              // Type sugar for arrays.
+              assert(importedTypeArgs.size() == 1);
+              bridgedType = ArraySliceType::get(importedTypeArgs[0]);
+            } else if (unboundDecl == Impl.SwiftContext.getDictionaryDecl()) {
+              // Type sugar for dictionaries.
+              assert(importedTypeArgs.size() == 2);
+              bridgedType = DictionaryType::get(importedTypeArgs[0],
+                                                importedTypeArgs[1]);
+            } else {
+              // Everything else.
+              bridgedType =
+                  BoundGenericType::get(cast<NominalTypeDecl>(unboundDecl),
+                                        Type(), importedTypeArgs);
+            }
+          }
+
           return { importedType,
-                   ImportHint(ImportHint::NSDictionary, Type(), Type()) };
-        }
-
-        if (imported->hasName() &&
-            imported->getName()
-              == Impl.SwiftContext.getSwiftId(KnownFoundationEntity::NSSet)) {
-          // If we have type arguments, import them.
-          ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
-          if (typeArgs.size() == 1) {
-            Type elementType = Impl.importType(typeArgs[0],
-                                               ImportTypeKind::BridgedValue,
-                                               AllowNSUIntegerAsInt,
-                                               CanFullyBridgeTypes,
-                                               OTK_None);
-            return { importedType,
-                     ImportHint(ImportHint::NSSet, elementType) };
-          }
-
-          return { importedType, ImportHint(ImportHint::NSSet, Type()) };
+                   ImportHint(ImportHint::ObjCBridged, bridgedType) };
         }
 
         return { importedType, ImportHint::ObjCPointer };
@@ -898,6 +887,19 @@ static Type getUnmanagedType(ClangImporter::Implementation &impl,
   return unmanagedClassType;
 }
 
+/// Determine whether type is 'NSString.
+static bool isNSString(Type type) {
+  if (auto classType = type->getAs<ClassType>()) {
+    if (auto clangDecl = classType->getDecl()->getClangDecl()) {
+      if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
+        return objcClass->getName() == "NSString";
+      }
+    }
+  }
+
+  return false;
+}
+
 static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         clang::QualType clangType,
                                         Type importedType,
@@ -919,10 +921,10 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   }
 
   // Import NSString * globals as String.
-  if (hint == ImportHint::NSString &&
+  if (hint == ImportHint::ObjCBridged && isNSString(importedType) &&
       (importKind == ImportTypeKind::Variable ||
        importKind == ImportTypeKind::AuditedVariable)) {
-    return impl.getNamedSwiftType(impl.getStdlibModule(), "String");
+    return hint.BridgedType;
   }
 
   // Reference types are only permitted as function parameter types.
@@ -1079,63 +1081,11 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     importedType = getUnmanagedType(impl, importedType);
   }
 
-  // When NSString* is the type of a function parameter or a function
-  // result type, map it to String.
-  // FIXME: It's not really safe to do this when Foundation is missing.
-  // We do it anyway for ImportForwardDeclarations mode so that generated
-  // interfaces are correct, but trying to use the resulting declarations
-  // may result in compiler crashes further down the line.
-  if (hint == ImportHint::NSString && canBridgeTypes(importKind) &&
-      (impl.tryLoadFoundationModule() || impl.ImportForwardDeclarations)) {
-    importedType = impl.SwiftContext.getStringDecl()->getDeclaredType();
-  }
-
-
-  // When NSArray* is the type of a function parameter or a function
-  // result type, map it to [AnyObject].
-  if (hint == ImportHint::NSArray && canBridgeTypes(importKind) &&
-      impl.tryLoadFoundationModule()) {
-    Type elementType = hint.TypeArgs[0];
-    if (elementType.isNull())
-      elementType = impl.getNamedSwiftType(impl.getStdlibModule(), "AnyObject");
-    importedType = ArraySliceType::get(elementType);
-  }
-
-  // When NSDictionary* is the type of a function parameter or a function
-  // result type, map it to [K : V].
-  if (hint == ImportHint::NSDictionary && canBridgeTypes(importKind) &&
-      impl.tryLoadFoundationModule()) {
-    Type keyType = hint.TypeArgs[0];
-    Type objectType = hint.TypeArgs[1];
-
-    // If no key type was provided, or the key doesn't match the 'NSObject'
-    // bound required by the Swift Dictionary key, substitute in 'NSObject'.
-    if (keyType.isNull() || !impl.matchesNSObjectBound(keyType)) {
-      keyType = impl.getNSObjectType();
-    }
-
-    if (objectType.isNull()) {
-      objectType = impl.getNamedSwiftType(impl.getStdlibModule(), "AnyObject");
-    }
-
-    importedType = DictionaryType::get(keyType, objectType);
-  }
-
-  // When NSSet* is the type of a function parameter or a function
-  // result type, map it to Set<T>.
-  if (hint == ImportHint::NSSet && canBridgeTypes(importKind) &&
-      impl.tryLoadFoundationModule()) {
-    Type elementType = hint.TypeArgs[0];
-
-    // If no element type was provided, or the element type doesn't match the
-    // 'NSObject' bound required by the Swift Set, substitute in 'NSObject'.
-    if (elementType.isNull() || !impl.matchesNSObjectBound(elementType))
-      elementType = impl.getNSObjectType();
-
-    importedType = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                        "Set",
-                                                        elementType);
-  }
+  // If we have a bridged Objective-C type and we are allowed to
+  // bridge, do so.
+  if (hint == ImportHint::ObjCBridged && canBridgeTypes(importKind) &&
+      (impl.tryLoadFoundationModule() || impl.ImportForwardDeclarations))
+    importedType = hint.BridgedType;
 
   if (!importedType)
     return importedType;
@@ -2280,29 +2230,36 @@ Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
 }
 
 static Module *tryLoadModule(ASTContext &C,
-                             Identifier name,
+                             Identifier moduleName,
                              bool importForwardDeclarations,
-                             Optional<Module *> &cache) {
-  if (!cache.hasValue()) {
-    // If we're synthesizing forward declarations, we don't want to pull in
-    // the module too eagerly.
-    if (importForwardDeclarations)
-      cache = C.getLoadedModule(name);
-    else
-      cache = C.getModule({ {name, SourceLoc()} });
-  }
+                             llvm::DenseMap<Identifier, Module *>
+                               &checkedModules) {
+  // If we've already done this check, return the cached result.
+  auto known = checkedModules.find(moduleName);
+  if (known != checkedModules.end())
+    return known->second;
 
-  return cache.getValue();
+  Module *module;
+
+  // If we're synthesizing forward declarations, we don't want to pull in
+  // the module too eagerly.
+  if (importForwardDeclarations)
+    module = C.getLoadedModule(moduleName);
+  else
+    module = C.getModule({ {moduleName, SourceLoc()} });
+
+  checkedModules[moduleName] = module;
+  return module;
 }
 
 Module *ClangImporter::Implementation::tryLoadFoundationModule() {
   return tryLoadModule(SwiftContext, SwiftContext.Id_Foundation,
-                       ImportForwardDeclarations, checkedFoundationModule);
+                       ImportForwardDeclarations, checkedModules);
 }
 
 Module *ClangImporter::Implementation::tryLoadSIMDModule() {
   return tryLoadModule(SwiftContext, SwiftContext.Id_simd,
-                       ImportForwardDeclarations, checkedSIMDModule);
+                       ImportForwardDeclarations, checkedModules);
 }
 
 Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
@@ -2341,6 +2298,17 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
   if (auto *typeResolver = getTypeResolver())
     typeResolver->resolveDeclSignature(type);
   return type->getDeclaredType();
+}
+
+Type ClangImporter::Implementation::getNamedSwiftType(StringRef moduleName,
+                                                      StringRef name) {
+  // Try to load the module.
+  auto module = tryLoadModule(SwiftContext,
+                              SwiftContext.getIdentifier(moduleName),
+                              ImportForwardDeclarations, checkedModules);
+  if (!module) return Type();
+
+  return getNamedSwiftType(module, name);
 }
 
 Type

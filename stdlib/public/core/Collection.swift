@@ -813,7 +813,7 @@ extension Collection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="Removed in Swift 3. Please use underestimatedCount peoperty.")
+  @available(*, unavailable, message="Removed in Swift 3. Please use underestimatedCount property.")
   public func underestimateCount() -> Int {
     fatalError("unavailable function can't be called")
   }

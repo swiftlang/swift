@@ -1,4 +1,4 @@
-//===--- CollectionOfOne.swift - A Collection with one element --------===//
+//===--- CollectionOfOne.swift - A Collection with one element ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

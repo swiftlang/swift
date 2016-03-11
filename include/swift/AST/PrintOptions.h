@@ -31,6 +31,7 @@ class Type;
 enum DeclAttrKind : unsigned;
 class PrinterArchetypeTransformer;
 class SynthesizedExtensionAnalyzer;
+struct PrintOptions;
 
 /// Necessary information for archetype transformation during printing.
 struct ArchetypeTransformContext {
@@ -47,17 +48,15 @@ struct ArchetypeTransformContext {
                             SynthesizedExtensionAnalyzer *Analyzer);
   Type transform(Type Input);
   StringRef transform(StringRef Input);
+
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
+  bool shouldOpenExtension;
+  bool shouldCloseExtension;
+
   ~ArchetypeTransformContext();
 private:
   struct Implementation;
   Implementation &Impl;
-};
-
-struct SynthesizedExtensionInfo {
-  ExtensionDecl *Ext = nullptr;
-  std::vector<StringRef> KnownSatisfiedRequirements;
-  operator bool() const { return Ext; }
 };
 
 class SynthesizedExtensionAnalyzer {
@@ -66,10 +65,13 @@ class SynthesizedExtensionAnalyzer {
 
 public:
   SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
+                               PrintOptions Options,
                                bool IncludeUnconditional = true);
   ~SynthesizedExtensionAnalyzer();
   void forEachSynthesizedExtension(
     llvm::function_ref<void(ExtensionDecl*)> Fn);
+  void forEachSynthesizedExtensionMergeGroup(
+    llvm::function_ref<void(ArrayRef<ExtensionDecl*>)> Fn);
   bool isInSynthesizedExtension(const ValueDecl *VD);
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
 };
@@ -259,7 +261,7 @@ struct PrintOptions {
   /// \brief Print dependent types as references into this generic parameter
   /// list.
   GenericParamList *ContextGenericParams = nullptr;
-  
+
   /// \brief Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
 
@@ -305,6 +307,7 @@ struct PrintOptions {
     result.SkipPrivateStdlibDecls = true;
     result.SkipUnderscoredStdlibProtocols = true;
     result.SkipDeinit = true;
+    result.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
     return result;
   }
 

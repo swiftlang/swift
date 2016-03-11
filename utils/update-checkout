@@ -38,6 +38,19 @@ REPOSITORIES = {
     'swift-integration-tests': 'apple/swift-integration-tests',
 }
 
+NEXT_BRANCHES = {
+    'llvm': 'stable-next',
+    'clang': 'stable-next',
+    'swift': 'master-next',
+    'lldb': 'master-next',
+    'cmark': 'master',
+    'llbuild': 'master',
+    'swiftpm': 'master',
+    'swift-corelibs-xctest': 'master',
+    'swift-corelibs-foundation': 'master',
+    'swift-corelibs-libdispatch': 'master',
+    'swift-integration-tests': 'master',
+}
 
 def update_working_copy(repo_path, branch):
     if not os.path.isdir(repo_path):
@@ -74,12 +87,19 @@ def obtain_additional_swift_sources(
                 else:
                     remote = "https://github.com/" + repo + '.git'
                 if skip_history:
-                    check_call(['git', 'clone', '--depth', '1', remote, dir_name])
+                    check_call(['git', 'clone', '--depth', '1', remote,
+                                dir_name])
                 else:
                     check_call(['git', 'clone', remote, dir_name])
                 if branch:
+                    if branch == "stable-next" or branch == "master-next":
+                        repo_branch = NEXT_BRANCHES[dir_name]
+                    else:
+                        repo_branch = branch
                     src_path = SWIFT_SOURCE_ROOT + "/" + dir_name + "/" + ".git"
-                    check_call(['git', '--git-dir', src_path, '--work-tree', os.path.join(SWIFT_SOURCE_ROOT, dir_name), 'checkout', branch])
+                    check_call(['git', '--git-dir', src_path, '--work-tree',
+                                os.path.join(SWIFT_SOURCE_ROOT, dir_name),
+                                'checkout', repo_branch])
 
 
 def main():
@@ -121,11 +141,16 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         obtain_additional_swift_sources(
             clone_with_ssh, branch, skip_history, args.skip_repository)
 
+    repo_branch = branch
     for dir_name, _ in REPOSITORIES.items():
         if dir_name in args.skip_repository:
             print("--- Skipping '" + dir_name + "' ---")
             continue
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name), branch)
+        if branch:
+            if branch == "stable-next" or branch == "master-next":
+                repo_branch = NEXT_BRANCHES[dir_name]
+
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name), repo_branch)
 
     return 0
 

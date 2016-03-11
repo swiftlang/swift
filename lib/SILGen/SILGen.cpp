@@ -435,6 +435,14 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     if (!Captures.empty())
       TopLevelSGF->B.createMarkFunctionEscape(AFD, Captures);
   }
+  
+  // If the declaration is exported as a C function, emit its native-to-foreign
+  // thunk too, if it wasn't already forced.
+  if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
+    auto thunk = SILDeclRef(AFD).asForeign();
+    if (!hasFunction(thunk))
+      emitNativeToForeignThunk(thunk);
+  }
 }
 
 static bool hasSILBody(FuncDecl *fd) {

@@ -89,7 +89,8 @@ def flatten(*args):
 def read_sizes(sizes, file_name, function_details, group_by_prefix):
     # Check if multiple architectures are supported by the object file.
     # Prefer arm64 if available.
-    architectures = subprocess.check_output(["otool", "-V", "-f", file_name]).split("\n")
+    architectures = subprocess.check_output(
+        ["otool", "-V", "-f", file_name]).split("\n")
     arch = None
     arch_pattern = re.compile('architecture ([\S]+)')
     for architecture in architectures:
@@ -105,10 +106,21 @@ def read_sizes(sizes, file_name, function_details, group_by_prefix):
         arch_params = []
 
     if function_details:
-        content = subprocess.check_output(flatten(["otool", arch_params, "-l", "-v", "-t", file_name])).split("\n")
-        content += subprocess.check_output(flatten(["otool", arch_params, "-v", "-s", "__TEXT", "__textcoal_nt", file_name])).split("\n")
+        content = subprocess.check_output(
+            flatten([
+                "otool",
+                arch_params,
+                "-l",
+                "-v",
+                "-t",
+                file_name]
+            )).split("\n")
+        content += subprocess.check_output(flatten(
+            ["otool", arch_params, "-v", "-s", "__TEXT", "__textcoal_nt",
+             file_name])).split("\n")
     else:
-        content = subprocess.check_output(flatten(["otool", arch_params, "-l", file_name])).split("\n")
+        content = subprocess.check_output(
+            flatten(["otool", arch_params, "-l", file_name])).split("\n")
 
     sect_name = None
     curr_func = None
@@ -135,7 +147,8 @@ def read_sizes(sizes, file_name, function_details, group_by_prefix):
             section_match = section_pattern.match(line)
             if label_match:
                 func_name = label_match.group(1)
-                add_function(sizes, curr_func, start_addr, end_addr, group_by_prefix)
+                add_function(sizes, curr_func, start_addr,
+                             end_addr, group_by_prefix)
                 curr_func = func_name
                 start_addr = None
                 end_addr = None
@@ -155,10 +168,12 @@ def compare_sizes(old_sizes, new_sizes, name_key, title):
     new_size = new_sizes[name_key]
     if old_size is not None and new_size is not None:
         if old_size != 0:
-            perc = "%.1f%%" % ((1.0 - float(new_size) / float(old_size)) * 100.0)
+            perc = "%.1f%%" % (
+                (1.0 - float(new_size) / float(old_size)) * 100.0)
         else:
             perc = "- "
-        print("%-26s%16s: %8d  %8d  %6s" % (title, name_key, old_size, new_size, perc))
+        print("%-26s%16s: %8d  %8d  %6s" %
+              (title, name_key, old_size, new_size, perc))
 
 
 def compare_sizes_of_file(old_files, new_files, all_sections, list_categories):
@@ -181,7 +196,8 @@ def compare_sizes_of_file(old_files, new_files, all_sections, list_categories):
     compare_sizes(old_sizes, new_sizes, "__text", title)
     if list_categories:
         prev = None
-        for category_name in sorted(prefixes.values()) + sorted(infixes.values()) + ["Unknown"]:
+        for category_name in sorted(prefixes.values()) + \
+                sorted(infixes.values()) + ["Unknown"]:
             if category_name != prev:
                 compare_sizes(old_sizes, new_sizes, category_name, "")
             prev = category_name
@@ -241,20 +257,24 @@ def compare_function_sizes(old_files, new_files):
     if only_in_file1:
         print("Only in old file(s)")
         print(os.linesep.join(list_function_sizes(only_in_file1)))
-        print("Total size of functions only in old file: {}".format(only_in_file1size))
+        print("Total size of functions only in old file: {}".format(
+            only_in_file1size))
         print()
 
     if only_in_file2:
         print("Only in new files(s)")
         print(os.linesep.join(list_function_sizes(only_in_file2)))
-        print("Total size of functions only in new file: {}".format(only_in_file2size))
+        print("Total size of functions only in new file: {}".format(
+            only_in_file2size))
         print()
 
     if in_both:
         size_increase = 0
         size_decrease = 0
         print("%8s %8s %8s" % ("old", "new", "diff"))
-        for triple in sorted(in_both, key=lambda tup: (tup[2] - tup[1], tup[1])):
+        for triple in sorted(
+                in_both,
+                key=lambda tup: (tup[2] - tup[1], tup[1])):
             func = triple[0]
             old_size = triple[1]
             new_size = triple[2]
@@ -265,8 +285,13 @@ def compare_function_sizes(old_files, new_files):
                 size_decrease -= diff
             if diff == 0:
                 in_both_size += new_size
-            print("%8d %8d %8d %s" % (old_size, new_size, new_size - old_size, func))
-        print("Total size of functions with the same size in both files: {}".format(in_both_size))
-        print("Total size of functions that got smaller: {}".format(size_decrease))
-        print("Total size of functions that got bigger: {}".format(size_increase))
-        print("Total size change of functions present in both files: {}".format(size_increase - size_decrease))
+            print("%8d %8d %8d %s" %
+                  (old_size, new_size, new_size - old_size, func))
+        print("Total size of functions " +
+              "with the same size in both files: {}".format(in_both_size))
+        print("Total size of functions " +
+              "that got smaller: {}".format(size_decrease))
+        print("Total size of functions " +
+              "that got bigger: {}".format(size_increase))
+        print("Total size change of functions present " +
+              "in both files: {}".format(size_increase - size_decrease))

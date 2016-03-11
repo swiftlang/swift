@@ -726,7 +726,8 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
                                    SGFContext::AllowImmediatePlusZero)
         .getAsSingleValue(SGF, loc);
     else
-      self = SGF.emitLValueForDecl(loc, selfDecl, src.getType(),
+      self = SGF.emitLValueForDecl(loc, selfDecl,
+                                   src.getType()->getCanonicalType(),
                                    AccessKind::Write,
                                    AccessSemantics::DirectToStorage);
 

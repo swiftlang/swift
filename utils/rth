@@ -92,7 +92,9 @@ class ResilienceTest(object):
             for config2 in self.config_dir_map:
                 # --no-backward-deployment skips testing a new application
                 # linked against an old library.
-                if config1 == "BEFORE" and config2 == "AFTER" and self.no_backward_deployment:
+                if config1 == "BEFORE" and \
+                   config2 == "AFTER" and \
+                   self.no_backward_deployment:
                     continue
 
                 yield (config1, config2)

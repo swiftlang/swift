@@ -24,7 +24,8 @@ class Result(object):
         self.name = name
         self.status = status
         self.output = output
-        self.is_xfailed = any((re.match(x, self.name) is not None for x in xfail_list))
+        self.is_xfailed = any(
+            (re.match(x, self.name) is not None for x in xfail_list))
 
     def is_failure(self):
         return self.get_result() in ['FAIL', 'XPASS']
@@ -51,7 +52,7 @@ class Result(object):
         return self.data
 
     def merge_in_extra_data(self, d):
-        """Rather than modifying the extra data dict, just return it as a no-op"""
+        """Rather than modifying the extra data dict, return it as a no-op"""
         return d
 
     def print_data(self, max_test_len):
@@ -67,8 +68,10 @@ BenchmarkDriver_OptLevels = ['Onone', 'O', 'Ounchecked']
 
 class BenchmarkDriver(object):
 
-    def __init__(self, binary_dir, xfail_list, enable_parallel=False, opt_levels=BenchmarkDriver_OptLevels):
-        self.targets = [(os.path.join(binary_dir, 'Benchmark_%s' % o), o) for o in opt_levels]
+    def __init__(self, binary_dir, xfail_list, enable_parallel=False,
+                 opt_levels=BenchmarkDriver_OptLevels):
+        self.targets = [(os.path.join(binary_dir, 'Benchmark_%s' % o), o)
+                        for o in opt_levels]
         self.xfail_list = xfail_list
         self.enable_parallel = enable_parallel
         self.data = None
@@ -85,7 +88,8 @@ class BenchmarkDriver(object):
 
     def run_for_opt_level(self, binary, opt_level, test_filter):
         print("testing driver at path: %s" % binary)
-        names = [n.strip() for n in subprocess.check_output([binary, "--list"]).split()[2:]]
+        names = [n.strip() for n in subprocess.check_output(
+            [binary, "--list"]).split()[2:]]
         if test_filter:
             regex = re.compile(test_filter)
             names = [n for n in names if regex.match(n)]
@@ -111,7 +115,12 @@ class BenchmarkDriver(object):
             acc['extra_data'] = r.merge_in_extra_data(acc['extra_data'])
             return acc
 
-        return reduce(reduce_results, results, {'result': [], 'has_failure': False, 'max_test_len': 0, 'extra_data': {}})
+        return reduce(reduce_results, results, {
+            'result': [],
+            'has_failure': False,
+            'max_test_len': 0,
+            'extra_data': {}
+        })
 
     def print_data(self, data, max_test_len):
         print("Results:")
@@ -121,7 +130,9 @@ class BenchmarkDriver(object):
                 r.print_data(max_test_len)
 
     def run(self, test_filter=None):
-        self.data = [self.run_for_opt_level(binary, opt_level, test_filter) for binary, opt_level in self.targets]
+        self.data = [
+            self.run_for_opt_level(binary, opt_level, test_filter)
+            for binary, opt_level in self.targets]
         max_test_len = reduce(max, [d['max_test_len']for d in self.data])
         has_failure = reduce(max, [d['has_failure']for d in self.data])
         self.print_data(self.data, max_test_len)

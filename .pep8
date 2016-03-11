@@ -1,3 +1,4 @@
 [flake8]
 filename = *.py,Benchmark_Driver,Benchmark_DTrace.in,Benchmark_GuardMalloc.in,Benchmark_RuntimeLeaksRunner.in,build-script,gyb,line-directive,ns-html2rst,recursive-lipo,rth,submit-benchmark-results,update-checkout,viewcfg
-ignore = D100,D101,D102,D103,D104,D105,E402,E501
+ignore = D100,D101,D102,D103,D104,D105,E402
+max-line-length = 80

@@ -15,6 +15,8 @@
 // RUN: not %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5OuterP1_12PrivateInner
 // RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_test5OuterP33_5CB4BCC03C4B9CB2AEEDDFF10FE7BD1E12PrivateInner
 // RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtCC14swift_ide_testP33_5CB4BCC03C4B9CB2AEEDDFF10FE7BD1E12PrivateOuter5Inner
+// RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_Tta14swift_ide_testP33_5CB4BCC03C4B9CB2AEEDDFF10FE7BD1E16PrivateTypealias
+// RUN: %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_TtaC14swift_ide_test5OuterP33_5CB4BCC03C4B9CB2AEEDDFF10FE7BD1E16PrivateTypealias
 
 // RUN: %target-swiftc_driver -emit-module -o %t %s %S/Inputs/lookup_other.swift -module-name Lookup
 // RUN: echo 'import Lookup' > %t/test.swift
@@ -31,9 +33,12 @@ private struct PrivateStruct {
   let fromMainFile: Int
 }
 
+private typealias PrivateTypealias = Int
+
 class Outer {
   class Inner {}
   private class PrivateInner {}
+  private typealias PrivateTypealias = Int
 }
 
 private class PrivateOuter {

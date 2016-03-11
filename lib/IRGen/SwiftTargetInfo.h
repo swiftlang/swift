@@ -44,6 +44,13 @@ public:
     return ObjCUseISAMask;
   }
 
+  /// True if the ObjC runtime for the chosen platform has opaque ISAs.  This
+  /// means that even masking the ISA may not return a pointer value.  The ObjC
+  /// runtime should be used for all accesses to get the ISA from a value.
+  bool hasOpaqueISAs() const {
+    return ObjCHasOpaqueISAs;
+  }
+
   /// The target's object format type.
   llvm::Triple::ObjectFormatType OutputObjectFormat;
   
@@ -83,6 +90,7 @@ public:
   bool ObjCUseFPRet = false;
   bool ObjCUseFP2Ret = false;
   bool ObjCUseISAMask = false;
+  bool ObjCHasOpaqueISAs = false;
   
   /// The value stored in a Builtin.once predicate to indicate that an
   /// initialization has already happened, if known.

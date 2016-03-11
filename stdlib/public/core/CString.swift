@@ -57,7 +57,7 @@ extension String {
   public static func decodeCString<Encoding : UnicodeCodec>(
     cString: UnsafePointer<Encoding.CodeUnit>,
     as encoding: Encoding.Type,
-    repairingInvalidCodeUnits isReparing: Bool = true)
+    repairingInvalidCodeUnits isRepairing: Bool = true)
       -> (result: String, repairsMade: Bool)? {
 
     if cString._isNull {
@@ -68,7 +68,7 @@ extension String {
       start: cString, count: len)
 
     let (stringBuffer, hadError) = _StringBuffer.fromCodeUnits(
-      buffer, encoding: encoding, repairIllFormedSequences: isReparing)
+      buffer, encoding: encoding, repairIllFormedSequences: isRepairing)
     return stringBuffer.map {
       (result: String(_storage: $0), repairsMade: hadError)
     }

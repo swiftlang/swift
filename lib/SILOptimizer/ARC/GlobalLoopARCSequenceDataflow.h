@@ -110,6 +110,11 @@ public:
   /// Remove \p I from the interesting instruction list of its parent block.
   void removeInterestingInst(SILInstruction *I);
 
+  /// Clear the folding node set of the set factory we have stored internally.
+  void clearSetFactory() {
+    SetFactory.clear();
+  }
+
 private:
   /// Merge in the BottomUp state of any successors of DataHandle.getBB() into
   /// DataHandle.getState().

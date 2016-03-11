@@ -345,7 +345,7 @@ func testExplicitlyBridged() {
   let roundTripBridgedSwifts
     = Swift._forceBridgeFromObjectiveC(bridgedSwiftsAsNSArray, 
                                        [BridgedSwift].self)
-  // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
+  // CHECK-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
   // CHECK-NEXT: [BridgedSwift#[[id10:[0-9]+]](42), BridgedSwift#[[id11:[0-9]+]](17)]
   print("roundTripBridgedSwifts = \(roundTripBridgedSwifts))")
 
@@ -355,8 +355,8 @@ func testExplicitlyBridged() {
   // ...and bridge *that* back
   let bridgedBackSwifts
     = Swift._forceBridgeFromObjectiveC(cocoaBridgedSwifts, [BridgedSwift].self)
-  // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
-  // CHECK-NEXT-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
+  // CHECK-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
+  // CHECK-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
   // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]
   print("bridgedBackSwifts      = \(bridgedBackSwifts)")
   

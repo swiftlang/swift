@@ -81,10 +81,13 @@ def run():
         )
 
         error_pattern = re.compile(
-            '^(' + '|'.join(re.escape(s) for s in sources) + '):([0-9]+):([0-9]+):(.*)')
+            '^(' + '|'.join(re.escape(s) for s in sources) +
+            '):([0-9]+):([0-9]+):(.*)')
 
         assertion_pattern = re.compile(
-            '^(.*)(: file| at|#[0-9]+:) (' + '|'.join(re.escape(s) for s in sources) + ')(, line |:)([0-9]+)(.*)')
+            '^(.*)(: file| at|#[0-9]+:) (' +
+            '|'.join(re.escape(s) for s in sources) +
+            ')(, line |:)([0-9]+)(.*)')
 
         while True:
             line = command.stdout.readline()
@@ -94,12 +97,15 @@ def run():
             m = error_pattern.match(l)
             if m:
                 file, line_num = map_line(m.group(1), int(m.group(2)))
-                line = '%s:%s:%s:%s\n' % (file, line_num, int(m.group(3)), m.group(4))
+                line = '%s:%s:%s:%s\n' % (
+                    file, line_num, int(m.group(3)), m.group(4))
             else:
                 m = assertion_pattern.match(l)
                 if m:
                     file, line_num = map_line(m.group(3), int(m.group(5)))
-                    line = '%s%s %s%s%s%s\n' % (m.group(1), m.group(2), file, m.group(4), line_num, m.group(6))
+                    line = '%s%s %s%s%s%s\n' % (
+                        m.group(1), m.group(2), file, m.group(4), line_num,
+                        m.group(6))
             sys.stdout.write(line)
 
         sys.exit(command.wait())

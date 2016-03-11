@@ -24,7 +24,7 @@ public protocol ApproximateCountableSequence : Sequence {
   var approximateCount: ApproximateCount { get }
 }
 
-/// A collection that provides an efficient way to spilt its index ranges.
+/// A collection that provides an efficient way to split its index ranges.
 public protocol SplittableCollection : Collection {
   // We need this protocol so that collections with only forward or bidirectional
   // traversals could customize their splitting behavior.

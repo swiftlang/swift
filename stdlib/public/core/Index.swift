@@ -1,4 +1,4 @@
-//===--- Index.swift - A position in a Collection ---------------------===//
+//===--- Index.swift - A position in a Collection -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

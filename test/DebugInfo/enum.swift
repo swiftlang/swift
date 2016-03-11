@@ -6,6 +6,7 @@
 // CHECK-SAME:             size: 8, align: 8,
 // CHECK-SAME:             identifier: "_TtO4enum5Color"
 enum Color : UInt64 {
+// This is effectively a 2-bit bitfield:
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "Red"
 // CHECK-SAME:           baseType: !"_TtVs6UInt64"
 // CHECK-SAME:           size: 8, align: 8{{[,)]}}
@@ -18,12 +19,11 @@ enum Color : UInt64 {
 // CHECK-SAME:             identifier: "_TtO4enum12MaybeIntPair"
 enum MaybeIntPair {
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "none"
-// CHECK-SAME:           baseType: !"_TtSi"
-// CHECK-SAME:           size: 136, align: 64{{[,)]}}
+// CHECK-SAME:           baseType: !"_TtSi", align: 8{{[,)]}}
   case none
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "just"
 // CHECK-SAME:           baseType: !"_TtTVs5Int64S__"
-// CHECK-SAME:           size: 136, align: 64{{[,)]}}
+// CHECK-SAME:           size: 128, align: 64{{[,)]}}
   case just(Int64, Int64)
 }
 

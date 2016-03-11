@@ -565,6 +565,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_CDecl:
   case DAK_SILGenName: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -601,9 +602,16 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
     }
 
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) SILGenNameAttr(AsmName.getValue(), AtLoc,
+    if (!DiscardAttribute) {
+      if (DK == DAK_SILGenName)
+        Attributes.add(new (Context) SILGenNameAttr(AsmName.getValue(), AtLoc,
+                                                AttrRange, /*Implicit=*/false));
+      else if (DK == DAK_CDecl)
+        Attributes.add(new (Context) CDeclAttr(AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
+      else
+        llvm_unreachable("out of sync with switch");
+    }
 
     break;
   }
@@ -1738,9 +1746,9 @@ bool Parser::isStartOfDecl() {
   if (!isKeywordPossibleDeclStart(Tok)) return false;
 
   // When 'init' appears inside another 'init', it's likely the user wants to
-  // invoke a initializer but forgets to prefix it with 'self.' or 'super.'
+  // invoke an initializer but forgets to prefix it with 'self.' or 'super.'
   // Otherwise, expect 'init' to be the start of a declaration (and complain
-  // when the expectation is not fullfilled).
+  // when the expectation is not fulfilled).
   if (Tok.is(tok::kw_init)) {
     return !isa<ConstructorDecl>(CurDeclContext);
   }

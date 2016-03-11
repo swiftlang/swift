@@ -599,7 +599,8 @@ class Config(object):
         name = platform.system()
 
         if name == 'Darwin':
-            # The XPC service cannot run via the bindings due to permissions issue.
+            # The XPC service cannot run via the bindings due to permissions
+            # issue.
             # file = 'sourcekitd.framework/sourcekitd'
             file = 'libsourcekitdInProc.dylib'
         elif name == 'Windows':
