@@ -312,10 +312,12 @@ public protocol Collection : Indexable, Sequence {
 extension Collection {
   @inline(__always)
   public func _nextInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: tests.
     i = next(i)
   }
 
   public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
+    // FIXME: swift-3-indexing-model: tests.
     _precondition(
       bounds.startIndex <= index,
       "index is out of bounds: index designates a position before bounds.startIndex")
@@ -325,6 +327,7 @@ extension Collection {
   }
 
   public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
+    // FIXME: swift-3-indexing-model: tests.
     _precondition(
       bounds.startIndex <= range.startIndex,
       "range.startIndex is out of bounds: index designates a position before bounds.startIndex")
@@ -342,16 +345,19 @@ extension Collection {
 
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
+    // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n)
   }
 
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n, limit: limit)
   }
 
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
+    // FIXME: swift-3-indexing-model: tests.
     _precondition(start <= end,
       "Only BidirectionalCollections can have end come before start")
 
@@ -397,11 +403,12 @@ extension Collection {
   }
 }
 
-/// Supply optimized defaults for `Collection` models that use some model 
+/// Supply optimized defaults for `Collection` models that use some model
 /// of `Strideable` as their `Index`.
 extension Collection where Index : Strideable {
   @warn_unused_result
   public func next(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: tests.
     _failEarlyRangeCheck(i, bounds:startIndex..<endIndex)
 
     return i.advanced(by: 1)
