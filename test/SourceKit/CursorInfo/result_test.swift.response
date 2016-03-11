@@ -1,7 +1,7 @@
-source.lang.swift.ref.enumelement (7:10-7:17)
+source.lang.swift.ref.enumelement (11:10-11:17)
 Success
-s:FO11result_test10ResultTest7Successu0_R_s9ErrorTyperFMGS0_xq__FxGS0_xq__
-<Value, Error : ErrorType> ResultTest<Value, Error>.Type -> (Value) -> ResultTest<Value, Error>
+s:FO11result_test10ResultTest7Successu0_R_S_11MyErrorTyperFMGS0_xq__FxGS0_xq__
+<Value, Error : MyErrorType> ResultTest<Value, Error>.Type -> (Value) -> ResultTest<Value, Error>
 <Declaration></Declaration>
 OVERRIDES BEGIN
 OVERRIDES END

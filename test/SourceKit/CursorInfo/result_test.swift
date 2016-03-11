@@ -1,9 +1,13 @@
-// RUN: %sourcekitd-test -req cursor -offset 441 %s -- -serialize-diagnostics -serialize-diagnostics-path %t.dia %s | %sed_clean > %t.response
+// RUN: %sourcekitd-test -req cursor -pos 17:15 %s -- %s >%t.response
 // RUN: diff -u %s.response %t.response
 
-import Foundation
+public protocol MyErrorType {
+}
 
-public enum ResultTest<Value, Error: ErrorType> {
+enum MyErrorEnum: MyErrorType {
+}
+
+public enum ResultTest<Value, Error: MyErrorType> {
     case Success(Value)
     case Failure(Error)
 
