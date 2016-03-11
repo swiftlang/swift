@@ -14,6 +14,7 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Fallthrough.h"
@@ -23,18 +24,54 @@
 using namespace swift;
 using namespace Lowering;
 
+/// Bridge the given Swift value to its corresponding Objective-C
+/// object, using the appropriate witness for the
+/// _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
+static Optional<ManagedValue> emitBridgeToObjectiveC(SILGenFunction &gen,
+                                                     SILLocation loc,
+                                                     ManagedValue swiftValue) {
+  // Dig out the nominal type we're bridging from.
+  Type swiftValueType = swiftValue.getSwiftType()->getRValueType();
+
+  // Dig out its conformance to _ObjectiveCBridgeable.
+  auto conformance =
+      gen.SGM.getConformanceToObjectiveCBridgeable(loc, swiftValueType);
+  if (!conformance) return None;
+
+  // Find the _bridgeToObjectiveC requirement.
+  auto requirement = gen.SGM.getBridgeToObjectiveCRequirement(loc);
+  if (!requirement) return None;
+
+  // Retrieve the _bridgeToObjectiveC witness.
+  auto witness = conformance->getWitness(requirement, nullptr);
+  assert(witness);
+
+  // Determine the type we're bridging to.
+  auto objcTypeReq = gen.SGM.getBridgedObjectiveCTypeRequirement(loc);
+  if (!objcTypeReq) return None;
+
+  Type objcType =
+      conformance->getTypeWitness(objcTypeReq, nullptr).getReplacement();
+  if (!objcTypeReq) return None;
+
+  // Create a reference to the witness.
+  SILDeclRef witnessConstant(witness.getDecl());
+  auto witnessRef = gen.emitGlobalFunctionRef(loc, witnessConstant);
+
+  // Call the witness.
+  SILType resultTy = gen.getLoweredType(objcType);
+  SILValue bridgedValue = gen.B.createApply(loc, witnessRef,
+                                            witnessRef->getType(),
+                                            resultTy,
+                                            witness.getSubstitutions(),
+                                            swiftValue.forward(gen));
+  return gen.emitManagedRValueWithCleanup(bridgedValue);
+}
+
 static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
                                                SILLocation loc,
                                                ManagedValue str) {
-  // func _convertStringToNSString(String) -> NSString
-  SILValue stringToNSStringFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringToNSStringFn());
-
-  SILValue nsstr = gen.B.createApply(loc, stringToNSStringFn,
-                           stringToNSStringFn->getType(),
-                           gen.getLoweredType(gen.SGM.Types.getNSStringType()),
-                           {}, str.forward(gen));
-  return gen.emitManagedRValueWithCleanup(nsstr);
+  llvm_unreachable("Handled via the _bridgeToObjectiveC witness");
 }
 
 static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
@@ -342,6 +379,16 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   CanType loweredNativeTy = v.getType().getSwiftRValueType();
   if (loweredNativeTy == loweredBridgedTy)
     return v;
+
+  // FIXME: Handle this via an _ObjectiveCBridgeable query rather than
+  // hardcoding String -> NSString.
+  if (loweredNativeTy == gen.SGM.Types.getStringType()
+      && loweredBridgedTy == gen.SGM.Types.getNSStringType()) {
+    if (auto result = emitBridgeToObjectiveC(gen, loc, v))
+      return *result;
+
+    return gen.emitUndef(loc, bridgedTy);
+  }
 
   // If the input is a native type with a bridged mapping, convert it.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \

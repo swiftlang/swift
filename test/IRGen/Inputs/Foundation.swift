@@ -31,6 +31,31 @@ func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
+extension String : _ObjectiveCBridgeable {
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+
+  public static func _getObjectiveCType() -> Any.Type {
+    return NSString.self
+  }
+  public func _bridgeToObjectiveC() -> NSString {
+    return NSString()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    x: NSString,
+    result: inout String?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSString,
+    result: inout String?
+  ) -> Bool {
+    return true
+  }
+}
+
+
 extension NSError: ErrorProtocol {
   public var _domain: String { return domain }
   public var _code: Int { return code }

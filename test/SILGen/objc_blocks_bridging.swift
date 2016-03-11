@@ -119,7 +119,7 @@ func clearDraggingItemImageComponentsProvider(x: NSDraggingItem) {
 
 // CHECK-LABEL: sil hidden @{{.*}}bridgeNonnullBlockResult{{.*}}
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oSS_XFdCb__aGSqCSo8NSString__
-// CHECK:         [[CONVERT:%.*]] = function_ref @swift_StringToNSString
+// CHECK:         [[CONVERT:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:         [[BRIDGED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:         return [[OPTIONAL_BRIDGED]]

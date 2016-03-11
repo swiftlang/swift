@@ -123,7 +123,11 @@ public:
   Optional<SILDeclRef> ErrorProtocolToNSErrorFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
-  
+
+  Optional<ProtocolDecl*> ObjectiveCBridgeable;
+  Optional<FuncDecl*> BridgeToObjectiveCRequirement;
+  Optional<AssociatedTypeDecl*> BridgedObjectiveCType;
+
 public:
   SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile);
   ~SILGenModule();
@@ -348,6 +352,20 @@ public:
   SILDeclRef getNSErrorToErrorProtocolFn();
   SILDeclRef getErrorProtocolToNSErrorFn();
   
+  /// Retrieve the _ObjectiveCBridgeable protocol definition.
+  ProtocolDecl *getObjectiveCBridgeable(SILLocation loc);
+
+  /// Retrieve the _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
+  FuncDecl *getBridgeToObjectiveCRequirement(SILLocation loc);
+
+  /// Retrieve the _ObjectiveCBridgeable._ObjectiveCType requirement.
+  AssociatedTypeDecl *getBridgedObjectiveCTypeRequirement(SILLocation loc);
+
+  /// Find the conformance of the given Swift type to the
+  /// _ObjectiveCBridgeable protocol.
+  ProtocolConformance *getConformanceToObjectiveCBridgeable(SILLocation loc,
+                                                            Type type);
+
   /// Report a diagnostic.
   template<typename...T, typename...U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,

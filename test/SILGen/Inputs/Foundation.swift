@@ -104,10 +104,10 @@ extension Array : _ObjectiveCBridgeable {
     x: NSArray,
     result: inout Array?
   ) -> Bool {
-    return nil
+    return true
   }
   public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(T.self)
+    return Swift._isBridgedToObjectiveC(Element.self)
   }
 }
 
@@ -130,7 +130,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     return true
   }
   public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(T.self)
+    return Swift._isBridgedToObjectiveC(Key.self) && Swift._isBridgedToObjectiveC(Value.self)
   }
 }
 

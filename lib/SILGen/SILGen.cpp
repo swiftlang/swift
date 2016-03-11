@@ -160,6 +160,96 @@ GET_BRIDGING_FN(Foundation, OPTIONAL, NSDictionary, GENERIC, Dictionary)
 #undef OPTIONAL
 #undef GENERIC
 
+ProtocolDecl *SILGenModule::getObjectiveCBridgeable(SILLocation loc) {
+  if (ObjectiveCBridgeable)
+    return *ObjectiveCBridgeable;
+
+  // Find the _ObjectiveCBridgeable protocol.
+  auto &ctx = getASTContext();
+  auto proto = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
+  if (!proto)
+    diagnose(loc, diag::bridging_objcbridgeable_missing);
+
+  ObjectiveCBridgeable = proto;
+  return proto;
+}
+
+FuncDecl *SILGenModule::getBridgeToObjectiveCRequirement(SILLocation loc) {
+  if (BridgeToObjectiveCRequirement)
+    return *BridgeToObjectiveCRequirement;
+
+  // Find the _ObjectiveCBridgeable protocol.
+  auto proto = getObjectiveCBridgeable(loc);
+  if (!proto) {
+    BridgeToObjectiveCRequirement = nullptr;
+    return nullptr;
+  }
+
+  // Look for _bridgeToObjectiveC().
+  auto &ctx = getASTContext();
+  FuncDecl *found = nullptr;
+  DeclName name(ctx, ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
+  for (auto member : proto->lookupDirect(name, true)) {
+    if (auto func = dyn_cast<FuncDecl>(member)) {
+      found = func;
+      break;
+    }
+  }
+
+  if (!found)
+    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+
+  BridgeToObjectiveCRequirement = found;
+  return found;
+}
+
+AssociatedTypeDecl *
+SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
+  if (BridgedObjectiveCType)
+    return *BridgedObjectiveCType;
+
+  // Find the _ObjectiveCBridgeable protocol.
+  auto proto = getObjectiveCBridgeable(loc);
+  if (!proto) {
+    BridgeToObjectiveCRequirement = nullptr;
+    return nullptr;
+  }
+
+  // Look for _bridgeToObjectiveC().
+  auto &ctx = getASTContext();
+  AssociatedTypeDecl *found = nullptr;
+  DeclName name(ctx.getIdentifier("_ObjectiveCType"));
+  for (auto member : proto->lookupDirect(name, true)) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      found = assocType;
+      break;
+    }
+  }
+
+  if (!found)
+    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+
+  BridgedObjectiveCType = found;
+  return found;
+}
+
+ProtocolConformance *
+SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
+  auto proto = getObjectiveCBridgeable(loc);
+  if (!proto) return nullptr;
+
+  // Find the conformance to _ObjectiveCBridgeable.
+  auto result = SwiftModule->lookupConformance(type, proto, nullptr);
+  switch (result.getInt()) {
+  case ConformanceKind::Conforms:
+    return result.getPointer();
+
+  case ConformanceKind::DoesNotConform:
+  case ConformanceKind::UncheckedConforms:
+    return nullptr;
+  }
+}
+
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
   auto extInfo = SILFunctionType::ExtInfo()
