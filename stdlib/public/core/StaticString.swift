@@ -91,7 +91,9 @@ public struct StaticString
     return Int(_utf8CodeUnitCount)
   }
 
-  /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units.
+  /// `true` [iff] `self` stores a pointer to ASCII or UTF-8 code units.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @_transparent
   public var hasPointerRepresentation: Bool {
     return (UInt8(_flags) & 0x1) == 0

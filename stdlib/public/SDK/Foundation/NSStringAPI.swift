@@ -614,7 +614,9 @@ extension String {
   /// - Parameter leftover: The remaining range. Pass `nil` If you do
   ///   not need this value.
   ///
-  /// - Returns: `true` iff some characters were converted.
+  /// - Returns: `true` [iff] some characters were converted.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   ///
   /// - Note: Conversion stops when the buffer fills or when the
   ///   conversion isn't possible due to the chosen encoding.
@@ -1643,8 +1645,10 @@ extension String {
   // No need to make these unavailable on earlier OSes, since they can
   // forward trivially to rangeOfString.
 
-  /// Returns `true` iff `other` is non-empty and contained within
+  /// Returns `true` [iff] `other` is non-empty and contained within
   /// `self` by case-sensitive, non-literal search.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   ///
   /// Equivalent to `self.rangeOfString(other) != nil`
   @warn_unused_result
@@ -1656,9 +1660,11 @@ extension String {
     return r
   }
   
-  /// Returns `true` iff `other` is non-empty and contained within
+  /// Returns `true` [iff] `other` is non-empty and contained within
   /// `self` by case-insensitive, non-literal search, taking into
   /// account the current locale.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   ///
   /// Locale-independent case-insensitive operation, and other needs,
   /// can be achieved by calling

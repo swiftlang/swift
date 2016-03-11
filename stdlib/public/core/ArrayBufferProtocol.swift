@@ -49,8 +49,10 @@ public protocol _ArrayBufferProtocol : MutableCollection {
     minimumCapacity minimumCapacity: Int
   ) -> _ContiguousArrayBuffer<Element>?
 
-  /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
+  /// Returns `true` [iff] this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   ///
   /// - Note: This function must remain mutating; otherwise the buffer
   ///   may acquire spurious extra references, which will cause

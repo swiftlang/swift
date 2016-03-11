@@ -265,33 +265,43 @@ extension ${Self} : FloatingPoint {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
 
-  /// `true` iff `self` is negative.
+  /// `true` [iff] `self` is negative.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isSignMinus: Bool {
     return __getSignBit() == 1
   }
 
-  /// `true` iff `self` is normal (not zero, subnormal, infinity, or
+  /// `true` [iff] `self` is normal (not zero, subnormal, infinity, or
   /// NaN).
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isNormal:  Bool {
     let biasedExponent = __getBiasedExponent()
     return biasedExponent != ${getInfinityExponent(bits)} &&
            biasedExponent != 0
   }
 
-  /// `true` iff `self` is zero, subnormal, or normal (not infinity
+  /// `true` [iff] `self` is zero, subnormal, or normal (not infinity
   /// or NaN).
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isFinite:  Bool {
     return __getBiasedExponent() != ${getInfinityExponent(bits)}
   }
 
-  /// `true` iff `self` is +0.0 or -0.0.
+  /// `true` [iff] `self` is +0.0 or -0.0.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isZero:  Bool {
     // Mask out the sign bit.
     let mask: _BitsType = (1 << (${bits} - 1)) - 1
     return (_toBitPattern() & mask) == 0
   }
 
-  /// `true` iff `self` is subnormal.
+  /// `true` [iff] `self` is subnormal.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isSubnormal:  Bool {
     if __getBiasedExponent() == 0 {
       return __getSignificand() != 0
@@ -307,7 +317,9 @@ extension ${Self} : FloatingPoint {
     // condition is going to be faster.
   }
 
-  /// `true` iff `self` is infinity.
+  /// `true` [iff] `self` is infinity.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isInfinite:  Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       return __getSignificand() == 0
@@ -318,7 +330,9 @@ extension ${Self} : FloatingPoint {
     // return abs(self) == ${Self}.infinity()
   }
 
-  /// `true` iff `self` is NaN.
+  /// `true` [iff] `self` is NaN.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isNaN:  Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       return __getSignificand() != 0
@@ -329,7 +343,9 @@ extension ${Self} : FloatingPoint {
     // return self != self
   }
 
-  /// `true` iff `self` is a signaling NaN.
+  /// `true` [iff] `self` is a signaling NaN.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isSignaling: Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       // IEEE-754R 2008 6.2.1: A signaling NaN bit string should be encoded

@@ -213,8 +213,10 @@ public protocol IntegerType
   var countRepresentedWords: Word { get }
 
   /// Replace as many bits as possible of the `n`th UWord of our
-  /// representation with newBits, returning `true` iff all of the
+  /// representation with newBits, returning `true` [iff] all of the
   /// bits were replaced.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   mutating func replaceUWord(n: Word, with newBits: UWord) -> Bool
   
   init<T : IntegerType>(_ source: T)

@@ -32,7 +32,9 @@ integerBinaryOps = [
 public protocol _IntegerArithmetic {
 % for name,_,Action,result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and a `Bool` that is
-  /// `true` iff the operation caused an arithmetic overflow.
+  /// `true` [iff] the operation caused an arithmetic overflow.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   static func ${name}WithOverflow(lhs: Self, _ rhs: Self) -> (Self, overflow: Bool)
 % end
 }

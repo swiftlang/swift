@@ -1274,8 +1274,10 @@ public:
     return !solverState || solverState->recordFixes;
   }
 
-  /// \brief Log and record the application of the fix. Return true iff any
+  /// \brief Log and record the application of the fix. Return true [iff] any
   /// subsequent solution would be worse than the best known solution.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   bool recordFix(Fix fix, ConstraintLocatorBuilder locator);
   
   /// \brief Try to salvage the constraint system by applying (speculative)

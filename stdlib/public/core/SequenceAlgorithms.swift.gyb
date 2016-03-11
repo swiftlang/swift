@@ -125,18 +125,22 @@ extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 %{
 if preds:
   comment = """
-  /// Returns `true` iff `self` begins with elements equivalent to those of
+  /// Returns `true` [iff] `self` begins with elements equivalent to those of
   /// `other`, using `isEquivalent` as the equivalence test.  Returns `true` if
   /// `other` is empty.
   ///
   /// - Precondition: `isEquivalent` is an
   ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Returns `true` iff the initial elements of `self` are equal to `prefix`.
+  /// Returns `true` [iff] the initial elements of `self` are equal to `prefix`.
   /// Returns `true` if `other` is empty."""
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   rethrows_ = ""
 }%
   ${comment}
@@ -179,16 +183,20 @@ extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 %{
 if preds:
   comment = """
-  /// Returns `true` iff `self` and `other` contain equivalent elements, using
+  /// Returns `true` [iff] `self` and `other` contain equivalent elements, using
   /// `isEquivalent` as the equivalence test.
   ///
   /// - Precondition: `isEquivalent` is an
   ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Returns `true` iff `self` and `other` contain the same elements in the
+  /// Returns `true` [iff] `self` and `other` contain the same elements in the
   /// same order."""
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   rethrows_ = ""
 }%
 
@@ -235,7 +243,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 %{
 if preds:
   comment = """
-  /// Returns `true` iff `self` precedes `other` in a lexicographical 
+  /// Returns `true` [iff] `self` precedes `other` in a lexicographical 
   /// ("dictionary") ordering, using `isOrderedBefore` as the comparison 
   /// between elements.
   ///
@@ -247,16 +255,20 @@ if preds:
   /// - Precondition: `isOrderedBefore` is a
   ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   ///   over the elements of `self` and `other`."""
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Returns `true` iff `self` precedes `other` in a lexicographical
+  /// Returns `true` [iff] `self` precedes `other` in a lexicographical
   /// ("dictionary") ordering, using "<" as the comparison between elements.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting strings
   ///   to present to the end-user, you should use `String` APIs that perform
   /// localized comparison."""
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   rethrows_ = ""
 }%
 
@@ -298,7 +310,9 @@ else:
 //===----------------------------------------------------------------------===//
 
 extension Sequence where Iterator.Element : Equatable {
-  /// Returns `true` iff `element` is in `self`.
+  /// Returns `true` [iff] `element` is in `self`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func contains(element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
@@ -315,7 +329,9 @@ extension Sequence where Iterator.Element : Equatable {
 }
 
 extension Sequence {
-  /// Returns `true` iff an element in `self` satisfies `predicate`.
+  /// Returns `true` [iff] an element in `self` satisfies `predicate`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func contains(
     @noescape predicate: (${GElement}) throws -> Bool

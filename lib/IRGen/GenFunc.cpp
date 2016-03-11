@@ -3467,7 +3467,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   assert((subs.empty() != hasPolymorphicParameters(origType) ||
          (subs.empty() && origType->getRepresentation() ==
              SILFunctionTypeRepresentation::WitnessMethod))
-         && "should have substitutions iff original function is generic");
+         && "should have substitutions if and only if original function is generic");
   WitnessMetadata witnessMetadata;
   if (hasPolymorphicParameters(origType)) {
     emitPolymorphicArguments(subIGF, origType, substType, subs,

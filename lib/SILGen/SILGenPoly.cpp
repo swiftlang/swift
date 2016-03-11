@@ -34,8 +34,10 @@
 // payload together with type metadata and witness tables.
 //
 // Between function types, the type A -> B is defined to be a subtype of
-// A' -> B' iff A' is a subtype of A, and B is a subtype of B' -- parameters
+// A' -> B' [iff] A' is a subtype of A, and B is a subtype of B' -- parameters
 // are contravariant, and results are covariant.
+//
+// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 //
 // A subtype conversion of a function value A -> B is performed by wrapping
 // the function value in a thunk of type A' -> B'. The thunk takes an A' and

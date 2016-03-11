@@ -156,13 +156,17 @@ extension String {
         }
       }
 
-      /// True iff the index is at the end of its view or if the next
+      /// True [iff] the index is at the end of its view or if the next
       /// byte begins a new UnicodeScalar.
+      ///
+      /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
       internal var _isOnUnicodeScalarBoundary : Bool {
         return UTF8._isValidUTF8(UInt32(truncatingBitPattern: _buffer)) || _isAtEnd
       }
 
-      /// True iff the index is at the end of its view
+      /// True [iff] the index is at the end of its view
+      ///
+      /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
       internal var _isAtEnd : Bool {
         return _buffer == Index._emptyBuffer
           && _coreIndex == _core.endIndex

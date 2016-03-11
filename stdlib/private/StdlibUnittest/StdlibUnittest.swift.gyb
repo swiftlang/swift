@@ -118,7 +118,9 @@ var _seenExpectCrash = false
 
 /// Run `body` and expect a failure to happen.
 ///
-/// The check passes iff `body` triggers one or more failures.
+/// The check passes [iff] `body` triggers one or more failures.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 public func expectFailure(${TRACE1}, body: () -> Void) {
   let startAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false

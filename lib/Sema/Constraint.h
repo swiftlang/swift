@@ -53,9 +53,11 @@ enum class ConstraintKind : char {
   Equal,
   /// \brief The first type is the type of a function parameter; the second
   /// type is the type of a reference to that parameter from within the
-  /// function body. Specifically, the left type is an inout type iff the right
+  /// function body. Specifically, the left type is an inout type [iff] the right
   /// type is an lvalue type with the same object type. Otherwise, the two
   /// types must be the same type.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   BindParam,
   /// \brief The first type is a subtype of the second type, i.e., a value
   /// of the type of the first type can be used wherever a value of the

@@ -164,7 +164,9 @@ public protocol Collection : Indexable, Sequence {
   @warn_unused_result
   func prefix(through position: Index) -> SubSequence
 
-  /// Returns `true` iff `self` is empty.
+  /// Returns `true` [iff] `self` is empty.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isEmpty: Bool { get }
 
   /// Returns the number of elements.
@@ -240,9 +242,11 @@ extension Collection where
 
 /// Default implementations of core requirements
 extension Collection {
-  /// Returns `true` iff `self` is empty.
+  /// Returns `true` [iff] `self` is empty.
   ///
   /// - Complexity: O(1)
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isEmpty: Bool {
     return startIndex == endIndex
   }

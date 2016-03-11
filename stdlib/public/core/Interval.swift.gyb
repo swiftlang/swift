@@ -15,7 +15,9 @@ public protocol Interval {
   /// The type of the `Interval`'s endpoints.
   associatedtype Bound : Comparable
 
-  /// Returns `true` iff the interval contains `value`.
+  /// Returns `true` [iff] the interval contains `value`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   func contains(value: Bound) -> Bool
 
@@ -24,7 +26,9 @@ public protocol Interval {
   @warn_unused_result
   func clamp(intervalToClamp: Self) -> Self
 
-  /// `true` iff `self` is empty.
+  /// `true` [iff] `self` is empty.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isEmpty: Bool { get }
 
 
@@ -101,7 +105,9 @@ public struct ${Self}<Bound : Comparable>
     return "${Self}(\(String(reflecting: start))${rangeOperator}\(String(reflecting: end)))"
   }
 
-  /// Returns `true` iff the `Interval` contains `x`.
+  /// Returns `true` [iff] the `Interval` contains `x`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func contains(x: Bound) -> Bool {
     return x >= start && x ${upperBoundCompare} end
@@ -149,22 +155,28 @@ public func == <Bound : Comparable> (
 %end
 
 extension HalfOpenInterval {
-  /// `true` iff the `Interval` is empty.
+  /// `true` [iff] the `Interval` is empty.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isEmpty: Bool {
     return end <= start
   }
 }
 
 extension ClosedInterval {
-  /// `true` iff the `Interval` is empty.  In the case of
+  /// `true` [iff] the `Interval` is empty.  In the case of
   /// `ClosedInterval`, always returns `false`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isEmpty: Bool {
     return false
   }
 }
 
 extension Interval {
-  /// Returns `true` iff `lhs` and `rhs` have a non-empty intersection.
+  /// Returns `true` [iff] `lhs` and `rhs` have a non-empty intersection.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func overlaps<
     I: Interval where I.Bound == Bound
@@ -190,7 +202,9 @@ public func ... <Bound : Comparable>(
   return ClosedInterval(_start: start, end: end)
 }
 
-/// Returns `true` iff `pattern` contains `value`.
+/// Returns `true` [iff] `pattern` contains `value`.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func ~= <I: Interval>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)

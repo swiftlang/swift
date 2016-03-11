@@ -20,7 +20,7 @@
 /// In a model of `SetAlgebra`, some elements may subsume other
 /// elements, where
 ///
-/// > `a` **subsumes** `b` iff `([a] as Self).isSupersetOf([b])`
+/// > `a` **subsumes** `b` [iff] `([a] as Self).isSupersetOf([b])`
 ///
 /// In many models of `SetAlgebra` such as `Set<Element>`, `a`
 /// *subsumes* `b` if and only if `a == b`, but that is not always the
@@ -41,10 +41,12 @@
 ///   - `x.union([]) == x`
 ///   - `x.contains(e)` implies `x.union(y).contains(e)`
 ///   - `x.union(y).contains(e)` implies `x.contains(e) || y.contains(e)`
-///   - `x.contains(e) && y.contains(e)` iff `x.intersect(y).contains(e)`
-///   - `x.isSubsetOf(y)` iff `y.isSupersetOf(x)`
-///   - `x.isStrictSupersetOf(y)` iff `x.isSupersetOf(y) && x != y`
-///   - `x.isStrictSubsetOf(y)` iff `x.isSubsetOf(y) && x != y`
+///   - `x.contains(e) && y.contains(e)` [iff] `x.intersect(y).contains(e)`
+///   - `x.isSubsetOf(y)` [iff] `y.isSupersetOf(x)`
+///   - `x.isStrictSupersetOf(y)` [iff] `x.isSupersetOf(y) && x != y`
+///   - `x.isStrictSubsetOf(y)` [iff] `x.isSubsetOf(y) && x != y`
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// A type for which `Self` provides a containment test.
   associatedtype Element
@@ -111,19 +113,27 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   @warn_unused_result
   func subtract(other: Self) -> Self
 
-  /// Returns `true` iff every element of `self` is contained in `other`.
+  /// Returns `true` [iff] every element of `self` is contained in `other`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   func isSubsetOf(other: Self) -> Bool
 
-  /// Returns `true` iff `self.intersect(other).isEmpty`.
+  /// Returns `true` [iff] `self.intersect(other).isEmpty`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   func isDisjointWith(other: Self) -> Bool
 
-  /// Returns `true` iff every element of `other` is contained in `self`.
+  /// Returns `true` [iff] every element of `other` is contained in `self`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   func isSupersetOf(other: Self) -> Bool
 
-  /// Returns `true` iff `self.contains(e)` is `false` for all `e`.
+  /// Returns `true` [iff] `self.contains(e)` is `false` for all `e`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isEmpty: Bool { get }
   
   /// Creates the set containing all elements of `sequence`.
@@ -134,17 +144,21 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// - Equivalent to replacing `self` with `self.subtract(other)`.
   mutating func subtractInPlace(other: Self)
 
-  /// Returns `true` iff `a` subsumes `b`.
+  /// Returns `true` [iff] `a` subsumes `b`.
   ///
   /// - Equivalent to `([a] as Self).isSupersetOf([b])`
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   static func element(a: Element, subsumes b: Element) -> Bool
 
-  /// Returns `true` iff `a` is disjoint with `b`.
+  /// Returns `true` [iff] `a` is disjoint with `b`.
   ///
   /// Two elements are disjoint when neither one subsumes the other.
   ///
   /// - SeeAlso: `Self.element(_, subsumes:_)`
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   static func element(a: Element, isDisjointWith b: Element) -> Bool
 }
@@ -180,19 +194,25 @@ extension SetAlgebra {
     self.intersectInPlace(self.exclusiveOr(other))
   }
 
-  /// Returns `true` iff every element of `self` is contained in `other`.
+  /// Returns `true` [iff] every element of `self` is contained in `other`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isSubsetOf(other: Self) -> Bool {
     return self.intersect(other) == self
   }
 
-  /// Returns `true` iff every element of `other` is contained in `self`.
+  /// Returns `true` [iff] every element of `other` is contained in `self`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isSupersetOf(other: Self) -> Bool {
     return other.isSubsetOf(self)
   }
 
-  /// Returns `true` iff `self.intersect(other).isEmpty`.
+  /// Returns `true` [iff] `self.intersect(other).isEmpty`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isDisjointWith(other: Self) -> Bool {
     return self.intersect(other).isEmpty
@@ -204,38 +224,48 @@ extension SetAlgebra {
     return self.intersect(self.exclusiveOr(other))
   }
 
-  /// Returns `true` iff `self.contains(e)` is `false` for all `e`.
+  /// Returns `true` [iff] `self.contains(e)` is `false` for all `e`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isEmpty: Bool {
     return self == Self()
   }
 
-  /// Returns `true` iff every element of `other` is contained in `self`
+  /// Returns `true` [iff] every element of `other` is contained in `self`
   /// and `self` contains an element that is not contained in `other`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isStrictSupersetOf(other: Self) -> Bool {
     return self.isSupersetOf(other) && self != other
   }
 
-  /// Returns `true` iff every element of `self` is contained in `other`
+  /// Returns `true` [iff] every element of `self` is contained in `other`
   /// and `other` contains an element that is not contained in `self`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isStrictSubsetOf(other: Self) -> Bool {
     return other.isStrictSupersetOf(self)
   }
 
-  /// Returns `true` iff `a` subsumes `b`.
+  /// Returns `true` [iff] `a` subsumes `b`.
   ///
   /// - Equivalent to `([a] as Self).isSupersetOf([b])`
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public static func element(a: Element, subsumes b: Element) -> Bool {
     return ([a] as Self).isSupersetOf([b])
   }
 
-  /// Returns `true` iff `a` is disjoint with `b`.
+  /// Returns `true` [iff] `a` is disjoint with `b`.
   ///
   /// Two elements are disjoint when neither one subsumes the other.
   ///
   /// - SeeAlso: `Self.element(_, subsumes:_)`
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public static func element(a: Element, isDisjointWith b: Element) -> Bool {
     return ([a] as Self).isDisjointWith([b])

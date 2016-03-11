@@ -174,7 +174,7 @@ import SwiftShims
 // Bridging `Dictionary` to `NSDictionary`
 // ---------------------------------------
 //
-// `Dictionary<K, V>` bridges to `NSDictionary` iff both `K` and `V` are
+// `Dictionary<K, V>` bridges to `NSDictionary` [iff] both `K` and `V` are
 // bridged.  Otherwise, a runtime error is raised.
 //
 // * if both `K` and `V` are bridged verbatim, then `Dictionary<K, V>` bridges
@@ -197,6 +197,7 @@ import SwiftShims
 // Bridging guarantees for `Set<Element>` are the same as for
 // `Dictionary<Element, ()>`.
 //
+// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 
 /// This protocol is only used for compile-time checks that
 /// every storage type implements all required operations.
@@ -467,7 +468,9 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Returns `true` iff `possibleSuperset` contains every member of `self`.
+  /// Returns `true` [iff] `possibleSuperset` contains every member of `self`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isSubsetOf<
     S : Sequence where S.Iterator.Element == Element
@@ -477,8 +480,10 @@ public struct Set<Element : Hashable> :
     return isSubsetOf(other)
   }
 
-  /// Returns `true` iff `possibleStrictSuperset` contains every member
+  /// Returns `true` [iff] `possibleStrictSuperset` contains every member
   /// of `self`, and at least one other element.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isStrictSubsetOf<
     S : Sequence where S.Iterator.Element == Element
@@ -488,7 +493,9 @@ public struct Set<Element : Hashable> :
     return isStrictSubsetOf(other)
   }
 
-  /// Returns `true` iff `self` contains every element of `possibleSubset`.
+  /// Returns `true` [iff] `self` contains every element of `possibleSubset`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isSupersetOf<
     S : Sequence where S.Iterator.Element == Element
@@ -499,8 +506,10 @@ public struct Set<Element : Hashable> :
     return other.isSubsetOf(self)
   }
 
-  /// Returns `true` iff `self` contains every element of
+  /// Returns `true` [iff] `self` contains every element of
   /// `possibleStrictSubset`, and at least one other element.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isStrictSupersetOf<
     S : Sequence where S.Iterator.Element == Element
@@ -509,7 +518,9 @@ public struct Set<Element : Hashable> :
     return other.isStrictSubsetOf(self)
   }
 
-  /// Returns `true` iff no element of `other` is a member of `self`.
+  /// Returns `true` [iff] no element of `other` is a member of `self`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isDisjointWith<
     S : Sequence where S.Iterator.Element == Element
@@ -646,7 +657,9 @@ public struct Set<Element : Hashable> :
   // Collection conformance
   //
 
-  /// `true` iff `self` is empty.
+  /// `true` [iff] `self` is empty.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isEmpty: Bool {
     return count == 0
   }
@@ -1177,7 +1190,9 @@ public struct Dictionary<Key : Hashable, Value> :
   // Collection conformance
   //
 
-  /// `true` iff `count == 0`.
+  /// `true` [iff] `count == 0`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isEmpty: Bool {
     return count == 0
   }
@@ -4149,20 +4164,26 @@ extension Set {
     _subtractInPlace(other)
   }
 
-  /// Returns true iff every element of `self` is contained in `other`.
+  /// Returns true [iff] every element of `self` is contained in `other`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isSubsetOf(other: Set<Element>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
 
-  /// Returns true iff every element of `other` is contained in `self`.
+  /// Returns true [iff] every element of `other` is contained in `self`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isSupersetOf(other: Set<Element>) -> Bool {
     return other.isSubsetOf(self)
   }
 
-  /// Returns true iff `self.intersect(other).isEmpty`.
+  /// Returns true [iff] `self.intersect(other).isEmpty`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isDisjointWith(other: Set<Element>) -> Bool {
     for member in self {
@@ -4179,15 +4200,19 @@ extension Set {
     return _subtract(other)
   }
 
-  /// Returns true iff every element of `other` is contained in `self`
+  /// Returns true [iff] every element of `other` is contained in `self`
   /// and `self` contains an element that is not contained in `other`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isStrictSupersetOf(other: Set<Element>) -> Bool {
     return self.isSupersetOf(other) && self != other
   }
 
-  /// Return true iff every element of `self` is contained in `other`
+  /// Return true [iff] every element of `self` is contained in `other`
   /// and `other` contains an element that is not contained in `self`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public func isStrictSubsetOf(other: Set<Element>) -> Bool {
     return other.isStrictSupersetOf(self)
