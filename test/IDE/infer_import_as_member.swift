@@ -70,9 +70,9 @@ import InferImportAsMember
 // PRINT-NEXT:    init(fuzzyWithFuzzyName fuzzyWithFuzzyName: ())
 // PRINT-NEXT:    init(fuzzyName fuzzyName: ())
 // PRINT-NEXT:  }
-
+//
 // PRINT-NEXT:  func __IAMStruct1IgnoreMe(_ s: IAMStruct1) -> Double
-
+//
 // PRINT-LABEL: /// Mutable
 // PRINT-NEXT:  struct IAMMutableStruct1 {
 // PRINT-NEXT:    init()
@@ -82,5 +82,28 @@ import InferImportAsMember
 // PRINT-NEXT:    init(withURL url: UnsafePointer<Int8>)
 // PRINT-NEXT:    func doSomething()
 // PRINT-NEXT:  }
-// FIXME: get the class working
-
+//
+// PRINT-LABEL: struct TDStruct {
+// PRINT-NEXT:    var x: Double
+// PRINT-NEXT:    init()
+// PRINT-NEXT:    init(x x: Double)
+// PRINT-NEXT:  }
+// PRINT-NEXT:  extension TDStruct {
+// PRINT-NEXT:    init(with Float: Float)
+// PRINT-NEXT:  }
+//
+// PRINT-LABEL: /// Class
+// PRINT-NEXT:  struct IAMClass {
+// PRINT-NEXT:    var x: Float
+// PRINT-NEXT:    var y: Float
+// PRINT-NEXT:    var z: Float
+// PRINT-NEXT:    init()
+// PRINT-NEXT:    init(x x: Float, y y: Float, z z: Float)
+// PRINT-NEXT:  }
+// PRINT-NEXT:  typealias IAMClassRef = UnsafeMutablePointer<IAMClass>
+// PRINT-NEXT:  typealias IAMOtherName = IAMClassRef
+// PRINT-NEXT:  extension IAMClass {
+// PRINT-NEXT:    static var typeID: UInt32 { get }
+// PRINT-NEXT:    init(i i: Double)
+// PRINT-NEXT:    mutating func invert()
+// PRINT-NEXT:  }

@@ -93,21 +93,23 @@ IAMStruct1CreateMutable(struct IAMStruct1 withIAMStruct1);
 struct IAMMutableStruct1 IAMStruct1CreateMutableWithURL(const char *url);
 static void IAMStruct1DoSomething(struct IAMMutableStruct1 iamStruct1);
 
-typedef struct MyStruct2 MyStruct2;
-struct MyStruct2 {
+typedef struct TDStruct TDStruct;
+struct TDStruct {
 	double x;
 };
 // FIXME: the below doesn't appear in the output
-const MyStruct2 MyStruct2CreateWithFloat(float f);
+const TDStruct TDStructCreateWithFloat(float Float);
 
-// typedef __attribute__((objc_bridge(id))) void *IAMClassRef;
+/// Class
 struct IAMClass {
   float x, y, z;
 };
 typedef struct IAMClass *IAMClassRef;
+typedef IAMClassRef IAMOtherName;
 
 extern unsigned IAMClassGetTypeID();
-
 extern IAMClassRef IAMClassCreate(double i);
+extern void IAMClassInvert(IAMOtherName iamOtherName);
+
 
 #endif // INFER_IMPORT_AS_MEMBER_H

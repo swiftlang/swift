@@ -79,32 +79,6 @@ static const std::array<StringRef, 2> PropertySpecifiers{{
     StringRef("Get"), StringRef("Set"),
 }};
 
-namespace {
-enum class CFNameKind : unsigned {
-  None,
-  CFType,
-  NonCFType,
-};
-}
-static CFNameKind getCFNameKind(StringRef name) {
-#define CF_TYPE(TYPE)                                                          \
-  if (name == #TYPE)                                                           \
-    return CFNameKind::CFType;
-#define NON_CF_TYPE(TYPE)                                                      \
-  if (name == #TYPE)                                                           \
-    return CFNameKind::NonCFType;
-#include "CFDatabase.def"
-  return CFNameKind::None;
-}
-
-static bool isCFTypeName(StringRef name) {
-  return getCFNameKind(name) == CFNameKind::CFType;
-}
-
-// static bool isExplicitNonCFTypeName(StringRef name) {
-//   return getCFNameKind(name) == CFNameKind::NonCFType;
-// }
-
 IAMOptions IAMOptions::getDefault() { return {}; }
 
 // As append, but skip a repeated word at the boundary. First-letter-case
@@ -296,8 +270,8 @@ private:
         name, clang::Sema::LookupNameKind::LookupOrdinaryName);
   }
 
-  const clang::TypeDecl *findTypeAndMatch(StringRef workingName,
-                                          NameBuffer &outStr) {
+  EffectiveClangContext findTypeAndMatch(StringRef workingName,
+                                         NameBuffer &outStr) {
     // FIXME: drop mutable...
 
     // TODO: should we try some form of fuzzy or fuzzier matching?
@@ -315,15 +289,15 @@ private:
 
       if (auto tyDecl = clangLookupTypeDecl(prefixWithRef)) {
         outStr.append(workingName.drop_front(prefix.size()));
-        return tyDecl;
+        return getEffectiveDC(clang::QualType(tyDecl->getTypeForDecl(), 0));
       }
       if (auto tyDecl = clangLookupTypeDecl(prefix)) {
         outStr.append(workingName.drop_front(prefix.size()));
-        return tyDecl;
+        return getEffectiveDC(clang::QualType(tyDecl->getTypeForDecl(), 0));
       }
     }
 
-    return nullptr;
+    return {};
   }
 
   bool validToImportAsProperty(const clang::FunctionDecl *originalDecl,
@@ -428,17 +402,39 @@ private:
 
   bool matchTypeName(StringRef str, clang::QualType qt, NameBuffer &outStr);
   bool match(StringRef str, StringRef toMatch, NameBuffer &outStr);
+
+  EffectiveClangContext getEffectiveDC(clang::QualType qt) {
+    // Read through typedefs until we get to a CF typedef or a non-typedef-ed
+    // type
+    while (qt.getTypePtrOrNull() && isa<clang::TypedefType>(qt.getTypePtr())) {
+      auto typedefType = cast<clang::TypedefType>(qt.getTypePtr());
+      auto typedefDecl = typedefType->getDecl()->getCanonicalDecl();
+      if (ClangImporter::Implementation::isCFTypeDecl(typedefDecl))
+        return {typedefDecl};
+      qt = qt.getSingleStepDesugaredType(clangSema.getASTContext());
+    }
+
+    auto pointeeQT = qt.getTypePtr()->getPointeeType();
+    if (pointeeQT != clang::QualType())
+      // Retry on the pointee
+      return getEffectiveDC(pointeeQT);
+
+    if (auto tagDecl = qt.getTypePtr()->getAsTagDecl())
+      return {tagDecl->getCanonicalDecl()};
+
+    // Failed to find a type we can extend
+    return {};
+  }
 };
 }
 
 static StringRef getTypeName(clang::QualType qt) {
   if (auto typedefTy = qt->getAs<clang::TypedefType>()) {
-    // Use the sugar-ed, but un-ref-ed name
-    auto name = typedefTy->getDecl()->getName();
-    if (name.endswith("Ref") &&
-        (isCFTypeName(name) ||
-         typedefTy->getDecl()->hasAttr<clang::ObjCBridgeAttr>()))
-      return name.drop_back(3);
+    // Check for a CF type name (drop the "Ref")
+    auto cfName = ClangImporter::Implementation::getCFTypeName(
+        typedefTy->getDecl()->getCanonicalDecl());
+    if (cfName != StringRef())
+      return cfName;
   }
 
   auto identInfo = qt.getBaseTypeIdentifier();
@@ -572,39 +568,6 @@ bool IAMInference::validToImportAsProperty(
   return true;
 }
 
-// Get the canonical, but still sugar-ed, effective decl context
-static EffectiveClangContext getEffectiveDC(clang::QualType qt) {
-  auto ty = qt.getTypePtr();
-  if (auto typedefType = ty->getAs<clang::TypedefType>())
-    return {typedefType->getDecl()->getCanonicalDecl()};
-
-  auto pointeeQT = ty->getPointeeType();
-  if (pointeeQT != clang::QualType())
-    ty = pointeeQT.getTypePtr();
-
-  if (auto typedefType = ty->getAs<clang::TypedefType>()) {
-    return {typedefType->getDecl()->getCanonicalDecl()};
-  }
-
-  if (const clang::RecordType *recTy = ty->getAsStructureType())
-    return {recTy->getDecl()->getCanonicalDecl()};
-
-  assert(0 && "not a valid Clang context");
-  return {};
-}
-
-static EffectiveClangContext getEffectiveDC(const clang::TypeDecl *tyDecl) {
-  // FIXME: ewwe
-  auto typeDecl = const_cast<clang::TypeDecl *>(tyDecl);
-  if (auto typedefName = dyn_cast<clang::TypedefNameDecl>(typeDecl))
-    return {typedefName->getCanonicalDecl()};
-  if (auto tagDecl = dyn_cast<clang::TagDecl>(typeDecl))
-    return {tagDecl->getCanonicalDecl()};
-
-  assert("expected valid Clang context");
-  return {};
-}
-
 IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   if (clangDecl->getName().startswith("_")) {
     ++SkipLeadingUnderscore;
@@ -627,15 +590,14 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
 
     // Special pattern: constants of the form "kFooBarBaz", extend "FooBar" with
     // property "Baz"
-    if (*camel_case::getWords(workingName).begin() == "k") {
+    if (*camel_case::getWords(workingName).begin() == "k")
       workingName = workingName.drop_front(1);
-    }
 
     NameBuffer remainingName;
-    const clang::TypeDecl *tyDecl =
-        findTypeAndMatch(workingName, remainingName);
-    if (tyDecl)
-      return importAsStaticProperty(remainingName, getEffectiveDC(tyDecl));
+    if (auto effectiveDC = findTypeAndMatch(workingName, remainingName))
+
+      return importAsStaticProperty(remainingName, effectiveDC);
+
     return fail();
   }
 
@@ -669,11 +631,13 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   StringRef getTypeID = "GetTypeID";
   if (numParams == 0 && workingName.endswith(getTypeID)) {
     NameBuffer remainingName;
-    if (auto tyDecl = findTypeAndMatch(workingName.drop_back(getTypeID.size()),
-                                       remainingName)) {
+    if (auto effectiveDC = findTypeAndMatch(
+            workingName.drop_back(getTypeID.size()), remainingName)) {
       // We shouldn't have anything else left in our name for typeID
-      if (remainingName.empty())
-        return importAsTypeID(retTy, getEffectiveDC(tyDecl));
+      if (remainingName.empty()) {
+
+        return importAsTypeID(retTy, effectiveDC);
+      }
     }
   }
 
@@ -685,10 +649,10 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
     if (matchTypeName(workingName, retTy, remainingName))
       for (auto initSpec : InitSpecifiers)
         if (hasWord(remainingName, initSpec))
-          return importAsConstructor(
-              remainingName, initSpec,
-              {funcDecl->param_begin(), funcDecl->param_end()},
-              getEffectiveDC(retTy));
+          if (auto effectiveDC = getEffectiveDC(retTy))
+            return importAsConstructor(
+                remainingName, initSpec,
+                {funcDecl->param_begin(), funcDecl->param_end()}, effectiveDC);
   }
 
   // 2) If we find a likely self reference in the parameters, make an instance
@@ -702,6 +666,8 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
     NameBuffer remainingName;
     if (matchTypeName(workingName, param->getType(), remainingName)) {
       auto effectiveDC = getEffectiveDC(param->getType());
+      if (!effectiveDC)
+        continue;
       nonSelfParams.append(funcDecl->param_begin(), paramI);
       nonSelfParams.append(++paramI, paramE);
       // See if it's a property
@@ -727,10 +693,7 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
 
   // 3) Finally, try to find a class to put this on as a static function
   NameBuffer remainingName;
-  if (const clang::TypeDecl *tyDecl =
-          findTypeAndMatch(workingName, remainingName)) {
-    auto effectiveDC = getEffectiveDC(tyDecl);
-
+  if (auto effectiveDC = findTypeAndMatch(workingName, remainingName)) {
     ArrayRef<const clang::ParmVarDecl *> params = {funcDecl->param_begin(),
                                                    funcDecl->param_end()};
     // See if it's a property
