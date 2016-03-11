@@ -29,6 +29,7 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
 
   InterceptTraps.cpp
   LifetimeTracked.swift
+  MinimalTypes.swift.gyb
   OpaqueIdentityFunctions.cpp
   OpaqueIdentityFunctions.swift
   RaceTest.swift
