@@ -2399,8 +2399,6 @@ public:
       ReconstructedType->print(Stream);
       Stream << "'\n";
     } else {
-      ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName,
-                                                     Error);
       Stream << "cannot reconstruct type from usr for '" << Range.str()
              << "'\n";
     }
