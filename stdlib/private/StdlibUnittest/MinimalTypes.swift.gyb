@@ -36,6 +36,9 @@ public struct OpaqueValue<Underlying> {
 public struct MinimalEquatableValue : Equatable {
   public static var timesEqualEqualWasCalled: Int = 0
 
+  public static var equalImpl =
+    ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
+
   public var value: Int
   public var identity: Int
 
@@ -54,7 +57,7 @@ public func == (
   rhs: MinimalEquatableValue
 ) -> Bool {
   MinimalEquatableValue.timesEqualEqualWasCalled += 1
-  return lhs.value == rhs.value
+  return MinimalEquatableValue.equalImpl.value(lhs.value, rhs.value)
 }
 
 /// A type that conforms only to `Equatable` and `Comparable`.
