@@ -81,6 +81,15 @@ struct MyGenStruct1<T, U: StringLiteralConvertible, V: Sequence> {
 // CHECK: reconstructed decl from usr for 'y' is 'let y: U'
   let z: V
 // CHECK: reconstructed decl from usr for 'z' is 'let z: V'
+
+  func test000() {
+    _ = x
+// CHECK: reconstructed type from usr for 'x' is 'T'
+    _ = y
+// CHECK: reconstructed type from usr for 'y' is 'U'
+    _ = z
+// CHECK: reconstructed type from usr for 'z' is 'V'
+  }
 }
 
 let genstruct1 = MyGenStruct1<Int, String, [Float]>(x: 1, y: "", z: [1.0])
