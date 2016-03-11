@@ -24,7 +24,8 @@ for traversal, base_kind, mutable in itertools.product(traversal_options,
             testFilename = Wrapper + '_Of_' + Base + '_' + name + '.swift'
             with open(testFilename + '.gyb', 'w') as testFile:
                 testFile.write("""
-//// Automatically Generated From GenerateSliceTests.py
+//// Automatically Generated From \
+validation-test/stdlib/Inputs/GenerateSliceTests.py
 //////// Do Not Edit Directly!
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
