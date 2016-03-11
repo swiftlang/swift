@@ -1,8 +1,8 @@
 // RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="cannot reconstruct"
 
 
-class Mystruct1 {
-// CHECK: reconstructed decl from usr for 'Mystruct1' is 'class Mystruct1'
+struct Mystruct1 {
+// CHECK: reconstructed decl from usr for 'Mystruct1' is 'struct Mystruct1'
   func s1f1() -> Int { return 0 }
 // CHECK: reconstructed decl from usr for 's1f1' is 'func s1f1() -> Int'
   var intField = 3
