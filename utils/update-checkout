@@ -22,7 +22,7 @@ from SwiftBuildSupport import (
     WorkingDirectory,
     check_call,
     check_output,
-)
+)  # noqa (E402 module level import not at top of file)
 
 REPOSITORIES = {
     'llvm': 'apple/swift-llvm',

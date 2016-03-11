@@ -19,7 +19,7 @@ import sys
 
 sys.path.append("@PATH_TO_DRIVER_LIBRARY@")
 
-import perf_test_driver
+import perf_test_driver  # noqa (E402 module level import not at top of file)
 
 # This is a hacked up XFAIL list. It should really be a json file, but it will
 # work for now. Add in the exact name of the pass to XFAIL.

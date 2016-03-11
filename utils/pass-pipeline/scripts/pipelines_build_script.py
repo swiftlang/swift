@@ -10,7 +10,7 @@ import textwrap
 sys.path.append(os.path.join(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))), 'src'))
 
-import passes
+import passes  # noqa (E402 module level import not at top of file)
 
 # TODO: This should not be hard coded.
 PIPELINES = ["PreSpecialize", "HighLevel", "EarlyLoopOpt",
