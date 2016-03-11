@@ -750,6 +750,87 @@ private:
       os << ' ';
   }
 
+  /// Determine whether this generic Swift nominal type maps to a
+  /// generic Objective-C class.
+  static bool hasGenericObjCType(const NominalTypeDecl *nominal) {
+    auto clangDecl = nominal->getClangDecl();
+    if (!clangDecl) return false;
+
+    auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl);
+    if (!objcClass) return false;
+
+    if (objcClass->getTypeParamList() == nullptr) return false;
+
+    return true;
+  }
+
+  /// If the nominal type is bridged to Objective-C (via a conformance
+  /// to _ObjectiveCBridgeable), print the bridged type.
+  bool printIfObjCBridgeable(const NominalTypeDecl *nominal,
+                             ArrayRef<Type> typeArgs,
+                             Optional<OptionalTypeKind> optionalKind) {
+    auto &ctx = nominal->getASTContext();
+
+    // Dig out the ObjectiveCBridgeable protocol.
+    auto proto = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
+    if (!proto) return false;
+
+    // Determine whether this nominal type is _ObjectiveCBridgeable.
+    SmallVector<ProtocolConformance *, 2> conformances;
+    if (!nominal->lookupConformance(&M, proto, conformances))
+      return false;
+
+    // Dig out the Objective-C type.
+    auto conformance = conformances.front();
+    Type objcType = ProtocolConformance::getTypeWitnessByName(
+                      nominal->getDeclaredType(),
+                      conformance,
+                      ctx.getIdentifier("_ObjectiveCType"),
+                      nullptr);
+    if (!objcType) return false;
+
+    // Dig out the Objective-C class.
+    auto classDecl = objcType->getClassOrBoundGenericClass();
+    if (!classDecl) return false;
+
+    // Determine the Objective-C name of the class.
+    SmallString<32> objcNameScratch;
+    StringRef objcName = classDecl->getObjCRuntimeName(objcNameScratch);
+
+    // Detect when the type arguments correspond to the unspecialized
+    // type, and clear them out. There is some type-specific hackery
+    // here for:
+    //
+    //   NSArray<id> --> NSArray
+    //   NSDictionary<NSObject *, id> --> NSDictionary
+    //   NSSet<id> --> NSSet
+    if (!typeArgs.empty() &&
+        (!hasGenericObjCType(classDecl) ||
+         (objcName == "NSArray" && typeArgs[0]->isAnyObject()) ||
+         (objcName == "NSDictionary" && isNSObject(ctx, typeArgs[0]) &&
+          typeArgs[1]->isAnyObject()) ||
+         (objcName == "NSSet" && isNSObject(ctx, typeArgs[0]))))
+      typeArgs = {};
+
+    // Print the class type.
+    os << objcName;
+
+    // Print the type arguments, if present.
+    if (!typeArgs.empty()) {
+      os << "<";
+        interleave(typeArgs,
+                   [this](Type type) {
+                     printCollectionElement(type);
+                   },
+                   [this] { os << ", "; });
+      os << ">";
+    }
+
+    os << " *";
+    printNullability(optionalKind);
+    return true;
+  }
+
   /// If "name" is one of the standard library types used to map in Clang
   /// primitives and basic types, print out the appropriate spelling and
   /// return true.
@@ -818,6 +899,10 @@ private:
 
       specialNames[{ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean")}]
         = { "Boolean", false};
+
+      Identifier ID_CoreGraphics = ctx.getIdentifier("CoreGraphics");
+      specialNames[{ID_CoreGraphics, ctx.getIdentifier("CGFloat")}]
+        = { "CGFloat", false };
 
       // Use typedefs we set up for SIMD vector types.
 #define MAP_SIMD_TYPE(BASENAME, __) \
@@ -921,14 +1006,14 @@ private:
   void visitStructType(StructType *ST, 
                        Optional<OptionalTypeKind> optionalKind) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
-    if (SD == M.getASTContext().getStringDecl()) {
-      os << "NSString *";
-      printNullability(optionalKind);
-      return;
-    }
 
+    // Handle known type names.
     if (printIfKnownTypeName(SD->getModuleContext()->getName(), SD->getName(),
                              optionalKind))
+      return;
+
+    // Handle bridged types.
+    if (printIfObjCBridgeable(SD, { }, optionalKind))
       return;
 
     maybePrintTagKeyword(SD);
@@ -963,48 +1048,6 @@ private:
 
     ASTContext &ctx = M.getASTContext();
 
-    if (SD == ctx.getArrayDecl()) {
-      if (!BGT->getGenericArgs()[0]->isAnyObject()) {
-        os << "NSArray<";
-        printCollectionElement(BGT->getGenericArgs()[0]);
-        os << "> *";
-      } else {
-        os << "NSArray *";
-      }
-
-      printNullability(optionalKind);
-      return true;
-    }
-
-    if (SD == ctx.getDictionaryDecl()) {
-      if (!isNSObject(ctx, BGT->getGenericArgs()[0]) ||
-          !BGT->getGenericArgs()[1]->isAnyObject()) {
-        os << "NSDictionary<";
-        printCollectionElement(BGT->getGenericArgs()[0]);
-        os << ", ";
-        printCollectionElement(BGT->getGenericArgs()[1]);
-        os << "> *";
-      } else {
-        os << "NSDictionary *";
-      }
-
-      printNullability(optionalKind);
-      return true;
-    }
-
-    if (SD == ctx.getSetDecl()) {
-      if (!isNSObject(ctx, BGT->getGenericArgs()[0])) {
-        os << "NSSet<";
-        printCollectionElement(BGT->getGenericArgs()[0]);
-        os << "> *";
-      } else {
-        os << "NSSet *";
-      }
-
-      printNullability(optionalKind);
-      return true;
-    }
-
     if (SD == ctx.getUnmanagedDecl()) {
       auto args = BGT->getGenericArgs();
       assert(args.size() == 1);
@@ -1038,13 +1081,25 @@ private:
 
   void visitBoundGenericStructType(BoundGenericStructType *BGT,
                                    Optional<OptionalTypeKind> optionalKind) {
+    // Handle bridged types.
+    if (printIfObjCBridgeable(BGT->getDecl(), BGT->getGenericArgs(),
+                              optionalKind))
+      return;
+
     if (printIfKnownGenericStruct(BGT, optionalKind))
       return;
+
     visitBoundGenericType(BGT, optionalKind);
   }
 
   void visitBoundGenericType(BoundGenericType *BGT,
                              Optional<OptionalTypeKind> optionalKind) {
+    // Handle bridged types.
+    if (!isa<StructDecl>(BGT->getDecl()) &&
+        printIfObjCBridgeable(BGT->getDecl(), BGT->getGenericArgs(),
+                              optionalKind))
+      return;
+
     OptionalTypeKind innerOptionalKind;
     if (auto underlying = BGT->getAnyOptionalObjectType(innerOptionalKind)) {
       visitPart(underlying, innerOptionalKind);
@@ -1054,6 +1109,11 @@ private:
 
   void visitEnumType(EnumType *ET, Optional<OptionalTypeKind> optionalKind) {
     const EnumDecl *ED = ET->getDecl();
+
+    // Handle bridged types.
+    if (printIfObjCBridgeable(ED, { }, optionalKind))
+      return;
+
     maybePrintTagKeyword(ED);
     os << getNameForObjC(ED);
   }
