@@ -316,11 +316,28 @@ extension Collection {
   }
 
   public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
-    // FIXME: swift-3-indexing-model: range check now that indexes are Comparable.
+    _precondition(
+      bounds.startIndex <= index,
+      "index is out of bounds: index designates a position before bounds.startIndex")
+    _precondition(
+      index < bounds.endIndex,
+      "index is out of bounds: index designates the bounds.endIndex position or a position after it")
   }
 
   public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
-    // FIXME: swift-3-indexing-model: range check now that indexes are Comparable.
+    _precondition(
+      bounds.startIndex <= range.startIndex,
+      "range.startIndex is out of bounds: index designates a position before bounds.startIndex")
+    _precondition(
+      bounds.startIndex <= range.endIndex,
+      "range.endIndex is out of bounds: index designates a position before bounds.startIndex")
+
+    _precondition(
+      range.startIndex <= bounds.endIndex,
+      "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
+    _precondition(
+      range.endIndex <= bounds.endIndex,
+      "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
   }
 
   @warn_unused_result
