@@ -25,7 +25,7 @@ print("testing...")
 //===--- Think of this code as being "in the library" ---------------------===//
 //===----------------------------------------------------------------------===//
 
-//===--- F "base" protocol (like ForwardIndex) ------------------------===//
+//===--- F "base" protocol (like ForwardIndex) ----------------------------===//
 
 protocol F {
   func successor() -> Self

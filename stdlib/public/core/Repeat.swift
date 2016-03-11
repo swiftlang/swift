@@ -1,4 +1,4 @@
-//===--- Repeated.swift - A Collection that repeats a value N times -------===//
+//===--- Repeat.swift - A Collection that repeats a value N times ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
