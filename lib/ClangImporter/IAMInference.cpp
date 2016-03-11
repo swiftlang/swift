@@ -14,6 +14,7 @@
 // members
 //
 //===----------------------------------------------------------------------===//
+#include "CFTypeInfo.h"
 #include "IAMInference.h"
 #include "ImporterImpl.h"
 
@@ -69,6 +70,7 @@ STATISTIC(OmitNumTimes,
           "# of times omitNeedlessWords was able to fire on an API");
 
 using namespace swift;
+using namespace importer;
 
 using NameBuffer = SmallString<32>;
 
@@ -404,13 +406,21 @@ private:
   bool match(StringRef str, StringRef toMatch, NameBuffer &outStr);
 
   EffectiveClangContext getEffectiveDC(clang::QualType qt) {
+    // Read through some attributes
+    while (qt.getTypePtrOrNull() && isa<clang::AttributedType>(qt.getTypePtr()))
+      qt = qt.getSingleStepDesugaredType(clangSema.getASTContext());
+
     // Read through typedefs until we get to a CF typedef or a non-typedef-ed
     // type
     while (qt.getTypePtrOrNull() && isa<clang::TypedefType>(qt.getTypePtr())) {
       auto typedefType = cast<clang::TypedefType>(qt.getTypePtr());
-      auto typedefDecl = typedefType->getDecl()->getCanonicalDecl();
-      if (ClangImporter::Implementation::isCFTypeDecl(typedefDecl))
-        return {typedefDecl};
+      if (auto pointeeInfo = CFPointeeInfo::classifyTypedef(
+              typedefType->getDecl()->getCanonicalDecl())) {
+        if (pointeeInfo.isRecord() || pointeeInfo.isTypedef())
+          return {typedefType->getDecl()->getCanonicalDecl()};
+        assert(pointeeInfo.isConstVoid() && "no other type");
+        return {};
+      }
       qt = qt.getSingleStepDesugaredType(clangSema.getASTContext());
     }
 

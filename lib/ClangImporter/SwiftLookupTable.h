@@ -65,8 +65,8 @@ private:
   Kind TheKind;
 
   union {
-    clang::DeclContext *DC;
-    clang::TypedefNameDecl *Typedef;
+    const clang::DeclContext *DC;
+    const clang::TypedefNameDecl *Typedef;
     struct {
       const char *Data;
       unsigned Length;
@@ -79,7 +79,7 @@ public:
     DC = nullptr;
   }
 
-  EffectiveClangContext(clang::DeclContext *dc) : TheKind(DeclContext) {
+  EffectiveClangContext(const clang::DeclContext *dc) : TheKind(DeclContext) {
     assert(dc != nullptr && "use null constructor instead");
     if (auto tagDecl = dyn_cast<clang::TagDecl>(dc)) {
       DC = tagDecl->getCanonicalDecl();
@@ -98,7 +98,7 @@ public:
     }
   }
 
-  EffectiveClangContext(clang::TypedefNameDecl *typedefName)
+  EffectiveClangContext(const clang::TypedefNameDecl *typedefName)
     : TheKind(TypedefContext)
   {
     Typedef = typedefName->getCanonicalDecl();
@@ -118,12 +118,12 @@ public:
   Kind getKind() const { return TheKind; }
 
   /// Retrieve the declaration context.
-  clang::DeclContext *getAsDeclContext() {
+  const clang::DeclContext *getAsDeclContext() {
     return getKind() == DeclContext ? DC : nullptr;
   }
 
   /// Retrieve the typedef declaration.
-  clang::TypedefNameDecl *getTypedefName() const {
+  const clang::TypedefNameDecl *getTypedefName() const {
     assert(getKind() == TypedefContext);
     return Typedef;
   }
