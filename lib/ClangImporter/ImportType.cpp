@@ -646,6 +646,31 @@ namespace {
       return nullptr;
     }
 
+    /// Map the Clang swift_bridge attribute to a specific type.
+    Type mapSwiftBridgeAttr(const clang::NamedDecl *clangDecl) {
+      // Check whether there is a swift_bridge attribute.
+      auto bridgeAttr = clangDecl->getAttr<clang::SwiftBridgeAttr>();
+      if (!bridgeAttr) return Type();
+
+      // Determine the module and Swift declaration names.
+      StringRef moduleName;
+      StringRef name = bridgeAttr->getSwiftType();
+      auto dotPos = name.find('.');
+      if (dotPos == StringRef::npos) {
+        // Determine the module name from the Clang declaration.
+        if (auto module = clangDecl->getImportedOwningModule())
+          moduleName = module->getTopLevelModuleName();
+        else
+          moduleName = clangDecl->getASTContext().getLangOpts().CurrentModule;
+      } else {
+        // The string is ModuleName.TypeName.
+        moduleName = name.substr(0, dotPos);
+        name = name.substr(dotPos + 1);
+      }
+
+      return Impl.getNamedSwiftType(moduleName, name);
+    }
+
     ImportResult
     VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
       // If this object pointer refers to an Objective-C class (possibly
@@ -684,20 +709,11 @@ namespace {
 
         // Determine whether this Objective-C class type is bridged to
         // a Swift type.
-        NominalTypeDecl *bridgedTypeDecl = nullptr;
-        StringRef objcClassName = objcClass->getName();
-        if (objcClassName == "NSString")
-          bridgedTypeDecl = Impl.SwiftContext.getStringDecl();
-        else if (objcClassName == "NSArray")
-          bridgedTypeDecl = Impl.SwiftContext.getArrayDecl();
-        else if (objcClassName == "NSDictionary")
-          bridgedTypeDecl = Impl.SwiftContext.getDictionaryDecl();
-        else if (objcClassName == "NSSet")
-          bridgedTypeDecl = Impl.SwiftContext.getSetDecl();
-
         Type bridgedType;
-        if (bridgedTypeDecl)
-          bridgedType = bridgedTypeDecl->getDeclaredType();
+        if (auto objcClassDef = objcClass->getDefinition())
+          bridgedType = mapSwiftBridgeAttr(objcClassDef);
+        else
+          bridgedType = mapSwiftBridgeAttr(objcClass);
 
         if (bridgedType) {
           // Gather the type arguments.
@@ -2214,29 +2230,36 @@ Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
 }
 
 static Module *tryLoadModule(ASTContext &C,
-                             Identifier name,
+                             Identifier moduleName,
                              bool importForwardDeclarations,
-                             Optional<Module *> &cache) {
-  if (!cache.hasValue()) {
-    // If we're synthesizing forward declarations, we don't want to pull in
-    // the module too eagerly.
-    if (importForwardDeclarations)
-      cache = C.getLoadedModule(name);
-    else
-      cache = C.getModule({ {name, SourceLoc()} });
-  }
+                             llvm::DenseMap<Identifier, Module *>
+                               &checkedModules) {
+  // If we've already done this check, return the cached result.
+  auto known = checkedModules.find(moduleName);
+  if (known != checkedModules.end())
+    return known->second;
 
-  return cache.getValue();
+  Module *module;
+
+  // If we're synthesizing forward declarations, we don't want to pull in
+  // the module too eagerly.
+  if (importForwardDeclarations)
+    module = C.getLoadedModule(moduleName);
+  else
+    module = C.getModule({ {moduleName, SourceLoc()} });
+
+  checkedModules[moduleName] = module;
+  return module;
 }
 
 Module *ClangImporter::Implementation::tryLoadFoundationModule() {
   return tryLoadModule(SwiftContext, SwiftContext.Id_Foundation,
-                       ImportForwardDeclarations, checkedFoundationModule);
+                       ImportForwardDeclarations, checkedModules);
 }
 
 Module *ClangImporter::Implementation::tryLoadSIMDModule() {
   return tryLoadModule(SwiftContext, SwiftContext.Id_simd,
-                       ImportForwardDeclarations, checkedSIMDModule);
+                       ImportForwardDeclarations, checkedModules);
 }
 
 Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
@@ -2275,6 +2298,17 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
   if (auto *typeResolver = getTypeResolver())
     typeResolver->resolveDeclSignature(type);
   return type->getDeclaredType();
+}
+
+Type ClangImporter::Implementation::getNamedSwiftType(StringRef moduleName,
+                                                      StringRef name) {
+  // Try to load the module.
+  auto module = tryLoadModule(SwiftContext,
+                              SwiftContext.getIdentifier(moduleName),
+                              ImportForwardDeclarations, checkedModules);
+  if (!module) return Type();
+
+  return getNamedSwiftType(module, name);
 }
 
 Type
