@@ -93,17 +93,15 @@ import InferImportAsMember
 // PRINT-NEXT:  }
 //
 // PRINT-LABEL: /// Class
-// PRINT-NEXT:  struct IAMClass {
-// PRINT-NEXT:    var x: Float
-// PRINT-NEXT:    var y: Float
-// PRINT-NEXT:    var z: Float
-// PRINT-NEXT:    init()
-// PRINT-NEXT:    init(x x: Float, y y: Float, z z: Float)
+// PRINT-NEXT:  class IAMClass {
 // PRINT-NEXT:  }
-// PRINT-NEXT:  typealias IAMClassRef = UnsafeMutablePointer<IAMClass>
-// PRINT-NEXT:  typealias IAMOtherName = IAMClassRef
+//
+// PRINT-LABEL: /// Class
+// PRINT-NEXT:  @available(*, unavailable, renamed="IAMClass", message="Not available in Swift")
+// PRINT-NEXT:  typealias IAMClassRef = IAMClass
+// PRINT-NEXT:  typealias IAMOtherName = IAMClass
 // PRINT-NEXT:  extension IAMClass {
-// PRINT-NEXT:    static var typeID: UInt32 { get }
-// PRINT-NEXT:    init(i i: Double)
-// PRINT-NEXT:    mutating func invert()
+// PRINT-NEXT:    class var typeID: UInt32 { get }
+// PRINT-NEXT:    init!(i i: Double)
+// PRINT-NEXT:    class func invert( iamOtherName: IAMOtherName!)
 // PRINT-NEXT:  }

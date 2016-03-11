@@ -101,10 +101,7 @@ struct TDStruct {
 const TDStruct TDStructCreateWithFloat(float Float);
 
 /// Class
-struct IAMClass {
-  float x, y, z;
-};
-typedef struct IAMClass *IAMClassRef;
+typedef const struct __attribute__((objc_bridge(id))) __IAMClass *IAMClassRef;
 typedef IAMClassRef IAMOtherName;
 
 extern unsigned IAMClassGetTypeID();
