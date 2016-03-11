@@ -16,9 +16,11 @@ public class _AnyIteratorBase {
 ///     func anyIterator<I: IteratorProtocol>(base: I) -> AnyIterator<I.Element>
 ///     func anyIterator<T>(nextImplementation: () -> T?) -> AnyIterator<T>
 public class AnyIterator<T> : _AnyIteratorBase, IteratorProtocol {
+
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
   override public init()
+
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -29,6 +31,7 @@ public class AnyIterator<T> : _AnyIteratorBase, IteratorProtocol {
 /// Every `IteratorProtocol` can also be a `Sequence`.  Note that
 /// traversing the sequence consumes the iterator.
 extension AnyIterator : Sequence {
+
   /// Returns `self`.
   public func makeIterator() -> AnyIterator
 }
@@ -51,5 +54,6 @@ public func anyIterator<I: IteratorProtocol>(base: I) -> AnyIterator<I.Element>
 public class FooIteratorBox<
   Base: IteratorProtocol
 > : AnyIterator<Base.Element> {
+
   public override func next() -> Base.Element?
 }
