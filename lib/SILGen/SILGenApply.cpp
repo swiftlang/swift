@@ -4442,7 +4442,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   SILValue optionalCallback = results[1].getUnmanagedValue();
 
   CanType origSelfType = origAccessType->getInput()
-      ->getRValueInstanceType()
+      ->getInOutObjectType()
       ->getCanonicalType();
   CanGenericSignature genericSig;
   if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType))
