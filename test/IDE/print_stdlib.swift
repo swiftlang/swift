@@ -85,3 +85,4 @@ func foo(x: _Pointer) {} // Checks that this protocol actually exists.
 
 // CHECK-FREQUENT-WORD: ///
 // CHECK-FREQUENT-WORD-NOT: where Slice<Dictionary<Key, Value>> == Slice<Self>
+// CHECK-FREQUENT-WORD-NOT: @warn_unused_result

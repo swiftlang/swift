@@ -307,6 +307,7 @@ struct PrintOptions {
     result.SkipPrivateStdlibDecls = true;
     result.SkipUnderscoredStdlibProtocols = true;
     result.SkipDeinit = true;
+    result.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
     return result;
   }
 
