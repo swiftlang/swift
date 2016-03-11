@@ -1648,9 +1648,10 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
 
 void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
                             bool openBracket, bool closeBracket) {
-  if (openBracket)
+  if (openBracket) {
     Printer << " {";
-  Printer.printNewline();
+    Printer.printNewline();
+  }
   {
     IndentRAII indentMore(*this);
     for (auto i = members.begin(), iEnd = members.end(); i != iEnd; ++i) {
