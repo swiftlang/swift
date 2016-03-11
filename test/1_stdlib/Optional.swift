@@ -240,7 +240,7 @@ OptionalTests.test("Casting Optional") {
 OptionalTests.test("Casting Optional Traps") {
   let nx: C? = nil
   expectCrashLater()
-  anyToAny(nx, Int.self)
+  _blackHole(anyToAny(nx, Int.self))
 }
 
 class TestNoString {}
@@ -325,11 +325,18 @@ OptionalTests.test("Optional OutputStream") {
 }
 
 OptionalTests.test("unsafelyUnwrapped") {
-  let empty: Int? = nil
   let nonEmpty: Int? = 3
   expectEqual(3, nonEmpty.unsafelyUnwrapped)
+}
+
+OptionalTests.test("unsafelyUnwrapped nil")
+  .xfail(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "assertions are disabled in Release and Unchecked mode"))
+  .code {
+  let empty: Int? = nil
   expectCrashLater()
-  empty.unsafelyUnwrapped
+  _blackHole(empty.unsafelyUnwrapped)
 }
 
 runAllTests()
