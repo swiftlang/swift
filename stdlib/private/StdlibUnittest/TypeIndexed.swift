@@ -52,7 +52,7 @@ public class TypeIndexed<Value> : Resettable {
   internal var defaultValue: Value
 }
 
-extension TypeIndexed where Value : ForwardIndex {
+extension TypeIndexed where Value : Strideable {
   public func expectIncrement<R>(
     t: Any.Type,
     @autoclosure _ message: () -> String = "",
@@ -61,7 +61,7 @@ extension TypeIndexed where Value : ForwardIndex {
     file: String = #file, line: UInt = #line,
     body: () -> R
   ) -> R {
-    let expected = self[t].successor()
+    let expected = self[t].advanced(by: 1)
     let r = body()
     expectEqual(
       expected, self[t], message(),

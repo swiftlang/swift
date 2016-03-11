@@ -301,22 +301,81 @@ public func expectMutableSliceType<
   X.SubSequence == X
 >(mutableSliceType: X.Type) {}
 
-/// Check all associated types of a `Collection`.
+/// Check that all associated types of a `Collection` are what we expect them
+/// to be.
 public func expectCollectionAssociatedTypes<
-  X : Collection,
-  Iterator : IteratorProtocol,
-  SubSequence : Sequence,
-  Index : ForwardIndex
+  X : Collection
   where
-  X.Index == Index
+
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  X._Element == X.Iterator.Element,
+  X.SubSequence : Collection,
+  X.SubSequence.Iterator.Element == X.Iterator.Element,
+  X.SubSequence.SubSequence == X.SubSequence,
+  X.Indices : Collection,
+  X.Indices.Iterator.Element == X.Index,
+  X.Indices.Index == X.Index,
+  X.Indices.SubSequence == X.Indices
 >(
   collectionType collectionType: X.Type,
-  iteratorType: Iterator.Type,
-  subSequenceType: SubSequence.Type,
-  indexType: Index.Type
+  iteratorType: X.Iterator.Type,
+  subSequenceType: X.SubSequence.Type,
+  indexType: X.Index.Type,
+  indexDistanceType: X.IndexDistance.Type,
+  indicesType: X.Indices.Type
 ) {}
 
-public func expectForwardIndexType<X : ForwardIndex>(x: X) -> X { return x }
+/// Check that all associated types of a `BidirectionalCollection` are what we
+/// expect them to be.
+public func expectBidirectionalCollectionAssociatedTypes<
+  X : BidirectionalCollection
+  where
+
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  X._Element == X.Iterator.Element,
+  X.SubSequence : BidirectionalCollection,
+  X.SubSequence.Iterator.Element == X.Iterator.Element,
+  X.SubSequence.SubSequence == X.SubSequence,
+  X.Indices : BidirectionalCollection,
+  X.Indices.Iterator.Element == X.Index,
+  X.Indices.Index == X.Index,
+  X.Indices.SubSequence == X.Indices
+>(
+  collectionType collectionType: X.Type,
+  iteratorType: X.Iterator.Type,
+  subSequenceType: X.SubSequence.Type,
+  indexType: X.Index.Type,
+  indexDistanceType: X.IndexDistance.Type,
+  indicesType: X.Indices.Type
+) {}
+
+/// Check that all associated types of a `RandomAccessCollection` are what we
+/// expect them to be.
+public func expectRandomAccessCollectionAssociatedTypes<
+  X : RandomAccessCollection
+  where
+
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  X._Element == X.Iterator.Element,
+  X.SubSequence : RandomAccessCollection,
+  X.SubSequence.Iterator.Element == X.Iterator.Element,
+  X.SubSequence.SubSequence == X.SubSequence,
+  X.Indices : RandomAccessCollection,
+  X.Indices.Iterator.Element == X.Index,
+  X.Indices.Index == X.Index,
+  X.Indices.SubSequence == X.Indices
+>(
+  collectionType collectionType: X.Type,
+  iteratorType: X.Iterator.Type,
+  subSequenceType: X.SubSequence.Type,
+  indexType: X.Index.Type,
+  indexDistanceType: X.IndexDistance.Type,
+  indicesType: X.Indices.Type
+) {}
+
 public func expectIsBooleanType<X : Boolean>(x: inout X) -> X { return x }
 
 public struct AssertionResult : CustomStringConvertible, Boolean {
@@ -1522,7 +1581,13 @@ public enum TestRunPredicate : CustomStringConvertible {
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
 public func checkEquatable<
-  Instances: Collection where Instances.Iterator.Element : Equatable
+  Instances : Collection
+  where
+  Instances.Iterator.Element : Equatable,
+
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index
 >(
   instances: Instances,
   oracle: (Instances.Index, Instances.Index) -> Bool,
@@ -1576,7 +1641,13 @@ public func checkEquatable<T : Equatable>(
 /// requirements of `Hashable`, using `equalityOracle` to generate
 /// equality expectations from pairs of positions in `instances`.
 public func checkHashable<
-  Instances: Collection where Instances.Iterator.Element : Hashable
+  Instances : Collection
+  where
+  Instances.Iterator.Element : Hashable,
+
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
@@ -1600,6 +1671,9 @@ public func checkHashable<T : Hashable>(
     [lhs, rhs], equalityOracle: { expectedEqual || $0 == $1 }, ${trace})
 }
 
+// TODO: swift-3-indexing-model - review the following
+#if false
+
 % for inc, protocol, successor, end in (
 %  ('inc', '_Incrementable', 'successor', 'end'),
 %  ('dec', 'BidirectionalIndex', 'predecessor', 'start')):
@@ -1614,7 +1688,7 @@ public func checkHashable<T : Hashable>(
 ///   elements of `instances`.''' if inc == 'inc' else '''all
 ///   elements of `instances` are reachable from `startIndex`.'''}
 public func check${inc.capitalize()}rementable<
-  Instances: Collection
+  Instances : Collection
   where Instances.Iterator.Element : ${protocol}
 >(
   instances: Instances,
@@ -1636,6 +1710,8 @@ public func check${inc.capitalize()}rementable<
   }
 }
 %end
+
+#endif
 
 public enum ExpectedComparisonResult {
   case lt, eq, gt
@@ -1696,7 +1772,13 @@ extension ExpectedComparisonResult : CustomStringConvertible {
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
 public func checkComparable<
-  Instances: Collection where Instances.Iterator.Element : Comparable
+  Instances : Collection
+  where
+  Instances.Iterator.Element : Comparable,
+
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index
 >(
   instances: Instances,
   oracle: (Instances.Index, Instances.Index) -> ExpectedComparisonResult,
@@ -1763,10 +1845,16 @@ public func checkComparable<T : Comparable>(
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
 public func checkStrideable<
-  Instances: Collection, Strides: Collection
+  Instances : Collection,
+  Strides : Collection
   where
   Instances.Iterator.Element : Strideable,
-  Strides.Iterator.Element == Instances.Iterator.Element.Stride
+  Strides.Iterator.Element == Instances.Iterator.Element.Stride,
+
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index,
+  Strides.Indices.Iterator.Element == Strides.Index
 >(
   instances: Instances, strides: Strides,
   distanceOracle:
@@ -1823,6 +1911,9 @@ public struct CollectionMisuseResiliencyChecks {
       subscriptRangeOnOutOfBoundsRangesBehavior: .none)
   }
 }
+
+// TODO: swift-3-indexing-model - review the following
+#if false
 
 internal func _checkIncrementalAdvance<
   Instances : Collection
@@ -1948,6 +2039,8 @@ public func checkRandomAccessIndex<
     advanceOracle: advanceOracle, ${trace})
 }
 
+#endif
+
 // Generate two overloads: one for Array (which will get
 // picked up when the caller passes a literal), and another that
 // accepts any appropriate Collection type.
@@ -2030,7 +2123,7 @@ public func checkSequence<
     var j = expected.startIndex
     for i in 0..<(end - buf) {
       expectTrue(sameValue(expected[j], buf[i]))
-      j = j.successor()
+      j = expected.next(j)
     }
     buf.deinitialize(count: end - buf)
     buf.deallocateCapacity(count)
@@ -2054,6 +2147,9 @@ public func checkSequence<
   ) { $0 == $1 }
 }
 
+// TODO: swift-3-indexing-model - review the following
+#if false
+
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 
 public func check${traversal}Collection<
@@ -2063,7 +2159,7 @@ public func check${traversal}Collection<
   C.Index : ${traversal}Index
 %  if traversal == 'RandomAccess':
   , C.Index.Stride == C.Index.Distance
-% end
+%  end
 >(
   expected: ${Expected}, _ collection: C,
   ${TRACE},
@@ -2291,6 +2387,8 @@ public func checkSliceableWithBidirectionalIndex<
   }
 }
 
+#endif
+
 % end
 
 public func nthIndex<C: Collection>(x: C, _ n: Int) -> C.Index {
@@ -2300,6 +2398,9 @@ public func nthIndex<C: Collection>(x: C, _ n: Int) -> C.Index {
 public func nth<C: Collection>(x: C, _ n: Int) -> C.Iterator.Element {
   return x[nthIndex(x, n)]
 }
+
+// TODO: swift-3-indexing-model - review the following
+#if false
 
 public func checkRangeReplaceable<
   C: RangeReplaceableCollection,
@@ -2362,6 +2463,8 @@ public func checkRangeReplaceable<
     }
   }
 }
+
+#endif
 
 public func expectEqualSequence<
   Expected: Sequence,
@@ -2661,48 +2764,6 @@ public func < (
 ) -> Bool {
   MinimalComparableValue.timesLessWasCalled.value += 1
   return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
-}
-
-/// A type that conforms only to `Comparable` and `ForwardIndexType`.
-///
-/// This type can be used to check that generic functions don't rely on any
-/// other conformances.
-public struct MinimalComparableIndexValue : Comparable, ForwardIndex {
-  public static var timesEqualEqualWasCalled = ResettableValue(0)
-  public static var timesLessWasCalled = ResettableValue(0)
-
-  public func successor() -> MinimalComparableIndexValue {
-    return MinimalComparableIndexValue(value.successor())
-  }
-
-  public var value: Int
-  public var identity: Int
-
-  public init(_ value: Int) {
-    self.value = value
-    self.identity = 0
-  }
-
-  public init(_ value: Int, identity: Int) {
-    self.value = value
-    self.identity = identity
-  }
-}
-
-public func == (
-  lhs: MinimalComparableIndexValue,
-  rhs: MinimalComparableIndexValue
-) -> Bool {
-  MinimalComparableIndexValue.timesEqualEqualWasCalled.value += 1
-  return lhs.value == rhs.value
-}
-
-public func < (
-  lhs: MinimalComparableIndexValue,
-  rhs: MinimalComparableIndexValue
-) -> Bool {
-  MinimalComparableIndexValue.timesLessWasCalled.value += 1
-  return lhs.value < rhs.value
 }
 
 % for kind in [ 'Value', 'Class' ]:
