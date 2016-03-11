@@ -25,6 +25,19 @@
 using namespace swift;
 using namespace Lowering;
 
+SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Substitution> subs)
+  : numSubs(subs.size()) {
+  std::copy(subs.begin(), subs.end(), getTrailingObjects<Substitution>());
+}
+
+SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
+                                             ArrayRef<Substitution> subs) {
+  unsigned size =
+    sizeof(SILSpecializeAttr) + (subs.size() * sizeof(Substitution));
+  void *buf = M.allocate(size, alignof(SILSpecializeAttr));
+  return ::new (buf) SILSpecializeAttr(subs);
+}
+
 SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  StringRef name,
                                  CanSILFunctionType loweredType,

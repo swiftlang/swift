@@ -1291,6 +1291,42 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                                      rParenLoc, false));
     break;
     }
+  case DAK_Specialize: {
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    SourceLoc lParenLoc = consumeToken();
+
+    SmallVector<TypeLoc, 8> TypeList;
+    do {
+      // Parse the concrete nominal type.
+      ParserResult<TypeRepr> Ty = parseTypeIdentifier();
+      if (Ty.isNull()) {
+        skipUntil(tok::r_paren);
+        return false;
+      }  
+
+      // Record the type.
+      TypeList.push_back(Ty.get());
+  
+      // Check for a ',', which indicates that there are more protocols coming.
+    } while (consumeIf(tok::comma));
+
+    // Parse the closing ')'.
+    SourceLoc rParenLoc;
+    if (!consumeIf(tok::r_paren, rParenLoc)) {
+      diagnose(lParenLoc, diag::attr_expected_rparen, AttrName,
+               /*DeclModifier=*/false);
+      return false;
+    }
+    Attributes.add(
+      SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
+                             TypeList));
+    break;
+    }
   }
 
   if (DuplicateAttribute) {
