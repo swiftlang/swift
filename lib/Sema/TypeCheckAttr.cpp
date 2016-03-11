@@ -1237,7 +1237,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   auto fn = cast<AbstractFunctionDecl>(D);
   for (auto paramList : fn->getParameterLists()) {
     for (auto param : *paramList)
-      if (hasThrowingFunctionParameter(param->getType()->getCanonicalType()))
+      if (hasThrowingFunctionParameter(param->getType()->lookThroughAllAnyOptionalTypes()->getCanonicalType()))
         return;
   }
 
