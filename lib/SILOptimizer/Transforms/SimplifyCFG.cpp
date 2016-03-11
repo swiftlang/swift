@@ -2751,8 +2751,8 @@ getSILValueFromCaseResult(SILBuilder &B, SILLocation Loc,
 /// a given enum is of a given tag.  If so, create a new select_enum instruction
 /// This is used to simplify arbitrary simple switch_enum diamonds into
 /// select_enums.
-bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
-                                    SILArgument *IntArg) {
+static bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
+                                           SILArgument *IntArg) {
 
   // Don't know which values should be passed if there is more
   // than one basic block argument.
