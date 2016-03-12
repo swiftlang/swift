@@ -29,6 +29,7 @@ integerBinaryOps = [
 ///
 /// Its requirements are inherited by `IntegerArithmetic` and thus must
 /// be satisfied by types conforming to that protocol.
+@_show_in_interface
 public protocol _IntegerArithmetic {
 % for name,_,Action,result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and a `Bool` that is

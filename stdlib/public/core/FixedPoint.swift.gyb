@@ -48,6 +48,7 @@ public typealias UIntMax = ${UIntMax}
 
 /// This protocol is an implementation detail of `Integer`; do
 /// not use it directly.
+@_show_in_interface
 public protocol _Integer
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
@@ -65,6 +66,7 @@ public protocol Integer : _Integer, RandomAccessIndex {
 
 /// This protocol is an implementation detail of `SignedInteger`;
 /// do not use it directly.
+@_show_in_interface
 public protocol _SignedInteger : _Integer, SignedNumber {
   /// Represent this number using Swift's widest native signed integer
   /// type.
@@ -89,6 +91,7 @@ public protocol SignedInteger : _SignedInteger, Integer {
 
 /// This protocol is an implementation detail of `UnsignedInteger`;
 /// do not use it directly.
+@_show_in_interface
 public protocol _DisallowMixedSignArithmetic : _Integer {
   // Used to create a deliberate ambiguity in cases like UInt(1) +
   // Int(1), which would otherwise compile due to the arithmetic

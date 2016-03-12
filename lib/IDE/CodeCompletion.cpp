@@ -2467,7 +2467,8 @@ public:
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     // Hide private stdlib declarations.
-    if (D->isPrivateStdlibDecl(/*whitelistProtocols*/false))
+    if (D->isPrivateStdlibDecl(/*whitelistProtocols*/false) ||
+        D->getAttrs().hasAttribute<ShowInInterfaceAttr>())
       return;
     if (AvailableAttr::isUnavailable(D))
       return;

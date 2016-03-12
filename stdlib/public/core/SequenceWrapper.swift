@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A type that is just a wrapper over some base Sequence
+@_show_in_interface
 public // @testable
 protocol _SequenceWrapper {
   associatedtype Base : Sequence
