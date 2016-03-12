@@ -1593,6 +1593,7 @@ public func checkEquatable<
   oracle: (Instances.Index, Instances.Index) -> Bool,
   ${TRACE}
 ) {
+  // TODO: swift-3-indexing-model: add tests for this function.
   for i in instances.indices {
     expectTrue(oracle(i, i), "bad oracle: broken reflexivity at index \(i)")
     let x = instances[i]
@@ -1618,10 +1619,12 @@ public func checkEquatable<
       for k in instances.indices {
         let z = instances[k]
         // Transitivity
-        if xy && y == z {
+        let predictedYZ = oracle(j, k)
+        if predictedXY && predictedYZ {
           expectTrue(
             oracle(i, k),
             "bad oracle: broken transitivity at indices \(i), \(j), \(k)")
+          expectEqual(y, z, ${trace})
           expectEqual(x, z, ${trace})
         }
       }
