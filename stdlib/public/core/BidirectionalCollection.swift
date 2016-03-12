@@ -101,7 +101,8 @@ extension BidirectionalCollection {
 extension BidirectionalCollection where Index : Strideable {
   @warn_unused_result
   public func previous(i: Index) -> Index {
-    _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+    // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
+    //_failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
     return i.advanced(by: -1)
   }
