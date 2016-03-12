@@ -358,6 +358,20 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
 
+
+  // Check 'Tok', return false if ':' or '=' cannot be found.
+  // Complain if '=' is found and suggest replacing it with ':'.
+  auto findAttrValueDelimiter = [&]() -> bool {
+    if (!Tok.is(tok::colon)) {
+      if (!Tok.is(tok::equal))
+        return false;
+      else
+        diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
+          .fixItReplace(Tok.getLoc(), ":");
+    }
+    return true;
+  };
+
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("DAK_Count should not appear in parsing switch");
@@ -761,8 +775,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       // version from the spec. For example, if we have
       //   @available(iOS 8.0, OSX 10.10, *):
       // we will synthesize:
-      //  @available(iOS, introduced=8.0)
-      //  @available(OSX, introduced=10.10)
+      //  @available(iOS, introduced: 8.0)
+      //  @available(OSX, introduced: 10.10)
       for (auto *Spec : Specs) {
         auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
         if (!VersionSpec)
@@ -841,7 +855,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       case IsMessage:
       case IsRenamed: {
         // Items with string arguments.
-        if (!consumeIf(tok::equal)) {
+        if (findAttrValueDelimiter()) {
+          consumeToken();
+        } else {
           diagnose(Tok, diag::attr_availability_expected_equal,
                    AttrName, ArgumentKindStr);
           DiscardAttribute = true;
@@ -872,7 +888,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       }
 
       case IsDeprecated:
-        if (Tok.isNot(tok::equal)) {
+        if (!findAttrValueDelimiter()) {
           if (Unconditional != UnconditionalAvailabilityKind::None) {
             diagnose(Tok, diag::attr_availability_unavailable_deprecated,
                      AttrName);
@@ -886,7 +902,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       case IsIntroduced:
       case IsObsoleted: {
         // Items with version arguments.
-        if (!consumeIf(tok::equal)) {
+        if (findAttrValueDelimiter()) {
+          consumeToken();
+        } else {
           diagnose(Tok, diag::attr_availability_expected_equal,
                    AttrName, ArgumentKindStr);
           DiscardAttribute = true;
@@ -1073,7 +1091,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     SourceLoc lParenLoc = consumeToken();
     bool invalid = false;
     do {
-      // If we see a closing parenthesis, 
+      // If we see a closing parenthesis,
       if (Tok.is(tok::r_paren))
         break;
 
@@ -1100,12 +1118,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
             .Case("message", KnownParameter::Message)
             .Case("mutable_variant", KnownParameter::MutableVariant)
             .Default(None);
-      
-      // If we don't have the '=', complain.
-      SourceLoc equalLoc;
-      if (!consumeIf(tok::equal, equalLoc)) {
+
+      // If we don't have the ':', try the deprecated '='. If that doesn't
+      // exist neither, complain.
+      if (findAttrValueDelimiter()) {
+        consumeToken();
+      } else {
         if (known)
-          diagnose(Tok, diag::attr_warn_unused_result_expected_eq, name);
+          diagnose(Tok, diag::attr_warn_unused_result_expected_colon, name);
         else
           diagnose(Tok, diag::attr_warn_unused_result_unknown_parameter, name);
         continue;
@@ -1117,7 +1137,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         if (Tok.isNot(tok::r_paren))
           skipUntil(tok::r_paren);
         invalid = true;
-        break;        
+        break;
       }
 
       // Dig out the string.
@@ -1202,8 +1222,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       // If we don't have the '=', complain.
       SourceLoc equalLoc;
-      if (!consumeIf(tok::equal, equalLoc)) {
-        diagnose(Tok, diag::attr_expected_equal_separator, name, AttrName);
+      if (findAttrValueDelimiter()) {
+        consumeToken();
+      } else {
+        diagnose(Tok, diag::attr_expected_colon_separator, name, AttrName);
         invalid = true;
         continue;
       }
@@ -1711,6 +1733,7 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::pound_if:
   case tok::identifier:
   case tok::pound_setline:
+  case tok::pound_sourceLocation:
     return true;
   case tok::pound_line:
     // #line at the start of the line is a directive, but it's deprecated.
@@ -1899,6 +1922,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   ParserStatus Status;
 
   while (1) {
+    // Save the original token, in case code-completion needs it.
+    auto OrigTok = Tok;
+    bool MayNeedOverrideCompletion = false;
+
     switch (Tok.getKind()) {
     // Modifiers
     case tok::kw_static:
@@ -2056,6 +2083,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
                             StaticSpelling, tryLoc);
       StaticLoc = SourceLoc();   // we handled static if present.
+      MayNeedOverrideCompletion = true;
       break;
     case tok::kw_typealias:
     case tok::kw_associatedtype:
@@ -2105,10 +2133,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       break;
     }
-    case tok::pound_setline:
+    case tok::pound_sourceLocation:
       Status = parseLineDirective(false);
       break;
     case tok::pound_line:
+    case tok::pound_setline:
       Status = parseLineDirective(true);
       break;
 
@@ -2116,6 +2145,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
       Status = DeclResult;
       StaticLoc = SourceLoc();   // we handled static if present.
+      MayNeedOverrideCompletion = true;
       break;
 
     case tok::kw_subscript:
@@ -2125,26 +2155,38 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         StaticLoc = SourceLoc();
       }
       Status = parseDeclSubscript(Flags, Attributes, Entries);
+      MayNeedOverrideCompletion = true;
       break;
 
     case tok::code_complete:
+      MayNeedOverrideCompletion = true;
+      Status.setIsParseError();
+      // Handled below.
+      break;
+    }
+
+    if (Status.isError() && MayNeedOverrideCompletion &&
+        Tok.is(tok::code_complete)) {
       Status = makeParserCodeCompletionStatus();
       if (CodeCompletion) {
-        // if we need to complete an override, we need to collect which keywords
-        // have already been specified by the developer; so that we do not
-        // duplicate them in code completion strings
+        // If we need to complete an override, collect the keywords already
+        // specifiedso that we do not duplicate them in code completion strings.
         SmallVector<StringRef, 3> Keywords;
-
-        // FIXME: need to handle the case where this line contains multiple decls
-        backtrackToPosition(ParserPosition(L->getStateForBeginningOfTokenLoc(
-          Lexer::getLocForStartOfLine(SourceMgr, Tok.getLoc())), SourceLoc()));
-        while (!Tok.is(tok::code_complete)) {
-          Keywords.push_back(Tok.getText());
-          consumeToken();
+        switch (OrigTok.getKind()) {
+        case tok::kw_func:
+        case tok::kw_subscript:
+        case tok::kw_var:
+          Keywords.push_back(OrigTok.getText());
+          break;
+        default:
+          // Other tokens are already accounted for.
+          break;
+        }
+        for (auto attr : Attributes) {
+          Keywords.push_back(attr->getAttrName());
         }
         CodeCompletion->completeNominalMemberBeginning(Keywords);
       }
-      break;
     }
 
     // If we 'break' out of the switch, break out of the loop too.
@@ -2572,11 +2614,10 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 }
 
 ParserStatus Parser::parseLineDirective(bool isLine) {
-  SourceLoc Loc = consumeToken(isLine ? tok::pound_line
-                                      : tok::pound_setline);
+  SourceLoc Loc = consumeToken();
   if (isLine) {
     diagnose(Loc, diag::line_directive_style_deprecated)
-        .fixItReplace(Loc, "#setline");
+        .fixItReplace(Loc, "#sourceLocation");
   }
   bool WasInPoundLineEnvironment = InPoundLineEnvironment;
   if (WasInPoundLineEnvironment) {
@@ -2584,58 +2625,121 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
     InPoundLineEnvironment = false;
   }
 
-  // #setline\n returns to the main buffer.
-  if (Tok.isAtStartOfLine()) {
-    if (!WasInPoundLineEnvironment) {
-      diagnose(Tok, diag::unexpected_line_directive);
+  
+  unsigned StartLine = 0;
+  Optional<StringRef> Filename;
+  const char *LastTokTextEnd;
+  if (!isLine) {
+    // #sourceLocation()
+    // #sourceLocation(file: "foo", line: 42)
+    if (parseToken(tok::l_paren, diag::sourceLocation_expected, "("))
+      return makeParserError();
+
+    // Handle the "reset" form.
+    if (consumeIf(tok::r_paren)) {
+      if (!WasInPoundLineEnvironment) {
+        diagnose(Tok, diag::unexpected_line_directive);
+        return makeParserError();
+      }
+      return makeParserSuccess();
+    }
+    
+    if (parseSpecificIdentifier("file", diag::sourceLocation_expected,"file:")||
+        parseToken(tok::colon, diag::sourceLocation_expected, ":"))
+      return makeParserError();
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Tok, diag::expected_line_directive_name);
       return makeParserError();
     }
-    return makeParserSuccess();
-  }
+    
+    Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
+                                                 "#sourceLocation");
+    if (!Filename.hasValue())
+      return makeParserError();
+    consumeToken(tok::string_literal);
+    
+    if (parseToken(tok::comma, diag::sourceLocation_expected, ",") ||
+        parseSpecificIdentifier("line", diag::sourceLocation_expected,"line:")||
+        parseToken(tok::colon, diag::sourceLocation_expected, ":"))
+      return makeParserError();
+  
+    if (Tok.isNot(tok::integer_literal)) {
+      diagnose(Tok, diag::expected_line_directive_number);
+      return makeParserError();
+    }
+    if (Tok.getText().getAsInteger(0, StartLine)) {
+      diagnose(Tok, diag::expected_line_directive_number);
+      return makeParserError();
+    }
+    if (StartLine == 0) {
+      diagnose(Tok, diag::line_directive_line_zero);
+      return makeParserError();
+    }
+    consumeToken(tok::integer_literal);
 
-  // #setline 42 "file.swift"\n
-  if (Tok.isNot(tok::integer_literal)) {
-    diagnose(Tok, diag::expected_line_directive_number);
-    return makeParserError();
-  }
-  unsigned StartLine = 0;
-  if (Tok.getText().getAsInteger(0, StartLine)) {
-    diagnose(Tok, diag::expected_line_directive_number);
-    return makeParserError();
-  }
-  if (StartLine == 0) {
-    diagnose(Tok, diag::line_directive_line_zero);
-    return makeParserError();
-  }
-  consumeToken();
+    LastTokTextEnd = Tok.getText().end();
+    if (parseToken(tok::r_paren, diag::sourceLocation_expected, ")"))
+      return makeParserError();
+    
+  } else {  // Legacy #line syntax.
+  
+    // #line\n returns to the main buffer.
+    if (Tok.isAtStartOfLine()) {
+      if (!WasInPoundLineEnvironment) {
+        diagnose(Tok, diag::unexpected_line_directive);
+        return makeParserError();
+      }
+      return makeParserSuccess();
+    }
 
-  if (Tok.isNot(tok::string_literal)) {
-    diagnose(Tok, diag::expected_line_directive_name);
-    return makeParserError();
+    // #line 42 "file.swift"\n
+    if (Tok.isNot(tok::integer_literal)) {
+      diagnose(Tok, diag::expected_line_directive_number);
+      return makeParserError();
+    }
+    if (Tok.getText().getAsInteger(0, StartLine)) {
+      diagnose(Tok, diag::expected_line_directive_number);
+      return makeParserError();
+    }
+    if (StartLine == 0) {
+      diagnose(Tok, diag::line_directive_line_zero);
+      return makeParserError();
+    }
+    consumeToken(tok::integer_literal);
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Tok, diag::expected_line_directive_name);
+      return makeParserError();
+    }
+    
+    Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
+                                                 "#line");
+    if (!Filename.hasValue())
+      return makeParserError();
+    LastTokTextEnd = Tok.getText().end();
+    consumeToken(tok::string_literal);
   }
-
-  auto Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
-                                                    isLine ? "#line"
-                                                           : "#setline");
-  if (!Filename.hasValue())
-    return makeParserError();
-
-  // FIXME: This will be incorrect if there is trailing whitespace at the end
-  // of the #line.
-  SourceLoc Begin = Lexer::getSourceLoc(Tok.getText().end()).getAdvancedLoc(1);
-  int LineOffset = StartLine - SourceMgr.getLineNumber(Begin);
-
-  consumeToken(tok::string_literal);
-  if (!Tok.isAtStartOfLine()) {
+  
+  // Skip over trailing whitespace and a single \n to the start of the next
+  // line.
+  while (*LastTokTextEnd == ' ' || *LastTokTextEnd == '\t')
+    ++LastTokTextEnd;
+  SourceLoc nextLineStartLoc = Lexer::getSourceLoc(LastTokTextEnd);
+  
+  if (*LastTokTextEnd == '\n')
+    nextLineStartLoc = nextLineStartLoc.getAdvancedLoc(1);
+  else {
     diagnose(Tok.getLoc(), diag::extra_tokens_line_directive);
     return makeParserError();
   }
-
+  
+  int LineOffset = StartLine - SourceMgr.getLineNumber(nextLineStartLoc);
+ 
   // Create a new virtual file for the region started by the #line marker.
-  bool isNewFile = SourceMgr.openVirtualFile(Begin, Filename.getValue(),
-                                             LineOffset);
-  assert(isNewFile);
-  (void)isNewFile;
+  bool isNewFile = SourceMgr.openVirtualFile(nextLineStartLoc,
+                                             Filename.getValue(), LineOffset);
+  assert(isNewFile);(void)isNewFile;
 
   InPoundLineEnvironment = true;
   return makeParserSuccess();

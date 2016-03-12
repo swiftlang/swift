@@ -15,6 +15,7 @@
 ///
 /// Its requirements are inherited by `ForwardIndex` and thus must
 /// be satisfied by types conforming to that protocol.
+@_show_in_interface
 public protocol _Incrementable : Equatable {}
 
 @available(*, unavailable, message="Use \'-= 1\' or call collection.prior(Index)")

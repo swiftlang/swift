@@ -246,19 +246,19 @@ public func stride<T : Strideable>(
   return StrideThrough(_start: start, end: end, stride: stride)
 }
 
-@available(*, unavailable, renamed="StrideToIterator")
+@available(*, unavailable, renamed: "StrideToIterator")
 public struct StrideToGenerator<Element : Strideable> {}
 
-@available(*, unavailable, renamed="StrideThroughIterator")
+@available(*, unavailable, renamed: "StrideThroughIterator")
 public struct StrideThroughGenerator<Element : Strideable> {}
 
 extension Strideable {
-  @available(*, unavailable, message="Use stride(from:to:by:) free function instead")
+  @available(*, unavailable, message: "Use stride(from:to:by:) free function instead")
   public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="Use stride(from:through:by:) free function instead")
+  @available(*, unavailable, message: "Use stride(from:through:by:) free function instead")
   public func stride(
     through end: Self, by stride: Stride
   ) -> StrideThrough<Self> {

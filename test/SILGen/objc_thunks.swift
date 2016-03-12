@@ -265,8 +265,9 @@ class Wotsit<T> : Gizmo {
   // CHECK-NEXT:   [[RESULT:%.*]] = apply [[NATIVE:%.*]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> @owned String
   // CHECK-NEXT:   strong_release [[SELF]] : $Wotsit<T>
   // CHECK-NEXT:   // function_ref
-  // CHECK-NEXT:   [[BRIDGE:%.*]] = function_ref @swift_StringToNSString : $@convention(thin) (@owned String) -> @owned NSString
-  // CHECK-NEXT:   [[NSRESULT:%.*]] = apply [[BRIDGE]]([[RESULT]]) : $@convention(thin) (@owned String) -> @owned NSString
+  // CHECK-NEXT:   [[BRIDGE:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
+  // CHECK-NEXT:   [[NSRESULT:%.*]] = apply [[BRIDGE]]([[RESULT]]) : $@convention(method) (@guaranteed String) -> @owned NSString
+  // CHECK-NEXT:   release_value [[RESULT]]
   // CHECK-NEXT:   return [[NSRESULT]] : $NSString
   // CHECK-NEXT: }
   override var description : String {

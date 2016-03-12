@@ -308,6 +308,8 @@ struct Foo<T>: AddressOnlySubscript {
   }
 }
 
+func increment(x: inout Int) { x += 1 }
+
 // Test for materializeForSet vs static properties of structs.
 
 protocol Beverage {
@@ -330,6 +332,27 @@ struct Wine<Color> : Beverage {
     }
     set { }
   }
+}
+
+// Make sure we can perform an inout access of such a property too.
+
+func inoutAccessOfStaticProperty<T : Beverage>(t: T.Type) {
+  increment(&t.abv)
+}
+
+// Test for materializeForSet vs static properties of classes.
+
+class ReferenceBeer {
+  class var abv: Int {
+    get {
+      return 7
+    }
+    set { }
+  }
+}
+
+func inoutAccessOfClassProperty() {
+  increment(&ReferenceBeer.abv)
 }
 
 // Test for materializeForSet when Self is re-abstracted.

@@ -308,6 +308,7 @@ struct PrintOptions {
     result.SkipUnderscoredStdlibProtocols = true;
     result.SkipDeinit = true;
     result.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
+    result.EmptyLineBetweenMembers = true;
     return result;
   }
 

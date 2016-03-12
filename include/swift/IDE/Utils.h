@@ -128,12 +128,10 @@ Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 Decl *getDeclFromMangledSymbolName(ASTContext &context, StringRef mangledName,
                                    std::string &error);
 
-Type getTypeFromMangledTypename(ASTContext &Ctx,
-                                const char *mangled_typename,
+Type getTypeFromMangledTypename(ASTContext &Ctx, StringRef mangledName,
                                 std::string &error);
 
-Type getTypeFromMangledSymbolname(ASTContext &Ctx,
-                                  const char *mangled_typename,
+Type getTypeFromMangledSymbolname(ASTContext &Ctx, StringRef mangledName,
                                   std::string &error);
 
 class XMLEscapingPrinter : public StreamPrinter {

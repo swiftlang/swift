@@ -401,13 +401,13 @@ extension LazyCollectionProtocol
 
 % end
 
-@available(*, unavailable, renamed="FlattenIterator")
+@available(*, unavailable, renamed: "FlattenIterator")
 public struct FlattenGenerator<
   Base : IteratorProtocol where Base.Element : Sequence
 > {}
 
 extension FlattenSequence {
-  @available(*, unavailable, renamed="iterator")
+  @available(*, unavailable, renamed: "iterator")
   public func generate() -> FlattenIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }
@@ -417,7 +417,7 @@ extension FlattenSequence {
 %   t = '' if traversal == 'Forward' else traversal
 %   Collection = 'Flatten%sCollection' % t
 extension ${Collection} {
-  @available(*, unavailable, message="Please use underestimatedCount property instead.")
+  @available(*, unavailable, message: "Please use underestimatedCount property instead.")
   public func underestimateCount() -> Int {
     fatalError("unavailable function can't be called")
   }

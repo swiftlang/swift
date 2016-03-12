@@ -63,7 +63,7 @@ public protocol IteratorProtocol {
 /// A conforming sequence that is not a collection is allowed to
 /// produce an arbitrary sequence of elements from the second iterator.
 public protocol Sequence {
-  //@available(*, unavailable, renamed="Iterator")
+  //@available(*, unavailable, renamed: "Iterator")
   //typealias Generator = ()
 
   /// A type that provides the *sequence*'s iteration interface and
@@ -650,24 +650,24 @@ public struct IteratorSequence<
   internal var _base: Base
 }
 
-@available(*, unavailable, renamed="IteratorProtocol")
+@available(*, unavailable, renamed: "IteratorProtocol")
 public typealias GeneratorType = IteratorProtocol
 
-@available(*, unavailable, renamed="Sequence")
+@available(*, unavailable, renamed: "Sequence")
 public typealias SequenceType = Sequence
 
 extension Sequence {
-  @available(*, unavailable, renamed="makeIterator()")
+  @available(*, unavailable, renamed: "makeIterator()")
   func generate() -> Iterator {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="it became a property 'underestimatedCount'")
+  @available(*, unavailable, message: "it became a property 'underestimatedCount'")
   func underestimateCount() -> Int {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="call 'split(_:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @available(*, unavailable, message: "call 'split(_:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   func split(maxSplit: Int, allowEmptySlices: Bool,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
@@ -676,7 +676,7 @@ extension Sequence {
 }
 
 extension Sequence where Iterator.Element : Equatable {
-  @available(*, unavailable, message="call 'split(separator:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @available(*, unavailable, message: "call 'split(separator:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   public func split(
     separator: Iterator.Element,
     maxSplit: Int = Int.max,
@@ -686,5 +686,5 @@ extension Sequence where Iterator.Element : Equatable {
   }
 }
 
-@available(*, unavailable, renamed="IteratorSequence")
+@available(*, unavailable, renamed: "IteratorSequence")
 public struct GeneratorSequence<Base : IteratorProtocol> {}

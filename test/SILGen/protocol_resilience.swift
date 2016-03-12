@@ -94,11 +94,14 @@ public protocol ResilientStorage {
   associatedtype T : ResilientConstructors
 
   var propertyWithDefault: Int { get }
+  var propertyWithNoDefault: Int { get }
   var mutablePropertyWithDefault: Int { get set }
   var mutablePropertyNoDefault: Int { get set }
   var mutableGenericPropertyWithDefault: T { get set }
 
   subscript(x: T) -> T { get set }
+
+  var mutatingGetterWithNonMutatingDefault: Int { mutating get set }
 }
 
 extension ResilientStorage {
@@ -151,6 +154,18 @@ extension ResilientStorage {
     set { }
   }
 
+// CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStorageg36mutatingGetterWithNonMutatingDefaultSi
+// CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientStorageg36mutatingGetterWithNonMutatingDefaultSi
+// CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStorages36mutatingGetterWithNonMutatingDefaultSi
+// CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientStorages36mutatingGetterWithNonMutatingDefaultSi
+// CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStoragem36mutatingGetterWithNonMutatingDefaultSi
+// CHECK-LABEL: sil [transparent] @_TFFP19protocol_resilience16ResilientStoragem36mutatingGetterWithNonMutatingDefaultSiU_T_
+  public var mutatingGetterWithNonMutatingDefault: Int {
+    get {
+      return 0
+    }
+    set { }
+  }
 }
 
 
@@ -235,12 +250,15 @@ protocol InternalProtocol {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientStorage {
-// CHECK-NEXT:  no_default
-// CHECK-NEXT:  no_default
+// CHECK-NEXT:   no_default
+// CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.propertyWithDefault!getter.1: @_TFP19protocol_resilience16ResilientStorageg19propertyWithDefaultSi
+// CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!getter.1: @_TFP19protocol_resilience16ResilientStorageg26mutablePropertyWithDefaultSi
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!setter.1: @_TFP19protocol_resilience16ResilientStorages26mutablePropertyWithDefaultSi
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!materializeForSet.1: @_TFP19protocol_resilience16ResilientStoragem26mutablePropertyWithDefaultSi
+// CHECK-NEXT:   no_default
+// CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!getter.1: @_TFP19protocol_resilience16ResilientStorageg33mutableGenericPropertyWithDefaultwx1T
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!setter.1: @_TFP19protocol_resilience16ResilientStorages33mutableGenericPropertyWithDefaultwx1T
@@ -248,6 +266,9 @@ protocol InternalProtocol {
 // CHECK-NEXT:   method #ResilientStorage.subscript!getter.1: @_TFP19protocol_resilience16ResilientStorageg9subscriptFwx1TwxS1_
 // CHECK-NEXT:   method #ResilientStorage.subscript!setter.1: @_TFP19protocol_resilience16ResilientStorages9subscriptFwx1TwxS1_
 // CHECK-NEXT:   method #ResilientStorage.subscript!materializeForSet.1: @_TFP19protocol_resilience16ResilientStoragem9subscriptFwx1TwxS1_
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!getter.1: @_TFP19protocol_resilience16ResilientStorageg36mutatingGetterWithNonMutatingDefaultSi
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!setter.1: @_TFP19protocol_resilience16ResilientStorages36mutatingGetterWithNonMutatingDefaultSi
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!materializeForSet.1: @_TFP19protocol_resilience16ResilientStoragem36mutatingGetterWithNonMutatingDefaultSi
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientOperators {

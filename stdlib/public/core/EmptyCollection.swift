@@ -127,11 +127,11 @@ public struct EmptyCollection<Element> :
   // TODO: swift-3-indexing-model - fast fail any others from RandomAccessCollection (and up inheritance)?
 }
 
-@available(*, unavailable, renamed="EmptyIterator")
+@available(*, unavailable, renamed: "EmptyIterator")
 public struct EmptyGenerator<Element> {}
 
 extension EmptyIterator {
-  @available(*, unavailable, renamed="iterator")
+  @available(*, unavailable, renamed: "iterator")
   public func generate() -> EmptyIterator<Element> {
     fatalError("unavailable function can't be called")
   }

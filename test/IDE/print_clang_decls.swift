@@ -100,7 +100,7 @@
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
-// FOUNDATION-NEXT: @available(*, unavailable, message="Zone-based memory management is unavailable")
+// FOUNDATION-NEXT: @available(*, unavailable, message: "Zone-based memory management is unavailable")
 // FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, _ name: String)
 
 // CTYPESBITS-NOT: FooStruct1

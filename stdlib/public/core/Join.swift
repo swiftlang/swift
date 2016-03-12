@@ -175,20 +175,20 @@ extension Sequence where Iterator.Element : Sequence {
   }
 }
 
-@available(*, unavailable, renamed="JoinedIterator")
+@available(*, unavailable, renamed: "JoinedIterator")
 public struct JoinGenerator<
   Base : IteratorProtocol where Base.Element : Sequence
 > {}
 
 extension JoinedSequence {
-  @available(*, unavailable, renamed="iterator")
+  @available(*, unavailable, renamed: "iterator")
   public func generate() -> JoinedIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension Sequence where Iterator.Element : Sequence {
-  @available(*, unavailable, renamed="joined")
+  @available(*, unavailable, renamed: "joined")
   public func joinWithSeparator<
     Separator : Sequence
     where

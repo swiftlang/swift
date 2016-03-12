@@ -80,6 +80,15 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
     }
   }
 
+  // A guaranteed function argument is guaranteed to outlive the function we are
+  // processing. So bottom up for such a parameter, we are always known safe.
+  if (auto *Arg = dyn_cast<SILArgument>(Op)) {
+    if (Arg->isFunctionArg() &&
+        Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed)) {
+      State.updateKnownSafe(true);
+    }
+  }
+
   DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT! Known Safe: "
                      << (State.isKnownSafe() ? "yes" : "no") << "\n");
 

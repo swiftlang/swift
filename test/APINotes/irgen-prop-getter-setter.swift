@@ -1,4 +1,7 @@
-// RUN: %target-build-swift -Xfrontend %clang-importer-sdk %s -emit-ir
+// RUN: rm -rf %t && mkdir %t
+// RUN: %build-clang-importer-objc-overlays
+
+// RUN: %target-swift-frontend %clang-importer-sdk-nosource -I %t %s -emit-ir
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop

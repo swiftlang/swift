@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-silgen-test-overlays
+
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
 
 // REQUIRES: objc_interop
 
@@ -58,7 +61,7 @@ func setFoo(f: Foo, s: String) {
 
 // CHECK:   select_enum [[OPT_NATIVE]]
 // CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
-// CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
+// CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
 // CHECK:    = enum $ImplicitlyUnwrappedOptional<NSString>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   bb3([[OPT_BRIDGED:%.*]] : $ImplicitlyUnwrappedOptional<NSString>):
@@ -178,7 +181,7 @@ func callSetBar(s: String) {
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NV]]
 // CHECK:   select_enum [[OPT_NATIVE]]
 // CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
-// CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
+// CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
 // CHECK:    = enum $ImplicitlyUnwrappedOptional<NSString>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[BRIDGED]]
 // CHECK: bb3([[OPT_BRIDGED:%.*]] : $ImplicitlyUnwrappedOptional<NSString>):
@@ -227,7 +230,7 @@ class Bas : NSObject {
   // CHECK:   [[PROPIMPL:%.*]] = function_ref @_TFC13objc_bridging3Basg11strRealPropSS
   // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[THIS]]) : $@convention(method) (@guaranteed Bas) -> @owned String
   // CHECK:   strong_release [[THIS]]
-  // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
+  // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[PROP_COPY]])
   // CHECK:   return [[NSSTR]]
   // CHECK: }
@@ -263,7 +266,7 @@ class Bas : NSObject {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
   // CHECK:   [[GETTER:%.*]] = function_ref @_TFC13objc_bridging3Basg11strFakePropSS
   // CHECK:   [[STR:%.*]] = apply [[GETTER]]([[THIS]])
-  // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
+  // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[STR]])
   // CHECK:   return [[NSSTR]]
   // CHECK: }
@@ -299,7 +302,7 @@ class Bas : NSObject {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
   // CHECK:   [[METHOD:%.*]] = function_ref @_TFC13objc_bridging3Bas9strResult
   // CHECK:   [[STR:%.*]] = apply [[METHOD]]([[THIS]])
-  // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
+  // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[STR]])
   // CHECK:   return [[NSSTR]]
   // CHECK: }
@@ -349,8 +352,8 @@ class Bas : NSObject {
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
   // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
   // CHECK:   strong_release [[SELF]]
-  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertArrayToNSArray{{.*}} : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
-  // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[ARRAY]]) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
+  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TFE10FoundationSa19_bridgeToObjectiveCfT_CSo7NSArray
+  // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[ARRAY]]) : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @owned NSArray
   // CHECK:   return [[NSARRAY]]
   func arrayResult() -> [AnyObject] { return [] }
 
@@ -362,7 +365,7 @@ class Bas : NSObject {
 // CHECK-LABEL: sil hidden @_TF13objc_bridging16applyStringBlock
 func applyStringBlock(f: @convention(block) String -> String, x: String) -> String {
   // CHECK: [[BLOCK:%.*]] = copy_block %0
-  // CHECK: [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
+  // CHECK: [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK: [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]
   // CHECK: [[RES:%.*]] = apply [[BLOCK]]([[NSSTR]]) : $@convention(block) (NSString) -> @autoreleased NSString
   // CHECK: function_ref @swift_NSStringToString

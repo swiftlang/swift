@@ -2396,12 +2396,11 @@ Decl *ide::getDeclFromMangledSymbolName(ASTContext &context,
 }
 
 Type ide::getTypeFromMangledTypename(ASTContext &Ctx,
-                                     const char *mangled_typename,
+                                     StringRef mangledName,
                                      std::string &error) {
-  ConstString mangled_name(mangled_typename);
   std::vector<Demangle::NodePointer> nodes;
   nodes.push_back(
-      Demangle::demangleTypeAsNode(mangled_typename, mangled_name.length()));
+      Demangle::demangleTypeAsNode(mangledName.data(), mangledName.size()));
   VisitNodeResult empty_generic_context;
   VisitNodeResult result;
 
@@ -2411,19 +2410,18 @@ Type ide::getTypeFromMangledTypename(ASTContext &Ctx,
     return result._types.front().getPointer();
   } else {
     error = stringWithFormat("type for typename '%s' was not found",
-                             mangled_typename);
+                             mangledName);
     return Type();
   }
   return Type();
 }
 
 Type ide::getTypeFromMangledSymbolname(ASTContext &Ctx,
-                                       const char *mangled_typename,
+                                       StringRef mangledName,
                                        std::string &error) {
-  ConstString mangled_name(mangled_typename);
   std::vector<Demangle::NodePointer> nodes;
   nodes.push_back(
-      Demangle::demangleSymbolAsNode(mangled_typename, mangled_name.length()));
+      Demangle::demangleSymbolAsNode(mangledName.data(), mangledName.size()));
   VisitNodeResult empty_generic_context;
   VisitNodeResult result;
 
@@ -2433,7 +2431,7 @@ Type ide::getTypeFromMangledSymbolname(ASTContext &Ctx,
     return result._types.front().getPointer();
   } else {
     error = stringWithFormat("type for symbolname '%s' was not found",
-                             mangled_typename);
+                             mangledName);
     return Type();
   }
   return Type();

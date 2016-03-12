@@ -3115,7 +3115,7 @@ isElementRepresentableInObjC(TypeChecker &TC, const DeclContext *DC, Type T) {
         TC.getProtocol({}, KnownProtocolKind::ObjectiveCBridgeable);
     if (bridgingProto &&
         TC.conformsToProtocol(T, bridgingProto, const_cast<DeclContext *>(DC),
-                              ConformanceCheckOptions())) {
+                              ConformanceCheckFlags::Used)) {
       return true;
     }
   }
@@ -3222,6 +3222,15 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   if (iter != ObjCRepresentableTypes.end()) {
     if (wasOptional && !iter->second)
       return false;
+
+    // If there is an _ObjectiveCBridgeable conformance, mark it as "used".
+    if (ProtocolDecl *bridgingProto =
+            getProtocol({}, KnownProtocolKind::ObjectiveCBridgeable)) {
+      (void)conformsToProtocol(T, bridgingProto,
+                               const_cast<DeclContext *>(DC),
+                               ConformanceCheckFlags::Used);
+    }
+
     return true;
   }
 

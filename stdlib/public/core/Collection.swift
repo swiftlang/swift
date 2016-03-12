@@ -819,30 +819,30 @@ extension Collection {
   }
 }
 
-@available(*, unavailable, message="Bit enum has been deprecated. Please use Int instead.")
+@available(*, unavailable, message: "Bit enum has been deprecated. Please use Int instead.")
 public enum Bit {}
 
-@available(*, unavailable, renamed="IndexingIterator")
+@available(*, unavailable, renamed: "IndexingIterator")
 public struct IndexingGenerator<Elements : Indexable> {}
 
-@available(*, unavailable, renamed="Collection")
+@available(*, unavailable, renamed: "Collection")
 public typealias CollectionType = Collection
 
 extension Collection {
-  @available(*, unavailable, renamed="Iterator")
+  @available(*, unavailable, renamed: "Iterator")
   public typealias Generator = Iterator
 
-  @available(*, unavailable, renamed="iterator")
+  @available(*, unavailable, renamed: "iterator")
   public func generate() -> Iterator {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="Removed in Swift 3. Please use underestimatedCount property.")
+  @available(*, unavailable, message: "Removed in Swift 3. Please use underestimatedCount peoperty.")
   public func underestimateCount() -> Int {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="Please use split(_:omittingEmptySubsequences:isSeparator:) instead")
+  @available(*, unavailable, message: "Please use split(_:omittingEmptySubsequences:isSeparator:) instead")
   public func split(
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
@@ -853,7 +853,7 @@ extension Collection {
 }
 
 extension Collection where Iterator.Element : Equatable {
-  @available(*, unavailable, message="Please use split(separator:maxSplits:omittingEmptySubsequences:) instead")
+  @available(*, unavailable, message: "Please use split(separator:maxSplits:omittingEmptySubsequences:) instead")
   public func split(
     separator: Iterator.Element,
     maxSplit: Int = Int.max,
@@ -863,5 +863,5 @@ extension Collection where Iterator.Element : Equatable {
   }
 }
 
-@available(*, unavailable, message="PermutationGenerator has been removed in Swift 3")
+@available(*, unavailable, message: "PermutationGenerator has been removed in Swift 3")
 public struct PermutationGenerator<C : Collection, Indices : Sequence> {}

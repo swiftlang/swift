@@ -1648,9 +1648,10 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
 
 void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
                             bool openBracket, bool closeBracket) {
-  if (openBracket)
+  if (openBracket) {
     Printer << " {";
-  Printer.printNewline();
+    Printer.printNewline();
+  }
   {
     IndentRAII indentMore(*this);
     for (auto i = members.begin(), iEnd = members.end(); i != iEnd; ++i) {
@@ -1904,8 +1905,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
 void PrintAST::
 printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
   if (Options.TransformContext->shouldOpenExtension) {
-    Printer << "/// Synthesized extension from " <<
-    ExtDecl->getExtendedType()->getAnyNominal()->getName().str() << "\n";
+    Printer << "// synthesized\n";
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";

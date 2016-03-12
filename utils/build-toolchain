@@ -10,7 +10,7 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-cd "$(dirname $0)/.."
+cd "$(dirname $0)/.." || exit
 SRC_DIR=$PWD
 
 YEAR=$(date +"%Y")
@@ -24,8 +24,6 @@ BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME="Local Swift Development Snapshot ${YEAR}-${MONTH}-${DAY}"
 TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
 
-SWIFT_SOURCE_ROOT="${SRC_DIR}"
-SWIFT_BUILD_ROOT="${SRC_DIR}/build"
 SWIFT_INSTALLABLE_PACKAGE="${SRC_DIR}/${ARCHIVE}"
 SWIFT_INSTALL_DIR="${SRC_DIR}/swift-nightly-install"
 SWIFT_INSTALL_SYMROOT="${SRC_DIR}/swift-nightly-symroot"

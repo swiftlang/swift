@@ -488,15 +488,15 @@ internal struct _CocoaFastEnumerationStackBuf {
 }
 
 extension AutoreleasingUnsafeMutablePointer {
-  @available(*, unavailable, renamed="Pointee")
+  @available(*, unavailable, renamed: "Pointee")
   public typealias Memory = Pointee
 
-  @available(*, unavailable, renamed="pointee")
+  @available(*, unavailable, renamed: "pointee")
   public var memory: Pointee {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="Removed in Swift 3. Please use nil literal instead.")
+  @available(*, unavailable, message: "Removed in Swift 3. Please use nil literal instead.")
   public init() {
     fatalError("unavailable function can't be called")
   }

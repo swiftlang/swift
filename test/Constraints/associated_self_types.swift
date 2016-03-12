@@ -1,26 +1,45 @@
 // RUN: %target-parse-verify-swift
 
-protocol P : Collection {
+protocol MyIteratorProtocol {
+  associatedtype Element
+  func next() -> Element?
+}
+
+protocol MySequence {
+  associatedtype Iterator : MyIteratorProtocol
+}
+
+protocol MyCollection : MySequence {
+  var startIndex: Iterator { get }
+}
+
+protocol P : MyCollection {
   init()
 }
 postfix operator ~>> {}
 
-postfix func ~>> <_Self : Sequence, A : P where _Self.Iterator.Element == A.Iterator.Element>(_:_Self) -> A {
+postfix func ~>> <_Self : MySequence, A : P where _Self.Iterator.Element == A.Iterator.Element>(_:_Self) -> A {
   return A()
 }
 
-protocol _ExtendedSequence : Sequence {
+protocol _ExtendedSequence : MySequence {
   postfix func ~>> <A : P where Self.Iterator.Element == A.Iterator.Element>(s: Self) -> A
 }
 
-extension Range : _ExtendedSequence {
+struct MyRangeIterator<T> : MyIteratorProtocol {
+  func next() -> T? { return nil }
 }
 
-protocol Q : Sequence {
-  func f<QS : Sequence where QS.Iterator.Element == Self.Iterator.Element>(x: QS)
+struct MyRange<T> : _ExtendedSequence {
+  typealias Element = T
+  typealias Iterator = MyRangeIterator<T>
 }
 
-struct No<NT> : IteratorProtocol {
+protocol Q : MySequence {
+  func f<QS : MySequence where QS.Iterator.Element == Self.Iterator.Element>(x: QS)
+}
+
+struct No<NT> : MyIteratorProtocol {
   func next() -> NT? {
     return .none
   }
@@ -29,7 +48,7 @@ struct No<NT> : IteratorProtocol {
 class X<XT> : Q {
   typealias Iterator = No<XT>
   
-  func f<SX : Sequence where SX.Iterator.Element == X.Iterator.Element>(x: SX) {
+  func f<SX : MySequence where SX.Iterator.Element == X.Iterator.Element>(x: SX) {
   }
   
   func makeIterator() -> No<XT> {

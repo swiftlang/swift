@@ -2389,18 +2389,16 @@ public:
       return true;
     T = T->getRValueType();
     Mangle::Mangler Man(/* DWARFMangling */true);
-    Man.mangleType(T, 0);
+    Man.mangleTypeForDebugger(T, D->getDeclContext());
     std::string MangledName(Man.finalize());
     std::string Error;
-    Type ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
+    Type ReconstructedType = getTypeFromMangledSymbolname(Ctx, MangledName,
                                                         Error);
     if (ReconstructedType) {
       Stream << "reconstructed type from usr for '" << Range.str() << "' is '";
       ReconstructedType->print(Stream);
       Stream << "'\n";
     } else {
-      ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
-                                                     Error);
       Stream << "cannot reconstruct type from usr for '" << Range.str()
              << "'\n";
     }

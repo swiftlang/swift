@@ -342,7 +342,7 @@ extension RangeOfStrideableIterator {
 }
 
 extension Range {
-  @available(*, unavailable, message="use the '..<' operator")
+  @available(*, unavailable, message: "use the '..<' operator")
   public init(start: Element, end: Element) {
     fatalError("unavailable function can't be called")
   }

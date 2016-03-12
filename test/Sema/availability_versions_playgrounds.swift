@@ -7,7 +7,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_interpreter
 
-@available(OSX, introduced=10.7, deprecated=10.8)
+@available(OSX, introduced: 10.7, deprecated: 10.8)
 func deprecatedOn10_8() { }
 
 func someFunction() {

@@ -277,12 +277,12 @@ public var S_IEXEC: mode_t  { return S_IXUSR }
 // unistd.h
 //===----------------------------------------------------------------------===//
 
-@available(*, unavailable, message="Please use threads or posix_spawn*()")
+@available(*, unavailable, message: "Please use threads or posix_spawn*()")
 public func fork() -> Int32 {
   fatalError("unavailable function can't be called")
 }
 
-@available(*, unavailable, message="Please use threads or posix_spawn*()")
+@available(*, unavailable, message: "Please use threads or posix_spawn*()")
 public func vfork() -> Int32 {
   fatalError("unavailable function can't be called")
 }

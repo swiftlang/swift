@@ -209,7 +209,7 @@ extension LazyCollectionProtocol {
   }
 }
 
-@available(*, unavailable, renamed="LazyCollectionProtocol")
+@available(*, unavailable, renamed: "LazyCollectionProtocol")
 public typealias LazyCollectionType = LazyCollectionProtocol
 
 // ${'Local Variables'}:

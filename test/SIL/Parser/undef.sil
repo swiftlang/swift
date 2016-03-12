@@ -49,7 +49,7 @@ bb0:
   // CHECK: debug_value_addr undef : $*()
   debug_value_addr undef : $*()
 
-  // Acccessing memory
+  // Accessing memory
 
   // CHECK: load undef : $*()
   load undef : $*()

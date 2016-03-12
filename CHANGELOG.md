@@ -2,12 +2,20 @@
 Swift 3
 -------
 
+* Renamification landed, so the Clang importer imports ObjC symbols
+  substantially differently.  *Someone should expand on this point.*
+
+* [SE-0040](https://github.com/apple/swift-evolution/blob/master/proposals/0040-attributecolons.md)
+  landed, changing attributes from using `=` in parameters lists to using `:`,
+  aligning with function call syntax.
+
 * Generic typealiases are now supported, e.g.:
+```swift
     typealias StringDictionary<T> = Dictionary<String, T>
     typealias IntFunction<T> = (T) -> Int
     typealias MatchingTriple<T> = (T, T, T)
     typealias BackwardTriple<T1,T2,T3> = (T3, T2, T1)
-
+```
   etc.
 
 * The @noescape attribute has been extended to be a more general type attribute.
@@ -16,10 +24,16 @@ Swift 3
   @noescape type, and use @noescape in typealiases.  For example, this is now
   valid code:
 
+```swift
     func apply<T, U>(@noescape f: T -> U,
                      @noescape g: (@noescape T -> U) -> U) -> U {
       return g(f)
     }
+```
+
+* [SE-0034](https://github.com/apple/swift-evolution/blob/master/proposals/0034-disambiguating-line.md)
+  has renamed the #line directive (which resets the logical source location
+  for diagnostics and debug information) to #sourceLocation.
 
 * Curried function syntax has been removed, and now produces a compile-time
   error.

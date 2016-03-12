@@ -240,12 +240,12 @@ extension StaticString {
 }
 
 extension StaticString {
-  @available(*, unavailable, renamed="utf8CodeUnitCount")
+  @available(*, unavailable, renamed: "utf8CodeUnitCount")
   public var byteSize: Int {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="use the 'String(_:)' initializer")
+  @available(*, unavailable, message: "use the 'String(_:)' initializer")
   public var stringValue: String {
     fatalError("unavailable function can't be called")
   }

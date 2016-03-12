@@ -129,14 +129,14 @@ extension String {
 
     @available(
       *, unavailable,
-      message="Indexing a String's UTF16View requires a String.UTF16View.Index, which can be constructed from Int when Foundation is imported")
+      message: "Indexing a String's UTF16View requires a String.UTF16View.Index, which can be constructed from Int when Foundation is imported")
     public subscript(i: Int) -> UTF16.CodeUnit {
       fatalError("unavailable function can't be called")
     }
 
     @available(
       *, unavailable,
-      message="Slicing a String's UTF16View requires a Range<String.UTF16View.Index>, String.UTF16View.Index can be constructed from Int when Foundation is imported")
+      message: "Slicing a String's UTF16View requires a Range<String.UTF16View.Index>, String.UTF16View.Index can be constructed from Int when Foundation is imported")
     public subscript(bounds: Range<Int>) -> UTF16View {
       fatalError("unavailable function can't be called")
     }

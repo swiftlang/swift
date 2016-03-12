@@ -394,11 +394,11 @@ public func +<
   return lhs
 }
 
-@available(*, unavailable, renamed="RangeReplaceableCollection")
+@available(*, unavailable, renamed: "RangeReplaceableCollection")
 public typealias RangeReplaceableCollectionType = RangeReplaceableCollection
 
 extension RangeReplaceableCollection {
-  @available(*, unavailable, renamed="replaceSubrange")
+  @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
@@ -407,16 +407,16 @@ extension RangeReplaceableCollection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="removeAt")
+  @available(*, unavailable, renamed: "removeAt")
   public mutating func removeAtIndex(i: Index) -> Iterator.Element {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="removeSubrange")
+  @available(*, unavailable, renamed: "removeSubrange")
   public mutating func removeRange(subRange: Range<Index>) {
   }
 
-  @available(*, unavailable, renamed="append(contentsOf:)")
+  @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence
     where
@@ -425,7 +425,7 @@ extension RangeReplaceableCollection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="insert(contentsOf:at:)")
+  @available(*, unavailable, renamed: "insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(newElements: C, at i: Index) {

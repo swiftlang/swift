@@ -289,7 +289,7 @@ extension String {
   // with unpaired surrogates
   func _encode<
     Encoding: UnicodeCodec
-  >(encoding: Encoding.Type, output: (Encoding.CodeUnit) -> Void)
+  >(encoding: Encoding.Type, @noescape output: (Encoding.CodeUnit) -> Void)
   {
     return _core.encode(encoding, output: output)
   }
@@ -1014,26 +1014,26 @@ extension String.Index {
 }
 
 extension String {
-  @available(*, unavailable, renamed="append")
+  @available(*, unavailable, renamed: "append")
   public mutating func appendContentsOf(other: String) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="append(contentsOf:)")
+  @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="insert(contentsOf:at:)")
+  @available(*, unavailable, renamed: "insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     S : Collection where S.Iterator.Element == Character
   >(newElements: S, at i: Index) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="replaceSubrange")
+  @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Character
   >(
@@ -1042,36 +1042,36 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="replaceSubrange")
+  @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange(
     subRange: Range<Index>, with newElements: String
   ) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="removeAt")
+  @available(*, unavailable, renamed: "removeAt")
   public mutating func removeAtIndex(i: Index) -> Character {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="removeSubrange")
+  @available(*, unavailable, renamed: "removeSubrange")
   public mutating func removeRange(subRange: Range<Index>) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="lowercased()")
+  @available(*, unavailable, renamed: "lowercased()")
   public var lowercaseString: String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="uppercased()")
+  @available(*, unavailable, renamed: "uppercased()")
   public var uppercaseString: String {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension Sequence where Iterator.Element == String {
-  @available(*, unavailable, renamed="joined")
+  @available(*, unavailable, renamed: "joined")
   public func joinWithSeparator(separator: String) -> String {
     fatalError("unavailable function can't be called")
   }

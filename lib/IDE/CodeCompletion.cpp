@@ -2467,7 +2467,8 @@ public:
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     // Hide private stdlib declarations.
-    if (D->isPrivateStdlibDecl(/*whitelistProtocols*/false))
+    if (D->isPrivateStdlibDecl(/*whitelistProtocols*/false) ||
+        D->getAttrs().hasAttribute<ShowInInterfaceAttr>())
       return;
     if (AvailableAttr::isUnavailable(D))
       return;
@@ -3727,9 +3728,12 @@ public:
       NameOffset = Printer.NameOffset.getValue();
     }
 
+    auto typeContext = CurrDeclContext->getInnermostTypeContext();
+    assert(typeContext &&
+           typeContext->getAsGenericTypeOrGenericTypeExtensionContext());
     Accessibility AccessibilityOfContext =
-      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
-        ->getFormalAccess();
+        typeContext->getAsGenericTypeOrGenericTypeExtensionContext()
+            ->getFormalAccess();
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
     bool missingAccess = !isKeywordSpecified("private") &&
@@ -3829,6 +3833,8 @@ public:
     if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
       if (!isa<ProtocolDecl>(CD->getDeclContext()))
         return;
+      if (hasIntroducer || isKeywordSpecified("override"))
+        return;
       if (CD->isRequired() || CD->isDesignatedInit())
         addConstructor(CD);
       return;
@@ -3836,6 +3842,9 @@ public:
   }
 
   void addDesignatedInitializers(Type CurrTy) {
+    if (hasFuncIntroducer || hasVarIntroducer || isKeywordSpecified("override"))
+      return;
+
     if (!CurrTy)
       return;
     const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
@@ -3857,6 +3866,9 @@ public:
 
   void getOverrideCompletions(SourceLoc Loc) {
     if (auto TypeContext = CurrDeclContext->getInnermostTypeContext()){
+      if (!TypeContext->getAsGenericTypeOrGenericTypeExtensionContext())
+        return;
+
       if (Type CurrTy = TypeContext->getDeclaredTypeInContext()) {
         lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
                                  TypeResolver.get());

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -verify -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import -disable-objc-attr-requires-foundation-module %s | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-silgen-test-overlays
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module %s | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -112,14 +114,14 @@ func clearDraggingItemImageComponentsProvider(x: NSDraggingItem) {
   x.imageComponentsProvider = {}
 }
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oGSaPs9AnyObject___XFdCb__aGSqCSo7NSArray__
-// CHECK:         [[CONVERT:%.*]] = function_ref @_TF10Foundation22_convertArrayToNSArray
+// CHECK:         [[CONVERT:%.*]] = function_ref @_TFE10FoundationSa19_bridgeToObjectiveCfT_CSo7NSArray
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[CONVERTED]]
 // CHECK:         return [[OPTIONAL]]
 
 // CHECK-LABEL: sil hidden @{{.*}}bridgeNonnullBlockResult{{.*}}
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oSS_XFdCb__aGSqCSo8NSString__
-// CHECK:         [[CONVERT:%.*]] = function_ref @swift_StringToNSString
+// CHECK:         [[CONVERT:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:         [[BRIDGED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:         return [[OPTIONAL_BRIDGED]]

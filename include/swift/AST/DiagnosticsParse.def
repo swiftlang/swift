@@ -59,15 +59,18 @@ ERROR(expected_conditional_compilation_expression,none,
 ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
 
+ERROR(sourceLocation_expected,none,
+      "expected '%0' in #sourceLocation directive", (StringRef))
+
 ERROR(unexpected_line_directive,none,
-      "parameterless closing #line directive "
-      "without prior opening #line directive", ())
+      "parameterless closing #sourceLocation() directive "
+      "without prior opening #sourceLocation(file:,line:) directive", ())
 ERROR(expected_line_directive_number,none,
-      "expected starting line number for #line directive", ())
+      "expected starting line number for #sourceLocation directive", ())
 ERROR(expected_line_directive_name,none,
-      "expected filename string literal for #line directive", ())
+      "expected filename string literal for #sourceLocation directive", ())
 ERROR(extra_tokens_line_directive,none,
-      "extra tokens at the end of #line directive", ())
+      "extra tokens at the end of #sourceLocation directive", ())
 ERROR(line_directive_line_zero,none,
       "the line number needs to be greater than zero", ())
 
@@ -149,7 +152,7 @@ WARNING(inout_as_attr_deprecated,none,
         "'inout' before a parameter name is deprecated, place it before the parameter type instead",
         ())
 WARNING(line_directive_style_deprecated,none,
-        "#line directive is deprecated, please use #setline instead",
+        "#line directive is deprecated, please use #sourceLocation instead",
         ())
 
 ERROR(declaration_same_line_without_semi,none,
@@ -1071,6 +1074,9 @@ ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
+
+WARNING(replace_equal_with_colon_for_value,none,
+        "'=' is deprecated in favor of ':' before an attribute argument", ())
 ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
 ERROR(unknown_attribute,none,
@@ -1114,8 +1120,8 @@ ERROR(attr_interpolated_string,none,
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 
-ERROR(attr_expected_equal_separator,none,
-      "expected '=' following '%0' argument of '%1'",
+ERROR(attr_expected_colon_separator,none,
+      "expected ':' following '%0' argument of '%1'",
       (StringRef, StringRef))
 
 ERROR(attr_expected_string_literal_arg,none,
@@ -1144,7 +1150,7 @@ ERROR(attr_availability_expected_option,none,
       "'obsoleted', 'message', or 'renamed'", (StringRef))
 
 ERROR(attr_availability_expected_equal,none,
-      "expected '=' after '%1' in '%0' attribute", (StringRef, StringRef))
+      "expected ':' after '%1' in '%0' attribute", (StringRef, StringRef))
 
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
@@ -1214,10 +1220,10 @@ WARNING(attr_warn_unused_result_expected_name,none,
         "expected parameter 'message' or 'mutable_variant'", ())
 WARNING(attr_warn_unused_result_duplicate_parameter,none,
       "duplicate '%0' parameter; previous value will be ignored", (StringRef))
-ERROR(attr_warn_unused_result_expected_eq,none,
-      "expected '=' following '%0' parameter", (StringRef))
+ERROR(attr_warn_unused_result_expected_colon,none,
+      "expected ':' following '%0' parameter", (StringRef))
 ERROR(attr_warn_unused_result_expected_string,none,
-      "expected a string following '=' for '%0' parameter", (StringRef))
+      "expected a string following ':' for '%0' parameter", (StringRef))
 WARNING(attr_warn_unused_result_unknown_parameter,none,
         "unknown parameter '%0' in 'warn_unused_result' attribute", (StringRef))
 ERROR(attr_warn_unused_result_expected_rparen,none,

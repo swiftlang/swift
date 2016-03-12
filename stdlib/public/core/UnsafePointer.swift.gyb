@@ -540,25 +540,25 @@ public func -= <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
 }
 
 extension ${Self} {
-  @available(*, unavailable, renamed="Pointee")
+  @available(*, unavailable, renamed: "Pointee")
   public typealias Memory = Pointee
 
-  @available(*, unavailable, message="use 'nil' literal")
+  @available(*, unavailable, message: "use 'nil' literal")
   public init() {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="use the '${Self}(allocatingCapacity:)' initializer")
+  @available(*, unavailable, message: "use the '${Self}(allocatingCapacity:)' initializer")
   public static func alloc(num: Int) -> ${Self} {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="deallocateCapacity")
+  @available(*, unavailable, renamed: "deallocateCapacity")
   public func dealloc(num: Int) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="pointee")
+  @available(*, unavailable, renamed: "pointee")
   public var memory: Pointee {
     get {
       fatalError("unavailable function can't be called")
@@ -568,17 +568,17 @@ extension ${Self} {
     }
   }
 
-  @available(*, unavailable, renamed="initialize(with:)")
+  @available(*, unavailable, renamed: "initialize(with:)")
   public func initialize(newvalue: Pointee) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="deinitialize(count:)")
+  @available(*, unavailable, renamed: "deinitialize(count:)")
   public func destroy() {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="deinitialize(count:)")
+  @available(*, unavailable, renamed: "deinitialize(count:)")
   public func destroy(count: Int) {
     fatalError("unavailable function can't be called")
   }

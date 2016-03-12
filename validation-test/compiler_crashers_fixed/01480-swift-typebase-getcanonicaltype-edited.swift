@@ -1,13 +1,14 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 // This test was tweaked slightly from the original
 // 1480-swift-typebase-getcanonicaltype.swift, because an unrelated change
 // happened to avoid the crash.
-
 func a(a: a {
 return x in c {
 }

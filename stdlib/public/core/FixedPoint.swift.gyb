@@ -48,6 +48,7 @@ public typealias UIntMax = ${UIntMax}
 
 /// This protocol is an implementation detail of `Integer`; do
 /// not use it directly.
+@_show_in_interface
 public protocol _Integer
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
@@ -64,6 +65,7 @@ public protocol Integer : _Integer, Strideable {}
 
 /// This protocol is an implementation detail of `SignedInteger`;
 /// do not use it directly.
+@_show_in_interface
 public protocol _SignedInteger : _Integer, SignedNumber {
   /// Represent this number using Swift's widest native signed integer
   /// type.
@@ -102,6 +104,7 @@ extension SignedInteger {
 
 /// This protocol is an implementation detail of `UnsignedInteger`;
 /// do not use it directly.
+@_show_in_interface
 public protocol _DisallowMixedSignArithmetic : _Integer {
   // Used to create a deliberate ambiguity in cases like UInt(1) +
   // Int(1), which would otherwise compile due to the arithmetic
@@ -597,14 +600,14 @@ public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
 // FIXME: After <rdar://problem/20226526> is fixed, we should be able
 //        to remove these.
 @_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
+@available(*, deprecated, message: "it will be removed in Swift 3")
 public prefix func ++ (x: inout ${Self}) -> ${Self} {
   x = x + 1
   return x
 }
 
 @_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
+@available(*, deprecated, message: "it will be removed in Swift 3")
 public postfix func ++ (x: inout ${Self}) -> ${Self} {
   let ret = x
   x = x + 1
@@ -612,14 +615,14 @@ public postfix func ++ (x: inout ${Self}) -> ${Self} {
 }
 
 @_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
+@available(*, deprecated, message: "it will be removed in Swift 3")
 public prefix func -- (x: inout ${Self}) -> ${Self} {
   x = x - 1
   return x
 }
 
 @_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
+@available(*, deprecated, message: "it will be removed in Swift 3")
 public postfix func -- (x: inout ${Self}) -> ${Self} {
   let ret = x
   x = x - 1
@@ -666,14 +669,13 @@ internal func _unsafeMinus(lhs: Int, _ rhs: Int) -> Int {
 #endif
 }
 
-
-@available(*, unavailable, renamed="Integer")
+@available(*, unavailable, renamed: "Integer")
 public typealias IntegerType = Integer
 
-@available(*, unavailable, renamed="SignedInteger")
+@available(*, unavailable, renamed: "SignedInteger")
 public typealias SignedIntegerType = SignedInteger
 
-@available(*, unavailable, renamed="UnsignedInteger")
+@available(*, unavailable, renamed: "UnsignedInteger")
 public typealias UnsignedIntegerType = UnsignedInteger
 
 // ${'Local Variables'}:

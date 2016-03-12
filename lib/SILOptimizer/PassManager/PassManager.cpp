@@ -52,6 +52,15 @@ llvm::cl::opt<unsigned> SILFunctionPassPipelineLimit("sil-pipeline-limit",
                                                      llvm::cl::init(10),
                                                      llvm::cl::desc(""));
 
+llvm::cl::opt<std::string> SILBreakOnFun(
+    "sil-break-on-function", llvm::cl::init(""),
+    llvm::cl::desc(
+        "Break before running each function pass on a particular function"));
+
+llvm::cl::opt<std::string> SILBreakOnPass(
+    "sil-break-on-pass", llvm::cl::init(""),
+    llvm::cl::desc("Break before running a particular function pass"));
+
 llvm::cl::opt<std::string>
     SILPrintOnlyFun("sil-print-only-function", llvm::cl::init(""),
                     llvm::cl::desc("Only print out the sil for this function"));
@@ -180,6 +189,22 @@ bool SILPassManager::analysesUnlocked() {
   return true;
 }
 
+// Test the function and pass names we're given against the debug
+// options that force us to break prior to a given pass and/or on a
+// given function.
+static bool breakBeforeRunning(StringRef fnName, StringRef passName) {
+  if (SILBreakOnFun.empty() && SILBreakOnPass.empty())
+    return false;
+
+  if (SILBreakOnFun.empty() && passName == SILBreakOnPass)
+    return true;
+
+  if (SILBreakOnPass.empty() && fnName == SILBreakOnFun)
+    return true;
+
+  return fnName == SILBreakOnFun && passName == SILBreakOnPass;
+}
+
 void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
                                          SILFunction *F,
                                          bool runToCompletion) {
@@ -229,6 +254,8 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
 
     llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
     Mod->registerDeleteNotificationHandler(SFT);
+    if (breakBeforeRunning(F->getName(), SFT->getName()))
+      LLVM_BUILTIN_DEBUGTRAP;
     SFT->run();
     assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
     Mod->removeDeleteNotificationHandler(SFT);

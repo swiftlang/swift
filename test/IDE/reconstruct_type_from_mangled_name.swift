@@ -1,8 +1,7 @@
 // RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="cannot reconstruct"
 
-
-class Mystruct1 {
-// CHECK: reconstructed decl from usr for 'Mystruct1' is 'class Mystruct1'
+struct Mystruct1 {
+// CHECK: reconstructed decl from usr for 'Mystruct1' is 'struct Mystruct1'
   func s1f1() -> Int { return 0 }
 // CHECK: reconstructed decl from usr for 's1f1' is 'func s1f1() -> Int'
   var intField = 3
@@ -67,4 +66,48 @@ class Myclass2 {
     arr3.append(Myclass1())
 // CHECK: reconstructed type from usr for 'append' is '@lvalue Array<Myclass1> -> Myclass1 -> ()'
   }
+}
+
+struct MyGenStruct1<T, U: StringLiteralConvertible, V: Sequence> {
+// CHECK: reconstructed decl from usr for 'MyGenStruct1' is 'struct MyGenStruct1<T, U : StringLiteralConvertible, V : Sequence>'
+// FIXME: why are these references to the base type?
+// CHECK: reconstructed decl from usr for 'T' is 'struct MyGenStruct1
+// CHECK: reconstructed decl from usr for 'U' is 'struct MyGenStruct1
+// CHECK: reconstructed decl from usr for 'V' is 'struct MyGenStruct1
+
+  let x: T
+// CHECK: reconstructed decl from usr for 'x' is 'let x: T'
+  let y: U
+// CHECK: reconstructed decl from usr for 'y' is 'let y: U'
+  let z: V
+// CHECK: reconstructed decl from usr for 'z' is 'let z: V'
+
+  func test000() {
+    _ = x
+// CHECK: reconstructed type from usr for 'x' is 'T'
+    _ = y
+// CHECK: reconstructed type from usr for 'y' is 'U'
+    _ = z
+// CHECK: reconstructed type from usr for 'z' is 'V'
+  }
+}
+
+let genstruct1 = MyGenStruct1<Int, String, [Float]>(x: 1, y: "", z: [1.0])
+// CHECK: reconstructed decl from usr for 'genstruct1' is 'let genstruct1: MyGenStruct1<Int, String, [Float]>'
+
+func test001() {
+// CHECK: reconstructed decl from usr for 'test001' is 'func test001()'
+  _ = genstruct1
+// CHECK: reconstructed type from usr for 'genstruct1' is 'MyGenStruct1<Int, String, Array<Float>>'
+
+  var genstruct2: MyGenStruct1<Int, String, [Int: Int]>
+// CHECK: reconstructed decl from usr for 'genstruct2' is 'var genstruct2: MyGenStruct1<Int, String, [Int : Int]>'
+  _ = genstruct2
+// CHECK: reconstructed type from usr for 'genstruct2' is 'MyGenStruct1<Int, String, Dictionary<Int, Int>>'
+  _ = genstruct2.x
+// CHECK: reconstructed type from usr for 'x' is 'Int'
+  _ = genstruct2.y
+// CHECK: reconstructed type from usr for 'y' is 'String'
+  _ = genstruct2.z
+// CHECK: reconstructed type from usr for 'z' is 'Dictionary<Int, Int>'
 }

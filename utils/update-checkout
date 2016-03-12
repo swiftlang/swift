@@ -22,7 +22,7 @@ from SwiftBuildSupport import (
     WorkingDirectory,
     check_call,
     check_output,
-)
+)  # noqa (E402 module level import not at top of file)
 
 REPOSITORIES = {
     'llvm': 'apple/swift-llvm',
@@ -51,6 +51,7 @@ NEXT_BRANCHES = {
     'swift-corelibs-libdispatch': 'master',
     'swift-integration-tests': 'master',
 }
+
 
 def update_working_copy(repo_path, branch):
     if not os.path.isdir(repo_path):
@@ -150,7 +151,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
             if branch == "stable-next" or branch == "master-next":
                 repo_branch = NEXT_BRANCHES[dir_name]
 
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name), repo_branch)
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
+                            repo_branch)
 
     return 0
 

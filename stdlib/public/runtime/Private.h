@@ -110,7 +110,7 @@ namespace swift {
   static inline bool _swift_isNonPointerIsaObjCClass(const void *object) {
     // Load the isa field.
     uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
-    // If the low bit is set, then we are definately an objc object.
+    // If the low bit is set, then we are definitely an objc object.
     // FIXME: Use a variable for this.
     return bits & 1;
   }

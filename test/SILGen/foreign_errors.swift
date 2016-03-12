@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -parse-as-library %s | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-clang-importer-objc-overlays
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen -parse-as-library %s | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -82,7 +85,7 @@ extension NSObject {
 // CHECK: [[T0:%.*]] = function_ref @_TFE14foreign_errorsCSo8NSObject14badDescription{{.*}} : $@convention(method) (@guaranteed NSObject) -> (@owned String, @error ErrorProtocol)
 // CHECK: try_apply [[T0]](
 // CHECK: bb1([[RESULT:%.*]] : $String):
-// CHECK:   [[T0:%.*]] = function_ref @swift_StringToNSString : $@convention(thin) (@owned String) -> @owned NSString
+// CHECK:   [[T0:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[RESULT]])
 // CHECK:   [[T2:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]] : $NSString
 // CHECK:   br bb3([[T2]] : $Optional<NSString>)

@@ -229,7 +229,7 @@
 // CHECK-CORECOOLING: func CFBottom() ->
 
 // Note: "Ref" variants are unavailable.
-// CHECK-CORECOOLING: @available(*, unavailable, renamed="CCPowerSupply", message="Not available in Swift")
+// CHECK-CORECOOLING: @available(*, unavailable, renamed: "CCPowerSupply", message: "Not available in Swift")
 // CHECK-CORECOOLING-NEXT: typealias CCPowerSupplyRef = CCPowerSupply
 
 // Note: Skipping over "Ref"

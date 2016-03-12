@@ -361,7 +361,7 @@ extension String.CharacterView {
 }
 
 extension String.CharacterView {
-  @available(*, unavailable, renamed="replaceSubrange")
+  @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Character
   >(
@@ -370,7 +370,7 @@ extension String.CharacterView {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="append(contentsOf:)")
+  @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {
