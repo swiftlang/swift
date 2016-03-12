@@ -52,7 +52,6 @@ class Block(object):
     def __init__(self, name, preds):
         self.name = name
         self.content = None
-        self.last_line_content = None
         self.preds = []
         self.succs = None
         self.last_line = None
