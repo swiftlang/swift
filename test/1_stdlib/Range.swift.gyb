@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
+// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 // XFAIL: interpret
@@ -22,7 +24,13 @@ extension Range where Element : TestProtocol1 {
   }
 }
 
-extension RangeIterator where Element : TestProtocol1 {
+extension RangeOfStrideable where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension RangeOfStrideableIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -30,23 +38,46 @@ extension RangeIterator where Element : TestProtocol1 {
 
 var RangeTestSuite = TestSuite("Range")
 
-RangeTestSuite.test("ReverseRange") {
-  // We no longer have a ReverseRange, but we can still make sure that
-  // lazy reversal works correctly.
-  expectEqualSequence((0..<10).lazy.reversed(), [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
+RangeTestSuite.test("TypeInference/Comparable") {
+  let v = MinimalComparableValue(1)
+  do {
+    var range = v..<v
+    expectType(Range<MinimalComparableValue>.self, &range)
+  }
+
 }
 
-func isEquatable<E : Equatable>(e: E) {}
+% for (Self, Element) in [
+%  ('Range', 'MinimalComparableValue'),
+%  ('RangeOfStrideable', 'MinimalStrideableValue'),
+% ]:
 
-RangeTestSuite.test("Range/Equatable") {
-  let r1: Range<Int> = 0..<0
-  let r2: Range<Int> = 0..<1
-  isEquatable(r1)
-  expectTrue(r1 == r1)
-  expectFalse(r1 != r1)
-  expectFalse(r1 == r2)
-  expectTrue(r1 != r2)
+RangeTestSuite.test("${Self}/Equatable") {
+  let _1 = ${Element}(1)
+  let _2 = ${Element}(2)
+
+  let instances: [${Self}<${Element}>] = [
+    _1..<_1,
+    _1..<_2,
+    _2..<_2,
+  ]
+  checkEquatable(instances, oracle: { $0 == $1 })
 }
+
+RangeTestSuite.test("${Self}: '..<' traps when end < start")
+  .crashOutputMatches("Can't form Range with end < start")
+  .code {
+  let _1 = ${Element}(1)
+  let _2 = ${Element}(2)
+  expectCrashLater()
+  let range: ${Self}<${Element}> = _2..<_1
+  _blackHole(range)
+}
+
+% end
+
+/*
+// FIXME: swift-3-indexing-model: fix the printing test.
 
 // Something to test with that distinguishes debugDescription from description
 struct X<T : ForwardIndex> : ForwardIndex, CustomStringConvertible, CustomDebugStringConvertible {
@@ -81,6 +112,7 @@ RangeTestSuite.test("Printing") {
   expectEqual("10..<42", String(X(10)...X(41)))
   expectEqual("Range(X(10)..<X(42))", String(reflecting: Range(X(10)...X(41))))
 }
+*/
 
 RangeTestSuite.test("Pattern matching") {
   let x = 0..<20
@@ -93,6 +125,29 @@ RangeTestSuite.test("Pattern matching") {
   expectFalse(1_000_000..<(1_000_000_000_000 as Int64) ~= 1)
 }
 
+RangeTestSuite.test("map()") {
+  // <rdar://problem/17054014> map method should exist on ranges
+  var result = (1..<4).map { $0*2 }
+  expectType(Array<Int>.self, &result)
+  expectEqualSequence([ 2, 4, 6 ], result)
+}
+
+RangeTestSuite.test("reversed()") {
+  var result = (0..<10).lazy.reversed()
+  expectType(Array<Int>.self, &result)
+  expectEqualSequence(
+    [ 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 ],
+    result)
+}
+
+
+// FIXME: swift-3-indexing-model: check that RangeOfStrideable is a collection.
+/*
+func assertCollection<C: Collection>(_: C) {}
+assertCollection(0..<10)
+*/
+
+// FIXME: swift-3-indexing-model: this test does not belong in this file.
 RangeTestSuite.test("stride") {
   var result = [Double]()
   for i in stride(from: 1.4, through: 3.4, by: 1) {
@@ -101,10 +156,6 @@ RangeTestSuite.test("stride") {
   expectEqual([ 1.4, 2.4, 3.4 ], result)
 }
 
-RangeTestSuite.test("map") {
-  // <rdar://problem/17054014> map method should exist on ranges
-  expectEqual([ 2, 4, 6 ], Array((1...3).map {$0*2}))
-}
 
 runAllTests()
 

@@ -11,8 +11,29 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-parse-verify-swift
 
-func assertCollection<C: Collection>(_: C) {}
-assertCollection(0..<10)
+import StdlibUnittest
+
+func typeInference_Comparable<C : Comparable>(v: C) {
+  do {
+    var range = v..<v
+    expectType(Range<C>.self, &range)
+  }
+  _ = v...v // FIXME: swift-3-indexing-model: shouldn't compile.
+}
+
+func typeInference_Strideable<S : Strideable>(v: S) {
+  do {
+    var range = v..<v
+    expectType(RangeOfStrideable<S>.self, &range)
+  }
+  do {
+    var range = v...v
+    expectType(RangeOfStrideable<S>.self, &range)
+  }
+}
+
+// FIXME: swift-3-indexing-model: decide what to do with the following QoI.
+// The previous implementation was imposing an ABI burden.
 
 // The point of this test is to check that we don't allow indexing
 // Range<Int> et al with Int outside a generic context, to prevent the
