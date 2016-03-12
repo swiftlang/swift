@@ -13,8 +13,8 @@
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
 public protocol Strideable : Comparable {
-  // FIXME: We'd like to name this type "Distance" but for
-  // <rdar://problem/17619038>
+  // FIXME(ABI)(compiler limitation): We'd like to name this type "Distance"
+  // but for <rdar://problem/17619038>
   /// A type that can represent the distance between two values of `Self`.
   associatedtype Stride : SignedNumber
 
