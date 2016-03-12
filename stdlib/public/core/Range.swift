@@ -81,7 +81,8 @@ public struct RangeOfStrideable<
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func next(i: Element) -> Element {
-    fatalError("FIXME: swift-3-indexing-model implement")
+    // FIXME: swift-3-indexing-model: bounds check.
+    return i.advanced(by: 1)
   }
 
   // FIXME(compiler limitation): this typealias should be inferred.
