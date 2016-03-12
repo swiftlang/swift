@@ -3833,6 +3833,8 @@ public:
     if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
       if (!isa<ProtocolDecl>(CD->getDeclContext()))
         return;
+      if (hasIntroducer || isKeywordSpecified("override"))
+        return;
       if (CD->isRequired() || CD->isDesignatedInit())
         addConstructor(CD);
       return;
@@ -3840,6 +3842,9 @@ public:
   }
 
   void addDesignatedInitializers(Type CurrTy) {
+    if (hasFuncIntroducer || hasVarIntroducer || isKeywordSpecified("override"))
+      return;
+
     if (!CurrTy)
       return;
     const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());

@@ -369,46 +369,52 @@ class OmitKW1 : ProtocolA {
 }
 
 //OMIT_KEYWORD1:         Begin completions
-//OMIT_KEYWORD1-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
+// OMIT_KEYWORD1-NOT:    Decl[Constructor]
 //OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc(){{$}}
 //OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 //OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         @noreturn func protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
 // OMIT_KEYWORD1-DAG:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD1-NOT:    Decl[Constructor]
 // OMIT_KEYWORD1: End completions
 
 class OmitKW2 : ProtocolA {
   override func#^OMIT_KEYWORD2^#
 }
 
-//OMIT_KEYWORD2:         Begin completions
-//OMIT_KEYWORD2-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
-//OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
-//OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
-//OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD2:        Begin completions
 // OMIT_KEYWORD2-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD2-NOT:    Decl[Constructor]
+// OMIT_KEYWORD2-DAG:    Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
+// OMIT_KEYWORD2-DAG:    Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+// OMIT_KEYWORD2-DAG:    Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD2-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD2-NOT:    Decl[Constructor]
 // OMIT_KEYWORD2: End completions
 
 class OmitKW3 : ProtocolA {
   func#^OMIT_KEYWORD3^#
 }
 
-// OMIT_KEYWORD3:         Begin completions
-// FIXME: init() not valid after 'func'
-// OMIT_KEYWORD3-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
+// OMIT_KEYWORD3:        Begin completions
 // FIXME: missing 'override'
-// OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
-// OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
-// OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
 // OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD3-NOT:    Decl[Constructor]
+// OMIT_KEYWORD3-DAG:    Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
+// OMIT_KEYWORD3-DAG:    Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+// OMIT_KEYWORD3-DAG:    Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD3-NOT:    Decl[Constructor]
 // OMIT_KEYWORD3: End completions
 
 class OmitKW4: ProtocolA {
   var #^OMIT_KEYWORD4^#
 }
 
+// OMIT_KEYWORD4-NOT:    Decl[Constructor]
 // OMIT_KEYWORD4-NOT:    Decl[InstanceMethod]
 // OMIT_KEYWORD4:        Decl[InstanceVar]/Super: protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD4-NOT:    Decl[InstanceMethod]
+// OMIT_KEYWORD4-NOT:    Decl[Constructor]
 
 class OmitKW5: ProtocolA {
   override
