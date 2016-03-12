@@ -197,11 +197,11 @@ extension LazySequenceProtocol {
   }
 }
 
-@available(*, unavailable, renamed="LazyCollectionProtocol")
+@available(*, unavailable, renamed: "LazyCollectionProtocol")
 public typealias LazySequenceType = LazySequenceProtocol
 
 extension LazySequenceProtocol {
-  @available(*, unavailable, message="Please use Array initializer instead.")
+  @available(*, unavailable, message: "Please use Array initializer instead.")
   public var array: [Iterator.Element] {
     fatalError("unavailable function can't be called")
   }

@@ -813,7 +813,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 //===----------------------------------------------------------------------===//
 
 /// Emit a diagnostic for references to declarations that have been
-/// marked as unavailable, either through "unavailable" or "obsoleted=".
+/// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  SourceRange R,
                                                  const DeclContext *DC) {

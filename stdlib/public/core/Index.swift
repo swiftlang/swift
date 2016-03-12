@@ -54,7 +54,7 @@ public struct _DisabledRangeIndex_ {
 /// Replace `i` with its `successor()` and return the updated value of
 /// `i`.
 @_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
+@available(*, deprecated, message: "it will be removed in Swift 3")
 public prefix func ++ <T : _Incrementable> (i: inout T) -> T {
   i._successorInPlace()
   return i
@@ -63,7 +63,7 @@ public prefix func ++ <T : _Incrementable> (i: inout T) -> T {
 /// Replace `i` with its `successor()` and return the original
 /// value of `i`.
 @_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
+@available(*, deprecated, message: "it will be removed in Swift 3")
 public postfix func ++ <T : _Incrementable> (i: inout T) -> T {
   let ret = i
   i._successorInPlace()
@@ -308,7 +308,7 @@ extension BidirectionalIndex {
 /// Replace `i` with its `predecessor()` and return the updated value
 /// of `i`.
 @_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
+@available(*, deprecated, message: "it will be removed in Swift 3")
 public prefix func -- <T : BidirectionalIndex> (i: inout T) -> T {
   i._predecessorInPlace()
   return i
@@ -318,7 +318,7 @@ public prefix func -- <T : BidirectionalIndex> (i: inout T) -> T {
 /// Replace `i` with its `predecessor()` and return the original
 /// value of `i`.
 @_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
+@available(*, deprecated, message: "it will be removed in Swift 3")
 public postfix func -- <T : BidirectionalIndex> (i: inout T) -> T {
   let ret = i
   i._predecessorInPlace()
@@ -401,11 +401,11 @@ extension RandomAccessIndex {
   }
 }
 
-@available(*, unavailable, renamed="ForwardIndex")
+@available(*, unavailable, renamed: "ForwardIndex")
 public typealias ForwardIndexType = ForwardIndex
 
-@available(*, unavailable, renamed="BidirectionalIndex")
+@available(*, unavailable, renamed: "BidirectionalIndex")
 public typealias BidirectionalIndexType = BidirectionalIndex
 
-@available(*, unavailable, renamed="RandomAccessIndex")
+@available(*, unavailable, renamed: "RandomAccessIndex")
 public typealias RandomAccessIndexType = RandomAccessIndex

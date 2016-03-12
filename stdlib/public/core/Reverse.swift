@@ -245,28 +245,28 @@ extension LazyCollectionProtocol
 }
 
 extension ReverseCollection {
-  @available(*, unavailable, message="use the 'reversed()' method on the collection")
+  @available(*, unavailable, message: "use the 'reversed()' method on the collection")
   public init(_ base: Base) {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension ReverseRandomAccessCollection {
-  @available(*, unavailable, message="use the 'reversed()' method on the collection")
+  @available(*, unavailable, message: "use the 'reversed()' method on the collection")
   public init(_ base: Base) {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension Collection where Index : BidirectionalIndex {
-  @available(*, unavailable, renamed="reversed")
+  @available(*, unavailable, renamed: "reversed")
   public func reverse() -> ReverseCollection<Self> {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension Collection where Index : RandomAccessIndex {
-  @available(*, unavailable, renamed="reversed")
+  @available(*, unavailable, renamed: "reversed")
   public func reverse() -> ReverseRandomAccessCollection<Self> {
     fatalError("unavailable function can't be called")
   }
@@ -274,7 +274,7 @@ extension Collection where Index : RandomAccessIndex {
 
 extension LazyCollectionProtocol
 where Index : BidirectionalIndex, Elements.Index : BidirectionalIndex {
-  @available(*, unavailable, renamed="reversed")
+  @available(*, unavailable, renamed: "reversed")
   public func reverse() -> LazyCollection<
     ReverseCollection<Elements>
   > {
@@ -284,7 +284,7 @@ where Index : BidirectionalIndex, Elements.Index : BidirectionalIndex {
 
 extension LazyCollectionProtocol
 where Index : RandomAccessIndex, Elements.Index : RandomAccessIndex {
-  @available(*, unavailable, renamed="reversed")
+  @available(*, unavailable, renamed: "reversed")
   public func reverse() -> LazyCollection<
     ReverseRandomAccessCollection<Elements>
   > {

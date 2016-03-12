@@ -131,171 +131,171 @@ extension NSCocoaError {
 }
 
 extension NSCocoaError {
-  @available(*, unavailable, renamed="managedObjectValidationError")
+  @available(*, unavailable, renamed: "managedObjectValidationError")
   public static var ManagedObjectValidationError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationMultipleErrorsError")
+  @available(*, unavailable, renamed: "validationMultipleErrorsError")
   public static var ValidationMultipleErrorsError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationMissingMandatoryPropertyError")
+  @available(*, unavailable, renamed: "validationMissingMandatoryPropertyError")
   public static var ValidationMissingMandatoryPropertyError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationRelationshipLacksMinimumCountError")
+  @available(*, unavailable, renamed: "validationRelationshipLacksMinimumCountError")
   public static var ValidationRelationshipLacksMinimumCountError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationRelationshipExceedsMaximumCountError")
+  @available(*, unavailable, renamed: "validationRelationshipExceedsMaximumCountError")
   public static var ValidationRelationshipExceedsMaximumCountError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationRelationshipDeniedDevareError")
+  @available(*, unavailable, renamed: "validationRelationshipDeniedDevareError")
   public static var ValidationRelationshipDeniedDevareError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationNumberTooLargeError")
+  @available(*, unavailable, renamed: "validationNumberTooLargeError")
   public static var ValidationNumberTooLargeError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationNumberTooSmallError")
+  @available(*, unavailable, renamed: "validationNumberTooSmallError")
   public static var ValidationNumberTooSmallError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationDateTooLateError")
+  @available(*, unavailable, renamed: "validationDateTooLateError")
   public static var ValidationDateTooLateError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationDateTooSoonError")
+  @available(*, unavailable, renamed: "validationDateTooSoonError")
   public static var ValidationDateTooSoonError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationInvalidDateError")
+  @available(*, unavailable, renamed: "validationInvalidDateError")
   public static var ValidationInvalidDateError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationStringTooLongError")
+  @available(*, unavailable, renamed: "validationStringTooLongError")
   public static var ValidationStringTooLongError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationStringTooShortError")
+  @available(*, unavailable, renamed: "validationStringTooShortError")
   public static var ValidationStringTooShortError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="validationStringPatternMatchingError")
+  @available(*, unavailable, renamed: "validationStringPatternMatchingError")
   public static var ValidationStringPatternMatchingError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="managedObjectContextLockingError")
+  @available(*, unavailable, renamed: "managedObjectContextLockingError")
   public static var ManagedObjectContextLockingError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreCoordinatorLockingError")
+  @available(*, unavailable, renamed: "persistentStoreCoordinatorLockingError")
   public static var PersistentStoreCoordinatorLockingError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="managedObjectReferentialIntegrityError")
+  @available(*, unavailable, renamed: "managedObjectReferentialIntegrityError")
   public static var ManagedObjectReferentialIntegrityError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="managedObjectExternalRelationshipError")
+  @available(*, unavailable, renamed: "managedObjectExternalRelationshipError")
   public static var ManagedObjectExternalRelationshipError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="managedObjectMergeError")
+  @available(*, unavailable, renamed: "managedObjectMergeError")
   public static var ManagedObjectMergeError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="managedObjectConstraintMergeError")
+  @available(*, unavailable, renamed: "managedObjectConstraintMergeError")
   public static var ManagedObjectConstraintMergeError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreInvalidTypeError")
+  @available(*, unavailable, renamed: "persistentStoreInvalidTypeError")
   public static var PersistentStoreInvalidTypeError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreTypeMismatchError")
+  @available(*, unavailable, renamed: "persistentStoreTypeMismatchError")
   public static var PersistentStoreTypeMismatchError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreIncompatibleSchemaError")
+  @available(*, unavailable, renamed: "persistentStoreIncompatibleSchemaError")
   public static var PersistentStoreIncompatibleSchemaError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreSaveError")
+  @available(*, unavailable, renamed: "persistentStoreSaveError")
   public static var PersistentStoreSaveError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreIncompvareSaveError")
+  @available(*, unavailable, renamed: "persistentStoreIncompvareSaveError")
   public static var PersistentStoreIncompvareSaveError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreSaveConflictsError")
+  @available(*, unavailable, renamed: "persistentStoreSaveConflictsError")
   public static var PersistentStoreSaveConflictsError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="coreDataError")
+  @available(*, unavailable, renamed: "coreDataError")
   public static var CoreDataError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreOperationError")
+  @available(*, unavailable, renamed: "persistentStoreOperationError")
   public static var PersistentStoreOperationError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreOpenError")
+  @available(*, unavailable, renamed: "persistentStoreOpenError")
   public static var PersistentStoreOpenError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreTimeoutError")
+  @available(*, unavailable, renamed: "persistentStoreTimeoutError")
   public static var PersistentStoreTimeoutError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreUnsupportedRequestTypeError")
+  @available(*, unavailable, renamed: "persistentStoreUnsupportedRequestTypeError")
   public static var PersistentStoreUnsupportedRequestTypeError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="persistentStoreIncompatibleVersionHashError")
+  @available(*, unavailable, renamed: "persistentStoreIncompatibleVersionHashError")
   public static var PersistentStoreIncompatibleVersionHashError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="migrationError")
+  @available(*, unavailable, renamed: "migrationError")
   public static var MigrationError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="migrationCancelledError")
+  @available(*, unavailable, renamed: "migrationCancelledError")
   public static var MigrationCancelledError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="migrationMissingSourceModelError")
+  @available(*, unavailable, renamed: "migrationMissingSourceModelError")
   public static var MigrationMissingSourceModelError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="migrationMissingMappingModelError")
+  @available(*, unavailable, renamed: "migrationMissingMappingModelError")
   public static var MigrationMissingMappingModelError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="migrationManagerSourceStoreError")
+  @available(*, unavailable, renamed: "migrationManagerSourceStoreError")
   public static var MigrationManagerSourceStoreError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="migrationManagerDestinationStoreError")
+  @available(*, unavailable, renamed: "migrationManagerDestinationStoreError")
   public static var MigrationManagerDestinationStoreError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="entityMigrationPolicyError")
+  @available(*, unavailable, renamed: "entityMigrationPolicyError")
   public static var EntityMigrationPolicyError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="sqliteError")
+  @available(*, unavailable, renamed: "sqliteError")
   public static var SQLiteError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="inferredMappingModelError")
+  @available(*, unavailable, renamed: "inferredMappingModelError")
   public static var InferredMappingModelError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }
-  @available(*, unavailable, renamed="externalRecordImportError")
+  @available(*, unavailable, renamed: "externalRecordImportError")
   public static var ExternalRecordImportError: NSCocoaError {
     fatalError("unavailable accessor can't be called")
   }

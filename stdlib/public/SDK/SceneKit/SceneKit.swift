@@ -143,8 +143,8 @@ extension double4x4 {
 
 // MARK: APIs refined for Swift
 
-@available(iOS, introduced=8.0)
-@available(OSX, introduced=10.8)
+@available(iOS, introduced: 8.0)
+@available(OSX, introduced: 10.8)
 extension SCNGeometryElement {
   public convenience init<IndexType : Integer>(
     indices: [IndexType], primitiveType: SCNGeometryPrimitiveType
@@ -176,8 +176,8 @@ internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
   _ uid: NSString,
   _ entryClass: AnyObject) -> AnyObject?
 
-@available(iOS, introduced=8.0)
-@available(OSX, introduced=10.8)
+@available(iOS, introduced: 8.0)
+@available(OSX, introduced: 10.8)
 extension SCNSceneSource {
   @warn_unused_result
   public func entryWithIdentifier<T>(uid: String, withClass entryClass: T.Type) -> T? {

@@ -180,8 +180,8 @@ static bool isShortAvailable(const DeclAttribute *DA) {
 /// Print the short-form @available() attribute for an array of long-form
 /// AvailableAttrs that can be represented in the short form.
 /// For example, for:
-///   @available(OSX, introduced=10.10)
-///   @available(iOS, introduced=8.0)
+///   @available(OSX, introduced: 10.10)
+///   @available(iOS, introduced: 8.0)
 /// this will print:
 ///   @available(OSX 10.10, iOS 8.0, *)
 static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
@@ -346,23 +346,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
       Printer << ", deprecated";
 
     if (Attr->Introduced)
-      Printer << ", introduced=" << Attr->Introduced.getValue().getAsString();
+      Printer << ", introduced: " << Attr->Introduced.getValue().getAsString();
     if (Attr->Deprecated)
-      Printer << ", deprecated=" << Attr->Deprecated.getValue().getAsString();
+      Printer << ", deprecated: " << Attr->Deprecated.getValue().getAsString();
     if (Attr->Obsoleted)
-      Printer << ", obsoleted=" << Attr->Obsoleted.getValue().getAsString();
+      Printer << ", obsoleted: " << Attr->Obsoleted.getValue().getAsString();
 
     if (!Attr->Rename.empty())
-      Printer << ", renamed=\"" << Attr->Rename << "\"";
+      Printer << ", renamed: \"" << Attr->Rename << "\"";
 
     // If there's no message, but this is specifically an imported
     // "unavailable in Swift" attribute, synthesize a message to look good in
     // the generated interface.
     if (!Attr->Message.empty())
-      Printer << ", message=\"" << Attr->Message << "\"";
+      Printer << ", message: \"" << Attr->Message << "\"";
     else if (Attr->getUnconditionalAvailability()
                == UnconditionalAvailabilityKind::UnavailableInSwift)
-      Printer << ", message=\"Not available in Swift\"";
+      Printer << ", message: \"Not available in Swift\"";
 
     Printer << ")";
     break;
@@ -407,12 +407,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
 
     if (attr->getRenamed()) {
       printSeparator();
-      Printer << "renamed=\"" << attr->getRenamed() << "\"";
+      Printer << "renamed: \"" << attr->getRenamed() << "\"";
     }
 
     if (!attr->getMessage().empty()) {
       printSeparator();
-      Printer << "message=\"";
+      Printer << "message: \"";
       Printer << attr->getMessage();
       Printer << "\"";
     }
@@ -426,7 +426,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     auto *attr = cast<WarnUnusedResultAttr>(this);
     bool printedParens = false;
     if (!attr->getMessage().empty()) {
-      Printer << "(message=\"" << attr->getMessage() << "\"";
+      Printer << "(message: \"" << attr->getMessage() << "\"";
       printedParens = true;
     }
     if (!attr->getMutableVariant().empty()) {
@@ -434,7 +434,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
         Printer << ", ";
       else
         Printer << "(";
-      Printer << "mutable_variant=\"" << attr->getMutableVariant() << "\"";
+      Printer << "mutable_variant: \"" << attr->getMutableVariant() << "\"";
       printedParens = true;
     }
     if (printedParens)

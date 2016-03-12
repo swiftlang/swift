@@ -162,6 +162,6 @@ extension OptionSet where RawValue : BitwiseOperations {
   }
 }
 
-@available(*, unavailable, renamed="OptionSet")
+@available(*, unavailable, renamed: "OptionSet")
 public typealias OptionSetType = OptionSet
 

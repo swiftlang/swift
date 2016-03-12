@@ -223,7 +223,7 @@ public extension CGRect {
   }
 
   @_transparent // @fragile
-  @warn_unused_result(mutable_variant="insetInPlace")
+  @warn_unused_result(mutable_variant: "insetInPlace")
   func insetBy(dx dx: CGFloat, dy: CGFloat) -> CGRect {
     return CGRectInset(self, dx, dy)
   }
@@ -234,7 +234,7 @@ public extension CGRect {
   }
 
   @_transparent // @fragile
-  @warn_unused_result(mutable_variant="offsetInPlace")
+  @warn_unused_result(mutable_variant: "offsetInPlace")
   func offsetBy(dx dx: CGFloat, dy: CGFloat) -> CGRect {
     return CGRectOffset(self, dx, dy)
   }
@@ -245,7 +245,7 @@ public extension CGRect {
   }
 
   @_transparent // @fragile
-  @warn_unused_result(mutable_variant="unionInPlace")
+  @warn_unused_result(mutable_variant: "unionInPlace")
   func union(rect: CGRect) -> CGRect {
     return CGRectUnion(self, rect)
   }
@@ -256,7 +256,7 @@ public extension CGRect {
   }
 
   @_transparent // @fragile
-  @warn_unused_result(mutable_variant="intersectInPlace")
+  @warn_unused_result(mutable_variant: "intersectInPlace")
   func intersect(rect: CGRect) -> CGRect {
     return CGRectIntersection(self, rect)
   }

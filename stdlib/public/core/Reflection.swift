@@ -579,7 +579,7 @@ struct _MetatypeMirror : _Mirror {
 }
 
 extension ObjectIdentifier {
-  @available(*, unavailable, message="use the 'UInt(_:)' initializer")
+  @available(*, unavailable, message: "use the 'UInt(_:)' initializer")
   public var uintValue: UInt {
     fatalError("unavailable function can't be called")
   }

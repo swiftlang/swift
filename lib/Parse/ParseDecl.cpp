@@ -358,6 +358,20 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
 
+
+  // Check 'Tok', return false if ':' or '=' cannot be found.
+  // Complain if '=' is found and suggest replacing it with ':'.
+  auto findAttrValueDelimiter = [&]() -> bool {
+    if (!Tok.is(tok::colon)) {
+      if (!Tok.is(tok::equal))
+        return false;
+      else
+        diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
+          .fixItReplace(Tok.getLoc(), ":");
+    }
+    return true;
+  };
+
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("DAK_Count should not appear in parsing switch");
@@ -761,8 +775,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       // version from the spec. For example, if we have
       //   @available(iOS 8.0, OSX 10.10, *):
       // we will synthesize:
-      //  @available(iOS, introduced=8.0)
-      //  @available(OSX, introduced=10.10)
+      //  @available(iOS, introduced: 8.0)
+      //  @available(OSX, introduced: 10.10)
       for (auto *Spec : Specs) {
         auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
         if (!VersionSpec)
@@ -841,7 +855,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       case IsMessage:
       case IsRenamed: {
         // Items with string arguments.
-        if (!consumeIf(tok::equal)) {
+        if (findAttrValueDelimiter()) {
+          consumeToken();
+        } else {
           diagnose(Tok, diag::attr_availability_expected_equal,
                    AttrName, ArgumentKindStr);
           DiscardAttribute = true;
@@ -872,7 +888,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       }
 
       case IsDeprecated:
-        if (Tok.isNot(tok::equal)) {
+        if (!findAttrValueDelimiter()) {
           if (Unconditional != UnconditionalAvailabilityKind::None) {
             diagnose(Tok, diag::attr_availability_unavailable_deprecated,
                      AttrName);
@@ -886,7 +902,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       case IsIntroduced:
       case IsObsoleted: {
         // Items with version arguments.
-        if (!consumeIf(tok::equal)) {
+        if (findAttrValueDelimiter()) {
+          consumeToken();
+        } else {
           diagnose(Tok, diag::attr_availability_expected_equal,
                    AttrName, ArgumentKindStr);
           DiscardAttribute = true;
@@ -1073,7 +1091,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     SourceLoc lParenLoc = consumeToken();
     bool invalid = false;
     do {
-      // If we see a closing parenthesis, 
+      // If we see a closing parenthesis,
       if (Tok.is(tok::r_paren))
         break;
 
@@ -1100,12 +1118,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
             .Case("message", KnownParameter::Message)
             .Case("mutable_variant", KnownParameter::MutableVariant)
             .Default(None);
-      
-      // If we don't have the '=', complain.
-      SourceLoc equalLoc;
-      if (!consumeIf(tok::equal, equalLoc)) {
+
+      // If we don't have the ':', try the deprecated '='. If that doesn't
+      // exist neither, complain.
+      if (findAttrValueDelimiter()) {
+        consumeToken();
+      } else {
         if (known)
-          diagnose(Tok, diag::attr_warn_unused_result_expected_eq, name);
+          diagnose(Tok, diag::attr_warn_unused_result_expected_colon, name);
         else
           diagnose(Tok, diag::attr_warn_unused_result_unknown_parameter, name);
         continue;
@@ -1117,7 +1137,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         if (Tok.isNot(tok::r_paren))
           skipUntil(tok::r_paren);
         invalid = true;
-        break;        
+        break;
       }
 
       // Dig out the string.
@@ -1202,8 +1222,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       // If we don't have the '=', complain.
       SourceLoc equalLoc;
-      if (!consumeIf(tok::equal, equalLoc)) {
-        diagnose(Tok, diag::attr_expected_equal_separator, name, AttrName);
+      if (findAttrValueDelimiter()) {
+        consumeToken();
+      } else {
+        diagnose(Tok, diag::attr_expected_colon_separator, name, AttrName);
         invalid = true;
         continue;
       }

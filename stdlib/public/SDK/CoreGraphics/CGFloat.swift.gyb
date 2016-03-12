@@ -135,12 +135,12 @@ extension CGFloat {
   }
 }
 
-@available(*,unavailable,message="use CGFloat.min")
+@available(*,unavailable,message: "use CGFloat.min")
 public var CGFLOAT_MIN: CGFloat {
   fatalError("can't retrieve unavailable property")
 }
 
-@available(*,unavailable,message="use CGFloat.max")
+@available(*,unavailable,message: "use CGFloat.max")
 public var CGFLOAT_MAX: CGFloat {
   fatalError("can't retrieve unavailable property")
 }

@@ -62,10 +62,10 @@ extension NSObject : CustomDebugStringConvertible {}
 // Strings
 //===----------------------------------------------------------------------===//
 
-@available(*, unavailable, message="Please use String or NSString")
+@available(*, unavailable, message: "Please use String or NSString")
 public class NSSimpleCString {}
 
-@available(*, unavailable, message="Please use String or NSString")
+@available(*, unavailable, message: "Please use String or NSString")
 public class NSConstantString {}
 
 @warn_unused_result
@@ -1006,19 +1006,19 @@ public func NSLog(format: String, _ args: CVarArg...) {
 // have CGRectEdge type.  This is not correct for Swift (as there is no
 // implicit conversion to NSRectEdge).
 
-@available(*, unavailable, renamed="NSRectEdge.MinX")
+@available(*, unavailable, renamed: "NSRectEdge.MinX")
 public var NSMinXEdge: NSRectEdge {
   fatalError("unavailable property can't be accessed")
 }
-@available(*, unavailable, renamed="NSRectEdge.MinY")
+@available(*, unavailable, renamed: "NSRectEdge.MinY")
 public var NSMinYEdge: NSRectEdge {
   fatalError("unavailable property can't be accessed")
 }
-@available(*, unavailable, renamed="NSRectEdge.MaxX")
+@available(*, unavailable, renamed: "NSRectEdge.MaxX")
 public var NSMaxXEdge: NSRectEdge {
   fatalError("unavailable property can't be accessed")
 }
-@available(*, unavailable, renamed="NSRectEdge.MaxY")
+@available(*, unavailable, renamed: "NSRectEdge.MaxY")
 public var NSMaxYEdge: NSRectEdge {
   fatalError("unavailable property can't be accessed")
 }

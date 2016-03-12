@@ -281,12 +281,12 @@ func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {
 
 extension UnicodeScalar {
   /// Creates an instance of the NUL scalar value.
-  @available(*, unavailable, message="use the 'UnicodeScalar(\"\\0\")'")
+  @available(*, unavailable, message: "use the 'UnicodeScalar(\"\\0\")'")
   public init() {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="escaped")
+  @available(*, unavailable, renamed: "escaped")
   public func escape(asASCII forceASCII: Bool) -> String {
     fatalError("unavailable function can't be called")
   }

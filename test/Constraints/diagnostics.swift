@@ -139,14 +139,14 @@ infix operator ***~ {
 func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
-@available(*, unavailable, message="call the 'map()' method on the sequence")
+@available(*, unavailable, message: "call the 'map()' method on the sequence")
 public func myMap<C : Collection, T>(
   source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
 }
 
-@available(*, unavailable, message="call the 'map()' method on the optional value")
+@available(*, unavailable, message: "call the 'map()' method on the optional value")
 public func myMap<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
   fatalError("unavailable function can't be called")
 }
@@ -640,7 +640,7 @@ func r22470302(c: r22470302Class) {
 
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
-  @available(*, unavailable, message="calling this is unwise")
+  @available(*, unavailable, message: "calling this is unwise")
   func unavail<T : Sequence where T.Iterator.Element == String> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
     (a : T) -> String {}
 }

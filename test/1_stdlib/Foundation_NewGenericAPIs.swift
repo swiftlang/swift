@@ -11,8 +11,8 @@ func test_NSCoder_decodeObject(coder: NSCoder) {
   expectType(Optional<AnyObject>.self, &r)
 }
 
-@available(iOS, introduced=9.0)
-@available(OSX, introduced=10.11)
+@available(iOS, introduced: 9.0)
+@available(OSX, introduced: 10.11)
 func test_NSCoder_decodeTopLevelObject(coder: NSCoder) throws {
   var r = try coder.decodeTopLevelObject()
   expectType(Optional<AnyObject>.self, &r)
@@ -30,8 +30,8 @@ func test_NSCoder_decodeObjectOfClasses_forKey(
   expectType(Optional<AnyObject>.self, &r)
 }
 
-@available(iOS, introduced=9.0)
-@available(OSX, introduced=10.11)
+@available(iOS, introduced: 9.0)
+@available(OSX, introduced: 10.11)
 func test_NSCoder_decodeTopLevelObjectOfClasses_forKey_error(
   coder: NSCoder, classes: NSSet?, key: String
 ) throws {
@@ -48,8 +48,8 @@ func test_NSKeyedUnarchiver_unarchiveObjectWithData(data: NSData) {
 /*
 The API is unavailable and it is not possible to overload on 'throws'.
 
-@available(iOS, introduced=9.0)
-@available(OSX, introduced=10.11)
+@available(iOS, introduced: 9.0)
+@available(OSX, introduced: 10.11)
 func test_NSKeyedUnarchiver_unarchiveObjectWithData_error(data: NSData) throws {
   var r = NSKeyedUnarchiver.unarchiveObjectWithData(data)
   expectType(Optional<AnyObject>.self, &r)
