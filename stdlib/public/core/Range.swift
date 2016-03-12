@@ -298,6 +298,7 @@ public func ..< <Pos : Comparable> (minimum: Pos, maximum: Pos)
 public func ..< <Pos : Strideable> (
   start: Pos, end: Pos
 ) -> RangeOfStrideable<Pos> {
+  // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
   return RangeOfStrideable(_start: start, end: end)
 }
@@ -308,10 +309,12 @@ public func ..< <Pos : Strideable> (
 @warn_unused_result
 public func ... <Pos : Strideable> (
   start: Pos, end: Pos
-) -> Range<Pos> {
+) -> RangeOfStrideable<Pos> {
+  let endPlusOne = end.advanced(by: 1)
+  // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
-  _precondition(end.advanced(by: 1) > end, "Range end index has no valid successor")
-  return Range(_start: start, end: end.advanced(by: 1))
+  _precondition(endPlusOne > end, "Range end has no valid successor")
+  return RangeOfStrideable(_start: start, end: endPlusOne)
 }
 
 @warn_unused_result

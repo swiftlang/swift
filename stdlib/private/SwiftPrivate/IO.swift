@@ -28,7 +28,7 @@ public struct _FDInputStream {
       _buffer[0..<_bufferUsed].index(of: UInt8(UnicodeScalar("\n").value)) {
       let result = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: _buffer[0..<newlineIndex])
-      _buffer.removeSubrange(0...newlineIndex)
+      _buffer.removeSubrange(Range(0...newlineIndex))
       _bufferUsed -= newlineIndex + 1
       return result
     }

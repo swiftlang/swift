@@ -391,7 +391,9 @@ extension _ArrayBuffer {
       else {
         var refCopy = self
         refCopy.replace(
-          subRange: i...i, with: 1, elementsOf: CollectionOfOne(newValue))
+          subRange: Range(i...i),
+          with: 1,
+          elementsOf: CollectionOfOne(newValue))
       }
     }
   }
