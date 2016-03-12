@@ -126,6 +126,16 @@ public func == <Element>(
     lhs.endIndex == rhs.endIndex
 }
 
+@warn_unused_result
+public func != <Element>(
+  lhs: RangeOfStrideable<Element>,
+  rhs: RangeOfStrideable<Element>
+) -> Bool {
+  return
+    lhs.startIndex != rhs.startIndex ||
+    lhs.endIndex != rhs.endIndex
+}
+
 /// An iterator over the elements of `Range<Element>`.
 public struct RangeOfStrideableIterator<
   Element : Strideable
