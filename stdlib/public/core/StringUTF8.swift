@@ -124,14 +124,14 @@ extension String {
       /// Returns the next consecutive value after `self`.
       ///
       /// - Precondition: The next value is representable.
-      // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.next(Index)
-      /*
       @warn_unused_result
       public func successor() -> Index {
+        // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.next(Index)
+        // FIXME: swift-3-indexing-model: remove the successor() function.
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
         let hiNibble = currentUnit >> 4
         // Map the high nibble of the current code unit into the
-        // amount by which to increment the utf16 index.  Only when
+        // amount by which to increment the UTF-16 index.  Only when
         // the high nibble is 1111 do we have a surrogate pair.
         let u16Increments = Int(bitPattern:
         // 1111 1110 1101 1100 1011 1010 1001 1000 0111 0110 0101 0100 0011 0010 0001 0000
@@ -157,7 +157,6 @@ extension String {
           return Index(_core, nextCoreIndex, nextBuffer)
         }
       }
-      */
 
       /// True iff the index is at the end of its view or if the next
       /// byte begins a new UnicodeScalar.
@@ -187,10 +186,10 @@ extension String {
         return (thisBuffer >> 8) | _bufferHiByte
       }
 
-      /// The underlying buffer we're presenting as UTF8
+      /// The underlying buffer we're presenting as UTF-8
       internal let _core: _StringCore
       /// The position of `self`, rounded up to the nearest unicode
-      /// scalar boundary, in the underlying UTF16.
+      /// scalar boundary, in the underlying UTF-16.
       internal let _coreIndex: Int
       /// If `self` is at the end of its `_core`, has the value `_endBuffer`.
       /// Otherwise, the low byte contains the value of
@@ -218,30 +217,7 @@ extension String {
     @warn_unused_result
     public func next(i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
-      fatalError("FIXME: swift-3-indexing-model implement")
-    }
-    
-    // TODO: swift-3-indexing-model - add docs
-    @warn_unused_result
-    public func advance(i: Index, by n: IndexDistance) -> Index {
-      // FIXME: swift-3-indexing-model: range check i?
-      fatalError("FIXME: swift-3-indexing-model implement")
-    }
-    
-    // TODO: swift-3-indexing-model - add docs
-    @warn_unused_result
-    public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
-      _precondition(n >= 0,
-        "Only BidirectionalCollections can be advanced by a negative amount")
-      // FIXME: swift-3-indexing-model: range check i?
-      fatalError("FIXME: swift-3-indexing-model implement")
-    }
-
-    // TODO: swift-3-indexing-model - add docs
-    @warn_unused_result
-    public func distance(from start: Index, to end: Index) -> IndexDistance {
-      // FIXME: swift-3-indexing-model: range check start and end?
-      fatalError("FIXME: swift-3-indexing-model implement")
+      return i.successor()
     }
 
     /// Access the element at `position`.
@@ -249,7 +225,7 @@ extension String {
     /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     public subscript(position: Index) -> UTF8.CodeUnit {
-      let result: UTF8.CodeUnit = numericCast(position._buffer & 0xFF)
+      let result = UTF8.CodeUnit(truncatingBitPattern: position._buffer & 0xFF)
       _precondition(result != 0xFF, "cannot subscript using endIndex")
       return result
     }
@@ -370,7 +346,10 @@ public func < (
   lhs: String.UTF8View.Index,
   rhs: String.UTF8View.Index
 ) -> Bool {
-  fatalError("FIXME: swift-3-indexing-model")
+  // FIXME: swift-3-indexing-model: tests.
+  // FIXME: swift-3-indexing-model: this implementation is wrong, it is just a
+  // temporary HACK.
+  return lhs._coreIndex < rhs._coreIndex
 }
 
 // Index conversions
