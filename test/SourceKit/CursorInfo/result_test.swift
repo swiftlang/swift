@@ -1,6 +1,6 @@
 // Checks that SourceKit does not crash for enum patterns in generics.
-// RUN: %sourcekitd-test -req cursor -pos 17:15 %s -- %s | FileCheck %s
-// CHECK: source.lang.swift.ref.enumelement (11:10-11:17)
+// RUN: %sourcekitd-test -req cursor -pos 18:15 %s -- %s | FileCheck %s
+// CHECK: source.lang.swift.ref.enumelement (12:10-12:17)
 
 public protocol MyErrorType {
 }
