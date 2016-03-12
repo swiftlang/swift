@@ -143,6 +143,61 @@ public func == (
 
 % end
 
+/// A type that conforms only to `Equatable`, `Comparable`, and `Strideable`.
+///
+/// This type can be used to check that generic functions don't rely on any
+/// other conformances.
+public struct MinimalStrideableValue : Equatable, Comparable, Strideable {
+  public static var timesEqualEqualWasCalled = ResettableValue(0)
+  public static var timesLessWasCalled = ResettableValue(0)
+
+  public static var equalImpl =
+    ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
+  public static var lessImpl =
+    ResettableValue<(Int, Int) -> Bool>({ $0 < $1 })
+
+  public var value: Int
+  public var identity: Int
+
+  public init(_ value: Int) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Int, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+
+  public typealias Stride = Int
+
+  @warn_unused_result
+  public func distance(to other: MinimalStrideableValue) -> Stride {
+    return other.value - self.value
+  }
+
+  @warn_unused_result
+  public func advanced(by n: Stride) -> MinimalStrideableValue {
+    return MinimalStrideableValue(self.value + n, identity: self.identity)
+  }
+}
+
+public func == (
+  lhs: MinimalStrideableValue,
+  rhs: MinimalStrideableValue
+) -> Bool {
+  MinimalStrideableValue.timesEqualEqualWasCalled.value += 1
+  return MinimalStrideableValue.equalImpl.value(lhs.value, rhs.value)
+}
+
+public func < (
+  lhs: MinimalStrideableValue,
+  rhs: MinimalStrideableValue
+) -> Bool {
+  MinimalStrideableValue.timesLessWasCalled.value += 1
+  return MinimalStrideableValue.lessImpl.value(lhs.value, rhs.value)
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
