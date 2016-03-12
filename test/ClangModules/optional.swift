@@ -22,6 +22,7 @@ class A {
 // CHECK:      [[T0:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[STR]])
 // CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
+// CHECK-NEXT: release_value [[STR]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
 // CHECK:      enum $Optional<NSString>, #Optional.none!enumelt

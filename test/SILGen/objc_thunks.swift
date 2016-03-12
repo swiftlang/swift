@@ -267,6 +267,7 @@ class Wotsit<T> : Gizmo {
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[BRIDGE:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK-NEXT:   [[NSRESULT:%.*]] = apply [[BRIDGE]]([[RESULT]]) : $@convention(method) (@guaranteed String) -> @owned NSString
+  // CHECK-NEXT:   release_value [[RESULT]]
   // CHECK-NEXT:   return [[NSRESULT]] : $NSString
   // CHECK-NEXT: }
   override var description : String {

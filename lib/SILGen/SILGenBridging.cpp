@@ -58,13 +58,25 @@ static Optional<ManagedValue> emitBridgeToObjectiveC(SILGenFunction &gen,
   SILDeclRef witnessConstant(witness.getDecl());
   auto witnessRef = gen.emitGlobalFunctionRef(loc, witnessConstant);
 
+  // Determine the substitutions.
+  ArrayRef<Substitution> substitutions;
+  auto witnessFnTy = witnessRef->getType();
+
+  if (auto valueTypeBGT = swiftValueType->getAs<BoundGenericType>()) {
+    // Compute the substitutions.
+    substitutions = valueTypeBGT->getSubstitutions(gen.SGM.SwiftModule,
+                                                   nullptr);
+
+    // Substitute into the witness function tye.
+    witnessFnTy = witnessFnTy.substGenericArgs(gen.SGM.M, substitutions);
+  }
+
   // Call the witness.
   SILType resultTy = gen.getLoweredType(objcType);
-  SILValue bridgedValue = gen.B.createApply(loc, witnessRef,
-                                            witnessRef->getType(),
-                                            resultTy,
-                                            witness.getSubstitutions(),
-                                            swiftValue.forward(gen));
+  SILValue bridgedValue = gen.B.createApply(loc, witnessRef, witnessFnTy,
+                                            resultTy, substitutions,
+                                            swiftValue.borrow()
+                                              .getUnmanagedValue());
   return gen.emitManagedRValueWithCleanup(bridgedValue);
 }
 
@@ -420,8 +432,10 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   // Bridge Array to NSArray.
   if (auto arrayDecl = gen.getASTContext().getArrayDecl()) {
     if (v.getType().getSwiftRValueType().getAnyNominal() == arrayDecl) {
-      SILDeclRef bridgeFn = gen.SGM.getArrayToNSArrayFn();
-      return emitBridgeCollectionFromNative(gen, loc, bridgeFn, v, bridgedTy);
+      if (auto result = emitBridgeToObjectiveC(gen, loc, v))
+        return *result;
+
+      return gen.emitUndef(loc, bridgedTy);
     }
   }
 
