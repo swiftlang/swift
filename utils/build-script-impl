@@ -1900,19 +1900,20 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 continue
                 ;;
             xctest)
+                SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
                 XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     set -x
                     xcodebuild \
                         -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTest \
+                        SWIFT_EXEC="${SWIFTC_BIN}" \
                         SKIP_INSTALL=NO \
                         DEPLOYMENT_LOCATION=YES \
                         DSTROOT="${XCTEST_BUILD_DIR}" \
                         INSTALL_PATH="/"
                     { set +x; } 2>/dev/null
                 else
-                    SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
                     FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
                     set -x
                     # FIXME: Use XCTEST_BUILD_TYPE (which is never properly
@@ -2168,14 +2169,15 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
+                SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     set -x
                     xcodebuild \
                         -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
-                        -scheme SwiftXCTestFunctionalTests
+                        -scheme SwiftXCTestFunctionalTests \
+                        SWIFT_EXEC="${SWIFTC_BIN}"
                     { set +x; } 2>/dev/null
                 else
-                    SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
                     FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
                     XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                     set -x
