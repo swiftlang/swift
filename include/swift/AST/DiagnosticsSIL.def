@@ -59,9 +59,6 @@ ERROR(bridging_objcbridgeable_missing,none,
 ERROR(bridging_objcbridgeable_broken,none,
       "broken definition of '_ObjectiveCBridgeable' protocol: missing %0",
       (DeclName))
-ERROR(bridging_objcbridgeable_missing_conformance,none,
-      "bridged type %0 is missing conformance to `_ObjectiveCBridgeable`",
-      (Type))
 
 ERROR(invalid_sil_builtin,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
