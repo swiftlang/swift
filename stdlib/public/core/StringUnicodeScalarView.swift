@@ -66,6 +66,7 @@ extension String {
       /// - Precondition: The next value is representable.
       @warn_unused_result
       public func successor() -> Index {
+        // FIXME: swift-3-indexing-model: remove `successor()`.
         var scratch = _ScratchIterator(_core, _position)
         var decoder = UTF16()
         let (_, length) = decoder._decodeOne(&scratch)
@@ -77,6 +78,7 @@ extension String {
       /// - Precondition: The previous value is representable.
       @warn_unused_result
       public func predecessor() -> Index {
+        // FIXME: swift-3-indexing-model: remove `predecessor()`.
         var i = _position-1
         let codeUnit = _core[i]
         if _slowPath((codeUnit >> 10) == 0b1101_11) {
@@ -119,13 +121,15 @@ extension String {
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
     public func next(i: Index) -> Index {
-      fatalError("FIXME: swift-3-indexing-model implement")
+      // FIXME: swift-3-indexing-model: move `successor()` implementation here.
+      return i.successor()
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
     public func previous(i: Index) -> Index {
-      fatalError("FIXME: swift-3-indexing-model implement")
+      // FIXME: swift-3-indexing-model: move `predecessor()` implementation here.
+      return i.predecessor()
     }
 
     /// Access the element at `position`.
