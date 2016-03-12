@@ -663,9 +663,10 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       } else {
         Printer << ", ";
       }
-      auto NM = Arg->getAnyNominal();
-      assert(NM && "Cannot get nominal type.");
-      Printer << NM->getNameStr();
+      if (auto NM = Arg->getAnyNominal())
+        Printer << NM->getNameStr();
+      else
+        Arg->print(Printer, Options);
     }
   } else {
     for (auto GP : Params->getParams()) {
