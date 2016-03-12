@@ -21,7 +21,8 @@ import re
 import subprocess
 import sys
 
-line_pattern = re.compile(r'^// ###sourceLocation\(file:\s*"([^"]+)",\s*line:\s*([0-9]+)\s*\)')
+line_pattern = re.compile(
+    r'^// ###sourceLocation\(file:\s*"([^"]+)",\s*line:\s*([0-9]+)\s*\)')
 
 
 def _make_line_map(filename, stream=None):
