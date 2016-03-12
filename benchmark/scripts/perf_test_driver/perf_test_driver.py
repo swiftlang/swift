@@ -42,15 +42,6 @@ class Result(object):
     def get_name(self):
         return self.name
 
-    def get_status(self):
-        return self.status
-
-    def get_output(self):
-        return self.output
-
-    def get_data(self):
-        return self.data
-
     def merge_in_extra_data(self, d):
         """Rather than modifying the extra data dict, return it as a no-op"""
         return d
