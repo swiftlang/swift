@@ -3727,9 +3727,10 @@ public:
       NameOffset = Printer.NameOffset.getValue();
     }
 
-    Accessibility AccessibilityOfContext =
-      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
-        ->getFormalAccess();
+
+    auto typeContext = CurrDeclContext->getInnermostTypeContext();
+    assert(typeContext && typeContext->getAsGenericTypeOrGenericTypeExtensionContext());
+    Accessibility AccessibilityOfContext = typeContext->getAsGenericTypeOrGenericTypeExtensionContext()->getFormalAccess();
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
     bool missingAccess = !isKeywordSpecified("private") &&
@@ -3857,6 +3858,9 @@ public:
 
   void getOverrideCompletions(SourceLoc Loc) {
     if (auto TypeContext = CurrDeclContext->getInnermostTypeContext()){
+      if (!TypeContext->getAsGenericTypeOrGenericTypeExtensionContext())
+        return;
+
       if (Type CurrTy = TypeContext->getDeclaredTypeInContext()) {
         lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
                                  TypeResolver.get());
