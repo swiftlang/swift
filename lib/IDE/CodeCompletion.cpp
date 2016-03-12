@@ -3727,10 +3727,12 @@ public:
       NameOffset = Printer.NameOffset.getValue();
     }
 
-
     auto typeContext = CurrDeclContext->getInnermostTypeContext();
-    assert(typeContext && typeContext->getAsGenericTypeOrGenericTypeExtensionContext());
-    Accessibility AccessibilityOfContext = typeContext->getAsGenericTypeOrGenericTypeExtensionContext()->getFormalAccess();
+    assert(typeContext &&
+           typeContext->getAsGenericTypeOrGenericTypeExtensionContext());
+    Accessibility AccessibilityOfContext =
+        typeContext->getAsGenericTypeOrGenericTypeExtensionContext()
+            ->getFormalAccess();
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
     bool missingAccess = !isKeywordSpecified("private") &&
