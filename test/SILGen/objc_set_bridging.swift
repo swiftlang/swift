@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-silgen-test-overlays
+
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -27,8 +30,8 @@ import gizmo
     // CHECK: strong_retain [[SELF]] : $Foo
     // CHECK: [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foo17bridge_Set_result{{.*}} : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
     // CHECK: [[SET:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
-    // CHECK: [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertSetToNSSet{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
-    // CHECK: [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
+    // CHECK: [[CONVERTER:%[0-9]+]] = function_ref @_TFE10FoundationVs3Set19_bridgeToObjectiveCfT_CSo5NSSet
+    // CHECK: [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned NSSet
     // CHECK: return [[NSSET]] : $NSSet
   }
 
@@ -40,8 +43,8 @@ import gizmo
   // CHECK:   strong_retain [[SELF]] : $Foo
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foog8property{{.*}} : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
   // CHECK:   [[SET:%[0-9]+]] = apply [[GETTER]]([[SELF]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
-  // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertSetToNSSet{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
-  // CHECK:   [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
+  // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TFE10FoundationVs3Set19_bridgeToObjectiveCfT_CSo5NSSet
+  // CHECK:   [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned NSSet
   // CHECK:   return [[NSSET]] : $NSSet
   
   // Property setter

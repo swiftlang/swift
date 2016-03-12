@@ -55,6 +55,74 @@ extension String : _ObjectiveCBridgeable {
   }
 }
 
+extension Array : _ObjectiveCBridgeable {
+  public static func _getObjectiveCType() -> Any.Type {
+    return NSArray.self
+  }
+  public func _bridgeToObjectiveC() -> NSArray {
+    return NSArray()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    x: NSArray,
+    result: inout Array?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSArray,
+    result: inout Array?
+  ) -> Bool {
+    return true
+  }
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return Swift._isBridgedToObjectiveC(Element.self)
+  }
+}
+
+extension Dictionary : _ObjectiveCBridgeable {
+  public static func _getObjectiveCType() -> Any.Type {
+    return NSDictionary.self
+  }
+  public func _bridgeToObjectiveC() -> NSDictionary {
+    return NSDictionary()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    x: NSDictionary,
+  result: inout Dictionary?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSDictionary,
+    result: inout Dictionary?
+  ) -> Bool {
+    return true
+  }
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return Swift._isBridgedToObjectiveC(Key.self) && Swift._isBridgedToObjectiveC(Value.self)
+  }
+}
+
+extension Set : _ObjectiveCBridgeable {
+  public static func _getObjectiveCType() -> Any.Type {
+    return NSSet.self
+  }
+  public func _bridgeToObjectiveC() -> NSSet {
+    return NSSet()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    x: NSSet,
+    result: inout Set?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSSet,
+    result: inout Set?
+  ) -> Bool {
+    return true
+  }
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return Swift._isBridgedToObjectiveC(Element.self)
+  }
+}
 
 extension NSError: ErrorProtocol {
   public var _domain: String { return domain }
