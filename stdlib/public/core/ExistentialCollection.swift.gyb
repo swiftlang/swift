@@ -514,11 +514,13 @@ public struct ${Self} : ${Traversal}Index {
   }
 }
 
-/// Returns `true` iff `lhs` and `rhs` wrap equal underlying
+/// Returns `true` [iff] `lhs` and `rhs` wrap equal underlying
 /// `${Self}`s.
 ///
 /// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
 ///   identical.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
@@ -555,7 +557,9 @@ public protocol AnyCollectionProtocol : Collection {
   var _underlyingCollectionID: ObjectIdentifier { get }
 }
 
-/// Returns `true` iff `lhs` and `rhs` store the same underlying collection.
+/// Returns `true` [iff] `lhs` and `rhs` store the same underlying collection.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func === <
   L : AnyCollectionProtocol, R : AnyCollectionProtocol
@@ -563,7 +567,9 @@ public func === <
   return lhs._underlyingCollectionID == rhs._underlyingCollectionID
 }
 
-/// Returns `false` iff `lhs` and `rhs` store the same underlying collection.
+/// Returns `false` [iff] `lhs` and `rhs` store the same underlying collection.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func !== <
   L : AnyCollectionProtocol, R : AnyCollectionProtocol

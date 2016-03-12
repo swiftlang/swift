@@ -290,7 +290,9 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
 
   /// \brief Ensure this Dictionary holds a unique reference to its
   /// buffer having at least minimumCapacity elements.  Return true
-  /// iff this results in a change of capacity.
+  /// [iff] this results in a change of capacity.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   mutating func _ensureUniqueBuffer(minimumCapacity: Int) -> Bool {
     var isUnique: Bool = isUniquelyReferencedNonObjC(&_owner)
 

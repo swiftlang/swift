@@ -134,7 +134,9 @@ public struct LazyFilterIndex<
   internal let _include: (BaseElements.Iterator.Element) -> Bool
 }
 
-/// Returns `true` iff `lhs` is identical to `rhs`.
+/// Returns `true` [iff] `lhs` is identical to `rhs`.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func == <Base : Collection>(
   lhs: LazyFilterIndex<Base>,

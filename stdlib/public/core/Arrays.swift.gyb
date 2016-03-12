@@ -131,8 +131,10 @@ if True:
 /// The main distinction between `Array` and the other array types is
 /// that it interoperates seamlessly and efficiently with Objective-C.
 ///
-/// `Array<Element>` is considered bridged to Objective-C iff `Element`
+/// `Array<Element>` is considered bridged to Objective-C [iff] `Element`
 /// is bridged to Objective-C.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 ///
 /// When `Element` is a `class` or `@objc` protocol type, `Array` may
 /// store its elements in an `NSArray`.  Since any arbitrary subclass
@@ -751,7 +753,9 @@ extension ${Self} : _ArrayProtocol {
 
   /// Remove all elements.
   ///
-  /// - Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
+  /// - Postcondition: `capacity == 0` [iff] `keepCapacity` is `false`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   ///
   /// - Complexity: O(`self.count`).
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {

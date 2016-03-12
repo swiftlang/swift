@@ -526,8 +526,10 @@ void swift::swift_unknownRelease(void *object)
   return objc_release(static_cast<id>(object));
 }
 
-/// Return true iff the given BridgeObject is not known to use native
+/// Return true [iff] the given BridgeObject is not known to use native
 /// reference-counting.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 ///
 /// Precondition: object does not encode a tagged pointer
 static bool isNonNative_unTagged_bridgeObject(void *object) {
@@ -1242,8 +1244,10 @@ swift::swift_dynamicCastForeignClassMetatypeUnconditional(
 }
 
 #if SWIFT_OBJC_INTEROP
-// Given a non-nil object reference, return true iff the object uses
+// Given a non-nil object reference, return true [iff] the object uses
 // native swift reference counting.
+//
+// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 static bool usesNativeSwiftReferenceCounting_nonNull(
   const void* object
 ) {
@@ -1276,8 +1280,10 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
     SWIFT_RT_ENTRY_CALL(swift_isUniquelyReferenced_nonNull_native)((HeapObject*)object);
 }
 
-// Given an object reference, return true iff it is non-nil and refers
+// Given an object reference, return true [iff] it is non-nil and refers
 // to a native swift object with strong reference count of 1.
+//
+// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 bool swift::swift_isUniquelyReferencedNonObjC(
   const void* object
 ) {
@@ -1349,9 +1355,11 @@ bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
                                                     (const HeapObject*)object);
 }
 
-// Given a non-@objc object reference, return true iff the
+// Given a non-@objc object reference, return true [iff] the
 // object is non-nil and either has a strong reference count of 1
 // or is pinned.
+//
+// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 SWIFT_RT_ENTRY_VISIBILITY
 bool swift::swift_isUniquelyReferencedOrPinned_native(
   const HeapObject* object)

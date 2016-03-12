@@ -409,19 +409,23 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     }
   }
 
-  /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  /// Returns `true` [iff] this buffer's storage is uniquely-referenced.
   ///
   /// - Note: This does not mean the buffer is mutable.  Other factors
   ///   may need to be considered, such as whether the buffer could be
   ///   some immutable Cocoa container.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public mutating func isUniquelyReferenced() -> Bool {
     return __bufferPointer.holdsUniqueReference()
   }
 
-  /// Returns `true` iff this buffer's storage is either
+  /// Returns `true` [iff] this buffer's storage is either
   /// uniquely-referenced or pinned.  NOTE: this does not mean
   /// the buffer is mutable; see the comment on isUniquelyReferenced.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   public mutating func isUniquelyReferencedOrPinned() -> Bool {
     return __bufferPointer.holdsUniqueOrPinnedReference()
@@ -464,8 +468,10 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return withUnsafeBufferPointer { UnsafePointer($0.baseAddress) }
   }
   
-  /// Returns `true` iff we have storage for elements of the given
+  /// Returns `true` [iff] we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   func canStoreElements(ofDynamicType proposedElementType: Any.Type) -> Bool {
     return _storage.canStoreElements(ofDynamicType: proposedElementType)
   }

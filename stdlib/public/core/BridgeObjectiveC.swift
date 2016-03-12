@@ -19,12 +19,14 @@
 public protocol _ObjectiveCBridgeable {
   associatedtype _ObjectiveCType : AnyObject
 
-  /// Returns `true` iff instances of `Self` can be converted to
+  /// Returns `true` [iff] instances of `Self` can be converted to
   /// Objective-C.  Even if this method returns `true`, a given
   /// instance of `Self._ObjectiveCType` may, or may not, convert
   /// successfully to `Self`; for example, an `NSArray` will only
   /// convert successfully to `[String]` if it contains only
   /// `NSString`s.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   static func _isBridgedToObjectiveC() -> Bool
 

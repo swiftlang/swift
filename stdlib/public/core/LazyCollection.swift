@@ -134,7 +134,9 @@ extension LazyCollection : Collection {
     return Slice(_base: _base, bounds: bounds).lazy
   }
   
-  /// Returns `true` iff `self` is empty.
+  /// Returns `true` [iff] `self` is empty.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isEmpty: Bool {
     return _base.isEmpty
   }

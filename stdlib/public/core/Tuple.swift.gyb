@@ -18,8 +18,10 @@
 
 %   equatableTypeParams = ", ".join(["{} : Equatable".format(c) for c in typeParams])
 
-/// Returns `true` iff each component of `lhs` is equal to the corresponding
+/// Returns `true` [iff] each component of `lhs` is equal to the corresponding
 /// component of `rhs`.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   guard lhs.0 == rhs.0 else { return false }
@@ -30,8 +32,10 @@ public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
   )
 }
 
-/// Returns `true` iff any component of `lhs` is not equal to the corresponding
+/// Returns `true` [iff] any component of `lhs` is not equal to the corresponding
 /// component of `rhs`.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   guard lhs.0 == rhs.0 else { return true }
@@ -49,8 +53,10 @@ public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
 /// over tuples of `Comparable` elements.
 ///
 /// Given two tuples `(a1, a2, ..., aN)` and `(b1, b2, ..., bN)`, the
-/// first tuple is `${op}${opeq}` the second tuple iff `a1 ${op} b1` or
+/// first tuple is `${op}${opeq}` the second tuple [iff] `a1 ${op} b1` or
 /// (`a1 == b1` and `(a2, ..., aN) ${op}${opeq} (b2, ..., bN)`).
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func ${op}${opeq} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   if lhs.0 != rhs.0 { return lhs.0 ${op}${opeq} rhs.0 }

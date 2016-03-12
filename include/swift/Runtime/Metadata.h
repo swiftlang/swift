@@ -2352,7 +2352,9 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
   const WitnessTable * getWitnessTable(const OpaqueValue *container,
                                        unsigned i) const;
 
-  /// Return true iff all the protocol constraints are @objc.
+  /// Return true [iff] all the protocol constraints are @objc.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   bool isObjC() const {
     return isClassBounded() && Flags.getNumWitnessTables() == 0;
   }
@@ -2408,7 +2410,8 @@ struct TargetExistentialMetatypeMetadata
     return metadata->getKind() == MetadataKind::ExistentialMetatype;
   }
 
-  /// Return true iff all the protocol constraints are @objc.
+  /// Return true [iff] all the protocol constraints are @objc.
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   bool isObjC() const {
     return isClassBounded() && Flags.getNumWitnessTables() == 0;
   }

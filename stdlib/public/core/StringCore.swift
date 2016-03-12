@@ -230,7 +230,9 @@ public struct _StringCore {
     return UnsafeMutablePointer(_baseAddress)
   }
 
-  /// True iff a contiguous ASCII buffer available.
+  /// True [iff] a contiguous ASCII buffer available.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isASCII: Bool {
     return elementWidth == 1
   }
@@ -545,8 +547,10 @@ public struct _StringCore {
     _invariantCheck()
   }
 
-  /// Returns `true` iff the contents of this string can be
+  /// Returns `true` [iff] the contents of this string can be
   /// represented as pure ASCII.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   ///
   /// - Complexity: O(N) in the worst case.
   @warn_unused_result

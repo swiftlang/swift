@@ -1260,7 +1260,7 @@ public:
     require(UI->getType().isObject(),
             "EnumInst must produce an object");
     require(UI->hasOperand() == UI->getElement()->hasArgumentType(),
-            "EnumInst must take an argument iff the element does");
+            "EnumInst must take an argument if and only if the element does");
 
     if (UI->getElement()->hasArgumentType()) {
       require(UI->getOperand()->getType().isObject(),

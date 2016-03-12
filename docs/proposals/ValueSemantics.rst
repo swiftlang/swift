@@ -287,10 +287,10 @@ distinction.  In fact both of the following must be present in order
 to observe a difference in behavior:
 
 1. Use of (one of) the big three operations on an object ``x``,
-   creating shared mutable state iff ``x`` is a reference
+   creating shared mutable state if and only if ``x`` is a reference
 
 2. In-place mutation of ``x`` *while a (reference) copy is extant* and
-   thus can be observed through the copy iff ``x`` is a reference.
+   thus can be observed through the copy if and only if ``x`` is a reference.
 
 Take, for example, ``swap``, which uses variable initialization and
 assignment to exchange two values::

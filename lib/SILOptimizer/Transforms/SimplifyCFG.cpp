@@ -669,10 +669,12 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
       DT->verify();
 
     // Simplify the block argument list. This is extremely subtle: simplifyArgs
-    // will not change the CFG iff the DT is null. Really we should move that
+    // will not change the CFG [iff] the DT is null. Really we should move that
     // one optimization out of simplifyArgs ... I am squinting at you
     // simplifySwitchEnumToSelectEnum.
     // simplifyArgs does use the dominator tree, though.
+    //
+    // [iff]: https://en.wikipedia.org/wiki/If_and_only_if
     for (auto &BB : Fn)
       HasChangedInCurrentIter |= simplifyArgs(&BB);
 

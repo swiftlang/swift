@@ -66,30 +66,46 @@ public protocol FloatingPoint : Strideable {
   /// The IEEE 754 "class" of this type.
   var floatingPointClass: FloatingPointClassification { get }
 
-  /// `true` iff `self` is negative.
+  /// `true` [iff] `self` is negative.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isSignMinus: Bool { get }
 
-  /// `true` iff `self` is normal (not zero, subnormal, infinity, or
+  /// `true` [iff] `self` is normal (not zero, subnormal, infinity, or
   /// NaN).
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isNormal: Bool { get }
 
-  /// `true` iff `self` is zero, subnormal, or normal (not infinity
+  /// `true` [iff] `self` is zero, subnormal, or normal (not infinity
   /// or NaN).
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isFinite: Bool { get }
 
-  /// `true` iff `self` is +0.0 or -0.0.
+  /// `true` [iff] `self` is +0.0 or -0.0.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isZero: Bool { get }
 
-  /// `true` iff `self` is subnormal.
+  /// `true` [iff] `self` is subnormal.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isSubnormal: Bool { get }
 
-  /// `true` iff `self` is infinity.
+  /// `true` [iff] `self` is infinity.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isInfinite: Bool { get }
 
-  /// `true` iff `self` is NaN.
+  /// `true` [iff] `self` is NaN.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isNaN: Bool { get }
 
-  /// `true` iff `self` is a signaling NaN.
+  /// `true` [iff] `self` is a signaling NaN.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   var isSignaling: Bool { get }
 
   // Not implemented, because it only makes sense for decimal floating point.

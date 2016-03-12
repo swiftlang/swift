@@ -94,7 +94,9 @@ extension _ArrayBuffer {
     return _isNativeTypeChecked
   }
 
-  /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  /// Returns `true` [iff] this buffer's storage is uniquely-referenced.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   mutating func isUniquelyReferenced() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
@@ -103,8 +105,9 @@ extension _ArrayBuffer {
     return _storage.isUniquelyReferencedNative() && _isNative
   }
 
-  /// Returns `true` iff this buffer's storage is either
+  /// Returns `true` [iff] this buffer's storage is either
   /// uniquely-referenced or pinned.
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   mutating func isUniquelyReferencedOrPinned() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {

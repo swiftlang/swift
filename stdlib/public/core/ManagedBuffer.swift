@@ -284,17 +284,21 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     return result
   }
 
-  /// Returns `true` iff `self` holds the only strong reference to its buffer.
+  /// Returns `true` [iff] `self` holds the only strong reference to its buffer.
   ///
   /// See `isUniquelyReferenced` for details.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public mutating func holdsUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)
   }
 
-  /// Returns `true` iff either `self` holds the only strong reference
+  /// Returns `true` [iff] either `self` holds the only strong reference
   /// to its buffer or the pinned has been 'pinned'.
   ///
   /// See `isUniquelyReferenced` for details.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public mutating func holdsUniqueOrPinnedReference() -> Bool {
     return _isUniqueOrPinned(&_nativeBuffer)
   }
@@ -449,7 +453,7 @@ public func == <Value, Element>(
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with
+/// Returns `true` [iff] `object` is a non-`@objc` class instance with
 /// a single strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
@@ -472,6 +476,8 @@ public func == <Value, Element>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 public func isUniquelyReferencedNonObjC<T : AnyObject>(object: inout T) -> Bool
 {
   return _isUnique(&object)
@@ -481,7 +487,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(object: inout T
   return _isUniqueOrPinned(&object)
 }
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with a single
+/// Returns `true` [iff] `object` is a non-`@objc` class instance with a single
 /// strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
@@ -503,13 +509,15 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(object: inout T
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 public func isUniquelyReferenced<T : NonObjectiveCBase>(
   object: inout T
 ) -> Bool {
   return _isUnique(&object)
 }
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with
+/// Returns `true` [iff] `object` is a non-`@objc` class instance with
 /// a single strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
@@ -532,6 +540,8 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 public func isUniquelyReferencedNonObjC<T : AnyObject>(
   object: inout T?
 ) -> Bool {

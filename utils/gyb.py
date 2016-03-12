@@ -351,7 +351,7 @@ def split_gyb_lines(source_lines):
 
 
 def code_starts_with_dedent_keyword(source_lines):
-    r"""Return True iff the incoming Python source_lines begin with "else",
+    r"""Return True if and only if the incoming Python source_lines begin with "else",
     "elif", "except", or "finally".
 
     Initial comments and whitespace are ignored.

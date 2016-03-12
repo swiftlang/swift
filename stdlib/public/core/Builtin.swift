@@ -140,15 +140,19 @@ func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 
-/// Returns `true` iff `t0` is identical to `t1`; i.e. if they are both
+/// Returns `true` [iff] `t0` is identical to `t1`; i.e. if they are both
 /// `nil` or they both represent the same type.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return unsafeBitCast(t0, to: Int.self) == unsafeBitCast(t1, to: Int.self)
 }
 
-/// Returns `false` iff `t0` is identical to `t1`; i.e. if they are both
+/// Returns `false` [iff] `t0` is identical to `t1`; i.e. if they are both
 /// `nil` or they both represent the same type.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @warn_unused_result
 public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return !(t0 == t1)
@@ -178,8 +182,10 @@ func _conditionallyUnreachable() {
 @_silgen_name("swift_isClassOrObjCExistentialType")
 func _swift_isClassOrObjCExistentialType<T>(x: T.Type) -> Bool
 
-/// Returns `true` iff `T` is a class type or an `@objc` existential such as
+/// Returns `true` [iff] `T` is a class type or an `@objc` existential such as
 /// `AnyObject`.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @inline(__always)
 @warn_unused_result
 internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
@@ -285,8 +291,10 @@ public func _slowPath<C : Boolean>(x: C) -> Bool {
 
 //===--- Runtime shim wrappers --------------------------------------------===//
 
-/// Returns `true` iff the class indicated by `theClass` uses native
+/// Returns `true` [iff] the class indicated by `theClass` uses native
 /// Swift reference-counting.
+///
+/// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
 @inline(__always)
 @warn_unused_result
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {

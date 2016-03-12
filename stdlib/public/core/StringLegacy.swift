@@ -43,7 +43,9 @@ extension String {
     return scalarSlices.map { String($0) }
   }
 
-  /// `true` iff `self` contains no characters.
+  /// `true` [iff] `self` contains no characters.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public var isEmpty : Bool {
     return _core.count == 0
   }
@@ -67,13 +69,17 @@ func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, _ prefix: AnyObject) -> 
 func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, _ suffix: AnyObject) -> Bool
 
 extension String {
-  /// Returns `true` iff `self` begins with `prefix`.
+  /// Returns `true` [iff] `self` begins with `prefix`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public func hasPrefix(prefix: String) -> Bool {
     return _stdlib_NSStringHasPrefixNFD(
       self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
-  /// Returns `true` iff `self` ends with `suffix`.
+  /// Returns `true` [iff] `self` ends with `suffix`.
+  ///
+  /// [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   public func hasSuffix(suffix: String) -> Bool {
     return _stdlib_NSStringHasSuffixNFD(
       self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())

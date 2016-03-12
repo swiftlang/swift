@@ -175,11 +175,13 @@ public struct _StringBuffer {
     return elementShift + 1
   }
 
-  // Return `true` iff we have the given capacity for the indicated
+  // Return `true` [iff] we have the given capacity for the indicated
   // substring.  This is what we need to do so that users can call
   // reserveCapacity on String and subsequently use that capacity, in
   // two separate phases.  Operations with one-phase growth should use
   // "grow()," below.
+  //
+  // [iff]: https://en.wikipedia.org/wiki/If_and_only_if
   @warn_unused_result
   func hasCapacity(
     cap: Int, forSubRange r: Range<UnsafePointer<_RawByte>>

@@ -2512,11 +2512,13 @@ Swift 2.2
     AnyObject>`.  It bridges in O(1), without memory allocation.
 
   - `Dictionary<K, V>` has an implicit conversion to `NSDictionary`.
-    `Dictionary<K, V>` bridges to `NSDictionary` iff both `K` and `V` are
+    `Dictionary<K, V>` bridges to `NSDictionary` [iff] both `K` and `V` are
     bridged.  Otherwise, a runtime error is raised.
 
     Depending on `K` and `V` the operation can be `O(1)` without memory
     allocation, or `O(N)` with memory allocation.
+
+[iff]: https://en.wikipedia.org/wiki/If_and_only_if
 
 * Single-quoted literals are no longer recognized.  Use double-quoted literals
   and an explicit type annotation to define `Characters` and `UnicodeScalars`:
