@@ -81,6 +81,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_1 -code-completion-keywords=false | FileCheck %s -check-prefix=NESTED_CLOSURE_1
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD1 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=OMIT_KEYWORD1< %t.txt
 
@@ -91,6 +93,12 @@
 // RUN: FileCheck %s -check-prefix=OMIT_KEYWORD3< %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD4 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD5 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD6 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD7 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD8 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD9 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD10 -code-completion-keywords=false | FileCheck %s -check-prefix=WITH_PA
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | FileCheck %s -check-prefix=HAS_THROWING
 
@@ -350,6 +358,12 @@ class OuterNominal : ProtocolA {
 // NESTED_NOMINAL: found code completion token
 // NESTED_NOMINAL-NOT: Begin completions
 
+class OuterNominal2: ProtocolA {
+  var f = { #^NESTED_CLOSURE_1^# }()
+}
+// NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_1-NOT: {|}
+
 class OmitKW1 : ProtocolA {
   override#^OMIT_KEYWORD1^#
 }
@@ -378,11 +392,13 @@ class OmitKW3 : ProtocolA {
   func#^OMIT_KEYWORD3^#
 }
 
-//OMIT_KEYWORD3:         Begin completions
-//OMIT_KEYWORD3-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
-//OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
-//OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
-//OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD3:         Begin completions
+// FIXME: init() not valid after 'func'
+// OMIT_KEYWORD3-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
+// FIXME: missing 'override'
+// OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
+// OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+// OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
 // OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD3: End completions
 
@@ -393,6 +409,39 @@ class OmitKW4: ProtocolA {
 // OMIT_KEYWORD4-NOT:    Decl[InstanceMethod]
 // OMIT_KEYWORD4:        Decl[InstanceVar]/Super: protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD4-NOT:    Decl[InstanceMethod]
+
+class OmitKW5: ProtocolA {
+  override
+  #^OMIT_KEYWORD5^#
+// Same as OMIT_KEYWORD1
+}
+class OmitKW6: ProtocolA {
+  override
+  func
+  #^OMIT_KEYWORD6^#
+// Same as OMIT_KEYWORD2
+}
+class OmitKW7: ProtocolA {
+  func
+  #^OMIT_KEYWORD7^#
+// Same as OMIT_KEYWORD3
+}
+
+class OmitKW8: ProtocolA {
+  var
+  #^OMIT_KEYWORD8^#
+// Same as OMIT_KEYWORD4
+}
+class OmitKW9: ProtocolA {
+  override
+  var
+  #^OMIT_KEYWORD9^#
+// Same as OMIT_KEYWORD4
+}
+class OmitKW10: ProtocolA {
+  override func protoAFunc() {}; #^OMIT_KEYWORD10^#
+// WITH_PA
+}
 
 protocol HasThrowingProtocol {
   func foo() throws

@@ -1922,6 +1922,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   ParserStatus Status;
 
   while (1) {
+    // Save the original token, in case code-completion needs it.
+    auto OrigTok = Tok;
+    bool MayNeedOverrideCompletion = false;
+
     switch (Tok.getKind()) {
     // Modifiers
     case tok::kw_static:
@@ -2079,6 +2083,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
                             StaticSpelling, tryLoc);
       StaticLoc = SourceLoc();   // we handled static if present.
+      MayNeedOverrideCompletion = true;
       break;
     case tok::kw_typealias:
     case tok::kw_associatedtype:
@@ -2140,6 +2145,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
       Status = DeclResult;
       StaticLoc = SourceLoc();   // we handled static if present.
+      MayNeedOverrideCompletion = true;
       break;
 
     case tok::kw_subscript:
@@ -2149,26 +2155,38 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         StaticLoc = SourceLoc();
       }
       Status = parseDeclSubscript(Flags, Attributes, Entries);
+      MayNeedOverrideCompletion = true;
       break;
 
     case tok::code_complete:
+      MayNeedOverrideCompletion = true;
+      Status.setIsParseError();
+      // Handled below.
+      break;
+    }
+
+    if (Status.isError() && MayNeedOverrideCompletion &&
+        Tok.is(tok::code_complete)) {
       Status = makeParserCodeCompletionStatus();
       if (CodeCompletion) {
-        // if we need to complete an override, we need to collect which keywords
-        // have already been specified by the developer; so that we do not
-        // duplicate them in code completion strings
+        // If we need to complete an override, collect the keywords already
+        // specifiedso that we do not duplicate them in code completion strings.
         SmallVector<StringRef, 3> Keywords;
-
-        // FIXME: need to handle the case where this line contains multiple decls
-        backtrackToPosition(ParserPosition(L->getStateForBeginningOfTokenLoc(
-          Lexer::getLocForStartOfLine(SourceMgr, Tok.getLoc())), SourceLoc()));
-        while (!Tok.is(tok::code_complete)) {
-          Keywords.push_back(Tok.getText());
-          consumeToken();
+        switch (OrigTok.getKind()) {
+        case tok::kw_func:
+        case tok::kw_subscript:
+        case tok::kw_var:
+          Keywords.push_back(OrigTok.getText());
+          break;
+        default:
+          // Other tokens are already accounted for.
+          break;
+        }
+        for (auto attr : Attributes) {
+          Keywords.push_back(attr->getAttrName());
         }
         CodeCompletion->completeNominalMemberBeginning(Keywords);
       }
-      break;
     }
 
     // If we 'break' out of the switch, break out of the loop too.
