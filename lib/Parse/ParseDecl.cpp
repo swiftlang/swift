@@ -1733,6 +1733,7 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::pound_if:
   case tok::identifier:
   case tok::pound_setline:
+  case tok::pound_sourceLocation:
     return true;
   case tok::pound_line:
     // #line at the start of the line is a directive, but it's deprecated.
@@ -2127,10 +2128,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       break;
     }
-    case tok::pound_setline:
+    case tok::pound_sourceLocation:
       Status = parseLineDirective(false);
       break;
     case tok::pound_line:
+    case tok::pound_setline:
       Status = parseLineDirective(true);
       break;
 
@@ -2594,11 +2596,10 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 }
 
 ParserStatus Parser::parseLineDirective(bool isLine) {
-  SourceLoc Loc = consumeToken(isLine ? tok::pound_line
-                                      : tok::pound_setline);
+  SourceLoc Loc = consumeToken();
   if (isLine) {
     diagnose(Loc, diag::line_directive_style_deprecated)
-        .fixItReplace(Loc, "#setline");
+        .fixItReplace(Loc, "#sourceLocation");
   }
   bool WasInPoundLineEnvironment = InPoundLineEnvironment;
   if (WasInPoundLineEnvironment) {
@@ -2606,58 +2607,121 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
     InPoundLineEnvironment = false;
   }
 
-  // #setline\n returns to the main buffer.
-  if (Tok.isAtStartOfLine()) {
-    if (!WasInPoundLineEnvironment) {
-      diagnose(Tok, diag::unexpected_line_directive);
+  
+  unsigned StartLine = 0;
+  Optional<StringRef> Filename;
+  const char *LastTokTextEnd;
+  if (!isLine) {
+    // #sourceLocation()
+    // #sourceLocation(file: "foo", line: 42)
+    if (parseToken(tok::l_paren, diag::sourceLocation_expected, "("))
+      return makeParserError();
+
+    // Handle the "reset" form.
+    if (consumeIf(tok::r_paren)) {
+      if (!WasInPoundLineEnvironment) {
+        diagnose(Tok, diag::unexpected_line_directive);
+        return makeParserError();
+      }
+      return makeParserSuccess();
+    }
+    
+    if (parseSpecificIdentifier("file", diag::sourceLocation_expected,"file:")||
+        parseToken(tok::colon, diag::sourceLocation_expected, ":"))
+      return makeParserError();
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Tok, diag::expected_line_directive_name);
       return makeParserError();
     }
-    return makeParserSuccess();
-  }
+    
+    Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
+                                                 "#sourceLocation");
+    if (!Filename.hasValue())
+      return makeParserError();
+    consumeToken(tok::string_literal);
+    
+    if (parseToken(tok::comma, diag::sourceLocation_expected, ",") ||
+        parseSpecificIdentifier("line", diag::sourceLocation_expected,"line:")||
+        parseToken(tok::colon, diag::sourceLocation_expected, ":"))
+      return makeParserError();
+  
+    if (Tok.isNot(tok::integer_literal)) {
+      diagnose(Tok, diag::expected_line_directive_number);
+      return makeParserError();
+    }
+    if (Tok.getText().getAsInteger(0, StartLine)) {
+      diagnose(Tok, diag::expected_line_directive_number);
+      return makeParserError();
+    }
+    if (StartLine == 0) {
+      diagnose(Tok, diag::line_directive_line_zero);
+      return makeParserError();
+    }
+    consumeToken(tok::integer_literal);
 
-  // #setline 42 "file.swift"\n
-  if (Tok.isNot(tok::integer_literal)) {
-    diagnose(Tok, diag::expected_line_directive_number);
-    return makeParserError();
-  }
-  unsigned StartLine = 0;
-  if (Tok.getText().getAsInteger(0, StartLine)) {
-    diagnose(Tok, diag::expected_line_directive_number);
-    return makeParserError();
-  }
-  if (StartLine == 0) {
-    diagnose(Tok, diag::line_directive_line_zero);
-    return makeParserError();
-  }
-  consumeToken();
+    LastTokTextEnd = Tok.getText().end();
+    if (parseToken(tok::r_paren, diag::sourceLocation_expected, ")"))
+      return makeParserError();
+    
+  } else {  // Legacy #line syntax.
+  
+    // #line\n returns to the main buffer.
+    if (Tok.isAtStartOfLine()) {
+      if (!WasInPoundLineEnvironment) {
+        diagnose(Tok, diag::unexpected_line_directive);
+        return makeParserError();
+      }
+      return makeParserSuccess();
+    }
 
-  if (Tok.isNot(tok::string_literal)) {
-    diagnose(Tok, diag::expected_line_directive_name);
-    return makeParserError();
+    // #line 42 "file.swift"\n
+    if (Tok.isNot(tok::integer_literal)) {
+      diagnose(Tok, diag::expected_line_directive_number);
+      return makeParserError();
+    }
+    if (Tok.getText().getAsInteger(0, StartLine)) {
+      diagnose(Tok, diag::expected_line_directive_number);
+      return makeParserError();
+    }
+    if (StartLine == 0) {
+      diagnose(Tok, diag::line_directive_line_zero);
+      return makeParserError();
+    }
+    consumeToken(tok::integer_literal);
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Tok, diag::expected_line_directive_name);
+      return makeParserError();
+    }
+    
+    Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
+                                                 "#line");
+    if (!Filename.hasValue())
+      return makeParserError();
+    LastTokTextEnd = Tok.getText().end();
+    consumeToken(tok::string_literal);
   }
-
-  auto Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
-                                                    isLine ? "#line"
-                                                           : "#setline");
-  if (!Filename.hasValue())
-    return makeParserError();
-
-  // FIXME: This will be incorrect if there is trailing whitespace at the end
-  // of the #line.
-  SourceLoc Begin = Lexer::getSourceLoc(Tok.getText().end()).getAdvancedLoc(1);
-  int LineOffset = StartLine - SourceMgr.getLineNumber(Begin);
-
-  consumeToken(tok::string_literal);
-  if (!Tok.isAtStartOfLine()) {
+  
+  // Skip over trailing whitespace and a single \n to the start of the next
+  // line.
+  while (*LastTokTextEnd == ' ' || *LastTokTextEnd == '\t')
+    ++LastTokTextEnd;
+  SourceLoc nextLineStartLoc = Lexer::getSourceLoc(LastTokTextEnd);
+  
+  if (*LastTokTextEnd == '\n')
+    nextLineStartLoc = nextLineStartLoc.getAdvancedLoc(1);
+  else {
     diagnose(Tok.getLoc(), diag::extra_tokens_line_directive);
     return makeParserError();
   }
-
+  
+  int LineOffset = StartLine - SourceMgr.getLineNumber(nextLineStartLoc);
+ 
   // Create a new virtual file for the region started by the #line marker.
-  bool isNewFile = SourceMgr.openVirtualFile(Begin, Filename.getValue(),
-                                             LineOffset);
-  assert(isNewFile);
-  (void)isNewFile;
+  bool isNewFile = SourceMgr.openVirtualFile(nextLineStartLoc,
+                                             Filename.getValue(), LineOffset);
+  assert(isNewFile);(void)isNewFile;
 
   InPoundLineEnvironment = true;
   return makeParserSuccess();

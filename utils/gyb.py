@@ -544,7 +544,7 @@ class ParseContext(object):
 class ExecutionContext(object):
     """State we pass around during execution of a template"""
 
-    def __init__(self, line_directive='// ###setline', **local_bindings):
+    def __init__(self, line_directive='// ###sourceLocation', **local_bindings):
         self.local_bindings = local_bindings
         self.line_directive = line_directive
         self.local_bindings['__context__'] = self
@@ -558,8 +558,8 @@ class ExecutionContext(object):
                 # We can only insert the line directive at a line break
                 if len(self.result_text) == 0 \
                    or self.result_text[-1].endswith('\n'):
-                    self.result_text.append('%s %d "%s"\n' % (
-                        self.line_directive, line + 1, file))
+                    self.result_text.append('%s(file: "%s", line: %d)\n' % (
+                        self.line_directive, file, line + 1))
                 # But if the new text contains any line breaks, we can create
                 # one
                 elif '\n' in text:
@@ -984,14 +984,14 @@ def execute_template(ast, line_directive='', **local_bindings):
     ... % else:
     ... THIS SHOULD NOT APPEAR IN THE OUTPUT
     ... ''')
-    >>> print execute_template(ast, line_directive='//#setline', x=1),
-    //#setline 1 "/dummy.file"
+    >>> print execute_template(ast, line_directive='//#sourceLocation', x=1),
+    //#sourceLocation(file: "/dummy.file", line: 1)
     Nothing
-    //#setline 4 "/dummy.file"
+    //#sourceLocation(file: "/dummy.file", line: 4)
     0
-    //#setline 4 "/dummy.file"
+    //#sourceLocation(file: "/dummy.file", line: 4)
     1
-    //#setline 4 "/dummy.file"
+    //#sourceLocation(file: "/dummy.file", line: 4)
     2
 
     >>> ast = parse_template('/dummy.file', text=
@@ -1002,10 +1002,10 @@ def execute_template(ast, line_directive='', **local_bindings):
     ... % end
     ... ${a}
     ... ''')
-    >>> print execute_template(ast, line_directive='//#setline', x=1),
-    //#setline 1 "/dummy.file"
+    >>> print execute_template(ast, line_directive='//#sourceLocation', x=1),
+    //#sourceLocation(file: "/dummy.file", line: 1)
     Nothing
-    //#setline 6 "/dummy.file"
+    //#sourceLocation(file: "/dummy.file", line: 6)
     [0, 1, 2]
     """
     execution_context = ExecutionContext(
@@ -1103,7 +1103,7 @@ def main():
         '--dump', action='store_true',
         default=False, help='Dump the parsed template to stdout')
     parser.add_argument(
-        '--line-directive', default='// ###setline',
+        '--line-directive', default='// ###sourceLocation',
         help='Line directive prefix; empty => no line markers')
 
     args = parser.parse_args(sys.argv[1:])

@@ -59,15 +59,18 @@ ERROR(expected_conditional_compilation_expression,none,
 ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
 
+ERROR(sourceLocation_expected,none,
+      "expected '%0' in #sourceLocation directive", (StringRef))
+
 ERROR(unexpected_line_directive,none,
-      "parameterless closing #line directive "
-      "without prior opening #line directive", ())
+      "parameterless closing #sourceLocation() directive "
+      "without prior opening #sourceLocation(file:,line:) directive", ())
 ERROR(expected_line_directive_number,none,
-      "expected starting line number for #line directive", ())
+      "expected starting line number for #sourceLocation directive", ())
 ERROR(expected_line_directive_name,none,
-      "expected filename string literal for #line directive", ())
+      "expected filename string literal for #sourceLocation directive", ())
 ERROR(extra_tokens_line_directive,none,
-      "extra tokens at the end of #line directive", ())
+      "extra tokens at the end of #sourceLocation directive", ())
 ERROR(line_directive_line_zero,none,
       "the line number needs to be greater than zero", ())
 
@@ -149,7 +152,7 @@ WARNING(inout_as_attr_deprecated,none,
         "'inout' before a parameter name is deprecated, place it before the parameter type instead",
         ())
 WARNING(line_directive_style_deprecated,none,
-        "#line directive is deprecated, please use #setline instead",
+        "#line directive is deprecated, please use #sourceLocation instead",
         ())
 
 ERROR(declaration_same_line_without_semi,none,

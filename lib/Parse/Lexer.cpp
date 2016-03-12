@@ -594,7 +594,7 @@ void Lexer::lexHash() {
 
   // Scan for [a-z]+ to see what we match.
   const char *tmpPtr = CurPtr;
-  while (clang::isLowercase(*tmpPtr))
+  while (clang::isLetter(*tmpPtr))
     ++tmpPtr;
 
   // Map the character sequence onto
