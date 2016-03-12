@@ -82,6 +82,7 @@
 // RUN: FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_1 -code-completion-keywords=false | FileCheck %s -check-prefix=NESTED_CLOSURE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_2 -code-completion-keywords=false | FileCheck %s -check-prefix=NESTED_CLOSURE_2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD1 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=OMIT_KEYWORD1< %t.txt
@@ -363,6 +364,12 @@ class OuterNominal2: ProtocolA {
 }
 // NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super
 // NESTED_CLOSURE_1-NOT: {|}
+
+class OuterNominal3: ProtocolA {
+  var f = { static #^NESTED_CLOSURE_2^# }()
+}
+// NESTED_CLOSURE_2-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_2-NOT: {|}
 
 class OmitKW1 : ProtocolA {
   override#^OMIT_KEYWORD1^#
