@@ -4,21 +4,6 @@ import pass_pipeline as ppipe
 import passes as p
 
 
-def diagnostic_passlist():
-    return ppipe.PassList([
-        p.CapturePromotion,
-        p.AllocBoxToStack,
-        p.InOutDeshadowing,
-        p.NoReturnFolding,
-        p.DefiniteInitialization,
-        p.PredictableMemoryOptimizations,
-        p.DiagnosticConstantPropagation,
-        p.DiagnoseUnreachable,
-        p.EmitDFDiagnostics,
-        p.SplitNonCondBrCriticalEdges,
-    ])
-
-
 def simplifycfg_silcombine_passlist():
     return ppipe.PassList([
         p.SimplifyCFG,
