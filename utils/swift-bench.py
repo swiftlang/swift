@@ -352,12 +352,15 @@ class Test(object):
         self.processed_source = processed_source
         self.binary = binary
         self.status = ""
+        self.results = None
+        self.output = None
 
     def do_print(self):
         print("NAME: %s" % self.name)
         print("SOURCE: %s" % self.source)
         if self.status == "":
-            self.results.do_print()
+            if self.results is not None:
+                self.results.do_print()
         else:
             print("STATUS: %s" % self.status)
             print("OUTPUT:")
