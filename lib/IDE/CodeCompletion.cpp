@@ -3843,8 +3843,7 @@ public:
     if (hasFuncIntroducer || hasVarIntroducer || isKeywordSpecified("override"))
       return;
 
-    if (!CurrTy)
-      return;
+    assert(CurrTy);
     const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
     if (!CD)
       return;
