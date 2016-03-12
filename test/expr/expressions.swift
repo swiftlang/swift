@@ -831,7 +831,7 @@ func swift22_deprecation_increment_decrement() {
 // SR-628 mixing lvalues and rvalues in tuple expression
 var x = 0
 var y = 1
-let _ = (x, x.successor()).0
+let _ = (x, x + 1).0
 let _ = (x, 3).1
 (x,y) = (2,3)
 (x,4) = (1,2) // expected-error {{cannot assign to value: function call returns immutable value}}
