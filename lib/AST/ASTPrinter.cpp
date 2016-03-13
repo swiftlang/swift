@@ -2277,11 +2277,23 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   if (param->hasType()) {
     auto bodyCanType = param->getType()->getCanonicalType();
     if (auto patternType = dyn_cast<AnyFunctionType>(bodyCanType)) {
-      switch (patternType->isAutoClosure()*2 + patternType->isNoEscape()) {
-      case 0: break; // neither.
-      case 1: Printer << "@noescape "; break;
-      case 2: Printer << "@autoclosure(escaping) "; break;
-      case 3: Printer << "@autoclosure "; break;
+      if (patternType->isAutoClosure() || patternType->isNoEscape()) {
+        Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+        switch (patternType->isAutoClosure()*2 + patternType->isNoEscape()) {
+        case 1:
+          Printer.printAttrName("@noescape");
+          break;
+        case 2:
+          Printer.printAttrName("@autoclosure");
+          Printer << "(escaping)";
+          break;
+        case 3: Printer.printAttrName("@autoclosure");
+          break;
+        default:
+          llvm_unreachable("impossible autoclosure/noescape");
+        }
+        Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+        Printer << " ";
       }
     }
   }
