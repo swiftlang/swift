@@ -158,6 +158,7 @@ precommitTests = [
   "ProtocolDispatch2": run_ProtocolDispatch2,
   "RC4": run_RC4,
   "RGBHistogram": run_RGBHistogram,
+  "RGBHistogramOfObjects": run_RGBHistogramOfObjects,
   "RangeAssignment": run_RangeAssignment,
   "RecursiveOwnedParameter": run_RecursiveOwnedParameter,
   "SetExclusiveOr": run_SetExclusiveOr,
