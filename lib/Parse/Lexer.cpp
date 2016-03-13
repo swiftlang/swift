@@ -592,7 +592,7 @@ void Lexer::lexHash() {
     return lexImpl();
   }
 
-  // Scan for [a-z]+ to see what we match.
+  // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
   while (clang::isLetter(*tmpPtr))
     ++tmpPtr;
