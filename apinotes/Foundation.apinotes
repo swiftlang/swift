@@ -1,6 +1,14 @@
 ---
 Name: Foundation
 Classes:
+- Name: NSArray
+  SwiftBridge: 'Swift.Array'
+- Name: NSDictionary
+  SwiftBridge: 'Swift.Dictionary'
+- Name: NSSet
+  SwiftBridge: 'Swift.Set'
+- Name: NSString
+  SwiftBridge: 'Swift.String'
 - Name: NSDistributedNotificationCenter
   Methods:
   - Selector: 'notificationCenterForType:'

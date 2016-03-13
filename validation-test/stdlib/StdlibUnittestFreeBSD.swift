@@ -12,18 +12,18 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-_setOverrideOSVersion(.FreeBSD)
+_setOverrideOSVersion(.freeBSD)
 _setTestSuiteFailedCallback() { print("abort()") }
 
 var XFailsFreeBSD = TestSuite("XFailsFreeBSD")
 
 // CHECK: [   UXPASS ] XFailsFreeBSD.xfail FreeBSD passes{{$}}
-XFailsFreeBSD.test("xfail FreeBSD passes").xfail(.FreeBSDAny(reason: "")).code {
+XFailsFreeBSD.test("xfail FreeBSD passes").xfail(.freeBSDAny(reason: "")).code {
   expectEqual(1, 1)
 }
 
 // CHECK: [    XFAIL ] XFailsFreeBSD.xfail FreeBSD fails{{$}}
-XFailsFreeBSD.test("xfail FreeBSD fails").xfail(.FreeBSDAny(reason: "")).code {
+XFailsFreeBSD.test("xfail FreeBSD fails").xfail(.freeBSDAny(reason: "")).code {
   expectEqual(1, 2)
 }
 

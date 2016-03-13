@@ -14,7 +14,7 @@ class ArrayContainer {
   final var arr : [Int]
 
   init() {
-    arr = [Int] (count: 100_000, repeatedValue: 0)
+    arr = [Int] (repeating: 0, count: 100_000)
   }
 
   func runLoop(N: Int) {

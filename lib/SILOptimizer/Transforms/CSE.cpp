@@ -686,7 +686,7 @@ using ApplyWitnessPair = std::pair<ApplyInst *, WitnessMethodInst *>;
 /// Returns the Apply and WitnessMethod instructions that use the
 /// open_existential_addr instructions, or null if at least one of the
 /// instructions is missing.
-ApplyWitnessPair getOpenExistentialUsers(OpenExistentialAddrInst *OE) {
+static ApplyWitnessPair getOpenExistentialUsers(OpenExistentialAddrInst *OE) {
   ApplyInst *AI = nullptr;
   WitnessMethodInst *WMI = nullptr;
   ApplyWitnessPair Empty = std::make_pair(nullptr, nullptr);

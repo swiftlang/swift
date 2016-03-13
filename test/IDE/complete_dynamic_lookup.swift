@@ -458,8 +458,8 @@ func testAnyObject11(dl: AnyObject) {
 }
 // FIXME: it would be nice if we produced a call pattern here.
 // DL_FUNC_NAME_1:     Begin completions
-// DL_FUNC_NAME_1-DAG: Decl[InstanceMethod]/CurrNominal:   .map({#(f):
-// DL_FUNC_NAME_1-DAG: Decl[InstanceMethod]/CurrNominal:   .flatMap({#(f):
+// DL_FUNC_NAME_1-DAG: Decl[InstanceVar]/CurrNominal:      .description[#String#]{{; name=.+$}}
+// DL_FUNC_NAME_1:     End completions
 
 func testAnyObject11_(dl: AnyObject) {
   dl.returnsObjcClass!(#^DL_FUNC_NAME_PAREN_1^#
@@ -473,8 +473,8 @@ func testAnyObject12(dl: AnyObject) {
 }
 // FIXME: it would be nice if we produced a call pattern here.
 // DL_FUNC_NAME_DOT_1:     Begin completions
-// DL_FUNC_NAME_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   map({#(f):
-// DL_FUNC_NAME_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   flatMap({#(f):
+// DL_FUNC_NAME_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      description[#String#]{{; name=.+$}}
+// DL_FUNC_NAME_DOT_1:     End completions
 
 func testAnyObject13(dl: AnyObject) {
   dl.returnsObjcClass!#^DL_FUNC_NAME_BANG_1^#

@@ -43,9 +43,10 @@ bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
     // Modules and file units can always handle name lookup.
     return true;
 
-  case DeclContextKind::NominalTypeDecl:
+  case DeclContextKind::GenericTypeDecl:
     // Get the nominal type.
-    nominal = cast<NominalTypeDecl>(dc);
+    nominal = dyn_cast<NominalTypeDecl>(cast<GenericTypeDecl>(dc));
+    if (!nominal) return true;
     break;
 
   case DeclContextKind::ExtensionDecl: {
@@ -147,7 +148,7 @@ bool IterativeTypeChecker::isUnqualifiedLookupInDeclContextSatisfied(
     // Modules and file units can always handle name lookup.
     return true;
 
-  case DeclContextKind::NominalTypeDecl:
+  case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
     // Check whether we can perform qualified lookup into this
     // declaration context.

@@ -5,7 +5,7 @@ import Swift
 class HeapStorage<Value, Element> {
   public final func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>) -> R
-  ) -> R { return body(UnsafeMutablePointer<Element>()) }
+  ) -> R { return body(nil) }
 }
 struct CountAndCapacity {}
 class TestHeapStorage<T> : HeapStorage<CountAndCapacity,T> {

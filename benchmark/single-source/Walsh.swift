@@ -18,7 +18,7 @@ func IsPowerOfTwo(x: Int) -> Bool { return (x & (x - 1)) == 0 }
 //Fast Walsh Hadamard Transform
 func WalshTransform(data: inout [Double]) {
   assert(IsPowerOfTwo(data.count), "Not a power of two")
-  var temp = [Double](count: data.count, repeatedValue: 0)
+  var temp = [Double](repeating: 0, count: data.count)
   var ret = WalshImpl(&data, &temp, 0, data.count)
   for i in 0..<data.count {
     data[i] = ret[i]

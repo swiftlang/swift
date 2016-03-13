@@ -81,10 +81,10 @@ struct OuterNominal {
 // POPULAR_STMT_0:   okay()
 // POPULAR_STMT_0:   DDModuleColor
 // POPULAR_STMT_0:   CCModuleColor
-// POPULAR_STMT_0:   EEModuleColor
-// bad() ends up here because it's an unpopular global but that's still better
-// than a random "other module" result like ModuleCollaborate.
+// bad() ends up here because it's an unpopular global but that's still
+// generally better than "other module" results.
 // POPULAR_STMT_0:   bad()
+// POPULAR_STMT_0:   EEModuleColor
 // POPULAR_STMT_0:   ModuleCollaborate
 // POPULAR_STMT_0: ]
 // POPULAR_STMT_0-LABEL: Results for filterText: col [
@@ -104,3 +104,41 @@ struct OuterNominal {
     }
   }
 }
+
+struct Outer {
+  struct ABTabularMonkey {}
+  struct ABTextMockery {}
+  struct ABTradeableEquity {}
+  struct ABVocalContour {}
+  struct ABBobtail {}
+  struct ABFont {}
+}
+
+// RUN: %complete-test -hide-none -fuzz -group=none -popular="%s.popular" -unpopular="%s.unpopular" -tok=POPULAR_VS_PREFIX_1 %s -- -I %S/Inputs | FileCheck %s -check-prefix=POPULAR_VS_PREFIX_1
+func testPopularityVsPrefixMatch1() {
+  let x: Outer.#^POPULAR_VS_PREFIX_1,,AB,ABT^#
+}
+// POPULAR_VS_PREFIX_1-LABEL: Results for filterText:  [
+// POPULAR_VS_PREFIX_1-NEXT:    ABVocalContour
+// POPULAR_VS_PREFIX_1-NEXT:    ABBobtail
+// POPULAR_VS_PREFIX_1-NEXT:    ABFont
+// POPULAR_VS_PREFIX_1-NEXT:    ABTabularMonkey
+// POPULAR_VS_PREFIX_1-NEXT:    ABTextMockery
+// POPULAR_VS_PREFIX_1-NEXT:    ABTradeableEquity
+// POPULAR_VS_PREFIX_1: ]
+// POPULAR_VS_PREFIX_1-LABEL: Results for filterText: AB [
+// POPULAR_VS_PREFIX_1-NEXT:    ABVocalContour
+// POPULAR_VS_PREFIX_1-NEXT:    ABBobtail
+// POPULAR_VS_PREFIX_1-NEXT:    ABFont
+// POPULAR_VS_PREFIX_1-NEXT:    ABTextMockery
+// POPULAR_VS_PREFIX_1-NEXT:    ABTabularMonkey
+// POPULAR_VS_PREFIX_1-NEXT:    ABTradeableEquity
+// POPULAR_VS_PREFIX_1-NEXT: ]
+// POPULAR_VS_PREFIX_1-LABEL: Results for filterText: ABT [
+// POPULAR_VS_PREFIX_1-NEXT:    ABTextMockery
+// POPULAR_VS_PREFIX_1-NEXT:    ABTabularMonkey
+// POPULAR_VS_PREFIX_1-NEXT:    ABTradeableEquity
+// POPULAR_VS_PREFIX_1-NEXT:    ABVocalContour
+// POPULAR_VS_PREFIX_1-NEXT:    ABBobtail
+// POPULAR_VS_PREFIX_1-NEXT:    ABFont
+// POPULAR_VS_PREFIX_1-NEXT: ]

@@ -10,8 +10,9 @@
 // A bare-bones Swift standard library
 //
 
-public enum Optional<T> {
-  case Some(T), None
+public enum Optional<Wrapped> {
+  case none
+  case some(Wrapped)
 }
 
 public typealias IntegerLiteralType = Int
@@ -27,12 +28,12 @@ public protocol _BuiltinFloatLiteralConvertible {
 }
 
 public protocol IntegerLiteralConvertible {
-  typealias IntegerLiteralType : _BuiltinIntegerLiteralConvertible
+  associatedtype IntegerLiteralType : _BuiltinIntegerLiteralConvertible
   init(integerLiteral value: IntegerLiteralType)
 }
 
 public protocol FloatLiteralConvertible {
-  typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
+  associatedtype FloatLiteralType : _BuiltinFloatLiteralConvertible
   init(floatLiteral value: FloatLiteralType)
 }
 

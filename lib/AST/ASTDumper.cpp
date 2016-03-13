@@ -546,8 +546,8 @@ namespace {
       printDeclName(VD);
       if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(VD))
         printGenericParameters(OS, AFD->getGenericParams());
-      if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(VD))
-        printGenericParameters(OS, NTD->getGenericParams());
+      if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
+        printGenericParameters(OS, GTD->getGenericParams());
 
       OS << " type='";
       if (VD->hasType())
@@ -1076,8 +1076,8 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     break;
   }
 
-  case DeclContextKind::NominalTypeDecl:
-    printName(os, cast<NominalTypeDecl>(dc)->getName());
+  case DeclContextKind::GenericTypeDecl:
+    printName(os, cast<GenericTypeDecl>(dc)->getName());
     break;
 
   case DeclContextKind::ExtensionDecl:
@@ -1368,12 +1368,12 @@ public:
     OS << '\n';
     printRec(S->getSequence());
     OS << '\n';
-    if (S->getGenerator()) {
-      printRec(S->getGenerator());
+    if (S->getIterator()) {
+      printRec(S->getIterator());
       OS << '\n';
     }
-    if (S->getGeneratorNext()) {
-      printRec(S->getGeneratorNext());
+    if (S->getIteratorNext()) {
+      printRec(S->getIteratorNext());
       OS << '\n';
     }
     printRec(S->getBody());

@@ -422,6 +422,26 @@ class d0120_TestClassBase {
     return 0
   }
 // PASS_COMMON-NEXT: {{^}}  subscript(i: Int) -> Int { get }{{$}}
+
+  class var baseClassVar1: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  class var baseClassVar1: Int { get }{{$}}
+
+  // FIXME: final class var not allowed to have storage, but static is?
+  // final class var baseClassVar2: Int = 0
+
+  final class var baseClassVar3: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  final class var baseClassVar3: Int { get }{{$}}
+  static var baseClassVar4: Int = 0
+// PASS_COMMON-NEXT: {{^}}  static var baseClassVar4: Int{{$}}
+  static var baseClassVar5: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  static var baseClassVar5: Int { get }{{$}}
+
+  class func baseClassFunc1() {}
+// PASS_COMMON-NEXT: {{^}}  class func baseClassFunc1(){{$}}
+  final class func baseClassFunc2() {}
+// PASS_COMMON-NEXT: {{^}}  final class func baseClassFunc2(){{$}}
+  static func baseClassFunc3() {}
+// PASS_COMMON-NEXT: {{^}}  static func baseClassFunc3(){{$}}
 }
 
 class d0121_TestClassDerived : d0120_TestClassBase {
@@ -498,9 +518,9 @@ class d0170_TestAvailability {
 // PASS_COMMON-NEXT: {{^}}  @available(*, unavailable){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f1(){{$}}
 
-  @available(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee")
+  @available(*, unavailable, message: "aaa \"bbb\" ccc\nddd\0eee")
   func f2() {}
-// PASS_COMMON-NEXT: {{^}}  @available(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee"){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(*, unavailable, message: "aaa \"bbb\" ccc\nddd\0eee"){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f2(){{$}}
 
   @available(iOS, unavailable)
@@ -516,8 +536,8 @@ class d0170_TestAvailability {
 // PASS_COMMON-NEXT: {{^}}  func f4(){{$}}
 
 // Convert long-form @available() to short form when possible.
-  @available(iOS, introduced=8.0)
-  @available(OSX, introduced=10.10)
+  @available(iOS, introduced: 8.0)
+  @available(OSX, introduced: 10.10)
   func f5() {}
 // PASS_COMMON-NEXT: {{^}}  @available(iOS 8.0, OSX 10.10, *){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f5(){{$}}
@@ -1266,16 +1286,16 @@ struct d2900_TypeSugar1 {
 
 // @warn_unused_result attribute
 public struct ArrayThingy {
-    // PASS_PRINT_AST: @warn_unused_result(mutable_variant="sortInPlace")
+    // PASS_PRINT_AST: @warn_unused_result(mutable_variant: "sort")
     // PASS_PRINT_AST-NEXT: public func sort() -> ArrayThingy
-    @warn_unused_result(mutable_variant="sortInPlace")
+    @warn_unused_result(mutable_variant: "sort")
     public func sort() -> ArrayThingy { return self }
 
-    public mutating func sortInPlace() { }
+    public mutating func sort() { }
 
-    // PASS_PRINT_AST: @warn_unused_result(message="dummy", mutable_variant="reverseInPlace")
+    // PASS_PRINT_AST: @warn_unused_result(message: "dummy", mutable_variant: "reverseInPlace")
     // PASS_PRINT_AST-NEXT: public func reverse() -> ArrayThingy
-    @warn_unused_result(message="dummy", mutable_variant="reverseInPlace")
+    @warn_unused_result(message: "dummy", mutable_variant: "reverseInPlace")
     public func reverse() -> ArrayThingy { return self }
 
     public mutating func reverseInPlace() { }
@@ -1285,9 +1305,9 @@ public struct ArrayThingy {
     @warn_unused_result
     public func mineGold() -> Int { return 0 }
 
-    // PASS_PRINT_AST: @warn_unused_result(message="oops")
+    // PASS_PRINT_AST: @warn_unused_result(message: "oops")
     // PASS_PRINT_AST-NEXT: public func mineCopper() -> Int
-    @warn_unused_result(message="oops")
+    @warn_unused_result(message: "oops")
     public func mineCopper() -> Int { return 0 }
 }
 
@@ -1328,3 +1348,9 @@ extension ProtocolToExtend where Self.Assoc == Int {}
 // PASS_PRINT_AST: #elseif
 // PASS_PRINT_AST: #else
 // PASS_PRINT_AST: #endif
+
+public struct MyPair<A, B> { var a: A, b: B }
+public typealias MyPairI<B> = MyPair<Int, B>
+// PASS_PRINT_AST: public typealias MyPairI<B> = MyPair<Int, B>
+public typealias MyPairAlias<T, U> = MyPair<T, U>
+// PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>

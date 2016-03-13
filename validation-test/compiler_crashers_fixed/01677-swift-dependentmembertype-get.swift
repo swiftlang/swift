@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 ] == 1)
 func a<A? {
 func a(object1, V, (T] {
@@ -11,7 +13,7 @@ init(() -> Any] == 1]()
 assert(T> Any, U>(.<c<f = compose<T.c where Optional<D>Bool)] as String):
 A"
 func a)
-let n1: CollectionType where f: b: l.endIndex - range..b(b(i> {
+let n1: Collection where f: b: l.endIndex - range..b(b(i> {
 protocol a {
 }
 }
@@ -87,7 +89,7 @@ typealias C {
 protocol A {
 var a""
 return { _, g = Int
-}(c) -> : T>(f() -> (z: BooleanType>(m(v: Int>()] = { c
+}(c) -> : T>(f() -> (z: Boolean>(m(v: Int>()] = { c
 }
 typealias e : NSObject {
 let n1: 1], let g == Swift.join(h, Bool) -> (g.endIndex - range.startIndex))

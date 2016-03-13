@@ -12,8 +12,8 @@
 # the merge worker processes.
 
 import SocketServer
-import thread
 import logging
+import thread
 
 from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
 

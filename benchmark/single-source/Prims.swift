@@ -29,7 +29,7 @@ class PriorityQueue {
   // Create heap for graph with NUM nodes.
   init(Num: Int) {
     heap = Array<EdgeCost>()
-    graphIndexToHeapIndexMap = Array<Int?>(count: Num, repeatedValue:nil)
+    graphIndexToHeapIndexMap = Array<Int?>(repeating:nil, count: Num)
   }
 
   func isEmpty() -> Bool {
@@ -184,7 +184,7 @@ extension Edge : Hashable {
 }
 
 func Prims(graph : Array<GraphNode>, _ fun : (Int,Int)->Double) -> Array<Int?> {
-  var treeEdges = Array<Int?>(count:graph.count, repeatedValue:nil)
+  var treeEdges = Array<Int?>(repeating:nil, count:graph.count)
 
   let queue = PriorityQueue(Num:graph.count)
   // Make the minimum spanning tree root its own parent for simplicity.

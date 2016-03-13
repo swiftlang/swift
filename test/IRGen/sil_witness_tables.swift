@@ -12,7 +12,7 @@ import sil_witness_tables_external_conformance
 protocol A {}
 
 protocol P {
-  typealias Assoc: A
+  associatedtype Assoc: A
 
   static func staticMethod()
   func instanceMethod()

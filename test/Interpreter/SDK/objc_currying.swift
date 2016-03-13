@@ -10,12 +10,12 @@ func foo(f: (String) -> String) {
 }
 
 let x: NSArray = ["foo", "bar", "bas"]
-foo(x.componentsJoinedByString)
+foo(x.componentsJoined)
 // CHECK: foo, bar, bas
 // CHECK: foo • bar • bas
 
 let a: AnyObject = x
-if let componentsJoinedByString = a.componentsJoinedByString {
+if let componentsJoinedByString = a.componentsJoined {
   foo(componentsJoinedByString)
 }
 // CHECK: foo, bar, bas

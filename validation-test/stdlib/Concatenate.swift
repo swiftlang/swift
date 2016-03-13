@@ -47,8 +47,8 @@ for (expected, source) in samples {
   ConcatenateTests.test("reverse-\(source)") {
     // FIXME: separate 'expected' and 'reversed' variables are a workaround
     // for: <rdar://problem/20789500>
-    let expected = ContiguousArray(expected.lazy.reverse())
-    let reversed = source.flatten().reverse()
+    let expected = ContiguousArray(expected.lazy.reversed())
+    let reversed = source.flatten().reversed()
     checkBidirectionalCollection(expected, reversed)
   }
 

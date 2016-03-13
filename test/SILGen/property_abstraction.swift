@@ -114,7 +114,7 @@ class MyClass {}
 // When simply assigning to a property, reabstract the r-value and assign
 // to the base instead of materializing and then assigning.
 protocol Factory {
-  typealias Product
+  associatedtype Product
   var builder : () -> Product { get set }
 }
 func setBuilder<F: Factory where F.Product == MyClass>(factory: inout F) {

@@ -80,6 +80,7 @@ import SevenBoom
 import Sim2DArray
 import SortLettersInPlace
 import SortStrings
+import StackPromo
 import StaticArray
 import StrComplexWalk
 import StrToInt
@@ -162,6 +163,7 @@ precommitTests = [
   "Sim2DArray": run_Sim2DArray,
   "SortLettersInPlace": run_SortLettersInPlace,
   "SortStrings": run_SortStrings,
+  "StackPromo": run_StackPromo,
   "StaticArray": run_StaticArray,
   "StrComplexWalk": run_StrComplexWalk,
   "StrToInt": run_StrToInt,

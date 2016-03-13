@@ -134,7 +134,7 @@ class OptionalResult {
 // CHECK: bb0(
 // CHECK-NEXT: debug_value %0 : $OptionalResult
 // CHECK-NEXT: strong_retain [[VALUE:%[0-9]+]]
-// CHECK-NEXT: [[T0:%.*]] = enum $Optional<OptionalResult>, #Optional.Some!enumelt.1, %0 : $OptionalResult
+// CHECK-NEXT: [[T0:%.*]] = enum $Optional<OptionalResult>, #Optional.some!enumelt.1, %0 : $OptionalResult
 // CHECK-NEXT: return [[T0]] : $Optional<OptionalResult>
 
 class OptionalResultInheritor : OptionalResult {
@@ -150,7 +150,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK:      select_enum [[RES]]
 // CHECK:      [[T1:%.*]] = unchecked_enum_data [[RES]]
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T1]] : $OptionalResult to $OptionalResultInheritor
-// CHECK-NEXT: enum $Optional<OptionalResultInheritor>, #Optional.Some!enumelt.1, [[T4]]
+// CHECK-NEXT: enum $Optional<OptionalResultInheritor>, #Optional.some!enumelt.1, [[T4]]
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
 // CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1f

@@ -3,7 +3,7 @@
 // The iOS/arm64 target uses _Bool for Objective C's BOOL.  We include
 // x86_64 here as well because the iOS simulator also uses _Bool.
 #if ((os(iOS) || os(tvOS)) && (arch(arm64) || arch(x86_64))) || os(watchOS)
-public struct ObjCBool : BooleanType {
+public struct ObjCBool : Boolean {
   private var value : Bool
 
   public init(_ value: Bool) {
@@ -18,7 +18,7 @@ public struct ObjCBool : BooleanType {
 
 #else
 
-public struct ObjCBool : BooleanType {
+public struct ObjCBool : Boolean {
   private var value : UInt8
 
   public init(_ value: Bool) {
@@ -44,7 +44,7 @@ extension ObjCBool : BooleanLiteralConvertible {
 }
 
 public struct Selector : StringLiteralConvertible {
-  private var ptr : COpaquePointer
+  private var ptr : OpaquePointer
 
   public init(_ value: String) {
     self.init(stringLiteral: value)
@@ -64,11 +64,11 @@ public struct Selector : StringLiteralConvertible {
 }
 
 public struct NSZone: NilLiteralConvertible {
-  public var pointer : COpaquePointer
+  public var pointer : OpaquePointer
 
   @_transparent public
   init(nilLiteral: ()) {
-    pointer = COpaquePointer()
+    pointer = nil
   }
 }
 

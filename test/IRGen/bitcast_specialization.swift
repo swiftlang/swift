@@ -14,8 +14,8 @@ public func myDictionaryBridge<
 
   for (key, value) in source {
     if keyBridgesDirectly {
-      var bridgedKey = unsafeBitCast(key, DestType.self)
-	  return bridgedKey
+      var bridgedKey = unsafeBitCast(key, to: DestType.self)
+      return bridgedKey
     }
   }
   return nil

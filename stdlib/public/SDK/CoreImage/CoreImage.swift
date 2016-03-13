@@ -33,8 +33,8 @@ extension CIFilter {
   }
 #endif
 
-  @available(iOS, introduced=8.0)
-  @available(OSX, introduced=10.10)
+  @available(iOS, introduced: 8.0)
+  @available(OSX, introduced: 10.10)
   convenience init?(
     name: String!, elements: (String, AnyObject)...
   ) {

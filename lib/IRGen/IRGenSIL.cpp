@@ -582,7 +582,7 @@ public:
                               StringRef Name, unsigned ArgNo,
                               Alignment Align = Alignment(0)) {
     auto Ty = Storage->getType();
-    if (IGM.Opts.Optimize ||
+    if (IGM.Opts.Optimize || (ArgNo == 0) ||
         isa<llvm::AllocaInst>(Storage) ||
         isa<llvm::UndefValue>(Storage) ||
         Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
@@ -652,9 +652,14 @@ public:
                                     StringRef Name,
                                     unsigned ArgNo = 0,
                                     IndirectionKind Indirection = DirectValue) {
-    // Eagerly load the type metadata at -Onone.
-    if (!IGM.Opts.Optimize && SILTy && SILTy.hasArchetype())
-      emitTypeMetadataRefForLayout(SILTy);
+    // Force all archetypes referenced by the type to be bound by this point.
+    // TODO: just make sure that we have a path to them that the debug info
+    //       can follow.
+    if (!IGM.Opts.Optimize && Ty.getType()->hasArchetype())
+      Ty.getType()->getCanonicalType().visit([&](Type t) {
+        if (auto archetype = dyn_cast<ArchetypeType>(CanType(t)))
+          emitTypeMetadataRef(archetype);
+       });
 
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
@@ -714,6 +719,9 @@ public:
   }
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
+  }
+  void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *i) {
+    llvm_unreachable("mark_uninitialized_behavior is not valid in canonical SIL");
   }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *i) {
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");

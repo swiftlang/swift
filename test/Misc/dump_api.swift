@@ -1,22 +1,22 @@
 // RUN: %target-swift-frontend -parse %s -dump-api-path %t.dump
 // RUN: diff -du %S/Inputs/dumped_api.swift %t.dump/dump_api.swift
 
-public class _AnyGeneratorBase {}
+public class _AnyIteratorBase {}
 
-/// An abstract `GeneratorType` base class over `T` elements.
+/// An abstract `IteratorProtocol` base class over `T` elements.
 ///
-/// Use this as a `Sequence`'s associated `Generator` type when you
-/// don't want to expose details of the concrete generator, a subclass.
+/// Use this as a `Sequence`'s associated `Iterator` type when you
+/// don't want to expose details of the concrete iterator, a subclass.
 ///
-/// It is an error to create instances of `AnyGenerator` that are not
-/// also instances of an `AnyGenerator` subclass.
+/// It is an error to create instances of `AnyIterator` that are not
+/// also instances of an `AnyIterator` subclass.
 ///
 /// See also:
 ///
-///     struct AnySequence<S: SequenceType>
-///     func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
-///     func anyGenerator<T>(nextImplementation: () -> T?) -> AnyGenerator<T>
-public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
+///     struct AnySequence<S: Sequence>
+///     func anyIterator<I: IteratorProtocol>(base: I) -> AnyIterator<I.Element>
+///     func anyIterator<T>(nextImplementation: () -> T?) -> AnyIterator<T>
+public class AnyIterator<T> : _AnyIteratorBase, IteratorProtocol {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
   override public init() {
@@ -30,34 +30,34 @@ public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   public func next() -> T? {fatalError("abstract")}
 }
 
-/// Every `GeneratorType` can also be a `SequenceType`.  Note that
-/// traversing the sequence consumes the generator.
-extension AnyGenerator : SequenceType {
+/// Every `IteratorProtocol` can also be a `Sequence`.  Note that
+/// traversing the sequence consumes the iterator.
+extension AnyIterator : Sequence {
   /// Returns `self`.
-  public func generate() -> AnyGenerator { return self }
+  public func makeIterator() -> AnyIterator { return self }
 }
 
-/// Return a `GeneratorType` instance that wraps `base` but whose type
-/// depends only on the type of `G.Element`.
+/// Return a `IteratorProtocol` instance that wraps `base` but whose type
+/// depends only on the type of `I.Element`.
 ///
 /// Example:
 ///
-///     func countStrings() -> AnyGenerator<String> {
+///     func countStrings() -> AnyIterator<String> {
 ///       let lazyStrings = lazy(0..<10).map { String($0) }
 ///
 ///       // This is a really complicated type of no interest to our
 ///       // clients.
-///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
-///         = lazyStrings.generate()
-///       return anyGenerator(g)
+///       let g: MapSequenceIterator<RangeIterator<Int>, String>
+///         = lazyStrings.makeIterator()
+///       return anyIterator(g)
 ///     }
-public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
-  return FooGeneratorBox(base)
+public func anyIterator<I: IteratorProtocol>(base: I) -> AnyIterator<I.Element> {
+  return FooIteratorBox(base)
 }
 
-public class FooGeneratorBox<
-  Base: GeneratorType
-> : AnyGenerator<Base.Element> {
+public class FooIteratorBox<
+  Base: IteratorProtocol
+> : AnyIterator<Base.Element> {
   init(_ base: Base) { self.base = base }
   public override func next() -> Base.Element? { return base.next() }
   var base: Base

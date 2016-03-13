@@ -95,3 +95,23 @@ TEST(ImmutablePointerSet, MultipleElementSets) {
   EXPECT_NE(*MixOfThreeAndPartialOverlap, *ThreeEltSet);
   EXPECT_NE(*MixOfThreeAndPartialOverlap, *TwoEltSet);
 }
+
+TEST(ImmutablePointerSet, EmptyIntersectionTests) {
+  llvm::BumpPtrAllocator BPA;
+  ImmutablePointerSetFactory<unsigned> F(BPA);
+
+  unsigned *Ptr1 = (unsigned *)3;
+  unsigned *Ptr2 = (unsigned *)4;
+  unsigned *Ptr3 = (unsigned *)3;
+  unsigned *Ptr4 = (unsigned *)5;
+  unsigned *Ptr5 = (unsigned *)6;
+
+  ArrayRef<unsigned *> Data1 = {Ptr1, Ptr2};
+  ArrayRef<unsigned *> Data2 = {Ptr3, Ptr2};
+  ArrayRef<unsigned *> Data3 = {Ptr4, Ptr5};
+  ArrayRef<unsigned *> Data4 = {Ptr2, Ptr4};
+
+  EXPECT_FALSE(F.get(Data1)->hasEmptyIntersection(F.get(Data2)));
+  EXPECT_TRUE(F.get(Data1)->hasEmptyIntersection(F.get(Data3)));
+  EXPECT_FALSE(F.get(Data1)->hasEmptyIntersection(F.get(Data4)));
+}

@@ -473,6 +473,8 @@ public:
       if (*moduleOpt)
         moduleName = (*moduleOpt)->getTopLevelModuleName();
     }
+    if (moduleName.empty())
+      moduleName = decl->getASTContext().getLangOpts().CurrentModule;
 
     StringRef enumName =
       decl->getDeclName() ? decl->getName()
@@ -495,7 +497,7 @@ public:
     // If there is no name for linkage, the computation is trivial and we
     // wouldn't be able to perform name-based caching anyway.
     if (!decl->hasNameForLinkage())
-      return importer::EnumInfo(decl, preprocessor);
+      return importer::EnumInfo(SwiftContext, decl, preprocessor);
 
     SmallString<32> keyScratch;
     auto key = getEnumInfoKey(decl, keyScratch);
@@ -503,7 +505,7 @@ public:
     if (known != enumInfos.end())
       return known->second;
 
-    importer::EnumInfo enumInfo(decl, preprocessor);
+    importer::EnumInfo enumInfo(SwiftContext, decl, preprocessor);
     enumInfos[key] = enumInfo;
     return enumInfo;
   }
@@ -603,7 +605,8 @@ public:
   clang::Selector setObjectForKeyedSubscript;
 
 private:
-  Optional<Module *> checkedFoundationModule, checkedSIMDModule;
+  /// Records those modules that we have looked up.
+  llvm::DenseMap<Identifier, Module *> checkedModules;
 
   /// External Decls that we have imported but not passed to the ASTContext yet.
   SmallVector<Decl *, 4> RegisteredExternalDecls;
@@ -1096,7 +1099,16 @@ public:
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///
-  /// \param module The name of the module in which the type should occur.
+  /// \param moduleName The name of the module in which the type should occur.
+  ///
+  /// \param name The name of the type to find.
+  ///
+  /// \returns The named type, or null if the type could not be found.
+  Type getNamedSwiftType(StringRef moduleName, StringRef name);
+
+  /// \brief Retrieve the named Swift type, e.g., Int32.
+  ///
+  /// \param module The module in which the type should occur.
   ///
   /// \param name The name of the type to find.
   ///

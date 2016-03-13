@@ -26,7 +26,7 @@ import StdlibUnittest
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-final class X : ForwardIndexType, Comparable, CustomStringConvertible, 
+final class X : ForwardIndex, Comparable, CustomStringConvertible, 
                 IntegerLiteralConvertible 
 {
   required init(_ value: Int) {
@@ -69,7 +69,7 @@ func < (x: X, y: X) -> Bool {
 
 //===----------------------------------------------------------------------===//
 
-func printSequence<T : SequenceType>(x: T) {
+func printSequence<T : Sequence>(x: T) {
   print("[", terminator: "")
   var prefix = ""
   for a in x {
@@ -82,11 +82,11 @@ func printSequence<T : SequenceType>(x: T) {
 
 typealias BufferID = UnsafePointer<Void>
 
-func bufferID<T : _ArrayType>(x: T) -> BufferID {
+func bufferID<T : _ArrayProtocol>(x: T) -> BufferID {
   return x._buffer.identity
 }
 
-func checkReallocation<T : _ArrayType>(
+func checkReallocation<T : _ArrayProtocol>(
   x: T, _ lastBuffer: BufferID, _ reallocationExpected: Bool
 ) -> BufferID {
   let currentBuffer = bufferID(x)
@@ -98,10 +98,10 @@ func checkReallocation<T : _ArrayType>(
 }
 
 func checkEqual<
-    S1 : SequenceType, S2 : SequenceType
-  where 
-    S1.Generator.Element == S2.Generator.Element,
-    S1.Generator.Element : Equatable
+  S1 : Sequence, S2 : Sequence
+  where
+  S1.Iterator.Element == S2.Iterator.Element,
+  S1.Iterator.Element : Equatable
 >(a1: S1, _ a2: S2, _ expected: Bool) {
   if a1.elementsEqual(a2) != expected {
     let un = expected ? "un" : ""
@@ -110,11 +110,12 @@ func checkEqual<
 }
 
 func test<
-  T : _ArrayType
-where T.Generator.Element == T._Buffer.Element,
-          T._Buffer.Element == T.Element,
-          T.Element == X,
-          T.Index == Int
+  T : _ArrayProtocol
+  where
+  T.Iterator.Element == T._Buffer.Element,
+  T._Buffer.Element == T.Element,
+  T.Element == X,
+  T.Index == Int
 >(_: T.Type, _ label: String) {
   print("test: \(label)...", terminator: "")
 
@@ -256,7 +257,7 @@ func testCocoa() {
   // CHECK-NEXT: [foo, bar, baz]
   
   a = nsArrayOfStrings()
-  a.insert("bag", atIndex:2)
+  a.insert("bag", at: 2)
   printSequence(a)
   // CHECK-NEXT: [foo, bar, bag, baz]
 
@@ -279,7 +280,7 @@ testCocoa()
 
 extension ArraySlice {
   mutating func qsort(compare: (Element, Element) -> Bool) {
-    _introSort(&self, self.indices, compare)
+    _introSort(&self, subRange: self.indices, isOrderedBefore: compare)
   }
 }
 
@@ -412,16 +413,16 @@ func testInoutViolation() {
 %for A in arrayTypes:
   if true {
     var b = ${A}(a)
-    b.sort { x, y in
+    b.sorted { x, y in
       b.removeAll()
       return x < y
     }
   }
 %end
   
-  // An overload of sort for Arrays uses withUnsafeMutableBufferPointer,
+  // An overload of sorted for Arrays uses withUnsafeMutableBufferPointer,
   // which disables bounds checks.
-  a.sort { x, y in
+  a.sorted { x, y in
     a = []         // Invalidate the whole array during sorting
     return x < y
   }
@@ -440,10 +441,10 @@ func testSingleElementModifiers${A}() {
   print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
-  a.insert(42, atIndex: 4)
+  a.insert(42, at: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
   
-  print(a.removeAtIndex(2).value) // CHECK-NEXT: 2
+  print(a.remove(at: 2).value) // CHECK-NEXT: 2
   printSequence(a)                  // CHECK-NEXT: [0, 1, 3, 42, 4, 5, 6, 7, 8]
 }
 testSingleElementModifiers${A}()
@@ -470,10 +471,10 @@ func testIsEmptyFirstLast${A}() {
   print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
-  a.insert(42, atIndex: 4)
+  a.insert(42, at: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
   
-  print(a.removeAtIndex(2).value) // CHECK-NEXT: 2
+  print(a.remove(at: 2).value) // CHECK-NEXT: 2
   printSequence(a)                  // CHECK-NEXT: [0, 1, 3, 42, 4, 5, 6, 7, 8]
 }
 testIsEmptyFirstLast${A}()
@@ -500,7 +501,7 @@ class Rdar16914909 : NSObject {
   var basicColorSet = [OSColor]()
   
   func doColorStuff() {
-    basicColorSet.append(OSColor.lightGrayColor())
+    basicColorSet.append(OSColor.lightGray())
     print("appended")
   }
 }

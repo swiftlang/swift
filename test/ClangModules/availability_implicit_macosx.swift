@@ -29,15 +29,15 @@ func useClassThatTriggersImportOfPotentiallyUnavailableOptions() {
 }
 
 func directUseShouldStillTriggerDeprecationWarning() {
-  _ = NSDeprecatedOptions.First // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
-  _ = NSDeprecatedEnum.First    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.51: Use a different API}}
+  _ = NSDeprecatedOptions.first // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
+  _ = NSDeprecatedEnum.first    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.51: Use a different API}}
 }
 
 func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
 }
 
 class SuperClassWithDeprecatedInitializer {
-  @available(OSX, introduced=10.9, deprecated=10.51)
+  @available(OSX, introduced: 10.9, deprecated: 10.51)
   init() { }
 }
 
@@ -52,7 +52,7 @@ func callImplicitInitializerOnSubClassWithSynthesizedDesignedInitializerOverride
   _ = SubClassWithSynthesizedDesignedInitializerOverride() // expected-warning {{'init()' was deprecated in OS X 10.51}}
 }
 
-@available(OSX, introduced=10.9, deprecated=10.51)
+@available(OSX, introduced: 10.9, deprecated: 10.51)
 class DeprecatedSuperClass {
   var i : Int = 7 // Causes initializer to be synthesized
 }
@@ -67,21 +67,21 @@ func callImplicitInitializerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
   _ = NotDeprecatedSubClassOfDeprecatedSuperClass()
 }
 
-@available(OSX, introduced=10.9, deprecated=10.51)
+@available(OSX, introduced: 10.9, deprecated: 10.51)
 class DeprecatedSubClassOfDeprecatedSuperClass : DeprecatedSuperClass {
 }
 
 // Tests synthesis of materializeForSet
 class ClassWithLimitedAvailabilityAccessors {
   var limitedGetter: Int {
-    @available(OSX, introduced=10.52)
+    @available(OSX, introduced: 10.52)
     get { return 10 }
     set(newVal) {}
   }
 
   var limitedSetter: Int {
     get { return 10 }
-    @available(OSX, introduced=10.52)
+    @available(OSX, introduced: 10.52)
     set(newVal) {}
   }
 }

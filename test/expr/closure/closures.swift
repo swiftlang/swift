@@ -312,6 +312,6 @@ func r21375863() {
   var width = 0
   var height = 0
   var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{use of undeclared type 'asdf'}}
-    [UInt8](count: width*height, repeatedValue: 0)
+    [UInt8](repeating: 0, count: width*height)
   }
 }

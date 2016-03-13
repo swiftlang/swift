@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 >())
 func g<1 {
 let f = D> a {
@@ -67,7 +69,7 @@ let a
 var b<T) -> Self {
 default:
 typealias B
-S.Generator.f : S<b(A(A>() -> T {
+S.Iterator.f : S<b(A(A>() -> T {
 protocol b {
 }
 init(#object1, k : AnyObject.c
@@ -84,7 +86,7 @@ class A {
 let h> {
 let h = Swift.advance(A, length: A<D> : B)
 var d {
-func f.Generator.A"
+func f.Iterator.A"
 func e<d<D>()
 }
 protocol a {
@@ -102,7 +104,7 @@ class A<T where T : String {
 func f: a {
 typealias b = b: d {
 }
-class B : SequenceType> ()
+class B : Sequence> ()
 }
 }
 }

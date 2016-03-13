@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 protocol a {
 }
 protocol b : a {
@@ -33,7 +35,7 @@ d(j i)
 class h {
     typealias i = i
 }
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
     l g: e
 }
 func h<e>() -> [l<e>] {
@@ -135,7 +137,7 @@ protocol c {
 }
 class k: c{  class func i {
 a=1 as a=1
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
 func a<T>() -> (T, T -> T) -> T {
     var b: ({ (x: Int, f: Int -> Int) -> Int in
@@ -179,7 +181,7 @@ f l: k -> k = {
 }(j, l)
 f
 protocol k : f { func f
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 protocol A {
     typealias E
 }
@@ -237,7 +239,7 @@ struct A<T> {
 }
 func prefix(with: String) -> <T>(() -> T) -  t.c()
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
@@ -262,7 +264,7 @@ func n<i>() {
 func n(k: Int = l) {
 }
 let j = n
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 protocol a {
@@ -273,7 +275,7 @@ class b: a {
 (b() as a).dynamicType.c()
 b
 protocol c : b { func b
-func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
+func some<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
     for (mx :       if let x = mx {
      d: f{  ceanTy b {
     clasi() {
@@ -367,9 +369,9 @@ func b<d {
 func f() {
     ({})
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func a<T>() -> (T, T -> T) -> T {
     var4, nil]
 print(some(xs))
@@ -422,7 +424,7 @@ protocol a {
 class b: a {
     c T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func f() {
     ({})
 }
@@ -434,14 +436,14 @@ func c<d {
         var _ = e
     }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
     return []
 }
 a=1 as a=1
-func some<S: SequenceType, T where Optional<T> return !(a)
+func some<S: Sequence, T where Optional<T> return !(a)
 }
 ({})
 func prefix(with: String) -> <T>(() -> T) -> String { func b
@@ -478,9 +480,9 @@ var e: Int -> Int = {
 }
 let d: Int =  { c, b in
     }(f, e)
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 i)
 import Foundation
 class q<k>: NSObject {

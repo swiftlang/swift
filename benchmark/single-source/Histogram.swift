@@ -16,11 +16,11 @@ import TestsUtils
 
 typealias rrggbb_t = UInt32
 
-func output_sorted_sparse_rgb_histogram<S: SequenceType where S.Generator.Element == rrggbb_t>(samples: S, _ N: Int) {
+func output_sorted_sparse_rgb_histogram<S: Sequence where S.Iterator.Element == rrggbb_t>(samples: S, _ N: Int) {
   var histogram = Dictionary<rrggbb_t, Int>()
   for  _ in 1...50*N {
     for sample in samples {   // This part is really awful, I agree
-      let i = histogram.indexForKey(sample)
+      let i = histogram.index(forKey: sample)
       histogram[sample] = (i != nil ? histogram[i!].1 : 0) + 1
     }
   }

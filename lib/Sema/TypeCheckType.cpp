@@ -103,7 +103,7 @@ Type TypeChecker::getUInt8Type(DeclContext *dc) {
 /// We call this the "exception type" to try to avoid confusion with
 /// the AST's ErrorType node.
 Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
-  if (NominalTypeDecl *decl = Context.getExceptionTypeDecl())
+  if (NominalTypeDecl *decl = Context.getErrorProtocolDecl())
     return decl->getDeclaredType();
 
   // Not really sugar, but the actual diagnostic text is fine.
@@ -451,13 +451,28 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     genericArgTypes.push_back(genericArg.getType());
   }
+  
+  // If we're completing a generic TypeAlias, then we map the types provided
+  // onto the underlying type.
+  if (auto *TAD = dyn_cast<TypeAliasDecl>(unbound->getDecl())) {
+    assert(TAD->getGenericParams()->getAllArchetypes().size()
+             == genericArgs.size() &&
+           "argument arity mismatch");
 
-  // Form the bound generic type
-  BoundGenericType *BGT = BoundGenericType::get(unbound->getDecl(),
-                                                unbound->getParent(),
-                                                genericArgTypes);
+    SmallVector<Substitution, 4> subs;
+    subs.reserve(genericArgs.size());
+    for (auto t : genericArgs)
+      subs.push_back(Substitution(t.getType(), {}));
+  
+    auto subst = TAD->getGenericParams()->getSubstitutionMap(subs);
+    return TAD->getUnderlyingType().subst(TAD->getParentModule(), subst, None);
+  }
+  
+  // Form the bound generic type.
+  auto *BGT = BoundGenericType::get(cast<NominalTypeDecl>(unbound->getDecl()),
+                                    unbound->getParent(), genericArgTypes);
   // Check protocol conformance.
-  if (!BGT->hasTypeParameter()) {
+  if (!BGT->hasTypeParameter() && !BGT->hasTypeVariable()) {
     SourceLoc noteLoc = unbound->getDecl()->getLoc();
     if (noteLoc.isInvalid())
       noteLoc = loc;
@@ -719,8 +734,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // parameters (only), then move up to the enclosing context.
   if (options.contains(TR_GenericSignature)) {
     GenericParamList *genericParams;
-    if (auto *nominal = dyn_cast<NominalTypeDecl>(DC)) {
-      genericParams = nominal->getGenericParams();
+    if (auto *generic = dyn_cast<GenericTypeDecl>(DC)) {
+      genericParams = generic->getGenericParams();
     } else if (auto *ext = dyn_cast<ExtensionDecl>(DC)) {
       genericParams = ext->getGenericParams();
     } else {
@@ -2618,9 +2633,10 @@ bool TypeChecker::isRepresentableInObjC(
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (FD->isAccessor()) {
       // Accessors can only be @objc if the storage declaration is.
+      // Global computed properties may however @_cdecl their accessors.
       auto storage = FD->getAccessorStorageDecl();
       validateDecl(storage);
-      if (!storage->isObjC()) {
+      if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl) {
         if (Diagnose) {
           auto error = FD->isGetter()
                     ? (isa<VarDecl>(storage) 
@@ -2675,7 +2691,8 @@ bool TypeChecker::isRepresentableInObjC(
     isSpecialInit = init->isObjCZeroParameterWithLongSelector();
 
   if (!isSpecialInit &&
-      !isParamListRepresentableInObjC(*this, AFD, AFD->getParameterList(1),
+      !isParamListRepresentableInObjC(*this, AFD,
+                                      AFD->getParameterLists().back(),
                                       Reason)) {
     if (!Diagnose) {
       // Return as soon as possible if we are not producing diagnostics.
@@ -2811,7 +2828,7 @@ bool TypeChecker::isRepresentableInObjC(
     // If the selector did not provide an index for the error, find
     // the last parameter that is not a trailing closure.
     if (!foundErrorParameterIndex) {
-      auto *paramList = AFD->getParameterList(1);
+      auto *paramList = AFD->getParameterLists().back();
       errorParameterIndex = paramList->size();
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.
@@ -3098,7 +3115,7 @@ isElementRepresentableInObjC(TypeChecker &TC, const DeclContext *DC, Type T) {
         TC.getProtocol({}, KnownProtocolKind::ObjectiveCBridgeable);
     if (bridgingProto &&
         TC.conformsToProtocol(T, bridgingProto, const_cast<DeclContext *>(DC),
-                              ConformanceCheckOptions())) {
+                              ConformanceCheckFlags::Used)) {
       return true;
     }
   }
@@ -3205,6 +3222,15 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   if (iter != ObjCRepresentableTypes.end()) {
     if (wasOptional && !iter->second)
       return false;
+
+    // If there is an _ObjectiveCBridgeable conformance, mark it as "used".
+    if (ProtocolDecl *bridgingProto =
+            getProtocol({}, KnownProtocolKind::ObjectiveCBridgeable)) {
+      (void)conformsToProtocol(T, bridgingProto,
+                               const_cast<DeclContext *>(DC),
+                               ConformanceCheckFlags::Used);
+    }
+
     return true;
   }
 
@@ -3303,7 +3329,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
 
   SmallVector<Identifier, 32> StdlibTypeNames;
 
-  StdlibTypeNames.push_back(Context.getIdentifier("COpaquePointer"));
+  StdlibTypeNames.push_back(Context.getIdentifier("OpaquePointer"));
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
   StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
 #include "swift/ClangImporter/BuiltinMappedTypes.def"

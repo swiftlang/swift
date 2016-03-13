@@ -21,7 +21,7 @@ import TestsUtils
 
 public func run_MonteCarloE(scale: Int) {
   let N = 200000*scale
-  var intervals = [Bool](count: N, repeatedValue: false)
+  var intervals = [Bool](repeating: false, count: N)
   for _ in 1...N {
     let pos = Int(UInt(truncatingBitPattern: Random())%UInt(N))
     intervals[pos] = true

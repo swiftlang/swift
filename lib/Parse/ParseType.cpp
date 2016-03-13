@@ -617,6 +617,9 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
                        : diag::expected_rbracket_array_type, 
                      lsquareLoc);
 
+  if (firstTy.hasCodeCompletion() || secondTy.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
+
   // If we couldn't parse anything for one of the types, propagate the error.
   if (firstTy.isNull() || (colonLoc.isValid() && secondTy.isNull()))
     return makeParserError();

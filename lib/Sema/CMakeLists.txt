@@ -11,7 +11,7 @@ add_swift_library(swiftSema
   CSSimplify.cpp
   CSSolver.cpp
   DerivedConformanceEquatableHashable.cpp
-  DerivedConformanceErrorType.cpp
+  DerivedConformanceErrorProtocol.cpp
   DerivedConformanceRawRepresentable.cpp
   DerivedConformances.cpp
   ITCDecl.cpp

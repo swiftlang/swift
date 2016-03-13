@@ -120,6 +120,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // Set the "arch" platform condition.
   switch (Target.getArch()) {
   case llvm::Triple::ArchType::arm:
+  case llvm::Triple::ArchType::thumb:
     addPlatformConditionValue("arch", "arm");
     break;
   case llvm::Triple::ArchType::aarch64:

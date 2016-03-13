@@ -77,7 +77,7 @@ final class AtomicInt4HeapInt2Int2RaceData {
   }
 }
 
-struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -148,17 +148,17 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2, 10, 20,  0, 40),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       }
     }
   }
 }
 
 struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
-  : RaceTestWithPerTrialDataType {
+  : RaceTestWithPerTrialData {
 
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
@@ -219,17 +219,17 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       }
     }
   }
 }
 
 struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
-  : RaceTestWithPerTrialDataType {
+  : RaceTestWithPerTrialData {
 
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
@@ -306,17 +306,17 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       }
     }
   }
 }
 
 struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
-  : RaceTestWithPerTrialDataType {
+  : RaceTestWithPerTrialData {
 
   typealias RaceData = AtomicInt4HeapInt2Int2RaceData
   typealias ThreadLocalData = Void
@@ -433,16 +433,16 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
            Observation(2, 10, 20,  0,  0, 100, 200, 999, 999),
            Observation(2, 10, 20, 30,  0, 100, 200, 300, 999),
            Observation(2, 10, 20, 30, 40, 100, 200, 300, 400):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       }
     }
   }
 }
 
-struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -514,16 +514,16 @@ struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2,  8, 16, -4, 64),
            Observation(2,  8, 16, 32, -4),
            Observation(2,  8, 16, 32, 64):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       }
     }
   }
 }
 
-struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -595,16 +595,16 @@ struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2, 11, 19,  3, 67),
            Observation(2, 11, 19, 35,  3),
            Observation(2, 11, 19, 35, 67):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       }
     }
   }
 }
 
-struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -676,10 +676,10 @@ struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2, 10, 18,  3, 66),
            Observation(2, 10, 18, 34,  3),
            Observation(2, 10, 18, 34, 66):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       }
     }
   }
@@ -688,7 +688,7 @@ struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
 
 var dummyObjectCount = _stdlib_ShardedAtomicCounter()
 
-struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
   class DummyObject {
     var payload: UInt = 0x12345678
     var randomInt: Int
@@ -740,7 +740,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
       if let ref =
         _stdlib_atomicLoadARCRef(object: raceData.atomicReferencePtr) {
         let dummy = ref as! DummyObject
-        observation.data2 = unsafeBitCast(ref, UInt.self)
+        observation.data2 = unsafeBitCast(ref, to: UInt.self)
         observation.data3 = dummy.payload
       }
     }
@@ -755,13 +755,13 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
     let ref = observations[0].data2
     if observations.contains({ $0.data2 != ref }) {
       for observation in observations {
-        sink(.FailureInteresting("mismatched reference, expected \(ref): \(observation)"))
+        sink(.failureInteresting("mismatched reference, expected \(ref): \(observation)"))
       }
       return
     }
     if observations.contains({ $0.data3 != 0x12345678 }) {
       for observation in observations {
-        sink(.FailureInteresting("wrong data: \(observation)"))
+        sink(.failureInteresting("wrong data: \(observation)"))
       }
       return
     }
@@ -777,23 +777,23 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
         // Lost race, value destroyed.
         lostRace += 1
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       }
     }
     if wonRace != 1 {
       for observation in observations {
-        sink(.FailureInteresting("zero or more than one thread won race: \(observation)"))
+        sink(.failureInteresting("zero or more than one thread won race: \(observation)"))
       }
       return
     }
     if lostRace < 1 {
       for observation in observations {
-        sink(.FailureInteresting("no thread lost race: \(observation)"))
+        sink(.failureInteresting("no thread lost race: \(observation)"))
       }
       return
     }
 
-    sink(.Pass)
+    sink(.pass)
   }
 }
 

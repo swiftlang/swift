@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 }
 class f<p : k, p : k n p.d> : o {
 }
@@ -24,10 +26,10 @@ func f<g : d {
   enum g {
         func g
         var _ = g
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+f(true as Boolean)
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 var f = 1
 var e: Int -> Int = {
     return $0

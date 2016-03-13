@@ -30,9 +30,9 @@ if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Int") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, Int.max, 4, 5, 6 ],
-      primitiveType: .Triangles)
+      primitiveType: .triangles)
 
-    expectEqual(.Triangles, element.primitiveType)
+    expectEqual(.triangles, element.primitiveType)
     expectEqual(2, element.primitiveCount)
   #if arch(i386) || arch(arm)
     expectEqual(
@@ -66,9 +66,9 @@ if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Int16") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, Int16.max, Int16.max/2, 5, 6 ] as [Int16],
-      primitiveType: .Triangles)
+      primitiveType: .triangles)
 
-    expectEqual(.Triangles, element.primitiveType)
+    expectEqual(.triangles, element.primitiveType)
     expectEqual(2, element.primitiveCount)
     expectEqual(
       [
@@ -86,9 +86,9 @@ if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Triangles") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, UInt8.max, UInt8.max/2, 5, 6 ] as [UInt8],
-      primitiveType: .Triangles)
+      primitiveType: .triangles)
 
-    expectEqual(.Triangles, element.primitiveType)
+    expectEqual(.triangles, element.primitiveType)
     expectEqual(2, element.primitiveCount)
     expectEqual(
       [ 1, 2, UInt8.max, UInt8.max/2, 5, 6 ],
@@ -99,9 +99,9 @@ if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/TriangleStrip") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, 3, 4, 5, 6 ] as [UInt8],
-      primitiveType: .TriangleStrip)
+      primitiveType: .triangleStrip)
 
-    expectEqual(.TriangleStrip, element.primitiveType)
+    expectEqual(.triangleStrip, element.primitiveType)
     expectEqual(4, element.primitiveCount)
     expectEqual(
       [ 1, 2, 3, 4, 5, 6 ],
@@ -112,9 +112,9 @@ if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Line") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, 3, 4, 5, 6 ] as [UInt8],
-      primitiveType: .Line)
+      primitiveType: .line)
 
-    expectEqual(.Line, element.primitiveType)
+    expectEqual(.line, element.primitiveType)
     expectEqual(3, element.primitiveCount)
     expectEqual(
       [ 1, 2, 3, 4, 5, 6 ],
@@ -125,9 +125,9 @@ if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Point") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, 3, 4, 5, 6 ] as [UInt8],
-      primitiveType: .Point)
+      primitiveType: .point)
 
-    expectEqual(.Point, element.primitiveType)
+    expectEqual(.point, element.primitiveType)
     expectEqual(6, element.primitiveCount)
     expectEqual(
       [ 1, 2, 3, 4, 5, 6 ],
@@ -138,8 +138,8 @@ if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNSceneSource.entryWithIdentifier(uid:withClass:)")
     .skip(.iOSAny("does not support COLLADA files"))
     .skip(.iOSSimulatorAny("does not support COLLADA files"))
-    .skip(.TVOSAny("does not support COLLADA files"))
-    .skip(.TVOSSimulatorAny("does not support COLLADA files"))
+    .skip(.tvOSAny("does not support COLLADA files"))
+    .skip(.tvOSSimulatorAny("does not support COLLADA files"))
     .skip(.watchOSAny("does not support COLLADA files"))
     .skip(.watchOSSimulatorAny("does not support COLLADA files"))
     .code {
@@ -305,8 +305,8 @@ if #available(iOS 8.0, *) {
       " </scene>" +
       "</COLLADA>"
 
-    let sceneData = sceneDescription.dataUsingEncoding(
-      NSUTF8StringEncoding,
+    let sceneData = sceneDescription.data(
+      usingEncoding: NSUTF8StringEncoding,
       allowLossyConversion: true)!
     let sceneSource = SCNSceneSource(data: sceneData, options: nil)!
 

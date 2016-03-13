@@ -108,7 +108,7 @@ func getDescription(o: NSObject) -> String {
 }
 
 func getUppercaseString(s: NSString) -> String {
-  return s.uppercaseString()
+  return s.uppercase()
 }
 
 // @interface Foo -(void) setFoo: (NSString*)s; @end

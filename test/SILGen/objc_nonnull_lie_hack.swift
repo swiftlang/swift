@@ -17,7 +17,7 @@ import gizmo
 
 // OPT-LABEL: sil hidden @_TF21objc_nonnull_lie_hack10makeObjectFT_GSqCSo8NSObject_
 // OPT:         [[OPT:%.*]] = unchecked_ref_cast
-// OPT:         select_enum [[OPT]] : $Optional<NSObject>{{.*}} case #Optional.None!enumelt
+// OPT:         select_enum [[OPT]] : $Optional<NSObject>{{.*}} case #Optional.none!enumelt
 func makeObject() -> NSObject? {
   let foo: NSObject? = NSObject()
   if foo == nil {

@@ -118,13 +118,13 @@ funge(x: &addressOnly)
 // <rdar://problem/16525257> 
 
 protocol Runcible {
-  typealias Frob: Frobable
+  associatedtype Frob: Frobable
 
   var frob: Frob { get set }
 }
 
 protocol Frobable {
-  typealias Anse
+  associatedtype Anse
   
   var anse: Anse { get set }
 }

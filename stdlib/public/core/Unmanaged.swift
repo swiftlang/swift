@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,9 +15,6 @@
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
 public struct Unmanaged<Instance : AnyObject> {
-  @available(*, unavailable, renamed="Instance")
-  public typealias T = Instance
-
   internal unowned(unsafe) var _value: Instance
 
   @_transparent
@@ -31,26 +28,14 @@ public struct Unmanaged<Instance : AnyObject> {
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @_transparent
   @warn_unused_result
-  public static func fromOpaque(value: COpaquePointer) -> Unmanaged {
+  public static func fromOpaque(value: OpaquePointer) -> Unmanaged {
     // Null pointer check is a debug check, because it guards only against one
     // specific bad pointer value.
-    _debugPrecondition(
+    _stdlibAssert(
       value != nil,
       "attempt to create an Unmanaged instance from a null pointer")
 
-    return Unmanaged(_private: unsafeBitCast(value, Instance.self))
-  }
-
-  /// Unsafely turn an unmanaged class reference into an opaque
-  /// C pointer.
-  ///
-  /// This operation does not change reference counts.
-  ///
-  ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
-  @_transparent
-  @warn_unused_result
-  public func toOpaque() -> COpaquePointer {
-    return unsafeBitCast(_value, COpaquePointer.self)
+    return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
   }
 
   /// Create an unmanaged reference with an unbalanced retain.

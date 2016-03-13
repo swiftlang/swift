@@ -19,16 +19,16 @@
 public var errno: Int32 {
   get {
 #if os(FreeBSD)
-    return __error().memory
+    return __error().pointee
 #else
-    return __errno_location().memory
+    return __errno_location().pointee
 #endif
   }
   set(val) {
 #if os(FreeBSD)
-    return __error().memory = val
+    return __error().pointee = val
 #else
-    return __errno_location().memory = val
+    return __errno_location().pointee = val
 #endif
   }
 }
@@ -166,13 +166,13 @@ public var S_ISVTX: mode_t  { return mode_t(0o001000) }
 #if os(Linux)
 public var SIG_DFL: __sighandler_t? { return nil }
 public var SIG_IGN: __sighandler_t {
-  return unsafeBitCast(1, __sighandler_t.self)
+  return unsafeBitCast(1, to: __sighandler_t.self)
 }
 public var SIG_ERR: __sighandler_t {
-  return unsafeBitCast(-1, __sighandler_t.self)
+  return unsafeBitCast(-1, to: __sighandler_t.self)
 }
 public var SIG_HOLD: __sighandler_t {
-  return unsafeBitCast(2, __sighandler_t.self)
+  return unsafeBitCast(2, to: __sighandler_t.self)
 }
 #endif
 

@@ -167,7 +167,8 @@ static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
 
 /// Determine the prefix to be stripped from the names of the enum constants
 /// within the given enum.
-void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
+void EnumInfo::determineConstantNamePrefix(ASTContext &ctx,
+                                           const clang::EnumDecl *decl) {
   switch (getKind()) {
   case EnumKind::Enum:
   case EnumKind::Options:
@@ -281,5 +282,5 @@ void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
     commonPrefix = commonPrefix.slice(0, commonWithEnum.size() + delta);
   }
 
-  constantNamePrefix = commonPrefix;
+  constantNamePrefix = ctx.AllocateCopy(commonPrefix);
 }

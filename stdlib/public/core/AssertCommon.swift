@@ -209,7 +209,7 @@ func _fatalErrorMessage(
 /// called by the Objective-C runtime.
 @_transparent @noreturn
 public // COMPILER_INTRINSIC
-func _unimplemented_initializer(className: StaticString,
+func _unimplemented_initializer(className className: StaticString,
                                 initName: StaticString = #function,
                                 file: StaticString = #file,
                                 line: UInt = #line,
@@ -256,6 +256,5 @@ func _undefined<T>(
   @autoclosure message: () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
-  _assertionFailed("fatal error", message(), file, line,
-    flags: 0)
+  _assertionFailed("fatal error", message(), file, line, flags: 0)
 }

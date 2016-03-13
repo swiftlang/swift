@@ -5,7 +5,8 @@
 import Foundation
 
 class BridgedClass : NSObject, NSCopying { 
-  func copyWithZone(zone: NSZone) -> AnyObject {
+  @objc(copyWithZone:)
+  func copy(with zone: NSZone) -> AnyObject {
     return self
   }
 }
@@ -226,12 +227,12 @@ func rdar19770981(s: String, ns: NSString) {
 
 // <rdar://problem/19831919> Fixit offers as! conversions that are known to always fail
 func rdar19831919() {
-  var s1 = 1 + "str"; // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note{{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Memory>), (Int, UnsafePointer<Memory>)}}
+  var s1 = 1 + "str"; // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note{{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 }
 
 // <rdar://problem/19831698> Incorrect 'as' fixits offered for invalid literal expressions
 func rdar19831698() {
-  var v70 = true + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
+  var v70 = true + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UnsafeMutablePointer<Pointee>, Int), (UnsafePointer<Pointee>, Int)}}
   var v71 = true + 1.0 // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Double'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}

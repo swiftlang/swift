@@ -138,9 +138,12 @@ struct AssociatedTypeRecordIterator {
   const AssociatedTypeRecord *Cur;
   const AssociatedTypeRecord * const End;
 
+  AssociatedTypeRecordIterator()
+    : Cur(nullptr), End(nullptr) {}
+
   AssociatedTypeRecordIterator(const AssociatedTypeRecord *Cur,
                                const AssociatedTypeRecord * const End)
-  : Cur(Cur), End(End) {}
+    : Cur(Cur), End(End) {}
 
   const AssociatedTypeRecord &operator*() const {
     return *Cur;
@@ -151,12 +154,21 @@ struct AssociatedTypeRecordIterator {
     return *this;
   }
 
+  AssociatedTypeRecordIterator
+  operator=(const AssociatedTypeRecordIterator &Other) {
+    return { Other.Cur, Other.End };
+  }
+
   bool operator==(const AssociatedTypeRecordIterator &other) const {
     return Cur == other.Cur && End == other.End;
   }
 
   bool operator!=(const AssociatedTypeRecordIterator &other) const {
     return !(*this == other);
+  }
+
+  operator bool() const {
+    return Cur && End;
   }
 };
 

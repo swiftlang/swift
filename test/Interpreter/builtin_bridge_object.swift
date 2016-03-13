@@ -155,19 +155,19 @@ if true {
 
 func hitOptionalGenerically<T>(x: T?) {
   switch x {
-  case .Some:
-    print("Some")
-  case .None:
-    print("None")
+  case .some:
+    print("some")
+  case .none:
+    print("none")
   }
 }
 
 func hitOptionalSpecifically(x: Builtin.BridgeObject?) {
   switch x {
-  case .Some:
-    print("Some")
-  case .None:
-    print("None")
+  case .some:
+    print("some")
+  case .none:
+    print("none")
   }
 }
 
@@ -178,14 +178,14 @@ if true {
 
   var bo: Builtin.BridgeObject? = nil
 
-  // CHECK-NEXT: None
+  // CHECK-NEXT: none
   hitOptionalSpecifically(bo)
-  // CHECK-NEXT: None
+  // CHECK-NEXT: none
   hitOptionalGenerically(bo)
 
   bo = Builtin.castToBridgeObject(C(), 0._builtinWordValue)
-  // CHECK-NEXT: Some
+  // CHECK-NEXT: some
   hitOptionalSpecifically(bo)
-  // CHECK: Some
+  // CHECK: some
   hitOptionalGenerically(bo)
 }

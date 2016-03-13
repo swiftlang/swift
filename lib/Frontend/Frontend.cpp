@@ -516,6 +516,11 @@ void CompilerInstance::performSema() {
       if (auto SF = dyn_cast<SourceFile>(File))
         performWholeModuleTypeChecking(*SF);
   }
+
+  for (auto File : MainModule->getFiles())
+    if (auto SF = dyn_cast<SourceFile>(File))
+      if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
+        finishTypeChecking(*SF);
 }
 
 void CompilerInstance::performParseOnly() {

@@ -85,11 +85,11 @@ private:
     return OtherPrinter.printSynthesizedExtensionPost(ED, NTD);
   }
 
-  void printParameterPre(PrintParameterKind Kind) override {
-    return OtherPrinter.printParameterPre(Kind);
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
+    return OtherPrinter.printStructurePre(Kind, D);
   }
-  void printParameterPost(PrintParameterKind Kind) override {
-    return OtherPrinter.printParameterPost(Kind);
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
+    return OtherPrinter.printStructurePost(Kind, D);
   }
 
   void printNamePre(PrintNameContext Context) override {
@@ -259,7 +259,7 @@ void swift::ide::printSubmoduleInterface(
       NoImportSubModules.insert(*It);
     }
   }
-
+  llvm::StringMap<std::vector<Decl*>> FileRangedDecls;
   // Separate the declarations that we are going to print into different
   // buckets.
   for (Decl *D : Decls) {
@@ -328,13 +328,32 @@ void swift::ide::printSubmoduleInterface(
       if (!GroupNames.empty()){
         if (auto Target = D->getGroupName()) {
           if (std::find(GroupNames.begin(), GroupNames.end(),
-                        Target.getValue()) != GroupNames.end())
-             SwiftDecls.push_back(D);
+                        Target.getValue()) != GroupNames.end()) {
+            FileRangedDecls.insert(std::make_pair(D->getSourceFileName().getValue(),
+              std::vector<Decl*>())).first->getValue().push_back(D);
+          }
         }
         continue;
       }
       // Add Swift decls if we are printing the top-level module.
       SwiftDecls.push_back(D);
+    }
+  }
+  if (!GroupNames.empty()) {
+    assert(SwiftDecls.empty());
+    for (auto &Entry : FileRangedDecls) {
+      auto &DeclsInFile = Entry.getValue();
+      std::sort(DeclsInFile.begin(), DeclsInFile.end(),
+                [](Decl* LHS, Decl *RHS) {
+                  assert(LHS->getSourceOrder().hasValue());
+                  assert(RHS->getSourceOrder().hasValue());
+                  return LHS->getSourceOrder().getValue() <
+                         RHS->getSourceOrder().getValue();
+                });
+
+      for (auto D : DeclsInFile) {
+        SwiftDecls.push_back(D);
+      }
     }
   }
 
@@ -446,17 +465,23 @@ void swift::ide::printSubmoduleInterface(
             continue;
 
           // Print synthesized extensions.
-          llvm::SmallPtrSet<ExtensionDecl *, 10> ExtensionsFromConformances;
-          SynthesizedExtensionAnalyzer Analyzer(NTD);
-          Analyzer.findSynthesizedExtensions(ExtensionsFromConformances);
-          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD);
-          for (auto ET : ExtensionsFromConformances) {
-            if (!shouldPrint(ET, AdjustedOptions))
-              continue;
-            Printer << "\n";
-            ET->print(Printer, AdjustedOptions);
-            Printer << "\n";
-          }
+          SynthesizedExtensionAnalyzer Analyzer(NTD, AdjustedOptions);
+          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
+                                                                    &Analyzer);
+          Analyzer.forEachSynthesizedExtensionMergeGroup(
+            [&](ArrayRef<ExtensionDecl*> Decls){
+              for (auto ET : Decls) {
+                AdjustedOptions.TransformContext->shouldOpenExtension =
+                  Decls.front() == ET;
+                AdjustedOptions.TransformContext->shouldCloseExtension =
+                  Decls.back() == ET;
+                if (AdjustedOptions.TransformContext->shouldOpenExtension)
+                  Printer << "\n";
+                ET->print(Printer, AdjustedOptions);
+                if (AdjustedOptions.TransformContext->shouldCloseExtension)
+                  Printer << "\n";
+            }
+          });
           AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
         }
       }

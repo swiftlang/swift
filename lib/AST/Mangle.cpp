@@ -248,8 +248,11 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     }
   }
 
-  case DeclContextKind::NominalTypeDecl:
-    mangleNominalType(cast<NominalTypeDecl>(ctx), shouldBind);
+  case DeclContextKind::GenericTypeDecl:
+    if (auto nomctx = dyn_cast<NominalTypeDecl>(ctx))
+      mangleNominalType(nomctx, shouldBind);
+    else
+      mangleContext(ctx->getParent(), shouldBind);
     return;
 
   case DeclContextKind::ExtensionDecl: {
@@ -963,18 +966,17 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     assert(DWARFMangling && "sugared types are only legal for the debugger");
     auto NameAliasTy = cast<NameAliasType>(tybase);
     TypeAliasDecl *decl = NameAliasTy->getDecl();
-    if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule)
+    if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
       // It's not possible to mangle the context of the builtin module.
       return mangleType(decl->getUnderlyingType(), uncurryLevel);
+    }
     
     Buffer << "a";
     // For the DWARF output we want to mangle the type alias + context,
     // unless the type alias references a builtin type.
     ContextStack context(*this);
-    while (DeclCtx && !DeclCtx->isInnermostContextGeneric())
-      DeclCtx = DeclCtx->getParent();
     mangleContextOf(decl, BindGenerics::None);
-    mangleIdentifier(decl->getName());
+    mangleDeclName(decl);
     return;
   }
 
@@ -1069,8 +1071,8 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     // are several occasions in which we'd like to mangle them in the
     // abstract.
     ContextStack context(*this);
-    mangleNominalType(cast<UnboundGenericType>(tybase)->getDecl(),
-                      BindGenerics::None);
+    auto decl = cast<UnboundGenericType>(tybase)->getDecl();
+    mangleNominalType(cast<NominalTypeDecl>(decl), BindGenerics::None);
     return;
   }
 

@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 }
 }
 }
@@ -55,7 +57,7 @@ protocol d = c> {
 }
 }
 () -> {
-enum S<T] as BooleanType, Any) {
+enum S<T] as Boolean, Any) {
 class A<T where l..init(_ = b()
 struct e where T> : end)
 }
@@ -71,10 +73,10 @@ protocol c == "ab"
 }
 func a<T>()
 init(T, x }
-init <S : BooleanType)
+init <S : Boolean)
 func g<U : Bool) {
 enum a: NSObject {
-func d: A where f, Any, y: [B, (A.Generator.C(seq: AnyObject)
+func d: A where f, Any, y: [B, (A.Iterator.C(seq: AnyObject)
 }
 0] = ")
 func i: A"].init()

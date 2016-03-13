@@ -200,7 +200,8 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     Int32Ty,                // size
     Int32Ty,                // flags
     Int16Ty,                // minimum witness count
-    Int16Ty                 // default witness count
+    Int16Ty,                // default witness count
+    Int32Ty                 // padding
   });
   
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
@@ -596,13 +597,8 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
                                          ARGS, ATTRS)                          \
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
-    /* Add underscore in JIT mode under Linux to enable proper symbol lookup */\
-    const char *Symbol =                                                       \
-        (Opts.UseJIT && TargetInfo.OutputObjectFormat == llvm::Triple::ELF)    \
-            ? "_" STR(SYMBOL_NAME)                                             \
-            : STR(SYMBOL_NAME);                                                \
-    return getWrapperFn(Module, ID##Fn, #NAME, Symbol, CC, RETURNS, ARGS,      \
-                        ATTRS);                                                \
+    return getWrapperFn(Module, ID##Fn, #NAME, STR(SYMBOL_NAME), CC, RETURNS,  \
+                        ARGS, ATTRS);                                          \
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"

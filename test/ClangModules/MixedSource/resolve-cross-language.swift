@@ -44,9 +44,9 @@ be = BaseEnum.Zung
 
 var beRaw: CShort = be.rawValue
 
-beo = BaseEnumObjC.Zippity
-beo = BaseEnumObjC.Doo
-beo = BaseEnumObjC.Dah
+beo = BaseEnumObjC.zippity
+beo = BaseEnumObjC.doo
+beo = BaseEnumObjC.dah
 
 var beoRaw: CUnsignedChar = beo.rawValue
 
@@ -56,9 +56,9 @@ se = SwiftEnum.Grault
 
 var seRaw: CShort = se.rawValue
 
-seo = SwiftEnumObjC.Quux
-seo = SwiftEnumObjC.Corge
-seo = SwiftEnumObjC.Grault
+seo = SwiftEnumObjC.quux
+seo = SwiftEnumObjC.corge
+seo = SwiftEnumObjC.grault
 
 var seoRaw: CUnsignedChar = seo.rawValue
 

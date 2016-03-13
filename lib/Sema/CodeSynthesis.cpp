@@ -593,7 +593,7 @@ static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
 
 /// Synthesize the code to store 'Val' to 'VD', given that VD has an @NSCopying
 /// attribute on it.  We know that VD is a stored property in a class, so we
-/// just need to generate something like "self.property = val.copyWithZone(nil)"
+/// just need to generate something like "self.property = val.copy(zone: nil)"
 /// here.  This does some type checking to validate that the call will succeed.
 static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
                                         TypeChecker &TC) {
@@ -626,15 +626,16 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // Generate:
   // (force_value_expr type='<null>'
   //   (call_expr type='<null>'
-  //     (unresolved_dot_expr type='<null>' field 'copyWithZone'
+  //     (unresolved_dot_expr type='<null>' field 'copy'
   //       "Val")
   //     (paren_expr type='<null>'
   //       (nil_literal_expr type='<null>'))))
   auto UDE = new (Ctx) UnresolvedDotExpr(Val, SourceLoc(),
-                                         Ctx.getIdentifier("copyWithZone"),
+                                         Ctx.getIdentifier("copy"),
                                          DeclNameLoc(), /*implicit*/true);
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
-  Nil = new (Ctx) ParenExpr(SourceLoc(), Nil, SourceLoc(), false);
+  Nil = TupleExpr::create(Ctx, SourceLoc(), { Nil }, { Ctx.Id_with },
+                          { SourceLoc() }, SourceLoc(), false, true);
 
   //- (id)copyWithZone:(NSZone *)zone;
   Expr *Call = new (Ctx) CallExpr(UDE, Nil, /*implicit*/true);
@@ -2078,7 +2079,8 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
 
   Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc,
                                                        /*Implicit=*/true);
-  className = new (tc.Context) ParenExpr(loc, className, loc, false);
+  className = TupleExpr::createImplicit(
+    tc.Context, {className}, {tc.Context.Id_className});
   className->setImplicit();
   Expr *call = new (tc.Context) CallExpr(fn, className, /*Implicit=*/true);
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),

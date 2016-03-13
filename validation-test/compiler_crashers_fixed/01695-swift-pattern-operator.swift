@@ -1,10 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
-
 extension Array {
 class C(A<Int
 }
@@ -15,7 +16,7 @@ return z()
 protocol a {
 }
 struct A : (a((x: A, A.a))))
-func c<I : SequenceType where d<3] == T) + seq: d where T : T! {
+func c<I : Sequence where d<3] == T) + seq: d where T : T! {
 }
 protocol d {
 let a {
@@ -87,7 +88,7 @@ protocol d {
 deinit {
 }
 self.c: C = a: Any) -> Void>(Any) -> {
-var a(seq: BooleanType, Any) -> : T.Type
+var a(seq: Boolean, Any) -> : T.Type
 extension A {
 func a)) {
 return m: b: Int
@@ -111,7 +112,7 @@ protocol a : Any, object2: A, "")
 protocol a {
 }
 }
-var e(i<T -> S : SequenceType, e == { _, Bool) {
+var e(i<T -> S : Sequence, e == { _, Bool) {
 typealias e = 1
 init(c == A> S {
 return "foobar"")

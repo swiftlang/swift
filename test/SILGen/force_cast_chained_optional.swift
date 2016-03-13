@@ -21,7 +21,7 @@ class D: C {}
 // CHECK:         [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*ImplicitlyUnwrappedOptional<Bar>
 // CHECK:         [[BAR:%.*]] = load [[PAYLOAD_ADDR]]
 // CHECK:         class_method {{%.*}} : $Bar, #Bar.bas!getter.1 : (Bar) -> () -> C! , $@convention(method) (@guaranteed Bar) ->
-// CHECK:         function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+// CHECK:         function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:         unconditional_checked_cast {{%.*}} : $C to $D
 // CHECK:       [[TRAP]]:
 // CHECK:         unreachable

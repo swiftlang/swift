@@ -11,20 +11,20 @@
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("swift_stdlib_getPointer")
-func _stdlib_getPointer(x: COpaquePointer) -> COpaquePointer
+func _stdlib_getPointer(x: OpaquePointer) -> OpaquePointer
 
 public func _opaqueIdentity<T>(x: T) -> T {
-  let ptr = UnsafeMutablePointer<T>.alloc(1)
-  ptr.initialize(x)
+  let ptr = UnsafeMutablePointer<T>(allocatingCapacity: 1)
+  ptr.initialize(with: x)
   let result =
-    UnsafeMutablePointer<T>(_stdlib_getPointer(COpaquePointer(ptr))).memory
-  ptr.destroy()
-  ptr.dealloc(1)
+    UnsafeMutablePointer<T>(_stdlib_getPointer(OpaquePointer(ptr))).pointee
+  ptr.deinitialize()
+  ptr.deallocateCapacity(1)
   return result
 }
 
 func _blackHolePtr<T>(x: UnsafePointer<T>) {
-  _stdlib_getPointer(COpaquePointer(x))
+  _stdlib_getPointer(OpaquePointer(x))
 }
 
 public func _blackHole<T>(x: T) {
@@ -76,7 +76,7 @@ public func getFloat64(x: Float64) -> Float64 { return _opaqueIdentity(x) }
 public func getFloat80(x: Float80) -> Float80 { return _opaqueIdentity(x) }
 #endif
 
-public func getPointer(x: COpaquePointer) -> COpaquePointer {
+public func getPointer(x: OpaquePointer) -> OpaquePointer {
   return _opaqueIdentity(x)
 }
 

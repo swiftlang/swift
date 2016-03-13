@@ -102,7 +102,7 @@ class B : A {
 class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] @_TFC15objc_properties13TestNSCopyings8propertyCSo8NSString : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK: bb0(%0 : $NSString, %1 : $TestNSCopying):
-  // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copyWithZone!1.foreign
+  // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copy!1.foreign
   @NSCopying var property : NSString
 
   @NSCopying var optionalProperty : NSString?
@@ -118,7 +118,7 @@ class TestNSCopying {
 // <rdar://problem/16663515> IBOutlet not adjusting getter/setter when making a property implicit unchecked optional
 @objc
 class TestComputedOutlet : NSObject {
-  var _disclosedView : TestComputedOutlet! = .None
+  var _disclosedView : TestComputedOutlet! = .none
 
   @IBOutlet var disclosedView : TestComputedOutlet! {
   get { return _disclosedView }

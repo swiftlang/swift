@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 func ji<qp>() -> (qp, qp -> qp) -> qp {
    kj l kj.s = {
 }
@@ -18,7 +20,7 @@ class qp {
         fe(ml)
     }
 }
-ed qp<kj : SequenceType> {
+ed qp<kj : Sequence> {
     dc fe: kj
 }
 func ml<kj>() -> [qp<kj>] {
@@ -48,7 +50,7 @@ ji(s x gf)
 func ji() {
     ({})
 }
-func u<qp: SequenceType, t where Optional<t> == qp.Generator.Element>(r : qp) -> t? {
+func u<qp: Sequence, t where Optional<t> == qp.Iterator.Element>(r : qp) -> t? {
     ih (y : t?) lk r {
         hg let fe = y {
             p fe

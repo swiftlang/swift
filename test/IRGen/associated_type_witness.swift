@@ -7,7 +7,7 @@ protocol P {}
 protocol Q {}
 
 protocol Assocked {
-  typealias Assoc : P, Q
+  associatedtype Assoc : P, Q
 }
 
 struct Universal : P, Q {}
@@ -124,7 +124,7 @@ struct Computed<T, U> : Assocked {
 
 struct PBox<T: P> {}
 protocol HasSimpleAssoc {
-  typealias Assoc
+  associatedtype Assoc
 }
 protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
 
@@ -163,7 +163,7 @@ struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
 
 
 protocol HasAssocked {
-  typealias Contents : Assocked
+  associatedtype Contents : Assocked
 }
 struct FulfilledFromAssociatedType<T : HasAssocked> : HasSimpleAssoc {
   typealias Assoc = PBox<T.Contents.Assoc>

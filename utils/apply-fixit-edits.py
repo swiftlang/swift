@@ -11,10 +11,11 @@
 
 from __future__ import print_function
 
-import json
 import argparse
-import sys
+import json
 import os
+import sys
+
 
 def find_remap_files(path):
     for root, dirs, files in os.walk(path):
@@ -22,6 +23,7 @@ def find_remap_files(path):
             if not filename.endswith(".remap"):
                 continue
             yield os.path.join(root, filename)
+
 
 def apply_edits(path):
     remap_files = find_remap_files(path)
@@ -64,6 +66,7 @@ def apply_edits(path):
         with open(fname, 'w') as f:
             f.write(file_data)
     return 0
+
 
 def main():
     parser = argparse.ArgumentParser(

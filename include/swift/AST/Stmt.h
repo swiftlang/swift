@@ -839,11 +839,11 @@ class ForEachStmt : public LabeledStmt {
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
   
-  /// The generator variable along with its initializer.
-  PatternBindingDecl *Generator = nullptr;
-  /// The expression that advances the generator and returns an Optional with
+  /// The iterator variable along with its initializer.
+  PatternBindingDecl *Iterator = nullptr;
+  /// The expression that advances the iterator and returns an Optional with
   /// the next value or None to signal end-of-stream.
-  Expr *GeneratorNext = nullptr;
+  Expr *IteratorNext = nullptr;
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
@@ -877,14 +877,14 @@ public:
   Expr *getSequence() const { return Sequence; }
   void setSequence(Expr *S) { Sequence = S; }
   
-  /// Retrieve the pattern binding that contains the (implicit) generator
+  /// Retrieve the pattern binding that contains the (implicit) iterator
   /// variable and its initialization from the container.
-  PatternBindingDecl *getGenerator() const { return Generator; }
-  void setGenerator(PatternBindingDecl *G) { Generator = G; }
+  PatternBindingDecl *getIterator() const { return Iterator; }
+  void setIterator(PatternBindingDecl *It) { Iterator = It; }
   
-  /// Retrieve the expression that advances the generator.
-  Expr *getGeneratorNext() const { return GeneratorNext; }
-  void setGeneratorNext(Expr *E) { GeneratorNext = E; }
+  /// Retrieve the expression that advances the iterator.
+  Expr *getIteratorNext() const { return IteratorNext; }
+  void setIteratorNext(Expr *E) { IteratorNext = E; }
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }

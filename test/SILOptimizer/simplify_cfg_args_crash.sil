@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-bb-args | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-bb-args -sroa-bb-args | FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -33,4 +33,31 @@ bb3:                                            // Preds: bb0 bb409
   return %8 : $()                              // id: %4307
 }
 
+// Verify that we do not crash in argument splitting (rdar://problem/25008398).
 
+class C {
+  @sil_stored let x: Builtin.Int32
+  init()
+}
+
+struct Pair {
+  @sil_stored let first: C
+  @sil_stored let second: C
+}
+
+// CHECK-LABEL: @simplify_args_crash
+sil @simplify_args_crash : $@convention(thin) (Pair) -> () {
+bb0(%1 : $Pair):
+  // CHECK: [[SECOND:%.*]] = struct_extract %0 : $Pair, #Pair.second
+  // CHECK: [[FIRST:%.*]] = struct_extract %0 : $Pair, #Pair.first
+  // CHECK: br bb1([[FIRST]] : $C, [[SECOND]] : $C)
+  br bb1(%1 : $Pair)
+
+// CHECK: bb1([[FIRST2:%.*]] : $C, [[SECOND2:%.*]] : $C):
+bb1(%2 : $Pair):
+  // CHECK: [[STRUCT:%.*]] = struct $Pair ([[FIRST2]] : $C, [[SECOND2]] : $C)
+  // CHECK: [[SECOND3:%.*]] = struct_extract [[STRUCT]] : $Pair, #Pair.second
+  // CHECK: [[FIRST3:%.*]] = struct_extract [[STRUCT]] : $Pair, #Pair.first
+  // CHECK: br bb1([[FIRST3]] : $C, [[SECOND3]] : $C)
+  br bb1(%2 : $Pair)
+}

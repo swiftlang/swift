@@ -14,13 +14,13 @@
 
 public enum Result<Value> {
 case Success(Value)
-case Error(ErrorType)
+case Error(ErrorProtocol)
 
   init(success x: Value) {
     self = Success(x)
   }
   
-  init(error: ErrorType) {
+  init(error: ErrorProtocol) {
     self = Error(error)
   }
   
@@ -52,7 +52,7 @@ case Error(ErrorType)
     }
   }
 
-  var error: ErrorType? {
+  var error: ErrorProtocol? {
     switch self {
     case Success: return nil
     case Error(let x): return x
@@ -89,11 +89,11 @@ func catchResult<Success>(body: () throws -> Success) -> Result<Success> {
 }
 
 // A couple of error types
-enum Nasty : ErrorType {
+enum Nasty : ErrorProtocol {
 case Bad, Awful, Terrible
 }
 
-enum Icky : ErrorType {
+enum Icky : ErrorProtocol {
 case Sad, Bad, Poor
 }
 

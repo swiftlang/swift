@@ -47,6 +47,7 @@ extern "C" id objc_initWeak(id*, id);
 extern "C" id objc_storeWeak(id*, id);
 extern "C" void objc_destroyWeak(id*);
 extern "C" id objc_loadWeakRetained(id*);
+extern "C" Class object_setClass(id, Class);
 
 // Description of an Objective-C image.
 // __DATA,__objc_imageinfo stores one of these.

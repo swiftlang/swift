@@ -90,10 +90,10 @@ public struct UnsafeMutableAudioBufferListPointer {
   /// (`mNumberBuffers`).
   public var count: Int {
     get {
-      return Int(unsafeMutablePointer.memory.mNumberBuffers)
+      return Int(unsafeMutablePointer.pointee.mNumberBuffers)
     }
     nonmutating set(newValue) {
-      unsafeMutablePointer.memory.mNumberBuffers = UInt32(newValue)
+      unsafeMutablePointer.pointee.mNumberBuffers = UInt32(newValue)
     }
   }
 
@@ -120,7 +120,7 @@ public struct UnsafeMutableAudioBufferListPointer {
   public var unsafeMutablePointer: UnsafeMutablePointer<AudioBufferList>
 }
 
-extension UnsafeMutableAudioBufferListPointer : MutableCollectionType {
+extension UnsafeMutableAudioBufferListPointer : MutableCollection {
   /// Always zero, which is the index of the first `AudioBuffer`.
   public var startIndex: Int {
     return 0
@@ -136,12 +136,12 @@ extension UnsafeMutableAudioBufferListPointer : MutableCollectionType {
     get {
       _precondition(index >= 0 && index < self.count,
         "subscript index out of range")
-      return (_audioBuffersPointer + index).memory
+      return (_audioBuffersPointer + index).pointee
     }
     nonmutating set(newValue) {
       _precondition(index >= 0 && index < self.count,
         "subscript index out of range")
-      (_audioBuffersPointer + index).memory = newValue
+      (_audioBuffersPointer + index).pointee = newValue
     }
   }
 }

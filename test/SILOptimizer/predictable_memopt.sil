@@ -338,14 +338,14 @@ bb0:
 // rdar://15887292 - PredictableMemoryOptimizations crashes on load from init_existential_addr
 // CHECK-LABEL: sil @init_existential_crash
 sil @init_existential_crash : $() -> () {
-  %99 = alloc_stack $BooleanType
-  %100 = init_existential_addr %99 : $*BooleanType, $Bool
+  %99 = alloc_stack $Boolean
+  %100 = init_existential_addr %99 : $*Boolean, $Bool
   %105 = integer_literal $Builtin.Int1, 0
   %106 = struct $Bool (%105 : $Builtin.Int1)
   store %106 to %100 : $*Bool
   %108 = struct_element_addr %100 : $*Bool, #Bool._value
   %109 = load %108 : $*Builtin.Int1
-  dealloc_stack %99 : $*BooleanType
+  dealloc_stack %99 : $*Boolean
   return undef : $()
 }
 

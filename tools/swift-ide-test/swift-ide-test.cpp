@@ -1397,9 +1397,10 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   case NodeKind::Enum:
   case NodeKind::Protocol:
   case NodeKind::Structure:
+  case NodeKind::TypeAlias:
     break;
   default:
-    llvm::errs() << "Name does not refer to a nominal type.\n";
+    llvm::errs() << "Name does not refer to a nominal type or typealias.\n";
     return EXIT_FAILURE;
   }
 
@@ -1407,17 +1408,6 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   SmallVector<std::pair<DeclName, Identifier>, 4> identifiers;
   do {
-    switch (node->getKind()) {
-    case NodeKind::Class:
-    case NodeKind::Enum:
-    case NodeKind::Protocol:
-    case NodeKind::Structure:
-      break;
-    default:
-      llvm::errs() << "Name does not refer to a nominal type.\n";
-      return EXIT_FAILURE;
-    }
-
     auto nameNode = node->getChild(1);
     switch (nameNode->getKind()) {
     case NodeKind::Identifier:
@@ -1436,6 +1426,20 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     }
 
     node = node->getChild(0);
+
+    switch (node->getKind()) {
+    case NodeKind::Module:
+      // Will break out of loop below.
+      break;
+    case NodeKind::Class:
+    case NodeKind::Enum:
+    case NodeKind::Protocol:
+    case NodeKind::Structure:
+      break;
+    default:
+      llvm::errs() << "Name does not refer to a nominal type.\n";
+      return EXIT_FAILURE;
+    }
   } while (node->getKind() != NodeKind::Module);
 
   Module *M = getModuleByFullName(ctx, node->getText());
@@ -1588,11 +1592,13 @@ public:
   void printDeclPost(const Decl *D) override {
     OS << "</decl>";
   }
-  void printParameterPre(PrintParameterKind Kind) override {
-    OS << "<decl:Param>";
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
+    if (D)
+      printDeclPre(D);
   }
-  void printParameterPost(PrintParameterKind Kind) override {
-    OS << "</decl>";
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
+    if (D)
+      printDeclPost(D);
   }
 
 
@@ -2368,7 +2374,14 @@ class TypeReconstructWalker : public SourceEntityWalker {
   llvm::raw_ostream &Stream;
 
 public:
-  TypeReconstructWalker(ASTContext &Ctx,llvm::raw_ostream &Stream) : Ctx(Ctx), Stream(Stream) {}
+  TypeReconstructWalker(ASTContext &Ctx, llvm::raw_ostream &Stream)
+      : Ctx(Ctx), Stream(Stream) {}
+
+  bool walkToDeclPre(Decl *D, CharSourceRange range) override {
+    if (auto *VD = dyn_cast<ValueDecl>(D))
+      tryDemangleDecl(VD, range);
+    return true;
+  }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, Type T) override {
@@ -2376,23 +2389,44 @@ public:
       return true;
     T = T->getRValueType();
     Mangle::Mangler Man(/* DWARFMangling */true);
-    Man.mangleType(T, 0);
+    Man.mangleTypeForDebugger(T, D->getDeclContext());
     std::string MangledName(Man.finalize());
     std::string Error;
-    Type ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
+    Type ReconstructedType = getTypeFromMangledSymbolname(Ctx, MangledName,
                                                         Error);
     if (ReconstructedType) {
-      Stream << "reconstructed type from usr for \'" << Range.str() <<"\' is ";
-      Stream << "\'";
+      Stream << "reconstructed type from usr for '" << Range.str() << "' is '";
       ReconstructedType->print(Stream);
-      Stream << "\'";
-      Stream << '\n';
+      Stream << "'\n";
     } else {
-      ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
-                                                     Error);
-      Stream << "cannot reconstruct type from usr for \'" << Range.str() << "\'" << '\n';
+      Stream << "cannot reconstruct type from usr for '" << Range.str()
+             << "'\n";
     }
     return true;
+  }
+
+private:
+  void tryDemangleDecl(ValueDecl *VD, CharSourceRange range) {
+    std::string mangledName;
+    {
+      llvm::raw_string_ostream OS(mangledName);
+      printDeclUSR(VD, OS);
+    }
+
+    // Put the expected symbol _T prefix on the name by replacing the s:.
+    assert(StringRef(mangledName).startswith("s:"));
+    mangledName[0] = '_';
+    mangledName[1] = 'T';
+
+    std::string error;
+    if (Decl *reDecl = getDeclFromMangledSymbolName(Ctx, mangledName, error)) {
+      Stream << "reconstructed decl from usr for '" << range.str() << "' is '";
+      reDecl->print(Stream, PrintOptions());
+      Stream << "'\n";
+    } else {
+      Stream << "cannot reconstruct decl from usr for '" << range.str()
+             << "'\n";
+    }
   }
 };
 

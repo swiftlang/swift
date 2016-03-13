@@ -64,7 +64,7 @@ class Hash {
   // Hash state:
   final var messageLength : Int = 0
   final var dataLength : Int = 0
-  final var data = [UInt8](count: 64, repeatedValue: 0)
+  final var data = [UInt8](repeating: 0, count: 64)
   final var blocksize : Int
 
   /// \brief Hash the internal data.
@@ -223,7 +223,7 @@ class MD5 : Hash {
     return first | second | third | fourth
   }
 
-  var w = [UInt32](count: 16, repeatedValue: 0)
+  var w = [UInt32](repeating: 0, count: 16)
   override
   func hash() {
     assert(dataLength == blocksize, "Invalid block size")
@@ -362,7 +362,7 @@ class SHA1 : Hash {
     assert(dataLength == blocksize, "Invalid block size")
 
     // Init the "W" buffer.
-    var w = [UInt32](count: 80, repeatedValue: 0)
+    var w = [UInt32](repeating: 0, count: 80)
 
     // Convert the Byte array to UInt32 array.
     var word : UInt32 = 0
@@ -497,7 +497,7 @@ class SHA256 :  Hash {
     assert(dataLength == blocksize, "Invalid block size")
 
     // Init the "W" buffer.
-    var w = [UInt32](count: 64, repeatedValue: 0)
+    var w = [UInt32](repeating: 0, count: 64)
 
     // Convert the Byte array to UInt32 array.
     var word : UInt32 = 0

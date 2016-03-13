@@ -12,8 +12,8 @@ class Foo {
 // CHECK-LABEL: sil hidden @_TF13objc_selector14createSelector
 func createSelector(foo: Foo) -> Selector {
   // CHECK: [[LITERAL:%[0-9]+]] = string_literal objc_selector "methodForInt:"
-  // CHECK-NEXT: [[PTR:%[0-9]+]] = struct $COpaquePointer ([[LITERAL]] : $Builtin.RawPointer)
-  // CHECK-NEXT: [[SEL:%[0-9]+]] = struct $Selector (%3 : $COpaquePointer)
+  // CHECK-NEXT: [[PTR:%[0-9]+]] = struct $OpaquePointer ([[LITERAL]] : $Builtin.RawPointer)
+  // CHECK-NEXT: [[SEL:%[0-9]+]] = struct $Selector (%3 : $OpaquePointer)
   // CHECK-: return [[SEL]] : $Selector
   return #selector(foo.method)
 }

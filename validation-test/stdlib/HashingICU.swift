@@ -8,8 +8,8 @@
 // favour of the more comprehensive tests that already exist once it does.
 
 // Let's not crash on changing case.
-let upper = "\u{00df}".uppercaseString
-let lower = "\u{0130}".lowercaseString
+let upper = "\u{00df}".uppercased()
+let lower = "\u{0130}".lowercased()
 
 // ASCII strings
 // CHECK: true

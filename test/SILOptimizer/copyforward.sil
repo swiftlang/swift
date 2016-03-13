@@ -335,7 +335,7 @@ bb0(%0 : $*T):
   return %6 : $()                                 // id: %7
 }
 
-sil @_TFSq4SomeU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+sil @_TFSq4someU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 
 sil @_TFsoi2neU__FTGSqQ__Vs26_OptionalNilComparisonType_Sb : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType) -> Bool
 
@@ -359,21 +359,21 @@ sil @_TFsoi2neU__FTGSqQ__Vs26_OptionalNilComparisonType_Sb : $@convention(thin) 
 //CHECK: return
 sil hidden @option_init : $@convention(thin) <T> (@in AnyObject) -> () {
 bb0(%0 : $*AnyObject):
-  %g0 = alloc_stack $GeneratorOfOne<AnyObject> // 831
-  %s0 = struct_element_addr %g0 : $*GeneratorOfOne<AnyObject>, #GeneratorOfOne.elements
+  %g0 = alloc_stack $IteratorOverOne<AnyObject> // 831
+  %s0 = struct_element_addr %g0 : $*IteratorOverOne<AnyObject>, #IteratorOverOne._elements
 
   %l0 = alloc_stack $Optional<AnyObject>
-  // function_ref Swift.Optional.Some <A>(Swift.Optional<A>.Type)(A) -> Swift.Optional<A>
-  %f0 = function_ref @_TFSq4SomeU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+  // function_ref Swift.Optional.some <A>(Swift.Optional<A>.Type)(A) -> Swift.Optional<A>
+  %f0 = function_ref @_TFSq4someU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
   %t0 = metatype $@thin Optional<AnyObject>.Type
   %i0 = apply %f0<AnyObject>(%l0, %0, %t0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 
-  %g1 = alloc_stack $GeneratorOfOne<AnyObject> // 850
-  %s1 = struct_element_addr %g1 : $*GeneratorOfOne<AnyObject>, #GeneratorOfOne.elements
+  %g1 = alloc_stack $IteratorOverOne<AnyObject> // 850
+  %s1 = struct_element_addr %g1 : $*IteratorOverOne<AnyObject>, #IteratorOverOne._elements
   // We can't backward propagate this yet because we can't analyze struct_element_addr copy dest.
   copy_addr [take] %l0 to [initialization] %s1 : $*Optional<AnyObject>
   // We ignore this copy because its Def is used by struct_element_addr
-  copy_addr [take] %g1 to [initialization] %g0 : $*GeneratorOfOne<AnyObject>
+  copy_addr [take] %g1 to [initialization] %g0 : $*IteratorOverOne<AnyObject>
 
   %l1 = alloc_stack $Optional<AnyObject> // 869
 
@@ -382,7 +382,7 @@ bb0(%0 : $*AnyObject):
   copy_addr %s0 to [initialization] %l2 : $*Optional<AnyObject>
 
   %l3 = alloc_stack $Optional<AnyObject> // 877
-  %o1 = enum $Optional<AnyObject>, #Optional.None!enumelt
+  %o1 = enum $Optional<AnyObject>, #Optional.none!enumelt
   store %o1 to %l3 : $*Optional<AnyObject>
   // We can't backward propagate this yet because we can't analyze struct_element_addr copy dest.
   copy_addr [take] %l3 to %s0 : $*Optional<AnyObject>
@@ -401,10 +401,10 @@ bb0(%0 : $*AnyObject):
   dealloc_stack %l4 : $*Optional<AnyObject>
   destroy_addr %l1 : $*Optional<AnyObject>
   dealloc_stack %l1 : $*Optional<AnyObject>
-  dealloc_stack %g1 : $*GeneratorOfOne<AnyObject>
+  dealloc_stack %g1 : $*IteratorOverOne<AnyObject>
   dealloc_stack %l0 : $*Optional<AnyObject>
-  destroy_addr %g0 : $*GeneratorOfOne<AnyObject>
-  dealloc_stack %g0 : $*GeneratorOfOne<AnyObject>
+  destroy_addr %g0 : $*IteratorOverOne<AnyObject>
+  dealloc_stack %g0 : $*IteratorOverOne<AnyObject>
   %p0 = tuple ()
   return %p0 : $()
 }
@@ -437,7 +437,7 @@ bb0:
 
   dealloc_stack %v1 : $*Optional<AClass>
   %l1 = load %v0 : $*Optional<AClass>
-  %d1 = unchecked_enum_data %l1 : $Optional<AClass>, #Optional.Some!enumelt.1
+  %d1 = unchecked_enum_data %l1 : $Optional<AClass>, #Optional.some!enumelt.1
   %f2 = function_ref @f_owned : $@convention(thin) <A> (@owned A) -> ()
   %c2 = apply %f2<AClass>(%d1) : $@convention(thin) <τ_0_0> (@owned τ_0_0) -> ()
   strong_retain %d1 : $AClass
@@ -460,10 +460,10 @@ bb0(%0 : $*Optional<T>):
   %2 = alloc_stack $Optional<T>
   copy_addr %0 to [initialization] %2 : $*Optional<T>
   destroy_addr %0 : $*Optional<T>
-  switch_enum_addr %2 : $*Optional<T>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
+  switch_enum_addr %2 : $*Optional<T>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %6 = unchecked_take_enum_data_addr %2 : $*Optional<T>, #Optional.Some!enumelt.1
+  %6 = unchecked_take_enum_data_addr %2 : $*Optional<T>, #Optional.some!enumelt.1
   destroy_addr %6 : $*T
   %8 = integer_literal $Builtin.Int1, -1
   br bb3(%8 : $Builtin.Int1)
@@ -573,9 +573,9 @@ bb0(%0 : $*Optional<P>, %1 : $*P):
   copy_addr %1 to [initialization] %2 : $*P
   %3 = function_ref @element_use : $@convention(thin)  (@inout P) -> ()
   %4 = apply %3(%1) : $@convention(thin)  (@inout P) -> ()
-  %5 = init_enum_data_addr %0 : $*Optional<P>, #Optional.Some!enumelt.1
+  %5 = init_enum_data_addr %0 : $*Optional<P>, #Optional.some!enumelt.1
   copy_addr %2 to [initialization] %5 : $*P
-  inject_enum_addr %0 : $*Optional<P>, #Optional.Some!enumelt.1
+  inject_enum_addr %0 : $*Optional<P>, #Optional.some!enumelt.1
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   %27 = tuple ()

@@ -4,7 +4,7 @@
 // is fixed then we should convert this test to a SIL test.
 
 protocol Pingable {
-  typealias Tp
+  associatedtype Tp
   func ping(x x : Tp) -> Tp
 
 }

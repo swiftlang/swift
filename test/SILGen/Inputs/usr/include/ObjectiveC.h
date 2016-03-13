@@ -3,8 +3,10 @@ typedef long NSInteger;
 
 @class NSString;
 
+typedef struct _NSZone NSZone;
+
 @protocol NSCopying
-- (id) copyWithZone: (void*)zone;
+- (id) copyWithZone: (nullable NSZone*)zone;
 @end
 
 SEL sel_registerName(const char *);

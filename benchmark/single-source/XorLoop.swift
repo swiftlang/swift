@@ -17,7 +17,7 @@ public func run_XorLoop(N: Int) {
   for _ in 1...5*N {
     let size = 100000
     let ref_result = 47813324
-    var x = [Int](count: size, repeatedValue: 0xA05FD)
+    var x = [Int](repeating: 0xA05FD, count: size)
     for i in 0..<size {
       x[i] = x[i] ^ 12345678
     }

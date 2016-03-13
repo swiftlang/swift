@@ -47,6 +47,7 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
+  IGNORED_ATTR(CDecl)
   IGNORED_ATTR(SILGenName)
   IGNORED_ATTR(Available)
   IGNORED_ATTR(Convenience)
@@ -77,6 +78,7 @@ public:
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(WarnUnusedResult)
+  IGNORED_ATTR(ShowInInterface)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -647,9 +649,12 @@ public:
     IGNORED_ATTR(Swift3Migration)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
+    IGNORED_ATTR(ShowInInterface)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
+  
+  void visitCDeclAttr(CDeclAttr *attr);
 
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
@@ -849,6 +854,18 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     TC.diagnose(EnclosingDecl->getLoc(),
                 diag::availability_decl_more_than_enclosing_enclosing_here);
   }
+}
+
+void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
+  // Only top-level func decls are currently supported.
+  if (D->getDeclContext()->isTypeContext())
+    TC.diagnose(attr->getLocation(),
+                diag::cdecl_not_at_top_level);
+  
+  // The name must not be empty.
+  if (attr->Name.empty())
+    TC.diagnose(attr->getLocation(),
+                diag::cdecl_empty_name);
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(

@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 init(A.Element == A<T.Type) {
 let end = { c<e)) {
 protocol C {
@@ -25,5 +27,5 @@ protocol b {
 () {
 return self.A"a: H) ->())
 }
-func d.Generator.Element>(Any, let end = ")
+func d.Iterator.Element>(Any, let end = ")
 typealias h: d == c

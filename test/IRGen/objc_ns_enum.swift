@@ -19,63 +19,63 @@ import gizmo
 // CHECK: define hidden i16 @_TF12objc_ns_enum22imported_enum_inject_aFT_OSC16NSRuncingOptions()
 // CHECK:   ret i16 123
 func imported_enum_inject_a() -> NSRuncingOptions {
-  return .Mince
+  return .mince
 }
 
 // CHECK: define hidden i16 @_TF12objc_ns_enum22imported_enum_inject_bFT_OSC16NSRuncingOptions()
 // CHECK:   ret i16 4567
 func imported_enum_inject_b() -> NSRuncingOptions {
-  return .QuinceSliced
+  return .quinceSliced
 }
 
 // CHECK: define hidden i16 @_TF12objc_ns_enum22imported_enum_inject_cFT_OSC16NSRuncingOptions()
 // CHECK:   ret i16 5678
 func imported_enum_inject_c() -> NSRuncingOptions {
-  return .QuinceJulienned
+  return .quinceJulienned
 }
 
 // CHECK: define hidden i16 @_TF12objc_ns_enum22imported_enum_inject_dFT_OSC16NSRuncingOptions()
 // CHECK:   ret i16 6789
 func imported_enum_inject_d() -> NSRuncingOptions {
-  return .QuinceDiced
+  return .quinceDiced
 }
 
 // CHECK: define hidden i32 @_TF12objc_ns_enum30imported_enum_inject_radixed_aFT_OSC16NSRadixedOptions() {{.*}} {
 // -- octal 0755
 // CHECK:   ret i32 493
 func imported_enum_inject_radixed_a() -> NSRadixedOptions {
-  return .Octal
+  return .octal
 }
 
 // CHECK: define hidden i32 @_TF12objc_ns_enum30imported_enum_inject_radixed_bFT_OSC16NSRadixedOptions() {{.*}} {
 // -- hex 0xFFFF
 // CHECK:   ret i32 65535
 func imported_enum_inject_radixed_b() -> NSRadixedOptions {
-  return .Hex
+  return .hex
 }
 
 // CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_aFT_OSC17NSNegativeOptions() {{.*}} {
 // CHECK:   ret i32 -1
 func imported_enum_inject_negative_a() -> NSNegativeOptions {
-  return .Foo
+  return .foo
 }
 
 // CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_bFT_OSC17NSNegativeOptions() {{.*}} {
 // CHECK:   ret i32 -2147483648
 func imported_enum_inject_negative_b() -> NSNegativeOptions {
-  return .Bar
+  return .bar
 }
 
 // CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_aFT_OSC25NSNegativeUnsignedOptions() {{.*}} {
 // CHECK:   ret i32 -1
 func imported_enum_inject_negative_unsigned_a() -> NSNegativeUnsignedOptions {
-  return .Foo
+  return .foo
 }
 
 // CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_bFT_OSC25NSNegativeUnsignedOptions() {{.*}} {
 // CHECK:   ret i32 -2147483648
 func imported_enum_inject_negative_unsigned_b() -> NSNegativeUnsignedOptions {
-  return .Bar
+  return .bar
 }
 
 func test_enum_without_name_Equatable(obj: TestThatEnumType) -> Bool {
@@ -83,7 +83,7 @@ func test_enum_without_name_Equatable(obj: TestThatEnumType) -> Bool {
 }
 
 func use_metadata<T>(t:T){}
-use_metadata(NSRuncingOptions.Mince)
+use_metadata(NSRuncingOptions.mince)
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaOSC16NSRuncingOptions()
 // CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMOSC16NSRuncingOptions {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]

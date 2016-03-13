@@ -47,7 +47,7 @@ struct Options {
   // the same as the worst possible match N/10 "contexts" ahead of it.
   unsigned semanticContextWeight = 10 * Completion::numSemanticContexts;
   unsigned fuzzyMatchWeight = 9;
-  unsigned popularityBonus = 9;
+  unsigned popularityBonus = 5;
 };
 
 struct SwiftCompletionInfo {

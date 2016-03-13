@@ -624,6 +624,15 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   }
 }
 
+void swift::finishTypeChecking(SourceFile &SF) {
+  auto &Ctx = SF.getASTContext();
+  TypeChecker TC(Ctx);
+
+  for (auto D : SF.Decls)
+    if (auto PD = dyn_cast<ProtocolDecl>(D))
+      TC.inferDefaultWitnesses(PD);
+}
+
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   Ctx.diagnoseAttrsRequiringFoundation(SF);
@@ -669,16 +678,16 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   return true;
 }
 
-bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext *DC) {
-  auto &Ctx = DC->getASTContext();
+bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext &DC) {
+  auto &Ctx = DC.getASTContext();
 
   // We try to reuse the type checker associated with the ast context first.
   if (Ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker*>(Ctx.getLazyResolver());
-    return TC->isConvertibleTo(Ty1, Ty2, DC);
+    return TC->isConvertibleTo(Ty1, Ty2, &DC);
   } else {
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return (new TypeChecker(Ctx, Diags))->isConvertibleTo(Ty1, Ty2, DC);
+    return (new TypeChecker(Ctx, Diags))->isConvertibleTo(Ty1, Ty2, &DC);
   }
 }
 

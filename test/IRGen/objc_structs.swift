@@ -57,7 +57,7 @@ func insetRect(r: NSRect, x: Double, y: Double) -> NSRect {
 func convertRectFromBase(v: NSView, r: NSRect) -> NSRect {
   // CHECK: load i8*, i8** @"\01L_selector(convertRectFromBase:)", align 8
   // CHECK: call void bitcast (void ()* @objc_msgSend_stret to void ([[NSRECT]]*, [[OPAQUE0:.*]]*, i8*, [[NSRECT]]*)*)([[NSRECT]]* noalias nocapture sret {{.*}}, [[OPAQUE0:.*]]* {{.*}}, i8* {{.*}}, [[NSRECT]]* byval align 8 {{.*}})
-  return v.convertRectFromBase(r)
+  return v.convertRect(fromBase: r)
 }
 // CHECK: }
 

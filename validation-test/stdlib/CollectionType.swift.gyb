@@ -1,8 +1,8 @@
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/CollectionType.swift -D test_path="%S"
-// RUN: %S/../../utils/line-directive %t/CollectionType.swift -- %target-build-swift %t/CollectionType.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/CollectionType.swift -- %target-run %t/a.out
+// RUN: %S/../../utils/gyb %s -o %t/Collection.swift -D test_path="%S"
+// RUN: %S/../../utils/line-directive %t/Collection.swift -- %target-build-swift %t/Collection.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/Collection.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 // <rdar://problem/24357067> The compiler never finishes compiling validation-test/stdlib/CollectionType.swift.gyb in -O
@@ -19,18 +19,18 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-var CollectionTypeTests = TestSuite("CollectionType")
+var CollectionTypeTests = TestSuite("Collection")
 
 % import gyb
 
-struct CollectionWithDefaultUnderestimateCount : CollectionType {
+struct CollectionWithDefaultUnderestimatedCount : Collection {
   init(count: Int) {
     self._count = count
   }
 
-  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+  func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
     expectUnreachable()
-    return MinimalGenerator([])
+    return MinimalIterator([])
   }
 
   var startIndex: MinimalForwardIndex {
@@ -60,15 +60,15 @@ var MinimalForwardCollectionWithCustomFilter_timesFilterWasCalled: Int = 0
 % for Implementation in [ 'Default', 'Custom' ]:
 
 struct MinimalForwardCollectionWith${Implementation}Filter<Element>
-  : CollectionType {
+  : Collection {
 
-  init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
+  init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
     self._data = MinimalForwardCollection(
       elements: data, underestimatedCount: underestimatedCount)
   }
 
-  func generate() -> MinimalGenerator<Element> {
-    return _data.generate()
+  func makeIterator() -> MinimalIterator<Element> {
+    return _data.makeIterator()
   }
 
   var startIndex: MinimalForwardIndex {
@@ -128,12 +128,12 @@ func callStaticCollectionFilter(
   return result
 }
 
-func callGenericCollectionFilter<S : CollectionType>(
+func callGenericCollectionFilter<S : Collection>(
   sequence: S,
-  @noescape includeElement: (S.Generator.Element) -> Bool
-) -> [S.Generator.Element] {
+  @noescape includeElement: (S.Iterator.Element) -> Bool
+) -> [S.Iterator.Element] {
   var result = sequence.filter(includeElement)
-  expectType(Array<S.Generator.Element>.self, &result)
+  expectType(Array<S.Iterator.Element>.self, &result)
   return result
 }
 
@@ -141,16 +141,16 @@ func callGenericCollectionFilter<S : CollectionType>(
 
 %   for dispatch in [ 'Static', 'Generic' ]:
 
-CollectionTypeTests.test("filter/CollectionType/${Implementation}Implementation/${dispatch}") {
+CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${dispatch}") {
   for test in filterTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Half,
-      UnderestimateCountBehavior.Value(0)
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalForwardCollectionWith${Implementation}Filter<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedCount: underestimatedCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -192,15 +192,15 @@ var MinimalForwardCollectionWithCustomMap_timesMapWasCalled: Int = 0
 % for Implementation in [ 'Default', 'Custom' ]:
 
 struct MinimalForwardCollectionWith${Implementation}Map<Element>
-  : CollectionType {
+  : Collection {
 
-  init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
+  init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
     self._data = MinimalForwardCollection(
       elements: data, underestimatedCount: underestimatedCount)
   }
 
-  func generate() -> MinimalGenerator<Element> {
-    return _data.generate()
+  func makeIterator() -> MinimalIterator<Element> {
+    return _data.makeIterator()
   }
 
   var startIndex: MinimalForwardIndex {
@@ -260,9 +260,9 @@ func callStaticCollectionMap<T>(
   return result
 }
 
-func callGenericCollectionMap<C : CollectionType, T>(
+func callGenericCollectionMap<C : Collection, T>(
   collection: C,
-  @noescape transform: (C.Generator.Element) -> T
+  @noescape transform: (C.Iterator.Element) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -274,19 +274,19 @@ func callGenericCollectionMap<C : CollectionType, T>(
 %   for dispatch in [ 'Static', 'Generic' ]:
 
 CollectionTypeTests.test(
-  "map/CollectionType/${Implementation}Implementation/${dispatch}"
+  "map/Collection/${Implementation}Implementation/${dispatch}"
 ) {
   for test in mapTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Half,
-      UnderestimateCountBehavior.Value(0)
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalForwardCollectionWith${Implementation}Map<
         OpaqueValue<Int>
       >(
         test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedCount: underestimatedCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -331,28 +331,28 @@ CollectionTypeTests.test(
 ${LazyFlatMapTest}
 
 //===----------------------------------------------------------------------===//
-// underestimateCount()
+// underestimatedCount
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("underestimateCount/CollectionType/DefaultImplementation") {
+CollectionTypeTests.test("underestimatedCount/Collection/DefaultImplementation") {
   do {
-    let s = CollectionWithDefaultUnderestimateCount(count: 0)
+    let s = CollectionWithDefaultUnderestimatedCount(count: 0)
     expectEqual(0, callGenericUnderestimatedCount(s))
   }
   do {
-    let s = CollectionWithDefaultUnderestimateCount(count: 5)
+    let s = CollectionWithDefaultUnderestimatedCount(count: 5)
     expectEqual(5, callGenericUnderestimatedCount(s))
   }
 }
 
-struct CollectionWithCustomUnderestimateCount : CollectionType {
+struct CollectionWithCustomUnderestimatedCount : Collection {
   init(underestimatedCount: Int) {
     self._underestimatedCount = underestimatedCount
   }
 
-  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+  func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
     expectUnreachable()
-    return MinimalGenerator([])
+    return MinimalIterator([])
   }
 
   var startIndex: MinimalForwardIndex {
@@ -371,29 +371,29 @@ struct CollectionWithCustomUnderestimateCount : CollectionType {
     return OpaqueValue(0xffff)
   }
 
-  func underestimateCount() -> Int {
+  var underestimatedCount: Int {
     return _underestimatedCount
   }
 
   let _underestimatedCount: Int
 }
 
-CollectionTypeTests.test("underestimateCount/CollectionType/CustomImplementation") {
+CollectionTypeTests.test("underestimatedCount/Collection/CustomImplementation") {
   do {
-    let s = CollectionWithCustomUnderestimateCount(underestimatedCount: 0)
+    let s = CollectionWithCustomUnderestimatedCount(underestimatedCount: 0)
     expectEqual(0, callGenericUnderestimatedCount(s))
   }
   do {
-    let s = CollectionWithCustomUnderestimateCount(underestimatedCount: 5)
+    let s = CollectionWithCustomUnderestimatedCount(underestimatedCount: 5)
     expectEqual(5, callGenericUnderestimatedCount(s))
   }
 }
 
 //===----------------------------------------------------------------------===//
-// CollectionType.generate(), CollectionType.Generator
+// Collection.makeIterator(), Collection.Iterator
 //===----------------------------------------------------------------------===//
 
-struct MinimalForwardCollectionWithDefaultGenerator : CollectionType {
+struct MinimalForwardCollectionWithDefaultIterator : Collection {
   init(count: Int) {
     self._count = count
   }
@@ -414,28 +414,28 @@ struct MinimalForwardCollectionWithDefaultGenerator : CollectionType {
   var _count: Int
 }
 
-func callGenericGenerate<S : SequenceType>(sequence: S) -> S.Generator {
-  return sequence.generate()
+func callGenericIterator<S : Sequence>(sequence: S) -> S.Iterator {
+  return sequence.makeIterator()
 }
 
-CollectionTypeTests.test("CollectionType.generate()/DefaultImplementation") {
+CollectionTypeTests.test("Collection.makeIterator()/DefaultImplementation") {
   for count in [ 0, 5 ] {
-    let collection = MinimalForwardCollectionWithDefaultGenerator(count: count)
+    let collection = MinimalForwardCollectionWithDefaultIterator(count: count)
 
     do {
       // Check the return type of the function when called statically.
-      var generator = collection.generate()
+      var iter = collection.makeIterator()
       expectType(
-        IndexingGenerator<MinimalForwardCollectionWithDefaultGenerator>.self,
-        &generator)
+        IndexingIterator<MinimalForwardCollectionWithDefaultIterator>.self,
+        &iter)
     }
 
     do {
       // Check the return type of the function when called generically.
-      var generator = callGenericGenerate(collection)
+      var iter = callGenericIterator(collection)
       expectType(
-        IndexingGenerator<MinimalForwardCollectionWithDefaultGenerator>.self,
-        &generator)
+        IndexingIterator<MinimalForwardCollectionWithDefaultIterator>.self,
+        &iter)
     }
 
     checkForwardCollection(
@@ -445,16 +445,16 @@ CollectionTypeTests.test("CollectionType.generate()/DefaultImplementation") {
   }
 }
 
-struct MinimalForwardCollectionWithCustomGenerator : CollectionType {
+struct MinimalForwardCollectionWithCustomIterator : Collection {
   init(count: Int) {
     self._count = count
   }
 
-  static var timesGenerateWasCalled: Int = 0
+  static var timesIteratorWasCalled: Int = 0
 
-  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
-    MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled += 1
-    return MinimalGenerator<OpaqueValue<Int>>(
+  func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
+    MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled += 1
+    return MinimalIterator<OpaqueValue<Int>>(
       Array(1..<_count+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
     )
   }
@@ -475,28 +475,28 @@ struct MinimalForwardCollectionWithCustomGenerator : CollectionType {
   var _count: Int
 }
 
-CollectionTypeTests.test("CollectionType.generate()/CustomImplementation") {
+CollectionTypeTests.test("Collection.makeIterator()/CustomImplementation") {
   for count in [ 0, 5 ] {
-    let collection = MinimalForwardCollectionWithCustomGenerator(count: count)
+    let collection = MinimalForwardCollectionWithCustomIterator(count: count)
 
     do {
       // Check the return type of the function when called statically.
-      MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled = 0
-      var generator = collection.generate()
+      MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled = 0
+      var iter = collection.makeIterator()
       expectType(
-        MinimalGenerator<OpaqueValue<Int>>.self,
-        &generator)
-      expectEqual(1, MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled)
+        MinimalIterator<OpaqueValue<Int>>.self,
+        &iter)
+      expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled)
     }
 
     do {
-      MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled = 0
+      MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled = 0
       // Check the return type of the function when called generically.
-      var generator = callGenericGenerate(collection)
+      var iter = callGenericIterator(collection)
       expectType(
-        MinimalGenerator<OpaqueValue<Int>>.self,
-        &generator)
-      expectEqual(1, MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled)
+        MinimalIterator<OpaqueValue<Int>>.self,
+        &iter)
+      expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled)
     }
 
     checkForwardCollection(
@@ -507,7 +507,7 @@ CollectionTypeTests.test("CollectionType.generate()/CustomImplementation") {
 }
 
 //===----------------------------------------------------------------------===//
-// subscript(_: Range<Index>), CollectionType.SubSequence
+// subscript(_: Range<Index>), Collection.SubSequence
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("subscript(_: Range<Index>)/Dispatch") {
@@ -524,8 +524,8 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
   var collection = MinimalRandomAccessMutableCollection(
     elements: [ 5, 4, 3, 2, 1, 0, -1, -2, -3, -4 ])
   var i = collection.startIndex
-  var j = i.advancedBy(5)
-  collection[i..<j].sortInPlace()
+  var j = i.advanced(by: 5)
+  collection[i..<j].sort()
   expectEqualSequence(
     [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
 }
@@ -561,12 +561,12 @@ CollectionTypeTests.test("count/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// indexOf()
+// index(of:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("indexOf/WhereElementIsEquatable/dispatch") {
+CollectionTypeTests.test("index(of:)/WhereElementIsEquatable/dispatch") {
   let tester = CollectionLog.dispatchTester([MinimalEquatableValue(1)])
-  _ = tester.indexOf(MinimalEquatableValue(1))
+  _ = tester.index(of: MinimalEquatableValue(1))
   expectCustomizable(tester, tester.log._customIndexOfEquatableElement)
 }
 
@@ -574,16 +574,16 @@ CollectionTypeTests.test("indexOf/WhereElementIsEquatable/dispatch") {
 // <rdar://problem/20582358> Commenting out one line determines whether a
 // completely different line type-checks
 func callGenericFind_<
-  C : CollectionType where C.Generator.Element : Equatable
->(collection: C, _ element: C.Generator.Element) -> C.Index? {
-  return collection.indexOf(element)
+  C : Collection where C.Iterator.Element : Equatable
+>(collection: C, _ element: C.Iterator.Element) -> C.Index? {
+  return collection.index(of: element)
 }
 
 func callStaticFind_(
   set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Set<MinimalHashableValue>.Index? {
-  return set.indexOf(element)
+  return set.index(of: element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -624,21 +624,21 @@ CollectionTypeTests.test("Set<T>.find/CustomImplementation/${dispatch}") {
 
 % end
 
-extension CollectionType where
-  Generator.Element : Equatable,
+extension Collection where
+  Iterator.Element : Equatable,
 
   // FIXME: the following constraints should go away after
-  // <rdar://problem/20715697> CollectionType.SubSlice should constrain its
+  // <rdar://problem/20715697> Collection.SubSlice should constrain its
   // Element type
-  SubSequence : CollectionType,
+  SubSequence : Collection,
   SubSequence.SubSequence == SubSequence,
-  SubSequence.Generator.Element == Generator.Element,
+  SubSequence.Iterator.Element == Iterator.Element,
   SubSequence.Index == Index {
 
-  func _test_indicesOf(element: Generator.Element) -> [Index] {
+  func _test_indicesOf(element: Iterator.Element) -> [Index] {
     var result: [Index] = []
     var tail = self[indices]
-    while let foundIndex = tail.indexOf(element) {
+    while let foundIndex = tail.index(of: element) {
       result.append(foundIndex)
       tail = tail[foundIndex.successor()..<endIndex]
     }
@@ -646,7 +646,7 @@ extension CollectionType where
   }
 }
 
-CollectionTypeTests.test("indexOf/ContinueSearch") {
+CollectionTypeTests.test("index(of:)/ContinueSearch") {
   do {
     let c = MinimalForwardCollection(elements: [] as [MinimalEquatableValue])
     expectEqualSequence(
@@ -660,53 +660,53 @@ CollectionTypeTests.test("indexOf/ContinueSearch") {
     let foundIndices = c._test_indicesOf(MinimalEquatableValue(1))
     expectEqualSequence(
       [ 0, 2, 4 ],
-      foundIndices.map { c.startIndex.distanceTo($0) })
+      foundIndices.map { c.startIndex.distance(to: $0) })
   }
 }
 
 //===----------------------------------------------------------------------===//
-// CollectionType.split()
+// Collection.split()
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("CollectionType/split/dispatch") {
+CollectionTypeTests.test("Collection/split/dispatch") {
   var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
 }
 
 //===----------------------------------------------------------------------===//
-// prefixThrough()
+// prefix(through:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("CollectionType/prefixThrough/dispatch") {
+CollectionTypeTests.test("Collection/prefix(through:)/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  tester.prefixThrough(1)
+  tester.prefix(through: 1)
   expectCustomizable(tester, tester.log.prefixThrough)
 }
 
 //===----------------------------------------------------------------------===//
-// prefixUpTo()
+// prefix(upTo:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("CollectionType/prefixUpTo/dispatch") {
+CollectionTypeTests.test("Collection/prefix(upTo:)/dispatch") {
   var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  tester.prefixUpTo(1)
+  tester.prefix(upTo: 1)
   expectCustomizable(tester, tester.log.prefixUpTo)
 }
 
 //===----------------------------------------------------------------------===//
-// suffixFrom()
+// suffix(from:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("CollectionType/suffixFrom/dispatch") {
+CollectionTypeTests.test("Collection/suffix(from:)/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  tester.suffixFrom(1)
+  tester.suffix(from: 1)
   expectCustomizable(tester, tester.log.suffixFrom)
 }
 
 
 //===----------------------------------------------------------------------===//
-// MutableCollectionType
+// MutableCollection
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
@@ -733,7 +733,7 @@ CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") 
 do {
   var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .expectationFailure
 
   CollectionTypeTests.add${traversal}CollectionTests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
@@ -777,7 +777,7 @@ do {
 do {
   var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .expectationFailure
 
   CollectionTypeTests.add${traversal}CollectionTests(
     makeCollection: { (elements: [LifetimeTracked]) in

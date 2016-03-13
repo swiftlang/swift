@@ -60,7 +60,7 @@ var i : Int, f : Float
 var p = pair(i, f)
 
 // Conformance constraints on static variables.
-func f1<S1 : SequenceType>(s1: S1) {}
+func f1<S1 : Sequence>(s1: S1) {}
 var x : Array<Int> = [1]
 f1(x)
 
@@ -120,19 +120,37 @@ var rdar14005696 : UInt8
 rdar14005696 ~~~ 5
 
 // <rdar://problem/15168483>
+public struct SomeIterator<
+  C: Collection, Indices: Sequence
+  where
+  C.Index == Indices.Iterator.Element
+> : IteratorProtocol, Sequence {
+  var seq : C
+  var indices : Indices.Iterator
+
+  public typealias Element = C.Iterator.Element
+
+  public mutating func next() -> Element? {
+    fatalError()
+  }
+
+  public init(elements: C, indices: Indices) {
+    fatalError()
+  }
+}
 func f1<
-  S: CollectionType 
-  where S.Index: BidirectionalIndexType
+  S: Collection 
+  where S.Index: BidirectionalIndex
 >(seq: S) {
-  let x = (seq.indices).lazy.reverse()
-  PermutationGenerator(elements: seq, indices: x) // expected-warning{{unused}}
-  PermutationGenerator(elements: seq, indices: seq.indices.reverse()) // expected-warning{{unused}}
+  let x = (seq.indices).lazy.reversed()
+  SomeIterator(elements: seq, indices: x) // expected-warning{{unused}}
+  SomeIterator(elements: seq, indices: seq.indices.reversed()) // expected-warning{{unused}}
 }
 
 // <rdar://problem/16078944>
-func count16078944<C: CollectionType>(x: C) -> Int { return 0 }
+func count16078944<C: Collection>(x: C) -> Int { return 0 }
 
-func test16078944 <T: ForwardIndexType>(lhs: T, args: T) -> Int {
+func test16078944 <T: ForwardIndex>(lhs: T, args: T) -> Int {
     return count16078944(lhs..<args) // don't crash
 }
 
@@ -147,15 +165,15 @@ class r22409190ManagedBuffer<Value, Element> {
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
     self.withUnsafeMutablePointerToElements { elems -> Void in
-      elems.destroy(self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+      elems.deinitialize(count: self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
     }
   }
 }
 
 // <rdar://problem/22459135> error: 'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'
 func r22459135() {
-  func h<S: SequenceType where S.Generator.Element: IntegerType>
-    (sequence: S) -> S.Generator.Element {
+  func h<S : Sequence where S.Iterator.Element : Integer>
+    (sequence: S) -> S.Iterator.Element {
     return 0
   }
 
@@ -191,7 +209,7 @@ var _ : Int = R24267414.foo() // expected-error {{generic parameter 'T' could no
 
 
 // https://bugs.swift.org/browse/SR-599
-func SR599<T: IntegerType>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599'}}
+func SR599<T: Integer>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599'}}
 _ = SR599()         // expected-error {{generic parameter 'T' could not be inferred}}
 
 

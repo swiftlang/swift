@@ -19,12 +19,13 @@ class A {
 // CHECK-NEXT: cond_br [[T2]]
 //   Something branch: project value, translate, inject into result.
 // CHECK:      [[STR:%.*]] = unchecked_enum_data [[T1]]
-// CHECK:      [[T0:%.*]] = function_ref @swift_StringToNSString
+// CHECK:      [[T0:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[STR]])
-// CHECK-NEXT: enum $Optional<NSString>, #Optional.Some!enumelt.1, [[T1]]
+// CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
+// CHECK-NEXT: release_value [[STR]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
-// CHECK:      enum $Optional<NSString>, #Optional.None!enumelt
+// CHECK:      enum $Optional<NSString>, #Optional.none!enumelt
 // CHECK-NEXT: br
 //   Continuation.
 // CHECK:      bb3([[T0:%.*]] : $Optional<NSString>):
@@ -38,12 +39,12 @@ class A {
 // CHECK:      [[NSSTR:%.*]] = unchecked_enum_data %0
 // CHECK:      [[T0:%.*]] = function_ref @swift_NSStringToString
 //   Make a temporary initialized string that we're going to clobber as part of the conversion process (?).
-// CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[NSSTR]] : $NSString
+// CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]] : $NSString
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR_BOX]])
-// CHECK-NEXT: enum $Optional<String>, #Optional.Some!enumelt.1, [[T1]]
+// CHECK-NEXT: enum $Optional<String>, #Optional.some!enumelt.1, [[T1]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
-// CHECK:      enum $Optional<String>, #Optional.None!enumelt
+// CHECK:      enum $Optional<String>, #Optional.none!enumelt
 // CHECK-NEXT: br
 //   Continuation.
 // CHECK:      bb3([[T0:%.*]] : $Optional<String>):

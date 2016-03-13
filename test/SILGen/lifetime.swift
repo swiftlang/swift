@@ -384,6 +384,8 @@ func logical_lvalue_lifetime(r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: {{.*}}([[CALLBACK:%.*]] : 
   // CHECK: [[TEMP:%.*]] = alloc_stack $RefWithProp
   // CHECK: store [[R2]] to [[TEMP]]
+  // CHECK: [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout RefWithProp, @thick RefWithProp.Type) -> () to $Builtin.RawPointer
+  // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout RefWithProp, @thick RefWithProp.Type) -> ()
   // CHECK: apply [[CALLBACK]]({{.*}}, [[STORAGE]], [[TEMP]], {{%.*}})
 }
 

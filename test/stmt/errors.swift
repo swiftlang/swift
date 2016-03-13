@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -parse -verify %s
-enum MSV : ErrorType {
+enum MSV : ErrorProtocol {
   case Foo, Bar, Baz
 
   var domain: String { return "" }
@@ -13,7 +13,7 @@ func d() {}
 func e() {}
 func thrower() throws {}
 
-func opaque_error() -> ErrorType { return MSV.Foo }
+func opaque_error() -> ErrorProtocol { return MSV.Foo }
 
 func one() {
   throw MSV.Foo // expected-error {{error is not handled because the enclosing function is not declared 'throws'}}
@@ -129,7 +129,7 @@ func eleven_one() {
     do {
       try thrower()
     // FIXME: suppress the double-emission of the 'always true' warning
-    } catch let e as ErrorType { // expected-warning {{immutable value 'e' was never used}} {{17-18=_}} expected-warning 2 {{'as' test is always true}}
+    } catch let e as ErrorProtocol { // expected-warning {{immutable value 'e' was never used}} {{17-18=_}} expected-warning 2 {{'as' test is always true}}
     }
   }
 }
@@ -153,7 +153,7 @@ func twelve() {
   }
 }
 
-struct Thirteen : ErrorType, Equatable {}
+struct Thirteen : ErrorProtocol, Equatable {}
 func ==(a: Thirteen, b: Thirteen) -> Bool { return true }
 
 func thirteen_helper(fn: (Thirteen) -> ()) {}

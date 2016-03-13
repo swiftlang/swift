@@ -97,7 +97,7 @@ struct MutableAddressorAndGet {
       return base
     }
     get {
-      return base.memory
+      return base.pointee
     }
   }
 }

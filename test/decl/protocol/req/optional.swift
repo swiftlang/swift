@@ -112,7 +112,7 @@ func optionalMethodGeneric<T : P1>(t: T) {
   var methodRef = t.method
 
   // Make sure it's an optional
-  methodRef = .None
+  methodRef = .none
 
   // ... and that we can call it.
   methodRef!(5)
@@ -124,7 +124,7 @@ func optionalPropertyGeneric<T : P1>(t: T) {
   var propertyRef = t.prop
 
   // Make sure it's an optional
-  propertyRef = .None
+  propertyRef = .none
 
   // ... and that we can use it
   let i = propertyRef!
@@ -137,7 +137,7 @@ func optionalSubscriptGeneric<T : P1>(t: T) {
   var subscriptRef = t[5]
 
   // Make sure it's an optional
-  subscriptRef = .None
+  subscriptRef = .none
 
   // ... and that we can use it
   let i = subscriptRef!
@@ -150,7 +150,7 @@ func optionalMethodExistential(t: P1) {
   var methodRef = t.method
 
   // Make sure it's an optional
-  methodRef = .None
+  methodRef = .none
 
   // ... and that we can call it.
   methodRef!(5)
@@ -162,7 +162,7 @@ func optionalPropertyExistential(t: P1) {
   var propertyRef = t.prop
 
   // Make sure it's an optional
-  propertyRef = .None
+  propertyRef = .none
 
   // ... and that we can use it
   let i = propertyRef!
@@ -175,7 +175,7 @@ func optionalSubscriptExistential(t: P1) {
   var subscriptRef = t[5]
 
   // Make sure it's an optional
-  subscriptRef = .None
+  subscriptRef = .none
 
   // ... and that we can use it
   let i = subscriptRef!

@@ -3,14 +3,14 @@
 protocol A {}
 
 protocol B {
-  typealias AA: A
+  associatedtype AA: A
   func foo()
 }
 
 @objc protocol O {}
 
 protocol C {
-  typealias OO: O
+  associatedtype OO: O
   func foo()
 }
 

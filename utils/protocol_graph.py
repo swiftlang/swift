@@ -1,4 +1,4 @@
-#===--- protocol_graph.py -------------------------*- coding: utf-8 -*----===#
+# ===--- protocol_graph.py ----------------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #
@@ -8,7 +8,7 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===//
 #
 # Create a graph of the protocol refinement relationships, associated
 # types, operator requirements, and defaulted generic operators.
@@ -20,17 +20,19 @@
 #   (ccomps -zX#$N -o /tmp/protocols.dot /tmp/p0.dot || true) \
 #   && dot -Tsvg /tmp/protocols.dot > /tmp/protocols.svg \
 #   && open /tmp/protocols.svg
-#===----------------------------------------------------------------------===#
+#
+# ===----------------------------------------------------------------------===//
 
 from __future__ import print_function
 
+import cgi
+import os
 import re
 import sys
-import os
-import cgi
 
 # Open 'stdlib.swift' in this directory if no path specified.
-args = list(sys.argv) + [os.path.join(os.path.dirname(__file__), 'stdlib.swift')]
+args = list(sys.argv) + \
+    [os.path.join(os.path.dirname(__file__), 'stdlib.swift')]
 
 re_flags = re.MULTILINE | re.VERBOSE
 
@@ -40,15 +42,17 @@ identifier = '[A-Za-z_][A-Za-z0-9_]*'
 # Pattern to recognize a (possibly-generic) operator decl.
 operator = r'''
 (?:(?:prefix|postfix).*)? func \s*
-(?=\S)[^A-Za-z_]                # non-space, non-identifier: begins an operator name
-(?:(?=\S)[^(){])*               # rest of operator name
+(?=\S)[^A-Za-z_]            # non-space, non-identifier: begins an operator name
+(?:(?=\S)[^(){])*           # rest of operator name
 \s*
-(<[^>{]+>)?                     # generic parameter list
+(<[^>{]+>)?                 # generic parameter list
 \s*
-\([^)]*\)                       # function parameter list
+\([^)]*\)                   # function parameter list
 '''
 
 # substitute local variables into the string
+
+
 def interpolate(string):
     import inspect
     frame = inspect.currentframe()
@@ -56,11 +60,14 @@ def interpolate(string):
 
 # Given the body_text of a protocol definition, return a list of
 # associated type and operator requirements.
+
+
 def body_lines(body_text):
     return [
         cgi.escape(b.group(0)) for b in
         re.finditer(
-            r'(typealias\s*' + identifier + r'(\s*[:,]\s*' + identifier + ')?|' + operator + '.*)',
+            r'(typealias\s*' + identifier +
+            r'(\s*[:,]\s*' + identifier + ')?|' + operator + '.*)',
             body_text, re_flags)
     ]
 
@@ -73,24 +80,29 @@ graph = {}
 # Mapping from protocol to generic operators taking instances as arguments
 generic_operators = {}
 
-comments = r'//.* | /[*] (.|\n)*? [*]/'  # FIXME: doesn't respect strings or comment nesting)
+# FIXME: doesn't respect strings or comment nesting)
+comments = r'//.* | /[*] (.|\n)*? [*]/'
 
 # read source, stripping all comments
 with open(args[1]) as src:
     source_sans_comments = re.sub(comments, '', src.read(), flags=re_flags)
 
-generic_parameter_constraint = interpolate(r' (%(identifier)s) \s* : \s* (%(identifier)s) ')
+generic_parameter_constraint = interpolate(
+    r' (%(identifier)s) \s* : \s* (%(identifier)s) ')
+
 
 def parse_generic_operator(m):
     generic_params = m.group(5)
     generic_operator = cgi.escape(m.group(0).strip())
     function_param_start = m.end(5) - m.start(0)
     function_params = generic_operator[function_param_start:]
-    for m2 in re.finditer(generic_parameter_constraint, generic_params, re_flags):
+    for m2 in re.finditer(
+            generic_parameter_constraint, generic_params, re_flags):
         type_parameter = m2.group(1)
         protocol = m2.group(2)
 
-        # we're only interested if we can find a function parameter of that type
+        # we're only interested if we can find a function parameter of that
+        # type
         if not re.search(r':\s*%s\s*[,)]' % type_parameter, function_params):
             continue
 
@@ -101,7 +113,9 @@ def parse_generic_operator(m):
             r'\b%s\b' % protocol, letter_pi,
             re.sub(r'\b%s\b' % type_parameter, letter_tau, generic_operator))
 
-        generic_operators.setdefault(protocol, set()).add(abbreviated_signature)
+        generic_operators.setdefault(
+            protocol, set()).add(abbreviated_signature)
+
 
 def parse_protocol(m):
     child = m.group(1)
@@ -140,7 +154,8 @@ for n in graph:
     cluster_builder.setdefault(n.translate(None, '_'), set()).add(n)
 
 # Grab the clusters with more than one member.
-clusters = dict((c, nodes) for (c, nodes) in cluster_builder.items() if len(nodes) > 1)
+clusters = dict((c, nodes)
+                for (c, nodes) in cluster_builder.items() if len(nodes) > 1)
 
 # A set of all intra-cluster edges
 cluster_edges = set(
@@ -168,7 +183,8 @@ for node in sorted(graph.keys()):
     divider = '<HR/>\n' if len(requirements) != 0 and len(generics) != 0 else ''
 
     label = node if len(requirements + generics) == 0 else (
-        '\n<TABLE BORDER="0">\n<TR><TD>\n%s\n</TD></TR><HR/>\n%s%s%s</TABLE>\n' % (
+        '\n<TABLE BORDER="0">\n<TR><TD>\n%s\n</TD></TR><HR/>' +
+        '\n%s%s%s</TABLE>\n' % (
             node,
             '\n'.join('<TR><TD>%s</TD></TR>' % r for r in requirements),
             divider,
@@ -177,8 +193,10 @@ for node in sorted(graph.keys()):
     print(interpolate('    %(node)s [style = %(style)s, label=<%(label)s>]'))
 for (parent, children) in sorted(graph.items()):
     print('    %s -> {' % parent, end=' ')
-    print('; '.join(
-        sorted(child for child in children if not (parent, child) in cluster_edges)), end=' ')
+    print('; '.join(sorted(
+        child for child in children
+        if not (parent, child) in cluster_edges)
+    ), end=' ')
     print('}')
 
 print('}')

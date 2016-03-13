@@ -105,12 +105,13 @@ struct S7b : P7 {
 }
 
 // <rdar://problem/14685674>
-struct zip<A: GeneratorType, B: GeneratorType> : GeneratorType, SequenceType {
-     func next() -> (A.Element, B.Element)? { }
+struct zip<A : IteratorProtocol, B : IteratorProtocol>
+  : IteratorProtocol, Sequence {
 
-     typealias Generator = zip
-     func generate() -> zip { }
-     
+  func next() -> (A.Element, B.Element)? { }
+
+  typealias Generator = zip
+  func makeIterator() -> zip { }
 }
 
 protocol P8 { }

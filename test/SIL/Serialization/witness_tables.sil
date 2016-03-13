@@ -31,8 +31,8 @@ sil_witness_table ConformingAssoc: AssocReqt module witness_tables {
 }
 
 protocol AnyProtocol {
-  typealias AssocType
-  typealias AssocWithReqt : AssocReqt
+  associatedtype AssocType
+  associatedtype AssocWithReqt : AssocReqt
   func assocTypesMethod(x: AssocType, y: AssocWithReqt)
   static func staticMethod(x: Self)
 }
