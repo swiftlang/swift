@@ -123,6 +123,7 @@ precommitTests = [
   "Dictionary2": run_Dictionary2,
   "Dictionary2OfObjects": run_Dictionary2OfObjects,
   "Dictionary3": run_Dictionary3,
+  "Dictionary3OfObjects": run_Dictionary3OfObjects,
   "DictionaryBridge": run_DictionaryBridge,
   "DictionaryLiteral": run_DictionaryLiteral,
   "DictionaryRemove": run_DictionaryRemove,
