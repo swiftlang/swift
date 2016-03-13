@@ -108,7 +108,7 @@ public struct UTF8 : UnicodeCodec {
   /// Start or continue decoding a UTF-8 sequence.
   ///
   /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
   /// Checking that the generator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
   /// generator.
@@ -122,22 +122,22 @@ public struct UTF8 : UnicodeCodec {
   ///   anything else between calls.  Failing to do so will yield unspecified
   ///   results.
   public mutating func decode<
-    G : GeneratorType where G.Element == CodeUnit
-    >(next: inout G) -> UnicodeDecodingResult {
+    I : IteratorProtocol where I.Element == CodeUnit
+  >(next: inout I) -> UnicodeDecodingResult {
 
       refillBuffer: if !_didExhaustGenerator {
         // Bufferless ASCII fastpath.
         if _fastPath(_bitsInBuffer == 0) {
           if let codeUnit = next.next() {
             if codeUnit & 0x80 == 0 {
-              return .Result(UnicodeScalar(_unchecked: UInt32(codeUnit)))
+              return .scalarValue(UnicodeScalar(_unchecked: UInt32(codeUnit)))
             }
             // Non-ASCII, proceed to buffering mode.
             _decodeBuffer = UInt32(codeUnit)
             _bitsInBuffer = 8
           } else {
             _didExhaustGenerator = true
-            return .EmptyInput
+            return .emptyInput
           }
         } else if(_decodeBuffer & 0x80 == 0) {
           // ASCII in buffer.  We don't refill the buffer so we can return
@@ -154,12 +154,12 @@ public struct UTF8 : UnicodeCodec {
             _bitsInBuffer = _bitsInBuffer &+ 8
           } else {
             _didExhaustGenerator = true
-            if _bitsInBuffer == 0 { return .EmptyInput }
+            if _bitsInBuffer == 0 { return .emptyInput }
             break // We still have some bytes left in our buffer.
           }
         } while _bitsInBuffer < 32
       } else if _bitsInBuffer == 0 {
-        return .EmptyInput
+        return .emptyInput
       }
 
       // Decode one unicode scalar.
@@ -177,9 +177,9 @@ public struct UTF8 : UnicodeCodec {
       _bitsInBuffer = _bitsInBuffer &- bitsConsumed
 
       if _fastPath(result != nil) {
-        return .Result(UnicodeScalar(_unchecked: result!))
+        return .scalarValue(UnicodeScalar(_unchecked: result!))
       } else {
-        return .Error // Ill-formed UTF-8 code unit sequence.
+        return .error // Ill-formed UTF-8 code unit sequence.
       }
   }
 
@@ -344,7 +344,7 @@ public struct UTF16 : UnicodeCodec {
   /// Start or continue decoding a UTF sequence.
   ///
   /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
   /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
   /// iterator.
@@ -481,7 +481,7 @@ public struct UTF32 : UnicodeCodec {
   /// Start or continue decoding a UTF sequence.
   ///
   /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
   /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
   /// iterator.
@@ -698,7 +698,6 @@ extension UTF8.CodeUnit : _StringElement {
     return UTF8.CodeUnit(utf16)
   }
 }
-
 extension UTF16 {
   /// Returns the number of code units required to encode `x`.
   @warn_unused_result
@@ -706,8 +705,8 @@ extension UTF16 {
     return x.value <= 0xFFFF ? 1 : 2
   }
 
-  /// Returns the high surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair)
-  /// representing `x`.
+  /// Returns the high surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
+  /// `x`.
   ///
   /// - Precondition: `width(x) == 2`.
   @warn_unused_result
@@ -716,8 +715,8 @@ extension UTF16 {
     return UTF16.CodeUnit((x.value - 0x1_0000) >> (10 as UInt32)) + 0xD800
   }
 
-  /// Returns the low surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair)
-  /// representing `x`.
+  /// Returns the low surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
+  /// `x`.
   ///
   /// - Precondition: `width(x) == 2`.
   @warn_unused_result
@@ -725,7 +724,7 @@ extension UTF16 {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit(
       (x.value - 0x1_0000) & (((1 as UInt32) << 10) - 1)
-    ) + 0xDC00
+      ) + 0xDC00
   }
 
   @warn_unused_result
@@ -743,19 +742,19 @@ extension UTF16 {
     source source: UnsafeMutablePointer<T>,
     destination: UnsafeMutablePointer<U>,
     count: Int
-  ) {
-    if strideof(T.self) == strideof(U.self) {
-      _memcpy(
-        dest: UnsafeMutablePointer(destination),
-        src: UnsafeMutablePointer(source),
-        size: UInt(count) * UInt(strideof(U.self)))
-    }
-    else {
-      for i in 0..<count {
-        let u16 = T._toUTF16CodeUnit((source + i).pointee)
-        (destination + i).pointee = U._fromUTF16CodeUnit(u16)
+    ) {
+      if strideof(T.self) == strideof(U.self) {
+        _memcpy(
+          dest: UnsafeMutablePointer(destination),
+          src: UnsafeMutablePointer(source),
+          size: UInt(count) * UInt(strideof(U.self)))
       }
-    }
+      else {
+        for i in 0..<count {
+          let u16 = T._toUTF16CodeUnit((source + i).pointee)
+          (destination + i).pointee = U._fromUTF16CodeUnit(u16)
+        }
+      }
   }
 
   /// Returns the number of UTF-16 code units required for the given code unit
@@ -769,35 +768,35 @@ extension UTF16 {
   public static func transcodedLength<
     Encoding : UnicodeCodec, Input : IteratorProtocol
     where Encoding.CodeUnit == Input.Element
-  >(
+    >(
     of input: Input,
     decodedAs sourceEncoding: Encoding.Type,
     repairingIllFormedSequences: Bool
-  ) -> (count: Int, isASCII: Bool)? {
-    var input = input
-    var count = 0
-    var isAscii = true
+    ) -> (count: Int, isASCII: Bool)? {
+      var input = input
+      var count = 0
+      var isAscii = true
 
-    var inputDecoder = Encoding()
-    loop:
-    while true {
-      switch inputDecoder.decode(&input) {
-      case .scalarValue(let us):
-        if us.value > 0x7f {
-          isAscii = false
-        }
-        count += width(us)
-      case .emptyInput:
-        break loop
-      case .error:
-        if !repairingIllFormedSequences {
-          return nil
-        }
-        isAscii = false
-        count += width(UnicodeScalar(0xfffd))
+      var inputDecoder = Encoding()
+      loop:
+        while true {
+          switch inputDecoder.decode(&input) {
+          case .scalarValue(let us):
+            if us.value > 0x7f {
+              isAscii = false
+            }
+            count += width(us)
+          case .emptyInput:
+            break loop
+          case .error:
+            if !repairingIllFormedSequences {
+              return nil
+            }
+            isAscii = false
+            count += width(UnicodeScalar(0xfffd))
+          }
       }
-    }
-    return (count, isAscii)
+      return (count, isAscii)
   }
 }
 
@@ -824,12 +823,12 @@ public func transcode<
   InputEncoding : UnicodeCodec,
   OutputEncoding : UnicodeCodec
   where InputEncoding.CodeUnit == Input.Element
->(
+  >(
   inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
   stoppingOnError stopOnError: Bool
-) -> Bool {
-  fatalError("unavailable function can't be called")
+  ) -> Bool {
+    fatalError("unavailable function can't be called")
 }
 
 extension UTF16 {
@@ -837,9 +836,9 @@ extension UTF16 {
   public static func measure<
     Encoding : UnicodeCodec, Input : IteratorProtocol
     where Encoding.CodeUnit == Input.Element
-  >(
+    >(
     _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
-  ) -> (Int, Bool)? {
-    fatalError("unavailable function can't be called")
+    ) -> (Int, Bool)? {
+      fatalError("unavailable function can't be called")
   }
 }
