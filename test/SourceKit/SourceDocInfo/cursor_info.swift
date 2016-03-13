@@ -155,6 +155,9 @@ typealias MyAlias2<A, B> = MyAlias<A, B>
 func paramAutoclosureNoescape1(@noescape msg: ()->String) {}
 func paramAutoclosureNoescape2(@autoclosure msg: ()->String) {}
 func paramAutoclosureNoescape3(@autoclosure(escaping) msg: ()->String) {}
+
+func paramDefaultPlaceholder(f: StaticString = #function, file: StaticString = #file, line: UInt = #line, col: UInt = #column, arr: [Int] = [], dict: [Int:Int] = [:], opt: Int? = nil, reg: Int = 1) {}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -564,3 +567,17 @@ func paramAutoclosureNoescape3(@autoclosure(escaping) msg: ()->String) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=157:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK72
 // CHECK72: <decl.var.parameter><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name>(escaping)</syntaxtype.attribute.builtin> <decl.var.parameter.name>
+
+// RUN: %sourcekitd-test -req=cursor -pos=159:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK73
+// CHECK73: <decl.function.free>
+// CHECK73-SAME: = <syntaxtype.keyword>#function</syntaxtype.keyword>
+// CHECK73-SAME: = <syntaxtype.keyword>#file</syntaxtype.keyword>
+// CHECK73-SAME: = <syntaxtype.keyword>#line</syntaxtype.keyword>
+// CHECK73-SAME: = <syntaxtype.keyword>#column</syntaxtype.keyword>
+// FIXME: []
+// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
+// FIXME: [:]
+// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
+// FIXME: keyword nil
+// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
+// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>

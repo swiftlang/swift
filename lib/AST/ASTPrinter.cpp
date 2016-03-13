@@ -2347,10 +2347,23 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
     Printer << " = ";
     auto defaultArgStr
       = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
-    if (defaultArgStr.empty())
+    if (defaultArgStr.empty()) {
       Printer << tok::kw_default;
-    else
-      Printer << defaultArgStr;
+    } else {
+      switch (param->getDefaultArgumentKind()) {
+      case DefaultArgumentKind::File:
+      case DefaultArgumentKind::Line:
+      case DefaultArgumentKind::Column:
+      case DefaultArgumentKind::Function:
+      case DefaultArgumentKind::DSOHandle:
+        Printer.printKeyword(defaultArgStr);
+        break;
+      default:
+        Printer << defaultArgStr;
+        break;
+      }
+
+    }
   }
 }
 
