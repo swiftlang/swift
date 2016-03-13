@@ -38,9 +38,9 @@ Compares code sizes of "new" files, taking "old" files as a reference.
 
 Environment variables:
     SWIFT_NEW_BUILDDIR   The new build-dir
-E.g. $HOME/swiftnew/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
+E.g. .../swiftnew/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
     SWIFT_OLD_BUILDDIR   The old build-dir
-E.g. $HOME/swiftold/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
+E.g. .../swiftold/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
 
 How to specify files:
 1) No files:

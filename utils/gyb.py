@@ -360,7 +360,8 @@ def code_starts_with_dedent_keyword(source_lines):
     False
     >>> code_starts_with_dedent_keyword(split_lines('except ifSomethingElse:'))
     True
-    >>> code_starts_with_dedent_keyword(split_lines('\n# comment\nelse: # yes'))
+    >>> code_starts_with_dedent_keyword(
+            split_lines('\n# comment\nelse: # yes'))
     True
     """
     token_text = None
@@ -449,7 +450,7 @@ class ParseContext(object):
         ... '''% for x in [1, 2, 3]:
         ... %   if x == 1:
         ... literal1
-        ... %   elif x > 1:  # add an output line after this line to fix the bug
+        ... %   elif x > 1:  # add an output line after this line to fix bug
         ... %     if x == 2:
         ... literal2
         ... %     end
@@ -544,7 +545,8 @@ class ParseContext(object):
 class ExecutionContext(object):
     """State we pass around during execution of a template"""
 
-    def __init__(self, line_directive='// ###sourceLocation', **local_bindings):
+    def __init__(self, line_directive='// ###sourceLocation',
+                 **local_bindings):
         self.local_bindings = local_bindings
         self.line_directive = line_directive
         self.local_bindings['__context__'] = self
@@ -753,7 +755,7 @@ def parse_template(filename, text=None):
                 {
                     if x == 1:
                         __children__[0].execute(__context__)
-                    elif x > 1: # add output line after this line to fix the bug
+                    elif x > 1: # add output line after this line to fix bug
                         __children__[1].execute(__context__)
                 }
                 [

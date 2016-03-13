@@ -120,8 +120,9 @@ def collect_submodules(common_args, module):
     my_args = ['-module-print-submodules', '-module-to-print=%s' % (module)]
     (exitcode, out, err) = run_command(common_args + my_args)
     if exitcode != 0:
-        print('error: submodule collection failed for module %s with error %d' %
-              (module, exitcode))
+        print(
+            'error: submodule collection failed for module %s with error %d' %
+            (module, exitcode))
         return ()
 
     # Find all of the submodule imports.
@@ -146,7 +147,8 @@ def print_command(cmd, outfile=""):
 # Dump the API for the given module.
 
 
-def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet, verbose)):
+def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet,
+                     verbose)):
     # Collect the submodules
     submodules = collect_submodules(cmd, module)
 
@@ -228,8 +230,9 @@ def collect_frameworks(sdk):
     return (sorted(list(frameworks)), sdk_path)
 
 
-def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target,
-                                source_filename, output_dir, quiet, verbose):
+def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module,
+                                target, source_filename, output_dir, quiet,
+                                verbose):
 
     # Determine the SDK root and collect the set of frameworks.
     (frameworks, sdk_root) = collect_frameworks(sdk)
