@@ -119,6 +119,7 @@ precommitTests = [
   "ClassArrayGetter": run_ClassArrayGetter,
   "DeadArray": run_DeadArray,
   "Dictionary": run_Dictionary,
+  "DictionaryOfObjects": run_DictionaryOfObjects,
   "Dictionary2": run_Dictionary2,
   "Dictionary3": run_Dictionary3,
   "DictionaryBridge": run_DictionaryBridge,
