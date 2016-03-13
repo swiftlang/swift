@@ -129,6 +129,7 @@ precommitTests = [
   "DictionaryRemove": run_DictionaryRemove,
   "DictionaryRemoveOfObjects": run_DictionaryRemoveOfObjects,
   "DictionarySwap": run_DictionarySwap,
+  "DictionarySwapOfObjects": run_DictionarySwapOfObjects,
   "ErrorHandling": run_ErrorHandling,
   "GlobalClass": run_GlobalClass,
   "Hanoi": run_Hanoi,
