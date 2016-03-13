@@ -2,4 +2,4 @@
 enum b:a{var f={static#^A^#
 // FIXME: we shouldn't back the parser to the beginning of the line, it leads
 // to ridiculous override completions like this.
-// CHECK: Decl[InstanceVar]/Super:            var rawValue: Self.RawValue;
+// CHECK-NOT: Decl{{.*}}/Super

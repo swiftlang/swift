@@ -21,18 +21,19 @@ import re
 import subprocess
 import sys
 
-line_pattern = re.compile(r'^// ###setline ([0-9]+) "([^"]+)"\s*')
+line_pattern = re.compile(
+    r'^// ###sourceLocation\(file:\s*"([^"]+)",\s*line:\s*([0-9]+)\s*\)')
 
 
 def _make_line_map(filename, stream=None):
     """
     >>> from StringIO import StringIO
     >>> _make_line_map('box',
-    ... StringIO('''// ###setline 3 "foo.bar"
+    ... StringIO('''// ###sourceLocation(file: "foo.bar", line: 3)
     ... line 2
     ... line 3
     ... line 4
-    ... // ###setline 20 "baz.txt"
+    ... // ###sourceLocation(file: "baz.txt", line: 20)
     ... line 6
     ... line 7
     ... '''))
@@ -43,7 +44,7 @@ def _make_line_map(filename, stream=None):
     for i, l in enumerate(input.readlines()):
         m = line_pattern.match(l)
         if m:
-            result.append((i + 1, m.group(2), int(m.group(1))))
+            result.append((i + 1, m.group(1), int(m.group(2))))
     return result
 
 _line_maps = {}

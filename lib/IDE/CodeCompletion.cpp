@@ -3728,11 +3728,9 @@ public:
       NameOffset = Printer.NameOffset.getValue();
     }
 
-    auto typeContext = CurrDeclContext->getInnermostTypeContext();
-    assert(typeContext &&
-           typeContext->getAsGenericTypeOrGenericTypeExtensionContext());
+    assert(CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext());
     Accessibility AccessibilityOfContext =
-        typeContext->getAsGenericTypeOrGenericTypeExtensionContext()
+        CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
             ->getFormalAccess();
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
@@ -3845,8 +3843,7 @@ public:
     if (hasFuncIntroducer || hasVarIntroducer || isKeywordSpecified("override"))
       return;
 
-    if (!CurrTy)
-      return;
+    assert(CurrTy);
     const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
     if (!CD)
       return;
@@ -3865,15 +3862,13 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    if (auto TypeContext = CurrDeclContext->getInnermostTypeContext()){
-      if (!TypeContext->getAsGenericTypeOrGenericTypeExtensionContext())
-        return;
+    if (!CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext())
+      return;
 
-      if (Type CurrTy = TypeContext->getDeclaredTypeInContext()) {
-        lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
-                                 TypeResolver.get());
-        addDesignatedInitializers(CurrTy);
-      }
+    if (Type CurrTy = CurrDeclContext->getDeclaredTypeInContext()) {
+      lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
+                               TypeResolver.get());
+      addDesignatedInitializers(CurrTy);
     }
   }
 };

@@ -2170,7 +2170,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       Status = makeParserCodeCompletionStatus();
       if (CodeCompletion) {
         // If we need to complete an override, collect the keywords already
-        // specifiedso that we do not duplicate them in code completion strings.
+        // specified so that we do not duplicate them in code completion
+        // strings.
         SmallVector<StringRef, 3> Keywords;
         switch (OrigTok.getKind()) {
         case tok::kw_func:

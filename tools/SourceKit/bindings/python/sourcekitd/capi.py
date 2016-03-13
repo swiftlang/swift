@@ -624,14 +624,6 @@ class Config(object):
 
         return library
 
-    def function_exists(self, name):
-        try:
-            getattr(self.lib, name)
-        except AttributeError:
-            return False
-
-        return True
-
 conf = Config()
 conf.lib.sourcekitd_initialize()
 
