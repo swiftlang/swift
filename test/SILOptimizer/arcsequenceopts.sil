@@ -2131,3 +2131,19 @@ bb0(%0 : $Builtin.NativeObject):
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
+
+// CHECK-LABEL: sil @in_guaranteed_always_known_safe_bu : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @in_guaranteed_always_known_safe_bu : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = load %0 : $*Builtin.NativeObject
+  strong_retain %1 : $Builtin.NativeObject
+  strong_retain %1 : $Builtin.NativeObject
+  %2 = function_ref @use : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_release %1 : $Builtin.NativeObject
+  return undef : $()
+}
