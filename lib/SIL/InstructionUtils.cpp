@@ -178,3 +178,32 @@ SILValue swift::stripExpectIntrinsic(SILValue V) {
     return V;
   return BI->getArguments()[0];
 }
+
+//===----------------------------------------------------------------------===//
+//                        DelayedInstructionDestructor
+//===----------------------------------------------------------------------===//
+
+DelayedInstructionDestroyer::~DelayedInstructionDestroyer() {
+  while (!Insts.empty()) {
+    SILInstruction *I = Insts.pop_back_val();
+    assert(I->getParent() == nullptr &&
+           "Instruction that was not removed from its parent?!");
+    Mod.deallocateInst(I);
+  }
+}
+
+void DelayedInstructionDestroyer::remove(SILInstruction *I) {
+  if (!Insts.insert(I))
+    return;
+  assert(I->getParent());
+  // Notify the delete handlers early that this instruction is essentially
+  // dead.
+  Mod.notifyDeleteHandlers(I);
+
+  // Remove \p I from its parent iplist.
+  I->removeFromParent();
+
+  // And then destroy the SILInstruction, but do not give up any of its
+  // memory. We do that in our destructor.
+  SILInstruction::destroy(I);
+}
