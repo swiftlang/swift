@@ -127,6 +127,7 @@ precommitTests = [
   "DictionaryBridge": run_DictionaryBridge,
   "DictionaryLiteral": run_DictionaryLiteral,
   "DictionaryRemove": run_DictionaryRemove,
+  "DictionaryRemoveOfObjects": run_DictionaryRemoveOfObjects,
   "DictionarySwap": run_DictionarySwap,
   "ErrorHandling": run_ErrorHandling,
   "GlobalClass": run_GlobalClass,
