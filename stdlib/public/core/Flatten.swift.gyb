@@ -148,93 +148,16 @@ public struct ${Index}<
   where
   ${constraints % {'Base': 'BaseElements.'}}
 > : ${indexConfromsToForTraversal(traversal)} {
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Precondition: The next value is representable.
-  /*
-  public func successor() -> ${Index} {
-    let nextInner = _inner!.successor()
-    if _fastPath(nextInner != _innerCollection!.endIndex) {
-      return ${Index}(_base, _outer, nextInner, _innerCollection)
-    }
-    for nextOuter in _outer.successor()..<_base.endIndex {
-      let nextInnerCollection = _base[nextOuter]
-      if !nextInnerCollection.isEmpty {
-        return ${Index}(
-          _base, nextOuter, nextInnerCollection.startIndex, nextInnerCollection)
-      }
-    }
-    return ${Index}(_endIndexOfFlattened: _base)
-  }
-  */
-
-  /// Returns the previous consecutive value before `self`.
-  ///
-  /// - Precondition: The previous value is representable.
-  /*
-  public func predecessor() -> ${Index} {
-    var prevOuter = _outer
-    var prevInnerCollection : BaseElements.Iterator.Element
-    if let ic = _innerCollection {
-      prevInnerCollection = ic
-    } else {
-      prevOuter._predecessorInPlace()
-      prevInnerCollection = _base[prevOuter]
-    }
-    var prevInner = _inner ?? prevInnerCollection.endIndex
-
-    while prevInner == prevInnerCollection.startIndex {
-      prevOuter._predecessorInPlace()
-      prevInnerCollection = _base[prevOuter]
-      prevInner = prevInnerCollection.endIndex
-    }
-
-    return ${Index}(
-      _base, prevOuter, prevInner.predecessor(), prevInnerCollection)
-  }
-  */
-
-  /// Construct the `startIndex` for a flattened view of `base`.
-  internal init(_startIndexOfFlattened base: BaseElements) {
-    fatalError("FIXME: swift-3-indexing-model")
-    /*
-    for outer in base.indices {
-      let innerCollection = base[outer]
-      if !innerCollection.isEmpty {
-        self._base = base
-        self._outer = outer
-        self._innerCollection = innerCollection
-        self._inner = innerCollection.startIndex
-        return
-      }
-    }
-    self = ${Index}(_endIndexOfFlattened: base)
-    */
-  }
-
-  /// Construct the `endIndex` for a flattened view of `base`.
-  internal init(_endIndexOfFlattened _base: BaseElements) {
-    self._base = _base
-    self._outer = _base.endIndex
-    self._inner = nil
-    self._innerCollection = nil
-  }
 
   internal init(
-    _ _base: BaseElements,
-    _ outer: BaseElements.Index,
-    _ inner: BaseElements.Iterator.Element.Index?,
-    _ innerCollection: BaseElements.Iterator.Element?) {
-    self._base = _base
-    self._outer = outer
+    _ _outer: BaseElements.Index,
+    _ inner: BaseElements.Iterator.Element.Index?) {
+    self._outer = _outer
     self._inner = inner
-    self._innerCollection = innerCollection
   }
   
-  internal let _base: BaseElements
   internal let _outer: BaseElements.Index
   internal let _inner: BaseElements.Iterator.Element.Index?
-  internal let _innerCollection: BaseElements.Iterator.Element?
 }
 
 @warn_unused_result
@@ -250,7 +173,20 @@ public func < <BaseElements> (
   lhs: ${Index}<BaseElements>, 
   rhs: ${Index}<BaseElements>
 ) -> Bool {
-  fatalError("FIXME: swift-3-indexing-model implement")
+  if lhs._outer != rhs._outer {
+    return lhs._outer < rhs._outer
+  }
+
+  if let lhsInner = lhs._inner, rhsInner = rhs._inner {
+    return lhsInner < rhsInner
+  }
+
+  // When combined, the two conditions above guarantee that both
+  // `_outer` indices are `_base.endIndex` and both `_inner` indices
+  // are `nil`, since `_inner` is `nil` iff `_outer == base.endIndex`.
+  _precondition(lhs._inner == nil && rhs._inner == nil)
+
+  return false
 }
 
 /// A flattened view of a base collection-of-collections.
@@ -304,7 +240,16 @@ public struct ${Collection}<
   ///
   /// In an empty collection, `startIndex == endIndex`.
   public var startIndex: Index {
-    return ${Index}(_startIndexOfFlattened: _base)
+    var outer = _base.startIndex
+    while outer != _base.endIndex {
+      let innerCollection = _base[outer]
+      if !innerCollection.isEmpty {
+        return ${Index}(outer, innerCollection.startIndex)
+      }
+      _base._nextInPlace(&outer)
+    }
+
+    return endIndex
   }
 
   /// The collection's "past the end" position.
@@ -313,40 +258,51 @@ public struct ${Collection}<
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   public var endIndex: Index {
-    return ${Index}(_endIndexOfFlattened: _base)
+    return ${Index}(_base.endIndex, nil)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func next(i: Index) -> Index {
-    fatalError("FIXME: swift-3-indexing-model implement")
+    // FIXME: swift-3-indexing-model: range checks?
+    let nextInner = _base[i._outer].next(i._inner!)
+    if _fastPath(nextInner != _base[i._outer].endIndex) {
+      return ${Index}(i._outer, nextInner)
+    }
+
+    var nextOuter = _base.next(i._outer)
+    while nextOuter != _base.endIndex {
+      let innerCollection = _base[nextOuter]
+      if !innerCollection.isEmpty {
+        return ${Index}(nextOuter, innerCollection.startIndex)
+      }
+      _base._nextInPlace(&nextOuter)
+    }
+
+    return endIndex
   }
 
 % if traversal == 'Bidirectional':
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func previous(i: Index) -> Index {
-    fatalError("FIXME: swift-3-indexing-model implement")
+    // FIXME: swift-3-indexing-model: range checks?
+    var prevOuter = i._outer
+    if prevOuter == _base.endIndex {
+      prevOuter = _base.previous(prevOuter)
+    }
+    var prevInnerCollection = _base[prevOuter]
+    var prevInner = i._inner ?? prevInnerCollection.endIndex
+
+    while prevInner == prevInnerCollection.startIndex {
+      prevOuter = _base.previous(prevOuter)
+      prevInnerCollection = _base[prevOuter]
+      prevInner = prevInnerCollection.endIndex
+    }
+
+    return ${Index}(prevOuter, prevInnerCollection.previous(prevInner))
   }
 % end
-  
-  // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
-    fatalError("FIXME: swift-3-indexing-model implement")
-  }
-  
-  // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
-    fatalError("FIXME: swift-3-indexing-model implement")
-  }
-
-  // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
-    fatalError("FIXME: swift-3-indexing-model implement")
-  }
 
   /// Access the element at `position`.
   ///
@@ -355,7 +311,7 @@ public struct ${Collection}<
   public subscript(
     position: Index
   ) -> Base.Iterator.Element.Iterator.Element {
-    return position._innerCollection![position._inner!]
+    return _base[position._outer][position._inner!]
   }
 
   // To return any estimate of the number of elements, we have to start
