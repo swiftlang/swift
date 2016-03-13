@@ -4309,10 +4309,15 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-void EnumElementDecl::computeType() {
+bool EnumElementDecl::computeType() {
   EnumDecl *ED = getParentEnum();
-
   Type resultTy = ED->getDeclaredTypeInContext();
+
+  if (resultTy->is<ErrorType>()) {
+    setType(resultTy);
+    return false;
+  }
+
   Type argTy = MetatypeType::get(resultTy);
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
@@ -4326,6 +4331,7 @@ void EnumElementDecl::computeType() {
     resultTy = FunctionType::get(argTy, resultTy);
 
   setType(resultTy);
+  return true;
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {
