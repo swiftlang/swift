@@ -983,6 +983,11 @@ namespace {
           if (base.getType().isAddress()) {
             baseAddress = base.getValue();
           } else {
+            AbstractionPattern origSelfType(materialized.genericSig,
+                                            materialized.origSelfType);
+            base = gen.emitSubstToOrigValue(loc, base, origSelfType,
+                                            baseFormalType);
+
             baseAddress = gen.emitTemporaryAllocation(loc, base.getType());
             gen.B.createStore(loc, base.getValue(), baseAddress);
           }
