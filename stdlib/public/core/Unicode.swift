@@ -42,12 +42,13 @@ public func == (
 
 /// A Unicode [encoding scheme](http://www.unicode.org/glossary/#character_encoding_scheme).
 ///
-/// Consists of an underlying [code unit](http://www.unicode.org/glossary/#code_unit) and functions to
-/// translate between sequences of these code units and [unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value).
+/// Consists of an underlying [code unit](http://www.unicode.org/glossary/#code_unit)
+/// and functions to translate between sequences of these code units and
+/// [unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value).
 public protocol UnicodeCodec {
 
-  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
-  /// encoding.
+  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit)
+  /// values for this encoding.
   associatedtype CodeUnit
 
   init()
@@ -64,8 +65,10 @@ public protocol UnicodeCodec {
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
   /// - Parameter next: A generator of code units to be decoded.  Repeated
-  /// calls to this method on the same instance should always reuse the same
-  /// generator.  Failing to do so will result in undefined behavior.
+  ///   calls to this method on the same instance should always pass the same
+  ///   generator and the generator or copies thereof should not be used for
+  ///   anything else between calls.  Failing to do so will yield unspecified
+  ///   results.
   mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(next: inout I) -> UnicodeDecodingResult
@@ -114,8 +117,10 @@ public struct UTF8 : UnicodeCodec {
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
   /// - Parameter next: A generator of code units to be decoded.  Repeated
-  /// calls to this method on the same instance should always reuse the same
-  /// generator.  Failing to do so will result in undefined behavior.
+  ///   calls to this method on the same instance should always pass the same
+  ///   generator and the generator or copies thereof should not be used for
+  ///   anything else between calls.  Failing to do so will yield unspecified
+  ///   results.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
     >(next: inout G) -> UnicodeDecodingResult {
@@ -183,17 +188,17 @@ public struct UTF8 : UnicodeCodec {
   ///
   /// - Returns:
   ///   - result: The decoded code point if the code unit sequence is
-  ///   well-formed; `nil` otherwise.
+  ///     well-formed; `nil` otherwise.
   ///   - length: The length of the code unit sequence in bytes if it is
-  ///   well-formed; otherwise the *maximal subpart of the ill-formed
-  ///   sequence* (Unicode 8.0.0, Ch 3.9, D93b), i.e. the number of leading
-  ///   code units that were valid or 1 in case none were valid.  Unicode
-  ///   recommends to skip these bytes bytes and replace them by a single
-  ///   replacement character (U+FFFD).
+  ///     well-formed; otherwise the *maximal subpart of the ill-formed
+  ///     sequence* (Unicode 8.0.0, Ch 3.9, D93b), i.e. the number of leading
+  ///     code units that were valid or 1 in case none were valid.  Unicode
+  ///     recommends to skip these bytes bytes and replace them by a single
+  ///     replacement character (U+FFFD).
   ///
   /// - Requires: There is at least one used byte in `buffer`, and the unused
-  /// space in `buffer` is filled with some value not matching the UTF-8
-  /// continuation byte form (`0b10xxxxxx`).
+  ///   space in `buffer` is filled with some value not matching the UTF-8
+  ///   continuation byte form (`0b10xxxxxx`).
   @warn_unused_result
   public // @testable
   static func _decodeOne(buffer: UInt32) -> (result: UInt32?, length: UInt8) {
@@ -320,8 +325,8 @@ public struct UTF8 : UnicodeCodec {
 
 /// A codec for [UTF-16](http://www.unicode.org/glossary/#UTF_16).
 public struct UTF16 : UnicodeCodec {
-  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
-  /// encoding.
+  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit)
+  /// values for this encoding.
   public typealias CodeUnit = UInt16
 
   public init() {}
@@ -348,8 +353,10 @@ public struct UTF16 : UnicodeCodec {
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
   /// - Parameter next: A generator of code units to be decoded.  Repeated
-  /// calls to this method on the same instance should always reuse the same
-  /// generator.  Failing to do so will result in undefined behavior.
+  ///   calls to this method on the same instance should always pass the same
+  ///   generator and the generator or copies thereof should not be used for
+  ///   anything else between calls.  Failing to do so will yield unspecified
+  ///   results.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(input: inout I) -> UnicodeDecodingResult {
@@ -465,8 +472,8 @@ public struct UTF16 : UnicodeCodec {
 
 /// A codec for [UTF-32](http://www.unicode.org/glossary/#UTF_32).
 public struct UTF32 : UnicodeCodec {
-  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
-  /// encoding.
+  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit)
+  /// values for this encoding.
   public typealias CodeUnit = UInt32
 
   public init() {}
@@ -483,8 +490,10 @@ public struct UTF32 : UnicodeCodec {
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
   /// - Parameter next: A generator of code units to be decoded.  Repeated
-  /// calls to this method on the same instance should always reuse the same
-  /// generator.  Failing to do so will result in undefined behavior.
+  ///   calls to this method on the same instance should always pass the same
+  ///   generator and the generator or copies thereof should not be used for
+  ///   anything else between calls.  Failing to do so will yield unspecified
+  ///   results.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(input: inout I) -> UnicodeDecodingResult {
@@ -515,7 +524,7 @@ public struct UTF32 : UnicodeCodec {
 /// Translate `input`, in the given `InputEncoding`, into `output`, in
 /// the given `OutputEncoding`.
 ///
-/// - parameter stopOnError: Causes encoding to stop when an encoding
+/// - Parameter stopOnError: Causes encoding to stop when an encoding
 ///   error is detected in `input`, if `true`.  Otherwise, U+FFFD
 ///   replacement characters are inserted for each detected error.
 public func transcode<
@@ -697,8 +706,8 @@ extension UTF16 {
     return x.value <= 0xFFFF ? 1 : 2
   }
 
-  /// Returns the high surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
-  /// `x`.
+  /// Returns the high surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair)
+  /// representing `x`.
   ///
   /// - Precondition: `width(x) == 2`.
   @warn_unused_result
@@ -707,8 +716,8 @@ extension UTF16 {
     return UTF16.CodeUnit((x.value - 0x1_0000) >> (10 as UInt32)) + 0xD800
   }
 
-  /// Returns the low surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
-  /// `x`.
+  /// Returns the low surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair)
+  /// representing `x`.
   ///
   /// - Precondition: `width(x) == 2`.
   @warn_unused_result
