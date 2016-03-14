@@ -1709,35 +1709,20 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   // Don't bother if the declaration is invalid.
   if (storage->isInvalid()) return;
 
-  // We only need materializeForSet in polymorphic contexts:
+  // We only need materializeForSet in type contexts.
   NominalTypeDecl *container = storage->getDeclContext()
       ->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!container) return;
 
-  //   - in non-ObjC protocols, but not protocol extensions.
+  // Requirements of ObjC protocols don't need this.
   if (auto protocol = dyn_cast<ProtocolDecl>(container)) {
     if (protocol->isObjC()) return;
-    if (storage->getDeclContext()->getAsProtocolExtensionContext()) return;
 
-  //   - in classes when the storage decl is not final and does
-  //     not override a decl that requires a materializeForSet
-  } else if (isa<ClassDecl>(container)) {
-    if (storage->isFinal()) {
-      auto overridden = storage->getOverriddenDecl();
-      if (!overridden || !overridden->getMaterializeForSetFunc())
-        return;
-    }
-
-  // Enums don't need this.
-  } else if (isa<EnumDecl>(container)) {
-    return;
-
-  // Structs imported by Clang don't need this, because we can
+  // Types imported by Clang don't need this, because we can
   // synthesize it later.
   } else {
-    assert(isa<StructDecl>(container));
-    if (container->hasClangNode())
-      return;
+    assert(isa<NominalTypeDecl>(container));
+    if (container->hasClangNode()) return;
   }
 
   addMaterializeForSet(storage, TC);

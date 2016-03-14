@@ -17,3 +17,10 @@ public struct FishAndChips {
     nonmutating set {}
   }
 }
+
+final class Beer {
+  var abv: Int {
+    get { return 7 }
+    set { }
+  }
+}
