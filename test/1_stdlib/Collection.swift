@@ -48,7 +48,7 @@ public struct PermutationGenerator<
   }
 }
 
-struct X : Collection {
+struct X : BidirectionalCollection {
   typealias Element = String.CharacterView.Iterator.Element
   typealias Index = String.Index
   var msg: String
@@ -62,6 +62,7 @@ struct X : Collection {
   }
   subscript(i: Index) -> Element { return msg[i] }
   func next(i: Index) -> Index { return msg.next(i) }
+  func previous(i: Index) -> Index { return msg.previous(i) }
 }
 
 var foobar = X("foobar")
@@ -84,16 +85,16 @@ for a in PermutationGenerator(elements: foobar, indices: r) {
 print("")
 
 func isPalindrome0<
-  S : Collection
+  S : BidirectionalCollection
   where
-  S.Index : BidirectionalIndex,
-  S.Iterator.Element : Equatable
+  S.Iterator.Element : Equatable,
+  S.Indices.Iterator.Element == S.Index
 >(seq: S) -> Bool {
   typealias Index = S.Index
 
   let a = seq.indices
-  var i = seq.indices
-  var ir = i.lazy.reversed()
+  let i = seq.indices
+  let ir = i.lazy.reversed()
   var b = ir.makeIterator()
   for i in a {
     if seq[i] != seq[b.next()!] {
@@ -109,13 +110,13 @@ print(isPalindrome0(X("GoHangaSalamiImaLasagneHoG")))
 print(isPalindrome0(X("GoHangaSalamiimalaSagnaHoG")))
 
 func isPalindrome1<
-  S : Collection
+  S : BidirectionalCollection
   where
-  S.Index : BidirectionalIndex,
-  S.Iterator.Element : Equatable
+  S.Iterator.Element : Equatable,
+  S.Indices.Iterator.Element == S.Index
 >(seq: S) -> Bool {
 
-  var a = PermutationGenerator(elements: seq, indices: seq.indices)
+  let a = PermutationGenerator(elements: seq, indices: seq.indices)
   var b = seq.lazy.reversed().makeIterator()
   for nextChar in a {
     if nextChar != b.next()! {
@@ -126,9 +127,8 @@ func isPalindrome1<
 }
 
 func isPalindrome1_5<
-  S: Collection
+  S: BidirectionalCollection
   where
-  S.Index: BidirectionalIndex,
   S.Iterator.Element == S.Iterator.Element,
   S.Iterator.Element: Equatable
 >(seq: S) -> Bool {
@@ -188,17 +188,17 @@ print(isPalindrome2(X("ZerimarORamireZ")))
 print(isPalindrome2(X("Zerimar-O-ramireZ")))
 
 func isPalindrome4<
-  S: Collection
+  S: BidirectionalCollection
   where
-  S.Index : BidirectionalIndex,
-  S.Iterator.Element : Equatable
+  S.Iterator.Element : Equatable,
+  S.Indices.Iterator.Element == S.Index
 >(seq: S) -> Bool {
   typealias Index = S.Index
 
-  var a = PermutationGenerator(elements: seq, indices: seq.indices)
+  let a = PermutationGenerator(elements: seq, indices: seq.indices)
   // FIXME: separate ri from the expression below pending
   // <rdar://problem/15772601> Type checking failure
-  var i = seq.indices
+  let i = seq.indices
   let ri = i.lazy.reversed()
   var b = PermutationGenerator(elements: seq, indices: ri)
   for nextChar in a {
