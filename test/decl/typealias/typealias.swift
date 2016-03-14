@@ -30,8 +30,7 @@ struct MyType<TyA, TyB> {
 protocol P {
   associatedtype X<T>  // expected-error {{associated types may not have a generic parameter list}}
   
-  // expected-error @+1 {{associated types may not have a generic parameter list}}
-  typealias Y<T>       // expected-warning {{use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead}}
+  typealias Y<T>       // expected-error {{expected '=' in typealias declaration}}
 }
 
 typealias basicTypealias = Int
@@ -122,3 +121,44 @@ extension A<Float,Int> {}  // expected-error {{constrained extension must be dec
 extension C<T> {}  // expected-error {{use of undeclared type 'T'}}
 extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
 
+
+// Allow typealias inside protocol, but don't allow it in where clauses (at least not yet)
+protocol Col {
+  associatedtype Elem
+  var elem: Elem { get }
+}
+
+protocol CB {
+  associatedtype C : Col
+  typealias E = C.Elem
+  
+  func setIt(element: E)
+}
+
+func go1<T : CB, U : Col where U.Elem == T.E>(col: U, builder: T) {
+  builder.setIt(col.elem)
+}
+func go2<T : CB, U : Col where U.Elem == T.C.Elem>(col: U, builder: T) { // OK
+  builder.setIt(col.elem)
+}
+
+// Specific diagnosis for trying to use complex typealiases in generic constraints
+protocol P1 {
+    associatedtype A
+    typealias F = A -> ()
+}
+
+protocol P2 {
+    associatedtype B
+}
+
+func go3<T : P1, U : P2 where T.F == U.B>(x: T) -> U { // expected-error {{typealias 'F' is too complex to be used as a generic constraint; use an associatedtype instead}} expected-error {{'F' is not a member type of 'T'}}
+}
+
+// Specific diagnosis for things that look like Swift 2.x typealiases
+protocol P3 {
+  typealias T // expected-error {{typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
+  typealias U : P2 // expected-error {{typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
+  
+  associatedtype V : P2 = // expected-error {{expected type in associatedtype declaration}}
+}

@@ -174,6 +174,16 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     return DependentMemberType::get(baseTy, assocType, TC.Context);
   }
 
+  // If the nested type comes from a type alias, use either the alias's
+  // concrete type, or resolve its components down to another dependent member.
+  if (auto alias = nestedPA->getTypeAliasDecl()) {
+    if (nestedPA->isConcreteType())
+      return nestedPA->getConcreteType();
+
+    return TC.substMemberTypeWithBase(DC->getParentModule(), alias,
+                                      baseTy, true);
+  }
+  
   Identifier name = ref->getIdentifier();
   SourceLoc nameLoc = ref->getIdLoc();
 

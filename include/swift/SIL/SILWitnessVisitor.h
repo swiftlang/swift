@@ -100,6 +100,10 @@ public:
     ProtocolType::canonicalizeProtocols(protos);
     asDerived().addAssociatedType(td, protos);
   }
+    
+  void visitTypeAliasDecl(TypeAliasDecl *tad) {
+    // We don't care about these by themselves for witnesses.
+  }
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
     // We only care about the contained VarDecls.

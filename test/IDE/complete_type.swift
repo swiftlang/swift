@@ -648,7 +648,7 @@ func resyncParser1() {}
 //===---
 
 protocol AssocType1 {
-  typealias AssocType = #^TYPE_IN_ASSOC_TYPE_1^#
+  associatedtype AssocType = #^TYPE_IN_ASSOC_TYPE_1^#
 }
 
 //===---
@@ -656,7 +656,7 @@ protocol AssocType1 {
 //===---
 
 protocol AssocType1 {
-  typealias AssocType : #^TYPE_IN_ASSOC_TYPE_INHERITANCE_1^#
+  associatedtype AssocType : #^TYPE_IN_ASSOC_TYPE_INHERITANCE_1^#
 }
 
 //===---
