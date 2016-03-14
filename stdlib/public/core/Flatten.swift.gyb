@@ -23,8 +23,8 @@ public struct FlattenIterator<
 > : IteratorProtocol, Sequence {
 
   /// Construct around a `base` iterator.
-  internal init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -76,15 +76,15 @@ public struct FlattenSequence<
   /// Creates a concatenation of the elements of the elements of `base`.
   ///
   /// - Complexity: O(1)
-  internal init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func makeIterator() -> FlattenIterator<Base.Iterator> {
-    return FlattenIterator(_base.makeIterator())
+    return FlattenIterator(_base: _base.makeIterator())
   }
   
   internal var _base: Base
@@ -94,7 +94,7 @@ extension Sequence where Iterator.Element : Sequence {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
   public func flatten() -> FlattenSequence<Self> {
-    return FlattenSequence(self)
+    return FlattenSequence(_base: self)
   }
 }
 
@@ -108,7 +108,7 @@ extension LazySequenceProtocol
   public func flatten() -> LazySequence<
     FlattenSequence<Elements>
   > {
-    return FlattenSequence(elements).lazy
+    return FlattenSequence(_base: elements).lazy
   }
 }
 
@@ -233,7 +233,7 @@ public struct ${Collection}<
   ///
   /// - Complexity: O(1).
   public func makeIterator() -> FlattenIterator<Base.Iterator> {
-    return FlattenIterator(_base.makeIterator())
+    return FlattenIterator(_base: _base.makeIterator())
   }
 
   /// The position of the first element in a non-empty collection.
