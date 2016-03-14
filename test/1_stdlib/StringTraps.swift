@@ -26,10 +26,10 @@ StringTraps.test("startIndex/predecessor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = i.successor()
-  i = i.predecessor()
+  i = s.next(i)
+  i = s.previous(i)
   expectCrashLater()
-  i = i.predecessor()
+  i = s.previous(i)
 }
 
 StringTraps.test("endIndex/successor")
@@ -39,11 +39,11 @@ StringTraps.test("endIndex/successor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.next(i)
+  i = s.next(i)
+  i = s.next(i)
   expectCrashLater()
-  i = i.successor()
+  i = s.next(i)
 }
 
 StringTraps.test("subscript(_:)/endIndex")
@@ -53,9 +53,9 @@ StringTraps.test("subscript(_:)/endIndex")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.next(i)
+  i = s.next(i)
+  i = s.next(i)
   expectCrashLater()
   s[i]
 }
@@ -67,11 +67,11 @@ StringTraps.test("UTF8ViewEndIndexSuccessor")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.utf8.next(i)
+  i = s.utf8.next(i)
+  i = s.utf8.next(i)
   expectCrashLater()
-  i = i.successor()
+  i = s.utf8.next(i)
 }
 
 StringTraps.test("UTF8ViewSubscript/endIndex")
@@ -81,9 +81,9 @@ StringTraps.test("UTF8ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.utf8.next(i)
+  i = s.utf8.next(i)
+  i = s.utf8.next(i)
   expectCrashLater()
   s.utf8[i]
 }
@@ -95,7 +95,7 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = i.predecessor()
+  i = s.utf16.previous(i)
   expectCrashLater()
   s.utf16[i]
 }
@@ -107,9 +107,9 @@ StringTraps.test("UTF16ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.utf16.next(i)
+  i = s.utf16.next(i)
+  i = s.utf16.next(i)
   expectCrashLater()
   s.utf16[i]
 }

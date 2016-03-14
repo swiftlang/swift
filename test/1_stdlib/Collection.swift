@@ -61,6 +61,7 @@ struct X : Collection {
     return msg.endIndex
   }
   subscript(i: Index) -> Element { return msg[i] }
+  func next(i: Index) -> Index { return msg.next(i) }
 }
 
 var foobar = X("foobar")
@@ -152,25 +153,24 @@ print(isPalindrome1_5(X("FleetoMeRemoteelF")))
 print(isPalindrome1_5(X("FleetoMeReMoteelF")))
 
 // Finally, one that actually uses indexing to do half as much work.
-// BidirectionalIndex traversal finally pays off!
+// BidirectionalCollection traversal finally pays off!
 func isPalindrome2<
-  S: Collection
+  S: BidirectionalCollection
   where
-  S.Index : BidirectionalIndex,
   S.Iterator.Element: Equatable
 >(seq: S) -> Bool {
 
   var b = seq.startIndex, e = seq.endIndex
 
   while (b != e) {
-    e = e.predecessor()
+    e = seq.previous(e)
     if (b == e) {
       break
     }
     if seq[b] != seq[e] {
       return false
     }
-    b = b.successor()
+    b = seq.next(b)
   }
   return true
 }

@@ -342,7 +342,7 @@ protocol MySeq : _MySeq {
 }
 
 protocol _MyCollection : _MySeq {
-  associatedtype Index : ForwardIndex
+  associatedtype Index : Strideable
 
   var myStartIndex : Index { get }
   var myEndIndex : Index { get }
@@ -361,7 +361,7 @@ struct MyIndexedIterator<C : _MyCollection> : IteratorProtocol {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    index = index.successor()
+    index = index.advanced(by: 1)
     return result
   }
 }
@@ -373,7 +373,7 @@ struct OtherIndexedIterator<C : _MyCollection> : IteratorProtocol {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    index = index.successor()
+    index = index.advanced(by: 1)
     return result
   }
 }

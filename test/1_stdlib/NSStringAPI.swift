@@ -358,13 +358,13 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
 
   do {
     let s = "abcd"
-    let r = s.startIndex.successor()..<s.endIndex
+    let r = s.next(s.startIndex)..<s.endIndex
     expectEqual(NSComparisonResult.orderedSame,
         s.compare("bcd", range: r))
   }
   do {
     let s = "абвг"
-    let r = s.startIndex.successor()..<s.endIndex
+    let r = s.next(s.startIndex)..<s.endIndex
     expectEqual(NSComparisonResult.orderedSame,
         s.compare("бвг", range: r))
   }
@@ -533,8 +533,8 @@ NSStringAPIs.test("enumerateLines(_:)") {
 
 NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
   let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
-  let startIndex = s.startIndex.advanced(by: 5)
-  let endIndex = s.startIndex.advanced(by: 62)
+  let startIndex = s.advance(s.startIndex, by: 5)
+  let endIndex = s.advance(s.startIndex, by: 62)
   var tags: [String] = []
   var tokens: [String] = []
   var sentences: [String] = []
@@ -562,8 +562,8 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
 
 NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
   let s = "え\u{304b}\u{3099}お\u{263a}\u{fe0f}😀😊"
-  let startIndex = s.startIndex.advanced(by: 1)
-  let endIndex = s.startIndex.advanced(by: 5)
+  let startIndex = s.advance(s.startIndex, by: 1)
+  let endIndex = s.advance(s.startIndex, by: 5)
   do {
     var substrings: [String] = []
     s.enumerateSubstrings(in: startIndex..<endIndex,
@@ -600,8 +600,8 @@ NSStringAPIs.test("fastestEncoding") {
 
 NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remaining:)") {
   let s = "abc абв def где gh жз zzz"
-  let startIndex = s.startIndex.advanced(by: 8)
-  let endIndex = s.startIndex.advanced(by: 22)
+  let startIndex = s.advance(s.startIndex, by: 8)
+  let endIndex = s.advance(s.startIndex, by: 22)
   do {
     // 'maxLength' is limiting.
     let bufferLength = 100
@@ -619,7 +619,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
     expectEqual(11, usedLength)
-    expectEqual(remainingRange.startIndex, startIndex.advanced(by: 8))
+    expectEqual(remainingRange.startIndex, s.advance(startIndex, by: 8))
     expectEqual(remainingRange.endIndex, endIndex)
   }
   do {
@@ -640,7 +640,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
     expectEqual(4, usedLength)
-    expectEqual(remainingRange.startIndex, startIndex.advanced(by: 4))
+    expectEqual(remainingRange.startIndex, s.advance(startIndex, by: 4))
     expectEqual(remainingRange.endIndex, endIndex)
   }
   do {
@@ -680,7 +680,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
     expectEqual(4, usedLength)
-    expectEqual(remainingRange.startIndex, startIndex.advanced(by: 4))
+    expectEqual(remainingRange.startIndex, s.advance(startIndex, by: 4))
     expectEqual(remainingRange.endIndex, endIndex)
   }
 }
@@ -733,7 +733,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
 
 NSStringAPIs.test("getLineStart(_:end:contentsEnd:forRange:)") {
   let s = "Глокая куздра\nштеко будланула\nбокра и кудрячит\nбокрёнка."
-  let r = s.startIndex.advanced(by: 16)..<s.startIndex.advanced(by: 35)
+  let r = s.advance(s.startIndex, by: 16)..<s.advance(s.startIndex, by: 35)
   do {
     var outStartIndex = s.startIndex
     var outLineEndIndex = s.startIndex
@@ -749,7 +749,7 @@ NSStringAPIs.test("getLineStart(_:end:contentsEnd:forRange:)") {
 
 NSStringAPIs.test("getParagraphStart(_:end:contentsEnd:forRange:)") {
   let s = "Глокая куздра\nштеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n Абв."
-  let r = s.startIndex.advanced(by: 16)..<s.startIndex.advanced(by: 35)
+  let r = s.advance(s.startIndex, by: 16)..<s.advance(s.startIndex, by: 35)
   do {
     var outStartIndex = s.startIndex
     var outEndIndex = s.startIndex
@@ -878,7 +878,7 @@ NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
 
 NSStringAPIs.test("lineRangeFor(_:)") {
   let s = "Глокая куздра\nштеко будланула\nбокра и кудрячит\nбокрёнка."
-  let r = s.startIndex.advanced(by: 16)..<s.startIndex.advanced(by: 35)
+  let r = s.advance(s.startIndex, by: 16)..<s.advance(s.startIndex, by: 35)
   do {
     let result = s.lineRange(for: r)
     expectEqual("штеко будланула\nбокра и кудрячит\n", s[result])
@@ -887,8 +887,8 @@ NSStringAPIs.test("lineRangeFor(_:)") {
 
 NSStringAPIs.test("linguisticTagsIn(_:scheme:options:orthography:tokenRanges:)") {
   let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
-  let startIndex = s.startIndex.advanced(by: 5)
-  let endIndex = s.startIndex.advanced(by: 17)
+  let startIndex = s.advance(s.startIndex, by: 5)
+  let endIndex = s.advance(s.startIndex, by: 17)
   var tokenRanges: [Range<String.Index>] = []
   var tags = s.linguisticTags(in: startIndex..<endIndex,
       scheme: NSLinguisticTagSchemeTokenType,
@@ -1044,7 +1044,7 @@ NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
 
 NSStringAPIs.test("paragraphRangeFor(_:)") {
   let s = "Глокая куздра\nштеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n Абв."
-  let r = s.startIndex.advanced(by: 16)..<s.startIndex.advanced(by: 35)
+  let r = s.advance(s.startIndex, by: 16)..<s.advance(s.startIndex, by: 35)
   do {
     let result = s.paragraphRange(for: r)
     expectEqual("штеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n", s[result])
@@ -1100,8 +1100,8 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
     do {
       let s = "Глокая куздра"
       let r = s.rangeOfCharacter(from: charset)!
-      expectEqual(s.startIndex.advanced(by: 4), r.startIndex)
-      expectEqual(s.startIndex.advanced(by: 5), r.endIndex)
+      expectEqual(s.advance(s.startIndex, by: 4), r.startIndex)
+      expectEqual(s.advance(s.startIndex, by: 5), r.endIndex)
     }
     do {
       expectEmpty("клмн".rangeOfCharacter(from: charset))
@@ -1110,15 +1110,15 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
       let s = "абвклмнабвклмн"
       let r = s.rangeOfCharacter(from: charset,
           options: .backwardsSearch)!
-      expectEqual(s.startIndex.advanced(by: 9), r.startIndex)
-      expectEqual(s.startIndex.advanced(by: 10), r.endIndex)
+      expectEqual(s.advance(s.startIndex, by: 9), r.startIndex)
+      expectEqual(s.advance(s.startIndex, by: 10), r.endIndex)
     }
     do {
       let s = "абвклмнабв"
       let r = s.rangeOfCharacter(from: charset,
-          range: s.startIndex.advanced(by: 3)..<s.endIndex)!
-      expectEqual(s.startIndex.advanced(by: 7), r.startIndex)
-      expectEqual(s.startIndex.advanced(by: 8), r.endIndex)
+          range: s.advance(s.startIndex, by: 3)..<s.endIndex)!
+      expectEqual(s.advance(s.startIndex, by: 7), r.startIndex)
+      expectEqual(s.advance(s.startIndex, by: 8), r.endIndex)
     }
   }
 
@@ -1149,20 +1149,20 @@ NSStringAPIs.test("rangeOfComposedCharacterSequence(at:)") {
   expectEqual("\u{1F601}", s[s.rangeOfComposedCharacterSequence(
       at: s.startIndex)])
   expectEqual("a", s[s.rangeOfComposedCharacterSequence(
-      at: s.startIndex.advanced(by: 1))])
+      at: s.advance(s.startIndex, by: 1))])
   expectEqual("\u{305f}\u{3099}", s[s.rangeOfComposedCharacterSequence(
-      at: s.startIndex.advanced(by: 5))])
+      at: s.advance(s.startIndex, by: 5))])
   expectEqual(" ", s[s.rangeOfComposedCharacterSequence(
-      at: s.startIndex.advanced(by: 6))])
+      at: s.advance(s.startIndex, by: 6))])
 }
 
 NSStringAPIs.test("rangeOfComposedCharacterSequences(for:)") {
   let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
 
   expectEqual("\u{1F601}a", s[s.rangeOfComposedCharacterSequences(
-      for: s.startIndex..<s.startIndex.advanced(by: 2))])
+      for: s.startIndex..<s.advance(s.startIndex, by: 2))])
   expectEqual("せ\u{3099}そ\u{3099}", s[s.rangeOfComposedCharacterSequences(
-      for: s.startIndex.advanced(by: 8)..<s.startIndex.advanced(by: 10))])
+      for: s.advance(s.startIndex, by: 8)..<s.advance(s.startIndex, by: 10))])
 }
 
 func toIntRange(
@@ -1171,8 +1171,8 @@ func toIntRange(
   guard let range = maybeRange else { return nil }
 
   return
-    string.startIndex.distance(to: range.startIndex) ..<
-    string.startIndex.distance(to: range.endIndex)
+    string.distance(from: string.startIndex, to: range.startIndex) ..<
+    string.distance(from: string.startIndex, to: range.endIndex)
 }
 
 NSStringAPIs.test("range(of:options:range:locale:)") {
@@ -1478,35 +1478,35 @@ NSStringAPIs.test("replacingCharacters(in:with:)") {
   expectEqual(
     "す\u{3099}せ\u{3099}そ\u{3099}",
     s.replacingCharacters(
-      in: s.startIndex..<s.startIndex.advanced(by: 7), with: ""))
+      in: s.startIndex..<s.advance(s.startIndex, by: 7), with: ""))
   expectEqual(
     "zzzす\u{3099}せ\u{3099}そ\u{3099}",
     s.replacingCharacters(
-      in: s.startIndex..<s.startIndex.advanced(by: 7), with: "zzz"))
+      in: s.startIndex..<s.advance(s.startIndex, by: 7), with: "zzz"))
   expectEqual(
     "\u{1F602}す\u{3099}せ\u{3099}そ\u{3099}",
     s.replacingCharacters(
-      in: s.startIndex..<s.startIndex.advanced(by: 7), with: "\u{1F602}"))
+      in: s.startIndex..<s.advance(s.startIndex, by: 7), with: "\u{1F602}"))
 
   expectEqual("\u{1F601}", s.replacingCharacters(
-    in: s.startIndex.successor()..<s.endIndex, with: ""))
+    in: s.next(s.startIndex)..<s.endIndex, with: ""))
   expectEqual("\u{1F601}zzz", s.replacingCharacters(
-    in: s.startIndex.successor()..<s.endIndex, with: "zzz"))
+    in: s.next(s.startIndex)..<s.endIndex, with: "zzz"))
   expectEqual("\u{1F601}\u{1F602}", s.replacingCharacters(
-    in: s.startIndex.successor()..<s.endIndex, with: "\u{1F602}"))
+    in: s.next(s.startIndex)..<s.endIndex, with: "\u{1F602}"))
 
   expectEqual(
     "\u{1F601}aす\u{3099}せ\u{3099}そ\u{3099}",
     s.replacingCharacters(
-      in: s.startIndex.advanced(by: 2)..<s.startIndex.advanced(by: 7), with: ""))
+      in: s.advance(s.startIndex, by: 2)..<s.advance(s.startIndex, by: 7), with: ""))
   expectEqual(
     "\u{1F601}azzzす\u{3099}せ\u{3099}そ\u{3099}",
     s.replacingCharacters(
-      in: s.startIndex.advanced(by: 2)..<s.startIndex.advanced(by: 7), with: "zzz"))
+      in: s.advance(s.startIndex, by: 2)..<s.advance(s.startIndex, by: 7), with: "zzz"))
   expectEqual(
     "\u{1F601}a\u{1F602}す\u{3099}せ\u{3099}そ\u{3099}",
     s.replacingCharacters(
-      in: s.startIndex.advanced(by: 2)..<s.startIndex.advanced(by: 7),
+      in: s.advance(s.startIndex, by: 2)..<s.advance(s.startIndex, by: 7),
       with: "\u{1F602}"))
 }
 
@@ -1575,12 +1575,12 @@ NSStringAPIs.test("replacingOccurrences(of:with:options:range:)") {
     s.replacingOccurrences(
       of: "\u{1F601}", with: "\u{1F602}\u{1F603}",
       options: NSStringCompareOptions.literalSearch,
-      range: s.startIndex..<s.startIndex.advanced(by: 1)))
+      range: s.startIndex..<s.advance(s.startIndex, by: 1)))
 
   expectEqual(s, s.replacingOccurrences(
       of: "\u{1F601}", with: "\u{1F602}\u{1F603}",
       options: NSStringCompareOptions.literalSearch,
-      range: s.startIndex.advanced(by: 1)..<s.startIndex.advanced(by: 3)))
+      range: s.advance(s.startIndex, by: 1)..<s.advance(s.startIndex, by: 3)))
 }
 
 NSStringAPIs.test("replacingPercentEscapes(usingEncoding:)") {
@@ -1666,8 +1666,8 @@ NSStringAPIs.test("substring(from:)") {
 
   expectEqual(s, s.substring(from: s.startIndex))
   expectEqual("せ\u{3099}そ\u{3099}",
-      s.substring(from: s.startIndex.advanced(by: 8)))
-  expectEqual("", s.substring(from: s.startIndex.advanced(by: 10)))
+      s.substring(from: s.advance(s.startIndex, by: 8)))
+  expectEqual("", s.substring(from: s.advance(s.startIndex, by: 10)))
 }
 
 NSStringAPIs.test("substring(to:)") {
@@ -1675,8 +1675,8 @@ NSStringAPIs.test("substring(to:)") {
 
   expectEqual("", s.substring(to: s.startIndex))
   expectEqual("\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}",
-      s.substring(to: s.startIndex.advanced(by: 8)))
-  expectEqual(s, s.substring(to: s.startIndex.advanced(by: 10)))
+      s.substring(to: s.advance(s.startIndex, by: 8)))
+  expectEqual(s, s.substring(to: s.advance(s.startIndex, by: 10)))
 }
 
 NSStringAPIs.test("substring(with:)") {
@@ -1685,12 +1685,12 @@ NSStringAPIs.test("substring(with:)") {
   expectEqual("", s.substring(with: s.startIndex..<s.startIndex))
   expectEqual(
     "",
-    s.substring(with: s.startIndex.advanced(by: 1)..<s.startIndex.advanced(by: 1)))
+    s.substring(with: s.advance(s.startIndex, by: 1)..<s.advance(s.startIndex, by: 1)))
   expectEqual("", s.substring(with: s.endIndex..<s.endIndex))
   expectEqual(s, s.substring(with: s.startIndex..<s.endIndex))
   expectEqual(
     "さ\u{3099}し\u{3099}す\u{3099}",
-    s.substring(with: s.startIndex.advanced(by: 5)..<s.startIndex.advanced(by: 8)))
+    s.substring(with: s.advance(s.startIndex, by: 5)..<s.advance(s.startIndex, by: 8)))
 }
 
 NSStringAPIs.test("localizedUppercase") {
@@ -1892,7 +1892,7 @@ NSStringAPIs.test("CompareStringsWithUnpairedSurrogates")
   let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
 
   expectEqual("\u{fffd}\u{1f602}\u{fffd}",
-    acceptor[donor.startIndex.advanced(by: 1)..<donor.startIndex.advanced(by: 5)])
+    acceptor[donor.advance(donor.startIndex, by: 1)..<donor.advance(donor.startIndex, by: 5)])
 }
 
 NSStringAPIs.test("copy construction") {

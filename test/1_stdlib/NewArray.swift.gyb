@@ -26,8 +26,7 @@ import StdlibUnittest
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-final class X : ForwardIndex, Comparable, CustomStringConvertible, 
-                IntegerLiteralConvertible 
+final class X : Comparable, CustomStringConvertible, IntegerLiteralConvertible 
 {
   required init(_ value: Int) {
     xCount += 1
@@ -48,7 +47,7 @@ final class X : ForwardIndex, Comparable, CustomStringConvertible,
   }
 
   func successor() -> Self {
-    return self.dynamicType.init(self.value.successor())
+    return self.dynamicType.init(self.value + 1)
   }
   
   convenience init(integerLiteral value: Int) {
@@ -139,7 +138,7 @@ func test<
   let bufferId2 = checkReallocation(x, bufferId1, true)
 
   let y = x
-  x[x.endIndex.predecessor()] = 17
+  x[x.previous(x.endIndex)] = 17
   let bufferId3 = checkReallocation(x, bufferId2, true)
   checkEqual(x, y, false)
 

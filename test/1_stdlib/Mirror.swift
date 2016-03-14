@@ -62,15 +62,15 @@ func find(substring: String, within domain: String) -> String.Index? {
 
   if (domainCount < substringCount) { return nil }
   var sliceStart = domain.startIndex
-  var sliceEnd = domain.startIndex.advanced(by: substringCount)
+  var sliceEnd = domain.advance(sliceStart, by: substringCount)
   var i = 0
   while true {
     if domain[sliceStart..<sliceEnd] == substring {
       return sliceStart
     }
     if i == domainCount - substringCount { break }
-    sliceStart = sliceStart.successor()
-    sliceEnd = sliceEnd.successor()
+    sliceStart = domain.next(sliceStart)
+    sliceEnd = domain.next(sliceEnd)
     i += 1
   }
   return nil

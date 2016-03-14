@@ -72,7 +72,10 @@ OptionalTests.test("nil comparison") {
   }
 
   expectEqual("forced extraction: 1.", "forced extraction: \(x!).")
-  expectEqual("forced extraction use: 2.", "forced extraction use: \(x!.successor()).")
+  expectEqual(
+    "forced extraction use: 2.",
+    "forced extraction use: \(x!.advanced(by: 1))."
+  )
 }
 
 func testRelation(p: (Int?, Int?) -> Bool) -> [Bool] {
