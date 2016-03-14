@@ -12,7 +12,7 @@
 
 // TODO: swift-3-indexing-model - this conformed to ForwardIndex but not sure why it did.
 
-public final class LifetimeTracked : Equatable, CustomStringConvertible {
+public final class LifetimeTracked {
   public init(_ value: Int, identity: Int = 0) {
     LifetimeTracked.instances += 1
     LifetimeTracked._nextSerialNumber += 1
@@ -27,11 +27,6 @@ public final class LifetimeTracked : Equatable, CustomStringConvertible {
     serialNumber = -serialNumber
   }
 
-  public var description: String {
-    assert(serialNumber > 0, "dead Tracked!")
-    return value.description
-  }
-
   public static var instances: Int = 0
   internal static var _nextSerialNumber = 0
   
@@ -40,6 +35,30 @@ public final class LifetimeTracked : Equatable, CustomStringConvertible {
   public var serialNumber: Int = 0
 }
 
+
+extension LifetimeTracked : Strideable {
+  @warn_unused_result
+  public func distance(to other: LifetimeTracked) -> Int {
+    return self.value.distance(to: other.value)
+  }
+
+  @warn_unused_result
+  public func advanced(by n: Int) -> LifetimeTracked {
+    return LifetimeTracked(self.value.advanced(by: n))
+  }
+}
+
+extension LifetimeTracked : CustomStringConvertible {
+  public var description: String {
+    assert(serialNumber > 0, "dead Tracked!")
+    return value.description
+  }
+}
+
 public func == (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
   return x.value == y.value
+}
+
+public func < (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
+  return x.value < y.value
 }

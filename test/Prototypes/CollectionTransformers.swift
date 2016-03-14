@@ -12,6 +12,9 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
+// FIXME: swift-3-indexing-model: This prototype needs to be updated to new indexing model
+#if false
+
 public enum ApproximateCount {
   case Unknown
   case Precise(IntMax)
@@ -1453,3 +1456,5 @@ http://habrahabr.ru/post/255659/
 */
 
 runAllTests()
+
+#endif

@@ -14,7 +14,7 @@
 
 public struct RangeOfStrideable<
   Element : Strideable
-> : Equatable, Collection,
+> : Equatable, RandomAccessCollection,
   CustomStringConvertible, CustomDebugStringConvertible {
 
   /// Construct a copy of `x`.
