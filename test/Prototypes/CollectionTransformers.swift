@@ -12,9 +12,6 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
-// FIXME: swift-3-indexing-model: This prototype needs to be updated to new indexing model
-#if false
-
 public enum ApproximateCount {
   case Unknown
   case Precise(IntMax)
@@ -52,16 +49,19 @@ public protocol SplittableCollection : Collection {
   func split(range: Range<Index>) -> [Range<Index>]
 }
 
-internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
-  range: Range<Index>
-) -> [Range<Index>] {
+internal func _splitRandomAccessIndexRange<
+  C : RandomAccessCollection
+>(
+  elements: C,
+  _ range: Range<C.Index>
+) -> [Range<C.Index>] {
   let startIndex = range.startIndex
   let endIndex = range.endIndex
-  let length = startIndex.distance(to: endIndex).toIntMax()
+  let length = elements.distance(from: startIndex, to: endIndex).toIntMax()
   if length < 2 {
     return [ range ]
   }
-  let middle = startIndex.advanced(by: Index.Distance(length / 2))
+  let middle = elements.advance(startIndex, by: C.IndexDistance(length / 2))
   return [startIndex ..< middle, middle ..< endIndex]
 }
 
@@ -127,7 +127,7 @@ public protocol BuildableCollectionProtocol : Collection {
 
 extension Array : SplittableCollection {
   public func split(range: Range<Int>) -> [Range<Int>] {
-    return _splitRandomAccessIndexRange(range)
+    return _splitRandomAccessIndexRange(self, range)
   }
 }
 
@@ -947,9 +947,11 @@ final internal class _CollectionTransformerStepCollectionSource<
     _ range: Range<InputCollection.Index>,
     _ collector: inout Collector
   ) {
-    for i in range {
+    var i = range.startIndex
+    while i != range.endIndex {
       let e = c[i]
       collector.append(e)
+      c._nextInPlace(&i)
     }
   }
 }
@@ -1123,7 +1125,7 @@ final class _CollectionTransformerFinalizerReduce<
     InputCollection.Iterator.Element == PipelineInputElement
   >(c: InputCollection) -> U {
     var collector = _ElementCollectorReduce(_initial, _combine)
-    _input.transform(c, c.indices, &collector)
+    _input.transform(c, c.startIndex..<c.endIndex, &collector)
     return collector.takeResult()
   }
 }
@@ -1185,7 +1187,7 @@ final class _CollectionTransformerFinalizerCollectTo<
     InputCollection.Iterator.Element == PipelineInputElement
   >(c: InputCollection) -> U {
     var collector = _ElementCollectorCollectTo<U>()
-    _input.transform(c, c.indices, &collector)
+    _input.transform(c, c.startIndex..<c.endIndex, &collector)
     return collector.takeResult()
   }
 }
@@ -1417,7 +1419,10 @@ func _parallelMap(input: [Int], transform: (Int) -> Int, range: Range<Int>)
 
 func parallelMap(input: [Int], transform: (Int) -> Int) -> [Int] {
   let t = ForkJoinPool.commonPool.forkTask {
-    _parallelMap(input, transform: transform, range: input.indices)
+    _parallelMap(
+      input,
+      transform: transform,
+      range: input.startIndex..<input.endIndex)
   }
   var builder = t.waitAndGetResult()
   return builder.takeResult()
@@ -1456,4 +1461,3 @@ http://habrahabr.ru/post/255659/
 
 runAllTests()
 
-#endif
