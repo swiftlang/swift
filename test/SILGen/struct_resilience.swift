@@ -32,6 +32,23 @@ func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
   return f(s)
 }
 
+// Use materializeForSet for inout access of properties in resilient structs
+// from a different resilience domain
+
+func inoutFunc(x: inout Int) {}
+
+// CHECK-LABEL: sil hidden @_TF17struct_resilience18resilientInOutTestFRV16resilient_struct4SizeT_ : $@convention(thin) (@inout Size) -> ()
+
+func resilientInOutTest(s: inout Size) {
+
+// CHECK:         function_ref @_TF17struct_resilience9inoutFuncFRSiT_
+// CHECK:         function_ref @_TFV16resilient_struct4Sizem1wSi
+
+  inoutFunc(&s.w)
+
+// CHECK: return
+}
+
 // Fixed-layout structs may be trivial or loadable
 
 // CHECK-LABEL: sil hidden @_TF17struct_resilience28functionWithFixedLayoutTypesFTV16resilient_struct5Point1fFS1_S1__S1_ : $@convention(thin) (Point, @owned @callee_owned (Point) -> Point) -> Point

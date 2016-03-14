@@ -799,24 +799,63 @@ namespace {
                                  std::move(value));
     }
 
+    bool shouldUseMaterializeForSet(SILGenFunction &gen,
+                                    AccessKind accessKind) {
+      // If this access is for a read, we can just call the getter.
+      if (accessKind == AccessKind::Read)
+        return false;
+
+      // If the declaration is dynamic, there's no materializeForSet.
+      if (decl->getAttrs().hasAttribute<DynamicAttr>())
+        return false;
+
+      // If the declaration was imported from C, we won't gain anything
+      // from using materializeForSet, and furthermore, it might not
+      // exist.
+      if (decl->hasClangNode())
+        return false;
+
+      // If the declaration is not in type context, there's no
+      // materializeForSet.
+      if (!decl->getDeclContext()->isTypeContext())
+        return false;
+
+      // If the declaration is in a different resilience domain, we have
+      // to use materializeForSet.
+      //
+      // FIXME: Use correct ResilienceExpansion if gen is @transparent
+      if (!decl->hasFixedLayout(gen.SGM.M.getSwiftModule(),
+                                ResilienceExpansion::Maximal))
+        return true;
+
+      // If the declaration is dynamically dispatched through a class,
+      // we have to use materializeForSet.
+      if (isa<ClassDecl>(decl->getDeclContext())) {
+        if (decl->isFinal())
+          return false;
+
+        return true;
+      }
+
+      // If the declaration is dynamically dispatched through a protocol,
+      // we have to use materializeForSet.
+      if (isa<ProtocolDecl>(decl->getDeclContext()))
+        return true;
+
+      return false;
+    }
+
     ManagedValue getMaterialized(SILGenFunction &gen,
                                  SILLocation loc,
                                  ManagedValue base,
                                  AccessKind accessKind) && override {
-      // If this is just for a read, or the property is dynamic, or if
-      // it doesn't have a materializeForSet, or if this is a direct
-      // use of something defined in a protocol extension (see
-      // maybeEmitMaterializeForSetThunk), just materialize to a
-      // temporary directly.
-      if (accessKind == AccessKind::Read ||
-          decl->getAttrs().hasAttribute<DynamicAttr>() ||
-          !decl->getMaterializeForSetFunc() ||
-          isa<StructDecl>(decl->getDeclContext()) ||
-          decl->getDeclContext()->getAsProtocolExtensionContext()) {
+      if (!shouldUseMaterializeForSet(gen, accessKind)) {
         return std::move(*this).LogicalPathComponent::getMaterialized(gen,
                                                         loc, base, accessKind);
       }
 
+      assert(decl->getMaterializeForSetFunc() &&
+             "polymorphic storage without materializeForSet");
       assert(gen.InWritebackScope &&
              "materializing l-value for modification without writeback scope");
 
