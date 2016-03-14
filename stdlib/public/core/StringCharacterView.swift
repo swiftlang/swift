@@ -78,11 +78,14 @@ extension String.CharacterView : BidirectionalCollection {
   
   /// A character position.
   public struct Index : Comparable, CustomPlaygroundQuickLookable {
-    public // SPI(Foundation)    
-    init(_base: String.UnicodeScalarView.Index) {
+    public // SPI(Foundation)
+    init(
+      _base: String.UnicodeScalarView.Index,
+      _view: String.UnicodeScalarView
+    ) {
       self._base = _base
       self._countUTF16 =
-          Index._measureExtendedGraphemeClusterForward(from: _base)
+        _view._measureExtendedGraphemeClusterForward(from: _base)
     }
 
     internal init(_base: UnicodeScalarView.Index, _countUTF16: Int) {
@@ -131,90 +134,7 @@ extension String.CharacterView : BidirectionalCollection {
     /// The one past end index for this extended grapheme cluster in Unicode
     /// scalars.
     internal var _endBase: UnicodeScalarView.Index {
-      return UnicodeScalarView.Index(
-          _utf16Index + _countUTF16, _base._core)
-    }
-
-    /// Returns the length of the first extended grapheme cluster in UTF-16
-    /// code units.
-    @warn_unused_result
-    @inline(never)
-    internal static func _measureExtendedGraphemeClusterForward(
-        from start: UnicodeScalarView.Index
-    ) -> Int {
-      var start = start
-      let end = start._viewEndIndex
-      if start == end {
-        return 0
-      }
-
-      let startIndexUTF16 = start._position
-      let unicodeScalars = UnicodeScalarView(start._core)
-      let graphemeClusterBreakProperty =
-          _UnicodeGraphemeClusterBreakPropertyTrie()
-      let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-
-      var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
-          unicodeScalars[start].value)
-      unicodeScalars._nextInPlace(&start)
-
-      while start != end {
-        // FIXME(performance): consider removing this "fast path".  A branch
-        // that is hard to predict could be worse for performance than a few
-        // loads from cache to fetch the property 'gcb1'.
-        if segmenter.isBoundaryAfter(gcb0) {
-          break
-        }
-        let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
-            unicodeScalars[start].value)
-        if segmenter.isBoundary(gcb0, gcb1) {
-          break
-        }
-        gcb0 = gcb1
-        unicodeScalars._nextInPlace(&start)
-      }
-
-      return start._position - startIndexUTF16
-    }
-
-    /// Returns the length of the previous extended grapheme cluster in UTF-16
-    /// code units.
-    @warn_unused_result
-    @inline(never)
-    internal static func _measureExtendedGraphemeClusterBackward(
-        from end: UnicodeScalarView.Index
-    ) -> Int {
-      let start = end._viewStartIndex
-      if start == end {
-        return 0
-      }
-
-      let endIndexUTF16 = end._position
-      let unicodeScalars = UnicodeScalarView(start._core)
-      let graphemeClusterBreakProperty =
-          _UnicodeGraphemeClusterBreakPropertyTrie()
-      let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-
-      var graphemeClusterStart = end
-
-      unicodeScalars._previousInPlace(&graphemeClusterStart)
-      var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
-          unicodeScalars[graphemeClusterStart].value)
-
-      var graphemeClusterStartUTF16 = graphemeClusterStart._position
-
-      while graphemeClusterStart != start {
-        unicodeScalars._previousInPlace(&graphemeClusterStart)
-        let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
-            unicodeScalars[graphemeClusterStart].value)
-        if segmenter.isBoundary(gcb1, gcb0) {
-          break
-        }
-        gcb0 = gcb1
-        graphemeClusterStartUTF16 = graphemeClusterStart._position
-      }
-
-      return endIndexUTF16 - graphemeClusterStartUTF16
+      return UnicodeScalarView.Index(_utf16Index + _countUTF16)
     }
 
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
@@ -227,7 +147,7 @@ extension String.CharacterView : BidirectionalCollection {
   /// The position of the first `Character` if `self` is
   /// non-empty; identical to `endIndex` otherwise.
   public var startIndex: Index {
-    return Index(_base: unicodeScalars.startIndex)
+    return Index(_base: unicodeScalars.startIndex, _view: unicodeScalars)
   }
 
   /// The "past the end" position.
@@ -236,7 +156,7 @@ extension String.CharacterView : BidirectionalCollection {
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   public var endIndex: Index {
-    return Index(_base: unicodeScalars.endIndex)
+    return Index(_base: unicodeScalars.endIndex, _view: unicodeScalars)
   }
 
   // TODO: swift-3-indexing-model - add docs
