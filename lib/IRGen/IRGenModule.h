@@ -757,7 +757,7 @@ public:
   void emitCoverageMapping();
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
-  void emitSILStaticInitializer();
+  void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
 
   void emitNestedTypeDecls(DeclRange members);

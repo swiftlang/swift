@@ -4813,40 +4813,34 @@ static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
   return llvm::ConstantStruct::get(STy, Elts);
 }
 
-void IRGenModule::emitSILStaticInitializer() {
-  SmallVector<SILFunction*, 8> StaticInitializers;
-  for (SILGlobalVariable &v : SILMod->getSILGlobals()) {
-    auto *staticInit = v.getInitializer();
-    if (!staticInit)
+void IRGenModule::emitSILStaticInitializers() {
+  SmallVector<SILFunction *, 8> StaticInitializers;
+  for (SILGlobalVariable &Global : SILMod->getSILGlobals()) {
+    if (!Global.getInitializer())
       continue;
 
-    auto *gvar = Module.getGlobalVariable(v.getName(),
-                                          /*allowInternal*/true);
+    auto *IRGlobal =
+        Module.getGlobalVariable(Global.getName(), true /* = AllowLocal */);
 
     // A check for multi-threaded compilation: Is this the llvm module where the
     // global is defined and not only referenced (or not referenced at all).
-    if (!gvar || !gvar->hasInitializer())
+    if (!IRGlobal || !IRGlobal->hasInitializer())
       continue;
 
-    if (auto *STy = dyn_cast<llvm::StructType>(gvar->getInitializer()->getType())) {
-      auto *InitValue = v.getValueOfStaticInitializer();
+    auto *STy = cast<llvm::StructType>(IRGlobal->getInitializer()->getType());
+    auto *InitValue = Global.getValueOfStaticInitializer();
 
-      // Get the StructInst that we write to the SILGlobalVariable.
-      if (auto *SI = dyn_cast<StructInst>(InitValue)) {
-        gvar->setInitializer(getConstantValue(*this, STy, SI));
-        continue;
-      }
-
-      // Get the TupleInst that we write to the SILGlobalVariable.
-      if (auto *TI = dyn_cast<TupleInst>(InitValue)) {
-        gvar->setInitializer(getConstantValue(*this, STy, TI));
-        continue;
-      }
-
-      llvm_unreachable("We only handle StructInst and TupleInst for now!");
+    // Set the IR global's initializer to the constant for this SIL
+    // struct.
+    if (auto *SI = dyn_cast<StructInst>(InitValue)) {
+      IRGlobal->setInitializer(getConstantValue(*this, STy, SI));
+      continue;
     }
 
-    llvm_unreachable("We only handle StructType for now!");
+    // Set the IR global's initializer to the constant for this SIL
+    // tuple.
+    auto *TI = cast<TupleInst>(InitValue);
+    IRGlobal->setInitializer(getConstantValue(*this, STy, TI));
   }
 }
 

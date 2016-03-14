@@ -807,7 +807,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
   // Emit static initializers.
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
-    IGM->emitSILStaticInitializer();
+    IGM->emitSILStaticInitializers();
   }
 
   // Emit witness tables.
