@@ -989,6 +989,11 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
 static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
                                      Type actualArgType,
                                      TypeSubstitutionMap &archetypesMap) {
+  // Type visitor doesn't handle unresolved types.
+  if (paramType->is<UnresolvedType>() ||
+      actualArgType->is<UnresolvedType>())
+    return false;
+  
   class GenericVisitor : public TypeMatcher<GenericVisitor> {
     DeclContext *dc;
     TypeSubstitutionMap &archetypesMap;
@@ -1617,7 +1622,8 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
   bool foundFailure = false;
   TypeSubstitutionMap archetypesMap;
   
-  if (!findGenericSubstitutions(failedArgument.declContext, failedArgument.parameterType,
+  if (!findGenericSubstitutions(failedArgument.declContext,
+                                failedArgument.parameterType,
                                 argType, archetypesMap))
     return false;
 
