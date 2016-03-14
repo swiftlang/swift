@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# ===--- compare_perf_tests.py --------------------------------------------===//
+# ===--- compare_perf_tests.py -------------------------------------------===//
 #
 #  This source file is part of the Swift.org open source project
 #
@@ -11,7 +11,7 @@
 #  See http://swift.org/LICENSE.txt for license information
 #  See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
-# ===----------------------------------------------------------------------===//
+# ===---------------------------------------------------------------------===//
 
 # e.g.
 # repeat.sh 3 tot/bin/Benchmark_Driver run -o -O > tot.O.times
@@ -136,7 +136,8 @@ def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
 
     if bestscore1 != 0 and bestscore2 != 0:
         print(("%+.1f%%" %
-               (((float(bestscore2) / bestscore1) - 1) * 100)).rjust(9), end="")
+               (((float(bestscore2) / bestscore1) - 1) * 100)).rjust(9),
+              end="")
         if ShowSpeedup:
             Num, Den = float(bestscore2), float(bestscore1)
             if IsTime:

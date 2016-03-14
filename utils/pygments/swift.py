@@ -157,7 +157,8 @@ class SwiftLexer(RegexLexer):
 
         'class-name': [
             (r'[A-Z][a-zA-Z0-9_?]*', Name.Constant),
-            (r'(\[)([0-9]+)(\])', bygroups(Operator, Number.Integer, Operator)),
+            (r'(\[)([0-9]+)(\])',
+             bygroups(Operator, Number.Integer, Operator)),
             (r'<', Punctuation, 'generic-type'),
             (r'\.\(', Punctuation, 'arg-list'),
             (r'\(', Punctuation, 'type-cast'),

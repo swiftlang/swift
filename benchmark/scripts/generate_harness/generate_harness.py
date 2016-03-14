@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ===--- generate_harness.py ----------------------------------------------===//
+# ===--- generate_harness.py ---------------------------------------------===//
 #
 #  This source file is part of the Swift.org open source project
 #
@@ -10,7 +10,7 @@
 #  See http://swift.org/LICENSE.txt for license information
 #  See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
-# ===----------------------------------------------------------------------===//
+# ===---------------------------------------------------------------------===//
 
 # Generate CMakeLists.txt and utils/main.swift from templates.
 

@@ -44,8 +44,8 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
 
     Any path in file_list that's a directory in src_root_dirs results in a
     corresponding subdirectory in dest_root_dir. If the subdirectory path
-    matches copy_verbatim_subpaths, the whole subdirectory is recursively copied
-    verbatim.
+    matches copy_verbatim_subpaths, the whole subdirectory is recursively
+    copied verbatim.
     """
     lipo_cmd = [lipo_executable, "-create"]
 
@@ -112,8 +112,9 @@ the file is copied directly to the destination. If there are different
 files in different directories, but the files are executable,
 lipo is run to merge the files together. Otherwise, a warning is produced.
 
-Use --copy-subdirs to override normal logic and copy certain sub directory paths
-verbatim. This is useful if some subdirectories already contain fat binaries.
+Use --copy-subdirs to override normal logic and copy certain sub directory
+paths verbatim. This is useful if some subdirectories already contain fat
+binaries.
 """)
 
     parser.add_argument("-v", "--verbose", action='store_true',

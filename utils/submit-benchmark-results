@@ -86,7 +86,8 @@ def main():
     parser.add_option("", "--output", dest="output", metavar="PATH",
                       help="Write raw report data to PATH",
                       action="store", type=str, default=None)
-    parser.add_option("", "--machine-name", dest="machine_name", metavar="NAME",
+    parser.add_option("", "--machine-name", dest="machine_name",
+                      metavar="NAME",
                       help="Set the machine name to embed in the report",
                       action="store", type=str, default=None)
     parser.add_option("", "--run-order", dest="run_order", metavar="REVISION",
@@ -113,8 +114,8 @@ def main():
     machine_name = opts.machine_name
     run_order = str(opts.run_order)
 
-    # Estimate the end time as being now, and the start time as being that minus
-    # the elapsed testing time.
+    # Estimate the end time as being now, and the start time as being that
+    # minus the elapsed testing time.
     utcnow = datetime.datetime.utcnow()
     start_time = utcnow - datetime.timedelta(seconds=data['elapsed'])
     end_time = utcnow

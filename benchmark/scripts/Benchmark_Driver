@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# ===--- Benchmark_Driver -------------------------------------------------===//
+# ===--- Benchmark_Driver ------------------------------------------------===//
 #
 #  This source file is part of the Swift.org open source project
 #
@@ -11,7 +11,7 @@
 #  See http://swift.org/LICENSE.txt for license information
 #  See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
-# ===----------------------------------------------------------------------===//
+# ===---------------------------------------------------------------------===//
 
 import argparse
 import datetime
@@ -109,10 +109,10 @@ def instrument_test(driver_path, test, num_samples):
         avg_test_output[i] = int(round(avg_test_output[i] /
                                        float(len(test_outputs))))
     avg_test_output[num_samples_index] = num_samples
-    avg_test_output[min_index] = min(test_outputs,
-                                     key=lambda x: int(x[min_index]))[min_index]
-    avg_test_output[max_index] = max(test_outputs,
-                                     key=lambda x: int(x[max_index]))[max_index]
+    avg_test_output[min_index] = min(
+        test_outputs, key=lambda x: int(x[min_index]))[min_index]
+    avg_test_output[max_index] = max(
+        test_outputs, key=lambda x: int(x[max_index]))[max_index]
     avg_test_output = map(str, avg_test_output)
 
     return avg_test_output
