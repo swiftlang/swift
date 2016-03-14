@@ -1053,6 +1053,8 @@ void Serializer::writeNormalConformance(
     data.push_back(addDeclRef(witness.getDecl()));
     assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
            || req->getAttrs().isUnavailable(req->getASTContext()));
+    // The substitution record is serialized later.
+    data.push_back(witness.getSubstitutions().size());
     ++numValueWitnesses;
   });
 
@@ -1099,6 +1101,12 @@ void Serializer::writeNormalConformance(
                      DeclTypeAbbrCodes);
   }
 
+  conformance->forEachValueWitness(nullptr,
+                                   [&](ValueDecl *req,
+                                       ConcreteDeclRef witness) {
+    writeSubstitutions(witness.getSubstitutions(), DeclTypeAbbrCodes);
+    return false;
+  });
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                   [&](AssociatedTypeDecl *assocType,
                                       const Substitution &witness,
