@@ -1333,6 +1333,29 @@ bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
   return false;
 }
 
+static CharSourceRange sanitizeUnpairedParenthesis(CharSourceRange Range) {
+  auto Text = Range.str();
+  if (Text.back() != ')') {
+    return Range;
+  }
+  unsigned Pairs = 0;
+  unsigned TrimLen = 0;
+  for (char C : Text) {
+    if (C == '(') {
+      Pairs ++;
+    } else if (C == ')') {
+      if (Pairs == 0)
+        TrimLen ++;
+      else
+        Pairs --;
+    } else {
+      TrimLen = 0;
+    }
+  }
+
+  return CharSourceRange(Range.getStart(), Text.size() - TrimLen);
+}
+
 bool ModelASTWalker::searchForURL(CharSourceRange Range) {
   StringRef OrigText = SM.extractText(Range, BufferID);
   SourceLoc OrigLoc = Range.getStart();
@@ -1349,7 +1372,8 @@ bool ModelASTWalker::searchForURL(CharSourceRange Range) {
       StringRef Match(RxMatch.first, RxMatch.second - RxMatch.first);
       SourceLoc Loc = OrigLoc.getAdvancedLoc(Match.data() - OrigText.data());
       CharSourceRange Range(Loc, Match.size());
-      SyntaxNode Node{ SyntaxNodeKind::CommentURL, Range };
+      SyntaxNode Node{ SyntaxNodeKind::CommentURL,
+                       sanitizeUnpairedParenthesis(Range) };
       if (!passNode(Node))
         return false;
       Text = Text.substr(Match.data() - Text.data() + Match.size());
