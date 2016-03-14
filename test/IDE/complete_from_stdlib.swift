@@ -8,16 +8,19 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_2B > %t.members2a.txt
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2 < %t.members2a.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2 < %t.members2a.txt
 // FIXME: filter?
 // RUN-disabled: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2a.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_2B > %t.members2b.txt
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2 < %t.members2b.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2 < %t.members2b.txt
 // FIXME: filter?
 // RUN-disabled: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2b.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_3 > %t.members3.txt
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_3 < %t.members3.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3 < %t.members3.txt
 // FIXME: filter?
 // RUN-disabled: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members3.txt
 
@@ -55,7 +58,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_2 | FileCheck %s -check-prefix=POSTFIX_LVALUE_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_OPTIONAL_1 | FileCheck %s -check-prefix=POSTFIX_OPTIONAL
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_1 | FileCheck %s -check-prefix=INFIX_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_1 > %t
+// RUN: FileCheck %s -check-prefix=INFIX_INT < %t
+// RUN: FileCheck %s -check-prefix=NEGATIVE_INFIX_INT < %t
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_2 | FileCheck %s -check-prefix=INFIX_LVALUE_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_STRING_1 | FileCheck %s -check-prefix=INFIX_STRING
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_EXT_STRING_1 | FileCheck %s -check-prefix=INFIX_EXT_STRING
@@ -91,8 +97,8 @@ func protocolExtCollection1b(a: Collection) {
 
 // PRIVATE_NOMINAL_MEMBERS_2: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_2-DAG: map({#(transform): (Self.Iterator.Element) throws -> T##(Self.Iterator.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_2-DAG-NOT: Decl{{.*}}: last
 // PRIVATE_NOMINAL_MEMBERS_2: End completions
+// NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2-NOT: Decl{{.*}}: last
 
 func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(a: C) {
   a.#^PRIVATE_NOMINAL_MEMBERS_3^#
@@ -101,9 +107,9 @@ func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(a
 // PRIVATE_NOMINAL_MEMBERS_3: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:         map({#(transform): (C.Iterator.Element) throws -> T##(C.Iterator.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceVar]/Super:            last[#C.Iterator.Element?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_3-DAG-NOT: Decl{{.*}}:         index({#({{.*}}): Self.Iterator.Element
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: index({#where: (C.Iterator.Element) throws -> Bool##(C.Iterator.Element) throws -> Bool#})[' rethrows'][#C.Index?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3: End completions
+// NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3-NOT: Decl{{.*}}:         index({#({{.*}}): Self.Iterator.Element
 
 func protocolExtArray<T : Equatable>(a: [T]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_4^#
@@ -244,9 +250,9 @@ func testInfixOperator1(x: Int) {
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  << {#Int#}[#Int#]
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#Int#}[#Bool#]
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Int#}[#Bool#]
-// INFIX_INT-DAG-NOT: &&
-// INFIX_INT-DAG-NOT: +=
 // INFIX_INT: End completions
+// NEGATIVE_INFIX_INT-NOT: &&
+// NEGATIVE_INFIX_INT-NOT: +=
 func testInfixOperator2(var x: Int) {
   x#^INFIX_INT_2^#
 }
