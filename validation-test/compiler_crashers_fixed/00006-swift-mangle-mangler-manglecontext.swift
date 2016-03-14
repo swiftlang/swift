@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -parse -verify
 
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/AlexDenisov (Alexey Denisov)
+// Issue found by https://github.com/AlexDenisov (Alexey Denisov)
 
 func i(c: () -> ()) {
 }

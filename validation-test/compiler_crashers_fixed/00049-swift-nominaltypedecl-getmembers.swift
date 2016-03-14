@@ -1,7 +1,6 @@
 // RUN: not %target-swift-frontend %s -emit-sil
 
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/rnapier (Rob Napier)
+// Issue found by https://github.com/rnapier (Rob Napier)
 
 var f = 1
 var e: Int -> Int = {

@@ -2,8 +2,7 @@
 
 // REQUIRES: objc_interop
 
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/mattdaw (Matt Daw)
+// Issue found by https://github.com/mattdaw (Matt Daw)
 
 import Foundation
 var a: NSMutableArray = [""]

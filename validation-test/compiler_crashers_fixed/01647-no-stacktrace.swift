@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-silgen
 
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/radex
+// Issue found by https://github.com/radex
 // rdar://18851497
 
 struct A {

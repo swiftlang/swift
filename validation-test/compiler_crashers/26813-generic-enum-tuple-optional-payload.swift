@@ -1,7 +1,6 @@
 // RUN: not --crash %target-swift-frontend %s -parse
 
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/austinzheng (Austin Zheng)
+// Issue found by https://github.com/austinzheng (Austin Zheng)
 
 enum A<T> {
     case Just(T)

@@ -1,7 +1,6 @@
 // RUN: not %target-swift-frontend %s -parse
 
-// Distributed under the terms of the MIT license
-// Test case found by https://github.com/benshan (Ben Shanfelder)
+// Issue found by https://github.com/benshan (Ben Shanfelder)
 
 import Cocoa
 
