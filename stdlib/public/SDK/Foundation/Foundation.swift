@@ -213,12 +213,6 @@ extension Int : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
   }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> Int {
-    return source!.integerValue
-  }
 }
 
 extension UInt : _ObjectiveCBridgeable {
@@ -252,12 +246,6 @@ extension UInt : _ObjectiveCBridgeable {
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> UInt {
-    return source!.unsignedIntegerValue
   }
 }
 
@@ -293,12 +281,6 @@ extension Float : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
   }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> Float {
-    return source!.floatValue
-  }
 }
 
 extension Double : _ObjectiveCBridgeable {
@@ -333,12 +315,6 @@ extension Double : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
   }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> Double {
-    return source!.doubleValue
-  }
 }
 
 extension Bool: _ObjectiveCBridgeable {
@@ -372,12 +348,6 @@ extension Bool: _ObjectiveCBridgeable {
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> Bool {
-    return source!.boolValue
   }
 }
 
@@ -415,13 +385,6 @@ extension CGFloat : _ObjectiveCBridgeable {
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> CGFloat {
-    return CGFloat(
-             CGFloat.NativeType._unconditionallyBridgeFromObjectiveC(source))
   }
 }
 

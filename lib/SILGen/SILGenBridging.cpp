@@ -131,6 +131,10 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
     // Compute the substitutions.
     substitutions = valueTypeBGT->getSubstitutions(gen.SGM.SwiftModule,
                                                    nullptr);
+  } else {
+    // FIXME: We should always be using these substitutions, but they
+    // aren't reliable with specialized conformances.
+    substitutions = witness.getSubstitutions();
   }
 
   // Substitute into the witness function type.
