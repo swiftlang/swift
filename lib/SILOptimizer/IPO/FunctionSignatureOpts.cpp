@@ -52,7 +52,7 @@ typedef SmallVector<FullApplySite, 8> ApplyList;
 //===----------------------------------------------------------------------===//
 
 static void
-computeOptimizedInterfaceParams(ArgumentDescriptor &AD,
+computeOptimizedInterfaceParams(const ArgumentDescriptor &AD,
                                 SmallVectorImpl<SILParameterInfo> &Out) {
   DEBUG(llvm::dbgs() << "        Computing Interface Params\n");
   // If we have a dead argument, bail.
@@ -180,7 +180,7 @@ addThunkArgs(const ArgumentDescriptor &AD, SILBuilder &Builder, SILBasicBlock *B
 }
 
 static unsigned
-updateOptimizedBBArgs(ArgumentDescriptor &AD, SILBuilder &Builder,
+updateOptimizedBBArgs(const ArgumentDescriptor &AD, SILBuilder &Builder,
                       SILBasicBlock *BB, unsigned ArgOffset) {
   // If this argument is completely dead, delete this argument and return
   // ArgOffset.
@@ -228,17 +228,27 @@ updateOptimizedBBArgs(ArgumentDescriptor &AD, SILBuilder &Builder,
     }
   }
 
+  // We have built a projection tree and filled it with liveness information.
+  //
+  // Use this as a base to replace values in current function with their leaf
+  // values.
+  //
+  // NOTE: this also allows us to NOT modify the results of an analysis pass.
+  llvm::BumpPtrAllocator Allocator;
+  ProjectionTree PT(BB->getModule(), Allocator);
+  PT.initializeWithExistingTree(AD.ProjTree);
+
   // Then go through the projection tree constructing aggregates and replacing
   // uses.
   //
   // TODO: What is the right location to use here?
-  AD.ProjTree.replaceValueUsesWithLeafUses(Builder, BB->getParent()->getLocation(),
-                                        LeafValues);
+  PT.replaceValueUsesWithLeafUses(Builder, BB->getParent()->getLocation(),
+                                  LeafValues);
 
   // We ignored debugvalue uses when we constructed the new arguments, in order
   // to preserve as much information as possible, we construct a new value for
   // OrigArg from the leaf values and use that in place of the OrigArg.
-  SILValue NewOrigArgValue = AD.ProjTree.computeExplodedArgumentValue(Builder,
+  SILValue NewOrigArgValue = PT.computeExplodedArgumentValue(Builder,
                                            BB->getParent()->getLocation(),
                                            LeafValues);
 
@@ -276,11 +286,11 @@ public:
     return FSFI->getArgDescList();
   }
 
-  MutableArrayRef<ArgumentDescriptor> getArgDescList() {
+  ArrayRef<ArgumentDescriptor> getArgDescList() {
     return FSFI->getArgDescList();
   }
 
-  MutableArrayRef<ResultDescriptor> getResultDescList() {
+  ArrayRef<ResultDescriptor> getResultDescList() {
     return FSFI->getResultDescList();
   }
 
@@ -603,7 +613,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
 
   // Then perform any updates to the arguments of NewF.
   SILBasicBlock *NewFEntryBB = &*NewF->begin();
-  MutableArrayRef<ArgumentDescriptor> ArgDescs = Optimizer.getArgDescList();
+  ArrayRef<ArgumentDescriptor> ArgDescs = Optimizer.getArgDescList();
   unsigned ArgOffset = 0;
   SILBuilder Builder(NewFEntryBB->begin());
   Builder.setCurrentDebugScope(NewFEntryBB->getParent()->getDebugScope());
@@ -689,7 +699,7 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   // And remove all callee retains that we found and made redundant via owned
   // to unowned conversion.
-  for (ResultDescriptor &RD : Optimizer.getResultDescList()) {
+  for (const ResultDescriptor &RD : Optimizer.getResultDescList()) {
     for (auto &X : RD.CalleeRetain) {
       if (!isa<StrongRetainInst>(X) && !isa<RetainValueInst>(X))
         continue;
@@ -840,7 +850,8 @@ public:
 
       // Otherwise, try to optimize the function signature of F.
       Changed |=
-          optimizeFunctionSignature(Allocator, RCIA->get(F), FSA->get(F), AA, F, CallSites);
+          optimizeFunctionSignature(Allocator, RCIA->get(F), FSA->get(F), AA,
+                                    F, CallSites);
     }
 
     // If we changed anything, invalidate the call graph.
@@ -857,4 +868,3 @@ public:
 SILTransform *swift::createFunctionSignatureOpts() {
   return new FunctionSignatureOpts();
 }
-

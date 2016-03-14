@@ -1172,6 +1172,16 @@ ProjectionTree::~ProjectionTree() {
     N->~ProjectionTreeNode();
 }
 
+void
+ProjectionTree::initializeWithExistingTree(const ProjectionTree &PT) {
+  Kind = PT.Kind;
+  EpilogueReleases = PT.EpilogueReleases;
+  LiveLeafIndices = PT.LiveLeafIndices;
+  for (const auto &N : PT.ProjectionTreeNodes) {
+    ProjectionTreeNodes.push_back(new (Allocator) ProjectionTreeNode(*N));
+  }
+}
+
 SILValue
 ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
                                                   SILLocation Loc,

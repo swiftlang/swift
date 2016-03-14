@@ -216,8 +216,7 @@ public:
 
   bool shouldModifySelfArgument() const { return ShouldModifySelfArgument; }
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
-  MutableArrayRef<ResultDescriptor> getResultDescList() {return ResultDescList;}
-  MutableArrayRef<ArgumentDescriptor> getArgDescList() { return ArgDescList; }
+  ArrayRef<ResultDescriptor> getResultDescList() {return ResultDescList;}
   SILFunction *getAnalyzedFunction() const { return F; }
 
 private:
