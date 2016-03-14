@@ -570,7 +570,7 @@ public:
 
   /// Return the ID of the parent region of this BB. Asserts if this is a
   /// function region.
-  unsigned getParentID() const { return *ParentID; }
+  Optional<unsigned> getParentID() const { return ParentID; }
 
   unsigned getRPONumber() const {
     if (isBlock())

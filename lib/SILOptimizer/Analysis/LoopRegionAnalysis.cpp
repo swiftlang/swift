@@ -512,10 +512,10 @@ static void getExitingRegions(LoopRegionFunctionInfo *LRFI, SILLoop *Loop,
   // this subloop's region. That is the *true* exiting region.
   for (auto *BB : ExitingBlocks) {
     auto *Region = LRFI->getRegion(BB);
-    unsigned RegionParentID = Region->getParentID();
+    unsigned RegionParentID = *Region->getParentID();
     while (RegionParentID != LRegion->getID()) {
       Region = LRFI->getRegion(RegionParentID);
-      RegionParentID = Region->getParentID();
+      RegionParentID = *Region->getParentID();
     }
     ExitingRegions.push_back(Region->getID());
   }
@@ -745,7 +745,7 @@ getRegionForNonLocalSuccessor(const LoopRegion *Child, unsigned SuccID) const {
   LoopRegion::SuccessorID Succ = {0, 0};
 
   do {
-    Iter = getRegion(Iter->getParentID());
+    Iter = getRegion(*Iter->getParentID());
     Succ = Iter->Succs[SuccID].getValue();
     SuccID = Succ.ID;
   } while (Succ.IsNonLocal);
@@ -876,7 +876,7 @@ struct LoopRegionWrapper {
   LoopRegion *Region;
 
   LoopRegionWrapper *getParent() const {
-    unsigned ParentIndex = Region->getParentID();
+    unsigned ParentIndex = *Region->getParentID();
     return &FuncInfo.Data[ParentIndex];
   }
 
@@ -922,7 +922,7 @@ struct alledge_iterator
     }
     // If we have a non-local id, just return the parent region's data.
     if ((*SuccIter)->IsNonLocal)
-      return &Wrapper->FuncInfo.Data[Wrapper->Region->getParentID()];
+      return &Wrapper->FuncInfo.Data[*(Wrapper->Region->getParentID())];
     // Otherwise return the data associated with this successor.
     return &Wrapper->FuncInfo.Data[(*SuccIter)->ID];
   }
