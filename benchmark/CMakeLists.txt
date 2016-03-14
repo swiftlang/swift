@@ -59,6 +59,7 @@ set(SWIFT_BENCH_MODULES
     single-source/NSError
     single-source/NSStringConversion
     single-source/ObjectAllocation
+    single-source/ObjectiveCBridging
     single-source/OpenClose
     single-source/Phonebook
     single-source/PolymorphicCalls
