@@ -48,6 +48,10 @@ class Base {
     get { return {0} }
     set {}
   }
+  static var staticFunction: () -> Int {
+    get { return {0} }
+    set {}
+  }
 }
 
 class Derived : Base {}
@@ -57,6 +61,7 @@ protocol Abstractable {
   var storedFunction: () -> Result { get set }
   var finalStoredFunction: () -> Result { get set }
   var computedFunction: () -> Result { get set }
+  static var staticFunction: () -> Result { get set }
 }
 
 // Validate that we thunk materializeForSet correctly when there's
@@ -136,12 +141,49 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC17materializeForSet7DerivedS_12AbstractableS_ZFS1_m14staticFunctionFT_wx6Result
+// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $@thick Derived.Type):
+// CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned () -> @out Int
+// CHECK-NEXT: [[SELF:%.*]] = upcast %2 : $@thick Derived.Type to $@thick Base.Type
+// CHECK-NEXT: [[OUT:%.*]] = alloc_stack $@callee_owned () -> Int
+// CHECK:      [[GETTER:%.*]] = function_ref @_TZFC17materializeForSet4Baseg14staticFunctionFT_Si : $@convention(thin) (@thick Base.Type) -> @owned @callee_owned () -> Int
+// CHECK-NEXT: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]]) : $@convention(thin) (@thick Base.Type) -> @owned @callee_owned () -> Int
+// CHECK-NEXT: store [[VALUE]] to [[OUT]] : $*@callee_owned () -> Int
+// CHECK-NEXT: [[VALUE:%.*]] = load [[OUT]] : $*@callee_owned () -> Int
+// CHECK-NEXT: strong_retain [[VALUE]] : $@callee_owned () -> Int
+// CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
+// CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
+// CHECK-NEXT: store [[NEWVALUE]] to [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
+// CHECK-NEXT: [[ADDR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
+// CHECK:      [[CALLBACK_FN:%.*]] = function_ref @_TTWC17materializeForSet7DerivedS_12AbstractableS_FZFS1_m14staticFunctionFT_wx6ResultU_T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout @thick Derived.Type, @thick Derived.Type.Type) -> ()
+// CHECK-NEXT: [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK_FN]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout @thick Derived.Type, @thick Derived.Type.Type) -> () to $Builtin.RawPointer
+// CHECK-NEXT: [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_ADDR]] : $Builtin.RawPointer
+// CHECK-NEXT: [[RESULT:%.*]] = tuple ([[ADDR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
+// CHECK-NEXT: destroy_addr [[OUT]] : $*@callee_owned () -> Int
+// CHECK-NEXT: dealloc_stack [[OUT]] : $*@callee_owned () -> Int
+// CHECK-NEXT: return [[RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+
+// CHECK-LABEL: sil hidden [transparent] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FZFS1_m14staticFunctionFT_wx6ResultU_T_
+// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*@thick Derived.Type, %3 : $@thick Derived.Type.Type):
+// CHECK-NEXT: [[SELF:%.*]] = load %2 : $*@thick Derived.Type
+// CHECK-NEXT: [[BASE_SELF:%.*]] = upcast [[SELF]] : $@thick Derived.Type to $@thick Base.Type
+// CHECK-NEXT: [[BUFFER:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned () -> @out Int
+// CHECK-NEXT: [[VALUE:%.*]] = load [[BUFFER]] : $*@callee_owned () -> @out Int
+// CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__iSi_XFo__dSi_ : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
+// CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]]) : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
+// CHECK:      [[SETTER_FN:%.*]] = function_ref @_TZFC17materializeForSet4Bases14staticFunctionFT_Si : $@convention(thin) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
+// CHECK-NEXT: apply [[SETTER_FN]]([[NEWVALUE]], [[BASE_SELF]]) : $@convention(thin) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
+// CHECK-NEXT: [[RESULT:%.*]] = tuple ()
+// CHECK-NEXT: return [[RESULT]] : $()
+
 protocol ClassAbstractable : class {
   associatedtype Result
   var storedFunction: () -> Result { get set }
   var finalStoredFunction: () -> Result { get set }
   var computedFunction: () -> Result { get set }
+  static var staticFunction: () -> Result { get set }
 }
+
 extension Derived : ClassAbstractable {}
 
 protocol Signatures {
