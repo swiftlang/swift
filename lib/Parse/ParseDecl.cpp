@@ -2086,10 +2086,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       MayNeedOverrideCompletion = true;
       break;
     case tok::kw_typealias:
+      DeclResult = parseDeclTypeAlias(Flags, Attributes);
+      Status = DeclResult;
+      break;
     case tok::kw_associatedtype:
-      DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
-                                       Flags.contains(PD_InProtocol),
-                                      Attributes);
+      DeclResult = parseDeclAssociatedType(Flags, Attributes);
       Status = DeclResult;
       break;
     case tok::kw_enum:
@@ -2833,43 +2834,23 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 ///
 /// \verbatim
 ///   decl-typealias:
-///     'typealias' identifier inheritance? '=' type
-///     'associatedtype' identifier inheritance? '=' type
+///     'typealias' identifier generic-params? '=' type
 /// \endverbatim
-ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
-                                                  bool isAssociatedType,
+ParserResult<TypeDecl> Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags,
                                                   DeclAttributes &Attributes) {
-  SourceLoc TypeAliasLoc;
-    
-  if (isAssociatedType) {
-    if (consumeIf(tok::kw_typealias, TypeAliasLoc)) {
-      diagnose(TypeAliasLoc, diag::typealias_inside_protocol)
-        .fixItReplace(TypeAliasLoc, "associatedtype");
-    } else {
-      TypeAliasLoc = consumeToken(tok::kw_associatedtype);
-    }
-  } else {
-    if (consumeIf(tok::kw_associatedtype, TypeAliasLoc)) {
-      diagnose(TypeAliasLoc, diag::associatedtype_outside_protocol)
-        .fixItReplace(TypeAliasLoc, "typealias");
-    } else {
-      TypeAliasLoc = consumeToken(tok::kw_typealias);
-    }
-  }
-  
+  ParserPosition startPosition = getParserPosition();
+  SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   Identifier Id;
   SourceLoc IdLoc;
   ParserStatus Status;
 
   Status |=
       parseIdentifierDeclName(*this, Id, IdLoc, tok::colon, tok::equal,
-                              diag::expected_identifier_in_decl, isAssociatedType ? "associatedtype" : "typealias");
+                              diag::expected_identifier_in_decl, "typealias");
   if (Status.isError())
     return nullptr;
     
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
-
-
 
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
@@ -2884,19 +2865,11 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
     if (!genericParams) {
       // If the parser returned null, it is an already diagnosed parse error.
-    } else if (isAssociatedType || !WantDefinition) {
-      // If the parameter list isn't valid here, reject it with a specific
-      // error.  If a constraint is present within the parameter list, reject
-      // that.
-      diagnose(genericParams->getLAngleLoc(),
-               diag::associated_type_generic_parameter_list)
-        .fixItRemove(genericParams->getSourceRange());
-      genericParams = nullptr;
     } else if (!genericParams->getRequirements().empty()) {
       // Reject a where clause.
       diagnose(genericParams->getWhereLoc(),
                diag::associated_type_generic_parameter_list)
-      .highlight(genericParams->getWhereClauseSourceRange());
+          .highlight(genericParams->getWhereClauseSourceRange());
     } else {
       // Reject inheritance clauses.
       for (auto *P : genericParams->getParams()) {
@@ -2911,46 +2884,28 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
     }
   }
 
-  // Parse optional inheritance clause.
-  // FIXME: Allow class requirements here.
-  SmallVector<TypeLoc, 2> Inherited;
-  if (isAssociatedType && Tok.is(tok::colon))
-    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
-
-  ParserResult<TypeRepr> UnderlyingTy;
-  if (WantDefinition || Tok.is(tok::equal)) {
-    if (Tok.is(tok::colon)) {
-      // It is a common mistake to write "typealias A : Int" instead of = Int.
-      // Recognize this and produce a fixit.
-      diagnose(Tok, diag::expected_equal_in_typealias)
+  if (Flags.contains(PD_InProtocol) && !genericParams && !Tok.is(tok::equal)) {
+    // If we're in a protocol and don't see an '=' this looks like leftover Swift 2
+    // code intending to be an associatedtype.
+    backtrackToPosition(startPosition);
+    return parseDeclAssociatedType(Flags, Attributes);
+  }
+  
+  if (Tok.is(tok::colon)) {
+    // It is a common mistake to write "typealias A : Int" instead of = Int.
+    // Recognize this and produce a fixit.
+    diagnose(Tok, diag::expected_equal_in_typealias)
         .fixItReplace(Tok.getLoc(), "=");
-      consumeToken(tok::colon);
-    
-    } else if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
-      Status.setIsParseError();
-      return Status;
-    }
-    UnderlyingTy = parseType(diag::expected_type_in_typealias);
-    Status |= UnderlyingTy;
-    if (UnderlyingTy.isNull())
-      return Status;
+    consumeToken(tok::colon);
+  } else if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
+    Status.setIsParseError();
+    return Status;
   }
+  ParserResult<TypeRepr> UnderlyingTy = parseType(diag::expected_type_in_typealias);
+  Status |= UnderlyingTy;
+  if (UnderlyingTy.isNull())
+    return Status;
 
-  // If this is an associated type, build the AST for it.
-  if (isAssociatedType) {
-    assert(!genericParams && "Associated types don't allow generic params");
-    auto assocType = new (Context) AssociatedTypeDecl(
-                                     CurDeclContext,
-                                     TypeAliasLoc, Id, IdLoc,
-                                     UnderlyingTy.getPtrOrNull());
-    assocType->getAttrs() = Attributes;
-    if (!Inherited.empty())
-      assocType->setInherited(Context.AllocateCopy(Inherited));
-    addToScope(assocType);
-    return makeParserResult(Status, assocType);
-  }
-
-  // Otherwise, build a typealias.
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
                                           UnderlyingTy.getPtrOrNull(),
                                           genericParams, CurDeclContext);
@@ -2961,6 +2916,79 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
   addToScope(TAD);
   return DCC.fixupParserResult(Status, TAD);
+}
+
+/// \brief Parse an associatedtype decl.
+///
+/// \verbatim
+///   decl-associatedtype:
+///     'associatedtype' identifier inheritance? ('=' type)?
+/// \endverbatim
+
+ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions Flags,
+                                                       DeclAttributes &Attributes) {
+  SourceLoc AssociatedTypeLoc;
+  ParserStatus Status;
+  Identifier Id;
+  SourceLoc IdLoc;
+  
+  // Look for 'typealias' here and diagnose a fixit because parseDeclTypeAlias can
+  // ask us to fix up leftover Swift 2 code intending to be an associatedtype.
+  if (Tok.is(tok::kw_typealias)) {
+    AssociatedTypeLoc = consumeToken(tok::kw_typealias);
+    diagnose(AssociatedTypeLoc, diag::typealias_inside_protocol_without_type)
+        .fixItReplace(AssociatedTypeLoc, "associatedtype");
+  } else {
+    AssociatedTypeLoc = consumeToken(tok::kw_associatedtype);
+  }
+  
+  Status =
+      parseIdentifierDeclName(*this, Id, IdLoc, tok::colon, tok::equal,
+                              diag::expected_identifier_in_decl, "associatedtype");
+  if (Status.isError())
+    return nullptr;
+  
+  DebuggerContextChange DCC(*this, Id, DeclKind::AssociatedType);
+  
+  // Reject generic parameters with a specific error.
+  if (startsWithLess(Tok)) {
+    if (auto genericParams = parseGenericParameters().getPtrOrNull()) {
+      diagnose(genericParams->getLAngleLoc(),
+               diag::associated_type_generic_parameter_list)
+      .fixItRemove(genericParams->getSourceRange());
+    }
+  }
+  
+  // Parse optional inheritance clause.
+  // FIXME: Allow class requirements here.
+  SmallVector<TypeLoc, 2> Inherited;
+  if (Tok.is(tok::colon))
+    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
+  
+  ParserResult<TypeRepr> UnderlyingTy;
+  if (Tok.is(tok::equal)) {
+    consumeToken(tok::equal);
+    UnderlyingTy = parseType(diag::expected_type_in_associatedtype);
+    Status |= UnderlyingTy;
+    if (UnderlyingTy.isNull())
+      return Status;
+  }
+  
+  if (!Flags.contains(PD_InProtocol)) {
+    diagnose(AssociatedTypeLoc, diag::associatedtype_outside_protocol)
+        .fixItReplace(AssociatedTypeLoc, "typealias");
+    Status.setIsParseError();
+    return Status;
+  }
+  
+  auto assocType = new (Context) AssociatedTypeDecl(CurDeclContext,
+                                                    AssociatedTypeLoc, Id, IdLoc,
+                                                    UnderlyingTy.getPtrOrNull());
+  assocType->getAttrs() = Attributes;
+  if (!Inherited.empty())
+    assocType->setInherited(Context.AllocateCopy(Inherited));
+  addToScope(assocType);
+  return makeParserResult(Status, assocType);
 }
 
 /// This function creates an accessor function (with no body) for a computed
@@ -5068,7 +5096,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       // Parse the members.
       ParseDeclOptions Options(PD_HasContainerType |
                                PD_DisallowNominalTypes |
-                               PD_DisallowInit | PD_DisallowTypeAliasDef |
+                               PD_DisallowInit |
                                PD_InProtocol);
       if (parseNominalDeclMembers(Members, LBraceLoc, RBraceLoc,
                                   diag::expected_rbrace_protocol,

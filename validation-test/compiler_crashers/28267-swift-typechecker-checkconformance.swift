@@ -7,4 +7,4 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-{enum S<T where S.c:A{case c
+protocol a}struct B<T:a{{}init(){{enum S<h{case

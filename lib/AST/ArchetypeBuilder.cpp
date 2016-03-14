@@ -219,7 +219,8 @@ void ArchetypeBuilder::PotentialArchetype::buildFullName(
 Identifier ArchetypeBuilder::PotentialArchetype::getName() const { 
   if (auto assocType = NameOrAssociatedType.dyn_cast<AssociatedTypeDecl *>())
     return assocType->getName();
-  
+  if (auto typeAlias = NameOrAssociatedType.dyn_cast<TypeAliasDecl *>())
+    return typeAlias->getName();
   return NameOrAssociatedType.get<Identifier>();
 }
 
@@ -303,11 +304,11 @@ static void maybeAddSameTypeRequirementForNestedType(
               RequirementSource fromSource,
               ProtocolConformance *superConformance,
               ArchetypeBuilder &builder) {
-  auto assocType = nestedPA->getResolvedAssociatedType();
-  assert(assocType && "Not resolved to an associated type?");
-
   // If there's no super conformance, we're done.
   if (!superConformance) return;
+
+  auto assocType = nestedPA->getResolvedAssociatedType();
+  assert(assocType && "Not resolved to an associated type?");
 
   // Dig out the type witness.
   auto concreteType =
@@ -467,20 +468,73 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   // archetype conforms.
   for (auto &conforms : ConformsTo) {
     for (auto member : conforms.first->lookupDirect(nestedName)) {
-      auto assocType = dyn_cast<AssociatedTypeDecl>(member);
-      if (!assocType)
-        continue;
+      PotentialArchetype *pa;
+      
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        // Resolve this nested type to this associated type.
+        pa = new PotentialArchetype(this, assocType);
+      } else if (auto alias = dyn_cast<TypeAliasDecl>(member)) {
+        // Resolve this nested type to this type alias.
+        pa = new PotentialArchetype(this, alias);
+        
+        if (!alias->hasUnderlyingType())
+          builder.getLazyResolver()->resolveDeclSignature(alias);
+        if (!alias->hasUnderlyingType())
+          continue;
 
-      // Resolve this nested type to this associated type.
-      auto pa = new PotentialArchetype(this, assocType);
+        auto type = alias->getUnderlyingType();
+        if (auto archetype = type->getAs<ArchetypeType>()) {
+          auto containingProtocol = cast<ProtocolDecl>(alias->getParent());
+          SmallVector<Identifier, 4> identifiers;
+          
+          // Go up archetype parents until we find our containing protocol.
+          while (archetype->getSelfProtocol() != containingProtocol) {
+            identifiers.push_back(archetype->getName());
+            archetype = archetype->getParent();
+            if (!archetype)
+              break;
+          }
+          if (!archetype)
+            continue;
+          
+          // Go down our PAs until we find the referenced PA.
+          auto existingPA = this;
+          while(identifiers.size()) {
+            existingPA = existingPA->getNestedType(identifiers.back(), builder);
+            identifiers.pop_back();
+          }
+          pa->Representative = existingPA;
+          RequirementSource source(RequirementSource::Inferred, SourceLoc());
+          pa->SameTypeSource = source;
+        } else if (type->hasArchetype()) {
+          // This is a complex type involving other associatedtypes, we'll fail
+          // to resolve and get a special diagnosis in finalize.
+          continue;
+        } else {
+          pa->ArchetypeOrConcreteType = NestedType::forConcreteType(type);
+        }
+      } else
+        continue;
 
       // If we have resolved this nested type to more than one associated
       // type, create same-type constraints between them.
       RequirementSource source(RequirementSource::Inferred, SourceLoc());
       if (!nested.empty()) {
-        pa->Representative = nested.front()->getRepresentative();
-        pa->Representative->EquivalenceClass.push_back(pa);
-        pa->SameTypeSource = source;
+        auto existing = nested.front();
+        if (auto alias = existing->getTypeAliasDecl()) {
+          // If we found a typealias first, and now have an associatedtype
+          // with the same name, it was a Swift 2 style declaration of the
+          // type an inherited associatedtype should be bound to. In such a
+          // case we want to make sure the associatedtype is frontmost to
+          // generate generics/witness lists correctly, and the alias
+          // will be unused/useless for generic constraining anyway.
+          alias->setInvalid();
+          nested.clear();
+        } else {
+          pa->Representative = existing->getRepresentative();
+          pa->Representative->EquivalenceClass.push_back(pa);
+          pa->SameTypeSource = source;
+        }
       }
 
       // Add this resolved nested type.
@@ -677,6 +731,9 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     builder.getASTContext().registerLazyArchetype(arch, builder, this);
     SmallVector<std::pair<Identifier, NestedType>, 4> FlatNestedTypes;
     for (auto Nested : NestedTypes) {
+      // Skip type aliases, which are just shortcuts.
+      if (Nested.second.front()->getTypeAliasDecl())
+        continue;
       bool anyNotRenamed = false;
       for (auto NestedPA : Nested.second) {
         if (!NestedPA->wasRenamed()) {
@@ -1646,6 +1703,23 @@ bool ArchetypeBuilder::finalize(SourceLoc loc) {
           /* FIXME: Should be able to handle this earlier */pa->getSuperclass())
         return;
 
+      // If a typealias with this name exists in one of the parent protocols,
+      // give a special diagnosis.
+      auto parentConformances = pa->getParent()->getConformsTo();
+      for (auto &conforms : parentConformances) {
+        for (auto member : conforms.first->getMembers()) {
+          auto typealias = dyn_cast<TypeAliasDecl>(member);
+          if (!typealias || typealias->getName() != pa->getName())
+            continue;
+
+          Context.Diags.diagnose(loc, diag::invalid_member_type_alias,
+                                 pa->getName());
+          invalid = true;
+          pa->setInvalid();
+          return;
+        }
+      }
+      
       // Try to typo correct to a nested type name.
       Identifier correction = typoCorrectNestedType(pa);
       if (correction.empty()) {
@@ -1702,7 +1776,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
         continue;
 
       PotentialArchetype *PA = Entry.second;
-      if (!PA->isConcreteType()) {
+      if (!PA->isConcreteType() && !PA->getTypeAliasDecl()) {
         auto Archetype = PA->getType(*this).castToArchetype();
         GenericParamList::addNestedArchetypes(Archetype, KnownArchetypes,
                                               Impl->AllArchetypes);
@@ -2105,6 +2179,9 @@ addNestedRequirements(
   for (const auto &nested : pa->getNestedTypes()) {
     // FIXME: Dropping requirements among different associated types of the
     // same name.
+    // Skip type aliases, which are just shortcuts down the tree.
+    if (nested.second.front()->getTypeAliasDecl())
+      continue;
     nestedTypes.push_back(std::make_pair(nested.first, nested.second.front()));
   }
   std::sort(nestedTypes.begin(), nestedTypes.end(),

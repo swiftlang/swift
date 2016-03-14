@@ -151,6 +151,13 @@ protocol P2: class, P1 {}
 
 typealias MyAlias<T, U> = (T, U, T, U)
 typealias MyAlias2<A, B> = MyAlias<A, B>
+
+func paramAutoclosureNoescape1(@noescape msg: ()->String) {}
+func paramAutoclosureNoescape2(@autoclosure msg: ()->String) {}
+func paramAutoclosureNoescape3(@autoclosure(escaping) msg: ()->String) {}
+
+func paramDefaultPlaceholder(f: StaticString = #function, file: StaticString = #file, line: UInt = #line, col: UInt = #column, arr: [Int] = [], dict: [Int:Int] = [:], opt: Int? = nil, reg: Int = 1) {}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -551,3 +558,26 @@ typealias MyAlias2<A, B> = MyAlias<A, B>
 // FIXME: missing USR for generic typealias parameter.
 // CHECK69-NEXT: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>, <Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>)</Declaration>
 // CHECK69-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = (<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</decl.typealias>
+
+// RUN: %sourcekitd-test -req=cursor -pos=155:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK70
+// CHECK70: <decl.var.parameter><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@noescape</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <decl.var.parameter.name>
+
+// RUN: %sourcekitd-test -req=cursor -pos=156:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK71
+// CHECK71: <decl.var.parameter><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <decl.var.parameter.name>
+
+// RUN: %sourcekitd-test -req=cursor -pos=157:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK72
+// CHECK72: <decl.var.parameter><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name>(escaping)</syntaxtype.attribute.builtin> <decl.var.parameter.name>
+
+// RUN: %sourcekitd-test -req=cursor -pos=159:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK73
+// CHECK73: <decl.function.free>
+// CHECK73-SAME: = <syntaxtype.keyword>#function</syntaxtype.keyword>
+// CHECK73-SAME: = <syntaxtype.keyword>#file</syntaxtype.keyword>
+// CHECK73-SAME: = <syntaxtype.keyword>#line</syntaxtype.keyword>
+// CHECK73-SAME: = <syntaxtype.keyword>#column</syntaxtype.keyword>
+// FIXME: []
+// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
+// FIXME: [:]
+// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
+// FIXME: keyword nil
+// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
+// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>

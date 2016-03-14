@@ -5270,7 +5270,9 @@ public:
         static_cast<unsigned>(ElementRecursiveness::NotRecursive);
   }
 
-  void computeType();
+  /// \returns false if there was an error during the computation rendering the
+  /// EnumElementDecl invalid, true otherwise.
+  bool computeType();
 
   bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
   Type getArgumentType() const { return ArgumentType.getType(); }
