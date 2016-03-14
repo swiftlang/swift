@@ -429,8 +429,16 @@ private:
       // Retry on the pointee
       return getEffectiveDC(pointeeQT);
 
-    if (auto tagDecl = qt.getTypePtr()->getAsTagDecl())
-      return {tagDecl->getCanonicalDecl()};
+    if (auto tagDecl = qt.getTypePtr()->getAsTagDecl()) {
+      auto canon = tagDecl->getCanonicalDecl();
+      if (canon->getDefinition())
+        return {canon};
+
+      // TODO: Once the importer learns how to import un-defined structs, then
+      // we will be able to infer them. Until that point, we have to bail
+      // because ImportDecl won't be able to re-map this.
+      return {};
+    }
 
     // Failed to find a type we can extend
     return {};
