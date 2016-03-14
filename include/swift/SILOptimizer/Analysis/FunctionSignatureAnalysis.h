@@ -173,7 +173,7 @@ struct ResultDescriptor {
   }
 };
 
-class FunctionSignatureFunctionInfo {
+class FunctionSignatureInfo {
   /// Function currently analyzing.
   SILFunction *F;
 
@@ -202,7 +202,7 @@ class FunctionSignatureFunctionInfo {
   llvm::BumpPtrAllocator Allocator;
 
 public:
-  FunctionSignatureFunctionInfo(SILFunction *F, AliasAnalysis *AA,
+  FunctionSignatureInfo(SILFunction *F, AliasAnalysis *AA,
                                 RCIdentityFunctionInfo *RCFI) :
   F(F), AA(AA), RCFI(RCFI), MayBindDynamicSelf(computeMayBindDynamicSelf(F)) {}
 
@@ -231,7 +231,7 @@ private:
   }
 };
 
-class FunctionSignatureAnalysis : public FunctionAnalysisBase<FunctionSignatureFunctionInfo> {
+class FunctionSignatureAnalysis : public FunctionAnalysisBase<FunctionSignatureInfo> {
   /// The alias analysis currently using.
   AliasAnalysis *AA;
 
@@ -239,7 +239,7 @@ class FunctionSignatureAnalysis : public FunctionAnalysisBase<FunctionSignatureF
   RCIdentityAnalysis *RCIA;
 public:
   FunctionSignatureAnalysis(SILModule *)
-    : FunctionAnalysisBase<FunctionSignatureFunctionInfo>(AnalysisKind::FunctionSignature),
+    : FunctionAnalysisBase<FunctionSignatureInfo>(AnalysisKind::FunctionSignature),
       AA(nullptr), RCIA(nullptr) {}
 
   FunctionSignatureAnalysis(const FunctionSignatureAnalysis &) = delete;
@@ -251,8 +251,8 @@ public:
 
   virtual void initialize(SILPassManager *PM) override;
   
-  virtual FunctionSignatureFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new FunctionSignatureFunctionInfo(F, AA, RCIA->get(F));
+  virtual FunctionSignatureInfo *newFunctionAnalysis(SILFunction *F) override {
+    return new FunctionSignatureInfo(F, AA, RCIA->get(F));
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

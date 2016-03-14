@@ -273,25 +273,25 @@ namespace {
 /// A class that contains all analysis information we gather about our
 /// function. Also provides utility methods for creating the new empty function.
 class SignatureOptimizer {
-  FunctionSignatureFunctionInfo *FSFI;
+  FunctionSignatureInfo &FSI;
 
 public:
   SignatureOptimizer() = delete;
   SignatureOptimizer(const SignatureOptimizer &) = delete;
   SignatureOptimizer(SignatureOptimizer &&) = delete;
 
-  SignatureOptimizer(FunctionSignatureFunctionInfo *FSFI) : FSFI(FSFI) {}
+  SignatureOptimizer(FunctionSignatureInfo &FSI) : FSI(FSI) {}
 
   ArrayRef<ArgumentDescriptor> getArgDescList() const {
-    return FSFI->getArgDescList();
+    return FSI.getArgDescList();
   }
 
   ArrayRef<ArgumentDescriptor> getArgDescList() {
-    return FSFI->getArgDescList();
+    return FSI.getArgDescList();
   }
 
   ArrayRef<ResultDescriptor> getResultDescList() {
-    return FSFI->getResultDescList();
+    return FSI.getResultDescList();
   }
 
   /// Create a new empty function with the optimized signature found by this
@@ -312,7 +312,7 @@ private:
 //===----------------------------------------------------------------------===//
 
 CanSILFunctionType SignatureOptimizer::createOptimizedSILFunctionType() {
-  auto *F = FSFI->getAnalyzedFunction();
+  auto *F = FSI.getAnalyzedFunction();
 
   const ASTContext &Ctx = F->getModule().getASTContext();
   CanSILFunctionType FTy = F->getLoweredFunctionType();
@@ -350,7 +350,7 @@ CanSILFunctionType SignatureOptimizer::createOptimizedSILFunctionType() {
   auto ExtInfo = FTy->getExtInfo();
 
   // Don't use a method representation if we modified self.
-  if (FSFI->shouldModifySelfArgument())
+  if (FSI.shouldModifySelfArgument())
     ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   return SILFunctionType::get(FTy->getGenericSignature(), ExtInfo,
@@ -361,7 +361,7 @@ CanSILFunctionType SignatureOptimizer::createOptimizedSILFunctionType() {
 SILFunction *SignatureOptimizer::createEmptyFunctionWithOptimizedSig(
     const std::string &NewFName) {
 
-  auto *F = FSFI->getAnalyzedFunction();
+  auto *F = FSI.getAnalyzedFunction();
   SILModule &M = F->getModule();
 
   // Create the new optimized function type.
@@ -647,7 +647,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
 /// returns false otherwise.
 static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                                       RCIdentityFunctionInfo *RCIA,
-                                      FunctionSignatureFunctionInfo *FSFI,
+                                      FunctionSignatureInfo *FSI,
                                       AliasAnalysis *AA, 
                                       SILFunction *F,
                                       const ApplyList &CallSites) {
@@ -657,7 +657,7 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   assert(!CallSites.empty() && "Unexpected empty set of call sites!");
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  if (!FSFI->analyze()) {
+  if (!FSI->analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");
     return false;
@@ -668,7 +668,7 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   ++NumFunctionSignaturesOptimized;
 
-  auto NewFName = FSFI->getOptimizedName();
+  auto NewFName = FSI->getOptimizedName();
 
   // If we already have a specialized version of this function, do not
   // respecialize. For now just bail.
@@ -680,7 +680,7 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   if (F->getModule().lookUpFunction(NewFName))
     return false;
 
-  SignatureOptimizer Optimizer(FSFI);
+  SignatureOptimizer Optimizer(*FSI);
 
   // Otherwise, move F over to NewF.
   SILFunction *NewF =

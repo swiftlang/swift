@@ -116,7 +116,7 @@ getNonTrivialNonDebugReleaseUse(SILArgument *Arg) {
   return Result;
 }
 
-bool FunctionSignatureFunctionInfo::analyzeParameters() {
+bool FunctionSignatureInfo::analyzeParameters() {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResults())
     return false;
@@ -197,7 +197,7 @@ bool FunctionSignatureFunctionInfo::analyzeParameters() {
   return ShouldOptimize;
 }
 
-bool FunctionSignatureFunctionInfo::analyzeResult() {
+bool FunctionSignatureInfo::analyzeResult() {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResults())
     return false;
@@ -230,7 +230,7 @@ bool FunctionSignatureFunctionInfo::analyzeResult() {
 /// This function goes through the arguments of F and sees if we have anything
 /// to optimize in which case it returns true. If we have nothing to optimize,
 /// it returns false.
-bool FunctionSignatureFunctionInfo::analyze() {
+bool FunctionSignatureInfo::analyze() {
   bool OptimizedParams = analyzeParameters();
   bool OptimizedResult = analyzeResult();
   return OptimizedParams || OptimizedResult;
@@ -240,7 +240,7 @@ bool FunctionSignatureFunctionInfo::analyze() {
 //                                  Mangling
 //===----------------------------------------------------------------------===//
 
-std::string FunctionSignatureFunctionInfo::getOptimizedName() const {
+std::string FunctionSignatureInfo::getOptimizedName() const {
   Mangle::Mangler M;
   auto P = SpecializationPass::FunctionSignatureOpts;
   FunctionSignatureSpecializationMangler FSSM(P, M, F);
