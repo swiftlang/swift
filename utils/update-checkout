@@ -32,6 +32,7 @@ REPOSITORIES = {
     'cmark': 'apple/swift-cmark',
     'llbuild': 'apple/swift-llbuild',
     'swiftpm': 'apple/swift-package-manager',
+    'compiler-rt': 'apple/swift-compiler-rt',
     'swift-corelibs-xctest': 'apple/swift-corelibs-xctest',
     'swift-corelibs-foundation': 'apple/swift-corelibs-foundation',
     'swift-corelibs-libdispatch': 'apple/swift-corelibs-libdispatch',
