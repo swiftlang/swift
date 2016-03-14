@@ -1398,6 +1398,8 @@ bool ModelASTWalker::findFieldsInDocCommentLine(SyntaxNode Node) {
   auto FieldNode = parseFieldNode(Text, OrigText, OrigLoc);
   if (FieldNode.hasValue())
     passNode(FieldNode.getValue());
+  else
+    searchForURL(Node.Range);
   return true;
 }
 
@@ -1438,6 +1440,10 @@ bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
     auto FieldNode = parseFieldNode(Line.drop_front(Indent), OrigText, OrigLoc);
     if (FieldNode.hasValue())
       passNode(FieldNode.getValue());
+    else
+      searchForURL(CharSourceRange(Node.Range.getStart().
+        getAdvancedLoc(Line.data() - OrigText.data()),
+                                   Line.size()));
   }
 
   std::match_results<StringRef::iterator> Matches;
