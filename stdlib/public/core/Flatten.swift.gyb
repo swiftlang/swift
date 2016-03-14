@@ -155,8 +155,16 @@ public struct ${Index}<
     self._outer = _outer
     self._inner = inner
   }
-  
+
+  /// The position in the outer collection of collections.
   internal let _outer: BaseElements.Index
+
+  /// The position in the inner collection at `base[_outer]`, or `nil` if
+  /// `_outer == base.endIndex`.
+  ///
+  /// When `_inner != nil`, `_inner!` is a valid subscript of `base[_outer]`;
+  /// when `_inner == nil`, `_outer == base.endIndex` and this index is
+  /// `endIndex` of the `${Collection}`.
   internal let _inner: BaseElements.Iterator.Element.Index?
 }
 
@@ -173,6 +181,7 @@ public func < <BaseElements> (
   lhs: ${Index}<BaseElements>, 
   rhs: ${Index}<BaseElements>
 ) -> Bool {
+  // FIXME: swift-3-indexing-model: tests.
   if lhs._outer != rhs._outer {
     return lhs._outer < rhs._outer
   }
@@ -216,6 +225,8 @@ public struct ${Collection}<
   where
   ${constraints % {'Base': 'Base.'}}
 > : ${collectionForTraversal(traversal)} {
+  // FIXME: swift-3-indexing-model: check test coverage for collection.
+
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -240,8 +251,9 @@ public struct ${Collection}<
   ///
   /// In an empty collection, `startIndex == endIndex`.
   public var startIndex: Index {
+    let end = _base.endIndex
     var outer = _base.startIndex
-    while outer != _base.endIndex {
+    while outer != end {
       let innerCollection = _base[outer]
       if !innerCollection.isEmpty {
         return ${Index}(outer, innerCollection.startIndex)
@@ -264,17 +276,17 @@ public struct ${Collection}<
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func next(i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range checks?
-    let nextInner = _base[i._outer].next(i._inner!)
-    if _fastPath(nextInner != _base[i._outer].endIndex) {
+    let innerCollection = _base[i._outer]
+    let nextInner = innerCollection.next(i._inner!)
+    if _fastPath(nextInner != innerCollection.endIndex) {
       return ${Index}(i._outer, nextInner)
     }
 
     var nextOuter = _base.next(i._outer)
     while nextOuter != _base.endIndex {
-      let innerCollection = _base[nextOuter]
-      if !innerCollection.isEmpty {
-        return ${Index}(nextOuter, innerCollection.startIndex)
+      let nextInnerCollection = _base[nextOuter]
+      if !nextInnerCollection.isEmpty {
+        return ${Index}(nextOuter, nextInnerCollection.startIndex)
       }
       _base._nextInPlace(&nextOuter)
     }
@@ -286,7 +298,6 @@ public struct ${Collection}<
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func previous(i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range checks?
     var prevOuter = i._outer
     if prevOuter == _base.endIndex {
       prevOuter = _base.previous(prevOuter)
@@ -328,6 +339,19 @@ public struct ${Collection}<
     // rely on underestimated count.
     return _copySequenceToNativeArrayBuffer(self)
   }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func forEach(
+    @noescape body: (Base.Iterator.Element.Iterator.Element) throws -> Void
+  ) rethrows {
+    // FIXME: swift-3-indexing-model: tests.
+    for innerCollection in _base {
+      try innerCollection.forEach(body)
+    }
+  }
+
+  // FIXME(performance): swift-3-indexing-model: add custom advance/distance
+  // methods that skip over inner collections when random-access
 
   internal var _base: Base
 }
