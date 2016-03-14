@@ -35,15 +35,12 @@ void SILDefaultWitnessTable::addDefaultWitnessTable() {
 
 SILDefaultWitnessTable *
 SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol,
-                               unsigned MinimumWitnessTableSizeInWords,
                                ArrayRef<SILDefaultWitnessTable::Entry> entries){
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILDefaultWitnessTable),
                          alignof(SILDefaultWitnessTable));
   SILDefaultWitnessTable *wt =
-      ::new (buf) SILDefaultWitnessTable(M, Protocol,
-                                         MinimumWitnessTableSizeInWords,
-                                         entries);
+      ::new (buf) SILDefaultWitnessTable(M, Protocol, entries);
 
   wt->addDefaultWitnessTable();
 
@@ -68,26 +65,20 @@ SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol) {
 SILDefaultWitnessTable::
 SILDefaultWitnessTable(SILModule &M,
                        const ProtocolDecl *Protocol,
-                       unsigned MinimumWitnessTableSizeInWords,
                        ArrayRef<Entry> entries)
-  : Mod(M), Protocol(Protocol), MinimumWitnessTableSizeInWords(0), Entries(),
-    IsDeclaration(true) {
+  : Mod(M), Protocol(Protocol), Entries(), IsDeclaration(true) {
 
-  convertToDefinition(MinimumWitnessTableSizeInWords, entries);
+  convertToDefinition(entries);
 }
 
 SILDefaultWitnessTable::SILDefaultWitnessTable(SILModule &M,
                                                const ProtocolDecl *Protocol)
-  : Mod(M), Protocol(Protocol), MinimumWitnessTableSizeInWords(0), Entries(),
-    IsDeclaration(true) {}
+  : Mod(M), Protocol(Protocol), Entries(), IsDeclaration(true) {}
 
 void SILDefaultWitnessTable::
-convertToDefinition(unsigned MinimumWitnessTableSizeInWords,
-                    ArrayRef<Entry> entries) {
+convertToDefinition(ArrayRef<Entry> entries) {
   assert(IsDeclaration);
   IsDeclaration = false;
-
-  this->MinimumWitnessTableSizeInWords = MinimumWitnessTableSizeInWords;
 
   void *buf = Mod.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
   memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
@@ -99,6 +90,31 @@ convertToDefinition(unsigned MinimumWitnessTableSizeInWords,
       entry.getWitness()->incrementRefCount();
     }
   }
+}
+
+unsigned SILDefaultWitnessTable::getMinimumWitnessTableSize() const {
+  unsigned defaultEntries = 0;
+  unsigned minimumEntries = 0;
+
+  // Count the number of entries up to and including the last null entry.
+  // This is the number of witnesses that all conforming types must
+  // provide.
+  //
+  // Any witnesses after the last null entry all have defaults, and can
+  // be omitted from conformances; these are the resilient defaults.
+  //
+  // FIXME: Really this should look at availability instead.
+  for (auto entry : Entries) {
+    if (entry.isValid()) {
+      defaultEntries++;
+    } else {
+      minimumEntries++;
+      minimumEntries += defaultEntries;
+      defaultEntries = 0;
+    }
+  }
+
+  return minimumEntries;
 }
 
 SILDefaultWitnessTable::~SILDefaultWitnessTable() {

@@ -171,6 +171,26 @@ Optional<StringRef> Decl::getGroupName() const {
   return None;
 }
 
+Optional<StringRef> Decl::getSourceFileName() const {
+
+  // We can only get group information from deserialized module files.
+  if (auto *Unit =
+      dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    return Unit->getSourceFileNameForDecl(this);
+  }
+  return None;
+}
+
+Optional<unsigned> Decl::getSourceOrder() const {
+
+  // We can only get source orders from deserialized module files.
+  if (auto *Unit =
+      dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    return Unit->getSourceOrderForDecl(this);
+  }
+  return None;
+}
+
 static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
                                      const Decl *D) {
   PrettyStackTraceDecl StackTrace("extracting brief comment for", D);

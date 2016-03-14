@@ -30,39 +30,50 @@ class DeclContext;
 class Type;
 enum DeclAttrKind : unsigned;
 class PrinterArchetypeTransformer;
+class SynthesizedExtensionAnalyzer;
+struct PrintOptions;
 
 /// Necessary information for archetype transformation during printing.
 struct ArchetypeTransformContext {
   Type getTypeBase();
   NominalTypeDecl *getNominal();
-  PrinterArchetypeTransformer *getTransformer() { return Transformer.get(); }
+  PrinterArchetypeTransformer *getTransformer();
   bool isPrintingSynthesizedExtension();
   bool isPrintingTypeInterface();
   ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer);
   ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
                             Type T);
   ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
-                            NominalTypeDecl *NTD);
+                            NominalTypeDecl *NTD,
+                            SynthesizedExtensionAnalyzer *Analyzer);
   Type transform(Type Input);
   StringRef transform(StringRef Input);
-private:
-  std::shared_ptr<PrinterArchetypeTransformer> Transformer;
 
-  // When printing a type interface, this is the type to print.
-  // When synthesizing extensions, this is the target nominal.
-  llvm::PointerUnion<TypeBase*, NominalTypeDecl*> TypeBaseOrNominal;
+  bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
+  bool shouldOpenExtension;
+  bool shouldCloseExtension;
+
+  ~ArchetypeTransformContext();
+private:
+  struct Implementation;
+  Implementation &Impl;
 };
 
 class SynthesizedExtensionAnalyzer {
   struct Implementation;
   Implementation &Impl;
-  bool isApplicable(ExtensionDecl *Ext);
 
 public:
-  SynthesizedExtensionAnalyzer(NominalTypeDecl *Target);
+  SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
+                               PrintOptions Options,
+                               bool IncludeUnconditional = true);
   ~SynthesizedExtensionAnalyzer();
-  void findSynthesizedExtensions(llvm::SmallPtrSetImpl<ExtensionDecl*> &Scratch);
+  void forEachSynthesizedExtension(
+    llvm::function_ref<void(ExtensionDecl*)> Fn);
+  void forEachSynthesizedExtensionMergeGroup(
+    llvm::function_ref<void(ArrayRef<ExtensionDecl*>)> Fn);
   bool isInSynthesizedExtension(const ValueDecl *VD);
+  bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
 };
 
 /// Options for printing AST nodes.
@@ -97,6 +108,9 @@ struct PrintOptions {
 
   /// \brief Whether to print a placeholder for default parameters.
   bool PrintDefaultParameterPlaceholder = true;
+
+  /// \brief Whether to print enum raw value expressions.
+  bool EnumRawValues = false;
 
   /// \brief Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
@@ -144,6 +158,7 @@ struct PrintOptions {
   bool SkipPrivateStdlibDecls = false;
 
   /// Whether to skip underscored stdlib protocols.
+  /// Protocols marked with @_show_in_interface are still printed.
   bool SkipUnderscoredStdlibProtocols = false;
 
   /// Whether to skip extensions that don't add protocols or no members.
@@ -246,7 +261,7 @@ struct PrintOptions {
   /// \brief Print dependent types as references into this generic parameter
   /// list.
   GenericParamList *ContextGenericParams = nullptr;
-  
+
   /// \brief Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
 
@@ -290,7 +305,10 @@ struct PrintOptions {
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
     result.SkipPrivateStdlibDecls = true;
+    result.SkipUnderscoredStdlibProtocols = true;
     result.SkipDeinit = true;
+    result.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
+    result.EmptyLineBetweenMembers = true;
     return result;
   }
 
@@ -300,7 +318,8 @@ struct PrintOptions {
 
   void setArchetypeTransformForQuickHelp(Type T, DeclContext *DC);
 
-  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D);
+  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D,
+                                    SynthesizedExtensionAnalyzer *SynAnalyzer);
 
   void clearArchetypeTransformerForSynthesizedExtensions();
 
@@ -365,6 +384,7 @@ struct PrintOptions {
   /// Print in the style of quick help declaration.
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
+    PO.EnumRawValues = true;
     PO.PrintDefaultParameterPlaceholder = true;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;

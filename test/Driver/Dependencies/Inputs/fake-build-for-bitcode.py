@@ -32,8 +32,8 @@ with open(outputFile, 'a'):
     os.utime(outputFile, None)
 
 if '-emit-bc' in sys.argv:
-  print("Handled", os.path.basename(primaryFile))
+    print("Handled", os.path.basename(primaryFile))
 elif '-c' in sys.argv:
-  print("Produced", os.path.basename(outputFile))
+    print("Produced", os.path.basename(outputFile))
 else:
-  assert False, "unknown action"
+    assert False, "unknown action"

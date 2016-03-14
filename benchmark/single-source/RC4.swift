@@ -20,7 +20,7 @@ struct RC4 {
   var J : UInt8 = 0
 
   init() {
-    State = [UInt8](count: 256, repeatedValue: 0)
+    State = [UInt8](repeating: 0, count: 256)
   }
 
   mutating
@@ -84,7 +84,7 @@ public func run_RC4(N: Int) {
   let SecretData : [UInt8] = Array(Secret.utf8)
   let KeyData    : [UInt8] = Array(Key.utf8)
 
-  var LongData : [UInt8] = [UInt8](count: messageLen, repeatedValue: 0)
+  var LongData : [UInt8] = [UInt8](repeating: 0, count: messageLen)
 
   for _ in 1...N {
     // Generate a long message.

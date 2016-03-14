@@ -29,7 +29,7 @@ func test0() {
 
 // CHECK-LABEL: sil hidden @_TF10reabstract10testThrowsFP_T_
 // CHECK:         function_ref @_TTRXFo_iT__iT__XFo___
-// CHECK:         function_ref @_TTRXFo_iT__iT_zoPs9ErrorType__XFo__zoPS___
+// CHECK:         function_ref @_TTRXFo_iT__iT_zoPs13ErrorProtocol__XFo__zoPS___
 func testThrows(x: Any) {
   _ = x as? () -> ()
   _ = x as? () throws -> ()

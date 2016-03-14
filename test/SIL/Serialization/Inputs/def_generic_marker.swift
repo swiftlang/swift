@@ -1,9 +1,9 @@
 public protocol mmGeneratorType {
-  typealias Element
+  associatedtype Element
 }
 
 public protocol mmSequenceType {
-  typealias Generator : mmGeneratorType
+  associatedtype Generator : mmGeneratorType
 }
 
 public protocol mmCollectionType : mmSequenceType {

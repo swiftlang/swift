@@ -21,7 +21,7 @@ class Noisy {
   init() { NoisyCount += 1 }
   deinit { NoisyCount -= 1 }
 }
-enum SillyError: ErrorType { case JazzHands }
+enum SillyError : ErrorProtocol { case JazzHands }
 
 var ErrorHandlingTests = TestSuite("ErrorHandling")
 
@@ -80,7 +80,7 @@ ErrorHandlingTests.test("ErrorHandling/Optional.map and .flatMap") {
   do {
     let y: String? = try x.flatMap {(n: Int) -> String? in
       throw SillyError.JazzHands
-      return .Some("\(n)")
+      return .some("\(n)")
     }
     expectUnreachable()
   } catch {}
@@ -102,9 +102,9 @@ ErrorHandlingTests.test("ErrorHandling/withCString extends lifetime") {
   // TODO: Some way to check string was deallocated?
 }
 
-ErrorHandlingTests.test("ErrorHandling/indexOf") {
+ErrorHandlingTests.test("ErrorHandling/index(where:)") {
   do {
-    let _: Int? = try [1, 2, 3].indexOf {
+    let _: Int? = try [1, 2, 3].index {
       throw SillyError.JazzHands
       return $0 == $0
     }
@@ -155,7 +155,7 @@ ErrorHandlingTests.test("ErrorHandling/Optional flatMap") {
       if $0 == 2 {
         throw SillyError.JazzHands
       }
-      return .Some($0)
+      return .some($0)
     }
     expectUnreachable()
   } catch {}
@@ -171,7 +171,7 @@ ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
       if x == 2 {
         throw SillyError.JazzHands
       }
-      return Array(count: x, repeatedValue: x)
+      return Array(repeating: x, count: x)
     }
     expectUnreachable()
   } catch {}
@@ -179,9 +179,9 @@ ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
   expectEqual(loopCount, 2)
 }
 
-ErrorHandlingTests.test("ErrorHandling/minElement") {
+ErrorHandlingTests.test("ErrorHandling/min") {
   do {
-    let _: Int? = try [1, 2, 3].minElement { _, _ in
+    let _: Int? = try [1, 2, 3].min { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -189,7 +189,7 @@ ErrorHandlingTests.test("ErrorHandling/minElement") {
   } catch {}
 
   do {
-    let _: Int? = try [1, 2, 3].maxElement { _, _ in
+    let _: Int? = try [1, 2, 3].max { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -197,9 +197,9 @@ ErrorHandlingTests.test("ErrorHandling/minElement") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/startsWith") {
+ErrorHandlingTests.test("ErrorHandling/starts(with:)") {
   do {
-    let x: Bool = try [1, 2, 3].startsWith([1, 2]) { _, _ in
+    let x: Bool = try [1, 2, 3].starts(with: [1, 2]) { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -217,9 +217,9 @@ ErrorHandlingTests.test("ErrorHandling/elementsEqual") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/lexicographicalCompare") {
+ErrorHandlingTests.test("ErrorHandling/lexicographicallyPrecedes(_:)") {
   do {
-    let x: Bool = try [1, 2, 3].lexicographicalCompare([0, 2, 3]) { _, _ in
+    let x: Bool = try [1, 2, 3].lexicographicallyPrecedes([0, 2, 3]) { _, _ in
       throw SillyError.JazzHands
       return false
     }

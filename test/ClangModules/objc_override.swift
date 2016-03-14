@@ -18,8 +18,8 @@ class SomeCellSub1 : SomeCell {
   // okay: should not conflict
   func initWithString(string: String) { }
 
-  var enabled: Bool { // expected-error{{overriding declaration requires an 'override' keyword}}
-    get { return super.enabled }
+  var isEnabled: Bool { // expected-error{{overriding declaration requires an 'override' keyword}}
+    get { return super.isEnabled }
   }
 
   @objc(enabled)
@@ -32,8 +32,8 @@ class SomeCellSub2 : SomeCell {
   // okay: should not conflict
   func initWithString(string: String) { }
 
-  override var enabled: Bool {
-    get { return super.enabled }
+  override var isEnabled: Bool {
+    get { return super.isEnabled }
   }
 
   @objc(enabled)
@@ -47,8 +47,8 @@ class SomeCellSub3 : SomeCell {
   // okay: should not conflict
   func initWithString(string: String) { }
 
-  override var enabled: Bool {
-    @objc(isEnabled) get { return super.enabled }
+  override var isEnabled: Bool {
+    @objc(isEnabled) get { return super.isEnabled }
   }
 
   @objc(enabled)
@@ -62,8 +62,8 @@ class SomeCellSub4 : SomeCell {
   // okay: should not conflict
   func initWithString(string: String) { }
 
-  override var enabled: Bool {
-    @objc get { return super.enabled }
+  override var isEnabled: Bool {
+    @objc get { return super.isEnabled }
   }
 
   @objc(enabled)
@@ -74,8 +74,8 @@ class SomeCellSub5 : SomeCell {
   @objc(initWithString:) // expected-error{{Objective-C method has a different selector from the method it overrides ('initWithString:' vs. 'initString:')}}{{9-24=initString:}}
   override init(string: String) { super.init(string: string) }
 
-  override var enabled: Bool {
-    @objc(wasEnabled) get { return super.enabled }
+  override var isEnabled: Bool {
+    @objc(wasEnabled) get { return super.isEnabled }
     // expected-error@-1{{Objective-C method has a different selector from the method it overrides ('wasEnabled' vs. 'isEnabled')}}{{11-21=isEnabled}}
   }
 

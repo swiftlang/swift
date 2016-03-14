@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 protocol P {
-  typealias A
+  associatedtype A
 
   func f(x: A)
 }

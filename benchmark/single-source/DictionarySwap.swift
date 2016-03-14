@@ -44,3 +44,47 @@ func swappedCorrectly(swapped: Bool, _ p25: Int, _ p75: Int) -> Bool {
     return swapped && (p25 == 75 && p75 == 25) ||
           !swapped && (p25 == 25 && p75 == 75)
 }
+
+class Box<T : Hashable where T : Equatable> : Hashable {
+  var value: T
+
+  init(_ v: T) {
+    value = v
+  }
+
+  var hashValue : Int {
+    return value.hashValue
+  }
+}
+
+extension Box : Equatable {
+}
+
+func ==<T: Equatable>(lhs: Box<T>,  rhs: Box<T>) -> Bool {
+  return lhs.value == rhs.value
+}
+
+@inline(never)
+public func run_DictionarySwapOfObjects(N: Int) {
+    let size = 100
+    var dict = Dictionary<Box<Int>, Box<Int>>(minimumCapacity: size)
+
+    // Fill dictionary
+    for i in 1...size {
+        dict[Box(i)] = Box(i)
+    }
+    CheckResults(dict.count == size,
+                 "Incorrect dict count: \(dict.count) != \(size).")
+
+    var swapped = false
+    for _ in 1...10000*N {
+        swap(&dict[Box(25)]!, &dict[Box(75)]!)
+        swapped = !swapped
+        if !swappedCorrectly(swapped, dict[Box(25)]!.value, dict[Box(75)]!.value) {
+            break
+        }
+    }
+
+    CheckResults(swappedCorrectly(swapped, dict[Box(25)]!.value, dict[Box(75)]!.value),
+                 "Dictionary value swap failed")
+}

@@ -22,7 +22,7 @@ class RefArray<T> {
   var array : [T]
 
   init(_ i:T) {
-    array = [T](count: 100000, repeatedValue: i)
+    array = [T](repeating: i, count: 100000)
   }
 }
 

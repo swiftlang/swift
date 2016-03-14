@@ -27,7 +27,6 @@ add_swift_library(swiftSIL
   SILSuccessor.cpp
   SILType.cpp
   SILValue.cpp
-  SILValueProjection.cpp
   SILVerifier.cpp
   SILVTable.cpp
   SILWitnessTable.cpp

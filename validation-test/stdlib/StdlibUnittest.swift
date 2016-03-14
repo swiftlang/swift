@@ -11,7 +11,7 @@ import StdlibUnittest
 import ObjectiveC
 #endif
 
-_setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
+_setOverrideOSVersion(.osx(major: 10, minor: 9, bugFix: 3))
 _setTestSuiteFailedCallback() { print("abort()") }
 
 //
@@ -26,7 +26,7 @@ TestSuitePasses.test("passes") {
 // CHECK: TestSuitePasses: All tests passed
 
 var TestSuiteUXPasses = TestSuite("TestSuiteUXPasses")
-TestSuiteUXPasses.test("uxpasses").xfail(.OSXAny("")).code {
+TestSuiteUXPasses.test("uxpasses").xfail(.osxAny("")).code {
   expectEqual(1, 1)
 }
 // CHECK: [   UXPASS ] TestSuiteUXPasses.uxpasses{{$}}
@@ -48,7 +48,7 @@ TestSuiteFails.test("fails") {
 // CHECK: abort()
 
 var TestSuiteXFails = TestSuite("TestSuiteXFails")
-TestSuiteXFails.test("xfails").xfail(.OSXAny("")).code {
+TestSuiteXFails.test("xfails").xfail(.osxAny("")).code {
   expectEqual(1, 2)
 }
 // CHECK: [    XFAIL ] TestSuiteXFails.xfails{{$}}
@@ -72,55 +72,55 @@ XFailsAndSkips.test("fails") {
 
 // CHECK: [    XFAIL ] XFailsAndSkips.fails-always{{$}}
 XFailsAndSkips.test("fails-always")
-  .xfail(.Always("must always fail")).code {
+  .xfail(.always("must always fail")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [      OK ] XFailsAndSkips.fails-never{{$}}
 XFailsAndSkips.test("fails-never")
-  .xfail(.Never).code {
+  .xfail(.never).code {
   expectEqual(1, 1)
 }
 
 // CHECK: [    XFAIL ] XFailsAndSkips.xfail 10.9.3 passes{{$}}
 XFailsAndSkips.test("xfail 10.9.3 passes")
-  .xfail(.OSXBugFix(10, 9, 3, reason: "")).code {
+  .xfail(.osxBugFix(10, 9, 3, reason: "")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [    XFAIL ] XFailsAndSkips.xfail 10.9.3 fails{{$}}
 XFailsAndSkips.test("xfail 10.9.3 fails")
-  .xfail(.OSXBugFix(10, 9, 3, reason: "")).code {
+  .xfail(.osxBugFix(10, 9, 3, reason: "")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [     SKIP ] XFailsAndSkips.skipAlways (skip: [Always(reason: skip)]){{$}}
 XFailsAndSkips.test("skipAlways")
-  .skip(.Always("skip")).code {
+  .skip(.always("skip")).code {
     fatalError("should not happen")
 }
 
 // CHECK: [       OK ] XFailsAndSkips.skipNever{{$}}
 XFailsAndSkips.test("skipNever")
-  .skip(.Never).code {
+  .skip(.never).code {
     expectEqual(1, 1)
 }
 
 // CHECK: [     FAIL ] XFailsAndSkips.skip 10.9.2 passes{{$}}
 XFailsAndSkips.test("skip 10.9.2 passes")
-  .skip(.OSXBugFix(10, 9, 2, reason: "")).code {
+  .skip(.osxBugFix(10, 9, 2, reason: "")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [     FAIL ] XFailsAndSkips.skip 10.9.2 fails{{$}}
 XFailsAndSkips.test("skip 10.9.2 fails")
-  .skip(.OSXBugFix(10, 9, 2, reason: "")).code {
+  .skip(.osxBugFix(10, 9, 2, reason: "")).code {
   expectEqual(1, 2)
 }
 
-// CHECK: [ SKIP     ] XFailsAndSkips.skip 10.9.3 (skip: [OSX(10.9.3, reason: )]){{$}}
+// CHECK: [ SKIP     ] XFailsAndSkips.skip 10.9.3 (skip: [osx(10.9.3, reason: )]){{$}}
 XFailsAndSkips.test("skip 10.9.3")
-  .skip(.OSXBugFix(10, 9, 3, reason: "")).code {
+  .skip(.osxBugFix(10, 9, 3, reason: "")).code {
   expectEqual(1, 2)
   fatalError("should not be executed")
 }
@@ -136,13 +136,13 @@ var XFailsCustomPredicates = TestSuite("XFailsCustomPredicates")
 
 // CHECK: [    XFAIL ] XFailsCustomPredicates.matches{{$}}
 XFailsCustomPredicates.test("matches")
-  .xfail(.Custom({ true }, reason: "")).code {
+  .xfail(.custom({ true }, reason: "")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [       OK ] XFailsCustomPredicates.not matches{{$}}
 XFailsCustomPredicates.test("not matches")
-  .xfail(.Custom({ false }, reason: "")).code {
+  .xfail(.custom({ false }, reason: "")).code {
   expectEqual(1, 1)
 }
 
@@ -155,68 +155,68 @@ XFailsCustomPredicates.test("not matches")
 var XFailsOSX = TestSuite("XFailsOSX")
 
 // CHECK: [   UXPASS ] XFailsOSX.xfail OSX passes{{$}}
-XFailsOSX.test("xfail OSX passes").xfail(.OSXAny("")).code {
+XFailsOSX.test("xfail OSX passes").xfail(.osxAny("")).code {
   expectEqual(1, 1)
 }
 
 // CHECK: [    XFAIL ] XFailsOSX.xfail OSX fails{{$}}
-XFailsOSX.test("xfail OSX fails").xfail(.OSXAny("")).code {
+XFailsOSX.test("xfail OSX fails").xfail(.osxAny("")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [       OK ] XFailsOSX.xfail 9.*{{$}}
-XFailsOSX.test("xfail 9.*").xfail(.OSXMajor(9, reason: "")).code {
+XFailsOSX.test("xfail 9.*").xfail(.osxMajor(9, reason: "")).code {
   expectEqual(1, 1)
 }
 
 // CHECK: [    XFAIL ] XFailsOSX.xfail 10.*{{$}}
-XFailsOSX.test("xfail 10.*").xfail(.OSXMajor(10, reason: "")).code {
+XFailsOSX.test("xfail 10.*").xfail(.osxMajor(10, reason: "")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [       OK ] XFailsOSX.xfail 10.8{{$}}
-XFailsOSX.test("xfail 10.8").xfail(.OSXMinor(10, 8, reason: "")).code {
+XFailsOSX.test("xfail 10.8").xfail(.osxMinor(10, 8, reason: "")).code {
   expectEqual(1, 1)
 }
 
 // CHECK: [    XFAIL ] XFailsOSX.xfail 10.9{{$}}
-XFailsOSX.test("xfail 10.9").xfail(.OSXMinor(10, 9, reason: "")).code {
+XFailsOSX.test("xfail 10.9").xfail(.osxMinor(10, 9, reason: "")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [       OK ] XFailsOSX.xfail 10.[7-8]{{$}}
 XFailsOSX.test("xfail 10.[7-8]")
-  .xfail(.OSXMinorRange(10, 7...8, reason: "")).code {
+  .xfail(.osxMinorRange(10, 7...8, reason: "")).code {
   expectEqual(1, 1)
 }
 
 // CHECK: [    XFAIL ] XFailsOSX.xfail 10.[9-10]{{$}}
 XFailsOSX.test("xfail 10.[9-10]")
-  .xfail(.OSXMinorRange(10, 9...10, reason: "")).code {
+  .xfail(.osxMinorRange(10, 9...10, reason: "")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [       OK ] XFailsOSX.xfail 10.9.2{{$}}
 XFailsOSX.test("xfail 10.9.2")
-  .xfail(.OSXBugFix(10, 9, 2, reason: "")).code {
+  .xfail(.osxBugFix(10, 9, 2, reason: "")).code {
   expectEqual(1, 1)
 }
 
 // CHECK: [    XFAIL ] XFailsOSX.xfail 10.9.3{{$}}
 XFailsOSX.test("xfail 10.9.3")
-  .xfail(.OSXBugFix(10, 9, 3, reason: "")).code {
+  .xfail(.osxBugFix(10, 9, 3, reason: "")).code {
   expectEqual(1, 2)
 }
 
 // CHECK: [       OK ] XFailsOSX.xfail 10.9.[1-2]{{$}}
 XFailsOSX.test("xfail 10.9.[1-2]")
-  .xfail(.OSXBugFixRange(10, 9, 1...2, reason: "")).code {
+  .xfail(.osxBugFixRange(10, 9, 1...2, reason: "")).code {
   expectEqual(1, 1)
 }
 
 // CHECK: [    XFAIL ] XFailsOSX.xfail 10.9.[3-4]{{$}}
 XFailsOSX.test("xfail 10.9.[3-4]")
-  .xfail(.OSXBugFixRange(10, 9, 3...4, reason: "")).code {
+  .xfail(.osxBugFixRange(10, 9, 3...4, reason: "")).code {
   expectEqual(1, 2)
 }
 
@@ -235,9 +235,9 @@ PassThroughStdoutStderr.test("hasNewline") {
   print("stdout third")
 
   var stderr = _Stderr()
-  print("stderr first", toStream: &stderr)
-  print("stderr second", toStream: &stderr)
-  print("stderr third", toStream: &stderr)
+  print("stderr first", to: &stderr)
+  print("stderr second", to: &stderr)
+  print("stderr third", to: &stderr)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.hasNewline
 // CHECK-DAG: out>>> stdout first
@@ -254,9 +254,9 @@ PassThroughStdoutStderr.test("noNewline") {
   print("stdout third", terminator: "")
 
   var stderr = _Stderr()
-  print("stderr first", toStream: &stderr)
-  print("stderr second", toStream: &stderr)
-  print("stderr third", terminator: "", toStream: &stderr)
+  print("stderr first", to: &stderr)
+  print("stderr second", to: &stderr)
+  print("stderr third", terminator: "", to: &stderr)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.noNewline
 // CHECK-DAG: out>>> stdout first
@@ -355,7 +355,7 @@ AssertionsTestSuite.test("expectFailure/Pass") {
 // CHECK: [       OK ] Assertions.expectFailure/Pass
 
 AssertionsTestSuite.test("expectFailure/UXPass")
-  .xfail(.Custom({ true }, reason: "test"))
+  .xfail(.custom({ true }, reason: "test"))
   .code {
   expectFailure {
     expectEqual(1, 2)
@@ -380,7 +380,7 @@ AssertionsTestSuite.test("expectFailure/Fail") {
 // CHECK: [     FAIL ] Assertions.expectFailure/Fail
 
 AssertionsTestSuite.test("expectFailure/XFail")
-  .xfail(.Custom({ true }, reason: "test"))
+  .xfail(.custom({ true }, reason: "test"))
   .code {
   expectFailure {
     return ()
@@ -409,7 +409,7 @@ AssertionsTestSuite.test("expectFailure/AfterFailure/Fail") {
 // CHECK: [     FAIL ] Assertions.expectFailure/AfterFailure/Fail
 
 AssertionsTestSuite.test("expectFailure/AfterFailure/XFail")
-  .xfail(.Custom({ true }, reason: "test"))
+  .xfail(.custom({ true }, reason: "test"))
   .code {
   expectEqual(1, 2)
   expectFailure {
@@ -444,7 +444,7 @@ AssertionsTestSuite.test("expectCrashLater/Pass") {
 // CHECK: [       OK ] Assertions.expectCrashLater/Pass
 
 AssertionsTestSuite.test("expectCrashLater/UXPass")
-  .xfail(.Custom({ true }, reason: "test"))
+  .xfail(.custom({ true }, reason: "test"))
   .code {
   let array: [Int] = _opaqueIdentity([])
   expectCrashLater()
@@ -462,7 +462,7 @@ AssertionsTestSuite.test("expectCrashLater/Fail") {
 // CHECK: [     FAIL ] Assertions.expectCrashLater/Fail
 
 AssertionsTestSuite.test("expectCrashLater/XFail")
-  .xfail(.Custom({ true }, reason: "test"))
+  .xfail(.custom({ true }, reason: "test"))
   .code {
   expectCrashLater()
 }
@@ -480,8 +480,8 @@ AssertionsTestSuite.test("UnexpectedCrash/RuntimeTrap") {
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/RuntimeTrap
 
 AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
-  let ptr = _opaqueIdentity(UnsafePointer<Int>())
-  _blackHole(ptr.memory)
+  let ptr: UnsafePointer<Int> = _opaqueIdentity(nil)
+  _blackHole(ptr.pointee)
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/NullPointerDereference
 // CHECK: err>>> CRASHED: SIG{{.*}}

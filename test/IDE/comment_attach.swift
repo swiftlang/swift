@@ -184,7 +184,7 @@ class decl_class_1 {
 /// decl_protocol_1 Aaa.
 protocol decl_protocol_1 {
   /// NestedTypealias Aaa.
-  typealias NestedTypealias
+  associatedtype NestedTypealias
 
   /// instanceFunc1 Aaa.
   func instanceFunc1()
@@ -293,7 +293,7 @@ func unterminatedBlockDocComment() {}
 // CHECK-NEXT: comment_attach.swift:177:15: EnumElement/decl_enum_1.Case5 RawComment=[/// Case4 Case5 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:181:7: Class/decl_class_1 RawComment=[/// decl_class_1 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:185:10: Protocol/decl_protocol_1 RawComment=[/// decl_protocol_1 Aaa.\n]
-// CHECK-NEXT: comment_attach.swift:187:13: AssociatedType/decl_protocol_1.NestedTypealias RawComment=[/// NestedTypealias Aaa.\n]
+// CHECK-NEXT: comment_attach.swift:187:18: AssociatedType/decl_protocol_1.NestedTypealias RawComment=[/// NestedTypealias Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:190:8: Func/decl_protocol_1.instanceFunc1 RawComment=[/// instanceFunc1 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:193:7: Var/decl_protocol_1.propertyWithGet RawComment=[/// propertyWithGet Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:193:30: Func/decl_protocol_1.<getter for decl_protocol_1.propertyWithGet> RawComment=none

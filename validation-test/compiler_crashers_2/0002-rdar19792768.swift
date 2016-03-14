@@ -3,12 +3,12 @@
 // rdar://problem/19792768
 
 public func foo<
-    Expected : SequenceType,
-    Actual : SequenceType,
-    T : Comparable
-    where
-      Expected.Generator.Element == Actual.Generator.Element,
-      Expected.Generator.Element == (T, T)
+  Expected : Sequence,
+  Actual : Sequence,
+  T : Comparable
+  where
+  Expected.Iterator.Element == Actual.Iterator.Element,
+  Expected.Iterator.Element == (T, T)
 >(expected: Expected, _ actual: Actual) {}
 
 func f() {

@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 // Extend a protocol with a property.
-extension SequenceType {
+extension Sequence {
   final var myCount: Int {
     var result = 0
     for _ in self {
@@ -16,9 +16,9 @@ extension SequenceType {
 print(["a", "b", "c", "d"].myCount)
 
 // Extend a protocol with a function.
-extension CollectionType {
+extension Collection {
   final var myIndices: Range<Index> {
-    return Range(start: startIndex, end: endIndex)
+    return startIndex..<endIndex
   }
 
   func clone() -> Self {
@@ -29,8 +29,8 @@ extension CollectionType {
 // CHECK: 4
 print(["a", "b", "c", "d"].clone().myCount)
 
-extension CollectionType {
-  final func indexMatching(fn: Generator.Element -> Bool) -> Index? {
+extension Collection {
+  final func indexMatching(fn: Iterator.Element -> Bool) -> Index? {
     for i in myIndices {
       if fn(self[i]) { return i }
     }
@@ -43,8 +43,8 @@ print(["a", "b", "c", "d"].indexMatching({$0 == "c"})!)
 
 // Extend certain instances of a collection (those that have equatable
 // element types) with another algorithm.
-extension CollectionType where Self.Generator.Element : Equatable {
-  final func myIndexOf(element: Generator.Element) -> Index? {
+extension Collection where Self.Iterator.Element : Equatable {
+  final func myIndexOf(element: Iterator.Element) -> Index? {
     for i in self.indices {
       if self[i] == element { return i }
     }
@@ -56,22 +56,22 @@ extension CollectionType where Self.Generator.Element : Equatable {
 // CHECK: 3
 print(["a", "b", "c", "d", "e"].myIndexOf("d")!)
 
-extension SequenceType {
-  final public func myEnumerate() -> EnumerateSequence<Self> { 
-    return EnumerateSequence(self)
+extension Sequence {
+  final public func myEnumerated() -> EnumeratedSequence<Self> {
+    return self.enumerated()
   }
 }
 
 // CHECK: (0, a)
 // CHECK-NEXT: (1, b)
 // CHECK-NEXT: (2, c)
-for (index, element) in ["a", "b", "c"].myEnumerate() {
+for (index, element) in ["a", "b", "c"].myEnumerated() {
   print("(\(index), \(element))")
 }
 
-extension SequenceType {
+extension Sequence {
   final public func myReduce<T>(
-    initial: T, @noescape combine: (T, Self.Generator.Element) -> T
+    initial: T, @noescape combine: (T, Self.Iterator.Element) -> T
   ) -> T { 
     var result = initial
     for value in self {
@@ -85,9 +85,9 @@ extension SequenceType {
 print([1, 2, 3, 4, 5].myReduce(0, combine: +))
 
 
-extension SequenceType {
-  final public func myZip<S : SequenceType>(s: S) -> Zip2Sequence<Self, S> {
-    return Zip2Sequence(self, s)
+extension Sequence {
+  final public func myZip<S : Sequence>(s: S) -> Zip2Sequence<Self, S> {
+    return Zip2Sequence(_sequence1: self, _sequence2: s)
   }
 }
 
@@ -99,17 +99,17 @@ for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
 }
 
 // Mutating algorithms.
-extension MutableCollectionType
-  where Self.Index: RandomAccessIndexType, Self.Generator.Element : Comparable {
+extension MutableCollection
+  where Self.Index: RandomAccessIndex, Self.Iterator.Element : Comparable {
 
-  public final mutating func myPartition(range: Range<Index>) -> Index {
-    return self.partition(range)
+  public final mutating func myPartition() -> Index {
+    return self.partition()
   }
 }
 
 // CHECK: 4 3 1 2 | 5 9 8 6 7 6
 var evenOdd = [5, 3, 6, 2, 4, 9, 8, 1, 7, 6]
-var evenOddSplit = evenOdd.myPartition(evenOdd.myIndices)
+var evenOddSplit = evenOdd.myPartition()
 for i in evenOdd.myIndices {
   if i == evenOddSplit { print(" |", terminator: "") }
   if i > 0 { print(" ", terminator: "") }
@@ -117,17 +117,17 @@ for i in evenOdd.myIndices {
 }
 print("")
 
-extension RangeReplaceableCollectionType {
-  public final func myJoin<S : SequenceType where S.Generator.Element == Self>(
+extension RangeReplaceableCollection {
+  public final func myJoin<S : Sequence where S.Iterator.Element == Self>(
     elements: S
   ) -> Self {
     var result = Self()
-    var gen = elements.generate()
-    if let first = gen.next() {
-      result.appendContentsOf(first)
-      while let next = gen.next() {
-        result.appendContentsOf(self)
-        result.appendContentsOf(next)
+    var iter = elements.makeIterator()
+    if let first = iter.next() {
+      result.append(contentsOf: first)
+      while let next = iter.next() {
+        result.append(contentsOf: self)
+        result.append(contentsOf: next)
       }
     }
     return result
@@ -142,7 +142,7 @@ print(
 )
 
 // Constrained extensions for specific types.
-extension CollectionType where Self.Generator.Element == String {
+extension Collection where Self.Iterator.Element == String {
   final var myCommaSeparatedList: String {
     if startIndex == endIndex { return "" }
 

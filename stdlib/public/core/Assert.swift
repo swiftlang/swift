@@ -35,7 +35,7 @@ public func assert(
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
+    if !_branchHint(condition(), expected: true) {
       _assertionFailed("assertion failed", message(), file, line,
         flags: _fatalErrorFlags())
     }
@@ -66,7 +66,7 @@ public func precondition(
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
+    if !_branchHint(condition(), expected: true) {
       _assertionFailed("precondition failed", message(), file, line,
         flags: _fatalErrorFlags())
     }
@@ -161,7 +161,7 @@ public func _precondition(
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
+    if !_branchHint(condition(), expected: true) {
       _fatalErrorMessage("fatal error", message, file, line,
         flags: _fatalErrorFlags())
     }
@@ -174,10 +174,9 @@ public func _precondition(
 @_transparent @noreturn
 public func _preconditionFailure(
   message: StaticString = StaticString(),
-  file: StaticString = #file, line: UInt = #line) {
-
-  _precondition(false, message, file:file, line: line)
-
+  file: StaticString = #file, line: UInt = #line
+) {
+  _precondition(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }
 
@@ -191,7 +190,7 @@ public func _overflowChecked<T>(
 ) -> T {
   let (result, error) = args
   if _isDebugAssertConfiguration() {
-    if _branchHint(error, false) {
+    if _branchHint(error, expected: false) {
       _fatalErrorMessage("fatal error", "Overflow/underflow", file, line,
         flags: _fatalErrorFlags())
     }
@@ -210,13 +209,13 @@ public func _overflowChecked<T>(
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
 @_transparent
-public func _debugPrecondition(
+public func _stdlibAssert(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
+    if !_branchHint(condition(), expected: true) {
       _fatalErrorMessage("fatal error", message, file, line,
         flags: _fatalErrorFlags())
     }
@@ -224,7 +223,7 @@ public func _debugPrecondition(
 }
 
 @_transparent @noreturn
-public func _debugPreconditionFailure(
+public func _stdlibAssertionFailure(
   message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line) {
   if _isDebugAssertConfiguration() {
@@ -245,7 +244,7 @@ public func _sanityCheck(
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
-  if !_branchHint(condition(), true) {
+  if !_branchHint(condition(), expected: true) {
     _fatalErrorMessage("fatal error", message, file, line,
       flags: _fatalErrorFlags())
   }

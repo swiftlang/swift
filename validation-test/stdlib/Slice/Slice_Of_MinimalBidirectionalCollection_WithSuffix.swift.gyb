@@ -22,7 +22,7 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-var SliceTests = TestSuite("CollectionType")
+var SliceTests = TestSuite("Collection")
 
 % import gyb
 % TSliceTest = gyb.parse_template("{}/Inputs/slice.gyb".format(test_path))
@@ -31,7 +31,7 @@ var SliceTests = TestSuite("CollectionType")
 %   traversal='Bidirectional',
 %   base_kind='Minimal',
 %   mutable=False,
-%   WrapperType='Slice',
+%   Wrapper='Slice',
 %   name='WithSuffix',
 %   prefix=[],
 %   suffix=[ -9999, -9998, -9997])

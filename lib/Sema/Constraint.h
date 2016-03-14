@@ -234,6 +234,9 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
+    
+  /// Introduce a '?.' to begin optional chaining.
+  OptionalChaining,
 
   /// Append 'as! T' to force a downcast to the specified type.
   ForceDowncast,

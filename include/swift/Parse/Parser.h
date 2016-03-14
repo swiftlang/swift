@@ -553,6 +553,11 @@ public:
   ///
   /// \returns false on success, true on error.
   bool parseIdentifier(Identifier &Result, SourceLoc &Loc, const Diagnostic &D);
+  
+  /// Consume an identifier with a specific expected name.  This is useful for
+  /// contextually sensitive keywords that must always be present.
+  bool parseSpecificIdentifier(StringRef expected, SourceLoc &Loc,
+                               const Diagnostic &D);
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseIdentifier(Identifier &Result, Diag<DiagArgTypes...> ID,
@@ -567,6 +572,12 @@ public:
     return parseIdentifier(Result, L, Diagnostic(ID, Args...));
   }
   
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  bool parseSpecificIdentifier(StringRef expected,
+                               Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+    SourceLoc L;
+    return parseSpecificIdentifier(expected, L, Diagnostic(ID, Args...));
+  }
 
   /// \brief Consume an identifier or operator if present and return its name
   /// in \p Result.  Otherwise, emit an error and return true.

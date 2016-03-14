@@ -19,7 +19,7 @@
     key.column: 19,
     key.filepath: placeholders.swift,
     key.severity: source.diagnostic.severity.error,
-    key.description: "type '()' does not conform to protocol 'SequenceType'",
+    key.description: "type '()' does not conform to protocol 'Sequence'",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema
   }
 ]

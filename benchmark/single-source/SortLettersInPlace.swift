@@ -34,7 +34,7 @@ public func run_SortLettersInPlace(N: Int) {
     ]
 
     // Sort the letters in place.
-    letters.sortInPlace {
+    letters.sort {
       return $0.value < $1.value
     }
 

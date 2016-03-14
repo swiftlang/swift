@@ -8,18 +8,18 @@
 var str : String = ""
 
 print(("One", 2))
-print("One", toStream: &str)
+print("One", to: &str)
 print("One", terminator: "\n")
 print("One", terminator: "")
-print("One", terminator: "\n", toStream: &str)
-print("One", terminator: "", toStream: &str)
+print("One", terminator: "\n", to: &str)
+print("One", terminator: "", to: &str)
 
 debugPrint(("One", 2))
-debugPrint("One", toStream: &str)
+debugPrint("One", to: &str)
 debugPrint("One", terminator: "\n")
 debugPrint("One", terminator: "")
-debugPrint("One", terminator: "\n", toStream: &str)
-debugPrint("One", terminator: "", toStream: &str)
+debugPrint("One", terminator: "\n", to: &str)
+debugPrint("One", terminator: "", to: &str)
 
 // CHECK: [{{.*}}] $builtin_log[str='']
 // CHECK-NEXT: ("One", 2)

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: rm -rf %t && mkdir %t
+// RUN: %build-silgen-test-overlays
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -43,7 +45,7 @@ func curry_bridged(x: CurryTest) -> String! -> String! {
 // CHECK:   return [[FN]]
 
 // CHECK: sil shared [[THUNK_BAR_2]] : $@convention(method) (@owned ImplicitlyUnwrappedOptional<String>, @guaranteed CurryTest) -> @owned ImplicitlyUnwrappedOptional<String>
-// CHECK:   function_ref @swift_StringToNSString
+// CHECK:   function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %1 : $CurryTest, #CurryTest.bridged!1.foreign
 // CHECK:   [[RES:%.*]] = apply [[METHOD]]({{%.*}}, %1) : $@convention(objc_method) (ImplicitlyUnwrappedOptional<NSString>, CurryTest) -> @autoreleased ImplicitlyUnwrappedOptional<NSString>
 // CHECK:   function_ref @swift_NSStringToString

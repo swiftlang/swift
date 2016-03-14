@@ -40,7 +40,7 @@ struct DistanceToTest {
     self.startIndex = startIndex
     self.endIndex = endIndex
     self.expectedDistance = expectedDistance
-    self.loc = SourceLoc(file, line, comment: "distanceTo() test data")
+    self.loc = SourceLoc(file, line, comment: "distance(to:) test data")
   }
 }
 
@@ -59,7 +59,7 @@ struct AdvancedByTest {
     self.distance = distance
     self.expectedIndex = expectedIndex
     self.limit = limit
-    self.loc = SourceLoc(file, line, comment: "advancedBy() test data")
+    self.loc = SourceLoc(file, line, comment: "advanced(by:) test data")
   }
 }
 
@@ -145,30 +145,30 @@ var Index = TestSuite("Index")
 
 % for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
-Index.test("${Traversal}IndexType/distanceTo/dispatch") {
+Index.test("${Traversal}Index/distance(to:)/dispatch") {
   var start = ${Traversal}IndexLog.dispatchTester(0)
   var end = ${Traversal}IndexLog.dispatchTester(10)
-  _ = start.distanceTo(end)
+  _ = start.distance(to: end)
   expectCustomizable(start, start.log.distanceTo)
 }
 
-Index.test("${Traversal}IndexType/advancedBy(n)/dispatch") {
+Index.test("${Traversal}Index/advanced(by:)/dispatch") {
   var start = ${Traversal}IndexLog.dispatchTester(0)
-  _ = start.advancedBy(10)
+  _ = start.advanced(by: 10)
   expectCustomizable(start, start.log.advancedBy)
 }
 
-Index.test("${Traversal}IndexType/advancedBy(n, limit:)/dispatch") {
+Index.test("${Traversal}Index/advanced(by: n, limit:)/dispatch") {
   let start = ${Traversal}IndexLog.dispatchTester(0)
   let limit = ${Traversal}IndexLog.dispatchTester(5)
-  _ = start.advancedBy(10, limit: limit)
+  _ = start.advanced(by: 10, limit: limit)
   expectCustomizable(start, start.log.advancedByWithLimit)
 }
 
 %   for Base in ['Minimal', 'Defaulted']:
 %     Kind = '{}{}'.format(Base, Traversal)
 
-Index.test("${Kind}IndexType/distanceTo/semantics") {
+Index.test("${Kind}Index/distance(to:)/semantics") {
   for test in distanceToTests {
     let start = ${Kind}Index(
       position: test.startIndex,
@@ -178,13 +178,13 @@ Index.test("${Kind}IndexType/distanceTo/semantics") {
       position: test.endIndex,
       startIndex: -20,
       endIndex: 20)
-    let d = start.distanceTo(end)
+    let d = start.distance(to: end)
     expectEqual(test.expectedDistance, d,
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
-Index.test("${Kind}IndexType/advancedBy(n)/semantics") {
+Index.test("${Kind}Index/advanced(by: n)/semantics") {
   for test in advancedByTests.filter({$0.limit == nil}) {
     let start = ${Kind}Index(
       position: test.startIndex,
@@ -199,20 +199,20 @@ Index.test("${Kind}IndexType/advancedBy(n)/semantics") {
 
     if test.distance < 0 {
       // Negative distance trap tests are handled in
-      // advancedBy(-n)/semantics
+      // advanced(by:-n)/semantics
       continue
     }
 
 %     end
 
-    let new = start.advancedBy(test.distance)
+    let new = start.advanced(by: test.distance)
     expectEqual(expected, new,
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
 %     if Traversal == 'Forward':
-Index.test("${Kind}IndexType/advancedBy(-n)/semantics") {
+Index.test("${Kind}Index/advanced(by: -n)/semantics") {
   for test in advancedByTests.filter({$0.limit == nil && $0.distance < 0}) {
     let start = ${Kind}Index(
       position: test.startIndex,
@@ -223,13 +223,13 @@ Index.test("${Kind}IndexType/advancedBy(-n)/semantics") {
       startIndex: -20,
       endIndex: 20)
     expectCrashLater()
-    let new = start.advancedBy(test.distance)
+    let new = start.advanced(by: test.distance)
   }
 }
 %     end
 
 %     if Traversal == 'Forward':
-Index.test("${Kind}IndexType/advancedBy(-n, limit:)/semantics") {
+Index.test("${Kind}Index/advanced(by: -n, limit:)/semantics") {
   for test in advancedByTests.filter({$0.limit != nil && $0.distance < 0}) {
     let start = ${Kind}Index(
       position: test.startIndex,
@@ -240,12 +240,12 @@ Index.test("${Kind}IndexType/advancedBy(-n, limit:)/semantics") {
       startIndex: -20,
       endIndex: 20)
     expectCrashLater()
-    let new = start.advancedBy(test.distance)
+    let new = start.advanced(by: test.distance)
   }
 }
 %     end
 
-Index.test("${Kind}IndexType/advancedBy(n, limit:)/semantics") {
+Index.test("${Kind}Index/advanced(by: n, limit:)/semantics") {
   for test in advancedByTests.filter({$0.limit != nil}) {
     let startIndex = test.startIndex
     let endIndex = test.startIndex + test.distance
@@ -266,7 +266,7 @@ Index.test("${Kind}IndexType/advancedBy(n, limit:)/semantics") {
 
 %     end
 
-    let new = start.advancedBy(test.distance, limit: limit)
+    let new = start.advanced(by: test.distance, limit: limit)
     let expected = ${Kind}Index(
       position: test.expectedIndex,
       startIndex: -20,
@@ -281,11 +281,11 @@ Index.test("${Kind}IndexType/advancedBy(n, limit:)/semantics") {
 
 %     if Traversal == 'RandomAccess' and Base == 'Defaulted':
 Index.test(
-  "${Kind}IndexType/advancedBy(n)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Index/advanced(by: n)/avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in advancedByTests.filter({$0.limit == nil}) {
     let i = ${Kind}Index(test.startIndex)
-    let result  = i.advancedBy(test.distance)
+    let result  = i.advanced(by: test.distance)
     expectEqual(test.expectedIndex, result.base)
     expectEqual(0, ${Kind}Index.timesSuccessorCalled.value)
     expectEqual(0, ${Kind}Index.timesPredecessorCalled.value)
@@ -293,11 +293,11 @@ Index.test(
 }
 
 Index.test(
-  "${Kind}IndexType/advancedBy(n, limit:)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Index/advanced(by: n, limit:)/avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in advancedByTests.filter({$0.limit != nil}) {
     let i = ${Kind}Index(test.startIndex)
-    let result  = i.advancedBy(test.distance, limit: ${Kind}Index(test.limit!))
+    let result  = i.advanced(by: test.distance, limit: ${Kind}Index(test.limit!))
     expectEqual(test.expectedIndex, result.base)
     expectEqual(0, ${Kind}Index.timesSuccessorCalled.value)
     expectEqual(0, ${Kind}Index.timesPredecessorCalled.value)

@@ -56,7 +56,7 @@ func test_puts(s: String) {
 
 func test_fopen(filename: String) -> CInt {
   let file = filename.withCString { fopen($0, "r") }
-  return file.memory.inode
+  return file.pointee.inode
 }
 
 func test_cfunc_in_swift() -> Int {
@@ -73,29 +73,29 @@ func test_pointer() {
   var f: CFloat = 0
   var fa: [CFloat] = [1, 2, 3]
 
-  param_pointer(UnsafeMutablePointer<CInt>())
+  param_pointer(nil as UnsafeMutablePointer<CInt>)
   param_pointer(&i)
   param_pointer(&ia)
 
-  param_const_pointer(UnsafeMutablePointer<CInt>())
+  param_const_pointer(nil as UnsafeMutablePointer<CInt>)
   param_const_pointer(&i)
   param_const_pointer(ia)
   param_const_pointer([1, 2, 3])
 
-  param_void_pointer(UnsafeMutablePointer<Void>())
-  param_void_pointer(UnsafeMutablePointer<CInt>())
-  param_void_pointer(UnsafeMutablePointer<CFloat>())
+  param_void_pointer(nil as UnsafeMutablePointer<Void>)
+  param_void_pointer(nil as UnsafeMutablePointer<CInt>)
+  param_void_pointer(nil as UnsafeMutablePointer<CFloat>)
   param_void_pointer(&i)
   param_void_pointer(&ia)
   param_void_pointer(&f)
   param_void_pointer(&fa)
 
-  param_const_void_pointer(UnsafeMutablePointer<Void>())
-  param_const_void_pointer(UnsafeMutablePointer<CInt>())
-  param_const_void_pointer(UnsafeMutablePointer<CFloat>())
-  param_const_void_pointer(UnsafePointer<Void>())
-  param_const_void_pointer(UnsafePointer<CInt>())
-  param_const_void_pointer(UnsafePointer<CFloat>())
+  param_const_void_pointer(nil as UnsafeMutablePointer<Void>)
+  param_const_void_pointer(nil as UnsafeMutablePointer<CInt>)
+  param_const_void_pointer(nil as UnsafeMutablePointer<CFloat>)
+  param_const_void_pointer(nil as UnsafePointer<Void>)
+  param_const_void_pointer(nil as UnsafePointer<CInt>)
+  param_const_void_pointer(nil as UnsafePointer<CFloat>)
   param_const_void_pointer(&i)
   param_const_void_pointer(ia)
   // FIXME: param_const_void_pointer([1, 2, 3])
@@ -103,17 +103,17 @@ func test_pointer() {
   param_const_void_pointer(fa)
   // FIXME: param_const_void_pointer([1.0, 2.0, 3.0])
 
-  let op = COpaquePointer()
+  let op: OpaquePointer = nil
   opaque_pointer_param(op)
 }
 
 func test_decay() {
-  decay_param_array(UnsafeMutablePointer<CInt>())
+  decay_param_array(nil as UnsafeMutablePointer<CInt>)
   var i: CInt = 0
   var a: [CInt] = [1, 2, 3]
   decay_param_array(&i)
   decay_param_array(&a)
-  decay_param_const_array(UnsafeMutablePointer<CInt>())
+  decay_param_const_array(nil as UnsafeMutablePointer<CInt>)
   decay_param_const_array(&i)
   decay_param_const_array(a)
   decay_param_const_array([1, 2, 3])

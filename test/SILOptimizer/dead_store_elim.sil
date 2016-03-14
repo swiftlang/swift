@@ -406,7 +406,7 @@ bb3:
 }
 
 // We should be able to remove the store in bb0, but we currently
-// cant due to deficiency in alias analysis.
+// can't due to deficiency in alias analysis.
 //
 // CHECK-LABEL: DeadStoreWithAliasingBasesSimpleClass
 // CHECK: bb0([[RET0:%.+]] : $Bool):

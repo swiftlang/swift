@@ -1704,11 +1704,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       
       auto isBridgeableTargetType = type2->isBridgeableObjectType();
       
-      // Allow bridged conversions to CVarArgType through NSObject.
+      // Allow bridged conversions to CVarArg through NSObject.
       if (!isBridgeableTargetType && type2->isExistentialType()) {
         if (auto nominalType = type2->getAs<NominalType>())
           isBridgeableTargetType = nominalType->getDecl()->getName() ==
-                                      TC.Context.Id_CVarArgType;
+                                      TC.Context.Id_CVarArg;
       }
       
       if (isBridgeableTargetType && TC.getBridgedToObjC(DC, type1)) {
@@ -1727,8 +1727,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
       }
       
-      // Bridging from an ErrorType to an Objective-C NSError.
-      if (auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorType)) {
+      // Bridging from an ErrorProtocol to an Objective-C NSError.
+      if (auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorProtocol)) {
         if (TC.containsProtocol(type1, errorType, DC,
                                 ConformanceCheckFlags::InExpression))
           if (auto NSErrorTy = TC.getNSErrorType(DC))
@@ -2256,8 +2256,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // See if there's anything we can do to fix the conformance:
   OptionalTypeKind optionalKind;
   if (auto optionalObjectType = type->getAnyOptionalObjectType(optionalKind)) {
-    if (protocol->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
-      // Optionals don't conform to BooleanType; suggest '!= nil'.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Boolean)) {
+      // Optionals don't conform to Boolean; suggest '!= nil'.
       if (recordFix(FixKind::OptionalToBoolean, getConstraintLocator(locator)))
         return SolutionKind::Error;
       return SolutionKind::Solved;
@@ -3120,8 +3120,17 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (constraint.getKind() == ConstraintKind::TypeMember) {
     // If the base type was an optional, try to look through it.
     if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
+      // Determine whether or not we want to provide an optional chaining fixit or
+      // a force unwrap fixit.
+      bool optionalChain;
+      if (!contextualType)
+        optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
+      else
+        optionalChain = !contextualType->getOptionalObjectType().isNull();
+      auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
+
       // Note the fix.
-      if (recordFix(FixKind::ForceOptional, constraint.getLocator()))
+      if (recordFix(fixKind, constraint.getLocator()))
         return SolutionKind::Error;
       
       // Look through one level of optional.
@@ -3144,8 +3153,17 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
     // If the base type was an optional, look through it.
     
+    // Determine whether or not we want to provide an optional chaining fixit or
+    // a force unwrap fixit.
+    bool optionalChain;
+    if (!contextualType)
+      optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
+    else
+      optionalChain = !contextualType->getOptionalObjectType().isNull();
+    auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
+
     // Note the fix.
-    if (recordFix(FixKind::ForceOptional, constraint.getLocator()))
+    if (recordFix(fixKind, constraint.getLocator()))
       return SolutionKind::Error;
     
     // Look through one level of optional.
@@ -4061,8 +4079,8 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   case ConversionRestrictionKind::BridgeToNSError: {
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
     
-    // The input type must be an ErrorType subtype.
-    auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorType)
+    // The input type must be an ErrorProtocol subtype.
+    auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorProtocol)
       ->getDeclaredType();
     return matchTypes(type1, errorType, TypeMatchKind::Subtype, subFlags,
                       locator);
@@ -4142,6 +4160,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
     return matchTypes(type1, type2, matchKind, subFlags, locator);
 
   case FixKind::ForceOptional:
+  case FixKind::OptionalChaining:
     // Assume that '!' was applied to the first type.
     return matchTypes(type1->getRValueObjectType()->getOptionalObjectType(),
                       type2, matchKind, subFlags, locator);

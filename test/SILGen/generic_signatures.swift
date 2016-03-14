@@ -1,12 +1,12 @@
 // RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s
 
 protocol P {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 protocol Q {
-  typealias Assoc1
-  typealias Assoc2
+  associatedtype Assoc1
+  associatedtype Assoc2
 }
 
 struct G<T> {}
@@ -50,11 +50,11 @@ struct Foo<V> {
 // member of a dependent member that substitutes to a type parameter.
 // <rdar://problem/16257259>
 protocol Fooable {
-  typealias Foo
+  associatedtype Foo
 }
 
 protocol Barrable {
-  typealias Bar: Fooable
+  associatedtype Bar: Fooable
 
   func bar(_: Bar) -> Bar.Foo
 }

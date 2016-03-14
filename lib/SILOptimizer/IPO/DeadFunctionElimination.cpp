@@ -348,6 +348,9 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     // Check default witness methods.
     for (SILDefaultWitnessTable &WT : Module->getDefaultWitnessTableList()) {
       for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
+        if (!entry.isValid())
+          continue;
+
         SILFunction *F = entry.getWitness();
         auto *fd = cast<AbstractFunctionDecl>(entry.getRequirement().getDecl());
 

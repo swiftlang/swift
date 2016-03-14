@@ -1,20 +1,8 @@
 
 import pass_pipeline as ppipe
+
 import passes as p
 
-def diagnostic_passlist():
-    return ppipe.PassList([
-        p.CapturePromotion,
-        p.AllocBoxToStack,
-        p.InOutDeshadowing,
-        p.NoReturnFolding,
-        p.DefiniteInitialization,
-        p.PredictableMemoryOptimizations,
-        p.DiagnosticConstantPropagation,
-        p.DiagnoseUnreachable,
-        p.EmitDFDiagnostics,
-        p.SplitNonCondBrCriticalEdges,
-    ])
 
 def simplifycfg_silcombine_passlist():
     return ppipe.PassList([
@@ -22,6 +10,7 @@ def simplifycfg_silcombine_passlist():
         p.SILCombine,
         p.SimplifyCFG,
     ])
+
 
 def highlevel_loopopt_passlist():
     return ppipe.PassList([
@@ -44,6 +33,7 @@ def highlevel_loopopt_passlist():
         p.SwiftArrayOpts,
     ])
 
+
 def lowlevel_loopopt_passlist():
     return ppipe.PassList([
         p.LICM,
@@ -52,6 +42,7 @@ def lowlevel_loopopt_passlist():
         p.SILCombine,
         p.SimplifyCFG,
     ])
+
 
 def inliner_for_optlevel(optlevel):
     if optlevel == 'high':
@@ -62,6 +53,7 @@ def inliner_for_optlevel(optlevel):
         return p.LateInliner
     else:
         raise RuntimeError('Unknown opt level')
+
 
 def ssapass_passlist(optlevel):
     return ppipe.PassList([
@@ -89,6 +81,7 @@ def ssapass_passlist(optlevel):
         p.GlobalARCOpts,
     ])
 
+
 def lower_passlist():
     return ppipe.PassList([
         p.DeadFunctionElimination,
@@ -99,6 +92,7 @@ def lower_passlist():
         p.SpeculativeDevirtualizer,
         p.FunctionSignatureOpts,
     ])
+
 
 def normal_passpipelines():
     result = []

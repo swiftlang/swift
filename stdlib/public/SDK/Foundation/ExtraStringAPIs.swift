@@ -13,7 +13,7 @@
 // Random access for String.UTF16View, only when Foundation is
 // imported.  Making this API dependent on Foundation decouples the
 // Swift core from a UTF16 representation.
-extension String.UTF16View.Index : RandomAccessIndexType {
+extension String.UTF16View.Index : RandomAccessIndex {
   /// Construct from an integer offset.
   public init(_ offset: Int) {
     _precondition(offset >= 0, "Negative UTF16 index offset not allowed")

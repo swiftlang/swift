@@ -1222,7 +1222,7 @@ func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
 // There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch19testOptionalPatternFGSqSi_T_
 func testOptionalPattern(value : Int?) {
-  // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
+  // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch value {
   case 1?: a()
   case 2?: b()
@@ -1232,12 +1232,12 @@ func testOptionalPattern(value : Int?) {
 }
 
 
-// x? and .None should both be considered "similar" and thus handled in the same
+// x? and .none should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch19testOptionalEnumMixFGSqSi_Si
 func testOptionalEnumMix(a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
-  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
+  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch a {
   case let x?:
     return 0
@@ -1246,7 +1246,7 @@ func testOptionalEnumMix(a : Int?) -> Int {
   // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.Int2048, 0
 
-  case .None:
+  case .none:
     return 42
 
   // CHECK: [[NILBB]]:
@@ -1259,7 +1259,7 @@ func testOptionalEnumMix(a : Int?) -> Int {
 // CHECK-LABEL: sil hidden @_TF6switch26testOptionalEnumMixWithNilFGSqSi_Si
 func testOptionalEnumMixWithNil(a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
-  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
+  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch a {
   case let x?:
     return 0

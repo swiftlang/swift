@@ -58,7 +58,8 @@ def install_prefix():
     system.
     """
     if platform.system() == 'Darwin':
-        return '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr'
+        return '/Applications/Xcode.app/Contents/Developer/Toolchains/' + \
+            'XcodeDefault.xctoolchain/usr'
     else:
         return '/usr'
 

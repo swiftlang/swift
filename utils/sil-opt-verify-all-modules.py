@@ -15,10 +15,11 @@ import argparse
 import glob
 import multiprocessing
 import os
+import pipes
 import subprocess
 import sys
 import tempfile
-import pipes
+
 
 def get_verify_toolchain_modules_commands(toolchain_dir, sil_opt):
     if sil_opt is None:
@@ -71,7 +72,8 @@ def get_verify_resource_dir_modules_commands(
     ]
 
     commands = []
-    module_cache_dir = tempfile.mkdtemp(prefix="swift-testsuite-clang-module-cache")
+    module_cache_dir = tempfile.mkdtemp(
+        prefix="swift-testsuite-clang-module-cache")
     for (subdir, arch, triple) in known_platforms:
         modules_dir = os.path.join(resource_dir, subdir, arch)
         print(modules_dir)
@@ -127,13 +129,16 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""Verifies Swift modules.""")
-    parser.add_argument("--sil-opt",
+    parser.add_argument(
+        "--sil-opt",
         help="use the specified 'sil-opt' binary",
         metavar="PATH")
-    parser.add_argument("--verify-build-dir",
-        help="verify the Swift resource directory under the given build directory",
+    parser.add_argument(
+        "--verify-build-dir",
+        help="verify the Swift resource directory under the given build dir.",
         metavar="PATH")
-    parser.add_argument("--verify-xcode",
+    parser.add_argument(
+        "--verify-xcode",
         help="verify the Xcode.app that is currently xcode-select'ed",
         action="store_true")
     args = parser.parse_args()

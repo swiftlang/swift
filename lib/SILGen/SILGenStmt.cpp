@@ -789,9 +789,9 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
-  // Emit the 'generator' variable that we'll be using for iteration.
+  // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF.Cleanups, SGF, CleanupLocation(S));
-  SGF.visitPatternBindingDecl(S->getGenerator());
+  SGF.visitPatternBindingDecl(S->getIterator());
   
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
@@ -801,7 +801,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // to hold the results.  This will be initialized on every entry into the loop
   // header and consumed by the loop body. On loop exit, the terminating value
   // will be in the buffer.
-  auto optTy = S->getGeneratorNext()->getType()->getCanonicalType();
+  auto optTy = S->getIteratorNext()->getType()->getCanonicalType();
   auto &optTL = SGF.getTypeLowering(optTy);
   SILValue nextBufOrValue;
 
@@ -819,14 +819,14 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
   if (optTL.isAddressOnly()) {
-    Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getGeneratorNext()));
+    Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
     auto nextInit = SGF.useBufferAsTemporary(nextBufOrValue, optTL);
-    SGF.emitExprInto(S->getGeneratorNext(), nextInit.get());
+    SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
     nextInit->getManagedAddress().forward(SGF);
   } else {
-    Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getGeneratorNext()));
+    Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
     nextBufOrValue =
-      SGF.emitRValueAsSingleValue(S->getGeneratorNext()).forward(SGF);
+      SGF.emitRValueAsSingleValue(S->getIteratorNext()).forward(SGF);
   }
   
   // Continue if the value is present.

@@ -136,9 +136,12 @@ tests.test("${Self}/radixTooHigh") {
 
 tests.test("${Self}/Basics") {
 % if Self != 'Float80': # Inf/NaN are not defined for Float80
+  expectEqual(.infinity, ${Self}("inf"))
   expectEqual(.infinity, ${Self}("Inf"))
+  expectEqual(-(.infinity), ${Self}("-inf"))
   expectEqual(-(.infinity), ${Self}("-Inf"))
-  expectEqual(String(${Self}.NaN), String(${Self}("NaN")!))
+  expectEqual(String(${Self}.nan), String(${Self}("nan")!))
+  expectEqual(String(${Self}.nan), String(${Self}("NaN")!))
 % end
   
   expectEqual(-0.0, ${Self}("-0"))
@@ -150,7 +153,7 @@ tests.test("${Self}/Basics") {
   // Check that we can round-trip the string representation of 2^100,
   // which requires an exponent to express...
   let large =
-    Repeat(count: 10, repeatedValue: 1024 as ${Self}).reduce(1, combine: *)
+    repeatElement(1024 as ${Self}, count: 10).reduce(1, combine: *)
   let largeText = String(large)
   expectEqual(largeText, String(${Self}(largeText)!))
   

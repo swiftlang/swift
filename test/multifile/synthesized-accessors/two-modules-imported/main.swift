@@ -9,7 +9,7 @@
 import CoreGraphics
 
 protocol MyPoint {
-  typealias FloatType
+  associatedtype FloatType
 
   var x: FloatType { get set }
   var y: FloatType { get set }

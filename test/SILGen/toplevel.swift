@@ -72,7 +72,7 @@ print_y()
 
 // -- treat 'guard' vars as locals
 // CHECK-LABEL: function_ref toplevel.A.__allocating_init
-// CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.Some!enumelt.1: [[SOME_CASE:.+]], default
+// CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.some!enumelt.1: [[SOME_CASE:.+]], default
 // CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
 // CHECK: store [[VALUE]] to [[BOX:%.+]] : $*A
 // CHECK-NOT: release

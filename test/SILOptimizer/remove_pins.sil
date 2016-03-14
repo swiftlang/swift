@@ -160,7 +160,7 @@ bb0(%0 : $*MyArray<MyInt>):
   %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
   %9 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 0
   strong_unpin %9 : $Optional<Builtin.NativeObject>
-  %11 = unchecked_enum_data %6 : $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1
+  %11 = unchecked_enum_data %6 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
   %12 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> Bool
   %13 = apply %12(%11) : $@convention(thin) (Builtin.NativeObject) -> Bool
   return %13 : $Bool

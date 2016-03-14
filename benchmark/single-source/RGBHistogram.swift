@@ -20,7 +20,7 @@ import TestsUtils
 
 @inline(never)
 public func run_RGBHistogram(N: Int) {
-    var histogram = [(rrggbb_t, Int)]()
+    var histogram = [(key: rrggbb_t, value: Int)]()
     for _ in 1...100*N {
         histogram = createSortedSparseRGBHistogram(samples)
         if !isCorrectHistogram(histogram) {
@@ -86,23 +86,23 @@ let samples: [rrggbb_t] = [
     0x607F4D9F, 0x9733E55E, 0xA360439D, 0x1DB568FD, 0xB7A5C3A1, 0xBE84492D
 ]
 
-func isCorrectHistogram(histogram: [(rrggbb_t, Int)]) -> Bool {
+func isCorrectHistogram(histogram: [(key: rrggbb_t, value: Int)]) -> Bool {
     return histogram.count  == 157 &&
            histogram[0].0   == 0x00808080 && histogram[0].1   == 54 &&
            histogram[156].0 == 0x003B8D96 && histogram[156].1 == 1
 }
 
 func createSortedSparseRGBHistogram
-        <S: SequenceType where S.Generator.Element == rrggbb_t>
-        (samples: S) -> [(rrggbb_t, Int)] {
+        <S: Sequence where S.Iterator.Element == rrggbb_t>
+        (samples: S) -> [(key: rrggbb_t, value: Int)] {
     var histogram = Dictionary<rrggbb_t, Int>()
 
     for sample in samples {
-        let i = histogram.indexForKey(sample)
+        let i = histogram.index(forKey: sample)
         histogram[sample] = ((i != nil) ? histogram[i!].1 : 0) + 1
     }
 
-    return histogram.sort() {
+    return histogram.sorted() {
       if $0.1 == $1.1 {
         return $0.0 > $1.0
       } else {
@@ -110,3 +110,63 @@ func createSortedSparseRGBHistogram
       }
     }
 }
+
+class Box<T : Hashable where T : Equatable> : Hashable {
+  var value: T
+
+  init(_ v: T) {
+    value = v
+  }
+
+  var hashValue : Int {
+    return value.hashValue
+  }
+}
+
+extension Box : Equatable {
+}
+
+func ==<T: Equatable>(lhs: Box<T>,  rhs: Box<T>) -> Bool {
+  return lhs.value == rhs.value
+}
+
+func isCorrectHistogramOfObjects(histogram: [(key: Box<rrggbb_t>, value: Box<Int>)]) -> Bool {
+    return histogram.count  == 157 &&
+           histogram[0].0.value   == 0x00808080 && histogram[0].1.value   == 54 &&
+           histogram[156].0.value == 0x003B8D96 && histogram[156].1.value == 1
+}
+
+func createSortedSparseRGBHistogramOfObjects
+        <S: Sequence where S.Iterator.Element == rrggbb_t>
+        (samples: S) -> [(key: Box<rrggbb_t>, value: Box<Int>)] {
+    var histogram = Dictionary<Box<rrggbb_t>, Box<Int>>()
+
+    for sample in samples {
+        let boxedSample = Box(sample)
+        let i = histogram.index(forKey: boxedSample)
+        histogram[boxedSample] = Box(((i != nil) ? histogram[i!].1.value : 0) + 1)
+    }
+
+    return histogram.sorted() {
+      if $0.1 == $1.1 {
+        return $0.0.value > $1.0.value
+      } else {
+        return $0.1.value > $1.1.value
+      }
+    }
+}
+
+@inline(never)
+public func run_RGBHistogramOfObjects(N: Int) {
+    var histogram = [(key: Box<rrggbb_t>, value: Box<Int>)]()
+    for _ in 1...100*N {
+        histogram = createSortedSparseRGBHistogramOfObjects(samples)
+        if !isCorrectHistogramOfObjects(histogram) {
+            break
+        }
+    }
+    CheckResults(isCorrectHistogramOfObjects(histogram),
+                 "Incorrect results in histogram")
+}
+
+

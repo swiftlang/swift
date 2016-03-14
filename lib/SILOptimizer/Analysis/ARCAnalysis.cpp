@@ -465,11 +465,8 @@ void ConsumedResultToEpilogueRetainMatcher::recompute() {
 
   // Find the return BB of F. If we fail, then bail.
   SILFunction::iterator BB = F->findReturnBB();
-  if (BB == F->end()) {
-    HasBlock = false;
+  if (BB == F->end())
     return;
-  }
-  HasBlock = true;
   findMatchingRetains(&*BB);
 }
 
@@ -694,29 +691,36 @@ releaseAllNonTrivials(ReleaseList Insts, SILValue Base) {
   return !ProjectionPath::hasUncoveredNonTrivials(Base->getType(), Mod, Paths);
 }
 
-void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
-    SILBasicBlock *BB) {
-  // Iterate over the instructions post-order and find releases associated with
-  // each arguments.
+void
+ConsumedArgToEpilogueReleaseMatcher::
+findMatchingReleases(SILBasicBlock *BB) {
+  // Iterate over the instructions post-order and find final releases
+  // associated with each arguments.
   //
-  // Break on these conditions.
+  // The ConsumedArgToEpilogueReleaseMatcher finds the final releases
+  // in the following way. 
   //
-  // 1. An instruction that can use ref count values.
+  // 1. If an instruction, which is not releaseinst nor releasevalue, that
+  // could decrement reference count is found. bail out.
   //
-  // 2. A release that can not be mapped to any @owned argument.
+  // 2. If a release is found and the release that can not be mapped to any
+  // @owned argument. bail as this release may well be the final release of
+  // an @owned argument, but somehow rc-identity fails to prove that.
   //
   // 3. A release that is mapped to an argument which already has a release
-  // that overlaps with this release.
+  // that overlaps with this release. This release for sure is not the final
+  // release.
   for (auto II = std::next(BB->rbegin()), IE = BB->rend(); II != IE; ++II) {
-    // If we do not have a release_value or strong_release...
+    // If we do not have a release_value or strong_release. We can continue
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
-      // And the object cannot use values in a manner that will keep the object
-      // alive, continue. We may be able to find additional releases.
-      if (canNeverUseValues(&*II))
+      // We do not know what this instruction is, do a simple check to make sure
+      // that it does not decrement the reference count of any of its operand. 
+      //
+      // TODO: we could make the logic here more complicated to handle each type
+      // of instructions in a more precise manner.
+      if (!II->mayRelease())
         continue;
-
-      // Otherwise, we need to stop computing since we do not want to reduce the
-      // lifetime of objects.
+      // This instruction may release something, bail out conservatively.
       break;
     }
 

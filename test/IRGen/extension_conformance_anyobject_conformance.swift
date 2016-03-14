@@ -6,5 +6,5 @@ public struct TestGeneratorCrashy <Key: AnyObject, Value: AnyObject> {
     }
 }
 
-extension TestGeneratorCrashy: GeneratorType {
+extension TestGeneratorCrashy: IteratorProtocol {
 }

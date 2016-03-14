@@ -59,7 +59,7 @@ tests.test("_isUniquelyReferenced/OptionalNativeObject") {
 class XObjC : NSObject {}
 
 tests.test("_isUnique_native/SpareBitTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -70,7 +70,7 @@ tests.test("_isUnique_native/SpareBitTrap")
 }
 
 tests.test("_isUniqueOrPinned_native/SpareBitTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -81,7 +81,7 @@ tests.test("_isUniqueOrPinned_native/SpareBitTrap")
 }
 
 tests.test("_isUnique_native/NonNativeTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -91,7 +91,7 @@ tests.test("_isUnique_native/NonNativeTrap")
 }
 
 tests.test("_isUniqueOrPinned_native/NonNativeTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -111,14 +111,6 @@ func genint() -> Int {
 tests.test("_assumeNonNegative") {
   let r = _assumeNonNegative(genint())
   expectEqual(r, 27)
-}
-
-tests.test("unsafeUnwrap") {
-  let empty: Int? = nil
-  let nonEmpty: Int? = 3
-  expectEqual(3, unsafeUnwrap(nonEmpty))
-  expectCrashLater()
-  unsafeUnwrap(empty)
 }
 
 var NoisyLifeCount = 0
@@ -145,17 +137,17 @@ struct Large : P {
 struct ContainsP { var p: P }
 
 func exerciseArrayValueWitnesses<T>(value: T) {
-  let buf = UnsafeMutablePointer<T>.alloc(5)
+  let buf = UnsafeMutablePointer<T>(allocatingCapacity: 5)
 
-  (buf + 0).initialize(value)
-  (buf + 1).initialize(value)
+  (buf + 0).initialize(with: value)
+  (buf + 1).initialize(with: value)
   
   Builtin.copyArray(T.self, (buf + 2)._rawValue, buf._rawValue, 2._builtinWordValue)
   Builtin.takeArrayBackToFront(T.self, (buf + 1)._rawValue, buf._rawValue, 4._builtinWordValue)
   Builtin.takeArrayFrontToBack(T.self, buf._rawValue, (buf + 1)._rawValue, 4._builtinWordValue)
   Builtin.destroyArray(T.self, buf._rawValue, 4._builtinWordValue)
 
-  buf.dealloc(5)
+  buf.deallocateCapacity(5)
 }
 
 tests.test("array value witnesses") {

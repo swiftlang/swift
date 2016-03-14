@@ -1,19 +1,19 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-silgen | FileCheck %s
 
 protocol P {
-  typealias Assoc1
-  typealias Assoc2
+  associatedtype Assoc1
+  associatedtype Assoc2
 }
 protocol PP: P {}
 protocol PQ: P {
-  typealias Assoc1: A
+  associatedtype Assoc1: A
 }
 protocol Q {
-  typealias Assoc0: A
+  associatedtype Assoc0: A
 }
 
 protocol A {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 class Base: Q, A {
@@ -186,7 +186,7 @@ func m2<T: A, U: A where U.Assoc == Y, T.Assoc == X>(x: T, y: U) {}
 func m3<T, U where T: A, U: A, U.Assoc == Y, T.Assoc == X>(x: T, y: U) {}
 
 protocol GenericWitnessTest {
-  typealias Tee
+  associatedtype Tee
 
   func closureInGenericContext<X>(b: X)
   var closureInGenericPropertyContext: Tee { get }

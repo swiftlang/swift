@@ -128,7 +128,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 9; // typedef context kind
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 10; // swift bridge
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.

@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 
+
 def run():
     if len(sys.argv) > 1:
         print("""
@@ -29,7 +30,8 @@ usage: nshtml2rst < NSString.html > NSString.rst
         r'<pre>\1</pre>',
         html, flags=re.MULTILINE | re.DOTALL)
 
-    # Remove links from <code>...</code>, which doesn't have a rendering in ReST
+    # Remove links from <code>...</code>, which doesn't have a rendering in
+    # ReST
     html = re.sub(
         r'<code>(.*?)<a[^>]*?>(.*?)</a>(.*?)</code>',
         r'<code>\1\2\3</code>',

@@ -16,22 +16,24 @@
 #
 # ----------------------------------------------------------------------------
 
-import sys
-import re
 import bisect
+import re
 import subprocess
+import sys
 
-line_pattern = re.compile(r'^// ###setline ([0-9]+) "([^"]+)"\s*')
+line_pattern = re.compile(
+    r'^// ###sourceLocation\(file:\s*"([^"]+)",\s*line:\s*([0-9]+)\s*\)')
+
 
 def _make_line_map(filename, stream=None):
     """
     >>> from StringIO import StringIO
     >>> _make_line_map('box',
-    ... StringIO('''// ###setline 3 "foo.bar"
+    ... StringIO('''// ###sourceLocation(file: "foo.bar", line: 3)
     ... line 2
     ... line 3
     ... line 4
-    ... // ###setline 20 "baz.txt"
+    ... // ###sourceLocation(file: "baz.txt", line: 20)
     ... line 6
     ... line 7
     ... '''))
@@ -42,10 +44,11 @@ def _make_line_map(filename, stream=None):
     for i, l in enumerate(input.readlines()):
         m = line_pattern.match(l)
         if m:
-            result.append((i + 1, m.group(2), int(m.group(1))))
+            result.append((i + 1, m.group(1), int(m.group(2))))
     return result
 
 _line_maps = {}
+
 
 def fline_map(filename):
     map = _line_maps.get(filename)
@@ -54,12 +57,14 @@ def fline_map(filename):
         _line_maps[filename] = map
     return map
 
+
 def map_line(filename, line_num):
     assert(line_num > 0)
     map = fline_map(filename)
     index = bisect.bisect_left(map, (line_num, '', 0))
     base = map[index - 1]
     return base[1], base[2] + (line_num - base[0] - 1)
+
 
 def run():
     if len(sys.argv) <= 1:
@@ -77,10 +82,13 @@ def run():
         )
 
         error_pattern = re.compile(
-            '^(' + '|'.join(re.escape(s) for s in sources) + '):([0-9]+):([0-9]+):(.*)')
+            '^(' + '|'.join(re.escape(s) for s in sources) +
+            '):([0-9]+):([0-9]+):(.*)')
 
         assertion_pattern = re.compile(
-            '^(.*)(: file| at|#[0-9]+:) (' + '|'.join(re.escape(s) for s in sources) + ')(, line |:)([0-9]+)(.*)')
+            '^(.*)(: file| at|#[0-9]+:) (' +
+            '|'.join(re.escape(s) for s in sources) +
+            ')(, line |:)([0-9]+)(.*)')
 
         while True:
             line = command.stdout.readline()
@@ -90,12 +98,15 @@ def run():
             m = error_pattern.match(l)
             if m:
                 file, line_num = map_line(m.group(1), int(m.group(2)))
-                line = '%s:%s:%s:%s\n' % (file, line_num, int(m.group(3)), m.group(4))
+                line = '%s:%s:%s:%s\n' % (
+                    file, line_num, int(m.group(3)), m.group(4))
             else:
                 m = assertion_pattern.match(l)
                 if m:
                     file, line_num = map_line(m.group(3), int(m.group(5)))
-                    line = '%s%s %s%s%s%s\n' % (m.group(1), m.group(2), file, m.group(4), line_num, m.group(6))
+                    line = '%s%s %s%s%s%s\n' % (
+                        m.group(1), m.group(2), file, m.group(4), line_num,
+                        m.group(6))
             sys.stdout.write(line)
 
         sys.exit(command.wait())

@@ -472,6 +472,15 @@ static uintptr_t const objectPointerIsObjCBit = 0x00000002U;
 
 static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
   assert(!isObjCTaggedPointerOrNull(object));
+#if SWIFT_HAS_OPAQUE_ISAS
+  // Fast path for opaque ISAs.  We don't want to call _swift_getClassOfAllocated
+  // as that will call object_getClass.  Instead we can look at the bits in the
+  // ISA and tell if its a non-pointer opaque ISA which means it is definitely
+  // an ObjC object and doesn't use native swift reference counting.
+  if (_swift_isNonPointerIsaObjCClass(object))
+    return false;
+  return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocatedFromPointer(object));
+#endif
   return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
 }
 
@@ -520,7 +529,7 @@ void swift::swift_unknownRelease(void *object)
 /// Return true iff the given BridgeObject is not known to use native
 /// reference-counting.
 ///
-/// Requires: object does not encode a tagged pointer
+/// Precondition: object does not encode a tagged pointer
 static bool isNonNative_unTagged_bridgeObject(void *object) {
   static_assert((heap_object_abi::SwiftSpareBitsMask & objectPointerIsObjCBit) ==
                 objectPointerIsObjCBit,
@@ -532,7 +541,7 @@ static bool isNonNative_unTagged_bridgeObject(void *object) {
 // Mask out the spare bits in a bridgeObject, returning the object it
 // encodes.
 ///
-/// Requires: object does not encode a tagged pointer
+/// Precondition: object does not encode a tagged pointer
 static void* toPlainObject_unTagged_bridgeObject(void *object) {
   return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
 }

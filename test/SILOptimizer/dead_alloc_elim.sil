@@ -101,7 +101,7 @@ sil @trivial_destructor_store_into : $@convention(thin) () -> () {
   return %4 : $()
 }
 
-// We store a pointer from the alloc_ref, dont do anything!
+// We store a pointer from the alloc_ref, don't do anything!
 //
 // CHECK-LABEL: sil @trivial_destructor_store_ptr
 // CHECK: bb0

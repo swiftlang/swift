@@ -62,7 +62,7 @@ func autoreleasepool(@noescape code: () -> Void) {
 /// Types conforming to this protocol should be structs.  (The type
 /// should be a struct to reduce unnecessary reference counting during
 /// the test.)  The types should be stateless.
-public protocol RaceTestWithPerTrialDataType {
+public protocol RaceTestWithPerTrialData {
 
   /// Input for threads.
   ///
@@ -103,27 +103,27 @@ public protocol RaceTestWithPerTrialDataType {
 /// according to it.
 public enum RaceTestObservationEvaluation : Equatable, CustomStringConvertible {
   /// Normal 'pass'.
-  case Pass
+  case pass
 
   /// An unusual 'pass'.
-  case PassInteresting(String)
+  case passInteresting(String)
 
   /// A failure.
-  case Failure
-  case FailureInteresting(String)
+  case failure
+  case failureInteresting(String)
 
   public var description: String {
     switch self {
-    case .Pass:
+    case .pass:
       return "Pass"
 
-    case .PassInteresting(let s):
+    case .passInteresting(let s):
       return "Pass(\(s))"
 
-    case .Failure:
+    case .failure:
       return "Failure"
 
-    case .FailureInteresting(let s):
+    case .failureInteresting(let s):
       return "Failure(\(s))"
     }
   }
@@ -133,11 +133,11 @@ public func == (
   lhs: RaceTestObservationEvaluation, rhs: RaceTestObservationEvaluation
 ) -> Bool {
   switch (lhs, rhs) {
-  case (.Pass, .Pass),
-       (.Failure, .Failure):
+  case (.pass, .pass),
+       (.failure, .failure):
     return true
 
-  case (.PassInteresting(let s1), .PassInteresting(let s2)):
+  case (.passInteresting(let s1), .passInteresting(let s2)):
     return s1 == s2
 
   default:
@@ -319,16 +319,16 @@ public func == (lhs: Observation9Int, rhs: Observation9Int) -> Bool {
 }
 
 /// A helper that is useful to implement
-/// `RaceTestWithPerTrialDataType.evaluateObservations()` in race tests.
+/// `RaceTestWithPerTrialData.evaluateObservations()` in race tests.
 public func evaluateObservationsAllEqual<T : Equatable>(observations: [T])
   -> RaceTestObservationEvaluation {
   let first = observations.first!
   for x in observations {
     if x != first {
-      return .Failure
+      return .failure
     }
   }
-  return .Pass
+  return .pass
 }
 
 struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
@@ -341,19 +341,19 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
 
   mutating func addEvaluation(evaluation: RaceTestObservationEvaluation) {
     switch evaluation {
-    case .Pass:
+    case .pass:
       passCount += 1
 
-    case .PassInteresting(let s):
+    case .passInteresting(let s):
       if passInterestingCount[s] == nil {
         passInterestingCount[s] = 0
       }
       passInterestingCount[s] = passInterestingCount[s]! + 1
 
-    case .Failure:
+    case .failure:
       failureCount += 1
 
-    case .FailureInteresting(let s):
+    case .failureInteresting(let s):
       if failureInterestingCount[s] == nil {
         failureInterestingCount[s] = 0
       }
@@ -368,12 +368,12 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
   var description: String {
     var result = ""
     result += "Pass: \(passCount) times\n"
-    for desc in passInterestingCount.keys.sort() {
+    for desc in passInterestingCount.keys.sorted() {
       let count = passInterestingCount[desc]!
       result += "Pass \(desc): \(count) times\n"
     }
     result += "Failure: \(failureCount) times\n"
-    for desc in failureInterestingCount.keys.sort() {
+    for desc in failureInterestingCount.keys.sorted() {
       let count = failureInterestingCount[desc]!
       result += "Failure \(desc): \(count) times\n"
     }
@@ -382,14 +382,14 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
 }
 
 // FIXME: protect this class against false sharing.
-class _RaceTestWorkerState<RT : RaceTestWithPerTrialDataType> {
+class _RaceTestWorkerState<RT : RaceTestWithPerTrialData> {
   // FIXME: protect every element of 'raceData' against false sharing.
   var raceData: [RT.RaceData] = []
   var raceDataShuffle: [Int] = []
   var observations: [RT.Observation] = []
 }
 
-class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
+class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
   var racingThreadCount: Int
 
   var trialBarrier: _stdlib_Barrier
@@ -411,20 +411,20 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
   }
 }
 
-func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
+func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
   sharedState: _RaceTestSharedState<RT>
 ) {
   let racingThreadCount = sharedState.racingThreadCount
   let raceDataCount = racingThreadCount * racingThreadCount
   let rt = RT()
 
-  sharedState.raceData.removeAll(keepCapacity: true)
-  sharedState.raceData.appendContentsOf(
+  sharedState.raceData.removeAll(keepingCapacity: true)
+  sharedState.raceData.append(contentsOf:
     (0..<raceDataCount).lazy.map { i in rt.makeRaceData() })
 
   let identityShuffle = Array(0..<sharedState.raceData.count)
-  sharedState.workerStates.removeAll(keepCapacity: true)
-  sharedState.workerStates.appendContentsOf(
+  sharedState.workerStates.removeAll(keepingCapacity: true)
+  sharedState.workerStates.append(contentsOf:
     (0..<racingThreadCount).lazy.map {
       i in
       let workerState = _RaceTestWorkerState<RT>()
@@ -466,12 +466,12 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
 
       let sink = { sharedState.aggregatedEvaluations.addEvaluation($0) }
       rt.evaluateObservations(observations, sink)
-      observations.removeAll(keepCapacity: true)
+      observations.removeAll(keepingCapacity: true)
     }
   }
 }
 
-func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
+func _workerThreadOneTrial<RT : RaceTestWithPerTrialData>(
   tid: Int, _ sharedState: _RaceTestSharedState<RT>
 ) {
   sharedState.trialBarrier.wait()
@@ -493,7 +493,7 @@ func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
   sharedState.trialBarrier.wait()
 }
 
-public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
+public func runRaceTest<RT : RaceTestWithPerTrialData>(
   _: RT.Type,
   trials: Int,
   threads: Int? = nil
@@ -550,7 +550,7 @@ internal func _divideRoundUp(lhs: Int, _ rhs: Int) -> Int {
   return (lhs + rhs) / rhs
 }
 
-public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
+public func runRaceTest<RT : RaceTestWithPerTrialData>(
   test: RT.Type,
   operations: Int,
   threads: Int? = nil

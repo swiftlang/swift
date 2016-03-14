@@ -17,7 +17,7 @@ class X {
 
 
 func testInitWith(url: String) {
-  _ = NSInterestingDesignated(URL: url)
+  _ = NSInterestingDesignated(url: url)
 }
 
 func testInstanceTypeFactoryMethod(queen: Bee) {
@@ -50,7 +50,7 @@ func testNonInstanceTypeFactoryMethod(s: String) {
 }
 
 func testUseOfFactoryMethod(queen: Bee) {
-  _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' is unavailable: use object construction 'Hive(queen:)'}}
+  _ = Hive.withQueen(queen) // expected-error{{'withQueen' is unavailable: use object construction 'Hive(queen:)'}}
 }
 
 func testNonsplittableFactoryMethod() {
@@ -60,5 +60,5 @@ func testNonsplittableFactoryMethod() {
 // rdar://problem/18797808
 func testFactoryMethodWithKeywordArgument() {
   let prot = NSCoding.self
-  _ = NSXPCInterface(withProtocol: prot) // not "protocol:"
+  _ = NSXPCInterface(with: prot) // not "protocol:"
 }

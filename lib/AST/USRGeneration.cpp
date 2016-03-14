@@ -68,7 +68,7 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
 
   // FIXME: mangling 'self' in destructors crashes in mangler.
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
-      return true;
+    return true;
 
   OS << getUSRSpacePrefix();
   Mangler Mangler;

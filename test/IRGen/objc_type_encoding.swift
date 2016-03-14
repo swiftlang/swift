@@ -30,7 +30,7 @@ import gizmo
 // CHECK-tvos: private unnamed_addr constant [11 x i8] c"v24@0:8q16\00"
 
   @objc func testPrimitives(b: CBool, i: Int, f: Float, d: Double)
-    -> COpaquePointer { return COpaquePointer() }
+    -> OpaquePointer { return nil }
 // CHECK-macosx: private unnamed_addr constant [21 x i8] c"^v40@0:8c16q20f28d32\00"
 // CHECK-ios: private unnamed_addr constant [21 x i8] c"^v40@0:8B16q20f28d32\00"
 // CHECK-tvos: private unnamed_addr constant [21 x i8] c"^v40@0:8B16q20f28d32\00"
@@ -119,15 +119,15 @@ func testArchetype(work: P3) {
 // CHECK-tvos: private unnamed_addr constant [12 x i8] c"q24@0:8@?16\00"
 
 @objc func returnNSRadixedOptions() -> NSRadixedOptions {
-    return .Octal
+    return .octal
   }
 // CHECK-macosx: [[ENUMENCODING:@.*]] = private unnamed_addr constant [8 x i8] c"i16@0:8\00"
 // CHECK-ios: [[ENUMENCODING:@.*]] = private unnamed_addr constant [8 x i8] c"i16@0:8\00"
 // CHECK-tvos: [[ENUMENCODING:@.*]] = private unnamed_addr constant [8 x i8] c"i16@0:8\00"
 @objc func returnChoseNSRadixedOptions(choice: NSRadixedOptions) -> NSRadixedOptions {
     switch choice {
-      case .Octal: return .Hex
-      case .Hex: return .Octal
+      case .octal: return .hex
+      case .hex: return .octal
     }
   }
 // CHECK-macosx: private unnamed_addr constant [11 x i8] c"i20@0:8i16\00"

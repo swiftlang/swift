@@ -31,7 +31,7 @@ class FooLayer: CALayer {
   }
 
   required init?(coder: NSCoder) {
-    black = coder.decodeObjectForKey("black") as! CGColor
+    black = coder.decodeObject(forKey: "black") as! CGColor
     super.init(coder: coder)
   }
 

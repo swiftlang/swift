@@ -75,12 +75,12 @@ func opt_to_class(obj: AnyObject) {
   // CHECK:      [[THUNKFN:%.*]] = function_ref @{{.*}} : $@convention(thin) (@in (), @owned @callee_owned () -> ()) -> @out ()
   // CHECK-NEXT: [[THUNK:%.*]] = partial_apply [[THUNKFN]]([[PARTIAL]])
   // CHECK-NEXT: store [[THUNK]] to [[THUNK_PAYLOAD]]
-  // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}Some
+  // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}some
   // CHECK-NEXT: br [[CONTBB:[a-zA-Z0-9]+]]
   
   // No method BB:
   // CHECK: [[NOBB]]:
-  // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}None
+  // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}none
   // CHECK-NEXT: br [[CONTBB]]
 
   // Continuation block
@@ -144,7 +144,7 @@ func opt_to_property(obj: AnyObject) {
   // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[BOUND_METHOD]]() : $@callee_owned () -> Int
   // CHECK-NEXT: [[VALUETEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // CHECK-NEXT: store [[VALUE]] to [[VALUETEMP]]
-  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]{{.*}}Some
+  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]{{.*}}some
   // CHECK-NEXT: br bb3
   var i: Int = obj.value!
 }
@@ -176,7 +176,7 @@ func direct_to_subscript(obj: AnyObject, i: Int) {
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
   // CHECK-NEXT: [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // CHECK-NEXT: store [[RESULT]] to [[RESULTTEMP]]
-  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]{{.*}}Some
+  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]{{.*}}some
   // CHECK-NEXT: br bb3
   var x: Int = obj[i]!
 }

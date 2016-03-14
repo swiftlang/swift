@@ -15,7 +15,7 @@ import TestsUtils
 import Foundation
 
 public func run_NSStringConversion(N: Int) {
-let test:NSString = NSString(CString: "test", encoding: NSASCIIStringEncoding)!
+let test:NSString = NSString(cString: "test", encoding: NSASCIIStringEncoding)!
   for _ in 1...N * 10000 {
     test as String
   }

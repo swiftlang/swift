@@ -1440,7 +1440,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              S.addTypeRef(IBSHI->getType().getSwiftRValueType()),
              (unsigned)IBSHI->getType().getCategory(),
              ListOfValues);
+    break;
   }
+  case ValueKind::MarkUninitializedBehaviorInst:
+    llvm_unreachable("todo");
   }
   // Non-void values get registered in the value table.
   if (SI.hasValue()) {

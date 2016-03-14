@@ -48,6 +48,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_default:
   case tok::pound_if:
   case tok::pound_setline:
+  case tok::pound_sourceLocation:
     return true;
 
   case tok::pound_line:
@@ -291,8 +292,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
     if (isStartOfDecl()
-        && Tok.isNot(tok::pound_if)
-        && Tok.isNot(tok::pound_setline)) {
+        && Tok.isNot(tok::pound_if, tok::pound_setline,
+                     tok::pound_sourceLocation)) {
       ParserStatus Status =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
       if (Status.isError()) {
@@ -345,11 +346,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         Entries.push_back(Entry);
       }
 
-    } else if (Tok.is(tok::pound_line)) {
+    } else if (Tok.isAny(tok::pound_line, tok::pound_setline)) {
       ParserStatus Status = parseLineDirective(true);
       BraceItemsStatus |= Status;
       NeedParseErrorRecovery = Status.isError();
-    } else if (Tok.is(tok::pound_setline)) {
+    } else if (Tok.is(tok::pound_sourceLocation)) {
       ParserStatus Status = parseLineDirective(false);
       BraceItemsStatus |= Status;
       NeedParseErrorRecovery = Status.isError();
@@ -408,17 +409,24 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           }
         }
       }
-    } else {
+    } else if (Tok.is(tok::kw_init) && isa<ConstructorDecl>(CurDeclContext)) {
       SourceLoc StartLoc = Tok.getLoc();
+      auto CD = cast<ConstructorDecl>(CurDeclContext);
+      // Hint at missing 'self.' or 'super.' then skip this statement.
+      bool isConvenient = CD->isConvenienceInit();
+      diagnose(StartLoc, diag::invalid_nested_init, isConvenient)
+        .fixItInsert(StartLoc, isConvenient ? "self." : "super.");
+      NeedParseErrorRecovery = true;
+    } else {
       ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
       BraceItemsStatus |= ExprOrStmtStatus;
       if (ExprOrStmtStatus.isError())
         NeedParseErrorRecovery = true;
       diagnoseDiscardedClosure(*this, Result);
       if (ExprOrStmtStatus.isSuccess() && IsTopLevel) {
-        // If this is a normal library, you can't have expressions or statements
-        // outside at the top level.
-        diagnose(StartLoc,
+        // If this is a normal library, you can't have expressions or
+        // statements outside at the top level.
+        diagnose(Tok.getLoc(),
                  Result.is<Stmt*>() ? diag::illegal_top_level_stmt
                                     : diag::illegal_top_level_expr);
         Result = ASTNode();
@@ -561,10 +569,11 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtIfConfig();
   case tok::pound_line:
+  case tok::pound_setline:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseLineDirective(true);
-  case tok::pound_setline:
+  case tok::pound_sourceLocation:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseLineDirective(false);
@@ -2456,8 +2465,6 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   ParserResult<Expr> Where;
   if (consumeIf(tok::kw_where)) {
     Where = parseExprBasic(diag::expected_foreach_where_expr);
-    if (Where.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Stmt>();
     if (Where.isNull())
       Where = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
     Status |= Where;

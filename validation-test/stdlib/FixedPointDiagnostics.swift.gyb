@@ -114,7 +114,7 @@ func testMixedSignArithmetic() {
 % end
 }
 
-func testOps<T : IntegerArithmeticType>(x: T, _ y: T) -> T {
+func testOps<T : IntegerArithmetic>(x: T, _ y: T) -> T {
   let a = x + y
   let s = x - y
   let m = x * y
@@ -133,7 +133,4 @@ let s32_ops:  Int32 = testOps(5, 2)
 let u32_ops: UInt32 = testOps(5, 2)
 let s64_ops:  Int64 = testOps(5, 2)
 let u64_ops: UInt64 = testOps(5, 2)
-
-func useWord(w: Word) {} // expected-error {{'Word' has been renamed to 'Int'}}
-func useUWord(w: UWord) {} // expected-error {{'UWord' has been renamed to 'UInt'}}
 

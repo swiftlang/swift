@@ -1,5 +1,6 @@
 // Check interface produced for the standard library.
 //
+// RUN: %target-swift-frontend -parse %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface > %t.txt
 // RUN: FileCheck -check-prefix=CHECK-ARGC %s < %t.txt
 // RUN: FileCheck %s < %t.txt
@@ -13,6 +14,13 @@
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface -skip-underscored-stdlib-protocols > %t-prot.txt
 // RUN: FileCheck -check-prefix=CHECK-UNDERSCORED-PROT %s < %t-prot.txt
+// CHECK-UNDERSCORED-PROT: public protocol _DisallowMixedSignArithmetic
+// CHECK-UNDERSCORED-PROT: public protocol _Incrementable
+// CHECK-UNDERSCORED-PROT: public protocol _Integer
+// CHECK-UNDERSCORED-PROT: public protocol _IntegerArithmetic
+// CHECK-UNDERSCORED-PROT: public protocol _RandomAccessAmbiguity
+// CHECK-UNDERSCORED-PROT: public protocol _SequenceWrapper
+// CHECK-UNDERSCORED-PROT: public protocol _SignedInteger
 // CHECK-UNDERSCORED-PROT-NOT: protocol _
 
 // CHECK-ARGC: static var argc: CInt { get }
@@ -42,6 +50,9 @@
 // CHECK-SUGAR: extension Optional :
 
 // CHECK-MUTATING-ATTR: mutating func
+
+func foo(x: _Pointer) {} // Checks that this protocol actually exists.
+// CHECK-NOT: _Pointer
 
 // NO-FIXMES-NOT: FIXME
 // RUN: %target-swift-ide-test -print-module-groups -module-to-print=Swift -source-filename %s -print-interface > %t-group.txt
@@ -80,3 +91,5 @@
 // RUN: %target-swift-ide-test -print-module -module-group "Collection/Type-erased" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
 
 // CHECK-FREQUENT-WORD: ///
+// CHECK-FREQUENT-WORD-NOT: where Slice<Dictionary<Key, Value>> == Slice<Self>
+// CHECK-FREQUENT-WORD-NOT: @warn_unused_result

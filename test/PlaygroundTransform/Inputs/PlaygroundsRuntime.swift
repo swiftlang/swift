@@ -6,17 +6,17 @@ class LogRecord {
   let text : String
   init(api : String, object : Any, name : String, id : Int) {
     var object_description : String = ""
-    print(object, terminator: "", toStream: &object_description)
+    print(object, terminator: "", to: &object_description)
     text = api + "[" + name + "='" + object_description + "']"
   }
   init(api : String, object : Any, name : String) {
     var object_description : String = ""
-    print(object, terminator: "", toStream: &object_description)
+    print(object, terminator: "", to: &object_description)
     text = api + "[" + name + "='" + object_description + "']"
   }
   init(api : String, object: Any) {
     var object_description : String = ""
-    print(object, terminator: "", toStream: &object_description)
+    print(object, terminator: "", to: &object_description)
     text = api + "['" + object_description + "']"
   }
   init(api: String) {

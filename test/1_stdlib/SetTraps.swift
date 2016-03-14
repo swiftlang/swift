@@ -20,53 +20,53 @@ import ObjectiveC
 var SetTraps = TestSuite("SetTraps")
 
 SetTraps.test("RemoveInvalidIndex1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = Set<Int>()
   let index = s.startIndex
   expectCrashLater()
-  s.removeAtIndex(index)
+  s.remove(at: index)
 }
 
 SetTraps.test("RemoveInvalidIndex2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = Set<Int>()
   let index = s.endIndex
   expectCrashLater()
-  s.removeAtIndex(index)
+  s.remove(at: index)
 }
 
 SetTraps.test("RemoveInvalidIndex3")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s: Set<Int> = [ 10, 20, 30 ]
   let index = s.endIndex
   expectCrashLater()
-  s.removeAtIndex(index)
+  s.remove(at: index)
 }
 
 SetTraps.test("RemoveInvalidIndex4")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s: Set<Int> = [ 10 ]
-  let index = s.indexOf(10)!
-  s.removeAtIndex(index)
+  let index = s.index(of: 10)!
+  s.remove(at: index)
   expectFalse(s.contains(10))
   expectCrashLater()
-  s.removeAtIndex(index)
+  s.remove(at: index)
 }
 
 SetTraps.test("RemoveFirstFromEmpty")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?

@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt | FileCheck %s
 
 protocol mmGeneratorType {
-  typealias Element
+  associatedtype Element
 }
 
 protocol mmSequenceType {
-  typealias Generator : mmGeneratorType
+  associatedtype Generator : mmGeneratorType
 }
 
 protocol mmCollectionType : mmSequenceType {

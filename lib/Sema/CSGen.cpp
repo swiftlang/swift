@@ -2498,7 +2498,7 @@ namespace {
       Expr *condExpr = expr->getCondExpr();
       auto booleanType
         = CS.getTypeChecker().getProtocol(expr->getQuestionLoc(),
-                                          KnownProtocolKind::BooleanType);
+                                          KnownProtocolKind::Boolean);
       if (!booleanType)
         return Type();
 
@@ -3208,8 +3208,9 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   return CS.solveSingle().hasValue();
 }
 
-bool canPossiblySatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind) {
-  ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
+static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
+                       bool ReplaceArchetypeWithVariables,
+                       bool AllowFreeVariables) {
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
@@ -3217,26 +3218,34 @@ bool canPossiblySatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind) 
     CreatedTC.reset(new TypeChecker(DC.getASTContext()));
     TC = CreatedTC.get();
   }
-  ConstraintSystem CS(*TC, &DC, Options);
-  std::function<Type(Type)> Trans = [&](Type Base) {
-    if (Base->getKind() == TypeKind::Archetype) {
-      return Type(CS.createTypeVariable(CS.getConstraintLocator(nullptr),
-                                        TypeVariableOptions::TVO_CanBindToLValue));
-    }
-    return Base;
-  };
-  T1 = T1.transform(Trans);
-  T2 = T2.transform(Trans);
+  ConstraintSystem CS(*TC, &DC, None);
+  if (ReplaceArchetypeWithVariables) {
+    std::function<Type(Type)> Trans = [&](Type Base) {
+      if (Base->getKind() == TypeKind::Archetype) {
+        return Type(CS.createTypeVariable(CS.getConstraintLocator(nullptr),
+                                    TypeVariableOptions::TVO_CanBindToLValue));
+      }
+      return Base;
+    };
+    T1 = T1.transform(Trans);
+    T2 = T2.transform(Trans);
+  }
   CS.addConstraint(Constraint::create(CS, Kind, T1, T2, DeclName(),
                                       CS.getConstraintLocator(nullptr)));
   SmallVector<Solution, 4> Solutions;
-  return !CS.solve(Solutions, FreeTypeVariableBinding::Allow);
+  return AllowFreeVariables ?
+          !CS.solve(Solutions, FreeTypeVariableBinding::Allow) :
+          CS.solveSingle().hasValue();
 }
 
 bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-  return canPossiblySatisfy(T1, T2, DC, ConstraintKind::Equal);
+  return canSatisfy(T1, T2, DC, ConstraintKind::Equal, true, true);
 }
 
 bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
-  return canPossiblySatisfy(T1, T2, DC, ConstraintKind::Conversion);
+  return canSatisfy(T1, T2, DC, ConstraintKind::Conversion, true, true);
+}
+
+bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
+  return canSatisfy(T1, T2, DC, ConstraintKind::Equal, false, false);
 }

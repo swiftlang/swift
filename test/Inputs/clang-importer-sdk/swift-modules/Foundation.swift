@@ -216,7 +216,7 @@ extension NSRange : _ObjectiveCBridgeable {
   }
 }
 
-extension NSError : ErrorType {
+extension NSError : ErrorProtocol {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
@@ -225,8 +225,8 @@ extension NSArray {
   @objc(methodIntroducedInOverlay) public func introducedInOverlay() { }
 }
 
-@_silgen_name("swift_convertNSErrorToErrorType")
-func _convertNSErrorToErrorType(string: NSError?) -> ErrorType
+@_silgen_name("swift_convertNSErrorToErrorProtocol")
+func _convertNSErrorToErrorProtocol(string: NSError?) -> ErrorProtocol
 
-@_silgen_name("swift_convertErrorTypeToNSError")
-func _convertErrorTypeToNSError(string: ErrorType) -> NSError
+@_silgen_name("swift_convertErrorProtocolToNSError")
+func _convertErrorProtocolToNSError(string: ErrorProtocol) -> NSError

@@ -1239,10 +1239,10 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  // The generator decl is built directly on top of the sequence
+  // The iterator decl is built directly on top of the sequence
   // expression, so don't visit both.
-  if (PatternBindingDecl *Generator = S->getGenerator()) {
-    if (doIt(Generator))
+  if (PatternBindingDecl *Iterator = S->getIterator()) {
+    if (doIt(Iterator))
       return nullptr;
 
   } else if (Expr *Sequence = S->getSequence()) {
@@ -1252,9 +1252,9 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (auto GeneratorNext = S->getGeneratorNext()) {
-    if ((GeneratorNext = doIt(GeneratorNext)))
-      S->setGeneratorNext(GeneratorNext);
+  if (auto IteratorNext = S->getIteratorNext()) {
+    if ((IteratorNext = doIt(IteratorNext)))
+      S->setIteratorNext(IteratorNext);
     else
       return nullptr;
   }

@@ -9,9 +9,10 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
-import setuptools
 
 import cmpcodesize
+
+import setuptools
 
 # setuptools expects to be invoked from within the directory of setup.py,
 # but it is nice to allow `python path/to/setup.py install` to work

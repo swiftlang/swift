@@ -55,6 +55,7 @@ namespace swift {
   class TypeAliasDecl;
   class TypeDecl;
   class NominalTypeDecl;
+  class GenericTypeDecl;
   class EnumDecl;
   class EnumElementDecl;
   class StructDecl;
@@ -622,14 +623,34 @@ public:
   ///          superclass.
   Type getSuperclass(LazyResolver *resolver);
   
-  /// \brief True if this type is a superclass of another type.
+  /// \brief True if this type is the exact superclass of another type.
   ///
   /// \param ty       The potential subclass.
   /// \param resolver The resolver for lazy type checking, or null if the
   ///                 AST is already type-checked.
   ///
   /// \returns True if this type is \c ty or a superclass of \c ty.
-  bool isSuperclassOf(Type ty, LazyResolver *resolver);
+  ///
+  /// If this type is a bound generic class \c Foo<T>, the method only
+  /// returns true if the generic parameters of \c ty exactly match the
+  /// superclass of \c ty. For instance, if \c ty is a
+  /// class DerivedClass: Base<Int>, then \c Base<T> (where T is an archetype)
+  /// will return false. `isBindableToSuperclassOf` should be used
+  /// for queries that care whether a generic class type can be substituted into
+  /// a type's subclass.
+  bool isExactSuperclassOf(Type ty, LazyResolver *resolver);
+
+  /// \brief True if this type is the superclass of another type, or a generic
+  /// type that could be bound to the superclass.
+  ///
+  /// \param ty       The potential subclass.
+  /// \param resolver The resolver for lazy type checking, or null if the
+  ///                 AST is already type-checked.
+  ///
+  /// \returns True if this type is \c ty, a superclass of \c ty, or an
+  ///          archetype-parameterized type that can be bound to a superclass
+  ///          of \c ty.
+  bool isBindableToSuperclassOf(Type ty, LazyResolver *resolver);
 
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.
@@ -672,6 +693,11 @@ public:
   /// unbound generic nominal type, return the (possibly generic) nominal type
   /// declaration.
   NominalTypeDecl *getAnyNominal();
+
+  /// \brief If this is a GenericType, bound generic nominal type, or
+  /// unbound generic nominal type, return the (possibly generic) nominal type
+  /// declaration.
+  GenericTypeDecl *getAnyGeneric();
 
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
@@ -1391,16 +1417,16 @@ BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
   }
 END_CAN_TYPE_WRAPPER(TupleType, Type)
 
-/// UnboundGenericType - Represents a generic nominal type where the
-/// type arguments have not yet been resolved.
+/// UnboundGenericType - Represents a generic type where the type arguments have
+/// not yet been resolved.
 class UnboundGenericType : public TypeBase, public llvm::FoldingSetNode {
-  NominalTypeDecl *TheDecl;
+  GenericTypeDecl *TheDecl;
 
   /// \brief The type of the parent, in which this type is nested.
   Type Parent;
 
 private:
-  UnboundGenericType(NominalTypeDecl *TheDecl, Type Parent, const ASTContext &C,
+  UnboundGenericType(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C,
                      RecursiveTypeProperties properties)
     : TypeBase(TypeKind::UnboundGeneric,
                (!Parent || Parent->isCanonical())? &C : nullptr,
@@ -1408,11 +1434,11 @@ private:
       TheDecl(TheDecl), Parent(Parent) { }
 
 public:
-  static UnboundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
+  static UnboundGenericType* get(GenericTypeDecl *TheDecl, Type Parent,
                                  const ASTContext &C);
 
   /// \brief Returns the declaration that declares this type.
-  NominalTypeDecl *getDecl() const { return TheDecl; }
+  GenericTypeDecl *getDecl() const { return TheDecl; }
 
   /// \brief Returns the type of the parent of this type. This will
   /// be null for top-level types or local types, and for non-generic types
@@ -1427,7 +1453,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *D,
+  static void Profile(llvm::FoldingSetNodeID &ID, GenericTypeDecl *D,
                       Type Parent);
 
   // Implement isa/cast/dyncast/etc.
@@ -1442,8 +1468,8 @@ END_CAN_TYPE_WRAPPER(UnboundGenericType, Type)
 inline CanType getAsCanType(const Type &type) { return CanType(type); }
 typedef ArrayRefView<Type,CanType,getAsCanType> CanTypeArrayRef;
 
-/// BoundGenericType - An abstract class for applying a generic
-/// nominal type to the given type arguments.
+/// BoundGenericType - An abstract class for applying a generic type to the
+/// given type arguments.
 class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
   NominalTypeDecl *TheDecl;
 
@@ -4290,19 +4316,12 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
   return getCanonicalType().getAnyNominal();
 }
 
-inline NominalTypeDecl *CanType::getAnyNominal() const {
-  if (auto nominalTy = dyn_cast<NominalType>(*this))
-    return nominalTy->getDecl();
-
-  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
-    return boundTy->getDecl();
-
-  if (auto unboundTy = dyn_cast<UnboundGenericType>(*this))
-    return unboundTy->getDecl();
-
-  return nullptr;
+inline GenericTypeDecl *TypeBase::getAnyGeneric() {
+  return getCanonicalType().getAnyGeneric();
 }
 
+  
+  
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))
     return intTy->getWidth().isFixedWidth()

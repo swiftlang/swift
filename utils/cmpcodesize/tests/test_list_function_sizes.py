@@ -1,4 +1,4 @@
-# test_list_function_sizes.py - Unit tests for list_function_sizes -*- python -*-
+# test_list_function_sizes.py - list_function_sizes unit tests -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -14,6 +14,7 @@ from cmpcodesize.compare import list_function_sizes
 
 
 class ListFunctionSizesTestCase(unittest.TestCase):
+
     def test_when_size_array_is_none_raises(self):
         with self.assertRaises(TypeError):
             list(list_function_sizes(None))

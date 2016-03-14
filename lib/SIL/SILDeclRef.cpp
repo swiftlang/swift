@@ -325,7 +325,10 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   
   // Currying and calling convention thunks have shared linkage.
   if (isThunk())
-    return SILLinkage::Shared;
+    // If a function declares a @_cdecl name, its native-to-foreign thunk is
+    // exported with the visibility of the function.
+    if (!isNativeToForeignThunk() || !d->getAttrs().hasAttribute<CDeclAttr>())
+      return SILLinkage::Shared;
   
   // Enum constructors are essentially the same as thunks, they are
   // emitted by need and have shared linkage.
@@ -483,13 +486,20 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
       return mangler.finalize();
     }
 
-    // As a special case, functions can have external asm names.
-    // Use the asm name only for the original non-thunked, non-curried entry
+    // As a special case, functions can have manually mangled names.
+    // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
-    if (auto AsmA = c.getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
+    if (auto NameA = c.getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
           && !c.isCurried) {
-        mangler.append(AsmA->Name);
+        mangler.append(NameA->Name);
+        return mangler.finalize();
+      }
+      
+    // Use a given cdecl name for native-to-foreign thunks.
+    if (auto CDeclA = c.getDecl()->getAttrs().getAttribute<CDeclAttr>())
+      if (c.isNativeToForeignThunk()) {
+        mangler.append(CDeclA->Name);
         return mangler.finalize();
       }
 

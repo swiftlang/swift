@@ -31,7 +31,7 @@ import ObjectiveC
 var IntervalTraps = TestSuite("IntervalTraps")
 
 IntervalTraps.test("HalfOpen")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -42,7 +42,7 @@ IntervalTraps.test("HalfOpen")
 }
 
 IntervalTraps.test("Closed")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

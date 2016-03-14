@@ -951,7 +951,8 @@ bool AllocOptimize::doIt() {
   }
   
   // If this is an allocation, try to remove it completely.
-  if (!isa<MarkUninitializedInst>(TheMemory))
+  if (!isa<MarkUninitializedInst>(TheMemory)
+      && !isa<MarkUninitializedBehaviorInst>(TheMemory))
     Changed |= tryToRemoveDeadAllocation();
 
   return Changed;

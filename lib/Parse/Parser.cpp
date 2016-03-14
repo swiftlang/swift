@@ -568,6 +568,17 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
   }
 }
 
+bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
+                                     const Diagnostic &D) {
+  if (Tok.getText() != expected) {
+    diagnose(Tok, D);
+    return true;
+  }
+  loc = consumeToken(tok::identifier);
+  return false;
+}
+
+
 /// parseAnyIdentifier - Consume an identifier or operator if present and return
 /// its name in Result.  Otherwise, emit an error and return true.
 bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,

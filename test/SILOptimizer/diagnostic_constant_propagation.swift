@@ -324,12 +324,12 @@ func tryDouble() -> Int8 {
 }
 
 @_transparent
-func add<T : SignedIntegerType>(left: T, _ right: T) -> T {
+func add<T : SignedInteger>(left: T, _ right: T) -> T {
   return left + right
 }
 
 @_transparent
-func applyBinary<T : SignedIntegerType>(fn: (T, T) -> (T), _ left: T, _ right: T) -> T {
+func applyBinary<T : SignedInteger>(fn: (T, T) -> (T), _ left: T, _ right: T) -> T {
   return fn(left, right)
 }
 

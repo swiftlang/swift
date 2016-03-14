@@ -22,7 +22,7 @@ struct _Prespecialize {
     func _createArrayUser<Element : Comparable>(sampleValue: Element) {
       // Initializers.
       let _: [Element] = [ sampleValue ]
-      var a = [Element](count: 1, repeatedValue: sampleValue)
+      var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
       let _ =  a[0]
@@ -41,7 +41,7 @@ struct _Prespecialize {
 
       a[0] = sampleValue
 
-      // Get length and capacity
+      // Get count and capacity
       let _ = a.count + a.capacity
 
       // Iterate over array
@@ -57,8 +57,8 @@ struct _Prespecialize {
       a.reserveCapacity(100)
 
       // Sort array
-      let _ = a.sort { (a:Element, b:Element) in a < b }
-      a.sortInPlace { (a:Element, b:Element) in a < b }
+      let _ = a.sorted { (a: Element, b: Element) in a < b }
+      a.sort { (a: Element, b: Element) in a < b }
 
       // force specialization of append.
       a.append(a[0])
@@ -71,7 +71,7 @@ struct _Prespecialize {
     func _createArrayUserWithoutSorting<Element>(sampleValue: Element) {
       // Initializers.
       let _: [Element] = [ sampleValue ]
-      var a = [Element](count: 1, repeatedValue: sampleValue)
+      var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
       let _ =  a[0]
@@ -146,7 +146,7 @@ struct _Prespecialize {
 
   // Force pre-specialization of Range<Int>
   static internal func _specializeRanges() -> Int {
-    let a = [Int](count: 10, repeatedValue: 1)
+    let a = [Int](repeating: 1, count: 10)
     var count = 0
     // Specialize Range for integers
     for i in 0..<a.count {

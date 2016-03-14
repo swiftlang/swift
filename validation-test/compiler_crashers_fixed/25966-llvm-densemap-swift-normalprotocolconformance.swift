@@ -1,8 +1,11 @@
-// RUN: not %target-swift-frontend %s -parse
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// RUN: not %target-swift-frontend %s -parse
 }
 ( ")enum S<a
 struct B
@@ -52,7 +55,7 @@ in
 }
 case c
 typealias e : A
-extension g:BooleanType{
+extension g:Boolean{
 class A {}
 extension NSFileManager {
 return E.c{ enum b {
@@ -61,7 +64,7 @@ typealias e = compose()enum C {
 {struct A
 var d {
 {
-func a :BooleanType{
+func a :Boolean{
 let b{struct B<T:C>()
 let h : A {
 case c
@@ -100,7 +103,7 @@ struct b: a {enum b = F>() {
 ( "
 func a {
 class A : A
-func a:BooleanType{
+func a:Boolean{
 var f = compose(n: Dictionary<String, C>())
 struct b: A
 protocol A {

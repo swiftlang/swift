@@ -46,6 +46,22 @@
 #endif
 #endif
 
+/// Does the current Swift platform have ISA pointers which should be opaque
+/// to anyone outside the Swift runtime?  Similarly to the ISA_MASKING case
+/// above, information other than the class pointer could be contained in the
+/// ISA.
+#ifndef SWIFT_HAS_OPAQUE_ISAS
+#if __ARM_ARCH_7K__ >= 2
+#define SWIFT_HAS_OPAQUE_ISAS 1
+#else
+#define SWIFT_HAS_OPAQUE_ISAS 0
+#endif
+#endif
+
+#if SWIFT_HAS_OPAQUE_ISAS && SWIFT_HAS_ISA_MASKING
+#error Masking ISAs are incompatible with opaque ISAs
+#endif
+
 // We try to avoid global constructors in the runtime as much as possible.
 // These macros delimit allowed global ctors.
 #if __clang__

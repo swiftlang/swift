@@ -2709,24 +2709,6 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 // Protocol witnesses
 //===----------------------------------------------------------------------===//
 
-static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
-                                         ProtocolConformance *conformance,
-                                         SILDeclRef requirement,
-                                         SILDeclRef witness,
-                                         ArrayRef<Substitution> witnessSubs,
-                                         ArrayRef<ManagedValue> origParams) {
-  if (auto witnessFn = dyn_cast<FuncDecl>(witness.getDecl())) {
-    if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
-      auto reqFn = cast<FuncDecl>(requirement.getDecl());
-      assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
-      return gen.maybeEmitMaterializeForSetThunk(conformance, reqFn, witnessFn,
-                                                 witnessSubs, origParams);
-    }
-  }
-
-  return false;
-}
-
 enum class WitnessDispatchKind {
   Static,
   Dynamic,
@@ -2734,16 +2716,14 @@ enum class WitnessDispatchKind {
 };
 
 static WitnessDispatchKind
-getWitnessDispatchKind(ProtocolConformance *conformance,
-                       SILDeclRef witness,
-                       bool isFree) {
+getWitnessDispatchKind(Type selfType, SILDeclRef witness, bool isFree) {
   // Free functions are always statically dispatched...
   if (isFree)
     return WitnessDispatchKind::Static;
 
   // If we have a non-class, non-objc method or a class, objc method that is
   // final, we do not dynamic dispatch.
-  ClassDecl *C = conformance->getType()->getClassOrBoundGenericClass();
+  ClassDecl *C = selfType->getClassOrBoundGenericClass();
   if (!C)
     return WitnessDispatchKind::Static;
 
@@ -2923,37 +2903,33 @@ substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
   }
 }
 
-void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
+void SILGenFunction::emitProtocolWitness(Type selfType,
+                                         AbstractionPattern reqtOrigTy,
+                                         CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
                                          ArrayRef<Substitution> witnessSubs,
                                          IsFreeFunctionWitness_t isFree) {
-  auto witnessKind = getWitnessDispatchKind(conformance, witness, isFree);
-
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
-  
+
   SILLocation loc(witness.getDecl());
   FullExpr scope(Cleanups, CleanupLocation::get(loc));
-  
+ 
+  auto witnessKind = getWitnessDispatchKind(selfType, witness, isFree);
   auto thunkTy = F.getLoweredFunctionType();
-  
+
   SmallVector<ManagedValue, 8> origParams;
   // TODO: Should be able to accept +0 values here, once
   // forwardFunctionArguments/emitApply are able to.
   collectThunkParams(loc, origParams, /*allowPlusZero*/ false);
-  
+
   // Handle special abstraction differences in "self".
   // If the witness is a free function, drop it completely.
   // WAY SPECULATIVE TODO: What if 'self' comprised multiple SIL-level params?
   if (isFree)
     origParams.pop_back();
-
-  // Open-code certain protocol witness "thunks".
-  if (maybeOpenCodeProtocolWitness(*this, conformance, requirement,
-                                   witness, witnessSubs, origParams))
-    return;
 
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
@@ -2964,24 +2940,11 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
         ->substGenericArgs(SGM.M.getSwiftModule(), witnessSubs)
         ->getCanonicalType());
   }
-  CanType witnessSubstInputTy = witnessSubstTy.getInput();
-  
-  // Get the type of the requirement, so we can use it as an
-  // abstraction pattern.
-  auto reqtInfo = getConstantInfo(requirement);
-
-  // FIXME: reqtSubstTy is already computed in SGM::emitProtocolWitness(),
-  // but its called witnessSubstIfaceTy there; the mapTypeIntoContext()
-  // calls should be pushed down into thunk emission.
-  CanAnyFunctionType reqtSubstTy = SGM.substSelfTypeIntoProtocolRequirementType(
-      cast<GenericFunctionType>(reqtInfo.LoweredInterfaceType),
-      conformance);
   CanType reqtSubstInputTy = F.mapTypeIntoContext(reqtSubstTy.getInput())
       ->getCanonicalType();
   CanType reqtSubstResultTy = F.mapTypeIntoContext(reqtSubstTy.getResult())
       ->getCanonicalType();
 
-  AbstractionPattern reqtOrigTy(reqtInfo.LoweredInterfaceType);
   AbstractionPattern reqtOrigInputTy = reqtOrigTy.getFunctionInputType();
   // For a free function witness, discard the 'self' parameter of the
   // requirement.
@@ -3017,7 +2980,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
       ManagedValue &selfParam = origParams.back();
       SILValue selfAddr = selfParam.getUnmanagedValue();
       selfParam = emitLoad(loc, selfAddr,
-                           getTypeLowering(conformance->getType()),
+                           getTypeLowering(selfType),
                            SGFContext(),
                            IsNotTake);
     }
@@ -3030,7 +2993,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     .translate(reqtOrigInputTy,
                reqtSubstInputTy,
                witnessOrigTy.getFunctionInputType(),
-               witnessSubstInputTy);
+               witnessSubstTy.getInput());
 
   SILValue witnessFnRef = getWitnessFunctionRef(*this, witness, witnessKind,
                                                 witnessParams, loc);

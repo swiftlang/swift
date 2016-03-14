@@ -604,7 +604,15 @@ namespace {
         auto unboundDecl = unbound->getDecl();
         if (unboundDecl->isInvalid())
           return ErrorType::get(cs.getASTContext());
-
+        
+        // If the unbound decl hasn't been validated yet, we have a circular
+        // dependency that isn't being diagnosed properly.
+        if (!unboundDecl->getGenericSignature()) {
+          cs.TC.diagnose(unboundDecl, diag::circular_reference);
+          return ErrorType::get(cs.getASTContext());
+        }
+        
+        
         // Open up the generic type.
         cs.openGeneric(unboundDecl,
                        unboundDecl->getInnermostGenericParamTypes(),
@@ -613,15 +621,20 @@ namespace {
                        minOpeningDepth,
                        locator,
                        replacements);
-
+        
         // Map the generic parameters to their corresponding type variables.
-        llvm::SmallVector<Type, 4> arguments;
+        llvm::SmallVector<TypeLoc, 4> arguments;
         for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
-          assert(replacements.count(gp->getCanonicalType()) && 
+          assert(replacements.count(gp->getCanonicalType()) &&
                  "Missing generic parameter?");
-          arguments.push_back(replacements[gp->getCanonicalType()]);
+          arguments.push_back(TypeLoc::withoutLoc(
+                              replacements[gp->getCanonicalType()]));
         }
-        return BoundGenericType::get(unboundDecl, parentTy, arguments);
+        
+        return cs.TC.applyUnboundGenericArguments(unbound, SourceLoc(), cs.DC,
+                                                  arguments,
+                                                  /*isGenericSignature*/false,
+                                                  /*resolver*/nullptr);
       }
       
       return type;

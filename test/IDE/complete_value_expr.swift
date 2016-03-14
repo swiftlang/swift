@@ -167,6 +167,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE5 > %t.autoclosure5
 // RUN: FileCheck %s -check-prefix=AUTOCLOSURE_STRING < %t.autoclosure5
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_1 | FileCheck %s -check-prefix=GENERIC_TYPEALIAS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_2 | FileCheck %s -check-prefix=GENERIC_TYPEALIAS_2
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -1580,7 +1583,7 @@ func testGenericConforming3<T: P3>(x: T) {
 
 struct OnlyMe {}
 protocol P4 {
-  typealias T
+  associatedtype T
 }
 extension P4 where Self.T : P1 {
   final func extP4WhenP1() {}
@@ -1721,7 +1724,7 @@ extension P4 where Self.T == WillConformP1 {
 // PROTOCOL_EXT_P4_T_DOT_1: End completions
 
 protocol PWithT {
-  typealias T
+  associatedtype T
   func foo(x: T) -> T
 }
 
@@ -1742,7 +1745,7 @@ func testUnusableProtExt(x: PWithT) {
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: End completions
 
 protocol dedupP {
-  typealias T
+  associatedtype T
   func foo() -> T
   var bar: T {get}
   subscript(x: T) -> T {get}
@@ -1863,3 +1866,19 @@ func testWithAutoClosure5(x: String?) {
   if let y = (x ?? "autoclosure").#^AUTOCLOSURE5^# {
   }
 }
+
+func testGenericTypealias1() {
+  typealias MyPair<T> = (T, T)
+  var x: MyPair<Int>
+  x.#^GENERIC_TYPEALIAS_1^#
+}
+// GENERIC_TYPEALIAS_1: Pattern/CurrNominal:                0[#Int#];
+// GENERIC_TYPEALIAS_1: Pattern/CurrNominal:                1[#Int#];
+
+func testGenericTypealias2() {
+  struct Enclose {
+    typealias MyPair<T> = (T, T)
+  }
+  Enclose.#^GENERIC_TYPEALIAS_2^#
+}
+// GENERIC_TYPEALIAS_2: Decl[TypeAlias]/CurrNominal:        MyPair[#(T, T)#];

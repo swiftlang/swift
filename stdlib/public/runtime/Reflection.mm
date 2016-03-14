@@ -217,7 +217,7 @@ static_assert(sizeof(MagicMirrorData) == sizeof(ValueBuffer),
 /// arbitrary object.
 ///
 /// This type is layout-compatible with a Swift existential container for the
-/// _MirrorType protocol.
+/// _Mirror protocol.
 class MagicMirror {
 public:
   // The data for the mirror.
@@ -376,7 +376,7 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
       new (result) String("(Heap Generic Local Variable)");
       break;
     case MetadataKind::ErrorObject:
-      new (result) String("(ErrorType Object)");
+      new (result) String("(ErrorProtocol Object)");
       break;
   }
 }
@@ -1080,46 +1080,46 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 extern "C" const Metadata OpaqueMirrorMetadata
   __asm__(UNDERSCORE "_TMVs13_OpaqueMirror");
 extern "C" const MirrorWitnessTable OpaqueMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs13_OpaqueMirrors11_MirrorTypes");
+  __asm__(UNDERSCORE "_TWPVs13_OpaqueMirrors7_Mirrors");
 extern "C" const Metadata TupleMirrorMetadata
   __asm__(UNDERSCORE "_TMVs12_TupleMirror");
 extern "C" const MirrorWitnessTable TupleMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs12_TupleMirrors11_MirrorTypes");
+  __asm__(UNDERSCORE "_TWPVs12_TupleMirrors7_Mirrors");
 
 extern "C" const Metadata StructMirrorMetadata
   __asm__(UNDERSCORE "_TMVs13_StructMirror");
 extern "C" const MirrorWitnessTable StructMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs13_StructMirrors11_MirrorTypes");
+  __asm__(UNDERSCORE "_TWPVs13_StructMirrors7_Mirrors");
 
 extern "C" const Metadata EnumMirrorMetadata
   __asm__(UNDERSCORE "_TMVs11_EnumMirror");
 extern "C" const MirrorWitnessTable EnumMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs11_EnumMirrors11_MirrorTypes");
+  __asm__(UNDERSCORE "_TWPVs11_EnumMirrors7_Mirrors");
 
 extern "C" const Metadata ClassMirrorMetadata
   __asm__(UNDERSCORE "_TMVs12_ClassMirror");
 extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs12_ClassMirrors11_MirrorTypes");
+  __asm__(UNDERSCORE "_TWPVs12_ClassMirrors7_Mirrors");
 
 extern "C" const Metadata ClassSuperMirrorMetadata
   __asm__(UNDERSCORE "_TMVs17_ClassSuperMirror");
 extern "C" const MirrorWitnessTable ClassSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs17_ClassSuperMirrors11_MirrorTypes");
+  __asm__(UNDERSCORE "_TWPVs17_ClassSuperMirrors7_Mirrors");
 
 extern "C" const Metadata MetatypeMirrorMetadata
   __asm__(UNDERSCORE "_TMVs15_MetatypeMirror");
 extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs15_MetatypeMirrors11_MirrorTypes");
+  __asm__(UNDERSCORE "_TWPVs15_MetatypeMirrors7_Mirrors");
   
 #if SWIFT_OBJC_INTEROP
 extern "C" const Metadata ObjCMirrorMetadata
   __asm__(UNDERSCORE "_TMVs11_ObjCMirror");
 extern "C" const MirrorWitnessTable ObjCMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs11_ObjCMirrors11_MirrorTypes");
+  __asm__(UNDERSCORE "_TWPVs11_ObjCMirrors7_Mirrors");
 extern "C" const Metadata ObjCSuperMirrorMetadata
   __asm__(UNDERSCORE "_TMVs16_ObjCSuperMirror");
 extern "C" const MirrorWitnessTable ObjCSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs16_ObjCSuperMirrors11_MirrorTypes");
+  __asm__(UNDERSCORE "_TWPVs16_ObjCSuperMirrors7_Mirrors");
 #endif
 
 #undef UNDERSCORE

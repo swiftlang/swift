@@ -77,8 +77,8 @@ void emitIndirectConditionalCastWithScalar(
 /// \brief Does the type conform to the _ObjectiveCBridgeable protocol.
 bool isObjectiveCBridgeable(ModuleDecl *M, CanType Ty);
 
-/// \brief Does the type conform to the _Error protocol.
-bool isErrorType(ModuleDecl *M, CanType Ty);
+/// \brief Does the type conform to ErrorProtocol.
+bool isErrorProtocol(ModuleDecl *M, CanType Ty);
 } // end namespace swift
 
 #endif

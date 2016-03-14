@@ -25,6 +25,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/Runtime/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -3976,6 +3977,8 @@ static llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
     metadata = IGF.Builder.CreateAnd(metadata, mask);
     metadata = IGF.Builder.CreateIntToPtr(metadata, IGF.IGM.TypeMetadataPtrTy);
     return metadata;
+  } else if (IGF.IGM.TargetInfo.hasOpaqueISAs()) {
+    return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
   } else {
     object = IGF.Builder.CreateBitCast(object,
                                   IGF.IGM.TypeMetadataPtrTy->getPointerTo());
@@ -4851,13 +4854,13 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   switch (*known) {
   case KnownProtocolKind::AnyObject:
     return SpecialProtocol::AnyObject;
-  case KnownProtocolKind::ErrorType:
-    return SpecialProtocol::ErrorType;
+  case KnownProtocolKind::ErrorProtocol:
+    return SpecialProtocol::ErrorProtocol;
     
   // The other known protocols aren't special at runtime.
-  case KnownProtocolKind::SequenceType:
-  case KnownProtocolKind::GeneratorType:
-  case KnownProtocolKind::BooleanType:
+  case KnownProtocolKind::Sequence:
+  case KnownProtocolKind::IteratorProtocol:
+  case KnownProtocolKind::Boolean:
   case KnownProtocolKind::RawRepresentable:
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:
@@ -4884,14 +4887,14 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::BuiltinStringLiteralConvertible:
   case KnownProtocolKind::BuiltinUTF16StringLiteralConvertible:
   case KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible:
-  case KnownProtocolKind::OptionSetType:
+  case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
     return SpecialProtocol::None;
   }
 }
 
 namespace {
-  const unsigned NumProtocolDescriptorFields = 12;
+  const unsigned NumProtocolDescriptorFields = 13;
 
   class ProtocolDescriptorBuilder : public ConstantBuilder<> {
     ProtocolDecl *Protocol;
@@ -5005,12 +5008,18 @@ namespace {
         addConstantInt16(DefaultWitnesses->getMinimumWitnessTableSize());
         addConstantInt16(DefaultWitnesses->getDefaultWitnessTableSize());
 
-        for (auto entry : DefaultWitnesses->getEntries()) {
+        // Unused padding
+        addConstantInt32(0);
+
+        for (auto entry : DefaultWitnesses->getResilientDefaultEntries()) {
           addWord(IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition));
         }
       } else {
         addConstantInt16(0);
         addConstantInt16(0);
+
+        // Unused padding
+        addConstantInt32(0);
       }
     }
 

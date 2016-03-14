@@ -625,8 +625,8 @@
 
   <pre class="example">
     protocol SequenceType {
-      typename Generator : GeneratorType
-      func generate() -> Generator
+      typename Iterator : IteratorProtocol
+      func makeIterator() -> Iterator
     }
   </pre>
 

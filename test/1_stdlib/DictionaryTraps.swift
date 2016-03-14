@@ -67,7 +67,7 @@ DictionaryTraps.test("sanity") {
 }
 
 DictionaryTraps.test("DuplicateKeys1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -78,7 +78,7 @@ DictionaryTraps.test("DuplicateKeys1")
 }
 
 DictionaryTraps.test("DuplicateKeys2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -89,7 +89,7 @@ DictionaryTraps.test("DuplicateKeys2")
 }
 
 DictionaryTraps.test("DuplicateKeys3")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -99,49 +99,49 @@ DictionaryTraps.test("DuplicateKeys3")
 }
 
 DictionaryTraps.test("RemoveInvalidIndex1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var d = Dictionary<Int, Int>()
   let index = d.startIndex
   expectCrashLater()
-  d.removeAtIndex(index)
+  d.remove(at: index)
 }
 
 DictionaryTraps.test("RemoveInvalidIndex2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var d = Dictionary<Int, Int>()
   let index = d.endIndex
   expectCrashLater()
-  d.removeAtIndex(index)
+  d.remove(at: index)
 }
 
 DictionaryTraps.test("RemoveInvalidIndex3")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var d = [ 10: 1010, 20: 1020, 30: 1030 ]
   let index = d.endIndex
   expectCrashLater()
-  d.removeAtIndex(index)
+  d.remove(at: index)
 }
 
 DictionaryTraps.test("RemoveInvalidIndex4")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var d = [ 10: 1010 ]
-  let index = d.indexForKey(10)!
-  d.removeAtIndex(index)
+  let index = d.index(forKey: 10)!
+  d.remove(at: index)
   expectEmpty(d[10])
   expectCrashLater()
-  d.removeAtIndex(index)
+  d.remove(at: index)
 }
 
 class TestObjCKeyTy : NSObject {
@@ -205,7 +205,7 @@ func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
 }
 
 DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches("unrecognized selector sent to instance").code {
@@ -217,7 +217,7 @@ DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
 }
 
 DictionaryTraps.test("BridgedKeyIsNotNSCopyable2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -241,7 +241,7 @@ DictionaryTraps.test("Downcast1") {
 }
 
 DictionaryTraps.test("Downcast2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

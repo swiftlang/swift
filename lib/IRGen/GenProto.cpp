@@ -2612,19 +2612,19 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    GenericRequirement requirement,
                                    llvm::Value *value,
                                    GetTypeParameterInContextFn getInContext) {
-  // Get the corresponding context archetype.
-  auto archetype = cast<ArchetypeType>(getInContext(requirement.TypeParameter));
+  // Get the corresponding context type.
+  auto type = getInContext(requirement.TypeParameter);
 
   if (auto proto = requirement.Protocol) {
+    assert(isa<ArchetypeType>(type));
     assert(value->getType() == IGF.IGM.WitnessTablePtrTy);
-    setProtocolWitnessTableName(IGF.IGM, value, archetype, proto);
+    setProtocolWitnessTableName(IGF.IGM, value, type, proto);
     auto kind = LocalTypeDataKind::forAbstractProtocolWitnessTable(proto);
-    IGF.setUnscopedLocalTypeData(archetype, kind, value);
+    IGF.setUnscopedLocalTypeData(type, kind, value);
   } else {
     assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
-    setTypeMetadataName(IGF.IGM, value, archetype);
-    auto kind = LocalTypeDataKind::forTypeMetadata();
-    IGF.setUnscopedLocalTypeData(archetype, kind, value);
+    setTypeMetadataName(IGF.IGM, value, type);
+    IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value);
   }
 }
 

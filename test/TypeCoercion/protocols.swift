@@ -174,4 +174,4 @@ func testREPLPrintable() {
 }
 
 // Boolean coercion
-if true as BooleanType {}
+if true as Boolean {}

@@ -68,7 +68,7 @@ func test() throws -> Int {
   ; // Reset parser.
 
   try throw foo() // expected-error {{'try' must be placed on the thrown expression}} {{3-7=}} {{13-13=try }}
-  // expected-error@-1 {{thrown expression type 'Int' does not conform to 'ErrorType'}}
+  // expected-error@-1 {{thrown expression type 'Int' does not conform to 'ErrorProtocol'}}
   try return foo() // expected-error {{'try' must be placed on the returned expression}} {{3-7=}} {{14-14=try }}
 }
 
@@ -83,7 +83,7 @@ let _ = (try? "foo"*"bar") ?? 0
 
 
 // <rdar://problem/21414023> Assertion failure when compiling function that takes throwing functions and rethrows
-func rethrowsDispatchError(handleError: ((ErrorType) throws -> ()), body: () throws -> ()) rethrows {
+func rethrowsDispatchError(handleError: ((ErrorProtocol) throws -> ()), body: () throws -> ()) rethrows {
   do {
     body()   // expected-error {{call can throw but is not marked with 'try'}}
   } catch {
