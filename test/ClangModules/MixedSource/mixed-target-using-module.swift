@@ -75,3 +75,8 @@ func testProtocolWrapper(conformer: ForwardClassUser) {
 }
 testProtocolWrapper(ProtoConformer())
 
+func testDeclsNestedInObjCContainers() {
+  let _: NameInInterface = 0
+  let _: NameInProtocol = 0
+  let _: NameInCategory = 0
+}
