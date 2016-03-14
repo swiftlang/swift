@@ -379,6 +379,9 @@ function set_deployment_target_based_options() {
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
+                -DCOMPILER_RT_ENABLE_IOS:BOOL=$(false_true ${SKIP_IOS})
+                -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
             )
             swift_cmake_options=(
                 "${swift_cmake_options[@]}"
@@ -716,6 +719,13 @@ function true_false() {
 #
 # Set default values for command-line parameters.
 #
+function false_true() {
+    true_false $(not "$1")
+}
+
+function cmake_version() {
+    echo $("${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " ")
+}
 
 if [[ "${INSTALL_PREFIX}" == "" ]] ; then
     if [[ "$(uname -s)" == "Darwin" ]] ; then
@@ -912,6 +922,14 @@ if [ ! -e "${WORKSPACE}/clang" ] ; then
 fi
 if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
     ln -sf "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
+fi
+
+# Symlink compiler-rt into the llvm tree, if it exists.
+COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
+if [ -e "${WORKSPACE}/compiler-rt" ] ; then
+    if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
+        ln -sf "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
+    fi
 fi
 
 PRODUCTS=(cmark llvm swift)
