@@ -3344,11 +3344,20 @@ namespace {
       // complain.
       auto func = dyn_cast<AbstractFunctionDecl>(foundDecl);
       if (!func) {
-        tc.diagnose(E->getLoc(),
-                    isa<VarDecl>(foundDecl)
-                      ? diag::expr_selector_property
-                      : diag::expr_selector_not_method_or_init)
-          .highlight(subExpr->getSourceRange());
+        Optional<InFlightDiagnostic> diag;
+        if (auto VD = dyn_cast<VarDecl>(foundDecl)) {
+          diag.emplace(tc.diagnose(E->getLoc(), diag::expr_selector_var,
+                                   isa<ParamDecl>(VD)
+                                   ? 1
+                                   : VD->getDeclContext()->isTypeContext()
+                                     ? 0
+                                     : 2));
+        } else {
+          diag.emplace(tc.diagnose(E->getLoc(),
+                                   diag::expr_selector_not_method_or_init));
+        }
+        diag->highlight(subExpr->getSourceRange());
+        diag.reset();
         tc.diagnose(foundDecl, diag::decl_declared_here,
                     foundDecl->getFullName());
         return E;
