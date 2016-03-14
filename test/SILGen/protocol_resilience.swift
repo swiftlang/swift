@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-resilience %s | FileCheck %s --check-prefix=CHECK --check-prefix=GLOBAL
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-silgen -enable-resilience %s | FileCheck %s --check-prefix=CHECK --check-prefix=GLOBAL
+
+import resilient_protocol
 
 prefix operator ~~~ {}
 infix operator <*> {}
@@ -218,6 +220,25 @@ extension ReabstractSelfBase {
 }
 
 final class X : ReabstractSelfRefined {}
+
+func inoutFunc(x: inout Int) {}
+
+// CHECK-LABEL: sil hidden @_TF19protocol_resilience22inoutResilientProtocolFRP18resilient_protocol22OtherResilientProtocol_T_
+func inoutResilientProtocol(x: inout OtherResilientProtocol) {
+  // CHECK: function_ref @_TFE18resilient_protocolPS_22OtherResilientProtocolm19propertyInExtensionSi
+  inoutFunc(&x.propertyInExtension)
+}
+
+struct OtherConformingType : OtherResilientProtocol {}
+
+// CHECK-LABEL: sil hidden @_TF19protocol_resilience22inoutResilientProtocolFRVS_19OtherConformingTypeT_
+func inoutResilientProtocol(x: inout OtherConformingType) {
+  // CHECK: function_ref @_TFE18resilient_protocolPS_22OtherResilientProtocolm19propertyInExtensionSi
+  inoutFunc(&x.propertyInExtension)
+
+  // CHECK: function_ref @_TZFE18resilient_protocolPS_22OtherResilientProtocolm25staticPropertyInExtensionSi
+  inoutFunc(&OtherConformingType.staticPropertyInExtension)
+}
 
 // Protocol is not public -- doesn't need default witness table
 protocol InternalProtocol {

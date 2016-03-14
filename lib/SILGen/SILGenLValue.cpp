@@ -799,24 +799,57 @@ namespace {
                                  std::move(value));
     }
 
+    bool shouldUseMaterializeForSet(SILGenFunction &gen,
+                                    AccessKind accessKind) {
+      // If this access is for a read, we can just call the getter.
+      if (accessKind == AccessKind::Read)
+        return false;
+
+      // If the declaration is dynamic, there's no materializeForSet.
+      if (decl->getAttrs().hasAttribute<DynamicAttr>())
+        return false;
+
+      // If the declaration is not in type context, there's no
+      // materializeForSet.
+      if (!decl->getDeclContext()->isTypeContext())
+        return false;
+
+      // If the declaration is in a different resilience domain, we have
+      // to use materializeForSet.
+      //
+      // FIXME: Use correct ResilienceExpansion if gen is @transparent
+      if (!decl->hasFixedLayout(gen.SGM.M.getSwiftModule(),
+                                ResilienceExpansion::Maximal))
+        return true;
+
+      // If the declaration is dynamically dispatched through a class,
+      // we have to use materializeForSet.
+      if (isa<ClassDecl>(decl->getDeclContext())) {
+        if (decl->isFinal())
+          return false;
+
+        return true;
+      }
+
+      // If the declaration is dynamically dispatched through a protocol,
+      // we have to use materializeForSet.
+      if (isa<ProtocolDecl>(decl->getDeclContext()))
+        return true;
+
+      return false;
+    }
+
     ManagedValue getMaterialized(SILGenFunction &gen,
                                  SILLocation loc,
                                  ManagedValue base,
                                  AccessKind accessKind) && override {
-      // If this is just for a read, or the property is dynamic, or if
-      // it doesn't have a materializeForSet, or if this is a direct
-      // use of something defined in a protocol extension (see
-      // maybeEmitMaterializeForSetThunk), just materialize to a
-      // temporary directly.
-      if (accessKind == AccessKind::Read ||
-          decl->getAttrs().hasAttribute<DynamicAttr>() ||
-          !decl->getMaterializeForSetFunc() ||
-          isa<StructDecl>(decl->getDeclContext()) ||
-          decl->getDeclContext()->getAsProtocolExtensionContext()) {
+      if (!shouldUseMaterializeForSet(gen, accessKind)) {
         return std::move(*this).LogicalPathComponent::getMaterialized(gen,
                                                         loc, base, accessKind);
       }
 
+      assert(decl->getMaterializeForSetFunc() &&
+             "polymorphic storage without materializeForSet");
       assert(gen.InWritebackScope &&
              "materializing l-value for modification without writeback scope");
 
@@ -910,6 +943,7 @@ namespace {
 
       SILBasicBlock *contBB = gen.createBasicBlock();
       SILBasicBlock *writebackBB = gen.createBasicBlock(gen.B.getInsertionBB());
+
       gen.B.createSwitchEnum(loc, materialized.callback, /*defaultDest*/ nullptr,
                              { { ctx.getOptionalSomeDecl(), writebackBB },
                                { ctx.getOptionalNoneDecl(), contBB } });
@@ -922,22 +956,19 @@ namespace {
           SILType::getPrimitiveObjectType(TupleType::getEmpty(ctx));
         auto rawPointerTy = SILType::getRawPointerType(ctx);
 
-        SILType callbackSILType = gen.getLoweredType(
-                  materialized.callback->getType().getSwiftRValueType()
-                                                  .getAnyOptionalObjectType());
-
         // The callback is a BB argument from the switch_enum.
         SILValue callback =
-          writebackBB->createBBArg(callbackSILType);
+          writebackBB->createBBArg(rawPointerTy);
 
         // Cast the callback to the correct polymorphic function type.
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(
             decl, materialized.genericSig, materialized.origSelfType);
         auto origCallbackType = SILType::getPrimitiveObjectType(origCallbackFnType);
+        callback = gen.B.createPointerToThinFunction(loc, callback, origCallbackType);
+
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
             M, M.getSwiftModule(), substitutions);
         auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
-
         auto metatypeType = substCallbackFnType->getParameters().back().getSILType();
 
         // We need to borrow the base here.  We can't just consume it
@@ -950,6 +981,11 @@ namespace {
           if (base.getType().isAddress()) {
             baseAddress = base.getValue();
           } else {
+            AbstractionPattern origSelfType(materialized.genericSig,
+                                            materialized.origSelfType);
+            base = gen.emitSubstToOrigValue(loc, base, origSelfType,
+                                            baseFormalType);
+
             baseAddress = gen.emitTemporaryAllocation(loc, base.getType());
             gen.B.createStore(loc, base.getValue(), baseAddress);
           }
@@ -966,9 +1002,6 @@ namespace {
           gen.B.createAddressToPointer(loc,
                                        materialized.temporary.getValue(),
                                        rawPointerTy);
-
-        callback = gen.B.createThinFunctionToPointer(loc, callback, rawPointerTy);
-        callback = gen.B.createPointerToThinFunction(loc, callback, origCallbackType);
 
         // Apply the callback.
         gen.B.createApply(loc, callback, substCallbackType,

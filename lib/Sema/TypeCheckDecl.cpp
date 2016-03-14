@@ -3215,7 +3215,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
-      if (!VD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      if (!isa<ProtocolDecl>(VD->getDeclContext())) {
         synthesizeMaterializeForSet(materializeForSet, VD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -3448,7 +3448,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = SD->getMaterializeForSetFunc()) {
-      if (!SD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      if (!isa<ProtocolDecl>(SD->getDeclContext())) {
         synthesizeMaterializeForSet(materializeForSet, SD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
