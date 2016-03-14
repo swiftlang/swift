@@ -74,7 +74,7 @@ public protocol UnicodeCodec {
   >(next: inout I) -> UnicodeDecodingResult
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// calling `output` on each `CodeUnit`.
+  /// calling `processCodeUnit` on each `CodeUnit`.
   static func encode(
     input: UnicodeScalar,
     @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
@@ -281,7 +281,7 @@ public struct UTF8 : UnicodeCodec {
   }
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// calling `output` on each `CodeUnit`.
+  /// calling `processCodeUnit` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
     @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
@@ -452,7 +452,7 @@ public struct UTF16 : UnicodeCodec {
   }
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// calling `output` on each `CodeUnit`.
+  /// calling `processCodeUnit` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
     @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
@@ -512,7 +512,7 @@ public struct UTF32 : UnicodeCodec {
   }
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// calling `output` on each `CodeUnit`.
+  /// calling `processCodeUnit` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
     @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
@@ -521,7 +521,7 @@ public struct UTF32 : UnicodeCodec {
   }
 }
 
-/// Translate `input`, in the given `InputEncoding`, into `output`, in
+/// Translate `input`, in the given `InputEncoding`, into `processCodeUnit`, in
 /// the given `OutputEncoding`.
 ///
 /// - Parameter stopOnError: Causes encoding to stop when an encoding
