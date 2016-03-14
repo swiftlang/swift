@@ -501,6 +501,9 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
           auto existingPA = this;
           while(identifiers.size()) {
             existingPA = existingPA->getNestedType(identifiers.back(), builder);
+            existingPA = existingPA->getRepresentative();
+            if (existingPA == this)
+              break;
             identifiers.pop_back();
           }
           pa->Representative = existingPA;
