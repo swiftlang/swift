@@ -11,7 +11,7 @@
 
 Swift is a high-performance system programming language.  It has a clean
 and modern syntax, offers seamless access to existing C and Objective-C code
-and frameworks, and is memory safe (by default).
+and frameworks, and is memory safe by default.
 
 Although inspired by Objective-C and many other languages, Swift is not itself a
 C-derived language. As a complete and independent language, Swift packages core
@@ -23,12 +23,15 @@ modules, eliminating the need for headers and the code duplication they entail.
 ## Documentation
 
 To read the documentation, start by installing the
-[Sphinx](http://sphinx-doc.org) documentation generator tool (just run
-`easy_install -U Sphinx==1.3.4` (more recent versions are currently not supported) 
-from the command line and you're good to go). Once you
- have that, you can build the Swift documentation by going into `docs` and
-typing `make`. This compiles the `.rst` files in the `docs` directory into
-HTML in the `docs/_build/html` directory.
+[Sphinx](http://sphinx-doc.org) documentation generator tool by running the command:
+
+`easy_install -U Sphinx==1.3.4`
+
+More recent versions are currently **not supported.**
+
+Once complete, you can build the Swift documentation by changing directory into
+`docs` and typing `make`. This compiles the `.rst` files in the `docs` directory
+into HTML in the `docs/_build/html` directory.
 
 Many of the docs are out of date, but you can see some historical design
 documents in the `docs` directory.
@@ -57,7 +60,7 @@ For Ubuntu, you'll need the following development dependencies:
 
     sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config
 
-Note: LLDB currently requires at least swig-1.3.40 but will successfully build
+**Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
 
 If you are building on Ubuntu 14.04 LTS, you'll need to upgrade your clang
@@ -88,7 +91,7 @@ uploading SSH keys to GitHub):
 Swift and its companion projects; at least version 2.8.12.2 is required. Your
 favorite Linux distribution likely already has a CMake package you can install.
 On OS X, you can download the [CMake Binary Distribution](https://cmake.org/install),
-bundled as an application, copy it to /Applications, and add the embedded
+bundled as an application, copy it to `/Applications`, and add the embedded
 command line tools to your `PATH`:
 
     export PATH=/Applications/CMake.app/Contents/bin:$PATH
@@ -100,13 +103,13 @@ you're on OS X or don't install it as part of your Linux distribution, clone
 it next to the other projects and it will be bootstrapped automatically:
 
 ##### Build from source
-**Via https**
+**Via HTTPS**
 
     git clone https://github.com/ninja-build/ninja.git && cd ninja
     git checkout release
     cat README
 
-**Via ssh**
+**Via SSH**
 
     git clone git@github.com:ninja-build/ninja.git && cd ninja
     git checkout release
