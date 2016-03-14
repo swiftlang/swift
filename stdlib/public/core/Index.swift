@@ -18,31 +18,31 @@
 @_show_in_interface
 public protocol _Incrementable : Equatable {}
 
-@available(*, unavailable, message="Use \'-= 1\' or call collection.prior(Index)")
+@available(*, unavailable, message: "Use \'-= 1\' or call collection.prior(Index)")
 public prefix func -- <T : _Incrementable> (i: inout T) -> T {
   fatalError("unavailable operator can't be called")
 }
 
-@available(*, unavailable, message="Use \'-= 1\' or call collection.prior(Index)")
+@available(*, unavailable, message: "Use \'-= 1\' or call collection.prior(Index)")
 public postfix func -- <T : _Incrementable> (i: inout T) -> T {
   fatalError("unavailable operator can't be called")
 }
 
-@available(*, unavailable, message="Use \'+= 1\' or call 'collection.next(Index)")
+@available(*, unavailable, message: "Use \'+= 1\' or call 'collection.next(Index)")
 public prefix func ++ <T : _Incrementable> (i: inout T) -> T {
   fatalError("unavailable operator can't be called")
 }
 
-@available(*, unavailable, message="Use \'+= 1\' or call 'collection.next(Index)")
+@available(*, unavailable, message: "Use \'+= 1\' or call 'collection.next(Index)")
 public postfix func ++ <T : _Incrementable> (i: inout T) -> T {
   fatalError("unavailable operator can't be called")
 }
 
-@available(*, unavailable, message="Subsumed by Collection")
+@available(*, unavailable, renamed: "Comparable")
 public typealias ForwardIndexType = Void
 
-@available(*, unavailable, renamed="Subsumed by BidirectionalCollection")
+@available(*, unavailable, renamed: "Comparable")
 public typealias BidirectionalIndexType = Void
 
-@available(*, unavailable, renamed="Subsumed by RandomAccessCollection")
+@available(*, unavailable, renamed: "Strideable")
 public typealias RandomAccessIndexType = Void

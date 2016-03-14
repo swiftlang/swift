@@ -331,11 +331,11 @@ public func ~= <I : Strideable> (
   return pattern.contains(value)
 }
 
-@available(*, unavailable, renamed="RangeOfStrideableIterator")
+@available(*, unavailable, renamed: "RangeOfStrideableIterator")
 public struct RangeGenerator<Element> {}
 
 extension RangeOfStrideableIterator {
-  @available(*, unavailable, message="use the 'makeIterator()' method on the collection")
+  @available(*, unavailable, message: "use the 'makeIterator()' method on the collection")
   public init(_ bounds: Range<Element>) {
     fatalError("unavailable function can't be called")
   }

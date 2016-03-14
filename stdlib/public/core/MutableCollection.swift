@@ -220,8 +220,8 @@ internal func _writeBackMutableSlice<
   */
 }
 
-@available(*, unavailable, renamed="MutableCollection")
+@available(*, unavailable, renamed: "MutableCollection")
 public typealias MutableCollectionType = MutableCollection
 
-@available(*, unavailable, message="Please use 'Collection where SubSequence : MutableCollection'")
+@available(*, unavailable, message: "Please use 'Collection where SubSequence : MutableCollection'")
 public typealias MutableSliceable = Collection
