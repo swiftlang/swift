@@ -10,6 +10,7 @@ set(ANALYSIS_SOURCES
   Analysis/DestructorAnalysis.cpp
   Analysis/EscapeAnalysis.cpp
   Analysis/FunctionOrder.cpp
+  Analysis/FunctionSignatureAnalysis.cpp
   Analysis/IVAnalysis.cpp
   Analysis/LoopAnalysis.cpp
   Analysis/LoopRegionAnalysis.cpp
