@@ -918,7 +918,6 @@ struct alledge_iterator
   LoopRegion::subregion_iterator SubregionIter;
   LoopRegion::backedge_iterator BackedgeIter;
 
-  using SuccFilterFnTy = std::function<bool (LoopRegion::SuccessorID)>;
   using SuccIterTy =
     OptionalTransformIterator<LoopRegion::const_succ_iterator,
                               LoopRegion::SuccessorID::ToLiveSucc>;
