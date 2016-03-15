@@ -45,12 +45,11 @@ class struct(object):
     return 'struct(%r)' % self.__dict__
 
 binaryArithmetic = [
-    struct(operator='+', name='add', llvmName='add', kind='+'),
-    struct(operator='-', name='subtract', llvmName='sub', kind='-'),
-    struct(operator='*', name='multiply', llvmName='mul', kind='*'),
-    struct(operator='/', name='divideBy', llvmName='div', kind='/'),
-    struct(
-      operator='%', name='remainderWhenDividedBy', llvmName='rem', kind='/')
+       struct(operator='+', name='adding',      mutatingName='add',           firstArg='',           llvmName='add', kind='+'),
+       struct(operator='-', name='subtracting', mutatingName='subtract',      firstArg='',           llvmName='sub', kind='-'),
+       struct(operator='*', name='multiplied',  mutatingName='multiply',      firstArg='by',         llvmName='mul', kind='*'),
+       struct(operator='/', name='divided',     mutatingName='divide',        firstArg='by',         llvmName='div', kind='/'),
+       struct(operator='%', name='remainder',   mutatingName='formRemainder', firstArg='dividingBy', llvmName='rem', kind='/')
   ]
 
 
@@ -133,18 +132,19 @@ public protocol Arithmetic {
   // defaulted using an InPlace counterpart, but can be used as an
   // optimization hook
   @warn_unused_result
-  func ${x.name}(rhs: Self) -> Self
+  func ${x.name}(${x.firstArg} rhs: Self) -> Self
 
   // implementation hook
-  mutating func ${x.name}InPlace(rhs: Self)
+  mutating func ${x.mutatingName}(${x.firstArg} rhs: Self)
 % end
 }
 
 extension Arithmetic {
 % for x in binaryArithmetic:
-  public func ${x.name}(rhs: Self) -> Self {
+%   callLabel = x.firstArg + ': ' if x.firstArg else ''
+  public func ${x.name}(${x.firstArg} rhs: Self) -> Self {
     var lhs = self
-    lhs.${x.name}InPlace(rhs)
+    lhs.${x.mutatingName}(${callLabel}rhs)
     return lhs
   }
 % end
@@ -161,15 +161,16 @@ extension SignedArithmetic {
 }
 
 % for x in binaryArithmetic:
+%   callLabel = x.firstArg + ': ' if x.firstArg else ''
 @_transparent
 @warn_unused_result
 public func ${x.operator} <T: Arithmetic>(lhs: T, rhs: T) -> T {
-  return lhs.${x.name}(rhs)
+  return lhs.${x.name}(${callLabel}rhs)
 }
 
 @_transparent
 public func ${x.operator}= <T: Arithmetic>(lhs: inout T, rhs: T) {
-  lhs.${x.name}InPlace(rhs)
+  lhs.${x.mutatingName}(${callLabel}rhs)
 }
 % end
 
@@ -366,7 +367,7 @@ comment = '''
 ${comment}
   @warn_unused_result
   func ${x.name}WithOverflow(
-    rhs: Self
+    ${x.firstArg} rhs: Self
   ) -> (partialValue: Self, overflow: ArithmeticOverflow)
 % end
 
@@ -491,9 +492,10 @@ extension FixedWidthInteger {
   }
 
 % for x in binaryArithmetic:
+%   callLabel = x.firstArg + ': ' if x.firstArg else ''
   @_transparent
-  public mutating func ${x.name}InPlace(rhs: Self) {
-    let (result, overflow) = self.${x.name}WithOverflow(rhs)
+  public mutating func ${x.mutatingName}(${x.firstArg} rhs: Self) {
+    let (result, overflow) = self.${x.name}WithOverflow(${callLabel}rhs)
     _assertCond(overflow == .none, "overflow in ${x.name}")
     self = result
   }
@@ -506,7 +508,7 @@ extension FixedWidthInteger {
   @warn_unused_result
   @_transparent
   public func unsafe${capitalize(x.name)}(rhs: Self) -> Self {
-    let (result, overflow) = self.${x.name}WithOverflow(rhs)
+    let (result, overflow) = self.${x.name}WithOverflow(${callLabel}rhs)
 
     if (overflow != .none) {
       if (_isDebugAssertConfiguration()) {
@@ -555,10 +557,11 @@ extension FixedWidthInteger {
 }
 
 % for x in binaryArithmetic:
+%   callLabel = x.firstArg + ': ' if x.firstArg else ''
 %   if x.kind != '/':
 @warn_unused_result
 public func &${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
-  return lhs.${x.name}WithOverflow(rhs).partialValue
+  return lhs.${x.name}WithOverflow(${callLabel}rhs).partialValue
 }
 %   end
 % end
@@ -703,13 +706,14 @@ public struct ${Self}
   }
 
 %       for x in binaryArithmetic:
+%         callLabel = x.firstArg + ': ' if x.firstArg else ''
   /// Return a pair consisting of `self` ${x.operator} `rhs`,
   /// truncated to fit if necessary, and a flag indicating whether an
   /// arithmetic overflow occurred.
   @warn_unused_result
   @_transparent
   public func ${x.name}WithOverflow(
-    rhs: ${Self}
+    ${x.firstArg} rhs: ${Self}
   ) -> (partialValue: ${Self}, overflow: ArithmeticOverflow) {
 
 %         if x.kind == '/':
