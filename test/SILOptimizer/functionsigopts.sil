@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opt-rewriter -function-signature-opt-cloner %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opt-rewriter -function-signature-opt-cloner %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
 
 import Builtin
 import Swift
@@ -103,25 +103,6 @@ bb0(%0 : $boo):
   return %4 : $(Int, Int)
 }
 
-// CHECK-LABEL: sil [fragile] @dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
-// CHECK-NOT: function_ref @_TTSf4d_n__dead_arg_no_callsites
-sil [fragile] @dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
-  cond_br undef, bb1, bb2
-
-bb1:
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  %3 = apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
-  %4 = tuple()
-  return %4 : $()
-}
-
 // Make sure %0 is a dead argument.
 //
 // CHECK-LABEL: sil [thunk] @exploded_release_to_dead_argument
@@ -193,7 +174,7 @@ bb3(%4 : $boo):
 
 // CHECK-LABEL: sil [thunk] @single_owned_return_value_with_interfering_release
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @_TTSf4s__single_owned_return_value_with_interfering_release
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4g_n_n___TTSf4s__single_owned_return_value_with_interfering_release
 // CHECK-NOT: retain_value
 // CHECK: return
 sil @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) -> @owned boo {
@@ -777,9 +758,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-NOT: retain_value
 // CHECK: return
 
-// CHECK-LABEL: sil @_TTSf4s__single_owned_return_value_with_interfering_release : $@convention(thin) (@owned foo, @owned foo, Int) -> @owned boo {
-// CHECK: retain_value
-// CHECK: release_value
+// CHECK-LABEL: sil @_TTSf4g_n_n___TTSf4s__single_owned_return_value_with_interfering_release
 
 // CHECK-LABEL: @_TTSf4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorProtocol) {
 // CHECK: bb2
