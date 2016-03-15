@@ -174,6 +174,12 @@ struct ResultDescriptor {
 };
 
 class FunctionSignatureInfo {
+  /// Have the signature be computed for this function.
+  bool SignatureComputed;
+
+  /// Should we optimize the signature for this function.
+  bool SignatureOptimize;
+
   /// Function currently analyzing.
   SILFunction *F;
 
@@ -203,8 +209,9 @@ class FunctionSignatureInfo {
 
 public:
   FunctionSignatureInfo(SILFunction *F, AliasAnalysis *AA,
-                                RCIdentityFunctionInfo *RCFI) :
-  F(F), AA(AA), RCFI(RCFI), MayBindDynamicSelf(computeMayBindDynamicSelf(F)) {}
+                        RCIdentityFunctionInfo *RCFI)
+    : SignatureComputed(false), SignatureOptimize(false), F(F), AA(AA),
+      RCFI(RCFI), MayBindDynamicSelf(computeMayBindDynamicSelf(F)) {}
 
   bool analyze();
   bool analyzeParameters();

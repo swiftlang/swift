@@ -102,6 +102,10 @@ PASS(FunctionOrderPrinter, "function-order-printer",
      "Print function orderings for test purposes")
 PASS(FunctionSignatureOpts, "function-signature-opts",
      "Optimize Function Signatures")
+PASS(FunctionSignatureOptCloner, "function-signature-opt-cloner",
+     "Create function with optimized signatures")
+PASS(FunctionSignatureOptRewriter, "function-signature-opt-rewriter",
+     "Optimize Function Signatures by rewriting callsites")
 PASS(ARCSequenceOpts, "arc-sequence-opts",
      "Optimize sequences of retain/release opts by removing redundant inner "
      "retain/release sequences")
