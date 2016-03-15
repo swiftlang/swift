@@ -1276,9 +1276,11 @@ namespace {
       // Find the conformance of the value type to _BridgedToObjectiveC.
       Type valueType = value->getType()->getRValueType();
       ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
-                                            ConformanceCheckFlags::InExpression,
-                                            &conformance);
+      bool conforms =
+        tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
+                              (ConformanceCheckFlags::InExpression|
+                               ConformanceCheckFlags::Used),
+                              &conformance);
       assert(conforms && "Should already have checked the conformance");
       (void)conforms;
 
@@ -1318,7 +1320,8 @@ namespace {
         = tc.conformsToProtocol(valueType,
                                 bridgedProto,
                                 cs.DC,
-                                ConformanceCheckFlags::InExpression,
+                                (ConformanceCheckFlags::InExpression|
+                                 ConformanceCheckFlags::Used),
                                 &conformance);
 
       FuncDecl *fn = nullptr;

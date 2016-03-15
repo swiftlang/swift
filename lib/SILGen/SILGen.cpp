@@ -203,6 +203,37 @@ FuncDecl *SILGenModule::getBridgeToObjectiveCRequirement(SILLocation loc) {
   return found;
 }
 
+FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
+    SILLocation loc) {
+  if (UnconditionallyBridgeFromObjectiveCRequirement)
+    return *UnconditionallyBridgeFromObjectiveCRequirement;
+
+  // Find the _ObjectiveCBridgeable protocol.
+  auto proto = getObjectiveCBridgeable(loc);
+  if (!proto) {
+    UnconditionallyBridgeFromObjectiveCRequirement = nullptr;
+    return nullptr;
+  }
+
+  // Look for _bridgeToObjectiveC().
+  auto &ctx = getASTContext();
+  FuncDecl *found = nullptr;
+  DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
+                llvm::makeArrayRef(Identifier()));
+  for (auto member : proto->lookupDirect(name, true)) {
+    if (auto func = dyn_cast<FuncDecl>(member)) {
+      found = func;
+      break;
+    }
+  }
+
+  if (!found)
+    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+
+  UnconditionallyBridgeFromObjectiveCRequirement = found;
+  return found;
+}
+
 AssociatedTypeDecl *
 SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
   if (BridgedObjectiveCType)
