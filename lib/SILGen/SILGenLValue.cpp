@@ -1438,21 +1438,6 @@ LValue LValue::forAddress(ManagedValue address,
   return lv;
 }
 
-LValue LValue::forClassReference(ManagedValue ref) {
-  assert(ref.isPlusZeroRValueOrTrivial());
-  assert(ref.getType().isObject());
-  assert(ref.getType().getSwiftRValueType()->mayHaveSuperclass());
-
-  CanType classType = ref.getType().getSwiftRValueType();
-  LValueTypeData typeData = {
-    AbstractionPattern(classType), classType, ref.getType()
-  };
-
-  LValue lv;
-  lv.add<ValueComponent>(ref, typeData);
-  return lv;
-}
-
 void LValue::addMemberComponent(SILGenFunction &gen, SILLocation loc,
                                 AbstractStorageDecl *storage,
                                 ArrayRef<Substitution> subs,

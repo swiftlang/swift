@@ -135,6 +135,12 @@ private:
       TheAccessSemantics(AccessSemantics::Ordinary),
       IsSuper(false) {
 
+    // Determine the formal type of the 'self' parameter.
+    if (WitnessStorage->isStatic()) {
+      SubstSelfType = CanMetatypeType::get(SubstSelfType);
+      SelfInterfaceType = CanMetatypeType::get(SelfInterfaceType);
+    }
+
     // Determine the formal type of the storage.
     CanType witnessIfaceType =
       WitnessStorage->getInterfaceType()->getCanonicalType();
@@ -205,10 +211,16 @@ public:
   forConcreteImplementation(SILGenModule &SGM,
                             FuncDecl *witness,
                             ArrayRef<Substitution> witnessSubs) {
-    Type selfInterfaceType
-      = witness->computeInterfaceSelfType(false)->getLValueOrInOutObjectType();
-    Type selfType
-      = witness->computeSelfType()->getLValueOrInOutObjectType();
+    Type selfInterfaceType, selfType;
+
+    auto *dc = witness->getDeclContext();
+    if (auto *proto = dc->getAsProtocolOrProtocolExtensionContext()) {
+      selfInterfaceType = proto->getProtocolSelf()->getDeclaredType();
+      selfType = ArchetypeBuilder::mapTypeIntoContext(dc, selfInterfaceType);
+    } else {
+      selfInterfaceType = dc->getDeclaredInterfaceType();
+      selfType = dc->getDeclaredTypeInContext();
+    }
 
     MaterializeForSetEmitter emitter(SGM, witness, witnessSubs,
                                      selfInterfaceType, selfType);
@@ -301,7 +313,7 @@ public:
 
     // Metatypes and bases of non-mutating setters on value types
     //  are always rvalues.
-    if (!SubstSelfType->mayHaveSuperclass()) {
+    if (!SubstSelfType->getRValueInstanceType()->mayHaveSuperclass()) {
       if (self.getType().isObject())
         return LValue::forValue(self, SubstSelfType);
       else {
@@ -329,13 +341,13 @@ public:
 
     // Do a derived-to-base conversion if necessary.
     if (witnessSelfType != SubstSelfType) {
-      auto selfSILType = SILType::getPrimitiveObjectType(witnessSelfType);
+      auto selfSILType = gen.getLoweredType(witnessSelfType);
       selfValue = gen.B.createUpcast(loc, selfValue, selfSILType);
     }
 
     // Recreate as a borrowed value.
     self = ManagedValue::forUnmanaged(selfValue);
-    return LValue::forClassReference(self);
+    return LValue::forValue(self, witnessSelfType);
   }
 
   LValue buildLValue(SILGenFunction &gen, SILLocation loc,
