@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %target-swift-frontend -emit-module-path %t/print_synthesized_extensions.swiftmodule %s
+// RUN: %target-swift-frontend -emit-module-path %t/print_synthesized_extensions.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_synthesized_extensions.swiftdoc %s
 // RUN: %target-swift-ide-test -print-module -annotate-print -synthesize-extension -print-interface -module-to-print=print_synthesized_extensions -I %t -source-filename=%s > %t.syn.txt
 // RUN: FileCheck %s < %t.syn.txt
 
@@ -123,6 +123,20 @@ public struct S10 : P1 {
   }
 }
 
+public protocol P4 {}
+
+/// Extension on P4Func1
+public extension P4 {
+  func P4Func1() {}
+}
+
+/// Extension on P4Func2
+public extension P4 {
+  func P4Func2() {}
+}
+
+public struct S11 : P4 {}
+
 // CHECK: <synthesized>
 // CHECK: extension <ref:Struct>S1</ref> where T : P2 {
 // CHECK:     <decl:Func>public func <loc>p2member()</loc></decl></synthesized>
@@ -154,6 +168,16 @@ public struct S10 : P1 {
 // CHECK: <synthesized>
 // CHECK:     <decl:Func>public func <loc>S9IntFunc()</loc></decl>
 // CHECK: }</synthesized>
+
+// CHECK:  <synthesized>/// Extension on P4Func1
+// CHECK:  extension <ref:Struct>S11</ref> {
+// CHECK:      <decl:Func>public func <loc>P4Func1()</loc></decl>
+// CHECK:  }</synthesized>
+
+// CHECK:  <synthesized>/// Extension on P4Func2
+// CHECK:  extension <ref:Struct>S11</ref> {
+// CHECK:  <decl:Func>public func <loc>P4Func2()</loc></decl>
+// CHECK:  }</synthesized>
 
 // CHECK:  <synthesized>
 // CHECK: extension <ref:Struct>S4</ref> {

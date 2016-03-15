@@ -329,7 +329,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   isApplicable(ExtensionDecl *Ext) {
     SynthesizedExtensionInfo Result;
     std::unique_ptr<ExtensionMergeInfo> MergeInfo(new ExtensionMergeInfo());
-    MergeInfo->HasDocComment = false;
+    MergeInfo->HasDocComment = !Ext->getRawComment().isEmpty();
     if (!Ext->isConstrainedExtension()) {
       if (IncludeUnconditional)
         Result.Ext = Ext;
