@@ -292,6 +292,12 @@ SWIFT_RUNTIME_EXPORT
 extern "C" void (*SWIFT_CC(RegisterPreservingCC)
                      _swift_release_n)(HeapObject *object, uint32_t n);
 
+/// Sets the RC_DEALLOCATING_FLAG flag. This is done non-atomically.
+/// The strong reference count of \p object must be 1 and no other thread may
+/// retain the object during executing this function.
+SWIFT_RUNTIME_EXPORT
+extern "C" void swift_setDeallocating(HeapObject *object);
+
 // Refcounting observation hooks for memory tools. Don't use these.
 SWIFT_RUNTIME_EXPORT
 extern "C" size_t swift_retainCount(HeapObject *object);
