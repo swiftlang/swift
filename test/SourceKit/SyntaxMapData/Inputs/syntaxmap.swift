@@ -47,3 +47,5 @@ func bar() {}
 // radar:1234567
 // mailto:thisisnotmail
 // unknownprotocol://awesomeguy.com
+
+_ = -123

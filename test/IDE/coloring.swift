@@ -454,6 +454,17 @@ func funcTakingFor(for internalName: Int) {}
 func funcTakingIn(in internalName: Int) {}
 // CHECK: <kw>func</kw> funcTakingIn(in internalName: <type>Int</type>) {}
 
+_ = 123
+// CHECK: <int>123</int>
+_ = -123
+// CHECK: <int>-123</int>
+_ = -1
+// CHECK: <int>-1</int>
+_ = -0x123
+// CHECK: <int>-0x123</int>
+_ = -3.1e-5
+// CHECK: <float>-3.1e-5</float>
+
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
 
