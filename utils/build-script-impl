@@ -30,7 +30,7 @@ umask 0022
 # need to change any of these, you should do so on trunk or in a branch.
 #
 
-LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC"
+LLVM_TARGETS_TO_BUILD="X86"
 
 #
 # End of configurable options.
