@@ -1163,6 +1163,13 @@ public:
             "Source value must be a reference type or optional thereof");
   }
   
+  void checkSetDeallocatingInst(SetDeallocatingInst *I) {
+    require(I->getOperand()->getType().isObject(),
+            "Source value should be an object value");
+    require(I->getOperand()->getType().hasRetainablePointerRepresentation(),
+            "Source value must be a reference type");
+  }
+  
   void checkCopyBlockInst(CopyBlockInst *I) {
     require(I->getOperand()->getType().isBlockPointerCompatible(),
             "operand of copy_block should be a block");

@@ -674,6 +674,12 @@ public:
         getSILDebugLocation(Loc), operand));
   }
 
+  SetDeallocatingInst *createSetDeallocating(SILLocation Loc,
+                                            SILValue operand) {
+    return insert(new (F.getModule()) SetDeallocatingInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
   StructInst *createStruct(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements) {
     return insert(

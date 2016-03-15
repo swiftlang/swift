@@ -274,6 +274,7 @@ public:
   void emitNativeStrongInit(llvm::Value *value, Address addr);
   void emitNativeStrongRetain(llvm::Value *value);
   void emitNativeStrongRelease(llvm::Value *value);
+  void emitNativeSetDeallocating(llvm::Value *value);
   //   - unowned references
   void emitNativeUnownedRetain(llvm::Value *value);
   void emitNativeUnownedRelease(llvm::Value *value);

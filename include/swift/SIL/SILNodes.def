@@ -123,6 +123,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
          MayRelease)
     INST(RetainValueInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)
     INST(ReleaseValueInst, RefCountingInst, MayHaveSideEffects, MayRelease)
+    INST(SetDeallocatingInst, RefCountingInst, MayHaveSideEffects,
+         DoesNotRelease)
     INST(AutoreleaseValueInst, RefCountingInst, MayHaveSideEffects,
          DoesNotRelease)
     VALUE_RANGE(RefCountingInst, StrongRetainInst, AutoreleaseValueInst)
