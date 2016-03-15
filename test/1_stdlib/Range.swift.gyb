@@ -140,6 +140,47 @@ RangeTestSuite.test("reversed()") {
     result)
 }
 
+RangeTestSuite.test("RangeOfStrideable: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable") {
+  var r: RangeOfStrideable<CustomPrintableValue> =
+    CustomPrintableValue(1)..<CustomPrintableValue(2)
+  expectPrinted(
+    "(value: 1).description..<(value: 2).description", r)
+  expectDebugPrinted(
+    "RangeOfStrideable(" +
+      "(value: 1).debugDescription..<(value: 2).debugDescription" +
+    ")",
+    r)
+  expectDumped(
+    "▿ RangeOfStrideable((value: 1).debugDescription..<(value: 2).debugDescription)\n" +
+    "  ▿ startIndex: (value: 1).debugDescription\n" +
+    "    - value: 1\n" +
+    "    - identity: 0\n" +
+    "  ▿ endIndex: (value: 2).debugDescription\n" +
+    "    - value: 2\n" +
+    "    - identity: 0\n",
+    r)
+}
+
+RangeTestSuite.test("Range: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable") {
+  var r: Range<CustomPrintableValue> =
+    CustomPrintableValue(1)..<CustomPrintableValue(2)
+  expectPrinted(
+    "(value: 1).description..<(value: 2).description", r)
+  expectDebugPrinted(
+    "Range(" +
+      "(value: 1).debugDescription..<(value: 2).debugDescription" +
+    ")",
+    r)
+  expectDumped(
+    "▿ Range((value: 1).debugDescription..<(value: 2).debugDescription)\n" +
+    "  ▿ startIndex: (value: 1).debugDescription\n" +
+    "    - value: 1\n" +
+    "    - identity: 0\n" +
+    "  ▿ endIndex: (value: 2).debugDescription\n" +
+    "    - value: 2\n" +
+    "    - identity: 0\n",
+    r)
+}
 
 // FIXME: swift-3-indexing-model: check that RangeOfStrideable is a collection.
 /*
@@ -155,7 +196,6 @@ RangeTestSuite.test("stride") {
   }
   expectEqual([ 1.4, 2.4, 3.4 ], result)
 }
-
 
 runAllTests()
 
