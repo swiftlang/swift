@@ -2472,16 +2472,15 @@ namespace {
       result->setAccessibility(Accessibility::Public);
       if (selfIsInOut)
         result->setMutating();
-
-      if (!selfIdx)
+      if (selfIdx)
+        result->setSelfIndex(selfIdx.getValue());
+      else
         result->setStatic();
 
       if (dc->getAsClassOrClassExtensionContext())
         // FIXME: only if the class itself is not marked final
         result->getAttrs().add(new (SwiftCtx) FinalAttr(/*IsImplicit=*/true));
 
-      // FIXME: Need to either store or communicate selfIdx to SILGen. Or, maybe
-      // SILGen recomputes it?
       finishFuncDecl(decl, result);
       return result;
     }

@@ -4484,6 +4484,11 @@ protected:
 
   CaptureInfo Captures;
 
+  // If this is imported-as-a-member, the index at which self is passed.
+  // Internally, stored as 0 for no self index, and stored at n+1 for self index
+  // of n
+  uint8_t selfIndex = 0;
+
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, unsigned NumParameterLists,
                        GenericParamList *GenericParams)
@@ -4513,6 +4518,19 @@ public:
   
   GenericSignature *getGenericSignature() const {
     return GenericSig;
+  }
+
+  bool hasSelfIndex() const { return selfIndex != 0; }
+
+  uint8_t getSelfIndex() const {
+    assert(hasSelfIndex() && "not set");
+    return selfIndex - 1;
+  }
+
+  void setSelfIndex(uint8_t idx) {
+    assert(!hasSelfIndex() && "already set");
+    assert(idx != UINT8_MAX && "out of bounds");
+    selfIndex = idx + 1;
   }
 
 public:
