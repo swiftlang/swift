@@ -36,14 +36,16 @@ sil @no_return_func : $@convention(thin) @noreturn () -> ()
 // CHECK-NEXT:         (region id:4)
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:3
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:loop ucfh:false ucft:false parent:3
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -53,6 +55,8 @@ sil @no_return_func : $@convention(thin) @noreturn () -> ()
 // CHECK-NEXT:         (region id:1))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:1))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:1)))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:4
 // CHECK-NEXT:     (preds)
@@ -60,14 +64,16 @@ sil @no_return_func : $@convention(thin) @noreturn () -> ()
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:3
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @one_natural_self_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -96,14 +102,16 @@ bb2:
 // CHECK-NEXT:         (region id:6)
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:6 kind:loop ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -115,6 +123,8 @@ bb2:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:3))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:3)))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
@@ -123,7 +133,8 @@ bb2:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -131,21 +142,24 @@ bb2:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @one_natural_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -182,14 +196,16 @@ bb4:
 // CHECK-NEXT:         (region id:7)
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:loop ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -202,6 +218,8 @@ bb4:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
@@ -211,7 +229,8 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -219,7 +238,8 @@ bb4:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -227,7 +247,8 @@ bb4:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -235,14 +256,16 @@ bb4:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @one_natural_loop_with_diamond : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -280,14 +303,16 @@ bb5:
 // CHECK-NEXT:         (region id:6)
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:6 kind:loop ucfh:true  ucft:true  parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -299,6 +324,9 @@ bb5:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:3))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:2)
 // CHECK-NEXT:         (region id:3)))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:true  parent:6
 // CHECK-NEXT:     (preds
@@ -307,7 +335,8 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs)) 
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:true  parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -315,21 +344,24 @@ bb5:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs)) 
 // CHECK: (region id:1 kind:bb   ucfh:true  ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs)) 
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs)) 
 sil @one_natural_loop_multiple_backedges : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -352,6 +384,8 @@ bb4:
 // inner loop. The ucfh does not propagate up b/c the header of the loop is not
 // in the inner loop.
 //
+// This is an example that can not happen in sil with canonicalized loops.
+//
 // CHECK-LABEL: @inner_natural_loop_with_multiple_backedges@
 // CHECK: (region id:6 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
@@ -361,14 +395,16 @@ bb4:
 // CHECK-NEXT:         (region id:7)
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:loop ucfh:false ucft:true  parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -379,6 +415,8 @@ bb4:
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:8))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:8)))
 // CHECK: (region id:8 kind:loop ucfh:true  ucft:true  parent:7
 // CHECK-NEXT:     (preds
@@ -391,6 +429,9 @@ bb4:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:3)
 // CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:true  parent:8
 // CHECK-NEXT:     (preds
@@ -399,7 +440,8 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:true  parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2))
@@ -407,28 +449,32 @@ bb4:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:true  ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @inner_natural_loop_with_multiple_backedges : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -468,14 +514,16 @@ bb5:
 // CHECK-NEXT:         (region id:8)
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:8 kind:loop ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:7))
@@ -486,7 +534,9 @@ bb5:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
-// CHECK-NEXT:         (region id:4)))
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:4))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:3))
@@ -494,14 +544,16 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:loop ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -512,6 +564,8 @@ bb5:
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:2))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:2)))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
@@ -520,21 +574,24 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @two_separate_natural_loops : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -577,14 +634,16 @@ bb5:
 // CHECK-NEXT:         (region id:9)
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:9))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:9 kind:loop ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:3)
@@ -596,6 +655,8 @@ bb5:
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:5))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:5)))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
@@ -604,14 +665,16 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:8))
@@ -619,7 +682,8 @@ bb5:
 // CHECK-NEXT:         (region id:9))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:8 kind:loop ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -631,6 +695,8 @@ bb5:
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:2))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:2)))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
@@ -640,21 +706,24 @@ bb5:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0)
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @two_separate_natural_loops_separated_by_diamond : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -704,7 +773,8 @@ bb6:
 // CHECK-NEXT:         (region id:11)
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:10)
@@ -712,7 +782,8 @@ bb6:
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:11 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:9)
@@ -724,6 +795,8 @@ bb6:
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:6))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:6)))
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds
@@ -732,14 +805,16 @@ bb6:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:10 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:9))
@@ -751,6 +826,8 @@ bb6:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds
@@ -760,14 +837,16 @@ bb6:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0)
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:9 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -779,6 +858,8 @@ bb6:
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:2))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:2)))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
@@ -788,21 +869,24 @@ bb6:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0)
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:9))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @two_separate_natural_loops_separated_by_diamond_with_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -842,7 +926,8 @@ bb7:
 // CHECK-NEXT:         (region id:11)
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:10)
@@ -850,7 +935,8 @@ bb7:
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:11 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:9))
@@ -861,6 +947,8 @@ bb7:
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:6))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:6)))
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds
@@ -869,14 +957,16 @@ bb7:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:10 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:3))
@@ -886,6 +976,8 @@ bb7:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds)
@@ -893,7 +985,8 @@ bb7:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:9))
@@ -901,7 +994,8 @@ bb7:
 // CHECK-NEXT:         (region id:10))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:9 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -913,6 +1007,8 @@ bb7:
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:2))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:2)))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
@@ -922,21 +1018,24 @@ bb7:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0)
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:9))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @three_separate_natural_loops : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -980,14 +1079,16 @@ bb7:
 // CHECK-NEXT:         (region id:6)
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:6 kind:loop ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -999,7 +1100,9 @@ bb7:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
-// CHECK-NEXT:         (region id:3)))
+// CHECK-NEXT:         (region id:3))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:3))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:7))
@@ -1007,7 +1110,8 @@ bb7:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:loop ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -1017,28 +1121,33 @@ bb7:
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
-// CHECK-NEXT:         (region id:2)))
+// CHECK-NEXT:         (region id:2))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:2))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @two_level_natural_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -1074,14 +1183,16 @@ bb4:
 // CHECK-NEXT:         (region id:7)
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:loop ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -1094,7 +1205,9 @@ bb4:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
-// CHECK-NEXT:         (region id:4)))
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:4))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:3)
@@ -1103,7 +1216,8 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1)
@@ -1112,7 +1226,8 @@ bb4:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:8 kind:loop ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -1123,7 +1238,9 @@ bb4:
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
-// CHECK-NEXT:         (region id:2)))
+// CHECK-NEXT:         (region id:2))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:2))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1131,7 +1248,7 @@ bb4:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0)
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -1139,14 +1256,15 @@ bb4:
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @two_level_natural_loop_with_diamond_and_multiple_loop_exits : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -1177,14 +1295,16 @@ bb5:
 // CHECK-NEXT:         (region id:7)
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:loop ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -1197,7 +1317,9 @@ bb5:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
-// CHECK-NEXT:         (region id:4)))
+// CHECK-NEXT:         (region id:4)
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:4))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2)
@@ -1206,7 +1328,8 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:8 kind:loop ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -1216,6 +1339,8 @@ bb5:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:3))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:3)))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
@@ -1223,7 +1348,8 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -1231,7 +1357,8 @@ bb5:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -1239,14 +1366,16 @@ bb5:
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @three_level_natural_loop_with_inner_loop_in_diamond : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -1283,14 +1412,16 @@ bb5:
 // CHECK-NEXT:         (region id:3)
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:true  ucft:true  parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0)
@@ -1299,7 +1430,8 @@ bb5:
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:true  ucft:true  parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1)
@@ -1310,7 +1442,8 @@ bb5:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:true  ucft:true  parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0)
@@ -1319,7 +1452,8 @@ bb5:
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -1327,7 +1461,8 @@ bb5:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @one_level_irreducible_loop : $@convention(thin) () -> () {
 bb0:
   cond_br undef, bb1, bb3
@@ -1357,14 +1492,16 @@ bb5:
 // CHECK-NEXT:         (region id:8)
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:8 kind:loop ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -1378,6 +1515,8 @@ bb5:
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:5))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:5)))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
@@ -1386,7 +1525,8 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:bb   ucfh:true  ucft:true  parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1)
@@ -1395,7 +1535,8 @@ bb5:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:true  ucft:true  parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2)
@@ -1406,7 +1547,8 @@ bb5:
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:true  ucft:true  parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1)
@@ -1415,7 +1557,8 @@ bb5:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -1423,14 +1566,16 @@ bb5:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @natural_loop_containing_irreducible_loop : $@convention(thin) () -> () {
 bb0:
   br bb6
@@ -1470,14 +1615,16 @@ bb7:
 // CHECK-NEXT:         (region id:11)
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:8 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:11))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:11 kind:loop ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:10))
@@ -1488,6 +1635,8 @@ bb7:
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:7))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:7)))
 // CHECK: (region id:7 kind:bb   ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds
@@ -1496,14 +1645,16 @@ bb7:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:10 kind:loop ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -1517,6 +1668,8 @@ bb7:
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:5))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:5)))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds
@@ -1525,7 +1678,8 @@ bb7:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:bb   ucfh:true  ucft:true  parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1)
@@ -1534,7 +1688,8 @@ bb7:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:true  ucft:true  parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2)
@@ -1545,7 +1700,8 @@ bb7:
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:true  ucft:true  parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1)
@@ -1554,7 +1710,8 @@ bb7:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -1562,14 +1719,16 @@ bb7:
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:10))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @two_natural_loop_one_with_irreducible_loop : $@convention(thin) () -> () {
 bb0:
   br bb6
@@ -1610,14 +1769,16 @@ bb9:
 // CHECK-NEXT:         (region id:16)
 // CHECK-NEXT:         (region id:11))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:11 kind:bb   ucfh:false ucft:false parent:12
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:16))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:16 kind:loop ucfh:false ucft:false parent:12
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:13))
@@ -1628,6 +1789,8 @@ bb9:
 // CHECK-NEXT:         (region id:10))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:10))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:10)))
 // CHECK: (region id:10 kind:bb   ucfh:false ucft:false parent:16
 // CHECK-NEXT:     (preds
@@ -1636,14 +1799,16 @@ bb9:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:9 kind:bb   ucfh:false ucft:false parent:16
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:10))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:13 kind:loop ucfh:false ucft:false parent:12
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -1657,6 +1822,8 @@ bb9:
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:8))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:8)))
 // CHECK: (region id:8 kind:bb   ucfh:false ucft:false parent:13
 // CHECK-NEXT:     (preds
@@ -1665,7 +1832,8 @@ bb9:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:14 kind:loop ucfh:true  ucft:true  parent:13
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1)
@@ -1678,14 +1846,17 @@ bb9:
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
-// CHECK-NEXT:         (region id:4)))
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:7)))
 // CHECK: (region id:7 kind:bb   ucfh:false ucft:false parent:14
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:15))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:15 kind:loop ucfh:false ucft:false parent:14
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:4))
@@ -1696,6 +1867,8 @@ bb9:
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:6))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:6)))
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:15
 // CHECK-NEXT:     (preds
@@ -1704,14 +1877,16 @@ bb9:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:15
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:bb   ucfh:true  ucft:true  parent:14
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -1719,7 +1894,8 @@ bb9:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:true  ucft:true  parent:13
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2)
@@ -1730,7 +1906,8 @@ bb9:
 // CHECK-NEXT:         (region id:14))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:true  ucft:true  parent:13
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1)
@@ -1739,7 +1916,8 @@ bb9:
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:13
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -1747,14 +1925,16 @@ bb9:
 // CHECK-NEXT:         (region id:14))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:12
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:13))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @multiple_level_natural_loop_with_irreducible_loop_sandwich : $@convention(thin) () -> () {
 bb0:
   br bb6
@@ -1804,21 +1984,21 @@ bb12:
 // CHECK-NEXT:         (region id:3)
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:6 kind:loop ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -1831,6 +2011,8 @@ bb12:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:1)
+// CHECK-NEXT:         (region id:2))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:2)))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
@@ -1839,7 +2021,7 @@ bb12:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -1847,14 +2029,14 @@ bb12:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 sil @unreachable_bb_in_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -1882,21 +2064,21 @@ bb4:
 // CHECK-NEXT:         (region id:5)
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:8 kind:loop ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -1910,7 +2092,9 @@ bb4:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:4)
-// CHECK-NEXT:         (region id:9)))
+// CHECK-NEXT:         (region id:9))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:9))
@@ -1918,7 +2102,7 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:9 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -1931,6 +2115,8 @@ bb4:
 // CHECK-NEXT:         (parentindex:1))
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:2)
+// CHECK-NEXT:         (region id:3))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:3)))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
@@ -1939,7 +2125,7 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -1947,21 +2133,21 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:9))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 sil @unreachable_bb_in_inner_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -1995,21 +2181,21 @@ bb6:
 // CHECK-NEXT:         (region id:5)
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:8 kind:loop ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -2023,7 +2209,9 @@ bb6:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:4)
-// CHECK-NEXT:         (region id:9)))
+// CHECK-NEXT:         (region id:9))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:9))
@@ -2031,7 +2219,7 @@ bb6:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:9 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -2044,6 +2232,8 @@ bb6:
 // CHECK-NEXT:         (parentindex:1))
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:2)
+// CHECK-NEXT:         (region id:3))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:3)))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
@@ -2053,7 +2243,7 @@ bb6:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0)
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -2061,21 +2251,21 @@ bb6:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:9))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 sil @unreachable_bb_in_inner_loop_with_multiple_edges : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2110,21 +2300,21 @@ bb6:
 // CHECK-NEXT:         (region id:3)
 // CHECK-NEXT:         (region id:4))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:6 kind:loop ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -2137,7 +2327,7 @@ bb6:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:1)
-// CHECK-NEXT:         (region id:2)))
+// CHECK-NEXT:         (region id:2))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -2145,7 +2335,7 @@ bb6:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -2153,14 +2343,14 @@ bb6:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 sil @noreturn_bb_in_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2192,21 +2382,21 @@ bb4:
 // CHECK-NEXT:         (region id:8)
 // CHECK-NEXT:         (region id:9))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:9 kind:bb   ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:11))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:8 kind:bb   ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:13))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:13 kind:loop ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:11))
@@ -2217,7 +2407,7 @@ bb4:
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
-// CHECK-NEXT:         (region id:7)))
+// CHECK-NEXT:         (region id:7))
 // CHECK: (region id:7 kind:bb   ucfh:false ucft:false parent:13
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:6))
@@ -2225,21 +2415,21 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:13
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:11))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:11 kind:loop ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -2255,7 +2445,7 @@ bb4:
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:1)
 // CHECK-NEXT:         (region id:4)
-// CHECK-NEXT:         (region id:12)))
+// CHECK-NEXT:         (region id:12))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:12))
@@ -2263,7 +2453,7 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:12 kind:loop ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -2276,7 +2466,7 @@ bb4:
 // CHECK-NEXT:         (parentindex:2))
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:2)
-// CHECK-NEXT:         (region id:3)))
+// CHECK-NEXT:         (region id:3))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:12
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2))
@@ -2284,7 +2474,7 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:12
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -2292,7 +2482,7 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -2300,14 +2490,14 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:10
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:11))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 sil @noreturn_bb_in_three_level_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2397,14 +2587,14 @@ bb4:
 // CHECK-NEXT:         (region id:6)
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:6 kind:loop ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -2415,6 +2605,8 @@ bb4:
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:7))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:7)))
 // CHECK: (region id:7 kind:loop ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
@@ -2426,14 +2618,16 @@ bb4:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
 // CHECK-NEXT:     (exiting-subregs
-// CHECK-NEXT:         (region id:2)))
+// CHECK-NEXT:         (region id:2))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -2441,21 +2635,21 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:5
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
 sil @exit_block_that_is_a_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2486,7 +2680,8 @@ bb4:
 // CHECK-NEXT:         (region id:7)
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:8 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:4)
@@ -2494,7 +2689,8 @@ bb4:
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:10))
@@ -2502,7 +2698,8 @@ bb4:
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:10))
@@ -2510,7 +2707,8 @@ bb4:
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:10 kind:loop ucfh:true  ucft:true  parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -2524,7 +2722,10 @@ bb4:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:11)
-// CHECK-NEXT:         (region id:12)))
+// CHECK-NEXT:         (region id:12))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:11)
+// CHECK-NEXT:         (region id:12))
 // CHECK: (region id:12 kind:loop ucfh:false ucft:true  parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -2535,6 +2736,8 @@ bb4:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:6))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:6)))
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:true  parent:12
 // CHECK-NEXT:     (preds
@@ -2543,14 +2746,16 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:12
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:11 kind:loop ucfh:false ucft:true  parent:10
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -2561,6 +2766,8 @@ bb4:
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
 // CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:         (region id:3))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:3)))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:true  parent:11
 // CHECK-NEXT:     (preds
@@ -2569,14 +2776,16 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:true  ucft:false parent:10
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -2584,14 +2793,16 @@ bb4:
 // CHECK-NEXT:         (region id:12))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:10))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @multiple_exit_blocks_that_are_loops : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2630,14 +2841,16 @@ bb8:
 // CHECK-NEXT:         (region id:7)
 // CHECK-NEXT:         (region id:5))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:loop ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -2652,6 +2865,8 @@ bb8:
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:2)
 // CHECK-NEXT:         (region id:3)
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
@@ -2660,7 +2875,8 @@ bb8:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2))
@@ -2669,7 +2885,8 @@ bb8:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -2678,21 +2895,24 @@ bb8:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:2))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @loop_with_multiple_early_exit : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2732,14 +2952,16 @@ bb5:
 // CHECK-NEXT:         (region id:7)
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:7 kind:loop ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -2752,13 +2974,16 @@ bb5:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:8))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:5)))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:8 kind:loop ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -2771,6 +2996,8 @@ bb5:
 // CHECK-NEXT:         (parentindex:0))
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:2)
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
@@ -2779,7 +3006,8 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -2787,21 +3015,24 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:6
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:7))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs
+// CHECK-NEXT:     (backedge-regs))
 sil @loop_with_one_early_exit_from_inner_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2831,14 +3062,16 @@ bb5:
 // CHECK-NEXT:         (region id:8)
 // CHECK-NEXT:         (region id:6))
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:8 kind:loop ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:0))
@@ -2851,7 +3084,9 @@ bb5:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:5)
-// CHECK-NEXT:         (region id:9)))
+// CHECK-NEXT:         (region id:9))
+// CHECK-NEXT:     (backedge-regs
+// CHECK-NEXT:         (region id:5)))
 // CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:9))
@@ -2859,7 +3094,8 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:9 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -2874,6 +3110,8 @@ bb5:
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:         (region id:2)
 // CHECK-NEXT:         (region id:3)
+// CHECK-NEXT:         (region id:4))
+// CHECK-NEXT:     (backedge-regs
 // CHECK-NEXT:         (region id:4)))
 // CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
@@ -2882,7 +3120,8 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:1))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2))
@@ -2891,7 +3130,8 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
@@ -2899,21 +3139,24 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
 // CHECK-NEXT:         (parentindex:0))
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:9))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:7
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs
 // CHECK-NEXT:         (region id:8))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
-// CHECK-NEXT:     (exiting-subregs))
+// CHECK-NEXT:     (exiting-subregs)
+// CHECK-NEXT:     (backedge-regs))
 sil @loop_with_multiple_early_exit_from_inner_loop : $@convention(thin) () -> () {
 bb0:
   br bb1

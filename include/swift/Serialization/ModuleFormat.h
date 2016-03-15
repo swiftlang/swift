@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 240; // Last change: @_cdecl
+const uint16_t VERSION_MINOR = 241; // Last change: value witness substitutions
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;

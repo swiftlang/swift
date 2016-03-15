@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# ===--- swift-bench.py -------------------------------*- coding: utf-8 -*-===//
+# ===--- swift-bench.py ------------------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #
@@ -16,16 +16,16 @@
 # each of these functions, runs all the tests and reports aggregate results.
 #
 # The workflow of the harness is the following:
-#   o Basing on the input files, generate 'processed' files. These files contain
-#     a main function with simple arguments parsing, time measurement utilities
-#     and a loop in which the bench-functions are called.
+#   o Basing on the input files, generate 'processed' files. These files
+#     contain a main function with simple arguments parsing, time measurement
+#     utilities and a loop in which the bench-functions are called.
 #   o When all files are processed, the harness begins to compile them, keeping
 #     track of all compile fails for later results reporting.
 #   o When all files are compiled, the harness begins to run the tests. The
 #     harness chooses a number of iterations for each tests to achieve the best
-#     accuracy in the given time limit (in order to do that, it performs several
-#     auxiliary test runs). When the iteration number is chosen, the measurement
-#     of execution time is actually performed.
+#     accuracy in the given time limit (in order to do that, it performs
+#     several auxiliary test runs). When the iteration number is chosen, the
+#     measurement of execution time is actually performed.
 #   o At this point everything is ready, and the harness simply reports the
 #     results.
 #
@@ -316,8 +316,8 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
         if (num_samples, iter_scale) == (0, 0):
             self.tests[name].status = "CAN'T MEASURE"
             self.tests[name].output = (
-                "Can't find number of iterations for the test to last longer " +
-                "than %d ms." % self.min_iter_time)
+                "Can't find number of iterations for the test to last " +
+                "longer than %d ms." % self.min_iter_time)
             return
         samples = []
         self.log("Running bench: %s, numsamples: %d" % (name, num_samples), 2)

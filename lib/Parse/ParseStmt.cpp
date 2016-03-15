@@ -168,7 +168,7 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   // Consume tokens up to code completion token.
-  while (Tok.isNot(tok::code_complete)) {
+  while (Tok.isNot(tok::code_complete, tok::eof)) {
     consumeToken();
   }
   // Consume the code completion token, if there is one.

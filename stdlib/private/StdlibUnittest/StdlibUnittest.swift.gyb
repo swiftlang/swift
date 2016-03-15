@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+%{
+from gyb_stdlib_unittest_support import TRACE, TRACE1, stackTrace, trace
+}%
+
 import SwiftPrivate
 import SwiftPrivatePthreadExtras
 import SwiftPrivateLibcExtras
@@ -85,22 +89,6 @@ public struct SourceLocStack {
     _printStackTrace(SourceLocStack(_locs: Array(locs.dropFirst())))
   }
 }
-
-%{
-  TRACE = '''@autoclosure _ message: () -> String = "",
-    showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = #file, line: UInt = #line'''
-
-  # When the parameter list would start with a ${TRACE}, we use 
-  # ${TRACE1} instead, to avoid the warning about an extraneous 
-  # '_' on the first parameter.
-  TRACE1 = TRACE.replace(' _ ', ' ', 1) 
-  
-  stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'
-
-  trace = 'message(),\n  stackTrace: ' + stackTrace
-}%
 
 func _printStackTrace(stackTrace: SourceLocStack?) {
   guard let s = stackTrace where !s.locs.isEmpty else { return }
@@ -2641,36 +2629,6 @@ public func expectEqualUnicodeScalars(
       + "actual: \"\(asHex(actualUnicodeScalars))\"",
       trace: ${trace})
   }
-}
-
-public func expectPrinted<T>(
-  expectedOneOf patterns: [String], _ object: T, ${TRACE}
-) {
-  let actual = String(object)
-  if !patterns.contains(actual) {
-    expectationFailure(
-      "expected: any of \(String(reflecting: patterns))\n"
-      + "actual: \(String(reflecting: actual))",
-      trace: ${trace})
-  }
-}
-
-public func expectPrinted<T>(
-  expected: String, _ object: T, ${TRACE}
-) {
-  expectPrinted(expectedOneOf: [expected], object, ${trace})
-}
-
-public func expectDebugPrinted<T>(
-  expectedOneOf patterns: [String], _ object: T, ${TRACE}
-) {
-  expectPrinted(expectedOneOf: patterns, String(reflecting: object), ${trace})
-}
-
-public func expectDebugPrinted<T>(
-  expected: String, _ object: T, ${TRACE}
-) {
-  expectDebugPrinted(expectedOneOf: [expected], object, ${trace})
 }
 
 func compose<A, B, C>(f: A -> B, _ g: B -> C) -> A -> C {

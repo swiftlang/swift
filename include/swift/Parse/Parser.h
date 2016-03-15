@@ -541,7 +541,7 @@ public:
     getScopeInfo().addToScope(D, *this);
   }
 
-  ValueDecl *lookupInScope(Identifier Name) {
+  ValueDecl *lookupInScope(DeclName Name) {
     return getScopeInfo().lookupValueName(Name);
   }
 
@@ -1110,7 +1110,7 @@ public:
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprConfiguration();
-  Expr *parseExprStringLiteral();
+  ParserResult<Expr> parseExprStringLiteral();
 
   /// If the token is an escaped identifier being used as an argument
   /// label, but doesn't need to be, diagnose it.

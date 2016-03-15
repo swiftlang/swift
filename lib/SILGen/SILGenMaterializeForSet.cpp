@@ -135,6 +135,12 @@ private:
       TheAccessSemantics(AccessSemantics::Ordinary),
       IsSuper(false) {
 
+    // Determine the formal type of the 'self' parameter.
+    if (WitnessStorage->isStatic()) {
+      SubstSelfType = CanMetatypeType::get(SubstSelfType);
+      SelfInterfaceType = CanMetatypeType::get(SelfInterfaceType);
+    }
+
     // Determine the formal type of the storage.
     CanType witnessIfaceType =
       WitnessStorage->getInterfaceType()->getCanonicalType();
@@ -205,10 +211,16 @@ public:
   forConcreteImplementation(SILGenModule &SGM,
                             FuncDecl *witness,
                             ArrayRef<Substitution> witnessSubs) {
-    Type selfInterfaceType
-      = witness->computeInterfaceSelfType(false)->getLValueOrInOutObjectType();
-    Type selfType
-      = witness->computeSelfType()->getLValueOrInOutObjectType();
+    Type selfInterfaceType, selfType;
+
+    auto *dc = witness->getDeclContext();
+    if (auto *proto = dc->getAsProtocolOrProtocolExtensionContext()) {
+      selfInterfaceType = proto->getProtocolSelf()->getDeclaredType();
+      selfType = ArchetypeBuilder::mapTypeIntoContext(dc, selfInterfaceType);
+    } else {
+      selfInterfaceType = dc->getDeclaredInterfaceType();
+      selfType = dc->getDeclaredTypeInContext();
+    }
 
     MaterializeForSetEmitter emitter(SGM, witness, witnessSubs,
                                      selfInterfaceType, selfType);
@@ -301,7 +313,7 @@ public:
 
     // Metatypes and bases of non-mutating setters on value types
     //  are always rvalues.
-    if (!SubstSelfType->mayHaveSuperclass()) {
+    if (!SubstSelfType->getRValueInstanceType()->mayHaveSuperclass()) {
       if (self.getType().isObject())
         return LValue::forValue(self, SubstSelfType);
       else {
@@ -329,13 +341,13 @@ public:
 
     // Do a derived-to-base conversion if necessary.
     if (witnessSelfType != SubstSelfType) {
-      auto selfSILType = SILType::getPrimitiveObjectType(witnessSelfType);
+      auto selfSILType = gen.getLoweredType(witnessSelfType);
       selfValue = gen.B.createUpcast(loc, selfValue, selfSILType);
     }
 
     // Recreate as a borrowed value.
     self = ManagedValue::forUnmanaged(selfValue);
-    return LValue::forClassReference(self);
+    return LValue::forValue(self, witnessSelfType);
   }
 
   LValue buildLValue(SILGenFunction &gen, SILLocation loc,
@@ -457,23 +469,12 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen) {
   // Form the callback.
   SILValue callback;
   if (callbackFn) {
-    // Make a reference to the function.
+    // Make a reference to the callback.
     callback = gen.B.createFunctionRef(loc, callbackFn);
-
-    // If it's polymorphic, cast to RawPointer and then back to the
-    // right monomorphic type.  The safety of this cast relies on some
-    // assumptions about what exactly IRGen can reconstruct from the
-    // callback's thick type argument.
-    if (callbackFn->getLoweredFunctionType()->isPolymorphic()) {
-      callback = gen.B.createThinFunctionToPointer(loc, callback, rawPointerTy);
-
-      OptionalTypeKind optKind;
-      auto callbackTy = optCallbackTy.getAnyOptionalObjectType(SGM.M, optKind);
-      callback = gen.B.createPointerToThinFunction(loc, callback, callbackTy);
-    }
-
+    callback = gen.B.createThinFunctionToPointer(loc, callback, rawPointerTy);
     callback = gen.B.createOptionalSome(loc, callback, optCallbackTy);
   } else {
+    // There is no callback.
     callback = gen.B.createOptionalNone(loc, optCallbackTy);
   }
 
@@ -548,7 +549,8 @@ collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
   return result;
 }
 
-SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorFn generator) {
+SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
+                                                      GeneratorFn generator) {
   auto callbackType =
       SGM.Types.getMaterializeForSetCallbackType(WitnessStorage,
                                                  GenericSig,

@@ -445,10 +445,10 @@ extension Mirror {
         position = children.index { $0.label == label } ?? children.endIndex
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
-// FIXME: swift-3-indexing-model - Review what we need to do here
-//        position = children.advance(children.startIndex,
-//          by: offset, limit: children.endIndex)
-        fatalError("FIXME: swift-3-indexing-model \(offset)")
+        position = children.advance(
+          children.startIndex,
+          by: offset,
+          limit: children.endIndex)
       }
       else {
         _preconditionFailure(

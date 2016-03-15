@@ -821,9 +821,13 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SyntaxStructureNode SN;
     SN.Dcl = D;
     SN.Kind = SyntaxStructureKind::Parameter;
-    if (!PD->getArgumentName().empty())
-      SN.NameRange = CharSourceRange(PD->getSourceRange().Start,
-                                     PD->getArgumentName().getLength());
+    if (!PD->getArgumentName().empty()) {
+      SourceLoc ArgStart = PD->getSourceRange().Start;
+      SN.NameRange = CharSourceRange(ArgStart, PD->getArgumentName().getLength());
+      passTokenNodesUntil(ArgStart, PassNodesBehavior::ExcludeNodeAtLocation);
+      const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
+        Identifier;
+    }
     SN.Range = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
     SN.Attrs = PD->getAttrs();
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
@@ -1333,6 +1337,29 @@ bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
   return false;
 }
 
+static CharSourceRange sanitizeUnpairedParenthesis(CharSourceRange Range) {
+  auto Text = Range.str();
+  if (Text.back() != ')') {
+    return Range;
+  }
+  unsigned Pairs = 0;
+  unsigned TrimLen = 0;
+  for (char C : Text) {
+    if (C == '(') {
+      Pairs ++;
+    } else if (C == ')') {
+      if (Pairs == 0)
+        TrimLen ++;
+      else
+        Pairs --;
+    } else {
+      TrimLen = 0;
+    }
+  }
+
+  return CharSourceRange(Range.getStart(), Text.size() - TrimLen);
+}
+
 bool ModelASTWalker::searchForURL(CharSourceRange Range) {
   StringRef OrigText = SM.extractText(Range, BufferID);
   SourceLoc OrigLoc = Range.getStart();
@@ -1349,7 +1376,8 @@ bool ModelASTWalker::searchForURL(CharSourceRange Range) {
       StringRef Match(RxMatch.first, RxMatch.second - RxMatch.first);
       SourceLoc Loc = OrigLoc.getAdvancedLoc(Match.data() - OrigText.data());
       CharSourceRange Range(Loc, Match.size());
-      SyntaxNode Node{ SyntaxNodeKind::CommentURL, Range };
+      SyntaxNode Node{ SyntaxNodeKind::CommentURL,
+                       sanitizeUnpairedParenthesis(Range) };
       if (!passNode(Node))
         return false;
       Text = Text.substr(Match.data() - Text.data() + Match.size());
@@ -1398,6 +1426,8 @@ bool ModelASTWalker::findFieldsInDocCommentLine(SyntaxNode Node) {
   auto FieldNode = parseFieldNode(Text, OrigText, OrigLoc);
   if (FieldNode.hasValue())
     passNode(FieldNode.getValue());
+  else
+    searchForURL(Node.Range);
   return true;
 }
 
@@ -1438,6 +1468,10 @@ bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
     auto FieldNode = parseFieldNode(Line.drop_front(Indent), OrigText, OrigLoc);
     if (FieldNode.hasValue())
       passNode(FieldNode.getValue());
+    else
+      searchForURL(CharSourceRange(Node.Range.getStart().
+        getAdvancedLoc(Line.data() - OrigText.data()),
+                                   Line.size()));
   }
 
   std::match_results<StringRef::iterator> Matches;

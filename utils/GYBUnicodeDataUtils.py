@@ -1,4 +1,4 @@
-# ===--- GYBUnicodeDataUtils.py -----------------------*- coding: utf-8 -*-===//
+# ===--- GYBUnicodeDataUtils.py ----------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #
@@ -105,8 +105,8 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         for cp in range(0, 0x110000):
             self.property_values[cp] = self.get_default_value()
 
-        for start_code_point, end_code_point, val in self.property_value_ranges:
-            for cp in range(start_code_point, end_code_point + 1):
+        for start_code_pt, end_code_pt, val in self.property_value_ranges:
+            for cp in range(start_code_pt, end_code_pt + 1):
                 self.property_values[cp] = val
 
     def get_default_value(self):
@@ -320,7 +320,8 @@ class UnicodeTrieGenerator(object):
         if cp <= 0xffff:
             data_block_index = self.bmp_lookup[
                 self.get_bmp_first_level_index(cp)]
-            return self.bmp_data[data_block_index][self.get_bmp_data_offset(cp)]
+            return self.bmp_data[data_block_index][
+                self.get_bmp_data_offset(cp)]
         else:
             second_lookup_index = self.supp_lookup1[
                 self.get_supp_first_level_index(cp)]
@@ -552,14 +553,14 @@ def get_grapheme_cluster_break_tests_as_utf8(grapheme_break_test_file_name):
                 pass
             else:
                 code_point = int(token, 16)
-                # Tests from Unicode spec have isolated surrogates in them.  Our
-                # segmentation algorithm works on UTF-8 sequences, so encoding a
-                # surrogate would produce an invalid code unit sequence.
-                # Instead of trying to emulate the maximal subpart algorithm for
-                # inserting U+FFFD in Python, we just replace every isolated
-                # surrogate with U+200B, which also has Grapheme_Cluster_Break
-                # equal to 'Control' and test separately that we handle
-                # ill-formed UTF-8 sequences.
+                # Tests from Unicode spec have isolated surrogates in them.
+                # Our segmentation algorithm works on UTF-8 sequences, so
+                # encoding a surrogate would produce an invalid code unit
+                # sequence. Instead of trying to emulate the maximal subpart
+                # algorithm for inserting U+FFFD in Python, we just replace
+                # every isolated surrogate with U+200B, which also has
+                # Grapheme_Cluster_Break equal to 'Control' and test
+                # separately that we handle ill-formed UTF-8 sequences.
                 if code_point >= 0xd800 and code_point <= 0xdfff:
                     code_point = 0x200b
                 code_point = (b'\U%(cp)08x' % {b'cp': code_point}).decode(
@@ -613,14 +614,14 @@ def get_grapheme_cluster_break_tests_as_unicode_scalars(
                 pass
             else:
                 code_point = int(token, 16)
-                # Tests from Unicode spec have isolated surrogates in them.  Our
+                # Tests from Unicode spec have isolated surrogates in them. Our
                 # segmentation algorithm works on UTF-16 sequences, so encoding
                 # a surrogate would produce an invalid code unit sequence.
-                # Instead of trying to emulate the maximal subpart algorithm for
-                # inserting U+FFFD in Python, we just replace every isolated
-                # surrogate with U+200B, which also has Grapheme_Cluster_Break
-                # equal to 'Control' and test separately that we handle
-                # ill-formed UTF-8 sequences.
+                # Instead of trying to emulate the maximal subpart algorithm
+                # for inserting U+FFFD in Python, we just replace every
+                # isolated surrogate with U+200B, which also has
+                # Grapheme_Cluster_Break equal to 'Control' and test separately
+                # that we handle ill-formed UTF-8 sequences.
                 if code_point >= 0xd800 and code_point <= 0xdfff:
                     code_point = 0x200b
                 test += [code_point]

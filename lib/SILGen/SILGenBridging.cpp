@@ -28,10 +28,10 @@ using namespace Lowering;
 /// object, using the appropriate witness for the
 /// _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
 static Optional<ManagedValue>
-emitBridgeToObjectiveC(SILGenFunction &gen,
-                       SILLocation loc,
-                       ManagedValue swiftValue,
-                       ProtocolConformance *conformance) {
+emitBridgeNativeToObjectiveC(SILGenFunction &gen,
+                             SILLocation loc,
+                             ManagedValue swiftValue,
+                             ProtocolConformance *conformance) {
   // Dig out the nominal type we're bridging from.
   Type swiftValueType = swiftValue.getSwiftType()->getRValueType();
 
@@ -80,9 +80,10 @@ emitBridgeToObjectiveC(SILGenFunction &gen,
 /// Bridge the given Swift value to its corresponding Objective-C
 /// object, using the appropriate witness for the
 /// _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
-static Optional<ManagedValue> emitBridgeToObjectiveC(SILGenFunction &gen,
-                                                     SILLocation loc,
-                                                     ManagedValue swiftValue) {
+static Optional<ManagedValue>
+emitBridgeNativeToObjectiveC(SILGenFunction &gen,
+                             SILLocation loc,
+                             ManagedValue swiftValue) {
   // Dig out the nominal type we're bridging from.
   Type swiftValueType = swiftValue.getSwiftType()->getRValueType();
 
@@ -91,7 +92,7 @@ static Optional<ManagedValue> emitBridgeToObjectiveC(SILGenFunction &gen,
       gen.SGM.getConformanceToObjectiveCBridgeable(loc, swiftValueType);
   if (!conformance) return None;
 
-  return emitBridgeToObjectiveC(gen, loc, swiftValue, conformance);
+  return emitBridgeNativeToObjectiveC(gen, loc, swiftValue, conformance);
 }
 
 static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
@@ -100,26 +101,84 @@ static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
   llvm_unreachable("Handled via the _bridgeToObjectiveC witness");
 }
 
-static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
-                                               SILLocation loc,
-                                               ManagedValue nsstr) {
-  SILValue bridgeFn =
-      gen.emitGlobalFunctionRef(loc, gen.SGM.getNSStringToStringFn());
+/// Bridge the given Objective-C object to its corresponding Swift
+/// value, using the appropriate witness for the
+/// _ObjectiveCBridgeable._unconditionallyBridgeFromObjectiveC requirement.
+static Optional<ManagedValue>
+emitBridgeObjectiveCToNative(SILGenFunction &gen,
+                             SILLocation loc,
+                             ManagedValue objcValue,
+                             ProtocolConformance *conformance) {
+  // Find the _unconditionallyBridgeFromObjectiveC requirement.
+  auto requirement =
+    gen.SGM.getUnconditionallyBridgeFromObjectiveCRequirement(loc);
+  if (!requirement) return None;
 
-  Type inputType = nsstr.getType().getSwiftRValueType();
-  if (!inputType->getOptionalObjectType()) {
-    SILType loweredOptTy = gen.SGM.getLoweredType(OptionalType::get(inputType));
-    auto *someDecl = gen.getASTContext().getOptionalSomeDecl();
-    auto *enumInst = gen.B.createEnum(loc, nsstr.getValue(), someDecl,
-                                      loweredOptTy);
-    nsstr = ManagedValue(enumInst, nsstr.getCleanup());
+  // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
+  auto witness = conformance->getWitness(requirement, nullptr);
+  assert(witness);
+
+  // Create a reference to the witness.
+  SILDeclRef witnessConstant(witness.getDecl());
+  auto witnessRef = gen.emitGlobalFunctionRef(loc, witnessConstant);
+
+  // Determine the substitutions.
+  ArrayRef<Substitution> substitutions;
+  auto witnessFnTy = witnessRef->getType().castTo<SILFunctionType>();
+
+  Type swiftValueType = conformance->getType();
+  if (auto valueTypeBGT = swiftValueType->getAs<BoundGenericType>()) {
+    // Compute the substitutions.
+    substitutions = valueTypeBGT->getSubstitutions(gen.SGM.SwiftModule,
+                                                   nullptr);
+  } else {
+    // FIXME: We should always be using these substitutions, but they
+    // aren't reliable with specialized conformances.
+    substitutions = witness.getSubstitutions();
   }
 
-  SILType nativeTy = gen.getLoweredType(gen.SGM.Types.getStringType());
-  SILValue str = gen.B.createApply(loc, bridgeFn, bridgeFn->getType(), nativeTy,
-                                   {}, { nsstr.forward(gen) });
+  // Substitute into the witness function type.
+  if (!substitutions.empty())
+    witnessFnTy = witnessFnTy->substGenericArgs(gen.SGM.M, gen.SGM.SwiftModule,
+                                                substitutions);
 
-  return gen.emitManagedRValueWithCleanup(str);
+  // If the Objective-C value isn't optional, wrap it in an optional.
+  Type objcValueType = objcValue.getType().getSwiftRValueType();
+  if (!objcValueType->getOptionalObjectType()) {
+    SILType loweredOptTy =
+        gen.SGM.getLoweredType(OptionalType::get(objcValueType));
+    auto *someDecl = gen.getASTContext().getOptionalSomeDecl();
+    auto *enumInst = gen.B.createEnum(loc, objcValue.getValue(), someDecl,
+                                      loweredOptTy);
+    objcValue = ManagedValue(enumInst, objcValue.getCleanup());
+  }
+
+  // Call the witness.
+  Type metatype = MetatypeType::get(swiftValueType);
+  SILValue metatypeValue = gen.B.createMetatype(loc,
+                                                gen.getLoweredType(metatype));
+
+  auto witnessCI = gen.getConstantInfo(witnessConstant);
+  CanType formalResultTy = witnessCI.LoweredInterfaceType.getResult();
+
+  // Set up the generic signature.
+  CanGenericSignature witnessGenericSignature;
+  if (auto genericSig =
+        cast<AbstractFunctionDecl>(witness.getDecl())->getGenericSignature())
+    witnessGenericSignature = genericSig->getCanonicalSignature();
+
+  GenericContextScope genericContextScope(gen.SGM.Types,
+                                          witnessGenericSignature);
+  return gen.emitApply(loc, ManagedValue::forUnmanaged(witnessRef),
+                       substitutions,
+                       { objcValue, ManagedValue::forUnmanaged(metatypeValue) },
+                       witnessFnTy,
+                       AbstractionPattern(witnessGenericSignature,
+                                          formalResultTy),
+                       swiftValueType->getCanonicalType(),
+                       ApplyOptions::None, None, None,
+                       SGFContext())
+    .getAsSingleValue(gen, loc);
 }
 
 static ManagedValue emitBridgeCollectionToNative(SILGenFunction &gen,
@@ -376,7 +435,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   // hardcoding String -> NSString.
   if (loweredNativeTy == gen.SGM.Types.getStringType()
       && loweredBridgedTy == gen.SGM.Types.getNSStringType()) {
-    if (auto result = emitBridgeToObjectiveC(gen, loc, v))
+    if (auto result = emitBridgeNativeToObjectiveC(gen, loc, v))
       return *result;
 
     return gen.emitUndef(loc, bridgedTy);
@@ -413,7 +472,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   // _bridgeToObjectiveC witness.
   if (auto conformance =
           gen.SGM.getConformanceToObjectiveCBridgeable(loc, loweredNativeTy)) {
-    if (auto result = emitBridgeToObjectiveC(gen, loc, v, conformance))
+    if (auto result = emitBridgeNativeToObjectiveC(gen, loc, v, conformance))
       return *result;
 
     return gen.emitUndef(loc, bridgedTy);
@@ -607,7 +666,14 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
   // Bridge NSString to String.
   if (auto stringDecl = gen.getASTContext().getStringDecl()) {
     if (nativeTy.getSwiftRValueType()->getAnyNominal() == stringDecl) {
-      return emitBridgeNSStringToString(gen, loc, v);
+      auto conformance =
+        gen.SGM.getConformanceToObjectiveCBridgeable(loc, loweredNativeTy);
+      assert(conformance &&
+             "Missing String conformation to _ObjectiveCBridgeable?");
+      if (auto result = emitBridgeObjectiveCToNative(gen, loc, v, conformance))
+        return *result;
+
+      return gen.emitUndef(loc, nativeTy);
     }
   }
 

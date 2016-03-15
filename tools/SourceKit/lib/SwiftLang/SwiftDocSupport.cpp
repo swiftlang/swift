@@ -120,10 +120,10 @@ public:
       EntitiesStack.back().SubEntities.push_back(std::move(Entity));
   }
 
-  void printTypeRef(const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
     unsigned StartOffset = OS.tell();
     References.emplace_back(TD, StartOffset, Name.str().size());
-    StreamPrinter::printTypeRef(TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name);
   }
 };
 

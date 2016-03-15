@@ -409,7 +409,7 @@ extension Collection where Index : Strideable {
   @warn_unused_result
   public func next(i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
-    _failEarlyRangeCheck(i, bounds:startIndex..<endIndex)
+    _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
     return i.advanced(by: 1)
   }

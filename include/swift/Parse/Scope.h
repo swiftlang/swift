@@ -35,7 +35,7 @@ class ScopeInfo {
 public:
   typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
   
-  typedef TreeScopedHashTable<Identifier, ValueScopeEntry> ScopedHTTy;
+  typedef TreeScopedHashTable<DeclName, ValueScopeEntry> ScopedHTTy;
   typedef ScopedHTTy::ScopeTy ScopedHTScopeTy;
   typedef ScopedHTTy::DetachedScopeTy ScopedHTDetachedScopeTy;
 
@@ -46,7 +46,7 @@ private:
   unsigned ResolvableDepth = 0;
 
 public:
-  ValueDecl *lookupValueName(Identifier Name);
+  ValueDecl *lookupValueName(DeclName Name);
 
   Scope *getCurrentScope() const { return CurScope; }
 
@@ -78,7 +78,6 @@ enum class ScopeKind {
   CatchVars,
   WhileVars,
   IfVars,
-  ActiveConfigBlock,
 
   ClosureParams,
 };
@@ -158,7 +157,7 @@ public:
   }
 };
 
-inline ValueDecl *ScopeInfo::lookupValueName(Identifier Name) {
+inline ValueDecl *ScopeInfo::lookupValueName(DeclName Name) {
   // FIXME: this check can go away when SIL parser parses everything in
   // a toplevel scope.
   if (!CurScope)

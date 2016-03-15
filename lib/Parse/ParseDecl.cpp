@@ -1829,7 +1829,7 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   // Consume tokens up to code completion token.
-  while (Tok.isNot(tok::code_complete))
+  while (Tok.isNot(tok::code_complete, tok::eof))
     consumeToken();
 
   // Consume the code completion token, if there is one.
@@ -2790,7 +2790,8 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 
     Optional<Scope> scope;
     if (!ConfigState.isConditionActive())
-      scope.emplace(this, ScopeKind::Brace, /*inactiveConfigBlock=*/true);
+      scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
+                    /*inactiveConfigBlock=*/true);
     
     SmallVector<Decl*, 8> Decls;
     if (ConfigState.shouldParse()) {

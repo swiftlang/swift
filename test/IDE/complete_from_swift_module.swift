@@ -22,7 +22,9 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_5 | FileCheck %s -check-prefix=ERROR_COMMON
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=POSTFIX_OPERATOR_1 | FileCheck %s -check-prefix=POSTFIX_OPERATOR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=POSTFIX_OPERATOR_1 > %t.compl.txt
+// RUN: FileCheck %s -check-prefix=POSTFIX_OPERATOR_1 < %t.compl.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE_POSTFIX_OPERATOR_1 < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
@@ -88,8 +90,8 @@ func testPostfixOperator1(x: Int) {
 // POSTFIX_OPERATOR_1: Begin completions
 // POSTFIX_OPERATOR_1-DAG: Decl[PostfixOperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
 // POSTFIX_OPERATOR_1-DAG: Decl[InfixOperatorFunction]/OtherModule[foo_swift_module]:  %%% {#Int#}[#Int#]
-// POSTFIX_OPERATOR_1-DAG-NOT: =->
 // POSTFIX_OPERATOR_1: End completions
+// NEGATIVE_POSTFIX_OPERATOR_1-NOT: =->
 
 #^TOP_LEVEL_1^#
 // TOP_LEVEL_1: Begin completions

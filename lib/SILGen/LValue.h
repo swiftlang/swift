@@ -342,10 +342,6 @@ public:
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
 
-  /// Form a class-reference l-value.  Only suitable as the base of
-  /// very specific member components.
-  static LValue forClassReference(ManagedValue reference);
-
   bool isValid() const { return !Path.empty(); }
 
   /// Is this lvalue purely physical?

@@ -48,11 +48,11 @@ public:
     :XMLEscapingPrinter(OS) { }
 
 private:
-  void printTypeRef(const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
     printXML("<Type usr=\"");
     SwiftLangSupport::printUSR(TD, OS);
     printXML("\">");
-    StreamPrinter::printTypeRef(TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name);
     printXML("</Type>");
   }
 };
@@ -259,11 +259,11 @@ private:
       closeTag(tag);
   }
 
-  void printTypeRef(const TypeDecl *TD, Identifier name) override {
+  void printTypeRef(Type T, const TypeDecl *TD, Identifier name) override {
     auto tag = getTagForDecl(TD, /*isRef=*/true);
     openTagWithUSRForDecl(tag, TD);
     insideRef = true;
-    XMLEscapingPrinter::printTypeRef(TD, name);
+    XMLEscapingPrinter::printTypeRef(T, TD, name);
     insideRef = false;
     closeTag(tag);
   }

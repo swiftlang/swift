@@ -25,7 +25,7 @@ print(a)
 
 // Create another array and copy in a slice
 var b = [Int](repeating: 0, count: 10)
-b[3...6] = a[5..<9]
+b[Range(3...6)] = a[5..<9]
 print(b)
 // CHECK: [0, 0, 0, 7, 8, 9, 8, 0, 0, 0]
 
@@ -73,8 +73,8 @@ let arr2 = [1, 2, 3, 4]
 let arr3 = [1, 2]
 let arr4 = [5, 6]
 
-let slice1_1_2 = arr1[1...2]
-let slice2_1_2 = arr2[1...2]
+let slice1_1_2 = arr1[Range(1...2)]
+let slice2_1_2 = arr2[Range(1...2)]
 let slice1_2_3 = arr1[2..<3]
 let slice2_2_3 = arr2[2..<3]
 
