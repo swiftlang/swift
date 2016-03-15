@@ -6,7 +6,5 @@ public struct S {
     // CHECK: call void @llvm.dbg.declare(metadata %V4main1S undef,
     // CHECK-SAME:                        metadata ![[SELF:[0-9]+]]
     // CHECK: ![[SELF]] = !DILocalVariable(name: "self", arg: 1,
-
-
   }
 }
