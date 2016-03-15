@@ -1339,7 +1339,7 @@ tests.test("nthWord") {
   expectEqual(0, z.nthWord(1))
 }
 
-tests.test("DoubeWidthMultiply/UInt8") {
+tests.test("DoubleWidthMultiply/UInt8") {
   let a: UInt8 = 42
   let b: UInt8 = 42
   let res = a.doubleWidthMultiply(b)
@@ -1347,7 +1347,7 @@ tests.test("DoubeWidthMultiply/UInt8") {
   expectEqual(0xe4, res.low)
 }
 
-tests.test("DoubeWidthMultiply/Int8") {
+tests.test("DoubleWidthMultiply/Int8") {
   let a: Int8 = 42
   let b: Int8 = -42
   let res = a.doubleWidthMultiply(b)
@@ -1355,7 +1355,7 @@ tests.test("DoubeWidthMultiply/Int8") {
   expectEqual(0x1c, res.low)
 }
 
-tests.test("DoubeWidthMultiply/Int8/DoubleNegation") {
+tests.test("DoubleWidthMultiply/Int8/DoubleNegation") {
   let a: Int8 = -42
   let b: Int8 = -42
   let res = a.doubleWidthMultiply(b)
