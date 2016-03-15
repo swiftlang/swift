@@ -317,7 +317,7 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
     if (auto MD = dyn_cast<ModuleDecl>(TD))
       Printer.printModuleRef(MD, getIdentifier());
     else
-      Printer.printTypeRef(TD, getIdentifier());
+      Printer.printTypeRef(Type(), TD, getIdentifier());
   } else {
     Printer.printName(getIdentifier());
   }

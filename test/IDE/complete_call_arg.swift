@@ -208,20 +208,24 @@ class C3 {
 // OVERLOAD2-NEXT: End completions
 
 // OVERLOAD3: Begin completions
+// OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal:      C1I[#C1#]; name=C1I
+// OVERLOAD3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C2I[#C2#]; name=C2I
 // OVERLOAD3-DAG: Decl[Class]/CurrModule/TypeRelation[Identical]: C2[#C2#]
-// OVERLOAD3-DAG-NOT: Decl[Class]{{.*}} C1
-// OVERLOAD3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
-// OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal:      C1I[#C1#]; name=C1I
 // OVERLOAD3: End completions
+
+// FIXME: This should be a negative test case
+// NEGATIVE_OVERLOAD_3-NOT: Decl[Class]{{.*}} C1
 
 // OVERLOAD4: Begin completions
 // OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
+// OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
 // OVERLOAD4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // OVERLOAD4-DAG: Decl[Class]/CurrModule/TypeRelation[Identical]: C1[#C1#]
-// OVERLOAD4-DAG-NOT: Decl[Class]{{.*}} C2
-// OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
 // OVERLOAD4: End completions
+
+// FIXME: This should be a negative test case
+// NEGATIVE_OVERLOAD4-NOT: Decl[Class]{{.*}} C2
 
 class C4 {
   func f1(G : Gen) {

@@ -8,8 +8,8 @@ mutable_options = [False, True]
 for traversal, base_kind, mutable in itertools.product(traversal_options,
                                                        base_kind_options,
                                                        mutable_options):
-    # Test Slice<Base> and MutableSlice<Base> of various collections using value
-    # types as elements.
+    # Test Slice<Base> and MutableSlice<Base> of various collections using
+    # value types as elements.
     wrapper_types = ['Slice', 'MutableSlice'] if mutable else ['Slice']
     for Wrapper in wrapper_types:
         for name, prefix, suffix in [

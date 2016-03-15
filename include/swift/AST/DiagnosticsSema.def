@@ -367,8 +367,8 @@ ERROR(expr_selector_module_missing,none,
       "import the 'ObjectiveC' module to use '#selector'", ())
 ERROR(expr_selector_no_declaration,none,
       "argument of '#selector' does not refer to an initializer or method", ())
-ERROR(expr_selector_property,none,
-      "argument of '#selector' cannot refer to a property", ())
+ERROR(expr_selector_var,none,
+      "argument of '#selector' cannot refer to a %select{property|parameter|variable}0", (int))
 ERROR(expr_selector_not_method_or_init,none,
       "argument of '#selector' does not refer to a method or initializer", ())
 ERROR(expr_selector_not_objc,none,

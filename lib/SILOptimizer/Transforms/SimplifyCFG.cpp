@@ -2309,8 +2309,8 @@ class ArgumentSplitter {
   /// The argument we are splitting.
   SILArgument *Arg;
 
-  /// The worklist of arguments that we still ned to visit. We simplify each
-  /// argument recursively one step at a time.
+  /// The worklist of arguments that we still need to visit. We
+  /// simplify each argument recursively one step at a time.
   std::vector<SILArgument *> &Worklist;
 
   /// The values incoming into Arg.

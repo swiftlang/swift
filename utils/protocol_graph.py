@@ -1,4 +1,4 @@
-# ===--- protocol_graph.py ----------------------------*- coding: utf-8 -*-===//
+# ===--- protocol_graph.py ---------------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #
@@ -8,7 +8,7 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
-# ===----------------------------------------------------------------------===//
+# ===---------------------------------------------------------------------===//
 #
 # Create a graph of the protocol refinement relationships, associated
 # types, operator requirements, and defaulted generic operators.
@@ -21,7 +21,7 @@
 #   && dot -Tsvg /tmp/protocols.dot > /tmp/protocols.svg \
 #   && open /tmp/protocols.svg
 #
-# ===----------------------------------------------------------------------===//
+# ===---------------------------------------------------------------------===//
 
 from __future__ import print_function
 
@@ -42,12 +42,12 @@ identifier = '[A-Za-z_][A-Za-z0-9_]*'
 # Pattern to recognize a (possibly-generic) operator decl.
 operator = r'''
 (?:(?:prefix|postfix).*)? func \s*
-(?=\S)[^A-Za-z_]            # non-space, non-identifier: begins an operator name
-(?:(?=\S)[^(){])*           # rest of operator name
+(?=\S)[^A-Za-z_]           # non-space, non-identifier: begins an operator name
+(?:(?=\S)[^(){])*          # rest of operator name
 \s*
-(<[^>{]+>)?                 # generic parameter list
+(<[^>{]+>)?                # generic parameter list
 \s*
-\([^)]*\)                   # function parameter list
+\([^)]*\)                  # function parameter list
 '''
 
 # substitute local variables into the string
@@ -180,7 +180,8 @@ for node in sorted(graph.keys()):
     requirements = body.get(node, [])
     generics = sorted(generic_operators.get(node, set()))
     style = 'solid' if node.startswith('_') else 'bold'
-    divider = '<HR/>\n' if len(requirements) != 0 and len(generics) != 0 else ''
+    divider = '<HR/>\n' if len(requirements) != 0 and len(generics) != 0 \
+              else ''
 
     label = node if len(requirements + generics) == 0 else (
         '\n<TABLE BORDER="0">\n<TR><TD>\n%s\n</TD></TR><HR/>' +

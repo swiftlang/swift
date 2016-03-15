@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -import-objc-header %S/Inputs/objc_bridged_results.h | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-silgen-test-overlays
+
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -import-objc-header %S/Inputs/objc_bridged_results.h | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -93,8 +96,9 @@ func testNonnullSet(obj: Test) -> Set<NSObject> {
 func testNonnullString(obj: Test) -> String {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullString!getter.1.foreign : Test -> () -> String , $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @swift_NSStringToString : $@convention(thin) (@owned Optional<NSString>) -> @owned String
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]]) : $@convention(thin) (@owned Optional<NSString>) -> @owned String
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(thin) (@owned Optional<NSString>, @thin String.Type) -> @owned String
   // CHECK: strong_release %0 : $Test
   // CHECK: return [[RESULT]] : $String
   return obj.nonnullString

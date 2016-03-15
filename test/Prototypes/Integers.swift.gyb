@@ -25,24 +25,18 @@ import Swift
 # Utility code for later in this template
 #
 from math import log
-from string import maketrans
-  
+from string import maketrans, capitalize
+
 # Number of bits in the Builtin.Word type
 word_bits = int(WORD_BITS) # int(CMAKE_SIZEOF_VOID_P) * 8
-  
+
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 IntLiteral = 'Int%s' % builtinIntLiteralBits
 
 # 32-bit iOS simulator doesn't have Int128 support, so we stop at
-# double-word.  When we've implemented the arithmetic algorithms
-# for bignum, we can go further.
-fixedBitWidths = [2 ** x for x in range(3, 8) if 2 ** x <= 2 * word_bits]
-minFixedBits = fixedBitWidths[0]
-maxFixedBits = fixedBitWidths[-1]
-  
-def capitalize(s):
-  return s[:1].upper() + s[1:]
+# double-word.
+fixedBitWidths = [x for x in [8, 16, 32, 64, 128] if x <= 2*word_bits]
 
 class struct(object):
   def __init__(self, **kw):
@@ -52,7 +46,7 @@ class struct(object):
 
 binaryArithmetic = [
     struct(operator='+', name='add', llvmName='add', kind='+'),
-    struct(operator='-', name='subtract', llvmName='sub', kind='+'),
+    struct(operator='-', name='subtract', llvmName='sub', kind='-'),
     struct(operator='*', name='multiply', llvmName='mul', kind='*'),
     struct(operator='/', name='divideBy', llvmName='div', kind='/'),
     struct(
@@ -82,7 +76,7 @@ extension Bool {
   public init(_ value: Builtin.Int1) {
     self.init(_builtinBooleanLiteral: value)
   }
-  
+
   @_transparent
   // Renamed from _value to __value, because the deserializer crashes
   // if stdlib is compiled with -sil-serialize-all (rdar://problem/23620491).
@@ -129,151 +123,136 @@ public func _log(@autoclosure message: ()->String) {
 }
 
 //===----------------------------------------------------------------------===//
-//===--- ArithmeticType ---------------------------------------------------===//
+//===--- Arithmetic -------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
-public protocol ArithmeticType {
+public protocol Arithmetic {
   /// Initialize to zero
   init()
-  
-% for x in binaryArithmetic:
-  // defaulted below
-  @warn_unused_result
-  func ${x.operator}(lhs: Self, rhs: Self) -> Self
 
-  // defaulted below
-  func ${x.operator}=(lhs: inout Self, rhs: Self)
+% for x in binaryArithmetic:
+  // defaulted using an InPlace counterpart, but can be used as an
+  // optimization hook
+  @warn_unused_result
+  func ${x.name}(rhs: Self) -> Self
 
   // implementation hook
   mutating func ${x.name}InPlace(rhs: Self)
 % end
+}
 
-  /// defaulted below
-  prefix func -(lhs: Self) -> Self
+extension Arithmetic {
+% for x in binaryArithmetic:
+  public func ${x.name}(rhs: Self) -> Self {
+    var lhs = self
+    lhs.${x.name}InPlace(rhs)
+    return lhs
+  }
+% end
+}
+
+public protocol SignedArithmetic : Arithmetic {
+  func negate() -> Self
+}
+
+extension SignedArithmetic {
+  public func negate() -> Self {
+    return Self() - self
+  }
 }
 
 % for x in binaryArithmetic:
 @_transparent
 @warn_unused_result
-public func ${x.operator} <T: ArithmeticType>(lhs: T, rhs: T) -> T {
-  var lhs = lhs
-  lhs.${x.name}InPlace(rhs)
-  return lhs
+public func ${x.operator} <T: Arithmetic>(lhs: T, rhs: T) -> T {
+  return lhs.${x.name}(rhs)
 }
 
 @_transparent
-public func ${x.operator}= <T: ArithmeticType>(lhs: inout T, rhs: T) {
+public func ${x.operator}= <T: Arithmetic>(lhs: inout T, rhs: T) {
   lhs.${x.name}InPlace(rhs)
 }
 % end
 
 @_transparent
 @warn_unused_result
-public prefix func -<T: ArithmeticType>(x: T) -> T {
-  return T() - x
+public prefix func -<T: SignedArithmetic>(x: T) -> T {
+  return x.negate()
 }
 
 //===----------------------------------------------------------------------===//
-//===--- IntegerType ------------------------------------------------------===//
+//===--- Integer ----------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 public typealias Word = Int${word_bits}
 public typealias UWord = UInt${word_bits}
 
-public protocol IntegerType
-  : Comparable, ArithmeticType, 
-    IntegerLiteralConvertible, CustomStringConvertible {
+% IntegerBase = 'Comparable, Arithmetic,' + \
+%               'IntegerLiteralConvertible, CustomStringConvertible'
 
-  // FIXME: Ideally, this constraint would just be : IntegerType.
+public protocol Integer : ${IntegerBase} {
+
+  // FIXME: Ideally, this constraint would just be : Integer.
   // Until we get recursive protocol requirements, that isn't
-  // possible, and we really need to factor IntegerType differently
-  // than it currently is so we can remove the constraints on
-  // AbsoluteValue in the multiprecision multiplication routines.
-  associatedtype AbsoluteValue : Comparable, ArithmeticType,
-    IntegerLiteralConvertible, CustomStringConvertible 
+  // possible.
+  associatedtype AbsoluteValue : ${IntegerBase}
 
+  /// An absolute value of the represented number.
+  ///
+  /// Please note that `absoluteValue` has a different type than `self`, and so
+  /// `abs(_:)` free function might be preferred for your use-case.
   var absoluteValue: AbsoluteValue { get }
-  
+
   // Dispatching through these puts less stress on the user reading
   // the interface and error messages (and on the type checker) than
   // does having many operator overloads.
   @warn_unused_result
   func isEqualTo(rhs: Self) -> Bool
-  
+
   @warn_unused_result
   func isLessThan(rhs: Self) -> Bool
 
-  /// The number of bits required to represent our value.  If `self`
-  /// is negative, returns the index of the least significant bit of
-  /// our representation such that all more-significant bits are 1.
-  /// Has the value -1 if `self` is 0.
-  var mostSignificantBit: Word { get }
-  
+  init<T : Integer>(_ source: T)
+
+  init<T : Integer>(extendingOrTruncating source: T)
+  init<T : Integer>(clamping source: T)
+
   @warn_unused_result
-  func uword(n: Word) -> UWord
-
-  var countRepresentedWords: Word { get }
-
-  /// Replace as many bits as possible of the `n`th UWord of our
-  /// representation with newBits, returning `true` iff all of the
-  /// bits were replaced.
-  mutating func replaceUWord(n: Word, with newBits: UWord) -> Bool
-  
-  init<T : IntegerType>(_ source: T)
-  
-  init<T : IntegerType>(extendingOrTruncating source: T)
-
-  mutating func addInPlace<RHS: IntegerType>(rhs: RHS) -> ArithmeticOverflow
-
-  /// The most significant word in a signed representation of `self`.
-  ///
-  ///     (x.word(x.signWordIndex) < 0) == (self < 0)
-  ///
-  /// and, for all `i` > `x.signWordIndex`,
-  ///
-  ///     x.word(i) == x.word(x.signWordIndex) >> (Word.bitWidth - 1)
-  ///
-  var signWordIndex: Word { get }
-  
-  mutating func signedOverflowIntoWord(
-    wordIndex: Word, overflow: Bool, originalSign: Word) -> ArithmeticOverflow  
+  func nthWord(n: Word) -> UWord
 
   static var isSigned: Bool { get }
+
+  // A number of bits in current representation of `self`
+  // Will be constant for fixed-width integer types.
+  var bitWidth : Word { get }
+
+  /// If `self` is negative, returns the index of the least significant bit of
+  /// our representation such that all more-significant bits are 1.
+  /// Has the value -1 if `self` is 0.
+  var signBitIndex: Word { get }
 }
 
-extension IntegerType {
-  @_transparent
-  @warn_unused_result
-  public func word(n: Word) -> Word {
-    return Word(uword(n)._storage)
-  }
-
-  /// The number of words required to represent our value.  If `self`
-  /// is negative, returns the index of the least significant words of
-  /// our representation such that all more-significant words are -1.
-  /// Has the value -1 if `self` is 0.
-  @_transparent
-  public // transparent
-  var _mostSignificantWord: Word {
-    return mostSignificantBit &>> ${int(log(word_bits,2))}
+extension Integer {
+  public var countRepresentedWords: Word {
+    return (self.bitWidth + ${word_bits} - 1) / ${word_bits}
   }
 }
 
 //===--- Homogeneous comparison -------------------------------------------===//
 @_transparent
 @warn_unused_result
-public func == <T : IntegerType>(lhs:T, rhs: T) -> Bool {
+public func == <T : Integer>(lhs:T, rhs: T) -> Bool {
   return lhs.isEqualTo(rhs)
 }
 
 @_transparent
 @warn_unused_result
-public func < <T : IntegerType>(lhs: T, rhs: T) -> Bool {
+public func < <T : Integer>(lhs: T, rhs: T) -> Bool {
   return lhs.isLessThan(rhs)
 }
 
 //===--- Heterogeneous comparison -----------------------------------------===//
 @_transparent
 @warn_unused_result
-public func == <T : IntegerType, U : IntegerType>(lhs:T, rhs: U) -> Bool {
+public func == <T : Integer, U : Integer>(lhs:T, rhs: U) -> Bool {
   return (lhs > 0) == (rhs > 0)
     && T(extendingOrTruncating: rhs) == lhs
     && U(extendingOrTruncating: lhs) == rhs
@@ -281,13 +260,13 @@ public func == <T : IntegerType, U : IntegerType>(lhs:T, rhs: U) -> Bool {
 
 @_transparent
 @warn_unused_result
-public func != <T : IntegerType, U : IntegerType>(lhs:T, rhs: U) -> Bool {
+public func != <T : Integer, U : Integer>(lhs:T, rhs: U) -> Bool {
   return !(lhs == rhs)
 }
 
 @_transparent
 @warn_unused_result
-public func < <T : IntegerType, U : IntegerType>(lhs: T, rhs: U) -> Bool {
+public func < <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
   let lhsSign = lhs < 0 ? -1 : lhs > 0 ? 1 : 0
   let rhsSign = rhs < 0 ? -1 : rhs > 0 ? 1 : 0
   if lhsSign != rhsSign { return lhsSign < rhsSign }
@@ -299,7 +278,7 @@ public func < <T : IntegerType, U : IntegerType>(lhs: T, rhs: U) -> Bool {
   // In this case, we can conceptually subtract 1 from the bitWidth of
   // any signed type, and either the resulting bitWidths are the same
   // or one can represent every value of the other.
-  
+
   let rT = T(extendingOrTruncating: rhs)
 
   // Can we round-trip rhs through T?
@@ -312,19 +291,19 @@ public func < <T : IntegerType, U : IntegerType>(lhs: T, rhs: U) -> Bool {
 
 @inline(__always)
 @warn_unused_result
-public func <= <T : IntegerType, U : IntegerType>(lhs: T, rhs: U) -> Bool {
+public func <= <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
   return !(rhs < lhs)
 }
 
 @inline(__always)
 @warn_unused_result
-public func >= <T : IntegerType, U : IntegerType>(lhs: T, rhs: U) -> Bool {
+public func >= <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
   return !(lhs < rhs)
 }
 
 @inline(__always)
 @warn_unused_result
-public func > <T : IntegerType, U : IntegerType>(lhs: T, rhs: U) -> Bool {
+public func > <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
   return rhs < lhs
 }
 
@@ -332,39 +311,39 @@ public func > <T : IntegerType, U : IntegerType>(lhs: T, rhs: U) -> Bool {
 // These two versions of the operators are not ordered with respect to
 // one another:
 //
-//     <T : Comparable>(T,T) -> Bool 
-//     <T : IntegerType, U : IntegerType>(T,U) -> Bool 
+//     <T : Comparable>(T,T) -> Bool
+//     <T : Integer, U : Integer>(T,U) -> Bool
 //
 // so we define:
 //
-//     <T : IntegerType>(T,T) -> Bool
+//     <T : Integer>(T,T) -> Bool
 
 @_transparent
 @warn_unused_result
-public func != <T : IntegerType>(lhs:T, rhs: T) -> Bool {
+public func != <T : Integer>(lhs:T, rhs: T) -> Bool {
   return !(lhs == rhs)
 }
 
 @inline(__always)
 @warn_unused_result
-public func <= <T : IntegerType>(lhs: T, rhs: T) -> Bool {
+public func <= <T : Integer>(lhs: T, rhs: T) -> Bool {
   return !(rhs < lhs)
 }
 
 @inline(__always)
 @warn_unused_result
-public func >= <T : IntegerType>(lhs: T, rhs: T) -> Bool {
+public func >= <T : Integer>(lhs: T, rhs: T) -> Bool {
   return !(lhs < rhs)
 }
 
 @inline(__always)
 @warn_unused_result
-public func > <T : IntegerType>(lhs: T, rhs: T) -> Bool {
+public func > <T : Integer>(lhs: T, rhs: T) -> Bool {
   return rhs < lhs
 }
 
 //===----------------------------------------------------------------------===//
-//===--- FixedWidthIntegerType --------------------------------------------===//
+//===--- FixedWidthInteger ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 public enum ArithmeticOverflow {
   @_transparent
@@ -372,7 +351,7 @@ public enum ArithmeticOverflow {
   case none, overflow
 }
 
-public protocol FixedWidthIntegerType : IntegerType {
+public protocol FixedWidthInteger : Integer {
   static var bitWidth : Word { get }
 
 % for x in binaryArithmetic:
@@ -382,17 +361,20 @@ comment = '''
   /// truncated to fit if necessary, and a flag indicating whether an
   /// arithmetic overflow occurred.''' + ('''
   ///
-  /// Precondition: `rhs != 0`''' if x.kind == '/' else '')
+  /// - Precondition: `rhs != 0`''' if x.kind == '/' else '')
 }%
 ${comment}
   @warn_unused_result
   func ${x.name}WithOverflow(
     rhs: Self
   ) -> (partialValue: Self, overflow: ArithmeticOverflow)
-  % end
-  
+% end
+
+  @warn_unused_result
+  func doubleWidthMultiply(other: Self) -> (high: Self, low: AbsoluteValue)
+
   static var max: Self { get }
-  
+
   static var min: Self { get }
 
 % for x in binaryBitwise + maskingShifts:
@@ -400,23 +382,18 @@ ${comment}
   func ${x.name}(rhs: Self) -> Self
 % end
 
-  @warn_unused_result
-  func countLeadingZeros() -> Word
-
   init(_truncatingBits bits: UWord)
-
-  var _lowUWord: UWord { get }
 }
 
 % for x in binaryBitwise:
 @warn_unused_result
 @_transparent
-public func ${x.operator} <T: FixedWidthIntegerType>(lhs: T, rhs: T) -> T {
+public func ${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
   return lhs.${x.name}(rhs)
 }
 
 @_transparent
-public func ${x.operator}= <T: FixedWidthIntegerType>(lhs: inout T, rhs: T) {
+public func ${x.operator}= <T: FixedWidthInteger>(lhs: inout T, rhs: T) {
   lhs = lhs.${x.name}(rhs)
 }
 % end
@@ -424,26 +401,26 @@ public func ${x.operator}= <T: FixedWidthIntegerType>(lhs: inout T, rhs: T) {
 % for x in maskingShifts:
 @warn_unused_result
 @_transparent
-public func ${x.operator} <T: FixedWidthIntegerType>(lhs: T, rhs: T) -> T {
+public func ${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
   return lhs.${x.name}(rhs)
 }
 
 @_transparent
-public func ${x.operator}= <T: FixedWidthIntegerType>(lhs: inout T, rhs: T) {
+public func ${x.operator}= <T: FixedWidthInteger>(lhs: inout T, rhs: T) {
   lhs = lhs ${x.operator} rhs
 }
 
 @warn_unused_result
 @_transparent
 public func ${x.operator} <
-  T: FixedWidthIntegerType, U: IntegerType
+  T: FixedWidthInteger, U: Integer
 >(lhs: T, rhs: U) -> T {
   return lhs.${x.name}(T(extendingOrTruncating: rhs))
 }
 
 @_transparent
 public func ${x.operator}= <
-  T: FixedWidthIntegerType, U: IntegerType
+  T: FixedWidthInteger, U: Integer
 >(lhs: inout T, rhs: U) {
   lhs = lhs ${x.operator} rhs
 }
@@ -451,10 +428,10 @@ public func ${x.operator}= <
 @warn_unused_result
 @_transparent
 public func ${x.nonMaskingOperator} <
-  T: FixedWidthIntegerType, U: IntegerType
+  T: FixedWidthInteger, U: Integer
 >(lhs: T, rhs: U) -> T {
   let shift = rhs < -T.bitWidth ? -T.bitWidth
-            : rhs > T.bitWidth ? T.bitWidth 
+            : rhs > T.bitWidth ? T.bitWidth
             : Word(rhs)
   return lhs ${x.nonMaskingOperator} shift
 }
@@ -464,7 +441,7 @@ public func ${x.nonMaskingOperator} <
 @warn_unused_result
 @_transparent
 public func ${x.nonMaskingOperator} <
-  T: FixedWidthIntegerType
+  T: FixedWidthInteger
 >(lhs: T, rhs: Word) -> T {
   let overshiftR = T.isSigned ? lhs &>> (T.bitWidth - 1) : 0
   let overshiftL: T = 0
@@ -474,7 +451,7 @@ public func ${x.nonMaskingOperator} <
     }
     return overshift${'LR'['R' in x.name]}
   }
-  
+
   if _slowPath(rhs <= -T.bitWidth) {
     return overshift${'RL'['R' in x.name]}
   }
@@ -483,14 +460,14 @@ public func ${x.nonMaskingOperator} <
 
 @_transparent
 public func ${x.nonMaskingOperator}= <
-  T: FixedWidthIntegerType
+  T: FixedWidthInteger
 >(lhs: inout T, rhs: T) {
   lhs = lhs ${x.nonMaskingOperator} rhs
 }
 
 @_transparent
 public func ${x.nonMaskingOperator}= <
-  T: FixedWidthIntegerType, U: IntegerType
+  T: FixedWidthInteger, U: Integer
 >(lhs: inout T, rhs: U) {
   lhs = lhs ${x.nonMaskingOperator} rhs
 }
@@ -498,12 +475,12 @@ public func ${x.nonMaskingOperator}= <
 
 @warn_unused_result
 @inline(__always)
-public prefix func ~ <T: FixedWidthIntegerType>(x: T) -> T {
+public prefix func ~ <T: FixedWidthInteger>(x: T) -> T {
   return 0 &- x &- 1
 }
 
-extension FixedWidthIntegerType {
-  public init<Other: IntegerType>(clamping source: Other) {
+extension FixedWidthInteger {
+  public init<Other: Integer>(clamping source: Other) {
     if _slowPath(source < Self.min) {
       self = Self.min
     }
@@ -512,7 +489,7 @@ extension FixedWidthIntegerType {
     }
     else { self = Self(extendingOrTruncating: source) }
   }
-  
+
 % for x in binaryArithmetic:
   @_transparent
   public mutating func ${x.name}InPlace(rhs: Self) {
@@ -530,7 +507,7 @@ extension FixedWidthIntegerType {
   @_transparent
   public func unsafe${capitalize(x.name)}(rhs: Self) -> Self {
     let (result, overflow) = self.${x.name}WithOverflow(rhs)
-    
+
     if (overflow != .none) {
       if (_isDebugAssertConfiguration()) {
         _preconditionFailure("overflow in unsafe${capitalize(x.name)}")
@@ -549,53 +526,27 @@ extension FixedWidthIntegerType {
   }
 
   @_transparent
-  public init<T : IntegerType>(extendingOrTruncating source: T) {
+  public init<T : Integer>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} {
-      self = Self.init(_truncatingBits: source.uword(0))
+      self = Self.init(_truncatingBits: source.nthWord(0))
     }
     else {
       var result: Self = source < 0 ? ~0 : 0
       // start with the most significant word
-      var n = source._mostSignificantWord
+      var n = source.countRepresentedWords
       while n >= 0 {
         // masking is OK here because this we have already ensured
         // that Self.bitWidth > ${word_bits}.  Not masking results in
         // infinite recursion.
         result &<<= ${word_bits}
-        result |= Self(_truncatingBits: source.uword(n))
+        result |= Self(_truncatingBits: source.nthWord(n))
         n -= 1
       }
-      
+
       self = result
     }
   }
 
-  @_transparent
-  public func uword(n: Word) -> UWord {
-    _precondition(n >= 0, "Negative word index")
-    if _fastPath(n < countRepresentedWords) {
-      let shift = UWord(n._storage) &* ${word_bits}
-      let bitWidth = UWord(Self.bitWidth._storage)
-      _sanityCheck(shift < bitWidth)
-      return (self &>> Self(_truncatingBits: shift))._lowUWord
-    }
-    return self < 0 ? ~0 : 0
-  }
-
-  public var countRepresentedWords: Word {
-    return (Self.bitWidth + ${word_bits} - 1) / ${word_bits}
-  }
-  
-  // @_transparent
-  public mutating func replaceUWord(n: Word, with newBits: UWord) -> Bool {
-    let flippedBits = uword(n) ^ newBits
-    self ^= Self(_truncatingBits: flippedBits) << (${word_bits} * n)
-    if uword(n) != newBits {
-      _log("###### overflow replacing word \(n) with \(newBits.hex)")
-    }
-    return uword(n) == newBits
-  }
-  
   @_transparent
   public // transparent
   static var _highBitIndex: Self {
@@ -603,67 +554,34 @@ extension FixedWidthIntegerType {
   }
 }
 
-extension UWord {
-  public typealias AdditiveOperator
-    = (UWord) -> (UWord, carryIn: Bool)
-     -> (result: UWord, carryFlag: Bool, overflowFlag: Bool)
-
-  % for name in 'add', 'subtract':
-  // @_transparent
-  public // transparent
-  func _${name}ing(
-    rhs: UWord, carryIn: Bool
-  ) -> (result: UWord, carryFlag: Bool, overflowFlag: Bool) {
-    _log("**** \(self.hex)._${name}ing(\(rhs.hex), carryIn: \(carryIn))")
-    let signedRHS = Word(bitPattern: rhs)
-    
-    let (uResult0, carry0) = self.${name}WithOverflow(rhs)
-    let (sResult0, overflow0)
-      = Word(bitPattern: self).${name}WithOverflow(signedRHS)
-    
-    let (uResult1, carry1) = uResult0.${name}WithOverflow(carryIn ? 1 : 0)
-    let (_, overflow1) = sResult0.${name}WithOverflow(carryIn ? 1 : 0)
-
-    let result = (
-      result: uResult1,
-      carryFlag: carry0 != .none || carry1 != .none,
-      overflowFlag: overflow0 != .none || overflow1 != .none
-    )
-    _log("**** -> sum: \(result.result.hex), "
-      + "carry: \(result.carryFlag), overflow: \(result.overflowFlag)")
-    return result
-  }
-  % end
-}
-
 % for x in binaryArithmetic:
 %   if x.kind != '/':
 @warn_unused_result
-public func &${x.operator} <T: FixedWidthIntegerType>(lhs: T, rhs: T) -> T {
+public func &${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
   return lhs.${x.name}WithOverflow(rhs).partialValue
 }
 %   end
 % end
 
 //===----------------------------------------------------------------------===//
-//===--- UnsignedIntegerType ----------------------------------------------===//
+//===--- UnsignedInteger --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
-public protocol UnsignedIntegerType : IntegerType {
-  associatedtype AbsoluteValue : IntegerType
+public protocol UnsignedInteger : Integer {
+  associatedtype AbsoluteValue : Integer
 }
 
-extension UnsignedIntegerType {
+extension UnsignedInteger {
   @_transparent
   public var absoluteValue: Self { return self }
 
   @_transparent
   public static var isSigned: Bool { return false }
-  
+
   public var description: String {
     if self == 0 {
       return "0"
     }
-    
+
     let ascii0 = 48
     var buf: [UnicodeScalar] = []
 
@@ -680,108 +598,70 @@ extension UnsignedIntegerType {
   }
 }
 
-extension UnsignedIntegerType where Self : FixedWidthIntegerType {
+extension UnsignedInteger where Self : FixedWidthInteger {
   @_transparent
-  public init<T : IntegerType>(_ source: T) {
+  public init<T : Integer>(_ source: T) {
     _assertCond(
       source >= 0, "negative value \(source) not representable by \(Self.self)")
-    let requiredBits = source.mostSignificantBit + 1
+    let requiredBits = source.signBitIndex + 1
     _assertCond(
       requiredBits <= Self.bitWidth,
       "\(Self.self) cannot store all \(requiredBits)  bits "
       + "needed for unsigned representation of \(source)")
     self.init(extendingOrTruncating: source)
   }
-  
+
   @_transparent
   public static var max: Self {
     return ~0
   }
-  
+
   @_transparent
   public static var min: Self {
     return 0
   }
 
-  @_transparent
-  public var mostSignificantBit: Word {
-    return Self.bitWidth - 1 - self.countLeadingZeros()
-  }
-  
-  @_transparent
-  public var signWordIndex: Word {
-    // If our high bit is set, then our signed representation contains
-    // one additional word.
-    let ifHighBitSetThen0Else1 = Word((~self &>> (Self.bitWidth - 1))._lowUWord)
-    return (Self.bitWidth - ifHighBitSetThen0Else1) / ${word_bits}
-  }
-
-  @_transparent
-  public mutating func signedOverflowIntoWord(
-    wordIndex: Word, overflow: Bool, originalSign: Word
-  ) -> ArithmeticOverflow {
-    // We were performing a signed operation on unsigned storage.  If
-    // the result was negative, we've overflowed.
-    return word(countRepresentedWords - 1) < 0 ? .overflow : .none
-  }
 }
 
 //===----------------------------------------------------------------------===//
-//===--- SignedIntegerType ------------------------------------------------===//
+//===--- SignedInteger ----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public protocol SignedIntegerType : IntegerType {
-  associatedtype AbsoluteValue : IntegerType
+public protocol SignedInteger : Integer, SignedArithmetic {
+  associatedtype AbsoluteValue : Integer
 }
 
-extension SignedIntegerType {
+extension SignedInteger {
   public var description: String {
     let base = String(absoluteValue)
     return self < 0 ? "-" + base : base
   }
-  
+
   @_transparent
   public static var isSigned: Bool { return true }
 }
 
-extension SignedIntegerType where Self : FixedWidthIntegerType {
+extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
-  public init<T : IntegerType>(_ source: T) {
-    let requiredBits = source.mostSignificantBit + (source >= 0 ? 2 : 1)
+  public init<T : Integer>(_ source: T) {
+    let requiredBits = source.signBitIndex + (source >= 0 ? 2 : 1)
     _assertCond(
       requiredBits <= Self.bitWidth,
       "\(Self.self) cannot store all \(requiredBits) bits "
       + "needed for signed representation of \(source)")
     self.init(extendingOrTruncating: source)
   }
-  
+
   @_transparent
   public static var max: Self {
     return ~min
   }
-  
+
   @_transparent
   public static var min: Self {
     return -1 &<< Self._highBitIndex
   }
 
-  @_transparent
-  public var mostSignificantBit: Word {
-    let x = self < 0 ? ~self : self
-    return Self.bitWidth - 1 - x.countLeadingZeros()
-  }
-
-  @_transparent
-  public var signWordIndex: Word {
-    return (Self.bitWidth - 1) / ${word_bits}
-  }
-
-  @_transparent
-  public mutating func signedOverflowIntoWord(
-    wordIndex: Word, overflow: Bool, originalSign: Word
-  ) -> ArithmeticOverflow {
-    return overflow ? .overflow : .none
-  }
 }
 
 //===--- Concrete FixedWidthIntegers --------------------------------------===//
@@ -792,22 +672,23 @@ extension SignedIntegerType where Self : FixedWidthIntegerType {
 %     Self = ('Int%d' if signed else 'UInt%d') % bits
 %     Unsigned = 'Signed' if signed else 'Unsigned'
 %     u = 's' if signed else 'u'
+%     U = 'U' if signed else ''
 %     z = 's' if signed else 'z'
 public struct ${Self}
-  : FixedWidthIntegerType, ${Unsigned}IntegerType,
-    _BuiltinIntegerLiteralConvertible {  
+  : FixedWidthInteger, ${Unsigned}Integer,
+    _BuiltinIntegerLiteralConvertible {
 
   @_transparent
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
     _storage = Builtin.truncOrBitCast_${IntLiteral}_Int${bits}(x)
     Builtin.condfail(
       Builtin.cmp_ne_${IntLiteral}(
-        Builtin.${'s' if signed else 'z'}extOrBitCast_Int${bits}_${IntLiteral}(
+        Builtin.${z}extOrBitCast_Int${bits}_${IntLiteral}(
           _storage), x))
   }
 
   @_transparent
-  public init(bitPattern x: ${'U' if signed else ''}Int${bits}) {
+  public init(bitPattern x: ${U}Int${bits}) {
     _storage = x._storage
   }
 
@@ -815,7 +696,7 @@ public struct ${Self}
   public func isEqualTo(rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_Int${bits}(_storage, rhs._storage))
   }
-  
+
   @warn_unused_result
   public func isLessThan(rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_${u}lt_Int${bits}(_storage, rhs._storage))
@@ -830,7 +711,7 @@ public struct ${Self}
   public func ${x.name}WithOverflow(
     rhs: ${Self}
   ) -> (partialValue: ${Self}, overflow: ArithmeticOverflow) {
-    
+
 %         if x.kind == '/':
     // No LLVM primitives for checking overflow of division
     // operations, so we check manually.
@@ -840,7 +721,7 @@ public struct ${Self}
     ) {
       return (partialValue: self, overflow: .overflow)
     }
-    
+
     let (newStorage, overflow) = (
       Builtin.${u}${x.llvmName}_Int${bits}(self._storage, rhs._storage),
       false.__value)
@@ -885,6 +766,19 @@ public struct ${Self}
   @_transparent
   public static var bitWidth : Word { return ${bits} }
 
+  public var bitWidth: Word { return ${bits} }
+
+  @_transparent
+  public var signBitIndex: Word {
+% if signed:
+    let x = self < 0 ? ~self : self
+    return ${Self}.bitWidth - 1 - x.countLeadingZeros()
+% else:
+    return ${Self}.bitWidth - 1 - self.countLeadingZeros()
+% end
+  }
+
+
   @_transparent
   @warn_unused_result
   public func countLeadingZeros() -> Word {
@@ -893,7 +787,20 @@ public struct ${Self}
         Builtin.int_ctlz_Int${bits}(self._storage, false.__value)
       )._lowUWord._storage)
   }
-  
+
+  @_transparent
+  public func nthWord(n: Word) -> UWord {
+    _precondition(n >= 0, "Negative word index")
+    if _fastPath(n < countRepresentedWords) {
+      let shift = UWord(n._storage) &* ${word_bits}
+      let bitWidth = UWord(self.bitWidth._storage)
+      _sanityCheck(shift < bitWidth)
+      return (self &>> ${Self}(_truncatingBits: shift))._lowUWord
+    }
+    return self < 0 ? ~0 : 0
+  }
+
+
   @_transparent
   public // transparent
   var _lowUWord: UWord {
@@ -902,7 +809,7 @@ public struct ${Self}
       Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_storage)
     )
   }
-  
+
   @_transparent
   public // transparent
   init(_truncatingBits bits: UWord) {
@@ -918,257 +825,46 @@ public struct ${Self}
     return self < 0 ? ~base + 1 : base
   }
 % end
-  
+
+%     dbits = bits*2
+  @warn_unused_result
+  public func doubleWidthMultiply(other: ${Self})
+    -> (high: ${Self}, low: ${Self}.AbsoluteValue) {
+%       if bits > 64:
+    fatalError("${bits}-bit integer multiplication is not supported")
+%       else:
+    let lhs = Builtin.sext_Int${bits}_Int${dbits}(self._storage)
+    let rhs = Builtin.sext_Int${bits}_Int${dbits}(other._storage)
+
+    let res = Builtin.mul_Int${dbits}(lhs, rhs)
+    let low = ${Self}.AbsoluteValue(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(res))
+    let shift: UInt8 = ${bits}
+    let shifted = Builtin.ashr_Int${dbits}(res,
+      Builtin.zextOrBitCast_Int8_Int${dbits}(shift._storage))
+    let high = ${Self}(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(shifted))
+    return (high: high, low: low)
+%       end
+  }
+
   public var _storage: Builtin.Int${bits}
 }
 
 %   end
 % end
 
-//===----------------------------------------------------------------------===//
-//===--- Multiprecision ---------------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-//===--- Addition and Subtraction -----------------------------------------===//
-//
-// * Treat both operands as infinite-precision numbers, proceeding a
-//   word-at-a-time.
-//
-// * Signed/Unsigned mixes treat the unsigned number as signed,
-//   thereby adding 1 significant bit (which could result in using an
-//   extra word), and doing a signed operation.
-//
-// * Operations proceed one word at a time.  Signed operations are
-//   composed of unsigned operations for all but the highest word.
-//
-// * Overflows in fixed-width integers are detected by two methods:
-//   - Checking the overflow flag when the most significant word of the
-//     result is computed.
-//   - Attempting to store bits that can't be represented.
-//
-// * In [un]signed operations, the maximum number of bits required to
-//   store a result is one more than the maximum number of bits
-//   required to store the [un]signed representation of both operands.
-//   When that number is one more than the number of bits
-//   representable by the [un]signed result type, we can use the
-//   carry/overflow flag to detect overflow.
-//
-extension IntegerType {
-  public mutating func unsignedAddInPlace<RHS: IntegerType>(
-    rhs: RHS, uwordOperator: UWord.AdditiveOperator
-  ) -> ArithmeticOverflow {
-    _log("* \(Self.self)(\(self.hex)).unsignedAddInPlace"
-      + "(\(RHS.self)(\(rhs.hex)))")
-    let (carry, knownOverflow) = self.unsignedAddInPlace(
-      rhs,
-      countWords: max(self.countRepresentedWords, rhs.countRepresentedWords),
-      uwordOperator: uwordOperator
-    )
-    return knownOverflow ?? ArithmeticOverflow(carry)
-  }
-  
-  public mutating func unsignedAddInPlace<RHS: IntegerType>(
-    rhs: RHS, countWords: Word, uwordOperator: UWord.AdditiveOperator
-  ) -> (carry: Bool, knownOverflow: ArithmeticOverflow?) {
-    _log("** \(Self.self)(\(self.hex)).unsignedAddInPlace"
-      + "(\(RHS.self)(\(rhs.hex)), countWords: \(countWords))")
-    _log("*** rhs.countRepresentedWords: \(rhs.countRepresentedWords)")
-    
-    var i: Word = 0
-    var carry: Bool = false
-    
-    while i < countWords {
-      let sum: UWord
-      (sum, carry, _) = uwordOperator(uword(i))(rhs.uword(i), carryIn: carry)
-      
-      if !self.replaceUWord(i, with: sum) {
-        return (false, .overflow)
-      }
-      i += 1
-      // optimization: if we've processed all represented words on the
-      // rhs and there's no carry out, the lhs can not be further
-      // affected and no overflow can occur.  This probably doesn't
-      // matter for fixed-width integers but may be significant with
-      // larger BigNums.  On the other hand, we may not want to
-      // optimize for that :-)
-      if carry == (rhs < 0) && i >= rhs.countRepresentedWords {
-        _log("*** early exit; carry can't affect lhs")
-        return (carry, .none as ArithmeticOverflow)
-      }
-    }
-    return (carry, nil)
-  }
-  
-  public mutating func signedAddInPlace<RHS: IntegerType>(
-    rhs: RHS, uwordOperator: UWord.AdditiveOperator
-  ) -> ArithmeticOverflow {
-    _log("* \(Self.self)(\(self.hex)).signedAddInPlace"
-      + "(\(RHS.self)(\(rhs.hex)))")
-    // Do a multiword unsigned operation on all the words below the sign
-    // word.  We may overflow here or discover that there is no
-    // overflow.
-    let lowWordCount = self.signWordIndex
-    
-    let (lowCarry, lowOverflowKnown)
-      = self.unsignedAddInPlace(
-        rhs, countWords: lowWordCount, uwordOperator: uwordOperator)
-
-    if let finalOverflow = lowOverflowKnown { return finalOverflow }
-    
-    // Save off the sign word so that we don't lose it if the highest
-    // stored bit of the lhs flips.  When this addition proceeds past
-    // the highest stored word, we still need to be able to retrieve
-    // the old sign word.
-    var oldSign = self.word(lowWordCount)
-    
-    var wordIndex: Word = lowWordCount
-    var overflow: Bool, carry: Bool = lowCarry
-    
-    repeat {
-      let bits: UWord
-      (bits, carry, overflow) = uwordOperator(oldSign._lowUWord)(
-        rhs.uword(wordIndex), carryIn: carry)
-      if !self.replaceUWord(wordIndex, with: bits) {
-        return .overflow
-      }
-      oldSign &>>= ${word_bits - 1} // further sign words are 0 or -1
-      wordIndex += 1
-    }
-    while wordIndex <= rhs.signWordIndex
-
-    return signedOverflowIntoWord(
-      wordIndex, overflow: overflow, originalSign: oldSign)
-  }
-}
-
-extension IntegerType {
-  % for name in 'add', 'subtract':
-  public mutating func ${name}InPlace<RHS: IntegerType>(
-    rhs: RHS
-  ) -> ArithmeticOverflow {
-    return Self.isSigned || RHS.isSigned
-    ? signedAddInPlace(rhs, uwordOperator: UWord._${name}ing)
-    : unsignedAddInPlace(rhs, uwordOperator: UWord._${name}ing)
-  }
-  % end
-}
-
-% for x in binaryArithmetic:
-@_transparent
-public func ${x.operator}= <
-  T: IntegerType
-    // FIXME: remove this constraint by refactoring IntegerType
-    where T.AbsoluteValue : IntegerType  
->(lhs: inout T, rhs: T) {
-  lhs.${x.name}InPlace(rhs)
-}
-% end
-
-@inline(__always)
-public func +=<T: IntegerType, U: IntegerType>(lhs: inout T, rhs: U) {
-  let overflow = lhs.addInPlace(rhs)
-  _assertCond(overflow == .none, "overflow in multiprecision add.")
-}
-
-@inline(__always)
-public func -=<T: IntegerType, U: IntegerType>(lhs: inout T, rhs: U) {
-  let overflow = lhs.subtractInPlace(rhs)
-  _assertCond(overflow == .none, "overflow in multiprecision subtract.")
-}
-
-//===--- Multiplication ---------------------------------------------------===//
-//
-// * Use the log-space algorithm given at
-//   https://en.wikipedia.org/wiki/Multiplication_algorithm#Space_complexity:
-//
-//       multiply(a[1..p], b[1..q], base)
-//         tot = 0
-//         for ri = 1 to p + q - 1
-//           for bi = MAX(1, ri - p + 1) to MIN(ri, q)
-//             ai = ri − bi + 1
-//             tot = tot + (a[ai] * b[bi])
-//           product[ri] = tot mod base
-//           tot = floor(tot / base)
-//         product[p+q] = tot mod base
-//         return product
-//       
-//
-// * Treat each word as a "digit."  
-extension IntegerType {
-  static func multiplyNonNegative<
-    LHS: IntegerType, RHS: IntegerType
-  >(a: LHS, _ b: RHS, negativeResult: Bool) -> (Self, ArithmeticOverflow) {
-    _log("* \(self).multiplyNonNegative(\(a.hex), \(b.hex), negativeResult: \(negativeResult))")
-
-    var product: Self = 0
-    var total: UDWord = negativeResult ? ~0 : 0
-    let p = a.countRepresentedWords, q = b.countRepresentedWords
-    var ri: Word = 1
-    var overflow = false
-    _log("p = \(p), q = \(q)")
-    
-    while ri <= p + q - 1 {
-      _log("** ri = \(ri)")
-      var bi: Word = Swift.max(1, ri - p + 1)
-      while bi <= Swift.min(ri, q) {
-        let ai = ri - bi + 1
-        _log("*** ai = \(ai), bi = \(bi)")
-        let p2 = UDWord(a.uword(ai - 1)) * UDWord(b.uword(bi - 1))
-        total = total &+ p2
-        _log("*** total += p2: \(p2.hex) => \(total.hex)")
-        bi += 1
-      }
-
-      _log("** total = \(total.hex)")
-      let u = negativeResult ? ~total._lowUWord : total._lowUWord
-      _log("** product word \(ri - 1) = \(u.hex)")
-      if !product.replaceUWord(ri - 1, with: u) {
-        overflow = true
-      }
-      if !negativeResult {
-        total &>>= UWord.bitWidth
-      }
-      else {
-        let signedTotal = DWord(bitPattern: total) 
-        total = UDWord(bitPattern: signedTotal &>> UWord.bitWidth)
-      }
-      _log("** total shifted to \(total.hex)")
-      ri += 1
-    }
-    let u = negativeResult ? ~total._lowUWord : total._lowUWord
-    _log("** product word \(p + q - 1) = \(u.hex)")
-    
-    if !product.replaceUWord(p + q - 1, with: u) { overflow = true  }
-    if (product < 0) != negativeResult { overflow = true  }
-    
-    return (product, overflow ? .overflow : .none)
-  }
-  
-  static func multiply<
-    LHS: IntegerType, RHS: IntegerType
-      // FIXME: remove this constraint by refactoring IntegerType
-      where LHS.AbsoluteValue : IntegerType, RHS.AbsoluteValue : IntegerType
-  >(lhs: LHS, _ rhs: RHS) -> (Self, ArithmeticOverflow) {
-    return multiplyNonNegative(
-      lhs.absoluteValue, rhs.absoluteValue,
-      negativeResult: (lhs < 0) != (rhs < 0))
-  }
-}
-
-func *= <
-  LHS : IntegerType, RHS : IntegerType 
-    // FIXME: remove this constraint by refactoring IntegerType
-    where LHS.AbsoluteValue : IntegerType, RHS.AbsoluteValue : IntegerType
->(lhs: inout LHS, rhs: RHS) {
-  
-  let (newLHS, overflow) = LHS.multiply(lhs, rhs)
-  _assertCond(overflow == .none, "Overflow in multiprecision in-place multiply")
-  lhs = newLHS
-}
-
 //===--- Tests ------------------------------------------------------------===//
 
-extension IntegerType {
+extension FixedWidthInteger {
+  // @_transparent
+  public mutating func replaceUWord(n: Word, with newBits: UWord) -> Bool {
+    let flippedBits = nthWord(n) ^ newBits
+    self ^= Self(_truncatingBits: flippedBits) << (${word_bits} * n)
+    if nthWord(n) != newBits {
+      _log("###### overflow replacing word \(n) with \(newBits.hex)")
+    }
+    return nthWord(n) == newBits
+  }
+
   /// a hex representation of every bit in the number
   func hexBits(bitWidth: Word) -> String {
     let hexDigits: [UnicodeScalar] = [
@@ -1182,7 +878,7 @@ extension IntegerType {
       if nibbles % 4 == 0 && nibbles != 0 {
         result.insert("_", at: result.startIndex)
       }
-      let lowUWord = x.uword(0)
+      let lowUWord = x.nthWord(0)
       result.insert(
         hexDigits[Swift.Int(lowUWord._storage) & 0xF],
         at: result.startIndex
@@ -1194,7 +890,7 @@ extension IntegerType {
     while (nibbles << 2 < bitWidth || (x != 0 && x + 1 != 0))
     return (self < 0 ? "[-]" : "[+]") + String(result)
   }
-  
+
   var hex: String { return hexBits(0) }
 }
 
@@ -1211,11 +907,11 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-func expectEqual<T: IntegerType>(
+func expectEqual<T : FixedWidthInteger>(
   expected: T, _ actual: T,
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   if expected != actual {
@@ -1231,11 +927,11 @@ func expectEqual<T: IntegerType>(
   }
 }
 
-func expectEqual<T: IntegerType>(
+func expectEqual<T : FixedWidthInteger>(
   expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
 % for i in 0, 1:
@@ -1280,7 +976,7 @@ tests.test("Unsigned Literal Trap") {
 tests.test("Equality") {
   expectEqual(183 as UInt8, 183)
   expectNotEqual(183 as UInt8, 184)
-  
+
   expectEqual(49 as Int8, 49)
   expectNotEqual(-49 as Int8, 49)
 }
@@ -1312,6 +1008,33 @@ tests.test("Simple-Arithmetic") {
   expectEqual(7 as Int8 % 3, 1)
 }
 
+% for w in fixedBitWidths:
+%   for prefix in ['U', '']:
+%     Type = '{}Int{}'.format(prefix, w)
+tests.test("${Type}/Add/Overflow") {
+  expectCrashLater()
+  let _ = ${Type}.max + 1
+}
+
+tests.test("${Type}/Subtract/Underflow") {
+  expectCrashLater()
+  let _ = ${Type}.min - 1
+}
+
+tests.test("${Type}/AddInPlace/Overflow") {
+  expectCrashLater()
+  var x = ${Type}.max
+  x += 1
+}
+
+tests.test("${Type}/SubtractInPlace/Underflow") {
+  expectCrashLater()
+  var x = ${Type}.min
+  x -= 1
+}
+%   end
+% end
+
 tests.test("Simple-Bitwise") {
   expectEqual(0b100_1001 as Int8 >> 1, 0b10_0100)
   expectEqual(-0b100_1001 as Int8 >> 1, -0b10_0101)
@@ -1320,7 +1043,7 @@ tests.test("Simple-Bitwise") {
   expectEqual(0b100_1001 as Int8 >> 1, 0b10_0100)
   expectEqual(-0b100_1001 as Int8 >> 1, -0b10_0101)
   expectEqual(0b1011_0111 as UInt8 >> 1, 0b0101_1011)
-  
+
   expectEqual(0b1011_0111 as UInt8 & 0b0110_1110, 0b0010_0110)
   expectEqual(0b1011_0111 as UInt8 | 0b0110_1110, 0xFF)
   expectEqual(0b1011_0111 as UInt8 ^ 0b0110_1110, 0b1101_1001)
@@ -1340,12 +1063,12 @@ tests.test("CountLeadingZeros") {
   expectEqual(0, Int8.min.countLeadingZeros())
 }
 
-tests.test("mostSignificantBit") {
-  expectEqual(7, UInt8.max.mostSignificantBit)
-  expectEqual(-1, UInt8.min.mostSignificantBit)
-  expectEqual(6, Int8.max.mostSignificantBit)
-  expectEqual(-1, (0 as Int8).mostSignificantBit)
-  expectEqual(6, Int8.min.mostSignificantBit)
+tests.test("signBitIndex") {
+  expectEqual(7, UInt8.max.signBitIndex)
+  expectEqual(-1, UInt8.min.signBitIndex)
+  expectEqual(6, Int8.max.signBitIndex)
+  expectEqual(-1, (0 as Int8).signBitIndex)
+  expectEqual(6, Int8.min.signBitIndex)
 }
 
 tests.test("Conversion8to16") {
@@ -1363,13 +1086,13 @@ tests.test("Conversion8to16") {
 tests.test("Conversion16to8") {
   expectEqual(255, UInt8(255 as UInt16))
   expectEqual(255, UInt8(255 as Int16))
-  
+
   expectEqual(0, UInt8(0 as UInt16))
   expectEqual(0, UInt8(0 as Int16))
-  
+
   expectEqual(127, Int8(127 as UInt16))
   expectEqual(127, Int8(127 as Int16))
-  
+
   expectEqual(-128, Int8(-128 as Int16))
   let tooLarge: UInt16 = 128
   expectCrashLater()
@@ -1408,13 +1131,13 @@ tests.test("ConversionWordToDWord") {
 tests.test("ConversionDWordToWord") {
   expectEqual(~0, UWord(1 << ${word_bits} - 1 as UDWord))
   expectEqual(~0, UWord(1 << ${word_bits} - 1 as DWord))
-  
+
   expectEqual(0, UWord(0 as UDWord))
   expectEqual(0, UWord(0 as DWord))
-  
+
   expectEqual(Word.max, Word(1 << ${word_bits-1} - 1 as UDWord))
   expectEqual(Word.max, Word(1 << ${word_bits-1} - 1 as DWord))
-  
+
   expectEqual(Word.min, Word(-1 << ${word_bits-1} as DWord))
   let tooLarge: UDWord = 1 << ${word_bits-1}
   expectCrashLater()
@@ -1440,7 +1163,7 @@ tests.test("ConversionDWordToWordC") {
 }
 
 tests.test("extendingOrTruncating") {
-  
+
   expectEqual(-2, Int8(extendingOrTruncating: UInt8.max - 1))
   expectEqual(3, Int8(extendingOrTruncating: 3 as UInt8))
   expectEqual(UInt8.max - 1, UInt8(extendingOrTruncating: -2 as Int8))
@@ -1450,7 +1173,7 @@ tests.test("extendingOrTruncating") {
   expectEqual(3, DWord(extendingOrTruncating: 3 as UDWord))
   expectEqual(UDWord.max - 1, UDWord(extendingOrTruncating: -2 as DWord))
   expectEqual(3, UDWord(extendingOrTruncating: 3 as DWord))
-  
+
   expectEqual(-2, Int32(extendingOrTruncating: -2 as Int8))
   expectEqual(3, Int32(extendingOrTruncating: 3 as Int8))
   expectEqual(127, Int32(extendingOrTruncating: 127 as UInt8))
@@ -1470,7 +1193,7 @@ tests.test("extendingOrTruncating") {
   expectEqual(3, UDWord(extendingOrTruncating: 3 as Int8))
   expectEqual(128, UDWord(extendingOrTruncating: 128 as UInt8))
   expectEqual(129, UDWord(extendingOrTruncating: 129 as UInt8))
-  
+
   expectEqual(-2, Int8(extendingOrTruncating: -2 as DWord))
   expectEqual(-2, Int8(extendingOrTruncating: -1 << 67 - 2 as DWord))
   expectEqual(127, Int8(extendingOrTruncating: 127 as UDWord))
@@ -1479,18 +1202,18 @@ tests.test("extendingOrTruncating") {
   expectEqual(0b1111_1100, UInt8(extendingOrTruncating: -1 << 67 - 4 as DWord))
   expectEqual(128, UInt8(extendingOrTruncating: 128 + 1024 as UDWord))
   expectEqual(129, UInt8(extendingOrTruncating: 129 + 1024 as UDWord))
-}  
+}
 
 tests.test("HeterogeneousEquality") {
   expectTrue(-1 as DWord != UDWord.max)
   expectTrue(DWord.max == UDWord.max / 2)
   expectTrue((0 as DWord) == 0 as UDWord)
-  
+
   expectTrue(-1 as Int8 == -1 as DWord)
   expectTrue(UInt8.max != -1 as DWord)
   expectTrue(UInt8.max == 255 as DWord)
   expectTrue((0 as UInt8) == 0 as DWord)
-  
+
   expectTrue(UInt8.max == 255 as UDWord)
   expectTrue(UInt8.max != UDWord.max)
   expectTrue((0 as UInt8) == (0 as UDWord))
@@ -1502,7 +1225,7 @@ tests.test("HeterogeneousOrdering") {
   expectTrue(DWord.max >= UDWord.max / 2)
   expectTrue((0 as DWord) <= (0 as UDWord))
   expectTrue((0 as DWord) >= (0 as UDWord))
-  
+
   expectTrue((-1 as Int8) <= -1 as DWord)
   expectTrue((-1 as Int8) >= -1 as DWord)
   expectTrue(UInt8.max > -1 as DWord)
@@ -1510,7 +1233,7 @@ tests.test("HeterogeneousOrdering") {
   expectTrue(UInt8.max >= 255 as DWord)
   expectTrue((0 as UInt8) <= (0 as DWord))
   expectTrue((0 as UInt8) >= (0 as DWord))
-  
+
   expectTrue(UInt8.max <= 255 as UDWord)
   expectTrue(UInt8.max >= 255 as UDWord)
   expectTrue(UInt8.max < UDWord.max)
@@ -1568,7 +1291,7 @@ tests.test("SmartBitShift/Heterogeneous/Left/UInt16") {
   expectEqual(0b1111_1111_1111_1110, all1s << (1 as Int32))
   expectEqual(UInt16.max / 2 + 1, all1s << (15 as UInt32))
   expectEqual(0, all1s << (16 as UInt8))
-  
+
   expectEqual(UInt16.max / 2, all1s << (-1 as DWord))
   expectEqual(1, all1s << (-15 as Word))
   expectEqual(0, all1s << (-16 as Int32))
@@ -1580,14 +1303,14 @@ tests.test("SmartBitShift/Unconstrained/Left/UInt16") {
   expectEqual(0b1111_1111_1111_1110, all1s << 1)
   expectEqual(UInt16.max / 2 + 1, all1s << 15)
   expectEqual(0, all1s << 16)
-  
+
   expectEqual(UInt16.max / 2, all1s << -1)
   expectEqual(1, all1s << -15)
   expectEqual(0, all1s << -16)
 }
 
 tests.test("Basics") {
-  
+
   expectEqual(sizeof(Word.self), sizeof(Swift.Int.self))
   expectEqual(sizeof(DWord.self), 2 * sizeof(Swift.Int.self))
 
@@ -1602,438 +1325,42 @@ tests.test("Basics") {
   expectEqual(32, Int32.bitWidth)
 }
 
-tests.test("uword") {
+tests.test("nthWord") {
   let x = UDWord(Word.max)
-  expectEqual(Word.max._lowUWord, x.uword(0))
-  expectEqual(0, x.uword(1))
-  
+  expectEqual(Word.max._lowUWord, x.nthWord(0))
+  expectEqual(0, x.nthWord(1))
+
   let y = DWord(Word.min)
-  expectEqual(Word.min._lowUWord, y.uword(0))
-  expectEqual(~0, y.uword(1))
+  expectEqual(Word.min._lowUWord, y.nthWord(0))
+  expectEqual(~0, y.nthWord(1))
 
   let z = UWord(~Word.min) + 1
-  expectEqual(Word.min._lowUWord, z.uword(0))
-  expectEqual(0, z.uword(1))
+  expectEqual(Word.min._lowUWord, z.nthWord(0))
+  expectEqual(0, z.nthWord(1))
 }
 
-tests.test("Multiprecision/+/DWord") {
-  var x = DWord.max - 2
-  x += (1 as UInt8)
-  expectEqual(DWord.max - 1, x)
-  x += (-1 as Int8)
-  expectEqual(DWord.max - 2, x)
-
-  x = DWord.min
-  x += (1 as UInt8)
-  expectEqual(DWord.min + 1, x)
-
-  x += (-1 as Int8)
-  expectEqual(DWord.min, x)
-
-  x = DWord(UWord.max)
-  x += (1 as Int8)
-  expectEqual(DWord(UWord.max) + 1, x)
-  x += (-1 as Int8)
-  expectEqual(DWord(UWord.max), x)
-  x += (1 as UDWord)
-  expectEqual(DWord(UWord.max) + 1, x)
-  
-  x = DWord(Word.max)
-  var overflow: ArithmeticOverflow
-  overflow = x.addInPlace(Word.min)
-  expectEqual(.none, overflow)
-  expectEqual(-1, x)
-
-  overflow = x.addInPlace(DWord.min)
-  expectEqual(.overflow, overflow)
-  expectEqual(DWord.max, x)
-
-  overflow = x.addInPlace(1 as Word)
-  expectEqual(.overflow, overflow)
-  expectEqual(DWord.min, x)
-
-  x = 1
-  overflow = x.addInPlace(DWord.max)
-  expectEqual(.overflow, overflow)
-  expectEqual(DWord.min, x)
+tests.test("DoubeWidthMultiply/UInt8") {
+  let a: UInt8 = 42
+  let b: UInt8 = 42
+  let res = a.doubleWidthMultiply(b)
+  expectEqual(0x06, res.high)
+  expectEqual(0xe4, res.low)
 }
 
-tests.test("Multiprecision/+/UDWord") {
-  var x = UDWord.max - 2
-  x += (1 as UInt8)
-  expectEqual(UDWord.max - 1, x)
-  x += (-1 as Int8)
-  expectEqual(UDWord.max - 2, x)
-
-  x = UDWord.min
-  x += (1 as UInt8)
-  expectEqual(1, x)
-
-  x += (-1 as Int8)
-  expectEqual(UDWord.min, x)
-
-  x = UDWord(UWord.max)
-  x += (1 as Int8)
-  expectEqual(UDWord(UWord.max) + 1, x)
-  x += (-1 as Int8)
-  expectEqual(UDWord(UWord.max), x)
-  x += (1 as DWord)
-  expectEqual(UDWord(UWord.max) + 1, x)
-  x += (-1 as DWord)
-  expectEqual(UDWord(UWord.max), x)
-  
-  x = UDWord(Word.max)
-  var overflow: ArithmeticOverflow
-  overflow = x.addInPlace(Word.min)
-  expectEqual(.overflow, overflow)
-  expectEqual(UDWord.max, x)
-
-  overflow = x.addInPlace(DWord.min)
-  expectEqual(.none, overflow)
-  overflow = x.addInPlace(DWord.min)
-  expectEqual(.overflow, overflow)
-  expectEqual(UDWord.max, x)
-
-  overflow = x.addInPlace(1 as Int8)
-  expectEqual(.overflow, overflow)
-  expectEqual(0, x)
-
-  x = 1
-  overflow = x.addInPlace(UDWord.max)
-  expectEqual(.overflow, overflow)
-  expectEqual(0, x)
+tests.test("DoubeWidthMultiply/Int8") {
+  let a: Int8 = 42
+  let b: Int8 = -42
+  let res = a.doubleWidthMultiply(b)
+  expectEqual(Int8(bitPattern: 0xf9), res.high)
+  expectEqual(0x1c, res.low)
 }
 
-tests.test("Multiprecision/-/DWord") {
-  var x = DWord.max - 2
-  x -= (-1 as Int8)
-  expectEqual(DWord.max - 1, x)
-  x -= (1 as Int8)
-  expectEqual(DWord.max - 2, x)
-
-  x = DWord.min
-  x -= (-1 as Int8)
-  expectEqual(DWord.min + 1, x)
-
-  x -= (1 as Int8)
-  expectEqual(DWord.min, x)
-
-  x = DWord(UWord.max)
-  x -= (-1 as Int8)
-  expectEqual(DWord(UWord.max) + 1, x)
-  x -= (1 as Int8)
-  expectEqual(DWord(UWord.max), x)
-  x -= (-1 as DWord)
-  expectEqual(DWord(UWord.max) + 1, x)
-  
-  x = DWord(Word.max)
-  var overflow: ArithmeticOverflow
-  overflow = x.subtractInPlace(UWord(~Word.min) + 1)
-  expectEqual(.none, overflow)
-  expectEqual(-1, x)
-
-  overflow = x.subtractInPlace(UDWord(~DWord.min) + 1)
-  expectEqual(.overflow, overflow)
-  expectEqual(DWord.max, x)
-
-  overflow = x.subtractInPlace(-1 as Word)
-  expectEqual(.overflow, overflow)
-  expectEqual(DWord.min, x)
-
-  x = 1
-  overflow = x.subtractInPlace(DWord.min + 1)
-  expectEqual(.overflow, overflow)
-  expectEqual(DWord.min, x)
+tests.test("DoubeWidthMultiply/Int8/DoubleNegation") {
+  let a: Int8 = -42
+  let b: Int8 = -42
+  let res = a.doubleWidthMultiply(b)
+  expectEqual(0x06, res.high)
+  expectEqual(0xe4, res.low)
 }
-
-tests.test("Multiprecision/-/UDWord") {
-  var x = UDWord.max - 2
-  x -= (-1 as Int8)
-  expectEqual(UDWord.max - 1, x)
-  x -= (1 as UInt8)
-  expectEqual(UDWord.max - 2, x)
-
-  x = UDWord.min
-  x -= (-1 as Int8)
-  expectEqual(1, x)
-
-  x -= (1 as Int8)
-  expectEqual(UDWord.min, x)
-
-  x = UDWord(UWord.max)
-  x -= (-1 as Int8)
-  expectEqual(UDWord(UWord.max) + 1, x)
-  x -= (1 as Int8)
-  expectEqual(UDWord(UWord.max), x)
-  x -= (-1 as DWord)
-  expectEqual(UDWord(UWord.max) + 1, x)
-  x -= (1 as DWord)
-  expectEqual(UDWord(UWord.max), x)
-  
-  x = UDWord(Word.max)
-  var overflow: ArithmeticOverflow
-  overflow = x.subtractInPlace(UWord(~Word.min) + 1)
-  expectEqual(.overflow, overflow)
-  expectEqual(UDWord.max, x)
-
-  overflow = x.subtractInPlace(UDWord(DWord.max) + 1)
-  expectEqual(.none, overflow)
-  overflow = x.subtractInPlace(UDWord(DWord.max) + 1)
-  expectEqual(.overflow, overflow)
-  expectEqual(UDWord.max, x)
-
-  overflow = x.subtractInPlace(DWord.max)
-  expectEqual(.none, overflow)
-  overflow = x.subtractInPlace(DWord.max)
-  expectEqual(.none, overflow)
-  expectEqual(1, x)
-  
-  overflow = x.subtractInPlace(2 as UDWord)
-  expectEqual(.overflow, overflow)
-  expectEqual(UDWord.max, x)
-  
-  overflow = x.subtractInPlace(-1 as Int8)
-  expectEqual(.overflow, overflow)
-  expectEqual(0, x)
-
-  x = 1
-  overflow = x.subtractInPlace(UDWord.max)
-  expectEqual(.overflow, overflow)
-  expectEqual(2, x)
-}
-
-tests.test("Multiprecision/+/Int16") {
-  var x = Int16.max - 2
-  x += (1 as UDWord)
-  expectEqual(Int16.max - 1, x)
-  x += (-1 as DWord)
-  expectEqual(Int16.max - 2, x)
-
-  x = Int16.min
-  x += (1 as UDWord)
-  expectEqual(Int16.min + 1, x)
-  
-  x += (-1 as DWord)
-  expectEqual(Int16.min, x)
-}
-
-tests.test("Multiprecision/*/Int8") {
-  let uShift = Int8.bitWidth - 1
-  expectEqual((42, .none), Int8.multiply(7 as Int8, 6 as Int8))
-  expectEqual((42, .none), Int8.multiply(-7 as Int8, -6 as Int8))
-  expectEqual((-42, .none), Int8.multiply(-7 as DWord, 6 as Int8))
-  expectEqual((-42, .none), Int8.multiply(7 as Int8, -6 as DWord))
-  
-  expectEqual((UInt8.max - 1, .none), UInt8.multiply(Int8.max, 2 as Int8))
-  expectEqual((UInt8.max - 1, .none), UInt8.multiply(-Int8.max, -2 as Int8))
-  expectEqual(
-    (0, .overflow),
-    UInt8.multiply((1 as UInt8) << (UInt8.bitWidth - 1), 2 as Int8))
-
-  expectEqual(
-    (Int8.max - 1, .none),
-    Int8.multiply(Int8.max >> 1, 2 as Int8))
-  
-  expectEqual(
-    (Int8.max - 1, .none),
-    Int8.multiply(-(Int8.max >> 1), -2 as Int8))
-  
-  expectEqual(
-    (-Int8.max + 1, .none),
-    Int8.multiply(-(Int8.max >> 1), 2 as Int8))
-
-  let shift = Int8.bitWidth - 2
-  expectEqual(
-    (Int8.min, .overflow),
-    Int8.multiply((1 << shift) as Int8, 2 as Int8))
-  
-  expectEqual(
-    (Int8.min, .overflow),
-    Int8.multiply(-(1 << shift) as Int8, -2 as Int8))
-  
-  expectEqual(
-    (Int8.min, .none), Int8.multiply((1 << shift) as Int8, -2 as Int8))
-  
-  expectEqual(
-    (Int8.min, .none), Int8.multiply(-(1 << shift) as Int8, 2 as Int8))
-}
-
-tests.test("Multiprecision/*/Word") {
-  expectEqual((42, .none), Word.multiply(7 as Word, 6 as Word))
-  expectEqual((42, .none), Word.multiply(-7 as Word, -6 as Word))
-  expectEqual((-42, .none), Word.multiply(-7 as DWord, 6 as Word))
-  expectEqual((-42, .none), Word.multiply(7 as Word, -6 as DWord))
-  
-  expectEqual((UWord.max - 1, .none), UWord.multiply(Word.max, 2 as Word))
-  expectEqual((UWord.max - 1, .none), UWord.multiply(-Word.max, -2 as Word))
-  expectEqual(
-    (0, .overflow),
-    UWord.multiply((1 as UWord) << (UWord.bitWidth - 1), 2 as Word))
-
-  expectEqual(
-    (Word.max - 1, .none),
-    Word.multiply(Word.max >> 1, 2 as Word))
-  
-  expectEqual(
-    (Word.max - 1, .none),
-    Word.multiply(-(Word.max >> 1), -2 as Word))
-  
-  expectEqual(
-    (-Word.max + 1, .none),
-    Word.multiply(-(Word.max >> 1), 2 as Word))
-
-  let shift = Word.bitWidth - 2
-  expectEqual(
-    (Word.min, .overflow),
-    Word.multiply((1 << shift) as Word, 2 as Word))
-  
-  expectEqual(
-    (Word.min, .overflow),
-    Word.multiply(-(1 << shift) as Word, -2 as Word))
-  
-  expectEqual(
-    (Word.min, .none),
-    Word.multiply((1 << shift) as Word, -2 as Word))
-  
-  expectEqual(
-    (Word.min, .none),
-    Word.multiply(-(1 << shift) as Word, 2 as Word))
-}
-
-tests.test("Multiprecision/*/DWord") {
-  let uShift = DWord.bitWidth - 1
-  expectEqual((42, .none), DWord.multiply(7 as DWord, 6 as DWord))
-  expectEqual((42, .none), DWord.multiply(-7 as DWord, -6 as DWord))
-  expectEqual((-42, .none), DWord.multiply(-7 as DWord, 6 as DWord))
-  expectEqual((-42, .none), DWord.multiply(7 as DWord, -6 as DWord))
-  
-  expectEqual((UDWord.max - 1, .none), UDWord.multiply(DWord.max, 2 as DWord))
-  expectEqual((UDWord.max - 1, .none), UDWord.multiply(-DWord.max, -2 as DWord))
-  expectEqual(
-    (0, .overflow),
-    UDWord.multiply((1 as UDWord) << (UDWord.bitWidth - 1), 2 as DWord))
-
-  expectEqual(
-    (DWord.max - 1, .none),
-    DWord.multiply(DWord.max >> 1, 2 as DWord))
-  
-  expectEqual(
-    (DWord.max - 1, .none),
-    DWord.multiply(-(DWord.max >> 1), -2 as DWord))
-  
-  expectEqual(
-    (-DWord.max + 1, .none),
-    DWord.multiply(-(DWord.max >> 1), 2 as DWord))
-
-  let shift = DWord.bitWidth - 2
-  expectEqual(
-    (DWord.min, .overflow),
-    DWord.multiply((1 << shift) as DWord, 2 as DWord))
-  
-  expectEqual(
-    (DWord.min, .overflow),
-    DWord.multiply(-(1 << shift) as DWord, -2 as DWord))
-  
-  expectEqual(
-    (DWord.min, .none),
-    DWord.multiply((1 << shift) as DWord, -2 as DWord))
-  
-  expectEqual(
-    (DWord.min, .none),
-    DWord.multiply(-(1 << shift) as DWord, 2 as DWord))
-
-  expectEqual(
-    ((-2 << Word.bitWidth) + 1, .overflow),
-    DWord.multiply(UWord.max, UWord.max))
-}
-
-tests.test("Multiprecision/Overflow/+/Int16") {
-  var x = Int16.max - 1
-  x += 1 as UInt16
-  expectCrashLater()
-  x += 1 as UInt16
-}
-
-tests.test("Multiprecision/Underflow/+/Int16") {
-  var x = Int16.min + 1
-  x += -1 as Int32
-  expectCrashLater()
-  x += -1 as Int32
-}
-
-
-tests.test("Multiprecision/Overflow/+/UInt16") {
-  var x = UInt16.max - 1
-  x += 1 as Int16
-  expectCrashLater()
-  x += 1 as Int16
-}
-
-tests.test("Multiprecision/Underflow/+/UInt16") {
-  var x = UInt16.min + 1
-  x += -1 as DWord
-  expectCrashLater()
-  x += -1 as DWord
-}
-
-
-tests.test("Multiprecision/Overflow/+/Word") {
-  var x = Word.max - 1
-  x += 1 as UWord
-  expectCrashLater()
-  x += 1 as UWord
-}
-
-tests.test("Multiprecision/Underflow/+/Word") {
-  var x = Word.min + 1
-  x += -1 as Int32
-  expectCrashLater()
-  x += -1 as Int32
-}
-
-
-tests.test("Multiprecision/Overflow/+/UWord") {
-  var x = UWord.max - 1
-  x += 1 as Word
-  expectCrashLater()
-  x += 1 as Word
-}
-
-tests.test("Multiprecision/Underflow/+/UWord") {
-  var x = UWord.min + 1
-  x += -1 as DWord
-  expectCrashLater()
-  x += -1 as DWord
-}
-
-tests.test("Multiprecision/Overflow/+/DWord") {
-  var x = DWord.max - 1
-  x += 1 as UWord
-  expectCrashLater()
-  x += 1 as UWord
-}
-
-tests.test("Multiprecision/Underflow/+/DWord") {
-  var x = DWord.min + 1
-  x += -1 as Int32
-  expectCrashLater()
-  x += -1 as Int32
-}
-
-
-tests.test("Multiprecision/Overflow/+/UDWord") {
-  var x = UDWord.max - 1
-  x += 1 as Word
-  expectCrashLater()
-  x += 1 as Word
-}
-
-tests.test("Multiprecision/Underflow/+/UDWord") {
-  var x = UDWord.min + 1
-  x += -1 as DWord
-  expectCrashLater()
-  x += -1 as DWord
-}
-
 
 runAllTests()

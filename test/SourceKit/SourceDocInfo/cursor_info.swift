@@ -158,6 +158,18 @@ func paramAutoclosureNoescape3(@autoclosure(escaping) msg: ()->String) {}
 
 func paramDefaultPlaceholder(f: StaticString = #function, file: StaticString = #file, line: UInt = #line, col: UInt = #column, arr: [Int] = [], dict: [Int:Int] = [:], opt: Int? = nil, reg: Int = 1) {}
 
+protocol P3 {
+  func f(s: Self) -> Self
+}
+extension P3: P2 {
+  func f(s: Self) -> Self { return s }
+}
+
+class C7 {
+  func f() -> Self { return self }
+}
+
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -546,7 +558,6 @@ func paramDefaultPlaceholder(f: StaticString = #function, file: StaticString = #
 // CHECK68-NEXT: MyAlias
 // CHECK68-NEXT: s:11cursor_info7MyAlias
 // CHECK68-NEXT: MyAlias.Type
-// FIXME: missing USR for generic typealias parameter.
 // CHECK68-NEXT: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>, <Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>)</Declaration>
 // CHECK68-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = (<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</decl.typealias>
 
@@ -555,7 +566,6 @@ func paramDefaultPlaceholder(f: StaticString = #function, file: StaticString = #
 // CHECK69-NEXT: MyAlias
 // CHECK69-NEXT: s:11cursor_info7MyAlias
 // CHECK69-NEXT: MyAlias.Type
-// FIXME: missing USR for generic typealias parameter.
 // CHECK69-NEXT: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>, <Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>)</Declaration>
 // CHECK69-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = (<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</decl.typealias>
 
@@ -581,3 +591,24 @@ func paramDefaultPlaceholder(f: StaticString = #function, file: StaticString = #
 // FIXME: keyword nil
 // CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
 // CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
+
+// RUN: %sourcekitd-test -req=cursor -pos=162:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK74
+// CHECK74: source.lang.swift.decl.function.method.instance (162:8-162:18)
+// CHECK74: <Self : P3> (Self) -> (Self) -> Self
+// CHECK74: <Declaration>func f(s: <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type>) -&gt; <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type></Declaration>
+// CHECK74: <decl.var.parameter.type><ref.generic_type_param usr="s:tP11cursor_info2P34SelfMx">Self</ref.generic_type_param></decl.var.parameter.type>
+// CHECK74-SAME: <decl.function.returntype><ref.generic_type_param usr="s:tP11cursor_info2P34SelfMx">Self</ref.generic_type_param></decl.function.returntype>
+
+// RUN: %sourcekitd-test -req=cursor -pos=165:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK75
+// CHECK75: source.lang.swift.decl.function.method.instance (165:8-165:18)
+// CHECK75: <Self : P3> (Self) -> (Self) -> Self
+// CHECK75: <Declaration>func f(s: <Type usr="s:tE11cursor_infoPS_2P34SelfMx">Self</Type>) -&gt; <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type></Declaration>
+// CHECK75: <decl.var.parameter.type><ref.generic_type_param usr="s:tE11cursor_infoPS_2P34SelfMx">Self</ref.generic_type_param></decl.var.parameter.type>
+// CHECK75-SAME: <decl.function.returntype><ref.generic_type_param usr="s:tP11cursor_info2P34SelfMx">Self</ref.generic_type_param></decl.function.returntype>
+// FIXME: the return type gets the USR for the original protocol, rather than the extension.
+
+// RUN: %sourcekitd-test -req=cursor -pos=169:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK76
+// CHECK76: source.lang.swift.decl.function.method.instance (169:8-169:11)
+// CHECK76: (Self) -> () -> Self
+// CHECK76: <Declaration>func f() -&gt; <Type usr="s:C11cursor_info2C7">Self</Type></Declaration>
+// CHECK76: <decl.function.returntype><ref.class usr="s:C11cursor_info2C7">Self</ref.class></decl.function.returntype>

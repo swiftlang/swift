@@ -123,7 +123,7 @@ public struct S10 : P1 {
   }
 }
 
-// CHECK: <synthesized>// synthesized
+// CHECK: <synthesized>
 // CHECK: extension <ref:Struct>S1</ref> where T : P2 {
 // CHECK:     <decl:Func>public func <loc>p2member()</loc></decl></synthesized>
 // CHECK: <synthesized>
@@ -131,22 +131,22 @@ public struct S10 : P1 {
 // CHECK:     <decl:Func>public func <loc>ef2(<decl:Param>t: <ref:Struct>S2</ref></decl>)</loc></decl>
 // CHECK: }</synthesized>
 
-// CHECK:  <synthesized>// synthesized
+// CHECK:  <synthesized>
 // CHECK: extension <ref:Struct>S1</ref> where T : P3 {
 // CHECK:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
 // CHECK: }</synthesized>
 
-// CHECK:  <synthesized>// synthesized
+// CHECK:  <synthesized>
 // CHECK: extension <ref:Struct>S1</ref> where T == Int {
 // CHECK:     <decl:Func>public func <loc>p1IntFunc(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
 // CHECK: }</synthesized>
 
-// CHECK:  <synthesized>// synthesized
+// CHECK:  <synthesized>
 // CHECK: extension <ref:Struct>S1</ref> where T == S9<Int> {
 // CHECK:     <decl:Func>public func <loc>S9IntFunc()</loc></decl>
 // CHECK: }</synthesized>
 
-// CHECK:  <synthesized>// synthesized
+// CHECK:  <synthesized>
 // CHECK: extension <ref:Struct>S10</ref> {
 // CHECK:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl></synthesized>
 // CHECK: <synthesized>
@@ -155,19 +155,19 @@ public struct S10 : P1 {
 // CHECK:     <decl:Func>public func <loc>S9IntFunc()</loc></decl>
 // CHECK: }</synthesized>
 
-// CHECK:  <synthesized>// synthesized
+// CHECK:  <synthesized>
 // CHECK: extension <ref:Struct>S4</ref> {
 // CHECK:     <decl:Func>public func <loc>p1IntFunc(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
 // CHECK: }</synthesized>
 
-// CHECK:  <synthesized>// synthesized
+// CHECK:  <synthesized>
 // CHECK: extension <ref:Struct>S6</ref> {
 // CHECK:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl></synthesized>
 // CHECK: <synthesized>
 // CHECK:     <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S5</ref></decl>)</loc></decl>
 // CHECK: }</synthesized>
 
-// CHECK:  <synthesized>// synthesized
+// CHECK:  <synthesized>
 // CHECK: extension <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S7</ref>.<ref:Struct>S8</ref> {
 // CHECK:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl></synthesized>
 // CHECK: <synthesized>

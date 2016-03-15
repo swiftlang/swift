@@ -204,35 +204,6 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   return setter;
 }
 
-/// Returns the type of the self argument of a materializeForSet
-/// callback.  If we don't have a meaningful direct self type, just
-/// use something meaningless and hope it doesn't matter.
-static Type getSelfTypeForMaterializeForSetCallback(ASTContext &ctx,
-                                                    DeclContext *DC,
-                                                    bool isStatic) {
-  Type selfType = DC->getDeclaredTypeInContext();
-  if (!selfType) {
-    // This restriction is theoretically liftable by writing the necessary
-    // contextual information into the callback storage.
-    assert(!DC->isGenericContext() &&
-           "no enclosing type for generic materializeForSet; callback "
-           "will not be able to bind type arguments!");
-    return TupleType::getEmpty(ctx);
-  }
-
-  // If we're in a protocol, we want to actually use the Self type.
-  if (selfType->is<ProtocolType>()) {
-    selfType = DC->getProtocolSelf()->getArchetype();
-  }
-
-  // Use the metatype if this is a static member.
-  if (isStatic) {
-    return MetatypeType::get(selfType, ctx);
-  } else {
-    return selfType;
-  }
-}
-
 // True if the storage is dynamic or imported from Objective-C. In these cases,
 // we need to emit a static materializeForSet thunk that dynamically dispatches
 // to 'get' and 'set', rather than the normal dynamically dispatched
@@ -252,44 +223,6 @@ bool needsToBeRegisteredAsExternalDecl(AbstractStorageDecl *storage) {
   if (!nominal)
     return false;
   return nominal->hasClangNode();
-}
-
-static Type createMaterializeForSetReturnType(AbstractStorageDecl *storage,
-                                              TypeChecker &TC) {
-  auto &ctx = storage->getASTContext();
-  SourceLoc loc = storage->getLoc();
-
-  auto DC = storage->getDeclContext();
-
-  if (DC->getDeclaredTypeInContext() &&
-      DC->getDeclaredTypeInContext()->is<ErrorType>()) {
-    return ErrorType::get(ctx);
-  }
-
-  Type callbackSelfType =
-    getSelfTypeForMaterializeForSetCallback(ctx, DC, storage->isStatic());
-  TupleTypeElt callbackArgs[] = {
-    ctx.TheRawPointerType,
-    InOutType::get(ctx.TheUnsafeValueBufferType),
-    InOutType::get(callbackSelfType),
-    MetatypeType::get(callbackSelfType, MetatypeRepresentation::Thick),
-  };
-  auto callbackExtInfo = FunctionType::ExtInfo()
-    .withRepresentation(FunctionType::Representation::Thin);
-  auto callbackType = FunctionType::get(TupleType::get(callbackArgs, ctx),
-                                        TupleType::getEmpty(ctx),
-                                        callbackExtInfo);
-
-  // Try to make the callback type optional.  Don't crash if it doesn't
-  // work, though.
-  auto optCallbackType = TC.getOptionalType(loc, callbackType);
-  if (!optCallbackType) optCallbackType = callbackType;
-
-  TupleTypeElt retElts[] = {
-    { ctx.TheRawPointerType },
-    { optCallbackType },
-  };
-  return TupleType::get(retElts, ctx);
 }
 
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
@@ -314,10 +247,15 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   };
   params.push_back(buildIndexForwardingParamList(storage, bufferElements));
 
-  // The accessor returns (Builtin.RawPointer, (@convention(thin) (...) -> ())?),
+  // The accessor returns (temporary: Builtin.RawPointer,
+  //                       callback: Builtin.RawPointer),
   // where the first pointer is the materialized address and the
-  // second is an optional callback.
-  Type retTy = createMaterializeForSetReturnType(storage, TC);
+  // second is the address of an optional callback.
+  TupleTypeElt retElts[] = {
+    { ctx.TheRawPointerType },
+    { OptionalType::get(ctx.TheRawPointerType) },
+  };
+  Type retTy = TupleType::get(retElts, ctx);
 
   auto *materializeForSet = FuncDecl::create(
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
@@ -1709,35 +1647,20 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   // Don't bother if the declaration is invalid.
   if (storage->isInvalid()) return;
 
-  // We only need materializeForSet in polymorphic contexts:
+  // We only need materializeForSet in type contexts.
   NominalTypeDecl *container = storage->getDeclContext()
       ->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!container) return;
 
-  //   - in non-ObjC protocols, but not protocol extensions.
+  // Requirements of ObjC protocols don't need this.
   if (auto protocol = dyn_cast<ProtocolDecl>(container)) {
     if (protocol->isObjC()) return;
-    if (storage->getDeclContext()->getAsProtocolExtensionContext()) return;
 
-  //   - in classes when the storage decl is not final and does
-  //     not override a decl that requires a materializeForSet
-  } else if (isa<ClassDecl>(container)) {
-    if (storage->isFinal()) {
-      auto overridden = storage->getOverriddenDecl();
-      if (!overridden || !overridden->getMaterializeForSetFunc())
-        return;
-    }
-
-  // Enums don't need this.
-  } else if (isa<EnumDecl>(container)) {
-    return;
-
-  // Structs imported by Clang don't need this, because we can
+  // Types imported by Clang don't need this, because we can
   // synthesize it later.
   } else {
-    assert(isa<StructDecl>(container));
-    if (container->hasClangNode())
-      return;
+    assert(isa<NominalTypeDecl>(container));
+    if (container->hasClangNode()) return;
   }
 
   addMaterializeForSet(storage, TC);

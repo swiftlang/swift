@@ -118,6 +118,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_GUARD_1 | FileCheck %s -check-prefix=TOP_LEVEL_GUARD
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_GUARD_2 | FileCheck %s -check-prefix=TOP_LEVEL_GUARD
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_1 | FileCheck %s -check-prefix=STRING_INTERP
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_2 | FileCheck %s -check-prefix=STRING_INTERP
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_3 | FileCheck %s -check-prefix=STRING_INTERP
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_4 | FileCheck %s -check-prefix=STRING_INTERP
+
 // Test code completion in top-level code.
 //
 // This test is not meant to test that we can correctly form all kinds of
@@ -420,7 +425,19 @@ func interstitial() {}
 // TOP_LEVEL_GUARD: Decl[LocalVar]/Local: guardedName[#Int#]; name=guardedName
 
 func resyncParserB14() {}
-  
+
+
+"\(#^STRING_INTERP_1^#)"
+"\(1) \(#^STRING_INTERP_2^#) \(2)"
+var stringInterp = "\(#^STRING_INTERP_3^#)"
+_ = "" + "\(#^STRING_INTERP_4^#)" + ""
+// STRING_INTERP: Begin completions
+// STRING_INTERP-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#];
+// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#];
+// STRING_INTERP-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#];
+// STRING_INTERP: End completions
+func resyncParserC1() {}
+
 
 //
 //===--- DON'T ADD ANY TESTS AFTER THIS LINE.

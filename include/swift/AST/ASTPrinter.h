@@ -21,6 +21,7 @@
 namespace swift {
   class Decl;
   class DeclContext;
+  class DynamicSelfType;
   class ModuleEntity;
   class TypeDecl;
   class Type;
@@ -39,6 +40,8 @@ enum class PrintNameContext {
   Keyword,
   /// Generic parameter context, where 'Self' is not escaped.
   GenericParameter,
+  /// Class method return type, where 'Self' is not escaped.
+  ClassDynamicSelf,
   /// Function parameter context, where keywords other than let/var/inout are
   /// not escaped.
   FunctionParameterExternal,
@@ -115,7 +118,11 @@ public:
 
   /// Called when printing the referenced name of a type declaration, possibly
   /// from deep inside another type.
-  virtual void printTypeRef(const TypeDecl *TD, Identifier Name);
+  ///
+  /// \param T the original \c Type being referenced. May be null.
+  /// \param RefTo the \c TypeDecl this is considered a reference to.
+  /// \param Name the name to be printed.
+  virtual void printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name);
 
   /// Called when printing the referenced name of a module.
   virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
@@ -143,6 +150,8 @@ public:
   virtual void printNamePost(PrintNameContext Context) {}
 
   // Helper functions.
+
+  void printTypeRef(DynamicSelfType *T, Identifier Name);
 
   void printSeparator(bool &first, StringRef separator) {
     if (first) {

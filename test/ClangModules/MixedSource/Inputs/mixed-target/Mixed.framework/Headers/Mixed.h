@@ -35,3 +35,15 @@ void doSomethingPartialSub(PartialSubClass *arg);
 - (NSObject *)unsafeOverridePartialSubParam:(NSObject *)arg;
 - (PartialSubClass *)unsafeOverridePartialSubReturn:(PartialSubClass *)arg;
 @end
+
+@interface WrapperInterface
+typedef int NameInInterface;
+@end
+
+@protocol WrapperProto
+typedef int NameInProtocol;
+@end
+
+@interface WrapperInterface (Category)
+typedef int NameInCategory;
+@end

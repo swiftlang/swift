@@ -657,14 +657,41 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   printText(Text);
 }
 
-void ASTPrinter::printTypeRef(const TypeDecl *TD, Identifier Name) {
+void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name) {
   PrintNameContext Context = PrintNameContext::Normal;
-  if (auto GP = dyn_cast<GenericTypeParamDecl>(TD)) {
+  if (auto GP = dyn_cast<GenericTypeParamDecl>(RefTo)) {
     if (GP->isProtocolSelf())
       Context = PrintNameContext::GenericParameter;
+  } else if (T && T->is<DynamicSelfType>()) {
+    assert(T->getAs<DynamicSelfType>()->getSelfType()->getAnyNominal() &&
+           "protocol Self handled as GenericTypeParamDecl");
+    Context = PrintNameContext::ClassDynamicSelf;
   }
 
   printName(Name, Context);
+}
+
+void ASTPrinter::printTypeRef(DynamicSelfType *T, Identifier Name) {
+  // Try to print as a reference to the static type so that we will get a USR,
+  // in cursor info.
+  if (auto staticSelfT = T->getSelfType()) {
+    // Handle protocol 'Self', which is an archetype.
+    if (auto AT = staticSelfT->getAs<ArchetypeType>()) {
+      if (auto GTD = AT->getSelfProtocol()->getProtocolSelf()) {
+        assert(GTD->isProtocolSelf());
+        printTypeRef(T, GTD, Name);
+        return;
+      }
+
+    // Handle class 'Self', which is just a class type.
+    } else if (auto *NTD = staticSelfT->getAnyNominal()) {
+      printTypeRef(T, NTD, Name);
+      return;
+    }
+  }
+
+  // If that fails, just print the name.
+  printName(Name, PrintNameContext::ClassDynamicSelf);
 }
 
 void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
@@ -730,6 +757,7 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   case PrintNameContext::Keyword:
     return false;
 
+  case PrintNameContext::ClassDynamicSelf:
   case PrintNameContext::GenericParameter:
     return keyword != "Self";
 
@@ -1899,13 +1927,12 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
     return;
   }
 
-  Printer.printTypeRef(Nominal, Nominal->getName());
+  Printer.printTypeRef(ExtendedType, Nominal, Nominal->getName());
 }
 
 void PrintAST::
 printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
   if (Options.TransformContext->shouldOpenExtension) {
-    Printer << "// synthesized\n";
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";
@@ -3130,7 +3157,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   template <typename T>
   void printTypeDeclName(T *Ty) {
     TypeDecl *TD = Ty->getDecl();
-    Printer.printTypeRef(TD, TD->getName());
+    Printer.printTypeRef(Ty, TD, TD->getName());
   }
 
   // FIXME: we should have a callback that would tell us
@@ -3424,7 +3451,7 @@ public:
   }
 
   void visitDynamicSelfType(DynamicSelfType *T) {
-    Printer << "Self";
+    Printer.printTypeRef(T, T->getASTContext().Id_Self);
   }
 
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
@@ -3828,10 +3855,18 @@ public:
       if (T->getName().empty())
         Printer << "<anonymous>";
       else {
-        PrintNameContext context = PrintNameContext::Normal;
-        if (T->getSelfProtocol())
-          context = PrintNameContext::GenericParameter;
-        Printer.printName(T->getName(), context);
+        // Print protocol 'Self' as a generic parameter so that it gets
+        // annotated in cursor info.
+        // FIXME: in a protocol extension, we really want the extension, not the
+        // protocol.
+        if (auto *P = T->getSelfProtocol()) {
+          auto *GTD = P->getProtocolSelf();
+          assert(GTD && GTD->isProtocolSelf());
+          Printer.printTypeRef(T, GTD, T->getName());
+          return;
+        }
+
+        Printer.printName(T->getName());
       }
     }
   }

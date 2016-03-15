@@ -1612,9 +1612,9 @@ public:
     OS << "</synthesized>";
   }
 
-  void printTypeRef(const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
     OS << "<ref:" << Decl::getKindName(TD->getKind()) << '>';
-    StreamPrinter::printTypeRef(TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name);
     OS << "</ref>";
   }
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {

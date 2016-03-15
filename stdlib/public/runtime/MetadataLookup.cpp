@@ -91,7 +91,18 @@ namespace {
   };
 }
 
+#if defined(__APPLE__) && defined(__MACH__)
 static void _initializeCallbacksToInspectDylib();
+#else
+namespace swift {
+  void _swift_initializeCallbacksToInspectDylib(
+    void (*fnAddImageBlock)(const uint8_t *, size_t),
+    const char *sectionName);
+}
+
+static void _addImageTypeMetadataRecordsBlock(const uint8_t *records,
+                                              size_t recordsSize);
+#endif
 
 struct TypeMetadataState {
   ConcurrentMap<TypeMetadataCacheEntry> Cache;
@@ -101,7 +112,13 @@ struct TypeMetadataState {
   TypeMetadataState() {
     SectionsToScan.reserve(16);
     pthread_mutex_init(&SectionsToScanLock, nullptr);
+#if defined(__APPLE__) && defined(__MACH__)
     _initializeCallbacksToInspectDylib();
+#else
+    _swift_initializeCallbacksToInspectDylib(
+      _addImageTypeMetadataRecordsBlock,
+      SWIFT_TYPE_METADATA_SECTION);
+#endif
   }
 };
 
@@ -155,72 +172,14 @@ static void _addImageTypeMetadataRecords(const mach_header *mh,
 
   _addImageTypeMetadataRecordsBlock(records, recordsSize);
 }
-#elif defined(__ELF__)
-static int _addImageTypeMetadataRecords(struct dl_phdr_info *info,
-                                        size_t size, void * /*data*/) {
-  void *handle;
-  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
-    handle = dlopen(nullptr, RTLD_LAZY);
-  } else
-    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
-  auto records = reinterpret_cast<const uint8_t*>(
-      dlsym(handle, SWIFT_TYPE_METADATA_SECTION));
-
-  if (!records) {
-    // if there are no type metadata records, don't hold this handle open.
-    dlclose(handle);
-    return 0;
-  }
-
-  // Extract the size of the type metadata block from the head of the section
-  auto recordsSize = *reinterpret_cast<const uint64_t*>(records);
-  records += sizeof(recordsSize);
-
-  _addImageTypeMetadataRecordsBlock(records, recordsSize);
-
-  dlclose(handle);
-  return 0;
-}
-#elif defined(__CYGWIN__)
-static int _addImageTypeMetadataRecords(struct dl_phdr_info *info,
-                                        size_t size, void * /*data*/) {
-  void *handle;
-  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
-    handle = dlopen(nullptr, RTLD_LAZY);
-  } else
-    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
-
-  unsigned long recordsSize;
-  const uint8_t *records =
-    _swift_getSectionDataPE(handle, SWIFT_TYPE_METADATA_SECTION,
-                           &recordsSize);
-
-  if (records) {
-    _addImageTypeMetadataRecordsBlock(records, recordsSize);
-  }
-  dlclose(handle);
-  return 0;
-}
-#endif
 
 static void _initializeCallbacksToInspectDylib() {
-#if defined(__APPLE__) && defined(__MACH__)
   // Install our dyld callback.
   // Dyld will invoke this on our behalf for all images that have already
   // been loaded.
   _dyld_register_func_for_add_image(_addImageTypeMetadataRecords);
-#elif defined(__ELF__)
-  // Search the loaded dls. Unlike the above, this only searches the already
-  // loaded ones.
-  // FIXME: Find a way to have this continue to happen after.
-  // rdar://problem/19045112
-  dl_iterate_phdr(_addImageTypeMetadataRecords, nullptr);
-#elif defined(__CYGWIN__)
-  _swift_dl_iterate_phdr(_addImageTypeMetadataRecords, nullptr);
-#else
-# error No known mechanism to inspect dynamic libraries on this platform.
-#endif
 }
+#endif
 
 void
 swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,

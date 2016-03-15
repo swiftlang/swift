@@ -284,7 +284,8 @@ To use it, specify the '--preset=' argument:
 
   [~/src/s]$ ./swift/utils/build-script --preset=ds
   ./swift/utils/build-script: using preset 'ds', which expands to
-  ./swift/utils/build-script --release --debug-swift --debug-swift-stdlib --test
+  ./swift/utils/build-script --release --debug-swift --debug-swift-stdlib \
+     --test
   --build-subdir=ds --
   ...
 
