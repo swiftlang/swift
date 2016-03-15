@@ -448,6 +448,12 @@ func playgroundCommentMultiLine(f : () throws -> ()) rethrows {}
 /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
 // CHECK: <doc-comment-line>/// [strict weak ordering](<comment-url>http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings</comment-url>
 
+func funcTakingFor(for internalName: Int) {}
+// CHECK: <kw>func</kw> funcTakingFor(for internalName: <type>Int</type>) {}
+
+func funcTakingIn(in internalName: Int) {}
+// CHECK: <kw>func</kw> funcTakingIn(in internalName: <type>Int</type>) {}
+
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
 

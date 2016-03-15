@@ -821,9 +821,13 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SyntaxStructureNode SN;
     SN.Dcl = D;
     SN.Kind = SyntaxStructureKind::Parameter;
-    if (!PD->getArgumentName().empty())
-      SN.NameRange = CharSourceRange(PD->getSourceRange().Start,
-                                     PD->getArgumentName().getLength());
+    if (!PD->getArgumentName().empty()) {
+      SourceLoc ArgStart = PD->getSourceRange().Start;
+      SN.NameRange = CharSourceRange(ArgStart, PD->getArgumentName().getLength());
+      passTokenNodesUntil(ArgStart, PassNodesBehavior::ExcludeNodeAtLocation);
+      const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
+        Identifier;
+    }
     SN.Range = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
     SN.Attrs = PD->getAttrs();
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
