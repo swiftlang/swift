@@ -1,5 +1,5 @@
 
-Swift 3
+Swift 3.0
 -------
 
 * Renamification landed, so the Clang importer imports ObjC symbols
@@ -18,10 +18,10 @@ Swift 3
 ```
   etc.
 
-* The @noescape attribute has been extended to be a more general type attribute.
-  You can now declare values of @noescape function type, e.g. in manually
+* The `@noescape` attribute has been extended to be a more general type attribute.
+  You can now declare values of `@noescape` function type, e.g. in manually
   curried function signatures.  You can now also declare local variables of
-  @noescape type, and use @noescape in typealiases.  For example, this is now
+  `@noescape` type, and use `@noescape` in `typealiases`.  For example, this is now
   valid code:
 
 ```swift
@@ -32,8 +32,8 @@ Swift 3
 ```
 
 * [SE-0034](https://github.com/apple/swift-evolution/blob/master/proposals/0034-disambiguating-line.md)
-  has renamed the #line directive (which resets the logical source location
-  for diagnostics and debug information) to #sourceLocation.
+  has renamed the `#line` directive (which resets the logical source location
+  for diagnostics and debug information) to `#sourceLocation`.
 
 * Curried function syntax has been removed, and now produces a compile-time
   error.
@@ -46,7 +46,7 @@ Swift 3
   ```
 
 * Section markers are created in ELF binaries through special objects during link time.
-  These objects allow for the deletion of swift.ld and the use of non-BFD linkers.
+  These objects allow for the deletion of `swift.ld` and the use of non-BFD linkers.
   A new argument to swiftc is provided to select the linker used, and the gold linker
   is set as the default for arm-based platforms.
 
@@ -65,8 +65,8 @@ Swift 3
 Swift 2.2
 ---------
 
-* Associated types in protocols can now be specified with a new 'associatedtype'
-  declaration, to replace the use of 'typealias':
+* Associated types in protocols can now be specified with a new `associatedtype`
+  declaration, to replace the use of `typealias`:
 
     ```swift
     protocol P {
@@ -74,13 +74,13 @@ Swift 2.2
     }
     ```
 
-  The typealias keyword is still allowed (but deprecated and produces a warning)
-  in Swift 2.2. This warning will become an error in Swift 3.
+  The `typealias` keyword is still allowed (but deprecated and produces a warning)
+  in Swift 2.2. This warning will become an error in Swift 3.0.
 
 * Curried function syntax has been deprecated, and is slated to be removed in 
-  Swift 3.
+  Swift 3.0.
 
-* The ++ and -- operators have been deprecated, and are slated to be removed in
+* The `++` and `--` operators have been deprecated, and are slated to be removed in
   Swift 3.0.  As a replacement, please use `x += 1` on integer or floating point
   types, and `x = x.successor()` on Index types.
 
@@ -94,6 +94,7 @@ Swift 2.2
     ```
 
   should move to being written as:
+  
     ```swift
     foo(x.0, x.b)
     ```
@@ -104,7 +105,7 @@ Swift 2.2
 * New `#file`, `#line`, `#column`, and `#function` expressions have been introduced to
   replace the existing `__FILE__`, `__LINE__`, `__COLUMN__`, and `__FUNCTION__` symbols.
   The `__FILE__`-style symbols have been deprecated, and will be removed in
-  Swift 3.
+  Swift 3.0.
 
 * The operator identifier lexer grammar has been revised to simplify the rules
   for operators that start with a dot (".").  The new rule is that an operator
@@ -156,10 +157,10 @@ Swift 2.2
 
 * Global `anyGenerator()` functions have been changed into initializers on
   `AnyGenerator`, making the API more intuitive and idiomatic.  They have been
-  deprecated in Swift 2.2, and will be removed in Swift 3.
+  deprecated in Swift 2.2, and will be removed in Swift 3.0.
 
 * Closures appearing inside generic types and generic methods can now be
-  converted to C function pointers as long as no generic type parameters
+  converted to C function pointers, as long as no generic type parameters
   are referenced in the closure's argument list or body. A conversion of
   a closure that references generic type parameters now produces a
   diagnostic instead of crashing.
@@ -227,7 +228,7 @@ Swift 2.2
 
   ```swift
   #if swift(>=2.2)
-    // Only this code will be parsed in Swift 3
+    // Only this code will be parsed in Swift 3.0
     func foo(x: Int) -> (y: Int) -> () {}
   #else
     // This code is ignored entirely.
@@ -253,9 +254,9 @@ Swift 2.2
    
   Generally, such string literals should be replaced with uses of
   `#selector`, and the compiler will provide Fix-Its that use
-  `#selector`. In cases where they is not possible (e.g., when referring
+  `#selector`. In cases where this is not possible (e.g., when referring
   to the getter of a property), one can still directly construct
-  selectors, e.g.,:
+  selectors, e.g.:
 
   ```swift
       let sel = Selector("propertyName")
@@ -335,7 +336,7 @@ Swift 2.2
   variable of type `String -> Any`. **(19517003)**
 
 
-2015-09-17 [Xcode 7.0, Swift 2]
+2015-09-17 [Xcode 7.0, Swift 2.0]
 ----------
 
 ## Swift Language Features
