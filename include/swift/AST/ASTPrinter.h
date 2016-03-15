@@ -21,6 +21,7 @@
 namespace swift {
   class Decl;
   class DeclContext;
+  class DynamicSelfType;
   class ModuleEntity;
   class TypeDecl;
   class Type;
@@ -39,6 +40,8 @@ enum class PrintNameContext {
   Keyword,
   /// Generic parameter context, where 'Self' is not escaped.
   GenericParameter,
+  /// Class method return type, where 'Self' is not escaped.
+  ClassDynamicSelf,
   /// Function parameter context, where keywords other than let/var/inout are
   /// not escaped.
   FunctionParameterExternal,
@@ -143,6 +146,8 @@ public:
   virtual void printNamePost(PrintNameContext Context) {}
 
   // Helper functions.
+
+  void printTypeRef(const DynamicSelfType *T, Identifier Name);
 
   void printSeparator(bool &first, StringRef separator) {
     if (first) {

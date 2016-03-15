@@ -667,6 +667,24 @@ void ASTPrinter::printTypeRef(const TypeDecl *TD, Identifier Name) {
   printName(Name, Context);
 }
 
+void ASTPrinter::printTypeRef(const DynamicSelfType *T, Identifier Name) {
+  // Try to print as a reference to the static type so that we will get a USR,
+  // in cursor info.
+  if (auto staticSelfT = T->getSelfType()) {
+    // Handle protocol 'Self', which is an archetype.
+    if (auto AT = staticSelfT->getAs<ArchetypeType>()) {
+      if (auto GTD = AT->getSelfProtocol()->getProtocolSelf()) {
+        assert(GTD->isProtocolSelf());
+        printTypeRef(GTD, Name);
+        return;
+      }
+    }
+  }
+
+  // If that fails, just print the name.
+  printName(Name, PrintNameContext::ClassDynamicSelf);
+}
+
 void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
 }
@@ -730,6 +748,7 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   case PrintNameContext::Keyword:
     return false;
 
+  case PrintNameContext::ClassDynamicSelf:
   case PrintNameContext::GenericParameter:
     return keyword != "Self";
 
@@ -3423,7 +3442,7 @@ public:
   }
 
   void visitDynamicSelfType(DynamicSelfType *T) {
-    Printer << "Self";
+    Printer.printTypeRef(T, T->getASTContext().Id_Self);
   }
 
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
