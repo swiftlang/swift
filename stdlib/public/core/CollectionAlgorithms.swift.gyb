@@ -135,8 +135,8 @@ ${orderingRequirementForComparable}
 
 %   end
 
-    let maybeResult = _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> Index in
+    let maybeOffset = _withUnsafeMutableBufferPointerIfSupported {
+      (baseAddress, count) -> Int in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
       let unsafeBufferPivot = bufferPointer.partition(
@@ -144,12 +144,10 @@ ${orderingRequirementForComparable}
         isOrderedBefore: isOrderedBefore
 %   end
         )
-      return advance(
-        startIndex,
-        by: numericCast(unsafeBufferPivot - bufferPointer.startIndex))
+      return unsafeBufferPivot - bufferPointer.startIndex
     }
-    if let result = maybeResult {
-      return result
+    if let offset = maybeOffset {
+      return advance(startIndex, by: numericCast(offset))
     }
 
 %   if preds:
