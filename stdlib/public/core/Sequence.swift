@@ -71,12 +71,19 @@ public protocol Sequence {
   /// encapsulates its iteration state.
   associatedtype Iterator : IteratorProtocol
 
-  // FIXME: should be constrained to Sequence
-  // (<rdar://problem/20715009> Implement recursive protocol
-  // constraints)
-
   /// A type that represents a subsequence of some of the elements.
   associatedtype SubSequence
+  // FIXME(compiler limitation):
+  // associatedtype SubSequence : Sequence
+  //   where
+  //   Iterator.Element == SubSequence.Iterator.Element,
+  //   SubSequence.SubSequence == SubSequence
+  //
+  // (<rdar://problem/20715009> Implement recursive protocol
+  // constraints)
+  //
+  // These constraints allow processing collections in generic code by
+  // repeatedly slicing them in a loop.
 
   /// Returns an iterator over the elements of this sequence.
   ///
