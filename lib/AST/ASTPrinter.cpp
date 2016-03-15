@@ -3855,10 +3855,18 @@ public:
       if (T->getName().empty())
         Printer << "<anonymous>";
       else {
-        PrintNameContext context = PrintNameContext::Normal;
-        if (T->getSelfProtocol())
-          context = PrintNameContext::GenericParameter;
-        Printer.printName(T->getName(), context);
+        // Print protocol 'Self' as a generic parameter so that it gets
+        // annotated in cursor info.
+        // FIXME: in a protocol extension, we really want the extension, not the
+        // protocol.
+        if (auto *P = T->getSelfProtocol()) {
+          auto *GTD = P->getProtocolSelf();
+          assert(GTD && GTD->isProtocolSelf());
+          Printer.printTypeRef(T, GTD, T->getName());
+          return;
+        }
+
+        Printer.printName(T->getName());
       }
     }
   }
