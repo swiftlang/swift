@@ -7,7 +7,4 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-func b{{
-protocol P{func b
-func b<T where T=e
-typealias e
+.A[
