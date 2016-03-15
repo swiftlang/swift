@@ -827,6 +827,8 @@ class ProjectionTree {
 
 public:
   /// Construct a projection tree from BaseTy.
+  ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator) 
+    : Mod(Mod), Allocator(Allocator) {}
   ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
                  SILType BaseTy);
   ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
@@ -841,6 +843,10 @@ public:
   /// Compute liveness and use information in this projection tree using Base.
   /// All debug instructions (debug_value, debug_value_addr) are ignored.
   void computeUsesAndLiveness(SILValue Base);
+
+  /// Initialize an empty projection tree with an existing, computed projection
+  /// true.
+  void initializeWithExistingTree(const ProjectionTree &PT);
 
   /// Create a root SILValue iout of the given leaf node values by walking on
   /// the projection tree.
