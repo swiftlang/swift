@@ -114,3 +114,19 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
   return false;
 }
 
+bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
+  if (ED->getExtendedType().isNull())
+    return true;
+
+  // We make up a unique usr for each extension by combining the usr of the
+  // extended type and the first value member of the extension.
+  if (printDeclUSR(ED->getExtendedType()->getAnyNominal(), OS))
+    return true;
+  for (auto D : ED->getMembers()) {
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      return printDeclUSR(VD, OS);
+    }
+  }
+  return true;
+}
+

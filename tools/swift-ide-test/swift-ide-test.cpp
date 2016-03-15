@@ -2120,6 +2120,21 @@ public:
       OS << " ";
       printDocComment(D);
       OS << "\n";
+    } else if (D->getKind() == DeclKind::Extension) {
+      SourceLoc Loc = D->getLoc();
+      if (Loc.isValid()) {
+        auto LineAndColumn = SM.getLineAndColumn(Loc);
+        OS << getBufferIdentifier(D->getLoc())
+        << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
+      }
+      OS << Decl::getKindName(D->getKind()) << "/";
+      OS << " ";
+      printRawComment(D->getRawComment());
+      OS << " ";
+      printBriefComment(D->getBriefComment());
+      OS << " ";
+      printDocComment(D);
+      OS << "\n";
     }
     return true;
   }

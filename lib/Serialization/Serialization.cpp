@@ -3600,8 +3600,8 @@ class DeclGroupNameContext {
     const bool Enable;
     GroupNameCollector(bool Enable) : Enable(Enable) {}
     virtual ~GroupNameCollector() = default;
-    virtual StringRef getGroupNameInternal(const ValueDecl *VD) = 0;
-    StringRef getGroupName(const ValueDecl *VD) {
+    virtual StringRef getGroupNameInternal(const Decl *VD) = 0;
+    StringRef getGroupName(const Decl *VD) {
       return Enable ? getGroupNameInternal(VD) : StringRef(NullGroupName);
     };
   };
@@ -3609,7 +3609,7 @@ class DeclGroupNameContext {
   // FIXME: Implement better name collectors.
   struct GroupNameCollectorFromFileName : public GroupNameCollector {
     GroupNameCollectorFromFileName(bool Enable) : GroupNameCollector(Enable) {}
-    StringRef getGroupNameInternal(const ValueDecl *VD) override {
+    StringRef getGroupNameInternal(const Decl *VD) override {
       auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
       if (!PathOp.hasValue())
         return NullGroupName;
@@ -3627,7 +3627,7 @@ class DeclGroupNameContext {
     GroupNameCollectorFromJson(StringRef RecordPath, ASTContext &Ctx) :
       GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath),
       Ctx(Ctx) {}
-    StringRef getGroupNameInternal(const ValueDecl *VD) override {
+    StringRef getGroupNameInternal(const Decl *VD) override {
       // We need the file path, so there has to be a location.
       if (VD->getLoc().isInvalid())
         return NullGroupName;
@@ -3663,7 +3663,7 @@ class DeclGroupNameContext {
 public:
   DeclGroupNameContext(StringRef RecordPath, ASTContext &Ctx) :
     pNameCollector(new GroupNameCollectorFromJson(RecordPath, Ctx)) {}
-  uint32_t getGroupSequence(const ValueDecl *VD) {
+  uint32_t getGroupSequence(const Decl *VD) {
     return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
                                      Map.size())).first->second;
   }
@@ -3721,7 +3721,29 @@ static void writeDeclCommentTable(
       return StringRef(Mem, String.size());
     }
 
+    void writeDocForExtensionDecl(ExtensionDecl *ED) {
+      RawComment Raw = ED->getRawComment();
+      if (Raw.Comments.empty() && !GroupContext.isEnable())
+        return;
+      // Compute USR.
+      {
+        USRBuffer.clear();
+        llvm::raw_svector_ostream OS(USRBuffer);
+        if (ide::printExtensionUSR(ED, OS))
+          return;
+      }
+      generator.insert(copyString(USRBuffer.str()),
+                       { ED->getBriefComment(), Raw,
+                         GroupContext.getGroupSequence(ED),
+                         SourceOrder ++ });
+    }
+
     bool walkToDeclPre(Decl *D) override {
+      if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+        writeDocForExtensionDecl(ED);
+        return true;
+      }
+
       auto *VD = dyn_cast<ValueDecl>(D);
       if (!VD)
         return true;

@@ -45,6 +45,16 @@ class first_decl_class_1 {
   func decl_func_3() {}
 }
 
+/// Comment for bar1
+extension first_decl_class_1 {
+  func bar1(){}
+}
+
+/// Comment for bar2
+extension first_decl_class_1 {
+  func bar2(){}
+}
+
 // FIRST: Class/first_decl_generic_class_1 RawComment=[/// first_decl_generic_class_1 Aaa.\n]
 // FIRST: Destructor/first_decl_generic_class_1.deinit RawComment=[/// deinit of first_decl_generic_class_1 Aaa.\n]
 // FIRST: Class/first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.\n]
@@ -53,4 +63,5 @@ class first_decl_class_1 {
 // FIRST: Func/first_decl_class_1.decl_func_3 RawComment=[/// decl_func_3 Aaa.\n/** Bbb. */]
 
 // SECOND: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
-
+// SECOND: Extension/ RawComment=[/// Comment for bar1\n] BriefComment=[Comment for bar1]
+// SECOND: Extension/ RawComment=[/// Comment for bar2\n] BriefComment=[Comment for bar2]
