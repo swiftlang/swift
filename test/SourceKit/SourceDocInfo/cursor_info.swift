@@ -185,7 +185,7 @@ class C7 {
 // CHECK2-NEXT: s:ZFsoi1pFTSiSi_Si
 // CHECK2-NEXT: (Int, Int) -> Int{{$}}
 // CHECK2-NEXT: Swift{{$}}
-// CHECK2-NEXT: <Group>Math</Group>
+// CHECK2-NEXT: <Group>Math/Integers</Group>
 // CHECK2-NEXT: SYSTEM
 // CHECK2-NEXT: <Declaration>func +(lhs: <Type usr="s:Si">Int</Type>, rhs: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type></Declaration>
 // CHECK2-NEXT: <decl.function.operator.infix><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>+</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.operator.infix>

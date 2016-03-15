@@ -1640,7 +1640,8 @@ struct GroupNamesPrinter {
   void addDecl(const Decl *D) {
     if(auto VD = dyn_cast<ValueDecl>(D)) {
       if (!VD->isImplicit() && !VD->isPrivateStdlibDecl()) {
-        StringRef Name = VD->getGroupName().getValue();
+        StringRef Name = VD->getGroupName().hasValue() ?
+          VD->getGroupName().getValue() : "";
         Groups.insert(Name.empty() ? "<NULL>" : Name);
       }
     }
