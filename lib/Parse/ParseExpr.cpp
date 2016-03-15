@@ -1450,13 +1450,14 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     }
     First = false;
   }
-  
+
   if (Exprs.empty()) {
     Status.setIsParseError();
     return makeParserResult(Status, new (Context) ErrorExpr(Loc));
   }
 
-  return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(Loc, Context.AllocateCopy(Exprs)));
+  return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
+                                      Loc, Context.AllocateCopy(Exprs)));
 }
 
 void Parser::diagnoseEscapedArgumentLabel(const Token &tok) {
