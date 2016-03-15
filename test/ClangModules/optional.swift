@@ -37,10 +37,11 @@ class A {
 // CHECK-NEXT: cond_br [[T1]]
 //   Something branch: project value, translate, inject into result.
 // CHECK:      [[NSSTR:%.*]] = unchecked_enum_data %0
-// CHECK:      [[T0:%.*]] = function_ref @swift_NSStringToString
+// CHECK:      [[T0:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
 //   Make a temporary initialized string that we're going to clobber as part of the conversion process (?).
 // CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]] : $NSString
-// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR_BOX]])
+// CHECK-NEXT: [[STRING_META:%.*]] = metatype $@thin String.Type
+// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR_BOX]], [[STRING_META]])
 // CHECK-NEXT: enum $Optional<String>, #Optional.some!enumelt.1, [[T1]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.

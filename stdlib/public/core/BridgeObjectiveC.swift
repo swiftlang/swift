@@ -73,6 +73,40 @@ public protocol _ObjectiveCBridgeable {
     source: _ObjectiveCType,
     result: inout Self?
   ) -> Bool
+
+  /// Bridge from an Objective-C object of the bridged class type to a
+  /// value of the Self type.
+  ///
+  /// This bridging operation is used for unconditional bridging when
+  /// interoperating with Objective-C code, either in the body of an
+  /// Objective-C thunk or when calling Objective-C code, and may
+  /// defer complete checking until later. For example, when bridging
+  /// from `NSArray` to `Array<Element>`, we can defer the checking
+  /// for the individual elements of the array.
+  ///
+  /// \param source The Objective-C object from which we are
+  /// bridging. This optional value will only be `nil` in cases where
+  /// an Objective-C method has returned a `nil` despite being marked
+  /// as `_Nonnull`/`nonnull`. In most such cases, bridging will
+  /// generally force the value immediately. However, this gives
+  /// bridging the flexibility to substitute a default value to cope
+  /// with historical decisions, e.g., an existing Objective-C method
+  /// that returns `nil` to for "empty result" rather than (say) an
+  /// empty array. In such cases, when `nil` does occur, the
+  /// implementation of `Swift.Array`'s conformance to
+  /// `_ObjectiveCBridgeable` will produce an empty array rather than
+  /// dynamically failing.
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self
+}
+
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
 }
 
 //===--- Bridging for metatypes -------------------------------------------===//
