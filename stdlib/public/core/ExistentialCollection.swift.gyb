@@ -215,7 +215,7 @@ internal class _AnyBidirectionalCollectionBox<Element>
   : _AnyCollectionBox<Element> {
 
   internal func _previous(i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func __previousInPlace(i: inout _AnyIndexBox) { _abstract() }
+  internal func __previousInPlace(i: _AnyIndexBox) { _abstract() }
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
@@ -311,6 +311,7 @@ internal final class _${Kind}Box<
     super.init(_startIndex: startIndex, endIndex: endIndex)
   }
   
+  @warn_unused_result
   internal override func _next(position: _AnyIndexBox) -> _AnyIndexBox {
     return _IndexBox(_base: _base.next(_unbox(position)))
   }
@@ -321,6 +322,23 @@ internal final class _${Kind}Box<
     }
     fatalError("Index type mismatch!")
   }
+  
+%     if Kind in ['BidirectionalCollection', 'RandomAccessCollection']:
+
+  @warn_unused_result
+  internal override func _previous(position: _AnyIndexBox) -> _AnyIndexBox {
+    return _IndexBox(_base: _base.previous(_unbox(position)))
+  }
+  
+  internal override func __previousInPlace(position: _AnyIndexBox) {
+    if let p = position as? _IndexBox<S.Index> {
+      return _base._previousInPlace(&p._base)
+    }
+    fatalError("Index type mismatch!")
+  }
+
+%     end
+
 %   end
   internal var _base: S
 }
@@ -590,6 +608,8 @@ public func !== <
 }
 
 % for (ti, Traversal) in enumerate(traversals):
+%   SelfProtocol = collectionForTraversal(Traversal)
+%   Self = 'Any' + SelfProtocol
 /// A type-erased wrapper over any collection with indices that
 /// support ${Traversal.lower().replace('omacc', 'om acc')} traversal.
 ///
@@ -598,32 +618,33 @@ public func !== <
 /// `Collection`.
 ///
 /// - SeeAlso: ${', '.join('`Any%sType`' % t for t in (2 * traversals)[ti + 1 : ti + 3]) }
-public struct Any${collectionForTraversal(Traversal)}<Element>
-  : AnyCollectionProtocol {
+public struct ${Self}<Element>
+  : AnyCollectionProtocol, ${SelfProtocol} {
 
 %   for SubTraversal in traversals[ti:]:
-  /// Create an `Any${collectionForTraversal(Traversal)}` that
+%     SubProtocol = collectionForTraversal(SubTraversal)
+  /// Create an `${Self}` that
   /// stores `base` as its underlying collection.
   ///
   /// - Complexity: O(1).
   public init<
-    C : ${collectionForTraversal(SubTraversal)}
+    C : ${SubProtocol}
     where
     C.Iterator.Element == Element,
 
     // FIXME(compiler limitation): these constraints should be applied to
     // associated types of Collection.
-    C.SubSequence : ${collectionForTraversal(SubTraversal)},
+    C.SubSequence : ${SubProtocol},
     C.SubSequence.Iterator.Element == Element,
     C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : ${collectionForTraversal(SubTraversal)},
+    C.Indices : ${SubProtocol},
     C.Indices.Iterator.Element == C.Index,
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices
   >(_ base: C) {
     // Traversal: ${Traversal}
     // SubTraversal: ${SubTraversal}
-    self._box = _${collectionForTraversal(SubTraversal)}Box<C>(
+    self._box = _${SubProtocol}Box<C>(
       _base: base,
       startIndex: _IndexBox(_base: base.startIndex),
       endIndex: _IndexBox(_base: base.endIndex))
@@ -636,7 +657,7 @@ public struct Any${collectionForTraversal(Traversal)}<Element>
   ///
   /// - Complexity: O(1).
   public init(
-    _ other: Any${collectionForTraversal(SubTraversal)}<Element>
+    _ other: Any${SubProtocol}<Element>
   ) {
     self._box = other._box
   }
@@ -644,16 +665,16 @@ public struct Any${collectionForTraversal(Traversal)}<Element>
 
 %   for SuperTraversal in traversals[:ti]:
   /// If the underlying collection stored by `other` satisfies
-  /// `${collectionForTraversal(Traversal)}`, create an
-  /// `Any${collectionForTraversal(Traversal)}` having the same underlying
-  /// collection as `other`.  Otherwise, the result is `nil`.
+  /// `${SelfProtocol}`, create an `${Self}` having the same
+  /// underlying collection as `other`.  Otherwise, the result is
+  /// `nil`.
   ///
   /// - Complexity: O(1).
   public init?(
     _ other: Any${collectionForTraversal(SuperTraversal)}<Element>
   ) {
     guard let box =
-      other._box as? _Any${collectionForTraversal(Traversal)}Box<Element> else {
+      other._box as? _${Self}Box<Element> else {
       return nil
     }
     self._box = box
@@ -695,7 +716,7 @@ public struct Any${collectionForTraversal(Traversal)}<Element>
   }
 
   public subscript(bounds: Range<AnyIndex>)
-    -> Any${collectionForTraversal(Traversal)}<Element>
+    -> ${Self}<Element>
   {
     fatalError("FIXME: swift-3-indexing-model: implement")
   }
@@ -723,11 +744,16 @@ public struct Any${collectionForTraversal(Traversal)}<Element>
 
 %   if Traversal == 'Bidirectional' or Traversal == 'RandomAccess':
   public func previous(i: AnyIndex) -> AnyIndex {
-    fatalError("FIXME: swift-3-indexing-model: implement")
+    return AnyIndex(_box: _box._previous(i._box))
   }
 
   public func _previousInPlace(i: inout AnyIndex) {
-    fatalError("FIXME: swift-3-indexing-model: implement")
+    if _isUnique(&i._box) {
+      _box.__previousInPlace(i._box)
+    }
+    else {
+      i = next(i)
+    }
   }
 %   end
 
@@ -737,7 +763,7 @@ public struct Any${collectionForTraversal(Traversal)}<Element>
     return ObjectIdentifier(_box)
   }
 
-  internal let _box: _Any${collectionForTraversal(Traversal)}Box<Element>
+  internal let _box: _${Self}Box<Element>
 }
 % end
 
