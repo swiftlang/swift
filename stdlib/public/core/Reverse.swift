@@ -249,6 +249,9 @@ public func > <Base : Collection>(
 public struct ReverseRandomAccessCollection<
   Base : RandomAccessCollection
 > : RandomAccessCollection {
+  // FIXME: swift-3-indexing-model: tests for ReverseRandomAccessIndex and
+  // ReverseRandomAccessCollection.
+
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
@@ -292,20 +295,21 @@ public struct ReverseRandomAccessCollection<
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
+    // FIXME: swift-3-indexing-model: tests.
     return ReverseRandomAccessIndex(_base.advance(i.base, by: -n))
   }
 
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    //return Index(_base.advance(i.base, by: -n, limit: ???)
-    fatalError("FIXME: swift-3-indexing-model")
+    // FIXME: swift-3-indexing-model: tests.
+    return Index(_base.advance(i.base, by: -n, limit: limit.base))
   }
 
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    //return
-    fatalError("FIXME: swift-3-indexing-model")
+    // FIXME: swift-3-indexing-model: tests.
+    return _base.distance(from: end.base, to: start.base)
   }
 
   public typealias _Element = Base.Iterator.Element
