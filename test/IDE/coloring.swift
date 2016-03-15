@@ -465,6 +465,13 @@ _ = -0x123
 _ = -3.1e-5
 // CHECK: <float>-3.1e-5</float>
 
+/** aaa
+
+
+ - returns: something
+ */
+// CHECK:  - <doc-comment-field>returns</doc-comment-field>: something
+
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
 

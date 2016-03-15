@@ -1471,11 +1471,15 @@ bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
   if (Text.empty())
     return true;
 
-  auto FirstNewLine = Text.find('\n');
-  if (FirstNewLine == StringRef::npos)
+  llvm::SmallVector<StringRef, 8> RawLines;
+  Text.split(RawLines, '\n');
+  auto FirstNewLine = std::find_if(RawLines.begin(), RawLines.end(),
+    [](StringRef Line) { return !Line.trim().empty(); });
+
+  if (FirstNewLine == RawLines.end())
     return true;
 
-  Text = Text.substr(FirstNewLine + 1);
+  Text = Text.substr(FirstNewLine->data() - Text.data());
   if (Text.empty())
     return true;
 
