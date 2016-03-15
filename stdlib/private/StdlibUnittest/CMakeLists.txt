@@ -35,7 +35,7 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   RaceTest.swift
   Statistics.swift
   StdlibCoreExtras.swift
-  StringConvertible.swift
+  StringConvertible.swift.gyb
   TestHelpers.swift
   TypeIndexed.swift
   ${swift_stdlib_unittest_platform_sources}

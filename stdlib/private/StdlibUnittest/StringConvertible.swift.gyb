@@ -1,4 +1,4 @@
-//===--- StringConvertible.swift ------------------------------------------===//
+//===--- StringConvertible.swift.gyb --------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,10 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+%{
+from gyb_stdlib_unittest_support import TRACE, TRACE1, stackTrace, trace
+}%
 
 /// A type that has different `CustomStringConvertible` and
 /// `CustomDebugStringConvertible` representations.
@@ -107,3 +111,44 @@ extension CustomPrintableValue : CustomDebugStringConvertible {
   }
 }
 
+public func expectPrinted<T>(
+  expectedOneOf patterns: [String], _ object: T, ${TRACE}
+) {
+  let actual = String(object)
+  if !patterns.contains(actual) {
+    expectationFailure(
+      "expected: any of \(String(reflecting: patterns))\n"
+      + "actual: \(String(reflecting: actual))",
+      trace: ${trace})
+  }
+}
+
+public func expectPrinted<T>(
+  expected: String, _ object: T, ${TRACE}
+) {
+  expectPrinted(expectedOneOf: [expected], object, ${trace})
+}
+
+public func expectDebugPrinted<T>(
+  expectedOneOf patterns: [String], _ object: T, ${TRACE}
+) {
+  expectPrinted(expectedOneOf: patterns, String(reflecting: object), ${trace})
+}
+
+public func expectDebugPrinted<T>(
+  expected: String, _ object: T, ${TRACE}
+) {
+  expectDebugPrinted(expectedOneOf: [expected], object, ${trace})
+}
+
+public func expectDumped<T>(
+  expected: String, _ object: T, ${TRACE}
+) {
+  var actual = ""
+  dump(object, to: &actual)
+  expectEqual(expected, actual, ${trace})
+}
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
