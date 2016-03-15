@@ -94,19 +94,16 @@ extension String.CharacterView : BidirectionalCollection {
     ///
     /// - Precondition: The next value is representable.
     // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.next(Index)
-    /*
-    public func successor() -> Index {
+    internal func _successor() -> Index {
       _precondition(_base != _base._viewEndIndex, "cannot increment endIndex")
       return Index(_base: _endBase)
     }
-    */
 
     /// Returns the previous consecutive value before `self`.
     ///
     /// - Precondition: The previous value is representable.
     // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.previous(Index)
-    /*
-    public func predecessor() -> Index {
+    internal func _predecessor() -> Index {
       _precondition(_base != _base._viewStartIndex,
           "cannot decrement startIndex")
       let predecessorLengthUTF16 =
@@ -115,7 +112,6 @@ extension String.CharacterView : BidirectionalCollection {
         _base: UnicodeScalarView.Index(
           _utf16Index - predecessorLengthUTF16, _base._core))
     }
-    */
 
     internal let _base: UnicodeScalarView.Index
 
@@ -243,35 +239,13 @@ extension String.CharacterView : BidirectionalCollection {
   @warn_unused_result
   public func next(i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
-    fatalError("FIXME: swift-3-indexing-model implement")
+    return i._successor()
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func previous(i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range check i?
-    fatalError("FIXME: swift-3-indexing-model implement")
-  }
-
-  // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
-    // FIXME: swift-3-indexing-model: range check i?
-    fatalError("FIXME: swift-3-indexing-model implement")
-  }
-
-  // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range check i?
-    fatalError("FIXME: swift-3-indexing-model implement")
-  }
-
-  // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
-    // FIXME: swift-3-indexing-model: range check start and end?
-    fatalError("FIXME: swift-3-indexing-model implement")
+    return i._predecessor()
   }
 
   /// Access the `Character` at `position`.
