@@ -118,7 +118,11 @@ public:
 
   /// Called when printing the referenced name of a type declaration, possibly
   /// from deep inside another type.
-  virtual void printTypeRef(const TypeDecl *TD, Identifier Name);
+  ///
+  /// \param T the original \c Type being referenced. May be null.
+  /// \param RefTo the \c TypeDecl this is considered a reference to.
+  /// \param Name the name to be printed.
+  virtual void printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name);
 
   /// Called when printing the referenced name of a module.
   virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
@@ -147,7 +151,7 @@ public:
 
   // Helper functions.
 
-  void printTypeRef(const DynamicSelfType *T, Identifier Name);
+  void printTypeRef(DynamicSelfType *T, Identifier Name);
 
   void printSeparator(bool &first, StringRef separator) {
     if (first) {

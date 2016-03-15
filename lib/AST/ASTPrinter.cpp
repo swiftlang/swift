@@ -657,17 +657,21 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   printText(Text);
 }
 
-void ASTPrinter::printTypeRef(const TypeDecl *TD, Identifier Name) {
+void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name) {
   PrintNameContext Context = PrintNameContext::Normal;
-  if (auto GP = dyn_cast<GenericTypeParamDecl>(TD)) {
+  if (auto GP = dyn_cast<GenericTypeParamDecl>(RefTo)) {
     if (GP->isProtocolSelf())
       Context = PrintNameContext::GenericParameter;
+  } else if (T && T->is<DynamicSelfType>()) {
+    assert(T->getAs<DynamicSelfType>()->getSelfType()->getAnyNominal() &&
+           "protocol Self handled as GenericTypeParamDecl");
+    Context = PrintNameContext::ClassDynamicSelf;
   }
 
   printName(Name, Context);
 }
 
-void ASTPrinter::printTypeRef(const DynamicSelfType *T, Identifier Name) {
+void ASTPrinter::printTypeRef(DynamicSelfType *T, Identifier Name) {
   // Try to print as a reference to the static type so that we will get a USR,
   // in cursor info.
   if (auto staticSelfT = T->getSelfType()) {
@@ -675,9 +679,14 @@ void ASTPrinter::printTypeRef(const DynamicSelfType *T, Identifier Name) {
     if (auto AT = staticSelfT->getAs<ArchetypeType>()) {
       if (auto GTD = AT->getSelfProtocol()->getProtocolSelf()) {
         assert(GTD->isProtocolSelf());
-        printTypeRef(GTD, Name);
+        printTypeRef(T, GTD, Name);
         return;
       }
+
+    // Handle class 'Self', which is just a class type.
+    } else if (auto *NTD = staticSelfT->getAnyNominal()) {
+      printTypeRef(T, NTD, Name);
+      return;
     }
   }
 
@@ -1918,7 +1927,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
     return;
   }
 
-  Printer.printTypeRef(Nominal, Nominal->getName());
+  Printer.printTypeRef(ExtendedType, Nominal, Nominal->getName());
 }
 
 void PrintAST::
@@ -3148,7 +3157,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   template <typename T>
   void printTypeDeclName(T *Ty) {
     TypeDecl *TD = Ty->getDecl();
-    Printer.printTypeRef(TD, TD->getName());
+    Printer.printTypeRef(Ty, TD, TD->getName());
   }
 
   // FIXME: we should have a callback that would tell us

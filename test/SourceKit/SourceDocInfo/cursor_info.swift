@@ -613,5 +613,5 @@ class C7 {
 // CHECK76: source.lang.swift.decl.function.method.instance (169:8-169:11)
 // CHECK76: (Self) -> () -> Self
 // FIXME: should have tags and a USR
-// CHECK76: <Declaration>func f() -&gt; Self</Declaration>
-// CHECK76: <decl.function.returntype>Self</decl.function.returntype>
+// CHECK76: <Declaration>func f() -&gt; <Type usr="s:C11cursor_info2C7">Self</Type></Declaration>
+// CHECK76: <decl.function.returntype><ref.class usr="s:C11cursor_info2C7">Self</ref.class></decl.function.returntype>
