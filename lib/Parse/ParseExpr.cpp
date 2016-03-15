@@ -865,7 +865,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     SWIFT_FALLTHROUGH;
       
   case tok::string_literal:  // "foo"
-    Result = makeParserResult(parseExprStringLiteral());
+    Result = parseExprStringLiteral();
     break;
   
   case tok::kw_nil:
@@ -1383,7 +1383,7 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
 
 ///   expr-literal:
 ///     string_literal
-Expr *Parser::parseExprStringLiteral() {
+ParserResult<Expr> Parser::parseExprStringLiteral() {
   SmallVector<Lexer::StringSegment, 1> Segments;
   L->getStringLiteralSegments(Tok, Segments);
   SourceLoc Loc = consumeToken();
@@ -1391,10 +1391,11 @@ Expr *Parser::parseExprStringLiteral() {
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
       Segments.front().Kind == Lexer::StringSegment::Literal) {
-    return createStringLiteralExprFromSegment(Context, L, Segments.front(),
-                                              Loc);
+    return makeParserResult(
+        createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
   }
-    
+
+  ParserStatus Status;
   SmallVector<Expr*, 4> Exprs;
   bool First = true;
   for (auto Segment : Segments) {
@@ -1436,6 +1437,7 @@ Expr *Parser::parseExprStringLiteral() {
       assert(Tok.is(tok::l_paren));
       
       ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
+      Status |= E;
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
 
@@ -1449,11 +1451,12 @@ Expr *Parser::parseExprStringLiteral() {
     First = false;
   }
   
-  if (Exprs.empty())
-    return new (Context) ErrorExpr(Loc);
+  if (Exprs.empty()) {
+    Status.setIsParseError();
+    return makeParserResult(Status, new (Context) ErrorExpr(Loc));
+  }
 
-  return new (Context) InterpolatedStringLiteralExpr(Loc,
-                                        Context.AllocateCopy(Exprs));
+  return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(Loc, Context.AllocateCopy(Exprs)));
 }
 
 void Parser::diagnoseEscapedArgumentLabel(const Token &tok) {
