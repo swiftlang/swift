@@ -32,47 +32,12 @@ public func == <Base : Collection>(
 }
 
 @warn_unused_result
-public func != <Base : Collection>(
-  lhs: ReverseIndex<Base>,
-  rhs: ReverseIndex<Base>
-) -> Bool {
-  return lhs.base != rhs.base
-}
-
-@warn_unused_result
 public func < <Base : Collection>(
   lhs: ReverseIndex<Base>,
   rhs: ReverseIndex<Base>
 ) -> Bool {
   // Note ReverseIndex has inverted logic compared to base Base.Index
   return lhs.base > rhs.base
-}
-
-@warn_unused_result
-public func <= <Base : Collection>(
-  lhs: ReverseIndex<Base>,
-  rhs: ReverseIndex<Base>
-) -> Bool {
-  // Note ReverseIndex has inverted logic compared to base Base.Index
-  return lhs.base >= rhs.base
-}
-
-@warn_unused_result
-public func >= <Base : Collection>(
-  lhs: ReverseIndex<Base>,
-  rhs: ReverseIndex<Base>
-) -> Bool {
-  // Note ReverseIndex has inverted logic compared to base Base.Index
-  return lhs.base <= rhs.base
-}
-
-@warn_unused_result
-public func > <Base : Collection>(
-  lhs: ReverseIndex<Base>,
-  rhs: ReverseIndex<Base>
-) -> Bool {
-  // Note ReverseIndex has inverted logic compared to base Base.Index
-  return lhs.base < rhs.base
 }
 
 /// A Collection that presents the elements of its `Base` collection
