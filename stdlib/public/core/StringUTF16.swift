@@ -199,8 +199,8 @@ extension String {
     let startUTF16 = UTF16Index(_offset: utf16._offset)
     let endUTF16 = UTF16Index(_offset: utf16._offset + utf16._length)
 
-    if let start = wholeString.index(equivalentTo: startUTF16),
-       let end = wholeString.index(equivalentTo: endUTF16) {
+    if let start = wholeString._index(equivalentTo: startUTF16),
+       let end = wholeString._index(equivalentTo: endUTF16) {
       self = wholeString[start..<end]
       return
     }
@@ -231,7 +231,7 @@ public func < (
 extension String.UTF16View {
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo utf8Index: String.UTF8Index
   ) -> String.UTF16Index? {
     _precondition(
@@ -247,7 +247,7 @@ extension String.UTF16View {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo unicodeScalarIndex: String.UnicodeScalarIndex
   ) -> String.UTF16Index? {
     // FIXME: swift-3-indexing-model: range check?
@@ -256,7 +256,7 @@ extension String.UTF16View {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo stringIndex: String.Index
   ) -> String.UTF16Index? {
     // FIXME: swift-3-indexing-model: range check?

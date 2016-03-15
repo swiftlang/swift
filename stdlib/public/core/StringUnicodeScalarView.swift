@@ -281,7 +281,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
 extension String.UnicodeScalarView {
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo utf8Index: String.UTF8Index
   ) -> String.UnicodeScalarIndex? {
     _precondition(
@@ -298,7 +298,7 @@ extension String.UnicodeScalarView {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo utf16Index: String.UTF16Index
   ) -> String.UnicodeScalarIndex? {
     let utf16 = String.UTF16View(_core)
@@ -323,7 +323,7 @@ extension String.UnicodeScalarView {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo stringIndex: String.Index
   ) -> String.UnicodeScalarIndex? {
     // FIXME: swift-3-indexing-model: range check?

@@ -928,26 +928,26 @@ extension String {
 extension String {
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo utf8Index: String.UTF8Index
   ) -> String.Index? {
-    return characters.index(equivalentTo: utf8Index)
+    return characters._index(equivalentTo: utf8Index)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo utf16Index: String.UTF16Index
   ) -> String.Index? {
-    return characters.index(equivalentTo: utf16Index)
+    return characters._index(equivalentTo: utf16Index)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo unicodeScalarIndex: String.UnicodeScalarIndex
   ) -> String.Index? {
-    return characters.index(equivalentTo: unicodeScalarIndex)
+    return characters._index(equivalentTo: unicodeScalarIndex)
   }
 }
 

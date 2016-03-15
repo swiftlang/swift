@@ -284,7 +284,7 @@ extension String.CharacterView {
 extension String.CharacterView {
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo utf8Index: String.UTF8Index
   ) -> Index? {
     fatalError("FIXME: swift-3-indexing-model: implement")
@@ -303,7 +303,7 @@ extension String.CharacterView {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo utf16Index: String.UTF16Index
   ) -> Index? {
     fatalError("FIXME: swift-3-indexing-model: implement")
@@ -322,7 +322,7 @@ extension String.CharacterView {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
+  public func _index(
     equivalentTo unicodeScalarIndex: String.UnicodeScalarIndex
   ) -> Index? {
     fatalError("FIXME: swift-3-indexing-model: implement")
