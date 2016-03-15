@@ -167,7 +167,7 @@ internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element> {
   */
   @warn_unused_result
   internal func _next(i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func __nextInPlace(i: inout _AnyIndexBox) { _abstract() }
+  internal func __nextInPlace(i: _AnyIndexBox) { _abstract() }
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
@@ -288,12 +288,20 @@ internal final class _${Kind}Box<
   internal override var _count: IntMax {
     return numericCast(_base.count)
   }
-  internal override subscript(position: _AnyIndexBox) -> Element {
-    guard let i = position._unbox() as S.Index? else {
-      fatalError("Index type mismatch!")
+
+  internal func _unbox(
+    position: _AnyIndexBox, file: StaticString = #file, line: UInt = #line
+  ) -> S.Index {
+    if let i = position._unbox() as S.Index? {
+      return i
     }
-    return _base[i]
+    fatalError("Index type mismatch!", file: file, line: line)
   }
+  
+  internal override subscript(position: _AnyIndexBox) -> Element {
+    return _base[_unbox(position)]
+  }
+  
   internal init(
     _base: S,
     startIndex: _AnyIndexBox,
@@ -301,6 +309,17 @@ internal final class _${Kind}Box<
   ) {
     self._base = _base
     super.init(_startIndex: startIndex, endIndex: endIndex)
+  }
+  
+  internal override func _next(position: _AnyIndexBox) -> _AnyIndexBox {
+    return _IndexBox(_base: _base.next(_unbox(position)))
+  }
+  
+  internal override func __nextInPlace(position: _AnyIndexBox) {
+    if let p = position as? _IndexBox<S.Index> {
+      return _base._nextInPlace(&p._base)
+    }
+    fatalError("Index type mismatch!")
   }
 %   end
   internal var _base: S
@@ -444,15 +463,9 @@ internal final class _IndexBox<
 
   @warn_unused_result
   internal func _unbox<T : Comparable>() -> T? {
-    if T.self is BaseIndex.Type {
-      _sanityCheck(BaseIndex.self is T.Type)
-      // This bit cast is really nothing as we have proven they are
-      // the same type.
-      return unsafeBitCast(_base, to: T.self)
-    }
-    return nil
+    return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
-
+  
   @warn_unused_result
   internal func _equal(to rhs: _AnyIndexBox) -> Bool {
     return _base == _unsafeUnbox(rhs)
@@ -696,11 +709,16 @@ public struct Any${collectionForTraversal(Traversal)}<Element>
 
   @warn_unused_result
   public func next(i: AnyIndex) -> AnyIndex {
-    fatalError("FIXME: swift-3-indexing-model: implement")
+    return AnyIndex(_box: _box._next(i._box))
   }
 
   public func _nextInPlace(i: inout AnyIndex) {
-    fatalError("FIXME: swift-3-indexing-model: implement")
+    if _isUnique(&i._box) {
+      _box.__nextInPlace(i._box)
+    }
+    else {
+      i = next(i)
+    }
   }
 
 %   if Traversal == 'Bidirectional' or Traversal == 'RandomAccess':
