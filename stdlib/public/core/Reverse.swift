@@ -124,87 +124,6 @@ public struct ReverseCollection<
   public let _base: Base
 }
 
-/// An index that traverses the same positions as an underlying index,
-/// with inverted traversal direction.
-public struct ReverseRandomAccessIndex<
-  Base : RandomAccessCollection
-> : Strideable {
-
-  public init(_ base: Base.Index) {
-    self.base = base
-  }
-
-  /// The position corresponding to `self` in the underlying collection.
-  public let base: Base.Index
-
-  public typealias Stride = Base.Index.Stride
-
-  @warn_unused_result
-  public func distance(to other: ReverseRandomAccessIndex) -> Stride {
-    // Note ReverseRandomAccessIndex has inverted logic compared to base Base.Index
-    return other.base.distance(to: base)
-  }
-
-  @warn_unused_result
-  public func advanced(by n: Stride) -> ReverseRandomAccessIndex {
-    // Note ReverseRandomAccessIndex has inverted logic compared to base Base.Index
-    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    return ReverseRandomAccessIndex(base.advanced(by: -n))
-  }
-}
-
-@warn_unused_result
-public func == <Base : Collection>(
-  lhs: ReverseRandomAccessIndex<Base>,
-  rhs: ReverseRandomAccessIndex<Base>
-) -> Bool {
-  return lhs.base == rhs.base
-}
-
-@warn_unused_result
-public func != <Base : Collection>(
-  lhs: ReverseRandomAccessIndex<Base>,
-  rhs: ReverseRandomAccessIndex<Base>
-) -> Bool {
-  return lhs.base != rhs.base
-}
-
-@warn_unused_result
-public func < <Base : Collection>(
-  lhs: ReverseRandomAccessIndex<Base>,
-  rhs: ReverseRandomAccessIndex<Base>
-) -> Bool {
-  // Note ReverseRandomAccessIndex has inverted logic compared to base Base.Index
-  return lhs.base > rhs.base
-}
-
-@warn_unused_result
-public func <= <Base : Collection>(
-  lhs: ReverseRandomAccessIndex<Base>,
-  rhs: ReverseRandomAccessIndex<Base>
-) -> Bool {
-  // Note ReverseRandomAccessIndex has inverted logic compared to base Base.Index
-  return lhs.base >= rhs.base
-}
-
-@warn_unused_result
-public func >= <Base : Collection>(
-  lhs: ReverseRandomAccessIndex<Base>,
-  rhs: ReverseRandomAccessIndex<Base>
-) -> Bool {
-  // Note ReverseRandomAccessIndex has inverted logic compared to base Base.Index
-  return lhs.base <= rhs.base
-}
-
-@warn_unused_result
-public func > <Base : Collection>(
-  lhs: ReverseRandomAccessIndex<Base>,
-  rhs: ReverseRandomAccessIndex<Base>
-) -> Bool {
-  // Note ReverseRandomAccessIndex has inverted logic compared to base Base.Index
-  return lhs.base < rhs.base
-}
-
 /// A Collection that presents the elements of its `Base` collection
 /// in reverse order.
 ///
@@ -226,7 +145,7 @@ public struct ReverseRandomAccessCollection<
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = ReverseRandomAccessIndex<Base>
+  public typealias Index = ReverseIndex<Base>
 
   public typealias IndexDistance = Base.IndexDistance
 
@@ -237,27 +156,27 @@ public struct ReverseRandomAccessCollection<
   >
 
   public var startIndex: Index {
-    return ReverseRandomAccessIndex(_base.endIndex)
+    return ReverseIndex(_base.endIndex)
   }
 
   public var endIndex: Index {
-    return ReverseRandomAccessIndex(_base.startIndex)
+    return ReverseIndex(_base.startIndex)
   }
 
   @warn_unused_result
   public func next(i: Index) -> Index {
-    return ReverseRandomAccessIndex(_base.previous(i.base))
+    return ReverseIndex(_base.previous(i.base))
   }
 
   @warn_unused_result
   public func previous(i: Index) -> Index {
-    return ReverseRandomAccessIndex(_base.next(i.base))
+    return ReverseIndex(_base.next(i.base))
   }
 
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    return ReverseRandomAccessIndex(_base.advance(i.base, by: -n))
+    return ReverseIndex(_base.advance(i.base, by: -n))
   }
 
   @warn_unused_result
