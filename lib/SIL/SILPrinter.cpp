@@ -1176,6 +1176,10 @@ public:
     *this << "autorelease_value " << getIDAndType(I->getOperand());
   }
 
+  void visitSetDeallocatingInst(SetDeallocatingInst *I) {
+    *this << "set_deallocating " << getIDAndType(I->getOperand());
+  }
+
   void visitStructInst(StructInst *SI) {
     *this << "struct " << SI->getType() << " (";
     interleave(SI->getElements(),

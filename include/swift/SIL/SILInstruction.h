@@ -2322,6 +2322,20 @@ class AutoreleaseValueInst
       : UnaryInstructionBase(DebugLoc, operand) {}
 };
 
+/// SetDeallocatingInst - Sets the operand in deallocating state.
+///
+/// This is the same operation what's done by a strong_release immediately
+/// before it calls the deallocator of the object.
+class SetDeallocatingInst
+                 : public UnaryInstructionBase<ValueKind::SetDeallocatingInst,
+                                                RefCountingInst,
+                                                /*HasValue*/ false> {
+  friend class SILBuilder;
+
+  SetDeallocatingInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand) {}
+};
+
 /// StrongPinInst - Ensure that the operand is retained and pinned, if
 /// not by this operation then by some enclosing pin.
 ///

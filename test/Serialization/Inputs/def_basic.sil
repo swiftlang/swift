@@ -939,6 +939,15 @@ bb0(%0 : $X):
   // CHECK-NEXT: return [[T0]] : $X
 }
 
+// CHECK-LABEL: sil public_external [fragile] @test_set_deallocating
+sil [fragile] @test_set_deallocating : $@convention(thin) (X) -> (X) {
+bb0(%0 : $X):
+  set_deallocating %0 : $X
+  return %0 : $X
+  // CHECK: set_deallocating [[T0:%.*]] : $X
+  // CHECK-NEXT: return [[T0]] : $X
+}
+
 public func serialize_all() {
 }
 
@@ -1337,7 +1346,8 @@ bb0:
   %113 = function_ref @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
   %115 = function_ref @test_mark_fn_escape : $@convention(thin) () -> ()
   %117 = function_ref @test_copy_release_value : $@convention(thin) (X) -> (X)
-  %118 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
+  %118 = function_ref @test_set_deallocating : $@convention(thin) (X) -> (X)
+  %119 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
 
   %124 = function_ref @block_storage_type : $@convention(thin) Int -> @convention(block) () -> ()
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
@@ -1354,7 +1364,7 @@ bb0:
   %150 = function_ref @a_reabstraction_thunk: $@convention(thin) () -> ()
   %151 = function_ref @a_regular_thunk: $@convention(thin) () -> ()
 
-  %119 = tuple ()
-  return %119 : $()
+  %r = tuple ()
+  return %r : $()
 }
 

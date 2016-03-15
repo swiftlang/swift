@@ -876,6 +876,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::RetainValueInst:
   case ValueKind::ReleaseValueInst:
   case ValueKind::AutoreleaseValueInst:
+  case ValueKind::SetDeallocatingInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocRefInst:
   case ValueKind::DeinitExistentialAddrInst:

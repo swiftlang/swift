@@ -1052,6 +1052,15 @@ SILCloner<ImplClass>::visitAutoreleaseValueInst(AutoreleaseValueInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitSetDeallocatingInst(SetDeallocatingInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createSetDeallocating(getOpLocation(Inst->getLoc()),
+                                       getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitStructInst(StructInst *Inst) {
   auto Elements = getOpValueArray<8>(Inst->getElements());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

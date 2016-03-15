@@ -1112,6 +1112,11 @@ void IRGenFunction::emitNativeStrongRelease(llvm::Value *value) {
   emitUnaryRefCountCall(*this, IGM.getNativeStrongReleaseFn(), value);
 }
 
+void IRGenFunction::emitNativeSetDeallocating(llvm::Value *value) {
+  if (doesNotRequireRefCounting(value)) return;
+  emitUnaryRefCountCall(*this, IGM.getNativeSetDeallocatingFn(), value);
+}
+
 void IRGenFunction::emitNativeUnownedInit(llvm::Value *value,
                                           Address dest) {
   dest = Builder.CreateStructGEP(dest, 0, Size(0));
