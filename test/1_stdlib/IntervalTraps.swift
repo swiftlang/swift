@@ -38,7 +38,7 @@ IntervalTraps.test("HalfOpen")
   var interval = 1.0..<1.0
   expectType(HalfOpenInterval<Double>.self, &interval)
   expectCrashLater()
-  1.0..<0.0
+  _ = 1.0..<0.0
 }
 
 IntervalTraps.test("Closed")
@@ -50,7 +50,7 @@ IntervalTraps.test("Closed")
   expectType(ClosedInterval<Double>.self, &interval)
 
   expectCrashLater()
-  1.0...0.0
+  _ = 1.0...0.0
 }
 
 runAllTests()
