@@ -48,7 +48,7 @@ func curry_bridged(x: CurryTest) -> String! -> String! {
 // CHECK:   function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %1 : $CurryTest, #CurryTest.bridged!1.foreign
 // CHECK:   [[RES:%.*]] = apply [[METHOD]]({{%.*}}, %1) : $@convention(objc_method) (ImplicitlyUnwrappedOptional<NSString>, CurryTest) -> @autoreleased ImplicitlyUnwrappedOptional<NSString>
-// CHECK:   function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+// CHECK:   function_ref @swift_NSStringToString
 // CHECK:   strong_release %1
 // CHECK:   return {{%.*}} : $ImplicitlyUnwrappedOptional<String>
 

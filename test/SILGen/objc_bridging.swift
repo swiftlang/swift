@@ -16,9 +16,9 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[OPT_BRIDGED:%.*]] = apply [[DESCRIPTION]]({{%.*}})
 // CHECK:  select_enum [[OPT_BRIDGED]]
 // CHECK:  [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
-// CHECK:  [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+// CHECK:  [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:  [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
-// CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]],
+// CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:  [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
 // CHECK:  [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
@@ -32,15 +32,15 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK-LABEL: sil hidden @_TF13objc_bridging18getUppercaseString
 // CHECK: bb0({{%.*}} : $NSString):
 // -- The 'self' argument of NSString methods doesn't bridge.
-// CHECK-NOT: function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+// CHECK-NOT: function_ref @swift_NSStringToString
 // CHECK-NOT: function_ref @swift_StringToNSString
 // CHECK:   [[UPPERCASE_STRING:%.*]] = class_method [volatile] {{%.*}} : {{.*}}, #NSString.uppercase!1.foreign
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[UPPERCASE_STRING]]({{%.*}})
 // CHECK:   select_enum [[OPT_BRIDGED]]
 // CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
-// CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+// CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
-// CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]]
+// CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
 // CHECK:   [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
@@ -159,9 +159,9 @@ func callBar() -> String {
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[BAR]]()
 // CHECK:   select_enum [[OPT_BRIDGED]]
 // CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
-// CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+// CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
-// CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]]
+// CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
 // CHECK:   [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
@@ -199,23 +199,23 @@ extension NSString {
   }
   // CHECK-LABEL: sil hidden [thunk] @_TToFE13objc_bridgingCSo8NSStringg13nsstrFakePropS0_
   // CHECK-NOT: swift_StringToNSString
-  // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK-NOT: swift_NSStringToString
   // CHECK: }
   // CHECK-LABEL: sil hidden [thunk] @_TToFE13objc_bridgingCSo8NSStrings13nsstrFakePropS0_
   // CHECK-NOT: swift_StringToNSString
-  // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   func nsstrResult() -> NSString { return NSS }
   // CHECK-LABEL: sil hidden [thunk] @_TToFE13objc_bridgingCSo8NSString11nsstrResult
   // CHECK-NOT: swift_StringToNSString
-  // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   func nsstrArg(s: NSString) { }
   // CHECK-LABEL: sil hidden [thunk] @_TToFE13objc_bridgingCSo8NSString8nsstrArg
   // CHECK-NOT: swift_StringToNSString
-  // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
 }
@@ -244,9 +244,9 @@ class Bas : NSObject {
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Bass11strRealPropSS : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
-  // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
   // CHECK:   [[VALUE_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[VALUE]]
-  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[VALUE_BOX]]
+  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[VALUE_BOX]])
   
   // CHECK:   [[SETIMPL:%.*]] = function_ref @_TFC13objc_bridging3Bass11strRealPropSS
   // CHECK:   apply [[SETIMPL]]([[STR]], %1)
@@ -273,9 +273,9 @@ class Bas : NSObject {
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bass11strFakePropSS : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
-  // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
   // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]]
-  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]]
+  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]])
   // CHECK:   [[SETTER:%.*]] = function_ref @_TFC13objc_bridging3Bass11strFakePropSS
   // CHECK:   apply [[SETTER]]([[STR]], [[THIS]])
   // CHECK: }
@@ -288,12 +288,12 @@ class Bas : NSObject {
   }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Basg13nsstrRealPropCSo8NSString : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK-NOT: swift_StringToNSString
-  // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Bass13nsstrRealPropCSo8NSString : $@convention(objc_method) (NSString, Bas) ->
   // CHECK-NOT: swift_StringToNSString
-  // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   // -- Bridging thunks for String methods convert between NSString
@@ -309,9 +309,9 @@ class Bas : NSObject {
   func strArg(s: String) { }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas6strArg
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
-  // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
   // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]]
-  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]]
+  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]])
   // CHECK:   [[METHOD:%.*]] = function_ref @_TFC13objc_bridging3Bas6strArg
   // CHECK:   apply [[METHOD]]([[STR]], [[THIS]])
   // CHECK: }
@@ -320,12 +320,12 @@ class Bas : NSObject {
   func nsstrResult() -> NSString { return NSS }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas11nsstrResult
   // CHECK-NOT: swift_StringToNSString
-  // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK-NOT: swift_NSStringToString
   // CHECK: }
   func nsstrArg(s: NSString) { }
   // CHECK-LABEL: sil hidden @_TFC13objc_bridging3Bas8nsstrArg
   // CHECK-NOT: swift_StringToNSString
-  // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   init(str: NSString) {
@@ -368,7 +368,7 @@ func applyStringBlock(f: @convention(block) String -> String, x: String) -> Stri
   // CHECK: [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK: [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]
   // CHECK: [[RES:%.*]] = apply [[BLOCK]]([[NSSTR]]) : $@convention(block) (NSString) -> @autoreleased NSString
-  // CHECK: function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK: function_ref @swift_NSStringToString
   // CHECK: return {{%.*}} : $String
   return f(x)
 }

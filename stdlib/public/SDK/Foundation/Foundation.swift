@@ -162,15 +162,6 @@ extension String : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return result != nil
   }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSString?
-  ) -> String {
-    // `nil` has historically been used as a stand-in for an empty
-    // string; map it to an empty string.
-    if _slowPath(source == nil) { return String() }
-    return String(source!)
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -213,12 +204,6 @@ extension Int : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
   }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> Int {
-    return source!.integerValue
-  }
 }
 
 extension UInt : _ObjectiveCBridgeable {
@@ -245,19 +230,12 @@ extension UInt : _ObjectiveCBridgeable {
   ) {
     result = x.unsignedIntegerValue
   }
-
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
     result: inout UInt?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> UInt {
-    return source!.unsignedIntegerValue
   }
 }
 
@@ -293,12 +271,6 @@ extension Float : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
   }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> Float {
-    return source!.floatValue
-  }
 }
 
 extension Double : _ObjectiveCBridgeable {
@@ -333,12 +305,6 @@ extension Double : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
   }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> Double {
-    return source!.doubleValue
-  }
 }
 
 extension Bool: _ObjectiveCBridgeable {
@@ -372,12 +338,6 @@ extension Bool: _ObjectiveCBridgeable {
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> Bool {
-    return source!.boolValue
   }
 }
 
@@ -415,13 +375,6 @@ extension CGFloat : _ObjectiveCBridgeable {
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
-  ) -> CGFloat {
-    return CGFloat(
-             CGFloat.NativeType._unconditionallyBridgeFromObjectiveC(source))
   }
 }
 
@@ -558,31 +511,6 @@ extension Array : _ObjectiveCBridgeable {
 
     result = _arrayConditionalCast(anyObjectArr)
     return result != nil
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSArray?
-  ) -> Array {
-    _precondition(
-      Swift._isBridgedToObjectiveC(Element.self),
-      "array element type is not bridged to Objective-C")
-
-    // `nil` has historically been used as a stand-in for an empty
-    // array; map it to an empty array instead of failing.
-    if _slowPath(source == nil) { return Array() }
-
-    // If we have the appropriate native storage already, just adopt it.
-    if let native =
-        Array._bridgeFromObjectiveCAdoptingNativeStorageOf(source!) {
-      return native
-    }
-
-    if _fastPath(_isBridgedVerbatimToObjectiveC(Element.self)) {
-      // Forced down-cast (possible deferred type-checking)
-      return Array(_cocoaArray: source!)
-    }
-
-    return _arrayForceCast([AnyObject](_cocoaArray: source!))
   }
 }
 
@@ -733,37 +661,6 @@ extension Dictionary : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Key.self) &&
            Swift._isBridgedToObjectiveC(Value.self)
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    d: NSDictionary?
-  ) -> Dictionary {
-    // `nil` has historically been used as a stand-in for an empty
-    // dictionary; map it to an empty dictionary.
-    if _slowPath(d == nil) { return Dictionary() }
-
-    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
-        d! as AnyObject) {
-      return native
-    }
-
-    if _isBridgedVerbatimToObjectiveC(Key.self) &&
-       _isBridgedVerbatimToObjectiveC(Value.self) {
-      return [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d!, to: _NSDictionary.self))
-    }
-
-    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
-    // may not be backed by an NSDictionary.
-    var builder = _DictionaryBuilder<Key, Value>(count: d!.count)
-    d!.enumerateKeysAndObjects({
-      (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
-       stop: UnsafeMutablePointer<ObjCBool>) in
-      builder.add(
-          key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
-          value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
-    })
-    return builder.take()
   }
 }
 
@@ -1010,32 +907,6 @@ extension Set : _ObjectiveCBridgeable {
 
     result = Swift._setBridgeFromObjectiveCConditional(anySet)
     return result != nil
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(s: NSSet?) -> Set {
-    // `nil` has historically been used as a stand-in for an empty
-    // set; map it to an empty set.
-    if _slowPath(s == nil) { return Set() }
-
-    if let native =
-      Set<Element>._bridgeFromObjectiveCAdoptingNativeStorageOf(s! as AnyObject) {
-
-      return native
-    }
-
-    if _isBridgedVerbatimToObjectiveC(Element.self) {
-      return Set<Element>(_cocoaSet: unsafeBitCast(s!, to: _NSSet.self))
-    }
-
-    // `Set<Element>` where `Element` is a value type may not be backed by
-    // an NSSet.
-    var builder = _SetBuilder<Element>(count: s!.count)
-    s!.enumerateObjects({
-      (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
-      builder.add(member: Swift._forceBridgeFromObjectiveC(
-        anyObjectMember, Element.self))
-    })
-    return builder.take()
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {

@@ -798,9 +798,9 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           bool preserveOptionality) {
   if (uncurryLevel == 0) {
     if (preserveOptionality) {
+      assert(!newResultType->getAnyOptionalObjectType());
       OptionalTypeKind resultOTK;
       if (auto objectType = getAnyOptionalObjectType(resultOTK)) {
-        assert(!newResultType->getAnyOptionalObjectType());
         return OptionalType::get(
             resultOTK,
             objectType->replaceCovariantResultType(
