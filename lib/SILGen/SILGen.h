@@ -126,7 +126,6 @@ public:
 
   Optional<ProtocolDecl*> ObjectiveCBridgeable;
   Optional<FuncDecl*> BridgeToObjectiveCRequirement;
-  Optional<FuncDecl*> UnconditionallyBridgeFromObjectiveCRequirement;
   Optional<AssociatedTypeDecl*> BridgedObjectiveCType;
 
 public:
@@ -358,11 +357,6 @@ public:
 
   /// Retrieve the _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
   FuncDecl *getBridgeToObjectiveCRequirement(SILLocation loc);
-
-  /// Retrieve the
-  /// _ObjectiveCBridgeable._unconditionallyBridgeFromObjectiveC
-  /// requirement.
-  FuncDecl *getUnconditionallyBridgeFromObjectiveCRequirement(SILLocation loc);
 
   /// Retrieve the _ObjectiveCBridgeable._ObjectiveCType requirement.
   AssociatedTypeDecl *getBridgedObjectiveCTypeRequirement(SILLocation loc);

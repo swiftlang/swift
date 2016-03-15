@@ -53,11 +53,6 @@ extension String : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
-  public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSString?
-  ) -> String {
-    return String()
-  }
 }
 
 extension Array : _ObjectiveCBridgeable {
@@ -77,11 +72,6 @@ extension Array : _ObjectiveCBridgeable {
     result: inout Array?
   ) -> Bool {
     return true
-  }
-  public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSArray?
-  ) -> Array {
-    return Array()
   }
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Element.self)
@@ -106,11 +96,6 @@ extension Dictionary : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
-  public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSDictionary?
-  ) -> Dictionary {
-    return Dictionary()
-  }
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Key.self) && Swift._isBridgedToObjectiveC(Value.self)
   }
@@ -133,11 +118,6 @@ extension Set : _ObjectiveCBridgeable {
     result: inout Set?
   ) -> Bool {
     return true
-  }
-  public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSSet?
-  ) -> Set {
-    return Set()
   }
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Element.self)
