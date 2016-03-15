@@ -176,9 +176,8 @@ func _introSortImpl<
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""},
   depthLimit: Int
 ) {
-
   // Insertion sort is better at handling smaller regions.
-  if range.count < 20 {
+  if elements.distance(from: range.startIndex, to: range.endIndex) < 20 {
     _insertionSort(
       &elements,
       subRange: range
@@ -235,7 +234,7 @@ func _siftDown<
   }
   // Check if right child is also within bounds before trying to examine it.
   if countToIndex + 2 < countFromIndex {
-    let right = left + 1
+    let right = elements.next(left)
     if ${cmp("elements[largest]", "elements[right]", p)} {
       largest = right
     }

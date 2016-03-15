@@ -13,11 +13,6 @@
 // TODO: swift-3-indexing-model - Add in RandomAccessCollection protocol documentation
 public protocol RandomAccessCollection : BidirectionalCollection {
 
-  associatedtype Index : Strideable
-  // FIXME(compiler limitation): where Index.Distance == IndexDistance
-  // FIXME(swift-3-indexing-model, design): does this requirement to conform to
-  // `Strideable` limit possible collection designs?
-
   // FIXME(compiler limitation):
   // associatedtype SubSequence : RandomAccessCollection
 
