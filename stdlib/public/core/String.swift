@@ -928,54 +928,26 @@ extension String {
 extension String {
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.UTF8Index,
-    from view: String.UTF8View
+  public func index(
+    equivalentTo utf8Index: String.UTF8Index
   ) -> String.Index? {
-    fatalError("FIXME: swift-3-indexing-model: implement")
-
-    // FIXME: swift-3-indexing-model: rework the following
-//    if let me = utf8Index.samePosition(
-//      in: characters.unicodeScalars
-//      )?.samePosition(in: characters) {
-//        self = me
-//    }
-//    else {
-//      return nil
-//    }
+    return characters.index(equivalentTo: utf8Index)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.UTF16Index,
-    from view: String.UTF16View
+  public func index(
+    equivalentTo utf16Index: String.UTF16Index
   ) -> String.Index? {
-    fatalError("FIXME: swift-3-indexing-model: implement")
-
-    // FIXME: swift-3-indexing-model: rework the following
-//    if let me = utf16Index.samePosition(
-//      in: characters.unicodeScalars
-//      )?.samePosition(in: characters) {
-//        self = me
-//    }
-//    else {
-//      return nil
-//    }
+    return characters.index(equivalentTo: utf16Index)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.UnicodeScalarIndex,
-    from view: String.UnicodeScalarView
+  public func index(
+    equivalentTo unicodeScalarIndex: String.UnicodeScalarIndex
   ) -> String.Index? {
-    // FIXME: swift-3-indexing-model: verify cores match?
-    // FIXME: swift-3-indexing-model: range check?
-    if !view._isOnGraphemeClusterBoundary(index) {
-      return nil
-    }
-    Index(_base: index)
+    return characters.index(equivalentTo: unicodeScalarIndex)
   }
 }
 

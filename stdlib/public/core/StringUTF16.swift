@@ -199,8 +199,8 @@ extension String {
     let startUTF16 = UTF16Index(_offset: utf16._offset)
     let endUTF16 = UTF16Index(_offset: utf16._offset + utf16._length)
 
-    if let start = wholeString.convert(index: startUTF16, from: utf16),
-       let end = wholeString.convert(index: endUTF16, from: utf16) {
+    if let start = wholeString.index(equivalentTo: startUTF16),
+       let end = wholeString.index(equivalentTo: endUTF16) {
       self = wholeString[start..<end]
       return
     }
@@ -231,48 +231,36 @@ public func < (
 extension String.UTF16View {
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.UTF8Index,
-    from view: String.UTF8View
+  public func index(
+    equivalentTo utf8Index: String.UTF8Index
   ) -> String.UTF16Index? {
-    // FIXME: swift-3-indexing-model: verify cores match?
+    _precondition(
+      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= _core.endIndex,
+      "Invalid String.UTF8Index for this UTF-16 view")
 
-    fatalError("FIXME: swift-3-indexing-model: implement")
-
-    // FIXME: swift-3-indexing-model: rework the following
-//    let core = utf16._core
-//
-//    _precondition(
-//      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
-//      "Invalid String.UTF8Index for this UTF-16 view")
-//
-//    // Detect positions that have no corresponding index.
-//    if !utf8Index._isOnUnicodeScalarBoundary {
-//      return nil
-//    }
-//    _offset = utf8Index._coreIndex
+    // Detect positions that have no corresponding index.
+    if !utf8Index._isOnUnicodeScalarBoundary {
+      return nil
+    }
+    return Index(_offset: utf8Index._coreIndex)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.UnicodeScalarIndex,
-    from view: String.UnicodeScalarView
+  public func index(
+    equivalentTo unicodeScalarIndex: String.UnicodeScalarIndex
   ) -> String.UTF16Index? {
-    // FIXME: swift-3-indexing-model: verify cores match?
     // FIXME: swift-3-indexing-model: range check?
     return Index(_offset: unicodeScalarIndex._position)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.Index,
-    from view: String
+  public func index(
+    equivalentTo stringIndex: String.Index
   ) -> String.UTF16Index? {
-    // FIXME: swift-3-indexing-model: verify cores match?
     // FIXME: swift-3-indexing-model: range check?
-    return Index(_offset: characterIndex._utf16Index)
+    return Index(_offset: stringIndex._utf16Index)
   }
 }
 

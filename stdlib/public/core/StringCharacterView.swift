@@ -280,6 +280,63 @@ extension String.CharacterView {
   }
 }
 
+// Index conversions
+extension String.CharacterView {
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func index(
+    equivalentTo utf8Index: String.UTF8Index
+  ) -> Index? {
+    fatalError("FIXME: swift-3-indexing-model: implement")
+    
+    // FIXME: swift-3-indexing-model: range check?
+    // FIXME: swift-3-indexing-model: rework the following, does it need other?
+//    if let me = utf8Index.samePosition(
+//      in: characters.unicodeScalars
+//      )?.samePosition(in: characters) {
+//        self = me
+//    }
+//    else {
+//      return nil
+//    }
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func index(
+    equivalentTo utf16Index: String.UTF16Index
+  ) -> Index? {
+    fatalError("FIXME: swift-3-indexing-model: implement")
+
+    // FIXME: swift-3-indexing-model: range check?
+    // FIXME: swift-3-indexing-model: rework the following, does it need other?
+//    if let me = utf16Index.samePosition(
+//      in: characters.unicodeScalars
+//      )?.samePosition(in: characters) {
+//        self = me
+//    }
+//    else {
+//      return nil
+//    }
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func index(
+    equivalentTo unicodeScalarIndex: String.UnicodeScalarIndex
+  ) -> Index? {
+    fatalError("FIXME: swift-3-indexing-model: implement")
+
+    // FIXME: swift-3-indexing-model: range check?
+    // FIXME: swift-3-indexing-model: rework the following, does it need other?
+//    if !view._isOnGraphemeClusterBoundary(index) {
+//      return nil
+//    }
+//    let countUTF16 = view._measureExtendedGraphemeClusterForward(from: _base)
+//    return Index(_base: index, _countUTF16: countUTF16)
+  }
+}
+
 extension String.CharacterView {
   @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange<

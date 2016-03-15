@@ -281,64 +281,53 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
 extension String.UnicodeScalarView {
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.UTF8Index,
-    from view: String.UTF8View
+  public func index(
+    equivalentTo utf8Index: String.UTF8Index
   ) -> String.UnicodeScalarIndex? {
-    // FIXME: swift-3-indexing-model: verify cores match?
-
     _precondition(
-      index._coreIndex >= 0 && index._coreIndex <= _core.endIndex,
-      "Invalid String.UTF8Index for this UnicodeScalar view"
-    )
+      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= _core.endIndex,
+      "Invalid String.UTF8Index for this UnicodeScalar view")
 
     // Detect positions that have no corresponding index.
-    if !index._isOnUnicodeScalarBoundary {
+    if !utf8Index._isOnUnicodeScalarBoundary {
       return nil
     }
 
-    return Index(index._coreIndex)
+    return Index(utf8Index._coreIndex)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.UTF16Index,
-    from view: String.UTF16View // needed?
+  public func index(
+    equivalentTo utf16Index: String.UTF16Index
   ) -> String.UnicodeScalarIndex? {
-    // FIXME: swift-3-indexing-model: verify cores match?
-
-    // FIXME: swift-3-indexing-model: just use supplied view, assuming cores match?
     let utf16 = String.UTF16View(_core)
 
-    if index != utf16.startIndex && index != utf16.endIndex {
+    if utf16Index != utf16.startIndex && utf16Index != utf16.endIndex {
       _precondition(
-        index >= utf16.startIndex && index <= utf16.endIndex,
-        "Invalid String.UTF16Index for this UnicodeScalar view"
-      )
+        utf16Index >= utf16.startIndex && utf16Index <= utf16.endIndex,
+        "Invalid String.UTF16Index for this UnicodeScalar view")
 
       // Detect positions that have no corresponding index.  Note that
       // we have to check before and after, because an unpaired
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid.
-      if UTF16.isTrailSurrogate(utf16[index])
-      && UTF16.isLeadSurrogate(utf16[utf16.previous(index)]) {
-          return nil
+      if UTF16.isTrailSurrogate(utf16[utf16Index])
+      && UTF16.isLeadSurrogate(utf16[utf16.previous(utf16Index)]) {
+        return nil
       }
     }
 
-    return Index(index._offset)
+    return Index(utf16Index._offset)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.Index,
-    from view: String
+  public func index(
+    equivalentTo stringIndex: String.Index
   ) -> String.UnicodeScalarIndex? {
-    // FIXME: swift-3-indexing-model: verify cores match?
     // FIXME: swift-3-indexing-model: range check?
-    return Index(index._base._position)
+    return Index(stringIndex._base._position)
   }
 }
 
@@ -350,7 +339,7 @@ extension String.UnicodeScalarView {
   internal func _measureExtendedGraphemeClusterForward(
     from start: Index
   ) -> Int {
-    var end = self.endIndex
+    let end = self.endIndex
     if start == end {
       return 0
     }

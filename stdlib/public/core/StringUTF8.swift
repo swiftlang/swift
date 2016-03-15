@@ -290,8 +290,8 @@ extension String {
   public init?(_ utf8: UTF8View) {
     let wholeString = String(utf8._core)
 
-    if let start = wholeString.convert(index: utf8.startIndex, from: utf8),
-       let end = wholeString.convert(index: utf8.endIndex, from: utf8) {
+    if let start = wholeString.index(equivalentTo: utf8.startIndex),
+       let end = wholeString.index(equivalentTo: utf8.endIndex) {
       self = wholeString[start..<end]
       return
     }
@@ -356,61 +356,52 @@ public func < (
 extension String.UTF8View {
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.UTF16Index,
-    from view: String.UTF16View
+  public func index(
+    equivalentTo utf16Index: String.UTF16Index
   ) -> String.UTF8Index? {
-    // FIXME: swift-3-indexing-model: verify cores match?
-
-    // FIXME: swift-3-indexing-model: just use supplied view, assuming cores match?
     let utf16 = String.UTF16View(_core)
 
-    if index != utf16.startIndex && index != utf16.endIndex {
+    if utf16Index != utf16.startIndex && utf16Index != utf16.endIndex {
       _precondition(
-        index >= utf16.startIndex && index <= utf16.endIndex,
-        "Invalid String.UTF16Index for this UTF-8 view"
-      )
+        utf16Index >= utf16.startIndex && utf16Index <= utf16.endIndex,
+        "Invalid String.UTF16Index for this UTF-8 view")
 
       // Detect positions that have no corresponding index.  Note that
       // we have to check before and after, because an unpaired
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid in UTF8.
-      if UTF16.isTrailSurrogate(utf16[index])
-      && UTF16.isLeadSurrogate(utf16[utf16.previous(index)]) {
+      if UTF16.isTrailSurrogate(utf16[utf16Index])
+      && UTF16.isLeadSurrogate(utf16[utf16.previous(utf16Index)]) {
           return nil
       }
     }
 
-    return Index(_core, _utf16Offset: index._offset)
+    return Index(_core, _utf16Offset: utf16Index._offset)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.UnicodeScalarIndex,
-    from view: String.UnicodeScalarView
+  public func index(
+    equivalentTo unicodeScalarIndex: String.UnicodeScalarIndex
   ) -> String.UTF8Index? {
-    // FIXME: swift-3-indexing-model: verify cores match?
     // FIXME: swift-3-indexing-model: range check?
-    return Index(_core, _utf16Offset: index._position)
+    return Index(_core, _utf16Offset: unicodeScalarIndex._position)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func convert(
-    index index: String.Index,
-    from view: String
+  public func index(
+    equivalentTo stringIndex: String.Index
   ) -> String.UTF8Index? {
-    // FIXME: swift-3-indexing-model: verify cores match?
     // FIXME: swift-3-indexing-model: range check?
-    return Index(_core, _utf16Offset: index._base._position)
+    return Index(_core, _utf16Offset: stringIndex._base._position)
   }
 }
 
 extension String.UTF8View.Index {
   internal init(_ core: _StringCore, _utf16Offset: Int) {
-      let (_, buffer) = core._encodeSomeUTF8(from: _utf16Offset)
-      self.init(core, _utf16Offset, buffer)
+    let (_, buffer) = core._encodeSomeUTF8(from: _utf16Offset)
+    self.init(core, _utf16Offset, buffer)
   }
 }
 
