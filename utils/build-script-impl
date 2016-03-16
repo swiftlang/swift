@@ -148,7 +148,6 @@ KNOWN_SETTINGS=(
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
-    xcode-ide-only              ""               "set to configure Xcode project for IDE use only, not building"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
     enable-llvm-assertions      "1"              "set to enable llvm assertions"
     build-llvm                  "1"              "set to 1 to build LLVM and Clang"
@@ -1210,12 +1209,6 @@ case "${CMAKE_GENERATOR}" in
             "${COMMON_CMAKE_OPTIONS[@]}"
             -DCMAKE_CONFIGURATION_TYPES="Debug;Release;MinSizeRel;RelWithDebInfo"
         )
-        if [[ "${XCODE_IDE_ONLY}" ]]; then
-          COMMON_CMAKE_OPTIONS=(
-              "${COMMON_CMAKE_OPTIONS[@]}"
-              -DSWIFT_XCODE_GENERATE_FOR_IDE_ONLY=ON
-          )
-        fi
         ;;
 esac
 
