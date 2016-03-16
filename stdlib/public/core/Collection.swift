@@ -184,6 +184,7 @@ public protocol Collection : Indexable, Sequence {
   // associatedtype SubSequence : Collection
   //   where
   //   Iterator.Element == SubSequence.Iterator.Element,
+  //   SubSequence.Index == Index,
   //   SubSequence.SubSequence == SubSequence
   //
   // (<rdar://problem/20715009> Implement recursive protocol
