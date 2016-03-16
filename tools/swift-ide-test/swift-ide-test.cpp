@@ -2423,19 +2423,14 @@ public:
 
 private:
   void tryDemangleDecl(ValueDecl *VD, CharSourceRange range) {
-    std::string mangledName;
+    std::string USR;
     {
-      llvm::raw_string_ostream OS(mangledName);
+      llvm::raw_string_ostream OS(USR);
       printDeclUSR(VD, OS);
     }
 
-    // Put the expected symbol _T prefix on the name by replacing the s:.
-    assert(StringRef(mangledName).startswith("s:"));
-    mangledName[0] = '_';
-    mangledName[1] = 'T';
-
     std::string error;
-    if (Decl *reDecl = getDeclFromMangledSymbolName(Ctx, mangledName, error)) {
+    if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
       Stream << "reconstructed decl from usr for '" << range.str() << "' is '";
       reDecl->print(Stream, PrintOptions());
       Stream << "'\n";

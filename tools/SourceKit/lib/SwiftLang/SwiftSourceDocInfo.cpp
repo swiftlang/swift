@@ -1051,22 +1051,15 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
                        {std::make_pair("USR", USR)});
       }
 
-      std::string mangledName(USR);
-      if (USR.startswith("s:")) {
-        mangledName.replace(0, 2, "_T");
-      } else if (USR.startswith("c:")) {
+      if (USR.startswith("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
-        Receiver({});
-        return;
-      } else if (!USR.startswith("_T")) {
-        LOG_WARN_FUNC("unknown USR prefix");
         Receiver({});
         return;
       }
 
       auto &context = CompIns.getASTContext();
       std::string error;
-      Decl *D = ide::getDeclFromMangledSymbolName(context, mangledName, error);
+      Decl *D = ide::getDeclFromUSR(context, USR, error);
 
       if (!D) {
         Receiver({});
