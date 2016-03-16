@@ -1724,7 +1724,7 @@ public:
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
-  DeclRange getMembers(bool forceDelayedMembers = true) const;
+  DeclRange getMembers() const;
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
     return IterableDeclContext::isLazy();
@@ -2667,18 +2667,9 @@ enum PointerTypeKind : unsigned {
   PTK_AutoreleasingUnsafeMutablePointer,
 };
 
-/// An implicitly created member decl, used when importing a Clang enum type.
-/// These are not added to their enclosing type unless forced.
-typedef std::function<void(SmallVectorImpl<Decl *> &)> DelayedDecl;
-
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   SourceRange Braces;
-
-  /// \brief The set of implicit members and protocols added to imported enum
-  /// types.  These members and protocols are added to the NominalDecl only if
-  /// the nominal type is directly or indirectly referenced.
-  std::unique_ptr<DelayedDecl> DelayedMembers;
 
   /// \brief The first extension of this type.
   ExtensionDecl *FirstExtension = nullptr;
@@ -2781,7 +2772,7 @@ protected:
   friend class ProtocolType;
 
 public:
-  DeclRange getMembers(bool forceDelayedMembers = true) const;
+  DeclRange getMembers() const;
   SourceRange getBraces() const { return Braces; }
   
   void setBraces(SourceRange braces) { Braces = braces; }
@@ -2934,10 +2925,6 @@ private:
   struct ToStoredProperty {
     Optional<VarDecl *> operator()(Decl *decl) const;
   };
-
-  /// Force delayed implicit member declarations to be added to the type
-  /// declaration.
-  void forceDelayedMemberDecls();
   
 public:
   /// A range for iterating the stored member variables of a structure.
@@ -2949,16 +2936,6 @@ public:
     return StoredPropertyRange(getMembers(), ToStoredProperty());
   }
 
-  bool hasDelayedMemberDecls() { return DelayedMembers.get(); }
-
-  void setDelayedMemberDecls(const DelayedDecl &delayedMembers);
-
-  /// Force delayed implicit member and protocol declarations to be added to the
-  /// type declaration.
-  void forceDelayed() {
-    forceDelayedMemberDecls();
-  }
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&

@@ -127,7 +127,7 @@ static void findNominals(llvm::MapVector<const NominalTypeDecl *, bool> &found,
     if (!nominal)
       continue;
     found[nominal] |= true;
-    findNominals(found, nominal->getMembers(/*forceDelayed=*/false));
+    findNominals(found, nominal->getMembers());
   }
 }
 

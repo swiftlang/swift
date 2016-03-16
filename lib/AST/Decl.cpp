@@ -724,10 +724,8 @@ loadAllConformances(const T *container,
                         container->getASTContext().AllocateCopy(Conformances));
 }
 
-DeclRange NominalTypeDecl::getMembers(bool forceDelayedMembers) const {
+DeclRange NominalTypeDecl::getMembers() const {
   loadAllMembers();
-  if (forceDelayedMembers)
-    const_cast<NominalTypeDecl*>(this)->forceDelayedMemberDecls();
   return IterableDeclContext::getMembers();
 }
 
@@ -805,7 +803,7 @@ void ExtensionDecl::setGenericSignature(GenericSignature *sig) {
   GenericSig = sig;
 }
 
-DeclRange ExtensionDecl::getMembers(bool forceDelayedMembers) const {
+DeclRange ExtensionDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
 }
