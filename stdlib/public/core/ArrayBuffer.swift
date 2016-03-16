@@ -214,8 +214,8 @@ extension _ArrayBuffer {
     let nonNative = _nonNative
 
     let nsSubRange = SwiftShims._SwiftNSRange(
-      location: bounds.startIndex,
-      length: bounds.endIndex - bounds.startIndex)
+      location: bounds.lowerBound,
+      length: bounds.upperBound - bounds.lowerBound)
 
     let buffer = UnsafeMutablePointer<AnyObject>(target)
     
@@ -263,11 +263,9 @@ extension _ArrayBuffer {
       // Tell Cocoa to copy the objects into our storage
       cocoa.buffer.getObjects(
         UnsafeMutablePointer(result.firstElementAddress),
-        range: _SwiftNSRange(
-          location: bounds.startIndex,
-          length: boundsCount))
+        range: _SwiftNSRange(location: bounds.lowerBound, length: boundsCount))
 
-      return _SliceBuffer(result, shiftedToStartIndex: bounds.startIndex)
+      return _SliceBuffer(result, shiftedToStartIndex: bounds.lowerBound)
     }
     set {
       fatalError("not implemented")

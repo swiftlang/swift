@@ -32,7 +32,7 @@ public protocol RangeReplaceableCollection : Collection {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`subRange.count`) if
-  ///   `subRange.endIndex == self.endIndex` and `newElements.isEmpty`,
+  ///   `subRange.upperBound == self.endIndex` and `newElements.isEmpty`,
   ///   O(`self.count` + `newElements.count`) otherwise.
   mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element

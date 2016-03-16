@@ -652,7 +652,7 @@ extension MyForwardCollectionType
   where SubSequence == MySlice<Self> {
 
   public subscript(bounds: MyRange<Index>) -> SubSequence {
-    return MySlice(base: self, start: bounds.startIndex, end: bounds.endIndex)
+    return MySlice(base: self, start: bounds.lowerBound, end: bounds.upperBound)
   }
 }
 extension MyForwardCollectionType
@@ -998,9 +998,9 @@ public struct MySlice<Collection : MyIndexableType /* : MyForwardCollectionType 
   public typealias SubSequence = MySlice
   public subscript(bounds: MyRange<Index>) -> SubSequence {
     _base._failEarlyRangeCheck2(
-      rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
+      rangeStart: bounds.lowerBound, rangeEnd: bounds.upperBound,
       boundsStart: startIndex, boundsEnd: endIndex)
-    return MySlice(base: _base, start: bounds.startIndex, end: bounds.endIndex)
+    return MySlice(base: _base, start: bounds.lowerBound, end: bounds.upperBound)
   }
 
   @warn_unused_result
@@ -1186,11 +1186,11 @@ public protocol MyRandomAccessIndexType : MyBidirectionalIndexType, MyStrideable
 extension MyRandomAccessIndexType {
   public func _failEarlyRangeCheck(index: Self, bounds: MyRange<Self>) {
     _precondition(
-      bounds.startIndex <= index,
-      "index is out of bounds: index designates a position before bounds.startIndex")
+      bounds.lowerBound <= index,
+      "index is out of bounds: index designates a position before bounds.lowerBound")
     _precondition(
-      index < bounds.endIndex,
-      "index is out of bounds: index designates the bounds.endIndex position or a position after it")
+      index < bounds.upperBound,
+      "index is out of bounds: index designates the bounds.upperBound position or a position after it")
   }
 
   public func _failEarlyRangeCheck2(
@@ -1202,18 +1202,18 @@ extension MyRandomAccessIndexType {
     let range = MyRange(startIndex: rangeStart, endIndex: rangeEnd)
     let bounds = MyRange(startIndex: boundsStart, endIndex: boundsEnd)
     _precondition(
-      bounds.startIndex <= range.startIndex,
-      "range.startIndex is out of bounds: index designates a position before bounds.startIndex")
+      bounds.lowerBound <= range.lowerBound,
+      "range.lowerBound is out of bounds: index designates a position before bounds.lowerBound")
     _precondition(
-      bounds.startIndex <= range.endIndex,
-      "range.endIndex is out of bounds: index designates a position before bounds.startIndex")
+      bounds.lowerBound <= range.upperBound,
+      "range.upperBound is out of bounds: index designates a position before bounds.lowerBound")
 
     _precondition(
-      range.startIndex <= bounds.endIndex,
-      "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
+      range.lowerBound <= bounds.upperBound,
+      "range.lowerBound is out of bounds: index designates a position after bounds.upperBound")
     _precondition(
-      range.endIndex <= bounds.endIndex,
-      "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
+      range.upperBound <= bounds.upperBound,
+      "range.lowerBound is out of bounds: index designates a position after bounds.upperBound")
   }
 
   @transparent

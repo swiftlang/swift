@@ -81,11 +81,11 @@ public protocol Indexable {
   /// The range check, if performed, is equivalent to:
   ///
   ///     precondition(
-  ///       bounds.contains(range.startIndex) ||
-  ///       range.startIndex == bounds.endIndex)
+  ///       bounds.contains(range.lowerBound) ||
+  ///       range.lowerBound == bounds.upperBound)
   ///     precondition(
-  ///       bounds.contains(range.endIndex) ||
-  ///       range.endIndex == bounds.endIndex)
+  ///       bounds.contains(range.upperBound) ||
+  ///       range.upperBound == bounds.upperBound)
   ///
   /// Use this function to perform a cheap range check for QoI purposes when
   /// memory safety is not a concern.  Do not rely on this range check for
@@ -319,28 +319,28 @@ extension Collection {
   public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
-      bounds.startIndex <= index,
-      "index is out of bounds: index designates a position before bounds.startIndex")
+      bounds.lowerBound <= index,
+      "index is out of bounds: index designates a position before bounds.lowerBound")
     _precondition(
-      index < bounds.endIndex,
-      "index is out of bounds: index designates the bounds.endIndex position or a position after it")
+      index < bounds.upperBound,
+      "index is out of bounds: index designates the bounds.upperBound position or a position after it")
   }
 
   public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
-      bounds.startIndex <= range.startIndex,
-      "range.startIndex is out of bounds: index designates a position before bounds.startIndex")
+      bounds.lowerBound <= range.lowerBound,
+      "range.lowerBound is out of bounds: index designates a position before bounds.lowerBound")
     _precondition(
-      bounds.startIndex <= range.endIndex,
-      "range.endIndex is out of bounds: index designates a position before bounds.startIndex")
+      bounds.lowerBound <= range.upperBound,
+      "range.upperBound is out of bounds: index designates a position before bounds.lowerBound")
 
     _precondition(
-      range.startIndex <= bounds.endIndex,
-      "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
+      range.lowerBound <= bounds.upperBound,
+      "range.lowerBound is out of bounds: index designates a position after bounds.upperBound")
     _precondition(
-      range.endIndex <= bounds.endIndex,
-      "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
+      range.upperBound <= bounds.upperBound,
+      "range.lowerBound is out of bounds: index designates a position after bounds.upperBound")
   }
 
   @warn_unused_result

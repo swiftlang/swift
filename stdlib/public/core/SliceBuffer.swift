@@ -22,9 +22,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   ) {
     self.owner = owner
     self.subscriptBaseAddress = subscriptBaseAddress
-    self.startIndex = indices.startIndex
+    self.startIndex = indices.lowerBound
     let bufferFlag = UInt(hasNativeBuffer ? 1 : 0)
-    self.endIndexAndFlags = (UInt(indices.endIndex) << 1) | bufferFlag
+    self.endIndexAndFlags = (UInt(indices.upperBound) << 1) | bufferFlag
     _invariantCheck()
   }
 
@@ -97,8 +97,8 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
     _sanityCheck(native.count + growth <= native.capacity)
 
-    let start = subRange.startIndex - startIndex + hiddenElementCount
-    let end = subRange.endIndex - startIndex + hiddenElementCount
+    let start = subRange.lowerBound - startIndex + hiddenElementCount
+    let end = subRange.upperBound - startIndex + hiddenElementCount
     native.replace(
       subRange: start..<end,
       with: insertCount,
@@ -186,11 +186,11 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _invariantCheck()
-    _sanityCheck(bounds.startIndex >= startIndex)
-    _sanityCheck(bounds.endIndex >= bounds.startIndex)
-    _sanityCheck(bounds.endIndex <= endIndex)
+    _sanityCheck(bounds.lowerBound >= startIndex)
+    _sanityCheck(bounds.upperBound >= bounds.lowerBound)
+    _sanityCheck(bounds.upperBound <= endIndex)
     let c = bounds.count
-    target.initializeFrom(subscriptBaseAddress + bounds.startIndex, count: c)
+    target.initializeFrom(subscriptBaseAddress + bounds.lowerBound, count: c)
     return target + c
   }
 
@@ -268,9 +268,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   public subscript(bounds: Range<Int>) -> _SliceBuffer {
     get {
-      _sanityCheck(bounds.startIndex >= startIndex)
-      _sanityCheck(bounds.endIndex >= bounds.startIndex)
-      _sanityCheck(bounds.endIndex <= endIndex)
+      _sanityCheck(bounds.lowerBound >= startIndex)
+      _sanityCheck(bounds.upperBound >= bounds.lowerBound)
+      _sanityCheck(bounds.upperBound <= endIndex)
       return _SliceBuffer(
         owner: owner,
         subscriptBaseAddress: subscriptBaseAddress,

@@ -92,7 +92,7 @@ return { _, g = Int
 }(c) -> : T>(f() -> (z: Boolean>(m(v: Int>()] = { c
 }
 typealias e : NSObject {
-let n1: 1], let g == Swift.join(h, Bool) -> (g.endIndex - range.startIndex))
+let n1: 1], let g == Swift.join(h, Bool) -> (g.endIndex - range.lowerBound))
 func f())
 class A? {
 }

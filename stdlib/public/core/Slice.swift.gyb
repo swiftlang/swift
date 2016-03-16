@@ -76,8 +76,8 @@ public struct Slice<Base : Indexable> : Collection {
   public // @testable
   init(_base: Base, bounds: Range<Index>) {
     self._base = _base
-    self.startIndex = bounds.startIndex
-    self.endIndex = bounds.endIndex
+    self.startIndex = bounds.lowerBound
+    self.endIndex = bounds.upperBound
   }
 
   internal let _base: Base
@@ -141,8 +141,8 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
   public // @testable
   init(_base: Base, bounds: Range<Index>) {
     self._base = _base
-    self._startIndex = bounds.startIndex
-    self._endIndex = bounds.endIndex
+    self._startIndex = bounds.lowerBound
+    self._endIndex = bounds.upperBound
   }
 
   internal var _base: Base

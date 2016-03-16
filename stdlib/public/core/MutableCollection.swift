@@ -80,11 +80,11 @@ public protocol MutableIndexable {
   /// The range check, if performed, is equivalent to:
   ///
   ///     precondition(
-  ///       bounds.contains(range.startIndex) ||
-  ///       range.startIndex == bounds.endIndex)
+  ///       bounds.contains(range.lowerBound) ||
+  ///       range.lowerBound == bounds.upperBound)
   ///     precondition(
-  ///       bounds.contains(range.endIndex) ||
-  ///       range.endIndex == bounds.endIndex)
+  ///       bounds.contains(range.upperBound) ||
+  ///       range.upperBound == bounds.upperBound)
   ///
   /// Use this function to perform a cheap range check for QoI purposes when
   /// memory safety is not a concern.  Do not rely on this range check for
@@ -198,8 +198,8 @@ internal func _writeBackMutableSlice<
   // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
   // aliasing violations if the newValue points to the same buffer?
 
-  var selfElementIndex = bounds.startIndex
-  let selfElementsEndIndex = bounds.endIndex
+  var selfElementIndex = bounds.lowerBound
+  let selfElementsEndIndex = bounds.upperBound
   var newElementIndex = slice.startIndex
   let newElementsEndIndex = slice.endIndex
 

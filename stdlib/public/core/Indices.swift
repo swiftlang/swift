@@ -49,8 +49,8 @@ public struct DefaultIndices<
     // FIXME: swift-3-indexing-model: range check.
     return DefaultIndices(
       _elements: _elements,
-      startIndex: bounds.startIndex,
-      endIndex: bounds.endIndex)
+      startIndex: bounds.lowerBound,
+      endIndex: bounds.upperBound)
   }
 
   @warn_unused_result

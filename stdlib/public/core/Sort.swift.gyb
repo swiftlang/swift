@@ -48,7 +48,7 @@ func _insertionSort<
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   if !range.isEmpty {
-    let start = range.startIndex
+    let start = range.lowerBound
 
     // Keep track of the end of the initial sequence of sorted
     // elements.
@@ -57,7 +57,7 @@ func _insertionSort<
     // One element is trivially already-sorted, thus pre-increment
     // Continue until the sorted elements cover the whole sequence
     elements._nextInPlace(&sortedEnd)
-    while sortedEnd != range.endIndex {
+    while sortedEnd != range.upperBound {
       // get the first unsorted element
       let x: C.Iterator.Element = elements[sortedEnd]
 
@@ -94,20 +94,20 @@ func _partition<
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) -> C.Index {
-  var lo = range.startIndex
-  var hi = range.endIndex
+  var lo = range.lowerBound
+  var hi = range.upperBound
 
   if lo == hi {
     return lo
   }
 
   // The first element is the pivot.
-  let pivot = elements[range.startIndex]
+  let pivot = elements[range.lowerBound]
 
   // Loop invariants:
   // * lo < hi
-  // * elements[i] < pivot, for i in range.startIndex+1..lo
-  // * pivot <= elements[i] for i in hi..range.endIndex
+  // * elements[i] < pivot, for i in range.lowerBound+1..lo
+  // * pivot <= elements[i] for i in hi..range.upperBound
 
 Loop: while true {
   FindLo: repeat {
@@ -132,9 +132,9 @@ Loop: while true {
   }
 
   elements._previousInPlace(&lo)
-  if lo != range.startIndex {
+  if lo != range.lowerBound {
     // swap the pivot into place
-    swap(&elements[lo], &elements[range.startIndex])
+    swap(&elements[lo], &elements[range.lowerBound])
   }
 
   return lo
@@ -153,7 +153,7 @@ func _introSort<
   var isOrderedBeforeVar = isOrderedBefore
 %   end
   let count =
-    elements.distance(from: range.startIndex, to: range.endIndex).toIntMax()
+    elements.distance(from: range.lowerBound, to: range.upperBound).toIntMax()
   if count < 2 {
     return
   }
@@ -177,7 +177,7 @@ func _introSortImpl<
   depthLimit: Int
 ) {
   // Insertion sort is better at handling smaller regions.
-  if elements.distance(from: range.startIndex, to: range.endIndex) < 20 {
+  if elements.distance(from: range.lowerBound, to: range.upperBound) < 20 {
     _insertionSort(
       &elements,
       subRange: range
@@ -201,12 +201,12 @@ func _introSortImpl<
     ${", isOrderedBefore: &isOrderedBefore" if p else ""})
   _introSortImpl(
     &elements,
-    subRange: range.startIndex..<partIdx,
+    subRange: range.lowerBound..<partIdx,
     ${"isOrderedBefore: &isOrderedBefore, " if p else ""}
     depthLimit: depthLimit &- 1)
   _introSortImpl(
     &elements,
-    subRange: (elements.next(partIdx))..<range.endIndex,
+    subRange: (elements.next(partIdx))..<range.upperBound,
     ${"isOrderedBefore: &isOrderedBefore, " if p else ""}
     depthLimit: depthLimit &- 1)
 }
@@ -220,8 +220,8 @@ func _siftDown<
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
-  let countToIndex = elements.distance(from: range.startIndex, to: index)
-  let countFromIndex = elements.distance(from: index, to: range.endIndex)
+  let countToIndex = elements.distance(from: range.lowerBound, to: index)
+  let countFromIndex = elements.distance(from: index, to: range.upperBound)
   // Check if left child is within bounds. If not, return, because there are
   // no children of the given node in the heap.
   if countToIndex + 1 >= countFromIndex {
@@ -264,10 +264,10 @@ func _heapify<
   //
   // We skip the rightmost half of the array, because these nodes don't have
   // any children.
-  let root = range.startIndex
+  let root = range.lowerBound
   var node = elements.advance(
     root,
-    by: elements.distance(from: range.startIndex, to: range.endIndex) / 2)
+    by: elements.distance(from: range.lowerBound, to: range.upperBound) / 2)
   while node != root {
     elements._previousInPlace(&node)
     _siftDown(
@@ -285,8 +285,8 @@ func _heapSort<
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
-  var hi = range.endIndex
-  let lo = range.startIndex
+  var hi = range.upperBound
+  let lo = range.lowerBound
   _heapify(
     &elements,
     subRange: range

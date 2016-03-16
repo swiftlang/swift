@@ -36,7 +36,7 @@ RangeTraps.test("HalfOpen")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var range = 1..<1
-  expectType(Range<Int>.self, &range)
+  expectType(RangeOfStrideable<Int>.self, &range)
   
   expectCrashLater()
   _ = 1..<0

@@ -235,7 +235,7 @@ extension String {
     /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.
     public subscript(bounds: Range<Index>) -> UTF8View {
-      return UTF8View(_core, bounds.startIndex, bounds.endIndex)
+      return UTF8View(_core, bounds.lowerBound, bounds.upperBound)
     }
 
     public var description: String {

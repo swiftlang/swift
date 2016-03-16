@@ -151,11 +151,11 @@ extension _ArrayBufferProtocol where Index == Int {
     let elements = self.subscriptBaseAddress
     _sanityCheck(elements != nil)
 
-    let oldTailIndex = subRange.endIndex
+    let oldTailIndex = subRange.upperBound
     let oldTailStart = elements + oldTailIndex
     let newTailIndex = oldTailIndex + growth
     let newTailStart = oldTailStart + growth
-    let tailCount = oldCount - subRange.endIndex
+    let tailCount = oldCount - subRange.upperBound
 
     if growth > 0 {
       // Slide the tail part of the buffer forwards, in reverse order
@@ -177,7 +177,7 @@ extension _ArrayBufferProtocol where Index == Int {
     }
     else { // We're not growing the buffer
       // Assign all the new elements into the start of the subRange
-      var i = subRange.startIndex
+      var i = subRange.lowerBound
       var j = newValues.startIndex
       for _ in 0..<newCount {
         elements[i] = newValues[j]

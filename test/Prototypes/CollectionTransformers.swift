@@ -55,8 +55,8 @@ internal func _splitRandomAccessIndexRange<
   elements: C,
   _ range: Range<C.Index>
 ) -> [Range<C.Index>] {
-  let startIndex = range.startIndex
-  let endIndex = range.endIndex
+  let startIndex = range.lowerBound
+  let endIndex = range.upperBound
   let length = elements.distance(from: startIndex, to: endIndex).toIntMax()
   if length < 2 {
     return [ range ]
@@ -947,8 +947,8 @@ final internal class _CollectionTransformerStepCollectionSource<
     _ range: Range<InputCollection.Index>,
     _ collector: inout Collector
   ) {
-    var i = range.startIndex
-    while i != range.endIndex {
+    var i = range.lowerBound
+    while i != range.upperBound {
       let e = c[i]
       collector.append(e)
       c._nextInPlace(&i)

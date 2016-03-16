@@ -56,7 +56,13 @@ class Subject<T>: Observer, Observable {
 
 struct X<T> {
 
-  mutating func replace<C : Collection where C.Iterator.Element == T>(a: C) {
+  // FIXME swift-3-indexing-model: Check with Ted K or Joe P about
+  // whether this change to the test is legit.  They appear to have
+  // added it in fad874708e05cff56aec5587a4b0f49cdadc6d11 or
+  // 53c69a956f3fac878bc5a00a243bb05245520208, respectively
+  mutating func replace<
+    C : Collection where C.Iterator.Element == T, C.Index : Strideable
+  >(a: C) {
     for i in a.startIndex..<a.endIndex {
       _ = a[i] as T
     }

@@ -149,8 +149,8 @@ extension String {
     public subscript(bounds: Range<Index>) -> UTF16View {
       return UTF16View(
         _core,
-        offset: _internalIndex(at: bounds.startIndex._offset),
-        length: bounds.endIndex._offset - bounds.startIndex._offset)
+        offset: _internalIndex(at: bounds.lowerBound._offset),
+        length: bounds.upperBound._offset - bounds.lowerBound._offset)
     }
 
     internal init(_ _core: _StringCore) {

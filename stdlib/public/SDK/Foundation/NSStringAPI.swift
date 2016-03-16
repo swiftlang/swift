@@ -32,8 +32,8 @@ func _toNSArray<T, U : AnyObject>(a: [T], @noescape f: (T) -> U) -> NSArray {
 @warn_unused_result
 func _toNSRange(r: Range<String.Index>) -> NSRange {
   return NSRange(
-    location: r.startIndex._utf16Index,
-    length: r.endIndex._utf16Index - r.startIndex._utf16Index)
+    location: r.lowerBound._utf16Index,
+    length: r.upperBound._utf16Index - r.lowerBound._utf16Index)
 }
 
 @warn_unused_result

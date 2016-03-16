@@ -382,13 +382,13 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
-    _sanityCheck(bounds.startIndex >= 0)
-    _sanityCheck(bounds.endIndex >= bounds.startIndex)
-    _sanityCheck(bounds.endIndex <= count)
+    _sanityCheck(bounds.lowerBound >= 0)
+    _sanityCheck(bounds.upperBound >= bounds.lowerBound)
+    _sanityCheck(bounds.upperBound <= count)
 
-    let initializedCount = bounds.endIndex - bounds.startIndex
+    let initializedCount = bounds.upperBound - bounds.lowerBound
     target.initializeFrom(
-      firstElementAddress + bounds.startIndex,
+      firstElementAddress + bounds.lowerBound,
       count: initializedCount)
     _fixLifetime(owner)
     return target + initializedCount

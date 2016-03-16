@@ -215,7 +215,7 @@ internal enum _CollectionOperation : Equatable {
         subRange,
         with: repeatElement(nextStateId, count: replacementCount))
 
-      let invalidIndices = subRange.startIndex..<result.endIndex
+      let invalidIndices = subRange.lowerBound..<result.endIndex
       result.replaceSubrange(
         invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
@@ -252,7 +252,7 @@ internal enum _CollectionOperation : Equatable {
     case removeRange(let subRange):
       result.removeSubrange(subRange)
 
-      let invalidIndices = subRange.startIndex..<result.endIndex
+      let invalidIndices = subRange.lowerBound..<result.endIndex
       result.replaceSubrange(
         invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
@@ -493,13 +493,13 @@ public struct ${Index} : ForwardIndex {
   public static func _failEarlyRangeCheck(
     index: ${Index}, bounds: Range<${Index}>
   ) {
-    expectLE(bounds.startIndex.position, index.position)
-    expectGT(bounds.endIndex.position, index.position)
+    expectLE(bounds.lowerBound.position, index.position)
+    expectGT(bounds.upperBound.position, index.position)
 
     if ${Index}.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck(
         index.position,
-        bounds: bounds.startIndex.position..<bounds.endIndex.position)
+        bounds: bounds.lowerBound.position..<bounds.upperBound.position)
     }
   }
 
@@ -509,10 +509,10 @@ public struct ${Index} : ForwardIndex {
   ) {
     let range = rangeStart..<rangeEnd
     let bounds = boundsStart..<boundsEnd
-    expectLE(bounds.startIndex.position, range.startIndex.position)
-    expectGE(bounds.endIndex.position, range.startIndex.position)
-    expectLE(bounds.startIndex.position, range.endIndex.position)
-    expectGE(bounds.endIndex.position, range.endIndex.position)
+    expectLE(bounds.lowerBound.position, range.lowerBound.position)
+    expectGE(bounds.upperBound.position, range.lowerBound.position)
+    expectLE(bounds.lowerBound.position, range.upperBound.position)
+    expectGE(bounds.upperBound.position, range.upperBound.position)
 
     if ${Index}.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck2(
@@ -592,13 +592,13 @@ public struct MinimalBidirectionalIndex : BidirectionalIndex {
     index: MinimalBidirectionalIndex,
     bounds: Range<MinimalBidirectionalIndex>
   ) {
-    expectLE(bounds.startIndex.position, index.position)
-    expectGT(bounds.endIndex.position, index.position)
+    expectLE(bounds.lowerBound.position, index.position)
+    expectGT(bounds.upperBound.position, index.position)
 
     if MinimalBidirectionalIndex.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck(
         index.position,
-        bounds: bounds.startIndex.position..<bounds.endIndex.position)
+        bounds: bounds.lowerBound.position..<bounds.upperBound.position)
     }
   }
 
@@ -610,10 +610,10 @@ public struct MinimalBidirectionalIndex : BidirectionalIndex {
   ) {
     let range = rangeStart..<rangeEnd
     let bounds = boundsStart..<boundsEnd
-    expectLE(bounds.startIndex.position, range.startIndex.position)
-    expectGE(bounds.endIndex.position, range.startIndex.position)
-    expectLE(bounds.startIndex.position, range.endIndex.position)
-    expectGE(bounds.endIndex.position, range.endIndex.position)
+    expectLE(bounds.lowerBound.position, range.lowerBound.position)
+    expectGE(bounds.upperBound.position, range.lowerBound.position)
+    expectLE(bounds.lowerBound.position, range.upperBound.position)
+    expectGE(bounds.upperBound.position, range.upperBound.position)
 
     if MinimalBidirectionalIndex.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck2(
@@ -794,13 +794,13 @@ public struct MinimalRandomAccessIndex : RandomAccessIndex {
     index: MinimalRandomAccessIndex,
     bounds: Range<MinimalRandomAccessIndex>
   ) {
-    expectLE(bounds.startIndex.position, index.position)
-    expectGT(bounds.endIndex.position, index.position)
+    expectLE(bounds.lowerBound.position, index.position)
+    expectGT(bounds.upperBound.position, index.position)
 
     if MinimalRandomAccessIndex.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck(
         index.position,
-        bounds: bounds.startIndex.position..<bounds.endIndex.position)
+        bounds: bounds.lowerBound.position..<bounds.upperBound.position)
     }
   }
 
@@ -812,10 +812,10 @@ public struct MinimalRandomAccessIndex : RandomAccessIndex {
   ) {
     let range = rangeStart..<rangeEnd
     let bounds = boundsStart..<boundsEnd
-    expectLE(bounds.startIndex.position, range.startIndex.position)
-    expectGE(bounds.endIndex.position, range.startIndex.position)
-    expectLE(bounds.startIndex.position, range.endIndex.position)
-    expectGE(bounds.endIndex.position, range.endIndex.position)
+    expectLE(bounds.lowerBound.position, range.lowerBound.position)
+    expectGE(bounds.upperBound.position, range.lowerBound.position)
+    expectLE(bounds.lowerBound.position, range.upperBound.position)
+    expectGE(bounds.upperBound.position, range.upperBound.position)
 
     if MinimalRandomAccessIndex.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck2(
@@ -1138,11 +1138,11 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   ) {
     let oldCount = count
     elements.replaceSubrange(
-      subRange.startIndex.position..<subRange.endIndex.position,
+      subRange.lowerBound.position..<subRange.upperBound.position,
       with: newElements)
     let newCount = count
     _willMutate(.replaceRange(
-      subRange: subRange.startIndex._offset..<subRange.endIndex._offset,
+      subRange: subRange.lowerBound._offset..<subRange.upperBound._offset,
       replacementCount: subRange.count + newCount - oldCount))
   }
 
@@ -1178,10 +1178,10 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   public mutating func removeSubrange(subRange: Range<${Index}>) {
     if !subRange.isEmpty {
       _willMutate(.removeRange(
-        subRange: subRange.startIndex._offset..<subRange.endIndex._offset))
+        subRange: subRange.lowerBound._offset..<subRange.upperBound._offset))
     }
     elements.removeSubrange(
-      subRange.startIndex.position..<subRange.endIndex.position
+      subRange.lowerBound.position..<subRange.upperBound.position
     )
   }
 
@@ -1318,8 +1318,8 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
 
   public init(base: Base, bounds: Range<Index>) {
     self.base = base
-    self.startIndex = bounds.startIndex
-    self.endIndex = bounds.endIndex
+    self.startIndex = bounds.lowerBound
+    self.endIndex = bounds.upperBound
   }
 
   public init(_ array: [Element]) {
@@ -1343,8 +1343,8 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
 
   public subscript(bounds: Range<Index>) -> Self_ {
     Index._failEarlyRangeCheck2(
-      rangeStart: bounds.startIndex,
-      rangeEnd: bounds.endIndex,
+      rangeStart: bounds.lowerBound,
+      rangeEnd: bounds.upperBound,
       boundsStart: startIndex,
       boundsEnd: endIndex)
     return Defaulted${traversal}RangeReplaceableSlice(
@@ -1363,8 +1363,8 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
       - subRange.count
       + numericCast(newElements.count) as Int
     Index._failEarlyRangeCheck2(
-      rangeStart: subRange.startIndex,
-      rangeEnd: subRange.endIndex,
+      rangeStart: subRange.lowerBound,
+      rangeEnd: subRange.upperBound,
       boundsStart: startIndex,
       boundsEnd: endIndex)
     base.replaceSubrange(subRange, with: newElements)

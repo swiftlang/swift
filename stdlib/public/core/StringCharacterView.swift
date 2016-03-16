@@ -267,7 +267,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Character
@@ -275,8 +275,8 @@ extension String.CharacterView : RangeReplaceableCollection {
     bounds: Range<Index>, with newElements: C
   ) {
     let rawSubRange: Range<Int> =
-      bounds.startIndex._base._position
-      ..< bounds.endIndex._base._position
+      bounds.lowerBound._base._position
+      ..< bounds.upperBound._base._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
@@ -328,7 +328,7 @@ extension String.CharacterView {
   ///   O(N) conversion.
   public subscript(bounds: Range<Index>) -> String.CharacterView {
     let unicodeScalarRange =
-      bounds.startIndex._base..<bounds.endIndex._base
+      bounds.lowerBound._base..<bounds.upperBound._base
     return String.CharacterView(
       String(_core).unicodeScalars[unicodeScalarRange]._core)
   }

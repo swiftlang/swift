@@ -146,8 +146,8 @@ IntervalTestSuite.test("Emptiness") {
 }
 
 IntervalTestSuite.test("start/end") {
-  expectEqual(0.0, (0.0..<0.1).start)
-  expectEqual(0.0, (0.0...0.1).start)
+  expectEqual(0.0, (0.0..<0.1).lowerBound)
+  expectEqual(0.0, (0.0...0.1).lowerBound)
   expectEqual(0.1, (0.0..<0.1).end)
   expectEqual(0.1, (0.0...0.1).end)
 }
@@ -202,30 +202,30 @@ IntervalTestSuite.test("rdar12016900") {
 
 IntervalTestSuite.test("clamp") {
   expectEqual(
-    (5..<10).clamp(0..<3), 5..<5)
+    (0..<3).clamped(to: 5..<10), 5..<5)
   expectEqual(
-    (5..<10).clamp(0..<9), 5..<9)
+    (0..<9).clamped(to: 5..<10), 5..<9)
   expectEqual(
-    (5..<10).clamp(0..<13), 5..<10)
+    (0..<13).clamped(to: 5..<10), 5..<10)
   expectEqual(
-    (5..<10).clamp(7..<9), 7..<9)
+    (7..<9).clamped(to: 5..<10), 7..<9)
   expectEqual(
-    (5..<10).clamp(7..<13), 7..<10)
+    (7..<13).clamped(to: 5..<10), 7..<10)
   expectEqual(
-    (5..<10).clamp(13..<15), 10..<10)
+    (13..<15).clamped(to: 5..<10), 10..<10)
 
   expectEqual(
-    (5...10).clamp(0...3), 5...5)
+    (0...3).clamped(to: 5...10), 5...5)
   expectEqual(
-    (5...10).clamp(0...9), 5...9)
+    (0...9).clamped(to: 5...10), 5...9)
   expectEqual(
-    (5...10).clamp(0...13), 5...10)
+    (0...13).clamped(to: 5...10), 5...10)
   expectEqual(
-    (5...10).clamp(7...9), 7...9)
+    (7...9).clamped(to: 5...10), 7...9)
   expectEqual(
-    (5...10).clamp(7...13), 7...10)
+    (7...13).clamped(to: 5...10), 7...10)
   expectEqual(
-    (5...10).clamp(13...15), 10...10)
+    (13...15).clamped(to: 5...10), 10...10)
 }
 
 runAllTests()

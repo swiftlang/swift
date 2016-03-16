@@ -35,10 +35,10 @@ tests.test("IteratorSequence") {
   var r = 1..<7
   var x = MinimalIterator(Array(r))
   for a in IteratorSequence(x) {
-    expectEqual(r.startIndex, a)
-    r.startIndex = r.startIndex.successor()
+    expectEqual(r.lowerBound, a)
+    r.lowerBound = r.lowerBound.successor()
   }
-  expectEqual(r.startIndex, r.endIndex)
+  expectEqual(r.lowerBound, r.upperBound)
 }
 
 struct MyIterator : IteratorProtocol {

@@ -126,13 +126,13 @@ struct A<T> : MutableCollection {
 
   subscript(r: Range<Int>) -> Array<T>.SubSequence {
     get {
-      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
-      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
+      expectTrue(r.lowerBound >= 0 && r.lowerBound <= impl.count)
+      expectTrue(r.upperBound >= 0 && r.upperBound <= impl.count)
       return impl[r]
     }
     set (x) {
-      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
-      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
+      expectTrue(r.lowerBound >= 0 && r.lowerBound <= impl.count)
+      expectTrue(r.upperBound >= 0 && r.upperBound <= impl.count)
       impl[r] = x
     }
   }

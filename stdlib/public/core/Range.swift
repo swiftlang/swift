@@ -10,83 +10,157 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: swift-3-indexing-model: this whole file.
+public // implementation sharing
+protocol _RangeProtocol {
+  associatedtype Bound : Comparable
+  
+  init(lowerBound: Bound, upperBound: Bound)
+  func contains(value: Bound) -> Bool
+  func overlaps(other: Self) -> Bool
+  var isEmpty: Bool { get }
+  
+  var lowerBound: Bound { get }
+  var upperBound: Bound { get }
+  
+  /// Returns `self` clamped to `limits`.
+  ///
+  /// The bounds of the result, even if it is empty, are always limited to the bounds of
+  /// `limits`.
+  func clamped(to limits: Self) -> Self
+}
+
+extension _RangeProtocol {
+
+  @inline(__always)
+  public init(_ other: Self) {
+    self.init(lowerBound: other.lowerBound, upperBound: other.upperBound)
+  }
+  
+  @inline(__always)
+  public func overlaps(other: Self) -> Bool {
+    return (!other.isEmpty && self.contains(other.lowerBound))
+        || (!self.isEmpty && other.contains(lowerBound))
+  }
+  
+  public var isEmpty: Bool {
+    return !self.contains(self.lowerBound)
+  }
+  
+  @inline(__always)
+  public func clamped(to limits: Self) -> Self {
+    return Self(
+      lowerBound:
+        limits.lowerBound > self.lowerBound ? limits.lowerBound
+        : limits.upperBound < self.lowerBound ? limits.upperBound
+        : self.lowerBound,
+      upperBound:
+        limits.upperBound < self.upperBound ? limits.upperBound
+        : limits.lowerBound > self.upperBound ? limits.lowerBound
+        : self.upperBound
+    )
+  }
+}
+
+public // implementation sharing
+protocol _HalfOpenRange : _RangeProtocol {}
+
+extension _HalfOpenRange {
+  @inline(__always)
+  public func contains(value: Bound) -> Bool {
+    return lowerBound <= value && upperBound > value
+  }
+}
+
+public // implementation sharing
+protocol _ClosedRange : _RangeProtocol {}
+
+extension _ClosedRange {
+  public func contains(value: Bound) -> Bool {
+    return lowerBound <= value && upperBound >= value
+  }
+}
+
+public // disambiguation
+protocol _HalfOpenRangeOfStrideable : RandomAccessCollection, _HalfOpenRange {}
+
+extension _HalfOpenRangeOfStrideable {
+  public var isEmpty : Bool {
+    return lowerBound >= upperBound
+  }
+}
 
 public struct RangeOfStrideable<
-  Element : Strideable
+  Bound : Strideable
 > : Equatable, RandomAccessCollection,
-  CustomStringConvertible, CustomDebugStringConvertible {
+  CustomStringConvertible, CustomDebugStringConvertible, 
+  _HalfOpenRangeOfStrideable {
 
+  public typealias Element = Bound
+  public typealias Index = Element
+
+  public init(lowerBound: Bound, upperBound: Bound) {
+    self.lowerBound = lowerBound
+    self.upperBound = upperBound
+  }
+  
   /// Construct a copy of `x`.
   @inline(__always)
-  public init(_ x: RangeOfStrideable<Element>) {
-    // This initializer exists only so that we can have a
-    // debugDescription that actually constructs the right type when
-    // evaluated
-    self = x
-  }
-
-  /// Construct a copy of `x`.
-  @inline(__always)
-  public init(_ x: Range<Element>) {
-    self.startIndex = x.startIndex
-    self.endIndex = x.endIndex
-  }
-
-  /// Construct a range with `startIndex == start` and `endIndex ==
-  /// end`.
-  @inline(__always)
-  internal init(_start: Element, end: Element) {
-    self.startIndex = _start
-    self.endIndex = end
+  public init(_ x: Range<Bound>) {
+    self.lowerBound = x.lowerBound
+    self.upperBound = x.upperBound
   }
 
   /// Access the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
-  public subscript(position: Element) -> Element {
-    _stdlibAssert(position != endIndex, "Index out of range")
+  ///   `position != upperBound`.
+  public subscript(position: Index) -> Element {
+    _stdlibAssert(self.contains(position), "Index out of range")
     return position
   }
 
   // FIXME(compiler limitation): this typealias should be inferred.
-  public typealias SubSequence = RangeOfStrideable<Element>
+  public typealias SubSequence = RangeOfStrideable<Bound>
 
-  public subscript(bounds: Range<Element>) -> RangeOfStrideable<Element> {
-    // FIXME: swift-3-indexing-model: range check.
+  public subscript(bounds: Range<Element>) -> RangeOfStrideable<Bound> {
     return RangeOfStrideable(bounds)
   }
 
-
-  /// Returns an iterator over the elements of this sequence.
-  ///
-  /// - Complexity: O(1).
-  public func makeIterator() -> RangeOfStrideableIterator<Element> {
-    return RangeOfStrideableIterator(_bounds: self)
+  public subscript(
+    bounds: RangeOfStrideable<Bound>
+  ) -> RangeOfStrideable<Bound> {
+    return self[Range(bounds)]
   }
-
+  
   /// The range's lower bound.
   ///
-  /// Identical to `endIndex` in an empty range.
-  public var startIndex: Element
+  /// Identical to `upperBound` in an empty range.
+  public var lowerBound: Bound
 
   /// The range's upper bound.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
+  /// `upperBound` is not a valid argument to `subscript`, and is always
+  /// reachable from `lowerBound` by zero or more applications of
   /// `successor()`.
-  public var endIndex: Element
+  public var upperBound: Bound
+  
+  public var startIndex: Index {
+    return lowerBound
+  }
+  
+  public var endIndex: Index {
+    return upperBound
+  }
   
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func next(i: Element) -> Element {
+  public func next(i: Index) -> Index {
     // FIXME: swift-3-indexing-model: bounds check.
     return i.advanced(by: 1)
   }
 
   // FIXME(compiler limitation): this typealias should be inferred.
-  public typealias Indices = RangeOfStrideable<Element>
+  public typealias Indices = RangeOfStrideable<Bound>
 
   public var indices: Indices {
     return self
@@ -94,17 +168,17 @@ public struct RangeOfStrideable<
 
   @warn_unused_result
   public func _customContainsEquatableElement(element: Element) -> Bool? {
-    return element >= self.startIndex && element < self.endIndex
+    return element >= self.lowerBound && element < self.upperBound
   }
 
   /// A textual representation of `self`.
   public var description: String {
-    return "\(startIndex)..<\(endIndex)"
+    return "\(lowerBound)..<\(upperBound)"
   }
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "RangeOfStrideable(\(String(reflecting: startIndex))..<\(String(reflecting: endIndex)))"
+    return "RangeOfStrideable(\(String(reflecting: lowerBound))..<\(String(reflecting: upperBound)))"
   }
 }
 
@@ -112,57 +186,28 @@ extension RangeOfStrideable : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self,
-      children: ["startIndex": startIndex, "endIndex": endIndex])
+      children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
 }
 
 @warn_unused_result
-public func == <Element>(
-  lhs: RangeOfStrideable<Element>,
-  rhs: RangeOfStrideable<Element>
+public func == <Bound>(
+  lhs: RangeOfStrideable<Bound>,
+  rhs: RangeOfStrideable<Bound>
 ) -> Bool {
   return
-    lhs.startIndex == rhs.startIndex &&
-    lhs.endIndex == rhs.endIndex
+    lhs.lowerBound == rhs.lowerBound &&
+    lhs.upperBound == rhs.upperBound
 }
 
 @warn_unused_result
-public func != <Element>(
-  lhs: RangeOfStrideable<Element>,
-  rhs: RangeOfStrideable<Element>
+public func != <Bound>(
+  lhs: RangeOfStrideable<Bound>,
+  rhs: RangeOfStrideable<Bound>
 ) -> Bool {
   return
-    lhs.startIndex != rhs.startIndex ||
-    lhs.endIndex != rhs.endIndex
-}
-
-/// An iterator over the elements of `Range<Element>`.
-public struct RangeOfStrideableIterator<
-  Element : Strideable
-> : IteratorProtocol, Sequence {
-
-  /// Construct an instance that traverses the elements of `bounds`.
-  @inline(__always)
-  internal init(_bounds: RangeOfStrideable<Element>) {
-    self._start = _bounds.startIndex
-    self._end = _bounds.endIndex
-  }
-
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
-  public mutating func next() -> Element? {
-    if _start == _end { return nil }
-    let result = _start
-    _start = _start.advanced(by: 1)
-    return result
-  }
-
-  /// The lower bound of the remaining range.
-  internal var _start: Element
-
-  /// The upper bound of the remaining range; not included in the
-  /// generated sequence.
-  internal let _end: Element
+    lhs.lowerBound != rhs.lowerBound ||
+    lhs.upperBound != rhs.upperBound
 }
 
 /// A collection of consecutive discrete index values.
@@ -171,13 +216,13 @@ public struct RangeOfStrideableIterator<
 ///   collection.
 ///
 /// Like other collections, a range containing one element has an
-/// `endIndex` that is the successor of its `startIndex`; and an empty
-/// range has `startIndex == endIndex`.
+/// `upperBound` that is the successor of its `lowerBound`; and an empty
+/// range has `lowerBound == upperBound`.
 ///
 /// Axiom: for any `Range` `r`, `r[i] == i`.
 ///
 /// Therefore, if `Element` has a maximal value, it can serve as an
-/// `endIndex`, but can never be contained in a `Range<Element>`.
+/// `upperBound`, but can never be contained in a `Range<Element>`.
 ///
 /// It also follows from the axiom above that `(-99..<100)[0] == 0`.
 /// To prevent confusion (because some expect the result to be `-99`),
@@ -195,87 +240,83 @@ public struct RangeOfStrideableIterator<
 ///     print(brackets(Range<Int>(start: -99, end: 100), 0))
 ///     // Prints "0"
 public struct Range<
-  Element : Comparable
-> : Equatable,
-    CustomStringConvertible, CustomDebugStringConvertible {
+  Bound : Comparable
+> : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
+    _HalfOpenRange {
 
   /// Construct a copy of `x`.
   @inline(__always)
-  public init(_ x: Range<Element>) {
+  public init(_ x: Range<Bound>) {
     // This initializer exists only so that we can have a
     // debugDescription that actually constructs the right type when
     // evaluated
     self = x
   }
 
-  /// Construct a range with `startIndex == start` and `endIndex ==
+  /// Construct a range with `lowerBound == start` and `upperBound ==
   /// end`.
   @inline(__always)
-  internal init(_start: Element, end: Element) {
-    self.startIndex = _start
-    self.endIndex = end
+  public init(lowerBound: Bound, upperBound: Bound) {
+    self.lowerBound = lowerBound
+    self.upperBound = upperBound
   }
 
   /// The range's lower bound.
   ///
-  /// Identical to `endIndex` in an empty range.
+  /// Identical to `upperBound` in an empty range.
   // FIXME: swift-3-indexing-model: rename to `start`.
-  public var startIndex: Element
+  public var lowerBound: Bound
 
   /// The range's upper bound.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
+  /// `upperBound` is not a valid argument to `subscript`, and is always
+  /// reachable from `lowerBound` by zero or more applications of
   /// `successor()`.
   // FIXME: swift-3-indexing-model: rename to `end`.
-  public var endIndex: Element
+  public var upperBound: Bound
 
   // FIXME: does not implement a requirement in `Collection`.
   // We need to implement `_customContainsEquatableElement` instead.
   @warn_unused_result
-  public func contains(element: Element) -> Bool {
-    return element >= self.startIndex && element < self.endIndex
-  }
-
-  public var isEmpty: Bool {
-    return startIndex == endIndex
+  public func contains(element: Bound) -> Bool {
+    return element >= self.lowerBound && element < self.upperBound
   }
 
   /// A textual representation of `self`.
   public var description: String {
-    return "\(startIndex)..<\(endIndex)"
+    return "\(lowerBound)..<\(upperBound)"
   }
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "Range(\(String(reflecting: startIndex))..<\(String(reflecting: endIndex)))"
+    return "Range(\(String(reflecting: lowerBound))..<\(String(reflecting: upperBound)))"
   }
 }
 
 extension Range : CustomReflectable {
   public var customMirror: Mirror {
-    return Mirror(self, children: ["startIndex": startIndex, "endIndex": endIndex])
+    return Mirror(self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
 }
 
-extension Range where Element : Strideable {
+extension Range where Bound : Strideable {
   /// Construct a copy of `x`.
   @inline(__always)
-  public init(_ x: RangeOfStrideable<Element>) {
-    self.startIndex = x.startIndex
-    self.endIndex = x.endIndex
+  public init(_ x: RangeOfStrideable<Bound>) {
+    self.lowerBound = x.lowerBound
+    self.upperBound = x.upperBound
   }
 
-  public var count: Element.Stride {
-    return startIndex.distance(to: endIndex)
+  public var count: Bound.Stride {
+    return lowerBound.distance(to: upperBound)
   }
 }
 
 @warn_unused_result
-public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
+public func == <Bound>(lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {
   return
-    lhs.startIndex == rhs.startIndex &&
-    lhs.endIndex == rhs.endIndex
+    lhs.lowerBound == rhs.lowerBound &&
+    lhs.upperBound == rhs.upperBound
 }
 
 /// Forms a half-open range that contains `minimum`, but not
@@ -285,10 +326,8 @@ public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
 public func ..< <Pos : Comparable> (minimum: Pos, maximum: Pos)
   -> Range<Pos> {
   _precondition(minimum <= maximum, "Can't form Range with end < start")
-  return Range(_start: minimum, end: maximum)
+  return Range(lowerBound: minimum, upperBound: maximum)
 }
-
-//===--- Prefer Ranges to Intervals, and add checking ---------------------===//
 
 /// Forms a half-open range that contains `start`, but not `end`.
 ///
@@ -300,7 +339,7 @@ public func ..< <Pos : Strideable> (
 ) -> RangeOfStrideable<Pos> {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
-  return RangeOfStrideable(_start: start, end: end)
+  return RangeOfStrideable(lowerBound: start, upperBound: end)
 }
 
 /// Forms a closed range that contains both `start` and `end`.
@@ -314,36 +353,16 @@ public func ... <Pos : Strideable> (
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
   _precondition(endPlusOne > end, "Range end has no valid successor")
-  return RangeOfStrideable(_start: start, end: endPlusOne)
+  return RangeOfStrideable(lowerBound: start, upperBound: endPlusOne)
 }
 
 @warn_unused_result
-public func ~= <I : Comparable> (
-  pattern: Range<I>, value: I
+public func ~= <R: _RangeProtocol> (
+  pattern: R, value: R.Bound
 ) -> Bool {
   return pattern.contains(value)
 }
 
-@warn_unused_result
-public func ~= <I : Strideable> (
-  pattern: RangeOfStrideable<I>, value: I
-) -> Bool {
-  return pattern.contains(value)
-}
-
-@available(*, unavailable, renamed: "RangeOfStrideableIterator")
-public struct RangeGenerator<Element> {}
-
-extension RangeOfStrideableIterator {
-  @available(*, unavailable, message: "use the 'makeIterator()' method on the collection")
-  public init(_ bounds: Range<Element>) {
-    fatalError("unavailable function can't be called")
-  }
-}
-
-extension Range {
-  @available(*, unavailable, message: "use the '..<' operator")
-  public init(start: Element, end: Element) {
-    fatalError("unavailable function can't be called")
-  }
-}
+// swift-3-indexing-model: this is not really a proper rename
+@available(*, unavailable, renamed: "IndexingIterator")
+public struct RangeGenerator<Bound> {}

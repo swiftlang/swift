@@ -15,22 +15,16 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-// Check that the generic parameter is called 'Element'.
+// Check that the generic parameter is called 'Bound'.
 protocol TestProtocol1 {}
 
-extension Range where Element : TestProtocol1 {
+extension Range where Bound : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension RangeOfStrideable where Element : TestProtocol1 {
-  var _elementIsTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
-extension RangeOfStrideableIterator where Element : TestProtocol1 {
+extension RangeOfStrideable where Bound : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -47,16 +41,16 @@ RangeTestSuite.test("TypeInference/Comparable") {
 
 }
 
-% for (Self, Element) in [
+% for (Self, Bound) in [
 %  ('Range', 'MinimalComparableValue'),
 %  ('RangeOfStrideable', 'MinimalStrideableValue'),
 % ]:
 
 RangeTestSuite.test("${Self}/Equatable") {
-  let _1 = ${Element}(1)
-  let _2 = ${Element}(2)
+  let _1 = ${Bound}(1)
+  let _2 = ${Bound}(2)
 
-  let instances: [${Self}<${Element}>] = [
+  let instances: [${Self}<${Bound}>] = [
     _1..<_1,
     _1..<_2,
     _2..<_2,
@@ -67,10 +61,10 @@ RangeTestSuite.test("${Self}/Equatable") {
 RangeTestSuite.test("${Self}: '..<' traps when end < start")
   .crashOutputMatches("Can't form Range with end < start")
   .code {
-  let _1 = ${Element}(1)
-  let _2 = ${Element}(2)
+  let _1 = ${Bound}(1)
+  let _2 = ${Bound}(2)
   expectCrashLater()
-  let range: ${Self}<${Element}> = _2..<_1
+  let range: ${Self}<${Bound}> = _2..<_1
   _blackHole(range)
 }
 
@@ -152,10 +146,10 @@ RangeTestSuite.test("RangeOfStrideable: CustomStringConvertible, CustomDebugStri
     r)
   expectDumped(
     "▿ RangeOfStrideable((value: 1).debugDescription..<(value: 2).debugDescription)\n" +
-    "  ▿ startIndex: (value: 1).debugDescription\n" +
+    "  ▿ lowerBound: (value: 1).debugDescription\n" +
     "    - value: 1\n" +
     "    - identity: 0\n" +
-    "  ▿ endIndex: (value: 2).debugDescription\n" +
+    "  ▿ upperBound: (value: 2).debugDescription\n" +
     "    - value: 2\n" +
     "    - identity: 0\n",
     r)
@@ -173,10 +167,10 @@ RangeTestSuite.test("Range: CustomStringConvertible, CustomDebugStringConvertibl
     r)
   expectDumped(
     "▿ Range((value: 1).debugDescription..<(value: 2).debugDescription)\n" +
-    "  ▿ startIndex: (value: 1).debugDescription\n" +
+    "  ▿ lowerBound: (value: 1).debugDescription\n" +
     "    - value: 1\n" +
     "    - identity: 0\n" +
-    "  ▿ endIndex: (value: 2).debugDescription\n" +
+    "  ▿ upperBound: (value: 2).debugDescription\n" +
     "    - value: 2\n" +
     "    - identity: 0\n",
     r)

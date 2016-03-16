@@ -66,8 +66,8 @@ SliceTests.test("Slice.{startIndex,endIndex}") {
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &slice)
 
-    expectEqual(bounds.startIndex, slice.startIndex)
-    expectEqual(bounds.endIndex, slice.endIndex)
+    expectEqual(bounds.lowerBound, slice.startIndex)
+    expectEqual(bounds.upperBound, slice.endIndex)
   }
 }
 
@@ -204,8 +204,8 @@ SliceTests.test("MutableSlice.{startIndex,endIndex}") {
       MutableSlice<MinimalForwardMutableCollection<OpaqueValue<Int>>>.self,
       &slice)
 
-    expectEqual(bounds.startIndex, slice.startIndex)
-    expectEqual(bounds.endIndex, slice.endIndex)
+    expectEqual(bounds.lowerBound, slice.startIndex)
+    expectEqual(bounds.upperBound, slice.endIndex)
   }
 }
 

@@ -23,8 +23,8 @@ public struct SubscriptRangeTest {
 
   public func boundsIn<C : Collection>(c: C) -> Range<C.Index> {
     let i = c.startIndex
-    return c.advance(i, by: numericCast(bounds.startIndex)) ..<
-           c.advance(i, by: numericCast(bounds.endIndex))
+    return c.advance(i, by: numericCast(bounds.lowerBound)) ..<
+           c.advance(i, by: numericCast(bounds.upperBound))
   }
 
   public init(

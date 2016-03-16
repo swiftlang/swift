@@ -155,7 +155,7 @@ extension String {
     ///   O(N) conversion.
     public subscript(r: Range<Index>) -> UnicodeScalarView {
       return UnicodeScalarView(
-        _core[r.startIndex._position..<r.endIndex._position])
+        _core[r.lowerBound._position..<r.upperBound._position])
     }
 
     /// A type whose instances can produce the elements of this
@@ -292,7 +292,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UnicodeScalar
@@ -300,8 +300,8 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
     bounds: Range<Index>, with newElements: C
   ) {
     let rawSubRange: Range<Int> =
-      bounds.startIndex._position
-      ..< bounds.endIndex._position
+      bounds.lowerBound._position
+      ..< bounds.upperBound._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }

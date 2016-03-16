@@ -619,8 +619,8 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
     expectEqual(11, usedLength)
-    expectEqual(remainingRange.startIndex, s.advance(startIndex, by: 8))
-    expectEqual(remainingRange.endIndex, endIndex)
+    expectEqual(remainingRange.lowerBound, s.advance(startIndex, by: 8))
+    expectEqual(remainingRange.upperBound, endIndex)
   }
   do {
     // 'bufferLength' is limiting.  Note that the buffer is not filled
@@ -640,8 +640,8 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
     expectEqual(4, usedLength)
-    expectEqual(remainingRange.startIndex, s.advance(startIndex, by: 4))
-    expectEqual(remainingRange.endIndex, endIndex)
+    expectEqual(remainingRange.lowerBound, s.advance(startIndex, by: 4))
+    expectEqual(remainingRange.upperBound, endIndex)
   }
   do {
     // 'range' is converted completely.
@@ -660,8 +660,8 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
     expectEqual(19, usedLength)
-    expectEqual(remainingRange.startIndex, endIndex)
-    expectEqual(remainingRange.endIndex, endIndex)
+    expectEqual(remainingRange.lowerBound, endIndex)
+    expectEqual(remainingRange.upperBound, endIndex)
   }
   do {
     // Inappropriate encoding.
@@ -680,8 +680,8 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
     expectEqual(4, usedLength)
-    expectEqual(remainingRange.startIndex, s.advance(startIndex, by: 4))
-    expectEqual(remainingRange.endIndex, endIndex)
+    expectEqual(remainingRange.lowerBound, s.advance(startIndex, by: 4))
+    expectEqual(remainingRange.upperBound, endIndex)
   }
 }
 
@@ -1100,8 +1100,8 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
     do {
       let s = "Глокая куздра"
       let r = s.rangeOfCharacter(from: charset)!
-      expectEqual(s.advance(s.startIndex, by: 4), r.startIndex)
-      expectEqual(s.advance(s.startIndex, by: 5), r.endIndex)
+      expectEqual(s.advance(s.startIndex, by: 4), r.lowerBound)
+      expectEqual(s.advance(s.startIndex, by: 5), r.upperBound)
     }
     do {
       expectEmpty("клмн".rangeOfCharacter(from: charset))
@@ -1110,15 +1110,15 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
       let s = "абвклмнабвклмн"
       let r = s.rangeOfCharacter(from: charset,
           options: .backwardsSearch)!
-      expectEqual(s.advance(s.startIndex, by: 9), r.startIndex)
-      expectEqual(s.advance(s.startIndex, by: 10), r.endIndex)
+      expectEqual(s.advance(s.startIndex, by: 9), r.lowerBound)
+      expectEqual(s.advance(s.startIndex, by: 10), r.upperBound)
     }
     do {
       let s = "абвклмнабв"
       let r = s.rangeOfCharacter(from: charset,
           range: s.advance(s.startIndex, by: 3)..<s.endIndex)!
-      expectEqual(s.advance(s.startIndex, by: 7), r.startIndex)
-      expectEqual(s.advance(s.startIndex, by: 8), r.endIndex)
+      expectEqual(s.advance(s.startIndex, by: 7), r.lowerBound)
+      expectEqual(s.advance(s.startIndex, by: 8), r.upperBound)
     }
   }
 
@@ -1171,8 +1171,8 @@ func toIntRange(
   guard let range = maybeRange else { return nil }
 
   return
-    string.distance(from: string.startIndex, to: range.startIndex) ..<
-    string.distance(from: string.startIndex, to: range.endIndex)
+    string.distance(from: string.startIndex, to: range.lowerBound) ..<
+    string.distance(from: string.startIndex, to: range.upperBound)
 }
 
 NSStringAPIs.test("range(of:options:range:locale:)") {

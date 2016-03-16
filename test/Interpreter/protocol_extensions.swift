@@ -16,8 +16,12 @@ extension Sequence {
 print(["a", "b", "c", "d"].myCount)
 
 // Extend a protocol with a function.
-extension Collection {
-  final var myIndices: Range<Index> {
+
+// FIXME swift-3-indexing-model: check with Doug G
+// (author of d0ab6890f8ca8aed73059e43372db894a96bea81) to make sure this
+// added constraint is still valid.
+extension Collection where Index : Strideable {  
+  final var myIndices: RangeOfStrideable<Index> {
     return startIndex..<endIndex
   }
 

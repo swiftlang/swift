@@ -30,11 +30,11 @@ struct MrMcRange : Collection {
 
   var startIndex: Int {
     print("using collection API")
-    return base.startIndex
+    return base.lowerBound
   }
   
   var endIndex: Int {
-    return base.endIndex
+    return base.upperBound
   }
 
   subscript(i: Int) -> LifetimeTracked {

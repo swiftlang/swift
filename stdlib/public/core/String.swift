@@ -687,7 +687,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Character
@@ -703,7 +703,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange(
     bounds: Range<Index>, with newElements: String

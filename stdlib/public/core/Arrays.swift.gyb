@@ -275,13 +275,13 @@ public struct ${Self}<Element>
   /// - Complexity: O(1).
   public subscript(bounds: Range<Int>) -> ArraySlice<Element> {
     get {
-      _checkIndex(bounds.startIndex)
-      _checkIndex(bounds.endIndex)
+      _checkIndex(bounds.lowerBound)
+      _checkIndex(bounds.upperBound)
       return ArraySlice(_buffer[bounds])
     }
     set(rhs) {
-      _checkIndex(bounds.startIndex)
-      _checkIndex(bounds.endIndex)
+      _checkIndex(bounds.lowerBound)
+      _checkIndex(bounds.upperBound)
       if self[bounds]._buffer.identity != rhs._buffer.identity {
         self.replaceSubrange(bounds, with: rhs)
       }
@@ -965,7 +965,7 @@ internal func _arrayOutOfPlaceReplace<
 
   _arrayOutOfPlaceUpdate(
     &source, &newBuffer,
-    bounds.startIndex - source.startIndex, insertCount,
+    bounds.lowerBound - source.startIndex, insertCount,
     _InitializeMemoryFromCollection(newValues)
   )
 }
@@ -989,7 +989,7 @@ internal func _growArrayCapacity(capacity: Int) -> Int {
 extension ${Self} {
   /// Replace the elements within `bounds` with `newElements`.
   ///
-  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
+  /// - Complexity: O(`subRange.count`) if `subRange.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(`count`) otherwise.
   @_semantics("array.mutate_unknown")
   public mutating func replaceSubrange<
@@ -997,10 +997,10 @@ extension ${Self} {
   >(
     subRange: Range<Int>, with newElements: C
   ) {
-    _precondition(subRange.startIndex >= self._buffer.startIndex,
+    _precondition(subRange.lowerBound >= self._buffer.startIndex,
       "${Self} replace: subRange start is negative")
 
-    _precondition(subRange.endIndex <= self._buffer.endIndex,
+    _precondition(subRange.upperBound <= self._buffer.endIndex,
       "${Self} replace: subRange extends past the end")
 
     let oldCount = self._buffer.count

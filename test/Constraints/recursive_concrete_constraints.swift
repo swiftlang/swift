@@ -18,7 +18,7 @@ struct S<A: Collection where A.Index == Int> : Collection {
   }
 
   subscript(i: Index) -> Element {
-    return base[baseRange.startIndex + i]
+    return base[baseRange.lowerBound + i]
   }
   
   func makeIterator() -> IndexingIterator<S> {
