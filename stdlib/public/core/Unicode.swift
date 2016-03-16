@@ -125,62 +125,62 @@ public struct UTF8 : UnicodeCodec {
     I : IteratorProtocol where I.Element == CodeUnit
   >(next: inout I) -> UnicodeDecodingResult {
 
-      refillBuffer: if !_didExhaustIterator {
-        // Bufferless ASCII fastpath.
-        if _fastPath(_bitsInBuffer == 0) {
-          if let codeUnit = next.next() {
-            if codeUnit & 0x80 == 0 {
-              return .scalarValue(UnicodeScalar(_unchecked: UInt32(codeUnit)))
-            }
-            // Non-ASCII, proceed to buffering mode.
-            _decodeBuffer = UInt32(codeUnit)
-            _bitsInBuffer = 8
-          } else {
-            _didExhaustIterator = true
-            return .emptyInput
+    refillBuffer: if !_didExhaustIterator {
+      // Bufferless ASCII fastpath.
+      if _fastPath(_bitsInBuffer == 0) {
+        if let codeUnit = next.next() {
+          if codeUnit & 0x80 == 0 {
+            return .scalarValue(UnicodeScalar(_unchecked: UInt32(codeUnit)))
           }
-        } else if(_decodeBuffer & 0x80 == 0) {
-          // ASCII in buffer.  We don't refill the buffer so we can return
-          // to bufferless mode once we've exhausted it.
-          break refillBuffer
+          // Non-ASCII, proceed to buffering mode.
+          _decodeBuffer = UInt32(codeUnit)
+          _bitsInBuffer = 8
+        } else {
+          _didExhaustIterator = true
+          return .emptyInput
         }
-        // Buffering mode.
-        // Fill buffer back to 4 bytes (or as many as are left in the iterator).
-        _sanityCheck(_bitsInBuffer < 32)
-        repeat {
-          if let codeUnit = next.next() {
-            // We use & 0x1f to make the compiler omit a bounds check branch.
-            _decodeBuffer |= (UInt32(codeUnit) << UInt32(_bitsInBuffer & 0x1f))
-            _bitsInBuffer = _bitsInBuffer &+ 8
-          } else {
-            _didExhaustIterator = true
-            if _bitsInBuffer == 0 { return .emptyInput }
-            break // We still have some bytes left in our buffer.
-          }
-        } while _bitsInBuffer < 32
-      } else if _bitsInBuffer == 0 {
-        return .emptyInput
+      } else if(_decodeBuffer & 0x80 == 0) {
+        // ASCII in buffer.  We don't refill the buffer so we can return
+        // to bufferless mode once we've exhausted it.
+        break refillBuffer
       }
+      // Buffering mode.
+      // Fill buffer back to 4 bytes (or as many as are left in the iterator).
+      _sanityCheck(_bitsInBuffer < 32)
+      repeat {
+        if let codeUnit = next.next() {
+          // We use & 0x1f to make the compiler omit a bounds check branch.
+          _decodeBuffer |= (UInt32(codeUnit) << UInt32(_bitsInBuffer & 0x1f))
+          _bitsInBuffer = _bitsInBuffer &+ 8
+        } else {
+          _didExhaustIterator = true
+          if _bitsInBuffer == 0 { return .emptyInput }
+          break // We still have some bytes left in our buffer.
+        }
+      } while _bitsInBuffer < 32
+    } else if _bitsInBuffer == 0 {
+      return .emptyInput
+    }
 
-      // Decode one unicode scalar.
-      // Note our empty bytes are always 0x00, which is required for this call.
-      let (result, length) = UTF8._decodeOne(_decodeBuffer)
+    // Decode one unicode scalar.
+    // Note our empty bytes are always 0x00, which is required for this call.
+    let (result, length) = UTF8._decodeOne(_decodeBuffer)
 
-      // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
-      let bitsConsumed = 8 &* length
-      _sanityCheck(1...4 ~= length && bitsConsumed <= _bitsInBuffer)
-      // Swift doesn't allow shifts greater than or equal to the type width.
-      // _decodeBuffer >>= UInt32(bitsConsumed) // >>= 32 crashes.
-      // Mask with 0x3f to let the compiler omit the '>= 64' bounds check.
-      _decodeBuffer = UInt32(truncatingBitPattern:
-        UInt64(_decodeBuffer) >> (UInt64(bitsConsumed) & 0x3f))
-      _bitsInBuffer = _bitsInBuffer &- bitsConsumed
+    // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
+    let bitsConsumed = 8 &* length
+    _sanityCheck(1...4 ~= length && bitsConsumed <= _bitsInBuffer)
+    // Swift doesn't allow shifts greater than or equal to the type width.
+    // _decodeBuffer >>= UInt32(bitsConsumed) // >>= 32 crashes.
+    // Mask with 0x3f to let the compiler omit the '>= 64' bounds check.
+    _decodeBuffer = UInt32(truncatingBitPattern:
+      UInt64(_decodeBuffer) >> (UInt64(bitsConsumed) & 0x3f))
+    _bitsInBuffer = _bitsInBuffer &- bitsConsumed
 
-      if _fastPath(result != nil) {
-        return .scalarValue(UnicodeScalar(_unchecked: result!))
-      } else {
-        return .error // Ill-formed UTF-8 code unit sequence.
-      }
+    if _fastPath(result != nil) {
+      return .scalarValue(UnicodeScalar(_unchecked: result!))
+    } else {
+      return .error // Ill-formed UTF-8 code unit sequence.
+    }
   }
 
   /// Attempts to decode a single UTF-8 code unit sequence starting at the LSB
@@ -698,6 +698,7 @@ extension UTF8.CodeUnit : _StringElement {
     return UTF8.CodeUnit(utf16)
   }
 }
+
 extension UTF16 {
   /// Returns the number of code units required to encode `x`.
   @warn_unused_result
@@ -724,7 +725,7 @@ extension UTF16 {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit(
       (x.value - 0x1_0000) & (((1 as UInt32) << 10) - 1)
-      ) + 0xDC00
+    ) + 0xDC00
   }
 
   @warn_unused_result
@@ -742,19 +743,19 @@ extension UTF16 {
     source source: UnsafeMutablePointer<T>,
     destination: UnsafeMutablePointer<U>,
     count: Int
-    ) {
-      if strideof(T.self) == strideof(U.self) {
-        _memcpy(
-          dest: UnsafeMutablePointer(destination),
-          src: UnsafeMutablePointer(source),
-          size: UInt(count) * UInt(strideof(U.self)))
+  ) {
+    if strideof(T.self) == strideof(U.self) {
+      _memcpy(
+        dest: UnsafeMutablePointer(destination),
+        src: UnsafeMutablePointer(source),
+        size: UInt(count) * UInt(strideof(U.self)))
+    }
+    else {
+      for i in 0..<count {
+        let u16 = T._toUTF16CodeUnit((source + i).pointee)
+        (destination + i).pointee = U._fromUTF16CodeUnit(u16)
       }
-      else {
-        for i in 0..<count {
-          let u16 = T._toUTF16CodeUnit((source + i).pointee)
-          (destination + i).pointee = U._fromUTF16CodeUnit(u16)
-        }
-      }
+    }
   }
 
   /// Returns the number of UTF-16 code units required for the given code unit
@@ -768,35 +769,35 @@ extension UTF16 {
   public static func transcodedLength<
     Encoding : UnicodeCodec, Input : IteratorProtocol
     where Encoding.CodeUnit == Input.Element
-    >(
+  >(
     of input: Input,
     decodedAs sourceEncoding: Encoding.Type,
     repairingIllFormedSequences: Bool
-    ) -> (count: Int, isASCII: Bool)? {
-      var input = input
-      var count = 0
-      var isAscii = true
+  ) -> (count: Int, isASCII: Bool)? {
+    var input = input
+    var count = 0
+    var isAscii = true
 
-      var inputDecoder = Encoding()
-      loop:
-        while true {
-          switch inputDecoder.decode(&input) {
-          case .scalarValue(let us):
-            if us.value > 0x7f {
-              isAscii = false
-            }
-            count += width(us)
-          case .emptyInput:
-            break loop
-          case .error:
-            if !repairingIllFormedSequences {
-              return nil
-            }
-            isAscii = false
-            count += width(UnicodeScalar(0xfffd))
-          }
+    var inputDecoder = Encoding()
+    loop:
+    while true {
+      switch inputDecoder.decode(&input) {
+      case .scalarValue(let us):
+        if us.value > 0x7f {
+          isAscii = false
+        }
+        count += width(us)
+      case .emptyInput:
+        break loop
+      case .error:
+        if !repairingIllFormedSequences {
+          return nil
+        }
+        isAscii = false
+        count += width(UnicodeScalar(0xfffd))
       }
-      return (count, isAscii)
+    }
+    return (count, isAscii)
   }
 }
 
@@ -823,12 +824,12 @@ public func transcode<
   InputEncoding : UnicodeCodec,
   OutputEncoding : UnicodeCodec
   where InputEncoding.CodeUnit == Input.Element
-  >(
+>(
   inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
   stoppingOnError stopOnError: Bool
-  ) -> Bool {
-    fatalError("unavailable function can't be called")
+) -> Bool {
+  fatalError("unavailable function can't be called")
 }
 
 extension UTF16 {
@@ -836,9 +837,9 @@ extension UTF16 {
   public static func measure<
     Encoding : UnicodeCodec, Input : IteratorProtocol
     where Encoding.CodeUnit == Input.Element
-    >(
+  >(
     _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
-    ) -> (Int, Bool)? {
-      fatalError("unavailable function can't be called")
+  ) -> (Int, Bool)? {
+    fatalError("unavailable function can't be called")
   }
 }
