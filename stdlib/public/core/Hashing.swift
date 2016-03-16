@@ -27,17 +27,7 @@ public // @testable
 struct _HashingDetail {
 
   public // @testable
-  static var fixedSeedOverride: UInt64 {
-    get {
-      // HACK: the variable itself is defined in C++ code so that it is
-      // guaranteed to be statically initialized.  This is a temporary
-      // workaround until the compiler can do the same for Swift.
-      return _swift_stdlib_HashingDetail_fixedSeedOverride
-    }
-    set {
-      _swift_stdlib_HashingDetail_fixedSeedOverride = newValue
-    }
-  }
+  static var fixedSeedOverride: UInt64 = 0
 
   @_transparent
   @warn_unused_result
