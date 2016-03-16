@@ -354,6 +354,10 @@ public:
                      ArrayRef<const char *> Args,
                      std::function<void(const CursorInfo &)> Receiver) override;
 
+  void getCursorInfoFromUSR(
+      StringRef Filename, StringRef USR, ArrayRef<const char *> Args,
+      std::function<void(const CursorInfo &)> Receiver) override;
+
   void findRelatedIdentifiersInFile(StringRef Filename, unsigned Offset,
                                     ArrayRef<const char *> Args,
               std::function<void(const RelatedIdentsInfo &)> Receiver) override;

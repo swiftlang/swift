@@ -994,6 +994,151 @@ void SwiftLangSupport::getCursorInfo(
                 Receiver);
 }
 
+static void
+resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
+                     SwiftInvocationRef Invok, bool TryExistingAST,
+                     std::function<void(const CursorInfo &)> Receiver) {
+  assert(Invok);
+
+  class CursorInfoConsumer : public SwiftASTConsumer {
+    std::string InputFile;
+    StringRef USR;
+    SwiftLangSupport &Lang;
+    SwiftInvocationRef ASTInvok;
+    const bool TryExistingAST;
+    std::function<void(const CursorInfo &)> Receiver;
+    SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
+
+  public:
+    CursorInfoConsumer(StringRef InputFile, StringRef USR,
+                       SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+                       bool TryExistingAST,
+                       std::function<void(const CursorInfo &)> Receiver)
+        : InputFile(InputFile), USR(USR), Lang(Lang),
+          ASTInvok(std::move(ASTInvok)), TryExistingAST(TryExistingAST),
+          Receiver(std::move(Receiver)) {}
+
+    bool canUseASTWithSnapshots(
+        ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
+      if (!TryExistingAST) {
+        LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
+        return false;
+      }
+
+      if (!Snapshots.empty()) {
+        PreviousASTSnaps.append(Snapshots.begin(), Snapshots.end());
+        LOG_INFO_FUNC(High, "will try existing AST");
+        return true;
+      }
+
+      LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
+      return false;
+    }
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &CompIns = AstUnit->getCompilerInstance();
+      Module *MainModule = CompIns.getMainModule();
+
+      unsigned BufferID =
+          AstUnit->getPrimarySourceFile().getBufferID().getValue();
+
+      trace::TracedOperation TracedOp;
+      if (trace::enabled()) {
+        trace::SwiftInvocation SwiftArgs;
+        ASTInvok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
+        trace::initTraceFiles(SwiftArgs, CompIns);
+        TracedOp.start(trace::OperationKind::CursorInfoForSource, SwiftArgs,
+                       {std::make_pair("USR", USR)});
+      }
+
+      std::string mangledName(USR);
+      if (USR.startswith("s:")) {
+        mangledName.replace(0, 2, "_T");
+      } else if (USR.startswith("c:")) {
+        LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
+        Receiver({});
+        return;
+      } else if (!USR.startswith("_T")) {
+        LOG_WARN_FUNC("unknown USR prefix");
+        Receiver({});
+        return;
+      }
+
+      auto &context = CompIns.getASTContext();
+      std::string error;
+      Decl *D = ide::getDeclFromMangledSymbolName(context, mangledName, error);
+
+      if (!D) {
+        Receiver({});
+        return;
+      }
+
+      CompilerInvocation CompInvok;
+      ASTInvok->applyTo(CompInvok);
+
+      if (auto *M = dyn_cast<ModuleDecl>(D)) {
+        passCursorInfoForModule(M, Lang.getIFaceGenContexts(), CompInvok,
+                                Receiver);
+      } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        bool Failed =
+            passCursorInfoForDecl(VD, MainModule, VD->getType(),
+                                  /*isRef=*/false, BufferID, Lang, CompInvok,
+                                  PreviousASTSnaps, Receiver);
+        if (Failed) {
+          if (!PreviousASTSnaps.empty()) {
+            // Attempt again using the up-to-date AST.
+            resolveCursorFromUSR(Lang, InputFile, USR, ASTInvok,
+                                 /*TryExistingAST=*/false, Receiver);
+          } else {
+            Receiver({});
+          }
+        }
+      }
+    }
+
+    void cancelled() override {
+      CursorInfo Info;
+      Info.IsCancelled = true;
+      Receiver(Info);
+    }
+
+    void failed(StringRef Error) override {
+      LOG_WARN_FUNC("cursor info failed: " << Error);
+      Receiver({});
+    }
+  };
+
+  auto Consumer = std::make_shared<CursorInfoConsumer>(
+      InputFile, USR, Lang, Invok, TryExistingAST, Receiver);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
+                                       &OncePerASTToken);
+}
+
+void SwiftLangSupport::getCursorInfoFromUSR(
+    StringRef filename, StringRef USR, ArrayRef<const char *> args,
+    std::function<void(const CursorInfo &)> receiver) {
+  if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
+    LOG_WARN_FUNC("info from usr for generated interface not implemented yet");
+    receiver({});
+    return;
+  }
+
+  std::string error;
+  SwiftInvocationRef invok = ASTMgr->getInvocation(args, filename, error);
+  if (!invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << error);
+    receiver({});
+    return;
+  }
+
+  resolveCursorFromUSR(*this, filename, USR, invok, /*TryExistingAST=*/true,
+                       receiver);
+}
+
 //===----------------------------------------------------------------------===//
 // SwiftLangSupport::findUSRRange
 //===----------------------------------------------------------------------===//
