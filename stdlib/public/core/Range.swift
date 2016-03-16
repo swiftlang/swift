@@ -72,17 +72,53 @@ protocol _HalfOpenRange : _RangeProtocol {}
 
 extension _HalfOpenRange {
   @inline(__always)
+  public init<
+    Other: _HalfOpenRange where Other.Bound == Bound
+  >(_ other: Other) {
+    self.init(
+      _uncheckedBounds: (lower: other.lowerBound, upper: other.upperBound)
+    )
+  }
+  
+  @inline(__always)
   public func contains(value: Bound) -> Bool {
     return lowerBound <= value && upperBound > value
   }
+
+  /// A textual representation of `self`.
+  public var description: String {
+    return "\(lowerBound)..<\(upperBound)"
+  }
 }
 
-public // implementation sharing
-protocol _ClosedRange : _RangeProtocol {}
+extension _HalfOpenRange where Bound : Strideable {
+  public var count: Bound.Stride {
+    return lowerBound.distance(to: upperBound)
+  }
+  
+  /// Access the element at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self` and
+  ///   `position != upperBound`.
+  public subscript(position: Bound) -> Bound {
+    _stdlibAssert(self.contains(position), "Index out of range")
+    return position
+  }
 
-extension _ClosedRange {
-  public func contains(value: Bound) -> Bool {
-    return lowerBound <= value && upperBound >= value
+  public subscript(bounds: Range<Bound>) -> Self {
+    return Self(bounds)
+  }
+
+  public subscript(bounds: Self) -> Self {
+    return bounds
+  }
+
+  public var startIndex: Bound {
+    return lowerBound
+  }
+  
+  public var endIndex: Bound {
+    return upperBound
   }
 }
 
@@ -94,28 +130,12 @@ public struct RangeOfStrideable<
 
   public typealias Element = Bound
   public typealias Index = Element
-
+  
   public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
   
-  /// Construct a copy of `x`.
-  @inline(__always)
-  public init(_ x: Range<Bound>) {
-    self.lowerBound = x.lowerBound
-    self.upperBound = x.upperBound
-  }
-
-  /// Access the element at `position`.
-  ///
-  /// - Precondition: `position` is a valid position in `self` and
-  ///   `position != upperBound`.
-  public subscript(position: Index) -> Element {
-    _stdlibAssert(self.contains(position), "Index out of range")
-    return position
-  }
-
   // FIXME(compiler limitation): this typealias should be inferred.
   public typealias SubSequence = RangeOfStrideable<Bound>
 
@@ -141,21 +161,6 @@ public struct RangeOfStrideable<
   /// `successor()`.
   public let upperBound: Bound
   
-  public var startIndex: Index {
-    return lowerBound
-  }
-  
-  public var endIndex: Index {
-    return upperBound
-  }
-  
-  // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
-  public func next(i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: bounds check.
-    return i.advanced(by: 1)
-  }
-
   // FIXME(compiler limitation): this typealias should be inferred.
   public typealias Indices = RangeOfStrideable<Bound>
 
@@ -166,11 +171,6 @@ public struct RangeOfStrideable<
   @warn_unused_result
   public func _customContainsEquatableElement(element: Element) -> Bool? {
     return element >= self.lowerBound && element < self.upperBound
-  }
-
-  /// A textual representation of `self`.
-  public var description: String {
-    return "\(lowerBound)..<\(upperBound)"
   }
 
   /// A textual representation of `self`, suitable for debugging.
@@ -246,15 +246,6 @@ public struct Range<
 > : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
     _HalfOpenRange {
 
-  /// Construct a copy of `x`.
-  @inline(__always)
-  public init(_ x: Range<Bound>) {
-    // This initializer exists only so that we can have a
-    // debugDescription that actually constructs the right type when
-    // evaluated
-    self = x
-  }
-
   /// Construct a range with `lowerBound == start` and `upperBound ==
   /// end`.
   @inline(__always)
@@ -298,19 +289,6 @@ public struct Range<
 extension Range : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
-  }
-}
-
-extension Range where Bound : Strideable {
-  /// Construct a copy of `x`.
-  @inline(__always)
-  public init(_ x: RangeOfStrideable<Bound>) {
-    self.lowerBound = x.lowerBound
-    self.upperBound = x.upperBound
-  }
-
-  public var count: Bound.Stride {
-    return lowerBound.distance(to: upperBound)
   }
 }
 
