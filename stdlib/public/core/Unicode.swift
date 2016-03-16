@@ -64,9 +64,9 @@ public protocol UnicodeCodec {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - Parameter next: A generator of code units to be decoded.  Repeated
+  /// - Parameter next: An iterator of code units to be decoded.  Repeated
   ///   calls to this method on the same instance should always pass the same
-  ///   generator and the generator or copies thereof should not be used for
+  ///   iterator and the iterator or copies thereof should not be used for
   ///   anything else between calls.  Failing to do so will yield unspecified
   ///   results.
   mutating func decode<
@@ -101,31 +101,31 @@ public struct UTF8 : UnicodeCodec {
   /// The number of bits in `_decodeBuffer` that are current filled.
   var _bitsInBuffer: UInt8 = 0
 
-  /// Whether we have exhausted the generator.  Note that this doesn't mean
+  /// Whether we have exhausted the iterator.  Note that this doesn't mean
   /// we are done decoding, as there might still be bytes left in the buffer.
-  var _didExhaustGenerator: Bool = false
+  var _didExhaustIterator: Bool = false
 
   /// Start or continue decoding a UTF-8 sequence.
   ///
   /// In order to decode a code unit sequence completely, this function should
   /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
-  /// Checking that the generator was exhausted is not sufficient.  The decoder
+  /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
-  /// generator.
+  /// iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
-  /// in the generator for a given returned `UnicodeScalar` or an error.
+  /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - Parameter next: A generator of code units to be decoded.  Repeated
+  /// - Parameter next: An iterator of code units to be decoded.  Repeated
   ///   calls to this method on the same instance should always pass the same
-  ///   generator and the generator or copies thereof should not be used for
+  ///   iterator and the iterator or copies thereof should not be used for
   ///   anything else between calls.  Failing to do so will yield unspecified
   ///   results.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(next: inout I) -> UnicodeDecodingResult {
 
-      refillBuffer: if !_didExhaustGenerator {
+      refillBuffer: if !_didExhaustIterator {
         // Bufferless ASCII fastpath.
         if _fastPath(_bitsInBuffer == 0) {
           if let codeUnit = next.next() {
@@ -136,7 +136,7 @@ public struct UTF8 : UnicodeCodec {
             _decodeBuffer = UInt32(codeUnit)
             _bitsInBuffer = 8
           } else {
-            _didExhaustGenerator = true
+            _didExhaustIterator = true
             return .emptyInput
           }
         } else if(_decodeBuffer & 0x80 == 0) {
@@ -145,7 +145,7 @@ public struct UTF8 : UnicodeCodec {
           break refillBuffer
         }
         // Buffering mode.
-        // Fill buffer back to 4 bytes (or as many as are left in the generator).
+        // Fill buffer back to 4 bytes (or as many as are left in the iterator).
         _sanityCheck(_bitsInBuffer < 32)
         repeat {
           if let codeUnit = next.next() {
@@ -153,7 +153,7 @@ public struct UTF8 : UnicodeCodec {
             _decodeBuffer |= (UInt32(codeUnit) << UInt32(_bitsInBuffer & 0x1f))
             _bitsInBuffer = _bitsInBuffer &+ 8
           } else {
-            _didExhaustGenerator = true
+            _didExhaustIterator = true
             if _bitsInBuffer == 0 { return .emptyInput }
             break // We still have some bytes left in our buffer.
           }
@@ -352,9 +352,9 @@ public struct UTF16 : UnicodeCodec {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - Parameter next: A generator of code units to be decoded.  Repeated
+  /// - Parameter next: An iterator of code units to be decoded.  Repeated
   ///   calls to this method on the same instance should always pass the same
-  ///   generator and the generator or copies thereof should not be used for
+  ///   iterator and the iterator or copies thereof should not be used for
   ///   anything else between calls.  Failing to do so will yield unspecified
   ///   results.
   public mutating func decode<
@@ -489,9 +489,9 @@ public struct UTF32 : UnicodeCodec {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - Parameter next: A generator of code units to be decoded.  Repeated
+  /// - Parameter next: An iterator of code units to be decoded.  Repeated
   ///   calls to this method on the same instance should always pass the same
-  ///   generator and the generator or copies thereof should not be used for
+  ///   iterator and the iterator or copies thereof should not be used for
   ///   anything else between calls.  Failing to do so will yield unspecified
   ///   results.
   public mutating func decode<
