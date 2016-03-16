@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+%{
+from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+}%
+
 import StdlibUnittest
 
 public protocol Wrapper {
@@ -115,6 +119,18 @@ public class CollectionLog : SequenceLog {
   public static var distance = TypeIndexed(0)
 }
 
+public class BidirectionalCollectionLog : SequenceLog {
+  public class func dispatchTester<C : BidirectionalCollection>(
+    c: C
+  ) -> LoggingBidirectionalCollection<LoggingBidirectionalCollection<C>> {
+    return LoggingBidirectionalCollection(
+      wrapping: LoggingBidirectionalCollection(wrapping: c))
+  }
+  public static var previous = TypeIndexed(0)
+  public static var _previousInPlace = TypeIndexed(0)
+  public static var last = TypeIndexed(0)
+}
+
 public class MutableCollectionLog : CollectionLog {
   public class func dispatchTester<C : MutableCollection>(
     c: C
@@ -166,9 +182,24 @@ public class RangeReplaceableCollectionLog : CollectionLog {
 //===----------------------------------------------------------------------===//
 
 % for Kind in ['Sequence', 'Collection', 'MutableCollection', 'RangeReplaceableCollection']:
+%   for Traversal in [''] if Kind == 'Sequence' else TRAVERSALS:
+%     if Kind == 'Sequence':
+%       Self = 'LoggingSequence'
+%     else:
+%       Self = 'Logging' + Kind.replace('Collection', collectionForTraversal(Traversal))
+%     end
+%     if Kind == 'Sequence':
+%       Constraints = Kind
+%       Protocols = Kind
+%     else:
+%       Constraints = 'protocol<' + Kind + ', ' + collectionForTraversal(Traversal) + '>'
+%       Protocols = ', '.join(set([Kind, collectionForTraversal(Traversal)]))
+%     end
 /// Interposes between `${Kind}` method calls to increment each method's
 /// counter.
-public struct Logging${Kind}<Base : ${Kind}> : ${Kind}, LoggingType {
+public struct ${Self}<
+  Base : ${Constraints}
+> : ${Protocols}, LoggingType {
 
   public var base: Base
 
@@ -280,7 +311,7 @@ public struct Logging${Kind}<Base : ${Kind}> : ${Kind}, LoggingType {
     return base._copyContents(initializing: ptr)
   }
 
-%   if Kind in ['Collection', 'MutableCollection', 'RangeReplaceableCollection']:
+%     if Kind in ['Collection', 'MutableCollection', 'RangeReplaceableCollection']:
   public typealias Index = Base.Index
 
   public var startIndex: Index {
@@ -298,12 +329,12 @@ public struct Logging${Kind}<Base : ${Kind}> : ${Kind}, LoggingType {
       Log.subscriptIndex[selfType] += 1
       return base[position]
     }
-%     if Kind == 'MutableCollection':
+%       if Kind == 'MutableCollection':
     set {
       Log.subscriptIndexSet[selfType] += 1
       base[position] = newValue
     }
-%     end
+%       end
   }
 
   public subscript(bounds: Range<Index>) -> SubSequence {
@@ -311,12 +342,12 @@ public struct Logging${Kind}<Base : ${Kind}> : ${Kind}, LoggingType {
       Log.subscriptRange[selfType] += 1
       return base[bounds]
     }
-%     if Kind == 'MutableCollection':
+%       if Kind == 'MutableCollection':
     set {
       Log.subscriptRangeSet[selfType] += 1
       base[bounds] = newValue
     }
-%     end
+%       end
   }
 
   public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
@@ -403,9 +434,9 @@ public struct Logging${Kind}<Base : ${Kind}> : ${Kind}, LoggingType {
     Log.distance[selfType] += 1
     return base.distance(from: start, to: end)
   }
-%   end
+%     end
 
-%   if Kind == 'MutableCollection':
+%     if Kind == 'MutableCollection':
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
@@ -416,9 +447,9 @@ public struct Logging${Kind}<Base : ${Kind}> : ${Kind}, LoggingType {
     }
     return result
   }
-%   end
+%     end
 
-%   if Kind == 'RangeReplaceableCollection':
+%     if Kind == 'RangeReplaceableCollection':
   public init() {
     self.base = Base()
     Log.init_[selfType] += 1
@@ -510,8 +541,26 @@ public struct Logging${Kind}<Base : ${Kind}> : ${Kind}, LoggingType {
     Log.reserveCapacity[selfType] += 1
     base.reserveCapacity(n)
   }
-%   end
+%     end
+%     if Traversal in ['Bidirectional', 'RandomAccess']:
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    BidirectionalCollectionLog.previous[selfType] += 1
+    return base.previous(i)
+  }
+
+  public func _previousInPlace(i: inout Index) {
+    BidirectionalCollectionLog._previousInPlace[selfType] += 1
+    base._previousInPlace(&i)
+  }
+
+  public var last: Iterator.Element? {
+    BidirectionalCollectionLog.last[selfType] += 1
+    return base.last
+  }
+%     end
 }
+%   end
 % end
 
 //===----------------------------------------------------------------------===//
