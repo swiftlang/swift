@@ -118,12 +118,11 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
   if (ED->getExtendedType().isNull())
     return true;
 
-  // We make up a unique usr for each extension by combining the usr of the
-  // extended type and the first value member of the extension.
-  if (printDeclUSR(ED->getExtendedType()->getAnyNominal(), OS))
-    return true;
+  // We make up a unique usr for each extension by combining a prefix
+  // and the USR of the first value member of the extension.
   for (auto D : ED->getMembers()) {
     if (auto VD = dyn_cast<ValueDecl>(D)) {
+      OS << "ext:";
       return printDeclUSR(VD, OS);
     }
   }
