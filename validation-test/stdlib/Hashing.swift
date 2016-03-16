@@ -87,7 +87,7 @@ HashingTestSuite.test("_squeezeHashValue/Int") {
         results[v] = Void()
       }
     }
-    expectEqual(results.count, r.endIndex - r.startIndex)
+    expectEqual(r.endIndex - r.startIndex, results.count)
   }
   checkRange(Int.min..<(Int.min+10))
   checkRange(0..<4)
@@ -119,7 +119,7 @@ HashingTestSuite.test("_squeezeHashValue/UInt") {
         results[v] = Void()
       }
     }
-    expectEqual(results.count, Int(cardinality))
+    expectEqual(Int(cardinality), results.count)
   }
   checkRange(0..<4)
   checkRange(0..<8)
