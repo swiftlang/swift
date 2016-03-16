@@ -41,7 +41,7 @@ void CallerAnalysis::processFunctionCallSites(SILFunction *F) {
         SILFunction *CalleeFn = getCallee(Apply);
         if (!CalleeFn)
           continue;
-        // Update the callee information for this fucntion.
+        // Update the callee information for this function.
         CallerAnalysisFunctionInfo &CallerInfo
                              = CallInfo.FindAndConstruct(F).second;
         CallerInfo.Callees.push_back(CalleeFn);
