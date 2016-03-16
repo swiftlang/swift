@@ -337,9 +337,10 @@ class Bas : NSObject {
   // CHECK: bb0([[NSARRAY:%[0-9]+]] : $NSArray, [[SELF:%[0-9]+]] : $Bas):
   // CHECK:   strong_retain [[NSARRAY]] : $NSArray
   // CHECK:   strong_retain [[SELF]] : $Bas
-  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray{{.*}} : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
+  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
   // CHECK-NEXT: [[OPT_NSARRAY:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[NSARRAY]] : $NSArray
-  // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
+  // CHECK-NEXT: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
+  // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]], [[ARRAY_META]])
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   strong_release [[SELF]] : $Bas

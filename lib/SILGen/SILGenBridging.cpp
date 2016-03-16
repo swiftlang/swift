@@ -177,36 +177,6 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
     .getAsSingleValue(gen, loc);
 }
 
-static ManagedValue emitBridgeCollectionToNative(SILGenFunction &gen,
-                                                 SILLocation loc,
-                                                 SILDeclRef bridgeFnRef,
-                                                 ManagedValue collection,
-                                                 SILType nativeTy) {
-  SILValue bridgeFn = gen.emitGlobalFunctionRef(loc, bridgeFnRef);
-
-  auto collectionTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
-  auto subs = collectionTy->getSubstitutions(gen.SGM.M.getSwiftModule(),
-                                             nullptr);
-  auto substFnType = bridgeFn->getType().substGenericArgs(gen.SGM.M, subs);
-
-  Type inputType = collection.getType().getSwiftRValueType();
-  if (!inputType->getOptionalObjectType()) {
-    SILType loweredOptTy = gen.SGM.getLoweredType(OptionalType::get(inputType));
-    auto *someDecl = gen.getASTContext().getOptionalSomeDecl();
-    auto *enumInst = gen.B.createEnum(loc, collection.getValue(), someDecl,
-                                      loweredOptTy);
-    collection = ManagedValue(enumInst, collection.getCleanup());
-  }
-
-  SILValue result = gen.B.createApply(loc, bridgeFn,
-                                      substFnType,
-                                      nativeTy,
-                                      subs,
-                                      { collection.forward(gen) });
-
-  return gen.emitManagedRValueWithCleanup(result);
-}
-
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
                                              SILLocation loc,
                                              ManagedValue swiftBool) {
@@ -665,7 +635,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
       auto conformance =
         gen.SGM.getConformanceToObjectiveCBridgeable(loc, loweredNativeTy);
       assert(conformance &&
-             "Missing String conformation to _ObjectiveCBridgeable?");
+             "Missing String conformance to _ObjectiveCBridgeable?");
       if (auto result = emitBridgeObjectiveCToNative(gen, loc, v, conformance))
         return *result;
 
@@ -676,24 +646,42 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
   // Bridge NSArray to Array.
   if (auto arrayDecl = gen.getASTContext().getArrayDecl()) {
     if (nativeTy.getSwiftRValueType()->getAnyNominal() == arrayDecl) {
-      SILDeclRef bridgeFn = gen.SGM.getNSArrayToArrayFn();
-      return emitBridgeCollectionToNative(gen, loc, bridgeFn, v, nativeTy);
+      auto conformance =
+        gen.SGM.getConformanceToObjectiveCBridgeable(loc, loweredNativeTy);
+      assert(conformance &&
+             "Missing Array conformance to _ObjectiveCBridgeable?");
+      if (auto result = emitBridgeObjectiveCToNative(gen, loc, v, conformance))
+        return *result;
+
+      return gen.emitUndef(loc, nativeTy);
     }
   }
 
   // Bridge NSDictionary to Dictionary.
   if (auto dictDecl = gen.getASTContext().getDictionaryDecl()) {
     if (nativeTy.getSwiftRValueType()->getAnyNominal() == dictDecl) {
-      SILDeclRef bridgeFn = gen.SGM.getNSDictionaryToDictionaryFn();
-      return emitBridgeCollectionToNative(gen, loc, bridgeFn, v, nativeTy);
+      auto conformance =
+        gen.SGM.getConformanceToObjectiveCBridgeable(loc, loweredNativeTy);
+      assert(conformance &&
+             "Missing Dictionary conformance to _ObjectiveCBridgeable?");
+      if (auto result = emitBridgeObjectiveCToNative(gen, loc, v, conformance))
+        return *result;
+
+      return gen.emitUndef(loc, nativeTy);
     }
   }
 
   // Bridge NSSet to Set.
   if (auto setDecl = gen.getASTContext().getSetDecl()) {
     if (nativeTy.getSwiftRValueType()->getAnyNominal() == setDecl) {
-      SILDeclRef bridgeFn = gen.SGM.getNSSetToSetFn();
-      return emitBridgeCollectionToNative(gen, loc, bridgeFn, v, nativeTy);
+      auto conformance =
+        gen.SGM.getConformanceToObjectiveCBridgeable(loc, loweredNativeTy);
+      assert(conformance &&
+             "Missing Set conformance to _ObjectiveCBridgeable?");
+      if (auto result = emitBridgeObjectiveCToNative(gen, loc, v, conformance))
+        return *result;
+
+      return gen.emitUndef(loc, nativeTy);
     }
   }
 

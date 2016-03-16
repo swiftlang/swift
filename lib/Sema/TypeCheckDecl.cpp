@@ -2227,6 +2227,8 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
   // Make sure we have the appropriate bridging operations.
   checkBridgedFunctions(TC);
+  TC.useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
+                                         D->getInterfaceType());
 
   // Record the name of this Objective-C method in its class.
   if (auto classDecl

@@ -423,7 +423,12 @@ enum class ConformanceCheckFlags {
   /// Whether we will be using the conformance in the AST.
   ///
   /// This implies that the conformance will have to be complete.
-  Used = 0x02
+  Used = 0x02,
+  /// Whether to suppress dependency tracking entirely.
+  ///
+  /// FIXME: This deals with some oddities with the
+  /// _ObjectiveCBridgeable conformances.
+  SuppressDependencyTracking = 0x04,
 };
 
 /// Options that control protocol conformance checking.
@@ -1468,6 +1473,9 @@ public:
                           ConformanceCheckOptions options,
                           ProtocolConformance **Conformance = nullptr,
                           SourceLoc ComplainLoc = SourceLoc());
+
+  /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+  void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.

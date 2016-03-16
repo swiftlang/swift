@@ -3393,6 +3393,12 @@ namespace {
     Expr *walkToExprPost(Expr *expr) {
       Expr *result = visit(expr);
 
+      // Mark any _ObjectiveCBridgeable conformances as 'used'.
+      if (result) {
+        auto &tc = cs.getTypeChecker();
+        tc.useObjectiveCBridgeableConformances(cs.DC, result->getType());
+      }
+
       assert(expr == ExprStack.back());
       ExprStack.pop_back();
 

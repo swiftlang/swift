@@ -4010,6 +4010,9 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
   const DeclContext *topLevelContext = DC->getModuleScopeContext();
   auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
+    if (options.contains(ConformanceCheckFlags::SuppressDependencyTracking))
+      return;
+
     // Record that we depend on the type's conformance.
     auto *constSF = dyn_cast<SourceFile>(topLevelContext);
     if (!constSF)
@@ -4064,6 +4067,39 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   case ConformanceKind::UncheckedConforms:
     llvm_unreachable("Can't get here!");
   }
+}
+
+/// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
+                                                      Type type) {
+  class Walker : public TypeWalker {
+    TypeChecker &TC;
+    DeclContext *DC;
+    ProtocolDecl *Proto;
+
+  public:
+    Walker(TypeChecker &tc, DeclContext *dc, ProtocolDecl *proto)
+      : TC(tc), DC(dc), Proto(proto) { }
+
+    virtual Action walkToTypePre(Type ty) {
+      // If we have a nominal type, "use" its conformance to
+      // _ObjectiveCBridgeable if it has one.
+      if (ty->getAnyNominal()) {
+        ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
+            | ConformanceCheckFlags::Used
+            | ConformanceCheckFlags::SuppressDependencyTracking;
+        (void)TC.conformsToProtocol(ty, Proto, DC, options);
+      }
+
+      return Action::Continue;
+    }
+  };
+
+  auto proto = getProtocol(SourceLoc(),
+                           KnownProtocolKind::ObjectiveCBridgeable);
+  if (!proto) return;
+
+  type.walk(Walker(*this, dc, proto));
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {

@@ -173,7 +173,7 @@ extension Set : _ObjectiveCBridgeable {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSSet
+    x: NSSet?
   ) -> Set {
     return Set()
   }

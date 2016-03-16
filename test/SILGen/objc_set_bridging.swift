@@ -15,9 +15,10 @@ import gizmo
     // CHECK: bb0([[NSSET:%[0-9]+]] : $NSSet, [[SELF:%[0-9]+]] : $Foo):
     // CHECK:   strong_retain [[NSSET]] : $NSSet
     // CHECK:   strong_retain [[SELF]] : $Foo
-    // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertNSSetToSet{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
+    // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TZFE10FoundationVs3Set36_unconditionallyBridgeFromObjectiveCfGSqCSo5NSSet_GS0_x_
     // CHECK: [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET]] : $NSSet
-    // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]]) : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
+    // CHECK: [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
+    // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foo16bridge_Set_param{{.*}} : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
     // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[SET]], [[SELF]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
     // CHECK:   return [[RESULT]] : $()
@@ -52,9 +53,10 @@ import gizmo
   // CHECK: bb0([[NSSET:%[0-9]+]] : $NSSet, [[SELF:%[0-9]+]] : $Foo):
   // CHECK:   strong_retain [[NSSET]] : $NSSet
   // CHECK:   strong_retain [[SELF]] : $Foo
-  // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertNSSetToSet{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
+  // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TZFE10FoundationVs3Set36_unconditionallyBridgeFromObjectiveCfGSqCSo5NSSet_GS0_x_
   // CHECK: [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET]] : $NSSet
-  // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]]) : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
+    // CHECK: [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
+  // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])
   // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foos8property{{.*}} : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[SET]], [[SELF]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
   // CHECK:   strong_release [[SELF]] : $Foo
