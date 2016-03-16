@@ -78,8 +78,21 @@ class ARCLoopOpts : public SILFunctionTransform {
     LoopHoister Hoister(F, LI, AA, RCFI, LRFI, &PTFI, SEA);
     LoopARCPairingContext ARCSequenceOptsCtx(*F, AA, LRFI, LI, RCFI, &PTFI);
     SILLoopVisitorGroup VisitorGroup(F, LI);
-    VisitorGroup.addVisitor(&Hoister);
-    VisitorGroup.addVisitor(&ARCSequenceOptsCtx);
+    static unsigned SequenceCount = 0;
+    unsigned SequenceLimit = -1;
+    if (auto *Op = getenv("LIMIT")) {
+      SequenceLimit = atoi(Op);
+    }
+
+    if (SequenceCount < SequenceLimit) {
+      SequenceCount++;
+      VisitorGroup.addVisitor(&Hoister);
+    }
+
+    if (SequenceCount < SequenceLimit) {
+      SequenceCount++;
+      VisitorGroup.addVisitor(&ARCSequenceOptsCtx);
+    }
     VisitorGroup.run();
 
     if (Hoister.madeChange() || ARCSequenceOptsCtx.madeChange())

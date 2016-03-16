@@ -951,7 +951,8 @@ bool LHContext::pairIncrementsDecrements(LoopRegion *R) {
       PreheaderState->getRegion()->getBlock()->getTerminator());
   llvm::SmallVector<std::pair<LHRegionState *, SILBuilder>, 4> SuccBuilders;
 
-  // We only need to put the release on the exit block from the loop latch.
+  // We only need to put the release on the exit block from the loop latch. The
+  // reason why this is true is that any other 
   //
   // A key thing to notice here is that due to the way we canonicalize loops, we
   // know that all backedge blocks have a back edge or a back edge and an exit
