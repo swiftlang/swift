@@ -276,7 +276,6 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
     return result.getPointer();
 
   case ConformanceKind::DoesNotConform:
-  case ConformanceKind::UncheckedConforms:
     return nullptr;
   }
 }

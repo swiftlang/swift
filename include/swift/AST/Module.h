@@ -154,9 +154,6 @@ enum class ConformanceKind {
   DoesNotConform,
   /// The type conforms to the protocol, with the given conformance.
   Conforms,
-  /// The type is specified to conform to the protocol, but that conformance
-  /// has not yet been checked.
-  UncheckedConforms
 };
 
 /// The result of looking for a specific conformance.

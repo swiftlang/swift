@@ -752,7 +752,6 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
           conformances.push_back(
                          ProtocolConformanceRef(proto, conforms.getPointer()));
           break;
-        case ConformanceKind::UncheckedConforms:
         case ConformanceKind::DoesNotConform:
           conformances.push_back(ProtocolConformanceRef(proto));
           break;
@@ -851,8 +850,6 @@ LookupConformanceResult Module::lookupConformance(Type type,
       switch (inheritedConformance.getInt()) {
       case ConformanceKind::DoesNotConform:
         return { nullptr, ConformanceKind::DoesNotConform };
-      case ConformanceKind::UncheckedConforms:
-        return inheritedConformance;
       case ConformanceKind::Conforms:
         auto result =
           ctx.getInheritedConformance(type, inheritedConformance.getPointer());
@@ -911,9 +908,6 @@ LookupConformanceResult Module::lookupConformance(Type type,
     switch (inheritedConformance.getInt()) {
     case ConformanceKind::DoesNotConform:
       llvm_unreachable("We already found the inherited conformance");
-
-    case ConformanceKind::UncheckedConforms:
-      return inheritedConformance;
 
     case ConformanceKind::Conforms:
       // Create inherited conformance below.

@@ -2409,7 +2409,6 @@ static Type getMemberForBaseType(Module *module,
     auto conformance = module->lookupConformance(substBase, proto, resolver);
     switch (conformance.getInt()) {
     case ConformanceKind::DoesNotConform:
-    case ConformanceKind::UncheckedConforms:
       return Type();
 
     case ConformanceKind::Conforms:

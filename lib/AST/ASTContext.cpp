@@ -3611,10 +3611,6 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     // The type conforms, and we know the conformance, so we can look up the
     // bridged type below.
     break;
-  case ConformanceKind::UncheckedConforms:
-    // The type conforms, but we don't have a conformance yet. Return
-    // Optional(nullptr) to signal this.
-    return Type();
   case ConformanceKind::DoesNotConform:
     // If we haven't imported Foundation but this is a whitelisted type,
     // behave as above.

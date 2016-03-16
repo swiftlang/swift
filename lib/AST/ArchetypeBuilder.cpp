@@ -292,7 +292,6 @@ static ProtocolConformance *getSuperConformance(
   }
 
   case ConformanceKind::DoesNotConform:
-  case ConformanceKind::UncheckedConforms:
     return nullptr;
   }
 }

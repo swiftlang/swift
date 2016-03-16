@@ -4063,9 +4063,6 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     else
       recordDependency();
     return false;
-
-  case ConformanceKind::UncheckedConforms:
-    llvm_unreachable("Can't get here!");
   }
 }
 
