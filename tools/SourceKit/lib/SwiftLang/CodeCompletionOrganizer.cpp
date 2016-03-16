@@ -37,10 +37,11 @@ struct Item {
   std::string name;
   std::string description;
   uint8_t kind : 2;
+  uint8_t isExactMatch: 1;
   double matchScore = 0.0; ///< The quality of the filter matching.
   double finalScore = -1.0; ///< The final score including match and context.
   ItemKind getKind() const { return static_cast<ItemKind>(kind); }
-  Item(ItemKind k = ItemKind::None) : kind(static_cast<decltype(kind)>(k)) {}
+  Item(ItemKind k = ItemKind::None) : kind(static_cast<decltype(kind)>(k)), isExactMatch(0) {}
   virtual ~Item() {}
 };
 struct Result : public Item {
@@ -563,7 +564,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
       match = completion->getName().startswith_lower(filterText);
     }
 
-    if (match && completion->getName().equals_lower(filterText)) {
+    bool isExactMatch = match && completion->getName().equals_lower(filterText);
+
+    if (isExactMatch) {
       if (!exactMatch)
         exactMatch = completion;
       match = (options.addInnerResults || options.addInnerOperators)
@@ -574,8 +577,11 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     // Build wrapper and add to results.
     if (match) {
       auto wrapper = make_result(completion);
-      if (options.fuzzyMatching)
+      if (options.fuzzyMatching) {
         wrapper->matchScore = pattern.scoreCandidate(completion->getName());
+      }
+      wrapper->isExactMatch = isExactMatch;
+
       contents.push_back(std::move(wrapper));
     }
   }
@@ -651,10 +657,14 @@ enum class ResultBucket {
   LiteralTypeMatch,
   HighPriorityKeyword,
   ExpressionSpecific,
+  ExactMatch,
 };
 } // end anonymous namespace
 
 static ResultBucket getResultBucket(Item &item, bool hasExpectedTypes) {
+  if (item.isExactMatch)
+    return ResultBucket::ExactMatch;
+
   if (isa<Group>(item))
     return ResultBucket::Normal; // FIXME: take best contained result.
   auto *completion = cast<Result>(item).value;
