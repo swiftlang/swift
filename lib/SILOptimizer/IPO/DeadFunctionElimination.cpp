@@ -511,14 +511,12 @@ public:
     findAliveFunctions();
     // Get rid of definitions for all global functions that are not marked as
     // alive.
-    bool NeedUpdate = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
       SILFunction *F = &*FI;
       ++FI;
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
-          NeedUpdate = true;
           DFEPass->invalidateAnalysis(F,
                                     SILAnalysis::InvalidationKind::Everything);
         }
