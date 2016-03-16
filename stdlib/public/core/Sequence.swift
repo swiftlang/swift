@@ -26,14 +26,11 @@ public protocol IteratorProtocol {
   /// The type of element traversed by `self`.
   associatedtype Element
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  /// Advance to the next element and return it, or `nil` if no next element
+  /// exists. Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.  Specific implementations of this protocol
-  ///   are encouraged to respond to violations of this requirement by
-  ///   calling `preconditionFailure("...")`.
+  ///   since the copy was made.
   @warn_unused_result
   mutating func next() -> Element?
 }
@@ -637,12 +634,11 @@ public struct IteratorSequence<
     _base = base
   }
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  /// Advance to the next element and return it, or `nil` if no next element
+  /// exists. Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.
+  ///   since the copy was made.
   public mutating func next() -> Base.Element? {
     return _base.next()
   }

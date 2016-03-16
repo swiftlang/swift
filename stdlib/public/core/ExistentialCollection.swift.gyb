@@ -66,8 +66,8 @@ public struct AnyIterator<Element> : IteratorProtocol {
     self._box = _box
   }
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  /// Advance to the next element and return it, or `nil` if no next element
+  /// exists. Once `nil` has been returned, all subsequent calls return `nil`.
   public func next() -> Element? {
     return _box.next()
   }
@@ -92,8 +92,8 @@ internal class _AnyIteratorBase {}
 internal class _AnyIteratorBoxBase<Element>
   : _AnyIteratorBase, IteratorProtocol {
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  /// Advance to the next element and return it, or `nil` if no next element
+  /// exists. Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Note: Subclasses must override this method.
   internal func next() -> Element? { _abstract() }
