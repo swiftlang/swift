@@ -355,6 +355,42 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   }
 }
 
+// FIXME: swift-3-indexing-model: file a bug for the compiler?
+/// Ambiguity breakers.
+extension RangeReplaceableCollection
+  where
+  Self : BidirectionalCollection,
+  SubSequence == Self
+{
+  /// Remove an element from the end.
+  ///
+  /// - Complexity: O(1)
+  /// - Precondition: `!self.isEmpty`
+  public mutating func removeLast() -> Iterator.Element {
+    _precondition(!isEmpty, "can't remove last element from an empty collection")
+    if let result = _customRemoveLast() {
+      return result
+    }
+    return remove(at: previous(endIndex))
+  }
+
+  /// Remove the last `n` elements.
+  ///
+  /// - Complexity: O(`self.count`)
+  /// - Precondition: `n >= 0 && self.count >= n`.
+  public mutating func removeLast(n: Int) {
+    if n == 0 { return }
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
+      "can't remove more items from a collection than it contains")
+    if _customRemoveLast(n) {
+      return
+    }
+    let end = endIndex
+    removeSubrange(advance(end, by: numericCast(-n))..<end)
+  }
+}
+
 @warn_unused_result
 public func +<
     C : RangeReplaceableCollection,
