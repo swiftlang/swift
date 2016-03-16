@@ -66,7 +66,7 @@ tests.test("_isUnique_native/SpareBitTrap")
   // Fake an ObjC pointer.
   var b = _makeObjCBridgeObject(X())
   expectCrashLater()
-  _isUnique_native(&b)
+  _ = _isUnique_native(&b)
 }
 
 tests.test("_isUniqueOrPinned_native/SpareBitTrap")
@@ -77,7 +77,7 @@ tests.test("_isUniqueOrPinned_native/SpareBitTrap")
   // Fake an ObjC pointer.
   var b = _makeObjCBridgeObject(X())
   expectCrashLater()
-  _isUniqueOrPinned_native(&b)
+  _ = _isUniqueOrPinned_native(&b)
 }
 
 tests.test("_isUnique_native/NonNativeTrap")
@@ -87,7 +87,7 @@ tests.test("_isUnique_native/NonNativeTrap")
   .code {
   var x = XObjC()
   expectCrashLater()
-  _isUnique_native(&x)
+  _ = _isUnique_native(&x)
 }
 
 tests.test("_isUniqueOrPinned_native/NonNativeTrap")
@@ -97,7 +97,7 @@ tests.test("_isUniqueOrPinned_native/NonNativeTrap")
   .code {
   var x = XObjC()
   expectCrashLater()
-  _isUniqueOrPinned_native(&x)
+  _ = _isUniqueOrPinned_native(&x)
 }
 #endif // _ObjC
 

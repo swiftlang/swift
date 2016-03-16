@@ -39,7 +39,7 @@ RangeTraps.test("HalfOpen")
   expectType(Range<Int>.self, &range)
   
   expectCrashLater()
-  1..<0
+  _ = 1..<0
 }
 
 RangeTraps.test("Closed")
@@ -51,7 +51,7 @@ RangeTraps.test("Closed")
   expectType(Range<Int>.self, &range)
 
   expectCrashLater()
-  1...0
+  _ = 1...0
 }
 
 RangeTraps.test("OutOfRange")
@@ -59,7 +59,7 @@ RangeTraps.test("OutOfRange")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-  0..<Int.max // This is a Range
+  _ = 0..<Int.max // This is a RangeOfStrideable
 
   // This works for Intervals, but...
   expectTrue(ClosedInterval(0...Int.max).contains(Int.max))
