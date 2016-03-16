@@ -48,7 +48,7 @@ STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
 typedef SmallVector<FullApplySite, 8> ApplyList;
 //===----------------------------------------------------------------------===//
-//                     Argument and Result Optimzer
+//                     Argument and Result Optimizer
 //===----------------------------------------------------------------------===//
 
 static void

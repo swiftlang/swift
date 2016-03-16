@@ -42,7 +42,7 @@ namespace swift {
     /// the location for where the reference is.
     llvm::DenseMap<Identifier,
                    std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
-    /// A list of all functions foward-declared by a sil_scope.
+    /// A list of all functions forward-declared by a sil_scope.
     std::vector<SILFunction *> PotentialZombieFns;
 
     /// A map from textual .sil scope number to SILDebugScopes.

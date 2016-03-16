@@ -78,7 +78,7 @@ public:
 
   /// Return true if the function has a caller inside current module.
   bool existCaller(SILFunction *F) {
-    // Recompute every function in the invaldiated function list and empty the
+    // Recompute every function in the invalidated function list and empty the
     // list.
     for (auto &F : RecomputeFunctionList) {
       processFunctionCallSites(F);
