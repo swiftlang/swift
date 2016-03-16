@@ -1049,7 +1049,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func next(i: Index) -> Index {
-    fatalError("FIXME: swift-3-indexing-model implement")
+    return i.successor()
   }
 
   /// Returns the `Index` for the given key, or `nil` if the key is not
