@@ -319,7 +319,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // Enable modules.
     "-fmodules",
 
-    // Enable implicit module maps
+    // Enable implicit module maps (this option is implied by "-fmodules").
     "-fimplicit-module-maps",
 
     // Don't emit LLVM IR.
@@ -382,6 +382,35 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       // Just use the most feature-rich C language mode.
       "-x", "c", "-std=gnu11",
     });
+
+    // The module map used for Glibc depends on the target we're compiling for,
+    // and is not included in the resource directory with the other implicit
+    // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
+    SmallString<128> GlibcModuleMapPath;
+    if (!importerOpts.OverrideResourceDir.empty()) {
+      GlibcModuleMapPath = importerOpts.OverrideResourceDir;
+    } else if (!searchPathOpts.RuntimeResourcePath.empty()) {
+      GlibcModuleMapPath = searchPathOpts.RuntimeResourcePath;
+    }
+
+    // Running without a resource directory is not a supported configuration.
+    assert(!GlibcModuleMapPath.empty());
+
+    llvm::sys::path::append(
+      GlibcModuleMapPath,
+      swift::getPlatformNameForTriple(triple), triple.getArchName(),
+      "glibc.modulemap");
+
+    // Only specify the module map if that file actually exists.
+    // It may not--for example in the case that
+    // `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
+    // a Swift compiler not built for Linux targets.
+    if (llvm::sys::fs::exists(GlibcModuleMapPath)) {
+      invocationArgStrs.push_back(
+        (Twine("-fmodule-map-file=") + GlibcModuleMapPath).str());
+    } else {
+      // FIXME: Emit a warning of some kind.
+    }
   }
 
   if (triple.isOSDarwin()) {
