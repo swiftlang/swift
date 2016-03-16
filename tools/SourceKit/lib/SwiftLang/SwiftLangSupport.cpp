@@ -197,7 +197,7 @@ UIdent UIdentVisitor::visitFuncDecl(const FuncDecl *D) {
                                                IsRef);
   }
 
-  if (auto *Op = D->getOperatorDecl())  {
+  if (auto *Op = D->getOperatorDecl()) {
     switch (Op->getKind()) {
     case DeclKind::PrefixOperator:
       return IsRef ? KindRefFunctionPrefixOperator : KindDeclFunctionPrefixOperator;

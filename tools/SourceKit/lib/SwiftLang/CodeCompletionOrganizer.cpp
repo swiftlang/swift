@@ -37,11 +37,12 @@ struct Item {
   std::string name;
   std::string description;
   uint8_t kind : 2;
-  uint8_t isExactMatch: 1;
+  uint8_t isExactMatch : 1;
   double matchScore = 0.0; ///< The quality of the filter matching.
   double finalScore = -1.0; ///< The final score including match and context.
   ItemKind getKind() const { return static_cast<ItemKind>(kind); }
-  Item(ItemKind k = ItemKind::None) : kind(static_cast<decltype(kind)>(k)), isExactMatch(0) {}
+  Item(ItemKind k = ItemKind::None)
+      : kind(static_cast<decltype(kind)>(k)), isExactMatch(0) {}
   virtual ~Item() {}
 };
 struct Result : public Item {

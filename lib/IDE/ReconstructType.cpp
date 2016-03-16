@@ -2375,7 +2375,8 @@ VisitNode(ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
   nodes.pop_back();
 }
 
-Decl *ide::getDeclFromUSR(ASTContext &context, StringRef USR, std::string &error) {
+Decl *ide::getDeclFromUSR(ASTContext &context, StringRef USR,
+                          std::string &error) {
   if (!USR.startswith("s:")) {
     error = "not a Swift USR";
     return nullptr;
