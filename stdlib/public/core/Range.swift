@@ -14,18 +14,22 @@ public // implementation sharing
 protocol _RangeProtocol {
   associatedtype Bound : Comparable
   
-  init(lowerBound: Bound, upperBound: Bound)
+  init(_uncheckedBounds: (lower: Bound, upper: Bound))
   func contains(value: Bound) -> Bool
   func overlaps(other: Self) -> Bool
   var isEmpty: Bool { get }
   
+  // Note: it is crucial to enforce the invariant that lowerBound <=
+  // upperBound, or when Range has a Stridable Bound, and is thus a
+  // collection, it may be empty with startIndex != endIndex.  Thus,
+  // make sure lowerBound and upperBound are not settable in concrete models.
   var lowerBound: Bound { get }
   var upperBound: Bound { get }
   
   /// Returns `self` clamped to `limits`.
   ///
-  /// The bounds of the result, even if it is empty, are always limited to the bounds of
-  /// `limits`.
+  /// The bounds of the result, even if it is empty, are always
+  /// limited to the bounds of `limits`.
   func clamped(to limits: Self) -> Self
 }
 
@@ -33,7 +37,7 @@ extension _RangeProtocol {
 
   @inline(__always)
   public init(_ other: Self) {
-    self.init(lowerBound: other.lowerBound, upperBound: other.upperBound)
+    self = other
   }
   
   @inline(__always)
@@ -49,14 +53,16 @@ extension _RangeProtocol {
   @inline(__always)
   public func clamped(to limits: Self) -> Self {
     return Self(
-      lowerBound:
+      _uncheckedBounds: (
+        lower:
         limits.lowerBound > self.lowerBound ? limits.lowerBound
-        : limits.upperBound < self.lowerBound ? limits.upperBound
-        : self.lowerBound,
-      upperBound:
-        limits.upperBound < self.upperBound ? limits.upperBound
-        : limits.lowerBound > self.upperBound ? limits.lowerBound
-        : self.upperBound
+          : limits.upperBound < self.lowerBound ? limits.upperBound
+          : self.lowerBound,
+        upper:
+          limits.upperBound < self.upperBound ? limits.upperBound
+          : limits.lowerBound > self.upperBound ? limits.lowerBound
+          : self.upperBound
+      )
     )
   }
 }
@@ -80,27 +86,18 @@ extension _ClosedRange {
   }
 }
 
-public // disambiguation
-protocol _HalfOpenRangeOfStrideable : RandomAccessCollection, _HalfOpenRange {}
-
-extension _HalfOpenRangeOfStrideable {
-  public var isEmpty : Bool {
-    return lowerBound >= upperBound
-  }
-}
-
 public struct RangeOfStrideable<
   Bound : Strideable
 > : Equatable, RandomAccessCollection,
   CustomStringConvertible, CustomDebugStringConvertible, 
-  _HalfOpenRangeOfStrideable {
+  _HalfOpenRange {
 
   public typealias Element = Bound
   public typealias Index = Element
 
-  public init(lowerBound: Bound, upperBound: Bound) {
-    self.lowerBound = lowerBound
-    self.upperBound = upperBound
+  public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+    self.lowerBound = bounds.lower
+    self.upperBound = bounds.upper
   }
   
   /// Construct a copy of `x`.
@@ -135,14 +132,14 @@ public struct RangeOfStrideable<
   /// The range's lower bound.
   ///
   /// Identical to `upperBound` in an empty range.
-  public var lowerBound: Bound
+  public let lowerBound: Bound
 
   /// The range's upper bound.
   ///
   /// `upperBound` is not a valid argument to `subscript`, and is always
   /// reachable from `lowerBound` by zero or more applications of
   /// `successor()`.
-  public var upperBound: Bound
+  public let upperBound: Bound
   
   public var startIndex: Index {
     return lowerBound
@@ -179,6 +176,11 @@ public struct RangeOfStrideable<
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "RangeOfStrideable(\(String(reflecting: lowerBound))..<\(String(reflecting: upperBound)))"
+  }
+
+  public // ambiguity resolution between _RangeProtocol and Collection defaults
+  var isEmpty: Bool {
+    return lowerBound == upperBound
   }
 }
 
@@ -256,16 +258,16 @@ public struct Range<
   /// Construct a range with `lowerBound == start` and `upperBound ==
   /// end`.
   @inline(__always)
-  public init(lowerBound: Bound, upperBound: Bound) {
-    self.lowerBound = lowerBound
-    self.upperBound = upperBound
+  public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+    self.lowerBound = bounds.lower
+    self.upperBound = bounds.upper
   }
 
   /// The range's lower bound.
   ///
   /// Identical to `upperBound` in an empty range.
   // FIXME: swift-3-indexing-model: rename to `start`.
-  public var lowerBound: Bound
+  public let lowerBound: Bound
 
   /// The range's upper bound.
   ///
@@ -273,7 +275,7 @@ public struct Range<
   /// reachable from `lowerBound` by zero or more applications of
   /// `successor()`.
   // FIXME: swift-3-indexing-model: rename to `end`.
-  public var upperBound: Bound
+  public let upperBound: Bound
 
   // FIXME: does not implement a requirement in `Collection`.
   // We need to implement `_customContainsEquatableElement` instead.
@@ -326,7 +328,7 @@ public func == <Bound>(lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {
 public func ..< <Pos : Comparable> (minimum: Pos, maximum: Pos)
   -> Range<Pos> {
   _precondition(minimum <= maximum, "Can't form Range with end < start")
-  return Range(lowerBound: minimum, upperBound: maximum)
+  return Range(_uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
 /// Forms a half-open range that contains `start`, but not `end`.
@@ -339,7 +341,7 @@ public func ..< <Pos : Strideable> (
 ) -> RangeOfStrideable<Pos> {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
-  return RangeOfStrideable(lowerBound: start, upperBound: end)
+  return RangeOfStrideable(_uncheckedBounds: (lower: start, upper: end))
 }
 
 /// Forms a closed range that contains both `start` and `end`.
@@ -353,7 +355,7 @@ public func ... <Pos : Strideable> (
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
   _precondition(endPlusOne > end, "Range end has no valid successor")
-  return RangeOfStrideable(lowerBound: start, upperBound: endPlusOne)
+  return RangeOfStrideable(_uncheckedBounds: (lower: start, upper: endPlusOne))
 }
 
 @warn_unused_result
