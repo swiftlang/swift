@@ -446,43 +446,48 @@ void swift::ide::printSubmoduleInterface(
             if (auto N = dyn_cast<NominalTypeDecl>(Sub))
               SubDecls.push(N);
 
-          // Print Ext and add sub-types of Ext.
-          for (auto Ext : NTD->getExtensions()) {
-            if (!shouldPrint(Ext, AdjustedOptions)) {
-              Printer.callAvoidPrintDeclPost(Ext);
-              continue;
+          if (!PrintSynthesizedExtensions) {
+            // Print Ext and add sub-types of Ext.
+            for (auto Ext : NTD->getExtensions()) {
+              if (!shouldPrint(Ext, AdjustedOptions)) {
+                Printer.callAvoidPrintDeclPost(Ext);
+                continue;
+              }
+              if (Ext->hasClangNode())
+                continue; // will be printed in its source location, see above.
+              Printer << "\n";
+              Ext->print(Printer, AdjustedOptions);
+              Printer << "\n";
+              for (auto Sub : Ext->getMembers())
+                if (auto N = dyn_cast<NominalTypeDecl>(Sub))
+                  SubDecls.push(N);
             }
-            if (Ext->hasClangNode())
-              continue; // will be printed in its source location, see above.
-            Printer << "\n";
-            Ext->print(Printer, AdjustedOptions);
-            Printer << "\n";
-            for (auto Sub : Ext->getMembers())
-              if (auto N = dyn_cast<NominalTypeDecl>(Sub))
-                SubDecls.push(N);
-          }
-          if (!PrintSynthesizedExtensions)
             continue;
+          }
 
           // Print synthesized extensions.
           SynthesizedExtensionAnalyzer Analyzer(NTD, AdjustedOptions);
-          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
-                                                                    &Analyzer);
-          Analyzer.forEachSynthesizedExtensionMergeGroup(
-            [&](ArrayRef<ExtensionDecl*> Decls){
+
+          Analyzer.forEachExtensionMergeGroup(
+            [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
               for (auto ET : Decls) {
-                AdjustedOptions.TransformContext->shouldOpenExtension =
-                  Decls.front() == ET;
-                AdjustedOptions.TransformContext->shouldCloseExtension =
-                  Decls.back() == ET;
-                if (AdjustedOptions.TransformContext->shouldOpenExtension)
+                AdjustedOptions.shouldOpenExtension =
+                  Decls.front().first == ET.first;
+                AdjustedOptions.shouldCloseExtension =
+                  Decls.back().first == ET.first;
+                if (AdjustedOptions.shouldOpenExtension)
                   Printer << "\n";
-                ET->print(Printer, AdjustedOptions);
-                if (AdjustedOptions.TransformContext->shouldCloseExtension)
+                if (ET.second)
+                  AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
+                                                                                   &Analyzer);
+                ET.first->print(Printer, AdjustedOptions);
+                if (ET.second)
+                  AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
+
+                if (AdjustedOptions.shouldCloseExtension)
                   Printer << "\n";
             }
           });
-          AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
         }
       }
       return true;

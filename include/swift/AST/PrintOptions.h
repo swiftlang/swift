@@ -50,8 +50,6 @@ struct ArchetypeTransformContext {
   StringRef transform(StringRef Input);
 
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
-  bool shouldOpenExtension;
-  bool shouldCloseExtension;
 
   ~ArchetypeTransformContext();
 private:
@@ -59,10 +57,11 @@ private:
   Implementation &Impl;
 };
 
+typedef std::pair<ExtensionDecl*, bool> ExtensionAndIsSynthesized;
+
 class SynthesizedExtensionAnalyzer {
   struct Implementation;
   Implementation &Impl;
-
 public:
   SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
                                PrintOptions Options,
@@ -70,8 +69,8 @@ public:
   ~SynthesizedExtensionAnalyzer();
   void forEachSynthesizedExtension(
     llvm::function_ref<void(ExtensionDecl*)> Fn);
-  void forEachSynthesizedExtensionMergeGroup(
-    llvm::function_ref<void(ArrayRef<ExtensionDecl*>)> Fn);
+  void forEachExtensionMergeGroup(
+    llvm::function_ref<void(ArrayRef<ExtensionAndIsSynthesized>)> Fn);
   bool isInSynthesizedExtension(const ValueDecl *VD);
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
 };
@@ -267,6 +266,10 @@ struct PrintOptions {
 
   /// \brief The information for converting archetypes to specialized types.
   std::shared_ptr<ArchetypeTransformContext> TransformContext;
+
+  bool shouldOpenExtension = true;
+
+  bool shouldCloseExtension = true;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
