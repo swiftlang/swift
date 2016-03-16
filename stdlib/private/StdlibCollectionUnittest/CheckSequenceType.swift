@@ -1482,6 +1482,10 @@ extension TestSuite {
       isMultiPass, isEquatableMultiPass,
       "Two sequence types are of different kinds?")
 
+    // FIXME: swift-3-indexing-model: add tests for `underestimatedCount`
+    // Check that it is non-negative, and an underestimate of the actual
+    // element count.
+
 //===----------------------------------------------------------------------===//
 // contains()
 //===----------------------------------------------------------------------===//

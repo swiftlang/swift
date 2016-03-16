@@ -218,6 +218,7 @@ public struct Mirror {
     // associated types of Collection.
     C.SubSequence : Collection,
     C.SubSequence.Iterator.Element == Child,
+    C.SubSequence.Index == C.Index,
     C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : Collection,
     C.Indices.Iterator.Element == C.Index,

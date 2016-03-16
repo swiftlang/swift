@@ -636,6 +636,7 @@ public struct ${Self}<Element>
     // associated types of Collection.
     C.SubSequence : ${SubProtocol},
     C.SubSequence.Iterator.Element == Element,
+    C.SubSequence.Index == C.Index,
     C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : ${SubProtocol},
     C.Indices.Iterator.Element == C.Index,
