@@ -366,8 +366,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         // Skip type decls if they aren't visible, or any type that has a
         // witness. This cuts down on duplicates.
         if (areTypeDeclsVisibleInLookupMode(LS) &&
-            (!NormalConformance->hasTypeWitness(ATD) ||
-             NormalConformance->usesDefaultDefinition(ATD))) {
+            !NormalConformance->hasTypeWitness(ATD)) {
           Consumer.foundDecl(ATD, ReasonForThisProtocol);
         }
         continue;
@@ -378,7 +377,6 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         // Skip value requirements that have corresponding witnesses. This cuts
         // down on duplicates.
         if (!NormalConformance->hasWitness(VD) ||
-            NormalConformance->usesDefaultDefinition(VD) ||
             NormalConformance->getWitness(VD, nullptr) == nullptr) {
           Consumer.foundDecl(VD, ReasonForThisProtocol);
         }

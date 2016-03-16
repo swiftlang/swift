@@ -1135,10 +1135,8 @@ namespace decls_block {
     BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
     BCVBR<5>, // inherited conformances count
-    BCVBR<5>, // defaulted definitions count
     BCArray<DeclIDField>
-    // The array contains archetype-value pairs,
-    // then type declarations, then defaulted definitions.
+    // The array contains archetype-value pairs, then type declarations.
     // Inherited conformances follow, then the substitution records for the
     // associated types.
   >;

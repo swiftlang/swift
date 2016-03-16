@@ -151,7 +151,8 @@ ProtocolConformance::getInheritedConformances() const {
 
 /// Determine whether the witness for the given requirement
 /// is either the default definition or was otherwise deduced.
-bool ProtocolConformance::usesDefaultDefinition(ValueDecl *requirement) const {
+bool ProtocolConformance::
+usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 

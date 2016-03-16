@@ -1034,7 +1034,6 @@ void Serializer::writeNormalConformance(
   SmallVector<DeclID, 32> data;
   unsigned numValueWitnesses = 0;
   unsigned numTypeWitnesses = 0;
-  unsigned numDefaultedDefinitions = 0;
 
   // Collect the set of protocols inherited by this conformance.
   SmallVector<ProtocolDecl *, 8> inheritedProtos;
@@ -1067,20 +1066,6 @@ void Serializer::writeNormalConformance(
     return false;
   });
 
-  SmallVector<ValueDecl *, 4> defaultedDefinitions{
-    conformance->getDefaultedDefinitions().begin(),
-    conformance->getDefaultedDefinitions().end()
-  };
-  llvm::array_pod_sort(defaultedDefinitions.begin(), defaultedDefinitions.end(),
-                       [](ValueDecl * const *left, ValueDecl * const *right) {
-    return (*left)->getFullName().compare((*right)->getFullName());
-  });
-
-  for (auto defaulted : defaultedDefinitions) {
-    data.push_back(addDeclRef(defaulted));
-    ++numDefaultedDefinitions;
-  }
-
   unsigned numInheritedConformances = inheritedProtos.size();
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
@@ -1090,7 +1075,6 @@ void Serializer::writeNormalConformance(
                                               numValueWitnesses,
                                               numTypeWitnesses,
                                               numInheritedConformances,
-                                              numDefaultedDefinitions,
                                               data);
 
   // Write inherited conformances.
