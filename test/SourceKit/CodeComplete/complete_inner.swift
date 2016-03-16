@@ -107,6 +107,12 @@ func test003(x: FooBar) {
 // FOOBAR_QUALIFIED_NOOP-NEXT:   prop.prop
 // FOOBAR_QUALIFIED_NOOP-NEXT: ]
 
+// RUN: %complete-test %s -group=none -no-include-exact-match -add-inner-results -no-inner-operators -tok=FOOBAR_QUALIFIED | FileCheck %s -check-prefix=FOOBAR_QUALIFIED_NOEXACT
+// FOOBAR_QUALIFIED_NOEXACT-LABEL: Results for filterText: prop [
+// FOOBAR_QUALIFIED_NOEXACT-NEXT:   prop.method()
+// FOOBAR_QUALIFIED_NOEXACT-NEXT:   prop.prop
+// FOOBAR_QUALIFIED_NOEXACT-NEXT: ]
+
 func test004() {
   FooBar#^FOOBAR_POSTFIX^#
 }
