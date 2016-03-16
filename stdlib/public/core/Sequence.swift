@@ -622,7 +622,7 @@ extension Sequence {
 }
 
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
-// pass a IteratorProtocol through IteratorSequence to give it "Sequence-ness"
+// pass an IteratorProtocol through IteratorSequence to give it "Sequence-ness"
 /// A sequence built around an iterator of type `Base`.
 ///
 /// Useful mostly to recover the ability to use `for`...`in`,
