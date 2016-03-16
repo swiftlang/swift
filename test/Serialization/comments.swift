@@ -55,6 +55,11 @@ extension first_decl_class_1 {
   func bar2(){}
 }
 
+public protocol P1 { }
+
+/// Comment for no member extension
+extension first_decl_class_1 : P1 {}
+
 // FIRST: Class/first_decl_generic_class_1 RawComment=[/// first_decl_generic_class_1 Aaa.\n]
 // FIRST: Destructor/first_decl_generic_class_1.deinit RawComment=[/// deinit of first_decl_generic_class_1 Aaa.\n]
 // FIRST: Class/first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.\n]
@@ -65,3 +70,4 @@ extension first_decl_class_1 {
 // SECOND: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
 // SECOND: Extension/ RawComment=[/// Comment for bar1\n] BriefComment=[Comment for bar1]
 // SECOND: Extension/ RawComment=[/// Comment for bar2\n] BriefComment=[Comment for bar2]
+// SECOND: Extension/ RawComment=[/// Comment for no member extension\n] BriefComment=[Comment for no member extension]

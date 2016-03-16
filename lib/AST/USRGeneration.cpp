@@ -126,6 +126,17 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
       return printDeclUSR(VD, OS);
     }
   }
+  if (ED->getExtendedType()) {
+    OS << getUSRSpacePrefix() << "e:";
+    printDeclUSR(ED->getExtendedType()->getAnyNominal(), OS);
+  } else {
+    return true;
+  }
+  for (auto Inherit : ED->getInherited()) {
+    if (auto T = Inherit.getType()) {
+      return printDeclUSR(T->getAnyNominal(), OS);
+    }
+  }
   return true;
 }
 
