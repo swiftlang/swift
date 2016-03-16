@@ -15,6 +15,7 @@ list(APPEND CMAKE_MODULE_PATH
 include(AddSwiftBenchmarkSuite)
 
 set(SWIFT_BENCH_MODULES
+    single-source/unit-tests/ObjectiveCBridging
     single-source/unit-tests/StackPromo
     single-source/Ackermann
     single-source/AngryPhonebook
@@ -59,7 +60,6 @@ set(SWIFT_BENCH_MODULES
     single-source/NSError
     single-source/NSStringConversion
     single-source/ObjectAllocation
-    single-source/ObjectiveCBridging
     single-source/OpenClose
     single-source/Phonebook
     single-source/PolymorphicCalls
