@@ -350,7 +350,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     if (!Ext->isConstrainedExtension()) {
       if (IncludeUnconditional)
         Result.Ext = Ext;
-      return {Result, std::move(MergeInfo)};
+      return {Result, MergeInfo};
     }
     assert(Ext->getGenericParams() && "No generic params.");
     for (auto Req : Ext->getGenericParams()->getRequirements()){
@@ -373,28 +373,28 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         switch (Kind) {
           case RequirementReprKind::TypeConstraint:
             if(!canPossiblyConvertTo(First, Second, *DC))
-              return {Result, std::move(MergeInfo)};
+              return {Result, MergeInfo};
             else if (isConvertibleTo(First, Second, *DC))
               Result.KnownSatisfiedRequirements.push_back(Written);
             else
-              MergeInfo->addRequirement(First, Second, Kind);
+              MergeInfo.addRequirement(First, Second, Kind);
             break;
           case RequirementReprKind::SameType:
             if (!canPossiblyEqual(First, Second, *DC))
-              return {Result, std::move(MergeInfo)};
+              return {Result, MergeInfo};
             else if (isEqual(First, Second, *DC))
               Result.KnownSatisfiedRequirements.push_back(Written);
             else
-              MergeInfo->addRequirement(First, Second, Kind);
+              MergeInfo.addRequirement(First, Second, Kind);
             break;
         }
       }
     }
     Result.Ext = Ext;
-    return {Result, std::move(MergeInfo)};
+    return {Result, MergeInfo};
   }
 
-  typedef llvm::MapVector<ExtensionDecl*, std::unique_ptr<ExtensionMergeInfo>>
+  typedef llvm::MapVector<ExtensionDecl*, ExtensionMergeInfo>
     ExtensionMergeInfoMap;
 
   typedef llvm::MapVector<ExtensionDecl*, unsigned> ExtensionMergeGroupMap;
@@ -404,17 +404,17 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     std::vector<std::pair<ExtensionMergeInfo*, unsigned>> KnownGroups;
     unsigned NewGroupNum = 0;
     for (auto &Pair : MergeInfoMap) {
-      auto Key = Pair.first;
+      ExtensionDecl* Ext = Pair.first;
       auto Found = std::find_if(KnownGroups.begin(), KnownGroups.end(),
         [&](std::pair<ExtensionMergeInfo*, unsigned> LHS) {
-          return (*LHS.first) == (*Pair.second);
+          return (*LHS.first) == Pair.second;
       });
       if (Found != KnownGroups.end()) {
-        MergeGroupMap.insert({Key, (*Found).second});
+        MergeGroupMap.insert({Ext, (*Found).second});
         continue;
       }
-      MergeGroupMap.insert({Key, NewGroupNum});
-      KnownGroups.push_back({Pair.second.get(), NewGroupNum});
+      MergeGroupMap.insert({Ext, NewGroupNum});
+      KnownGroups.push_back({&Pair.second, NewGroupNum});
       NewGroupNum ++;
     }
   }
@@ -444,7 +444,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         auto Pair = isApplicable(E, /*Synthesized*/true);
         if (Pair.first) {
           (*pMap).insert({E, Pair.first});
-          MergeInfoMap[E] = std::move(Pair.second);
+          MergeInfoMap.insert({E, Pair.second});
         }
         for (auto TL : Back->getInherited()) {
           addTypeLocNominal(TL);
@@ -459,7 +459,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       auto Pair = isApplicable(E, /*Synthesized*/false);
       if (Pair.first) {
         (*pMap).insert({E, Pair.first});
-        MergeInfoMap[E] = std::move(Pair.second);
+        MergeInfoMap.insert({E, Pair.second});
       }
     }
 
