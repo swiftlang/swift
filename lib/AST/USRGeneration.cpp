@@ -122,7 +122,7 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
   // and the USR of the first value member of the extension.
   for (auto D : ED->getMembers()) {
     if (auto VD = dyn_cast<ValueDecl>(D)) {
-      OS << "ext:";
+      OS << getUSRSpacePrefix() << "e:";
       return printDeclUSR(VD, OS);
     }
   }
