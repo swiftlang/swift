@@ -96,14 +96,14 @@ public struct UTF8 : UnicodeCodec {
   /// and bytes are read at LSB.  Note that we need to use a buffer, because
   /// in case of invalid subsequences we sometimes don't know whether we should
   /// consume a certain byte before looking at it.
-  var _decodeBuffer: UInt32 = 0
+  internal var _decodeBuffer: UInt32 = 0
 
   /// The number of bits in `_decodeBuffer` that are current filled.
-  var _bitsInBuffer: UInt8 = 0
+  internal var _bitsInBuffer: UInt8 = 0
 
   /// Whether we have exhausted the iterator.  Note that this doesn't mean
   /// we are done decoding, as there might still be bytes left in the buffer.
-  var _didExhaustIterator: Bool = false
+  internal var _didExhaustIterator: Bool = false
 
   /// Start or continue decoding a UTF-8 sequence.
   ///
@@ -332,14 +332,14 @@ public struct UTF16 : UnicodeCodec {
   public init() {}
 
   /// A lookahead buffer for one UTF-16 code unit.
-  var _decodeLookahead: UInt32 = 0
+  internal var _decodeLookahead: UInt32 = 0
 
   /// Flags with layout: `0b0000_00xy`.
   ///
   /// `y` is the EOF flag.
   ///
   /// `x` is set when `_decodeLookahead` contains a code unit.
-  var _lookaheadFlags: UInt8 = 0
+  internal var _lookaheadFlags: UInt8 = 0
 
   /// Start or continue decoding a UTF sequence.
   ///
@@ -435,7 +435,7 @@ public struct UTF16 : UnicodeCodec {
   /// Try to decode one Unicode scalar, and return the actual number of code
   /// units it spanned in the input.  This function may consume more code
   /// units than required for this scalar.
-  mutating func _decodeOne<
+  internal mutating func _decodeOne<
     I : IteratorProtocol where I.Element == CodeUnit
   >(input: inout I) -> (UnicodeDecodingResult, Int) {
     let result = decode(&input)
@@ -500,7 +500,7 @@ public struct UTF32 : UnicodeCodec {
     return UTF32._decode(&input)
   }
 
-  static func _decode<
+  internal static func _decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(input: inout I) -> UnicodeDecodingResult {
     guard let x = input.next() else { return .emptyInput }
@@ -805,7 +805,7 @@ extension UTF16 {
 extension UnicodeScalar {
   /// Create an instance with numeric value `value`, bypassing the regular
   /// precondition checks for code point validity.
-  init(_unchecked value: UInt32) {
+  internal init(_unchecked value: UInt32) {
     _sanityCheck(value < 0xD800 || value > 0xDFFF,
       "high- and low-surrogate code points are not valid Unicode scalar values")
     _sanityCheck(value <= 0x10FFFF, "value is outside of Unicode codespace")
