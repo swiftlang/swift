@@ -245,6 +245,7 @@ Type TypeChecker::resolveTypeInContext(
   bool nonTypeOwner = !ownerDC->isTypeContext();
   auto ownerNominal = ownerDC->getAsNominalTypeOrNominalTypeExtensionContext();
   auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
+  auto alias = dyn_cast<TypeAliasDecl>(typeDecl);
   DeclContext *typeParent = nullptr;
   assert((ownerNominal || nonTypeOwner) &&
          "Owner must be a nominal type or a non type context");
@@ -317,6 +318,31 @@ Type TypeChecker::resolveTypeInContext(
             }
           }
         }
+      }
+    }
+    
+    // If we found an alias type in an inherited protocol, resolve it based on our
+    // own `Self`.
+    if (alias && alias->hasUnderlyingType() && alias->getUnderlyingType()->hasArchetype()) {
+      auto typeRepr = alias->getUnderlyingTypeLoc().getTypeRepr();
+      auto identRepr = typeRepr ? dyn_cast<IdentTypeRepr>(typeRepr) : nullptr;
+
+      if (parentDC->getAsProtocolOrProtocolExtensionContext() && identRepr) {
+        auto protoSelf = parentDC->getProtocolSelf();
+        auto selfTy = protoSelf->getDeclaredType()->castTo<GenericTypeParamType>();
+        auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
+        
+        if (baseTy->isTypeParameter()) {
+          for (auto name : identRepr->getComponentRange()) {
+            if (name->getIdentifier() == protoSelf->getName())
+              continue;
+            baseTy = resolver->resolveDependentMemberType(baseTy, parentDC, identRepr->getSourceRange(), name);
+          }
+          return baseTy;
+        }
+        return substMemberTypeWithBase(parentDC->getParentModule(), alias,
+                                       protoSelf->getArchetype(),
+                                       /*isTypeReference=*/true);
       }
     }
 
