@@ -212,7 +212,29 @@ if(PYTHONINTERP_FOUND)
 
         set(command_upload_stdlib)
         if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
-          # These are supported testing SDKs.
+          # These are supported testing SDKs, but their implementation of
+          # `command_upload_stdlib` is hidden.
+        elseif("${SDK}" STREQUAL "ANDROID")
+          # Warning: This step will fail if you do not have an Android device
+          #          connected via USB. See docs/Android.md for details on
+          #          how to run the test suite for Android.
+          set(command_upload_stdlib
+              COMMAND
+                  # Reboot the device and remove everything in its tmp
+                  # directory. Build products and test executables are pushed
+                  # to that directory when running the test suite.
+                  ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
+              COMMAND
+                  ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
+                  --ndk "${SWIFT_ANDROID_NDK_PATH}"
+                  --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
+                  # Build products like libswiftCore.so.
+                  "${SWIFTLIB_DIR}/android"
+                  # These two directories may contain the same libraries,
+                  # but upload both to device just in case. Duplicates will be
+                  # overwritten, and uploading doesn't take very long anyway.
+                  "${SWIFT_ANDROID_ICU_UC}"
+                  "${SWIFT_ANDROID_ICU_I18N}")
         endif()
 
         foreach(test_subset ${TEST_SUBSETS})

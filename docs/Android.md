@@ -2,7 +2,10 @@
 
 The Swift stdlib can be compiled for Android armv7 targets, which makes it
 possible to execute Swift code on a mobile device running Android. This guide
-explains how to run a simple "Hello, world" program on your Android device.
+explains:
+
+1. How to run a simple "Hello, world" program on your Android device.
+2. How to run the Swift test suite, targeting Android, and on an Android device.
 
 If you encounter any problems following the instructions below, please file a
 bug using https://bugs.swift.org/.
@@ -39,7 +42,7 @@ To follow along with this guide, you'll need:
    turn on remote debugging by following the official instructions:
    https://developer.chrome.com/devtools/docs/remote-debugging.
 
-## "Hello, world" on Android
+## Part One: "Hello, world" on Android
 
 ### 1. Downloading (or building) the Swift Android stdlib dependencies
 
@@ -171,3 +174,28 @@ Hello, Android
 
 Congratulations! You've just run your first Swift program on Android.
 
+## Part Two: Running the Swift test suite hosted on an Android device
+
+When running the test suite, build products are automatically pushed to your
+device. As in part one, you'll need to connect your Android device via USB:
+
+1. Connect your Android device to your computer via USB. Ensure that remote
+   debugging is enabled for that device by following the official instructions:
+   https://developer.chrome.com/devtools/docs/remote-debugging.
+2. Confirm the device is connected by running `adb devices`. You should see
+   your device listed.
+3. Run the tests using the build script:
+
+```
+$ utils/build-script \
+  -R \                                           # Build in ReleaseAssert mode.
+  -T \                                           # Run all tests.
+  --android \                                    # Build for Android.
+  --android-deploy-device-path /data/local/tmp \ # Temporary directory on the device where Android tests are run.
+  --android-ndk ~/android-ndk-r10e \             # Path to an Android NDK.
+  --android-ndk-version 21 \
+  --android-icu-uc ~/libicu-android/armeabi-v7a/libicuuc.so \
+  --android-icu-uc-include ~/libicu-android/armeabi-v7a/icu/source/common \
+  --android-icu-i18n ~/libicu-android/armeabi-v7a/libicui18n.so \
+  --android-icu-i18n-include ~/libicu-android/armeabi-v7a/icu/source/i18n/
+```

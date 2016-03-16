@@ -160,6 +160,8 @@ set(SWIFT_ANDROID_ICU_I18N "" CACHE STRING
   "Path to a directory containing libicui18n.so")
 set(SWIFT_ANDROID_ICU_I18N_INCLUDE "" CACHE STRING
   "Path to a directory containing headers libicui18n")
+set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
+  "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
 #
 # User-configurable Darwin-specific options.
