@@ -21,6 +21,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -2380,6 +2381,17 @@ namespace {
     Decl *importGlobalAsInitializer(const clang::FunctionDecl *decl,
                                     DeclName name, DeclContext *dc,
                                     CtorInitializerKind initKind) {
+      // TODO: Should this be an error? How can this come up?
+      assert(dc->isTypeContext() && "cannot import as member onto non-type");
+
+      // Check for some invalid imports
+      if (dc->getAsProtocolOrProtocolExtensionContext()) {
+        // FIXME: clang source location
+        Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
+                                         /*isInit=*/true);
+        return nullptr;
+      }
+
       bool allowNSUIntegerAsInt =
         Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
 
@@ -2432,6 +2444,13 @@ namespace {
 
     Decl *importGlobalAsMethod(const clang::FunctionDecl *decl, DeclName name,
                                DeclContext *dc, Optional<unsigned> selfIdx) {
+      if (dc->getAsProtocolOrProtocolExtensionContext() && !selfIdx) {
+        // FIXME: source location...
+        Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
+                                         /*isInit=*/false);
+        return nullptr;
+      }
+
       bool allowNSUIntegerAsInt =
         Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
 
@@ -5829,6 +5848,9 @@ ClangImporter::Implementation::importDeclContextOf(
   ext->setValidated();
   ext->setCheckedInheritanceClause();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
+
+  if (auto protoDecl = ext->getAsProtocolExtensionContext())
+    ext->setGenericParams(protoDecl->createGenericParams(ext));
 
   // Add the extension to the nominal type.
   nominal->addExtension(ext);
