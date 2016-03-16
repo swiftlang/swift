@@ -82,7 +82,7 @@ public struct IndexingIterator<Elements : Indexable>
   }
 
   /// Advance to the next element and return it, or `nil` if no next element
-  /// exists. Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]

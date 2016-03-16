@@ -27,7 +27,7 @@ public protocol IteratorProtocol {
   associatedtype Element
 
   /// Advance to the next element and return it, or `nil` if no next element
-  /// exists. Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
@@ -635,7 +635,7 @@ public struct IteratorSequence<
   }
 
   /// Advance to the next element and return it, or `nil` if no next element
-  /// exists. Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.

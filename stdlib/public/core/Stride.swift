@@ -127,7 +127,7 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
   internal let _stride: Element.Stride
 
   /// Advance to the next element and return it, or `nil` if no next element
-  /// exists. Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
     if _stride > 0 ? _current >= _end : _current <= _end {
       return nil
@@ -185,7 +185,7 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
   internal var _done: Bool = false
 
   /// Advance to the next element and return it, or `nil` if no next element
-  /// exists. Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
     if _done {
       return nil
