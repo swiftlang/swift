@@ -527,6 +527,11 @@ HeaderToPrint("header-to-print",
 
 static llvm::cl::opt<std::string>
 LineColumnPair("pos", llvm::cl::desc("Line:Column pair"));
+
+static llvm::cl::opt<bool>
+NoEmptyLineBetweenMembers("no-empty-line-between-members",
+                          llvm::cl::desc("Print no empty line between members."),
+                          llvm::cl::init(false));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -2802,11 +2807,14 @@ int main(int argc, char *argv[]) {
 
     if (options::Action == ActionType::PrintModuleGroups)
       ExitCode = doPrintModuleGroups(InitInvok, options::ModuleToPrint);
-    else
+    else {
+      if (options::NoEmptyLineBetweenMembers.getNumOccurrences() > 0)
+        PrintOpts.EmptyLineBetweenMembers = !options::NoEmptyLineBetweenMembers;
       ExitCode = doPrintModules(
         InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
         TraversalOptions, PrintOpts, options::AnnotatePrint,
         options::SynthesizeExtension);
+    }
     break;
   }
 
