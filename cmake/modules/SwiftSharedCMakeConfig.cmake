@@ -113,11 +113,12 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
 
   if(${is_cross_compiling})
     # Can't run llvm-config from the cross-compiled LLVM.
-    set(LLVM_TOOLS_BINARY_DIR "" CACHE PATH "Path to llvm/bin")
-    set(LLVM_LIBRARY_DIR "" CACHE PATH "Path to llvm/lib")
-    set(LLVM_MAIN_INCLUDE_DIR "" CACHE PATH "Path to llvm/include")
-    set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM build tree")
+    set(LLVM_TOOLS_BINARY_DIR "${SWIFT_NATIVE_LLVM_TOOLS_PATH}" CACHE PATH "Path to llvm/bin")
+    set(LLVM_LIBRARY_DIR "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/../lib" CACHE PATH "Path to llvm/lib")
+    set(LLVM_MAIN_INCLUDE_DIR "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/../include" CACHE PATH "Path to llvm/include")
+    set(LLVM_BINARY_DIR "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/../" CACHE PATH "Path to LLVM build tree")
     set(LLVM_MAIN_SRC_DIR "" CACHE PATH "Path to LLVM source tree")
+    set(SWIFT_PATH_TO_CLANG_BUILD "${LLVM_BINARY_DIR}")
   else()
     # Rely on llvm-config.
     _swift_llvm_config_info(

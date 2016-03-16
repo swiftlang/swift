@@ -6,7 +6,8 @@ set(sources
 set(output_dir "${SWIFTLIB_DIR}/glibc")
 
 # Set correct paths to glibc headers
-set(GLIBC_INCLUDE_PATH "/usr/include")
+set(GLIBC_INCLUDE_PATH "${CMAKE_SYSROOT}/usr/include")
+
 if(CMAKE_LIBRARY_ARCHITECTURE)
   set(GLIBC_ARCH_INCLUDE_PATH "${GLIBC_INCLUDE_PATH}/${CMAKE_LIBRARY_ARCHITECTURE}")
 else()
@@ -40,7 +41,14 @@ swift_install_in_component(stdlib
     FILES "${output_dir}/module.map"
     DESTINATION "lib/swift/glibc")
 
+# Include directories passed to include_directories command
+get_directory_property(include_dirs INCLUDE_DIRECTORIES)
+foreach(dir ${include_dirs})
+    set(GLIBC_EXTRA_FLAGS ${GLIBC_EXTRA_FLAGS} "-I" ${dir})
+endforeach()
+
 add_swift_library(swiftGlibc IS_SDK_OVERLAY
     ${sources}
     FILE_DEPENDS copy_glibc_module "${output_dir}"
+    SWIFT_COMPILE_FLAGS "-I" "${GLIBC_INCLUDE_PATH}" "-I" "${GLIBC_ARCH_INCLUDE_PATH}" ${GLIBC_EXTRA_FLAGS}
     INSTALL_IN_COMPONENT stdlib-experimental)
