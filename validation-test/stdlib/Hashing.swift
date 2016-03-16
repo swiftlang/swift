@@ -80,7 +80,7 @@ HashingTestSuite.test("_squeezeHashValue/Int") {
   // Check that the function can return values that cover the whole range.
   func checkRange(r: Range<Int>) {
     var results = [Int : Void]()
-    for _ in 0..<(10 * (r.endIndex - r.startIndex)) {
+    for _ in 0..<(14 * (r.endIndex - r.startIndex)) {
       let v = _squeezeHashValue(randInt(), r)
       expectTrue(r ~= v)
       if results[v] == nil {
@@ -112,7 +112,7 @@ HashingTestSuite.test("_squeezeHashValue/UInt") {
   func checkRange(r: Range<UInt>) {
     var results = [UInt : Void]()
     let cardinality = r.endIndex - r.startIndex
-    for _ in 0..<(10*cardinality) {
+    for _ in 0..<(14 * cardinality) {
       let v = _squeezeHashValue(randInt(), r)
       expectTrue(r ~= v)
       if results[v] == nil {
