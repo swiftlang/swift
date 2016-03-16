@@ -4041,29 +4041,35 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   // Look up conformance in the module.
   Module *M = topLevelContext->getParentModule();
   auto lookupResult = M->lookupConformance(T, Proto, this);
-  switch (lookupResult.getInt()) {
-  case ConformanceKind::Conforms:
-    if (Conformance)
-      *Conformance = lookupResult.getPointer();
-    recordDependency(lookupResult.getPointer());
-
-    // If we're using this conformance and it is incomplete, queue it for
-    // completion.
-    if (options.contains(ConformanceCheckFlags::Used) &&
-        lookupResult.getPointer() &&
-        lookupResult.getPointer()->isIncomplete()) {
-      auto normalConf = lookupResult.getPointer()->getRootNormalConformance();
-      UsedConformances.insert(normalConf);
-    }
-    return true;
-
-  case ConformanceKind::DoesNotConform:
+  if (!lookupResult) {
     if (ComplainLoc.isValid())
       diagnoseConformanceFailure(*this, T, Proto, DC, ComplainLoc);
     else
       recordDependency();
+
     return false;
   }
+
+  // Store the conformance and record the dependency.
+  if (lookupResult->isConcrete()) {
+    if (Conformance)
+      *Conformance = lookupResult->getConcrete();
+    recordDependency(lookupResult->getConcrete());
+  } else {
+    if (Conformance)
+      *Conformance = nullptr;
+    recordDependency(nullptr);
+  }
+
+  // If we're using this conformance and it is incomplete, queue it for
+  // completion.
+  if (options.contains(ConformanceCheckFlags::Used) &&
+      lookupResult->isConcrete() &&
+      lookupResult->getConcrete()->isIncomplete()) {
+    auto normalConf = lookupResult->getConcrete()->getRootNormalConformance();
+    UsedConformances.insert(normalConf);
+  }
+  return true;
 }
 
 /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".

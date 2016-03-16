@@ -815,7 +815,9 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
                                   .getPointer();
 
     // Form the inherited conformance.
-    conformance = ctx.getInheritedConformance(type, inheritedConformance);
+    conformance = ctx.getInheritedConformance(
+                    type,
+                    inheritedConformance->getConcrete());
   } else {
     // Create or find the normal conformance.
     Type conformingType = conformingDC->getDeclaredTypeInContext();

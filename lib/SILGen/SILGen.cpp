@@ -271,13 +271,8 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
 
   // Find the conformance to _ObjectiveCBridgeable.
   auto result = SwiftModule->lookupConformance(type, proto, nullptr);
-  switch (result.getInt()) {
-  case ConformanceKind::Conforms:
-    return result.getPointer();
-
-  case ConformanceKind::DoesNotConform:
-    return nullptr;
-  }
+  if (result) return result->getConcrete();
+  return nullptr;
 }
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {

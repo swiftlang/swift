@@ -167,9 +167,9 @@ collectExistentialConformances(Module *M, Type fromType, Type toType) {
   
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    ProtocolConformance *conformance =
+    auto conformance =
       M->lookupConformance(fromType, proto, nullptr).getPointer();
-    conformances.push_back(ProtocolConformanceRef(proto, conformance));
+    conformances.push_back(*conformance);
   }
   
   return M->getASTContext().AllocateCopy(conformances);

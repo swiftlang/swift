@@ -2407,24 +2407,21 @@ static Type getMemberForBaseType(Module *module,
     auto proto = assocType->getProtocol();
     // FIXME: Introduce substituted type node here?
     auto conformance = module->lookupConformance(substBase, proto, resolver);
-    switch (conformance.getInt()) {
-    case ConformanceKind::DoesNotConform:
+    if (!conformance)
       return Type();
 
-    case ConformanceKind::Conforms:
-      // If we have an unsatisfied type witness while we're checking the
-      // conformances we're supposed to skip this conformance's unsatisfied type
-      // witnesses, and we have an unsatisfied type witness, return
-      // "missing".
-      assert(conformance.getPointer());
-      if (conformance.getPointer()->getRootNormalConformance()->getState()
-            == ProtocolConformanceState::CheckingTypeWitnesses &&
-          !conformance.getPointer()->hasTypeWitness(assocType, nullptr))
-        return Type();
+    // If we have an unsatisfied type witness while we're checking the
+    // conformances we're supposed to skip this conformance's unsatisfied type
+    // witnesses, and we have an unsatisfied type witness, return
+    // "missing".
+    assert(conformance->isConcrete());
+    if (conformance->getConcrete()->getRootNormalConformance()->getState()
+          == ProtocolConformanceState::CheckingTypeWitnesses &&
+        !conformance->getConcrete()->hasTypeWitness(assocType, nullptr))
+      return Type();
 
-      return conformance.getPointer()->getTypeWitness(assocType, resolver)
-               .getReplacement();
-    }
+    return conformance->getConcrete()->getTypeWitness(assocType, resolver)
+             .getReplacement();
   }
 
   // FIXME: This is a fallback. We want the above, conformance-based

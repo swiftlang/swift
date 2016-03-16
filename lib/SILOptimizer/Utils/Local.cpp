@@ -1372,10 +1372,9 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       M.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   auto Conf =
       M.getSwiftModule()->lookupConformance(Target, BridgedProto, nullptr);
-  assert(Conf.getInt() == ConformanceKind::Conforms &&
-         "_ObjectiveCBridgeable conformance should exist");
+  assert(Conf && "_ObjectiveCBridgeable conformance should exist");
 
-  auto *Conformance = Conf.getPointer();
+  auto *Conformance = Conf->getConcrete();
 
   auto ParamTypes = BridgedFunc->getLoweredFunctionType()->getParameters();
 
@@ -1529,8 +1528,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto Conf =
       M.getSwiftModule()->lookupConformance(Source, BridgedProto, nullptr);
 
-  assert(Conf.getInt() == ConformanceKind::Conforms &&
-         "_ObjectiveCBridgeable conformance should exist");
+  assert(Conf && "_ObjectiveCBridgeable conformance should exist");
   (void) Conf;
 
   bool isCurrentModuleBridgeToObjectiveC = false;

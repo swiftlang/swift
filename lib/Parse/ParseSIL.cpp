@@ -1312,7 +1312,9 @@ getConformanceOfReplacement(Parser &P, Type subReplacement,
                             ProtocolDecl *proto) {
   auto conformance = P.SF.getParentModule()->lookupConformance(
                        subReplacement, proto, nullptr);
-  return conformance.getPointer();
+  if (conformance && conformance->isConcrete())
+    return conformance->getConcrete();
+  return nullptr;
 }
 
 static bool isImpliedBy(ProtocolDecl *proto, ArrayRef<ProtocolDecl*> derived) {
@@ -2845,11 +2847,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (!isa<ArchetypeType>(LookupTy)) {
       auto lookup = P.SF.getParentModule()->lookupConformance(
                                                       LookupTy, proto, nullptr);
-      if (lookup.getInt() != ConformanceKind::Conforms) {
+      if (!lookup) {
         P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
         return true;
       }
-      Conformance = ProtocolConformanceRef(lookup.getPointer());
+      Conformance = ProtocolConformanceRef(*lookup);
     }
     
     ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
@@ -4046,17 +4048,15 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
                                        P.Context);
   auto lookup = P.SF.getParentModule()->lookupConformance(
                          lookupTy, proto, nullptr);
-  if (!lookup.getPointer()) {
+  if (!lookup) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
     return nullptr;
   }
-  NormalProtocolConformance *theConformance =
-      dyn_cast<NormalProtocolConformance>(lookup.getPointer());
-  if (!theConformance) {
+  if (!lookup->isConcrete()) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
     return nullptr;
   }
-  return theConformance;
+  return lookup->getConcrete()->getRootNormalConformance();
 }
 
 /// Parse the substitution list for a specialized conformance.

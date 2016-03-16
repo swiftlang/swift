@@ -3106,12 +3106,11 @@ Substitution SILGenFunction::getPointerSubstitution(Type pointerType) {
   auto conformance
     = Ctx.getStdlibModule()->lookupConformance(pointerType, pointerProto,
                                                nullptr);
-  assert(conformance.getInt() == ConformanceKind::Conforms
-         && "not a _Pointer type");
+  assert(conformance && "not a _Pointer type");
 
   // FIXME: Cache this
   ProtocolConformanceRef conformances[] = {
-    ProtocolConformanceRef(conformance.getPointer())
+    ProtocolConformanceRef(*conformance)
   };
   auto conformancesCopy = Ctx.AllocateCopy(conformances);
   

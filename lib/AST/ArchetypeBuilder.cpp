@@ -280,20 +280,15 @@ static ProtocolConformance *getSuperConformance(
   auto conformance =
     builder.getModule().lookupConformance(superclass, proto,
                                           builder.getLazyResolver());
-  switch (conformance.getInt()) {
-  case ConformanceKind::Conforms: {
-    // Conformance to this protocol is redundant; update the requirement source
-    // appropriately.
-    updateRequirementSource(
-      conformsSource,
-      RequirementSource(RequirementSource::Protocol,
-                        pa->getSuperclassSource().getLoc()));
-    return conformance.getPointer();
-  }
+  if (!conformance) return nullptr;
 
-  case ConformanceKind::DoesNotConform:
-    return nullptr;
-  }
+  // Conformance to this protocol is redundant; update the requirement source
+  // appropriately.
+  updateRequirementSource(
+    conformsSource,
+    RequirementSource(RequirementSource::Protocol,
+                      pa->getSuperclassSource().getLoc()));
+  return conformance->getConcrete();
 }
 
 /// If there is a same-type requirement to be added for the given nested type
@@ -1217,15 +1212,15 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       auto protocol = conforms.first;
       auto conformance = Mod.lookupConformance(Concrete, protocol,
                                                getLazyResolver());
-      if (conformance.getInt() == ConformanceKind::DoesNotConform) {
+      if (!conformance) {
         Diags.diagnose(Source.getLoc(),
                        diag::requires_generic_param_same_type_does_not_conform,
                        Concrete, protocol->getName());
         return true;
       }
 
-      assert(conformance.getPointer() && "No conformance pointer?");
-      conformances[protocol] = conformance.getPointer();
+      assert(conformance->isConcrete() && "Abstract conformance?");
+      conformances[protocol] = conformance->getConcrete();
     }
   }
   

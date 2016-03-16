@@ -3605,13 +3605,7 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   // Check whether the type conforms to _BridgedToObjectiveC.
   auto conformance
     = dc->getParentModule()->lookupConformance(type, bridgedProto, resolver);
-
-  switch (conformance.getInt()) {
-  case ConformanceKind::Conforms:
-    // The type conforms, and we know the conformance, so we can look up the
-    // bridged type below.
-    break;
-  case ConformanceKind::DoesNotConform:
+  if (!conformance) {
     // If we haven't imported Foundation but this is a whitelisted type,
     // behave as above.
     if (knownBridgedToObjC)
@@ -3621,7 +3615,7 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 
   // Find the type we bridge to.
   return ProtocolConformance::getTypeWitnessByName(type,
-                                               conformance.getPointer(),
+                                               conformance->getConcrete(),
                                                getIdentifier("_ObjectiveCType"),
                                                resolver);
 }
