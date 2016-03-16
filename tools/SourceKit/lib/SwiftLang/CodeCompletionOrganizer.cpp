@@ -602,13 +602,17 @@ static double getSemanticContextScore(bool useImportDepth,
     if (useImportDepth && completion->getModuleImportDepth())
       depth = *completion->getModuleImportDepth();
     // We treat depth == 0 the same as CurrentModule.
+    // Note: there is a gap in between that we use for keywords.
     order = (depth == 0) ? 5.0 : 6.0; // Base value.
     order += double(depth) / (Completion::maxModuleImportDepth + 1);
     assert((depth == 0 && order == 5.0) ||
            (depth && 6.0 <= order && order <= 7.0));
     break;
   }
-  case SemanticContextKind::None: order = 8.0; break;
+  case SemanticContextKind::None: {
+    order = completion->getKind() == Completion::Keyword ? 5.5 : 8.0;
+    break;
+  }
   }
   assert(0.0 <= order && order <= 8.0);
   return (8.0 - order) / 8.0;
