@@ -935,6 +935,43 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
   return false;
 }
 
+bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
+  using namespace decls_block;
+
+  auto entry = DeclTypeCursor.advance();
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return true;
+
+  SmallVector<uint64_t, 16> witnessIDBuffer;
+
+  unsigned kind = DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer);
+  assert(kind == DEFAULT_WITNESS_TABLE);
+  (void)kind;
+
+  ArrayRef<uint64_t> rawWitnessIDs;
+  decls_block::DefaultWitnessTableLayout::readRecord(
+      witnessIDBuffer, rawWitnessIDs);
+
+  if (rawWitnessIDs.empty())
+    return false;
+
+  unsigned e = rawWitnessIDs.size();
+  assert(e % 2 == 0 && "malformed default witness table");
+
+  for (unsigned i = 0, e = rawWitnessIDs.size(); i < e; i += 2) {
+    ValueDecl *requirement = cast<ValueDecl>(getDecl(rawWitnessIDs[i]));
+    assert(requirement && "unable to deserialize next requirement");
+    ValueDecl *witness = cast<ValueDecl>(getDecl(rawWitnessIDs[i + 1]));
+    assert(witness && "unable to deserialize next witness");
+    assert(requirement->getDeclContext() == proto);
+
+    // FIXME: substitutions
+    proto->setDefaultWitness(requirement, ConcreteDeclRef(witness));
+  }
+
+  return false;
+}
+
 static Optional<swift::CtorInitializerKind>
 getActualCtorInitializerKind(uint8_t raw) {
   switch (serialization::CtorInitializerKind(raw)) {
@@ -4047,13 +4084,19 @@ void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
   (void)Err;
 
   IterableDeclContext *IDC;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(D))
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
     IDC = nominal;
   else
     IDC = cast<ExtensionDecl>(D);
 
   for (auto member : members)
     IDC->addMember(member);
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(D)) {
+    bool Err = readDefaultWitnessTable(proto);
+    assert(!Err && "unable to read default witness table");
+    (void)Err;
+  }
 }
 
 void

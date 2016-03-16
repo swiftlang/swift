@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 241; // Last change: set_deallocating instruction
+const uint16_t VERSION_MINOR = 242; // Last change: serialize ProtocolDecl::DefaultWitnesses
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -832,7 +832,15 @@ namespace decls_block {
     AccessibilityKindField, // accessibility
     BCVBR<4>,               // number of protocols
     BCArray<DeclIDField>    // protocols and inherited types
-    // Trailed by the generic parameters (if any) and the members record
+    // Trailed by the generic parameters (if any), the members record, and
+    // the default witness table record
+  >;
+
+  /// A default witness table for a protocol.
+  using DefaultWitnessTableLayout = BCRecordLayout<
+    DEFAULT_WITNESS_TABLE,
+    BCArray<DeclIDField>
+    // An array of requirement / witness pairs
   >;
 
   using ConstructorLayout = BCRecordLayout<

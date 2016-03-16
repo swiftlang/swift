@@ -1269,6 +1269,31 @@ void Serializer::writeMembers(DeclRange members, bool isClass) {
   MembersLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
 }
 
+void Serializer::writeDefaultWitnessTable(const ProtocolDecl *proto,
+                                   const std::array<unsigned, 256> &abbrCodes) {
+  using namespace decls_block;
+
+  SmallVector<DeclID, 16> witnessIDs;
+
+  unsigned abbrCode = abbrCodes[DefaultWitnessTableLayout::Code];
+  for (auto member : proto->getMembers()) {
+    if (auto *value = dyn_cast<ValueDecl>(member)) {
+      ConcreteDeclRef witness = proto->getDefaultWitness(value);
+      if (!witness)
+        continue;
+
+      DeclID requirementID = addDeclRef(value);
+      DeclID witnessID = addDeclRef(witness.getDecl());
+      witnessIDs.push_back(requirementID);
+      witnessIDs.push_back(witnessID);
+
+      // FIXME: Substitutions
+    }
+  }
+  DefaultWitnessTableLayout::emitRecord(Out, ScratchRecord,
+                                        abbrCode, witnessIDs);
+}
+
 static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
   switch (K) {
   case swift::AccessorKind::NotAccessor:
@@ -2354,6 +2379,7 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(proto->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(proto->getGenericRequirements());
     writeMembers(proto->getMembers(), true);
+    writeDefaultWitnessTable(proto, DeclTypeAbbrCodes);
     break;
   }
 
@@ -3252,6 +3278,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<FuncLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
+  registerDeclTypeAbbr<DefaultWitnessTableLayout>();
   registerDeclTypeAbbr<PrefixOperatorLayout>();
   registerDeclTypeAbbr<PostfixOperatorLayout>();
   registerDeclTypeAbbr<InfixOperatorLayout>();

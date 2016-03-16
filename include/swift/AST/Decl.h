@@ -3523,20 +3523,10 @@ public:
 
   /// Returns the default witness for a requirement, or nullptr if there is
   /// no default.
-  ConcreteDeclRef getDefaultWitness(ValueDecl *requirement) {
-    auto found = DefaultWitnesses.find(requirement);
-    if (found == DefaultWitnesses.end())
-      return nullptr;
-    return found->second;
-  }
+  ConcreteDeclRef getDefaultWitness(ValueDecl *requirement) const;
 
   /// Record the default witness for a requirement.
-  void setDefaultWitness(ValueDecl *requirement, ConcreteDeclRef witness) {
-    assert(witness);
-    auto pair = DefaultWitnesses.insert(std::make_pair(requirement, witness));
-    assert(pair.second && "Already have a default witness!");
-    (void) pair;
-  }
+  void setDefaultWitness(ValueDecl *requirement, ConcreteDeclRef witness);
 
   /// Set the list of inherited protocols.
   void setInheritedProtocols(ArrayRef<ProtocolDecl *> protocols) {
