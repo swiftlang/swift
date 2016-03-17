@@ -134,7 +134,8 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
   }
   for (auto Inherit : ED->getInherited()) {
     if (auto T = Inherit.getType()) {
-      return printDeclUSR(T->getAnyNominal(), OS);
+      if (T->getAnyNominal())
+        return printDeclUSR(T->getAnyNominal(), OS);
     }
   }
   return true;
