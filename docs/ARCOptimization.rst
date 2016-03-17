@@ -65,6 +65,16 @@ count.
    also enable more LLVM level optimization in the presence of
    is_unique checks which currently appear to arbitrarily write memory.
 
+ARC and Copying
+===============
+
+TODO: Talk about how "ARC" and copying fit together. This means going into how
+retaining/releaseing is really "copying"/"destroying" a pointer reference where
+the value that is pointed to does not change means you don't have to change the
+bits.
+
+Talk about how this fits into @owned and @guaranteed parameters.
+
 RC Identity
 ===========
 
