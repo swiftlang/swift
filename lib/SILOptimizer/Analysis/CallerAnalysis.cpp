@@ -33,6 +33,12 @@ void CallerAnalysis::processFunctionCallSites(SILFunction *F) {
         // Update the callsite information for the callee.
         CallerAnalysisFunctionInfo &CalleeInfo
                            = CallInfo.FindAndConstruct(CalleeFn).second;
+
+        // Record it if this is the first time we see this caller.
+        if (CalleeInfo.CallSites.find(F) == CalleeInfo.CallSites.end())
+          CalleeInfo.Callers.push_back(F);
+
+        // Record the callsite. 
         CalleeInfo.CallSites[F].push_back(Apply);
       }   
     }   
