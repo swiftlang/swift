@@ -179,7 +179,10 @@ The corresponding value projection operations have analogous properties.
     RCIdentity are a simple case for ARC optimization to handle. The ARC
     optimizer relies on other optimizations like SROA, Function Signature Opts,
     and SimplifyCFG (for block arguments) to try and eliminate cases where value
-    types have multiple reference counted subtypes.
+    types have multiple reference counted subtypes. If one has a struct type
+    with multiple reference counted sub fields, wrapping the struct in a COW
+    data structure (for instance storing the struct in an array of one element)
+    will reduce the reference count overhead.
 
 what is ``retain_value`` and why is it important
 ------------------------------------------------
