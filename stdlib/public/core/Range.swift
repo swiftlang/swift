@@ -120,6 +120,10 @@ extension _HalfOpenRange where Bound : Strideable {
   public var endIndex: Bound {
     return upperBound
   }
+
+  public var indices: Self {
+    return self
+  }
 }
 
 public struct RangeOfStrideable<
@@ -163,10 +167,6 @@ public struct RangeOfStrideable<
   
   // FIXME(compiler limitation): this typealias should be inferred.
   public typealias Indices = RangeOfStrideable<Bound>
-
-  public var indices: Indices {
-    return self
-  }
 
   @warn_unused_result
   public func _customContainsEquatableElement(element: Element) -> Bool? {
