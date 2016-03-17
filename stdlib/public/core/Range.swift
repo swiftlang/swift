@@ -16,8 +16,8 @@ public struct RangeIterator<
 > : IteratorProtocol, Sequence {
 
   /// Construct an instance that traverses the elements of `bounds`.
+  // FIXME: cannot be @_transparent
   @_versioned
-  @_transparent
   internal init(_bounds: Range<Element>) {
     self.startIndex = _bounds.startIndex
     self.endIndex = _bounds.endIndex
@@ -87,7 +87,9 @@ public struct Range<
 
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
-  @_transparent
+  // FIXME: constructors cannot be transparent
+  // @_transparent
+  @_versioned
   internal init(_start: Element, end: Element) {
     self.startIndex = _start
     self.endIndex = end
