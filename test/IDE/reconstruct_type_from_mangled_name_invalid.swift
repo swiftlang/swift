@@ -29,6 +29,6 @@ protocol P {
 struct SP: P {
 // CHECK: decl: struct SP : P for 'SP'
   typealias TT = Self.T
-// FIXME: should be the typealiase decl
+// FIXME: should be the typealias decl
 // CHECK: decl: struct SP : P for 'TT' usr=s:V14swift_ide_test2SP2TT
 }

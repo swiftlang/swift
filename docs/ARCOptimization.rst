@@ -69,7 +69,7 @@ ARC and Copying
 ===============
 
 TODO: Talk about how "ARC" and copying fit together. This means going into how
-retaining/releaseing is really "copying"/"destroying" a pointer reference where
+retaining/releasing is really "copying"/"destroying" a pointer reference where
 the value that is pointed to does not change means you don't have to change the
 bits.
 
