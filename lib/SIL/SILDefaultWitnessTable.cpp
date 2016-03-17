@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Mangle.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
@@ -96,6 +97,16 @@ convertToDefinition(ArrayRef<Entry> entries) {
       entry.getWitness()->incrementRefCount();
     }
   }
+}
+
+Identifier SILDefaultWitnessTable::getIdentifier() const {
+  std::string name;
+  {
+    Mangle::Mangler mangler;
+    mangler.mangleType(getProtocol()->getDeclaredType(), /*uncurry*/ 0);
+    name = mangler.finalize();
+  }
+  return Mod.getASTContext().getIdentifier(name);
 }
 
 unsigned SILDefaultWitnessTable::getMinimumWitnessTableSize() const {
