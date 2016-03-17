@@ -20,6 +20,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   add_swift_unittest(SwiftRuntimeTests
     Metadata.cpp
+    Mutex.cpp
     Enum.cpp
     Refcounting.cpp
     ${PLATFORM_SOURCES}
