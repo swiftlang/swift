@@ -215,6 +215,20 @@ identity must have the following properties:
 This means in sum that conversions that preserve types and preserve
 non-trivialness are the interesting instructions.
 
+ARC and Enums
+-------------
+
+Enum types provide interesting challenges for ARC optimization. This is because
+if there exists one case where an enum is non-trivial, the aggregate type in all
+situations must be treated as if it is non-trivial. An important consideration
+here is that when performing ARC optimization on cases, one has to be very
+careful about ensuring that one only ignores reference count operations on
+values that are able to be proved to be that specific case.
+
+.. admonition:: TODO
+
+  This section needs to be filled out more.
+
 Copy-On-Write Considerations
 ============================
 
