@@ -202,16 +202,6 @@ public func == <Bound>(
     lhs.upperBound == rhs.upperBound
 }
 
-@warn_unused_result
-public func != <Bound>(
-  lhs: RangeOfStrideable<Bound>,
-  rhs: RangeOfStrideable<Bound>
-) -> Bool {
-  return
-    lhs.lowerBound != rhs.lowerBound ||
-    lhs.upperBound != rhs.upperBound
-}
-
 /// A collection of consecutive discrete index values.
 ///
 /// - parameter Element: Is both the element type and the index type of the
