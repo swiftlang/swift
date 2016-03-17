@@ -490,9 +490,6 @@ function set_deployment_target_based_options() {
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=$(false_true ${SKIP_IOS})
-
-                # FIXME: Test for these once compiler-rt support for {watch,tv}os is no
-                # longer marked as experimental.
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
             )
