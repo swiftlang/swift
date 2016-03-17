@@ -2415,14 +2415,13 @@ public:
     std::string Error;
     Type ReconstructedType = getTypeFromMangledSymbolname(Ctx, MangledName,
                                                         Error);
+    Stream << "type: ";
     if (ReconstructedType) {
-      Stream << "reconstructed type from usr for '" << Range.str() << "' is '";
       ReconstructedType->print(Stream);
-      Stream << "'\n";
     } else {
-      Stream << "cannot reconstruct type from usr for '" << Range.str()
-             << "'\n";
+      Stream << "FAILURE";
     }
+    Stream << "\tfor '" << Range.str() << "' mangled=" << MangledName << "\n";
     return true;
   }
 
@@ -2435,14 +2434,13 @@ private:
     }
 
     std::string error;
+    Stream << "decl: ";
     if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
-      Stream << "reconstructed decl from usr for '" << range.str() << "' is '";
       reDecl->print(Stream, PrintOptions());
-      Stream << "'\n";
     } else {
-      Stream << "cannot reconstruct decl from usr for '" << range.str()
-             << "'\n";
+      Stream << "FAILURE";
     }
+    Stream << "\tfor '" << range.str() << "' usr=" << USR << "\n";
   }
 };
 

@@ -1,33 +1,34 @@
-// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="reconstruct"
+// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="FAILURE"
 
 struct GS<T> {
-// CHECK: reconstructed decl from usr for 'GS' is 'struct GS<T>'
+// CHECK: decl: struct GS<T> for 'GS'
 // FIXME: why do we get this?
-// CHECK: reconstructed decl from usr for 'T' is 'struct GS<T>'
+// CHECK: decl: struct GS<T> for 'T' usr=s:tV14swift_ide_test2GS1TMx
 
   let a: T.Nope
-// CHECK: reconstructed decl from usr for 'a' is 'let a: <<error type>>'
+// CHECK: decl: let a: <<error type>>
   let b: T
-// CHECK: reconstructed decl from usr for 'b' is 'let b: T' 
+// CHECK: decl: let b: T
 }
 
 let global1: GS
-// CHECK: reconstructed decl from usr for 'global1' is 'let global1: <<error type>>'
+// CHECK: decl: let global1: <<error type>>
 let global2 = GS().x
-// CHECK: reconstructed decl from usr for 'global2' is 'let global2: <<error type>>'
+// CHECK: decl: let global2: <<error type>>
 let global3 = GS<Int>(a: 1, b: 2).b
-// CHECK: reconstructed decl from usr for 'global3' is 'let global3: <<error type>>'
+// CHECK: decl: let global3: <<error type>>
 
 protocol P {
 // FIXME: missing protocol entries?
-// CHECK: cannot reconstruct decl from usr for 'P'
+// CHECK: decl: FAILURE for 'P'
   associatedtype T
-// CHECK: cannot reconstruct decl from usr for 'T'
+// CHECK: decl: FAILURE for 'T'
   func foo() -> T
-// CHECK: cannot reconstruct decl from usr for 'foo'
+// CHECK: decl: FAILURE for 'foo'
 }
 struct SP: P {
-// CHECK: reconstructed decl from usr for 'SP' is 'struct SP : P'
+// CHECK: decl: struct SP : P for 'SP'
   typealias TT = Self.T
-// CHECK: reconstructed decl from usr for 'TT' is 'struct SP : P'
+// FIXME: should be the typealiase decl
+// CHECK: decl: struct SP : P for 'TT' usr=s:V14swift_ide_test2SP2TT
 }
