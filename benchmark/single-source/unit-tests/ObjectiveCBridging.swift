@@ -382,7 +382,7 @@ func testObjectiveCBridgeFromNSSetAnyObject() {
        result = nativeSet.contains(nsString)
     }
   }
-	CheckResults(result != nil && result! == true, "Expected results did not match")
+	CheckResults(result != nil && result!, "Expected results did not match")
 }
 
 @inline(never)
@@ -403,7 +403,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectForced() {
        result = nativeSet.contains(nsString)
     }
   }
-	CheckResults(result != nil && result! == true, "Expected results did not match")
+	CheckResults(result != nil && result!, "Expected results did not match")
 }
 
 @inline(never)
@@ -446,7 +446,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectToString() {
        result = nativeSet.contains(nativeString)
     }
   }
-	CheckResults(result != nil && result! == true, "Expected results did not match")
+	CheckResults(result != nil && result!, "Expected results did not match")
 }
 
 @inline(never)
@@ -468,7 +468,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
        result = nativeSet.contains(nativeString)
     }
   }
-	CheckResults(result != nil && result! == true, "Expected results did not match")
+	CheckResults(result != nil && result!, "Expected results did not match")
 }
 
 @inline(never)
