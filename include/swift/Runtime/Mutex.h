@@ -42,7 +42,7 @@ public:
   void notifyAll() const;
 
 protected:
-  void* Data;
+  void *Data;
 };
 
 /// Internal (private) implementation of mutex functionality.
@@ -63,10 +63,10 @@ public:
   bool try_lock() const;
 
 public:
-  void wait(const Condition& condition) const;
+  void wait(const Condition &condition) const;
 
 private:
-  void* Data;
+  void *Data;
 };
 
 /// Internal (private) implementation of scoped locking functionality.
@@ -80,18 +80,23 @@ public:
     Impl.unlock();
   }
 
+  ScopedLockImplementation
+    &operator=(const ScopedLockImplementation &) = delete;
+  ScopedLockImplementation
+    &operator=(ScopedLockImplementation &&) = delete;
+
 protected:
   ScopedLockImplementation(const MutexImplementation& impl) : Impl(impl) {
     Impl.lock();
   }
 
 public:
-  void wait(const Condition& condition) const {
+  void wait(const Condition &condition) const {
     Impl.wait(condition);
   }
 
 private:
-  const MutexImplementation& Impl;
+  const MutexImplementation &Impl;
 };
 
 /// Internal (private) implementation of scoped unlocking functionality.
@@ -105,13 +110,18 @@ public:
     Impl.lock();
   }
 
+  ScopedUnlockImplementation
+    &operator=(const ScopedUnlockImplementation &) = delete;
+  ScopedUnlockImplementation
+    &operator=(ScopedUnlockImplementation &&) = delete;
+
 protected:
-  ScopedUnlockImplementation(const MutexImplementation& impl) : Impl(impl) {
+  ScopedUnlockImplementation(const MutexImplementation &impl) : Impl(impl) {
     Impl.unlock();
   }
 
 private:
-  const MutexImplementation& Impl;
+  const MutexImplementation &Impl;
 };
 
 /// A Mutex object that supports `BasicLockable` and `Lockable` C++ concepts.
@@ -177,7 +187,7 @@ public:
   /// Releases lock, waits on supplied condition, and relocks before returning.
   ///
   /// Precondition: Mutex locked by this thread, undefined otherwise.
-  void wait(const Condition& condition) const {
+  void wait(const Condition &condition) const {
     Impl.wait(condition);
   }
 
@@ -216,7 +226,7 @@ public:
   ///
   /// Precondition: Mutex unlocked by this thread, undefined otherwise.
   template<typename CriticalSection>
-  void lockOrWait(const Condition& condition,
+  void lockOrWait(const Condition &condition,
                   CriticalSection criticalSection) const {
     ScopedLockImplementation guard(Impl);
     while ( criticalSection() ) {
@@ -235,7 +245,7 @@ public:
   ///
   /// Precondition: Mutex unlocked by this thread, undefined otherwise.
   template<typename CriticalSection>
-  void lockAndNotifyOne(const Condition& condition,
+  void lockAndNotifyOne(const Condition &condition,
                         CriticalSection criticalSection) const {
     ScopedLockImplementation guard(Impl);
     criticalSection();
@@ -253,7 +263,7 @@ public:
   ///
   /// Precondition: Mutex unlocked by this thread, undefined otherwise.
   template<typename CriticalSection>
-  void lockAndNotifyAll(const Condition& condition,
+  void lockAndNotifyAll(const Condition &condition,
                         CriticalSection criticalSection) const {
     ScopedLockImplementation guard(Impl);
     criticalSection();
@@ -270,13 +280,17 @@ protected:
 /// Precondition: Mutex unlocked by this thread, undefined otherwise.
 class ScopedLock : ScopedLockImplementation {
 public:
-  ScopedLock(Mutex& mutex) : ScopedLockImplementation(mutex.Impl) {}
+  explicit ScopedLock(const Mutex &mutex)
+    : ScopedLockImplementation(mutex.Impl) {}
+
+  ScopedLock &operator=(const ScopedLock &) = delete;
+  ScopedLock &operator=(ScopedLock &&) = delete;
 
 public:
   /// Releases lock, waits on supplied condition, and relocks before returning.
   ///
   /// Precondition: Mutex locked by this thread, undefined otherwise.
-  void wait(const Condition& condition) const {
+  void wait(const Condition &condition) const {
     ScopedLockImplementation::wait(condition);
   }
 };
@@ -287,7 +301,11 @@ public:
 /// Precondition: Mutex locked by this thread, undefined otherwise.
 class ScopedUnlock : ScopedUnlockImplementation {
 public:
-  ScopedUnlock(Mutex& mutex) : ScopedUnlockImplementation(mutex.Impl) {}
+  explicit ScopedUnlock(const Mutex &mutex)
+    : ScopedUnlockImplementation(mutex.Impl) {}
+  
+  ScopedUnlock &operator=(const ScopedUnlock &) = delete;
+  ScopedUnlock &operator=(ScopedUnlock &&) = delete;
 };
 
 }

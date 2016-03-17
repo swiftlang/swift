@@ -33,18 +33,17 @@ using namespace swift;
   } \
 }
 
-#define returnOrReportError(PThreadFunction, allowEBUSY) \
+#define returnTrueOrReportError(PThreadFunction, returnFalseOnEBUSY) \
 { \
   int errorcode = PThreadFunction; \
-  if (errorcode == 0 || (allowEBUSY && errorcode == EBUSY)) { \
-    return errorcode != EBUSY; \
-  } \
+  if (errorcode == 0) return true; \
+  if (returnFalseOnEBUSY && errorcode == EBUSY) return false; \
   fatalError(/* flags = */ 0, \
     "[%p] '%s' failed with error '%s'(%d)\n", \
     this, #PThreadFunction, errorName(errorcode), errorcode); \
 }
 
-static const char* errorName(int errorcode) {
+static const char *errorName(int errorcode) {
   switch (errorcode) {
     case EINVAL:
       return "EINVAL";
@@ -64,7 +63,7 @@ static const char* errorName(int errorcode) {
 }
 
 Condition::Condition() : Data(nullptr) {
-  pthread_cond_t* cond =
+  pthread_cond_t *cond =
     static_cast<pthread_cond_t*>(malloc(sizeof(pthread_cond_t)));
 
   if (cond == nullptr) {
@@ -76,28 +75,28 @@ Condition::Condition() : Data(nullptr) {
 }
 
 Condition::~Condition() {
-  pthread_cond_t* cond = static_cast<pthread_cond_t*>(Data);
+  pthread_cond_t *cond = static_cast<pthread_cond_t*>(Data);
   reportError( pthread_cond_destroy(cond) );
   free(cond);
 }
 
 void Condition::notifyOne() const {
-  pthread_cond_t* cond = static_cast<pthread_cond_t*>(Data);
+  pthread_cond_t *cond = static_cast<pthread_cond_t*>(Data);
   reportError( pthread_cond_signal(cond) );
 }
 
 void Condition::notifyAll() const {
-  pthread_cond_t* cond = static_cast<pthread_cond_t*>(Data);
+  pthread_cond_t *cond = static_cast<pthread_cond_t*>(Data);
   reportError( pthread_cond_broadcast(cond) );
 }
 
-MutexImplementation::MutexImplementation( bool checked ) : Data(nullptr) {
+MutexImplementation::MutexImplementation(bool checked) : Data(nullptr) {
 
   int kind =
     ( checked ? PTHREAD_MUTEX_ERRORCHECK : PTHREAD_MUTEX_NORMAL );
 
   pthread_mutexattr_t attr;
-  pthread_mutex_t* mutex =
+  pthread_mutex_t *mutex =
     static_cast<pthread_mutex_t*>(malloc(sizeof(pthread_mutex_t)));
 
   if (mutex == nullptr) {
@@ -112,28 +111,29 @@ MutexImplementation::MutexImplementation( bool checked ) : Data(nullptr) {
 }
 
 MutexImplementation::~MutexImplementation() {
-  pthread_mutex_t* mutex = static_cast<pthread_mutex_t*>(Data);
+  pthread_mutex_t *mutex = static_cast<pthread_mutex_t*>(Data);
   reportError( pthread_mutex_destroy(mutex) );
   free(mutex);
 }
 
 void MutexImplementation::lock() const {
-  pthread_mutex_t* mutex = static_cast<pthread_mutex_t*>(Data);
+  pthread_mutex_t *mutex = static_cast<pthread_mutex_t*>(Data);
   reportError( pthread_mutex_lock(mutex) );
 }
 
 void MutexImplementation::unlock() const {
-  pthread_mutex_t* mutex = static_cast<pthread_mutex_t*>(Data);
+  pthread_mutex_t *mutex = static_cast<pthread_mutex_t*>(Data);
   reportError( pthread_mutex_unlock(mutex) );
 }
 
 bool MutexImplementation::try_lock() const {
-  pthread_mutex_t* mutex = static_cast<pthread_mutex_t*>(Data);
-  returnOrReportError( pthread_mutex_trylock(mutex), /* allowEBUSY = */ true );
+  pthread_mutex_t *mutex = static_cast<pthread_mutex_t*>(Data);
+  returnTrueOrReportError( pthread_mutex_trylock(mutex),
+                           /* returnFalseOnEBUSY = */ true );
 }
 
-void MutexImplementation::wait(const Condition& condition) const {
-  pthread_mutex_t* mutex = static_cast<pthread_mutex_t*>(Data);
+void MutexImplementation::wait(const Condition &condition) const {
+  pthread_mutex_t *mutex = static_cast<pthread_mutex_t*>(Data);
   pthread_cond_t* cond = static_cast<pthread_cond_t*>(condition.Data);
   reportError( pthread_cond_wait(cond, mutex) );
 }

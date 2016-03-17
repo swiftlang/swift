@@ -13,6 +13,7 @@
 #include "swift/Runtime/Mutex.h"
 #include "gtest/gtest.h"
 #include <thread>
+#include <chrono>
 
 using namespace swift;
 
@@ -107,7 +108,7 @@ TEST(MutexTest, ScopedUnlockNestedCriticalSection) {
 
 template<typename ThreadBody>
 void threadedExecute(int threadCount,
-                     const Mutex& mutex,
+                     const Mutex &mutex,
                      ThreadBody threadBody) {
 
   std::vector<std::thread> threads;
@@ -115,8 +116,8 @@ void threadedExecute(int threadCount,
   // Block the threads we are about to create.
   mutex.lock();
 
-  for(int i = 0; i < 5; ++i){
-    threads.push_back(std::thread([&]{
+  for (int i = 0; i < 5; ++i) {
+    threads.push_back(std::thread([&] {
       threadBody();
     }));
   }
@@ -125,7 +126,7 @@ void threadedExecute(int threadCount,
   mutex.unlock();
 
   // Wait until all of our threads have finished.
-  for(auto& thread : threads){
+  for (auto &thread : threads){
     thread.join();
   }
 }
@@ -134,23 +135,45 @@ TEST(MutexTest, BasicLockableThreaded) {
   Mutex mutex(/* checked = */ true);
   int count = 0;
 
-  threadedExecute(5, mutex, [&]{
-    for (int j = 0; j < 10; ++j) {
+  mutex.lock();
+  auto thread = std::thread([&] {
+    mutex.lock();
+    mutex.unlock();
+  });
+  mutex.unlock();
+  thread.join();
+
+  threadedExecute(5, mutex, [&] {
+    for (int j = 0; j < 50; ++j) {
       mutex.lock();
       count++;
       mutex.unlock();
     }
   });
 
-  ASSERT_EQ(count, 50);
+  ASSERT_EQ(count, 250);
 }
 
 TEST(MutexTest, LockableThreaded) {
   Mutex mutex(/* checked = */ true);
-  int count = 0;
 
-  threadedExecute(5, mutex, [&]{
-    for (int j = 0; j < 10; ++j) {
+  mutex.lock();
+  auto thread = std::thread([&] {
+    ASSERT_FALSE(mutex.try_lock());
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  mutex.unlock();
+  thread.join();
+
+  thread = std::thread([&] {
+    ASSERT_TRUE(mutex.try_lock());
+    mutex.unlock();
+  });
+  thread.join();
+
+  int count = 0;
+  threadedExecute(5, mutex, [&] {
+    for (int j = 0; j < 50; ++j) {
       if (mutex.try_lock()) {
         count++;
         mutex.unlock();
@@ -160,21 +183,22 @@ TEST(MutexTest, LockableThreaded) {
     }
   });
 
-  ASSERT_EQ(count, 50);
+  ASSERT_EQ(count, 250);
 }
+
 
 TEST(MutexTest, ScopedLockThreaded) {
   Mutex mutex(/* checked = */ true);
   int count = 0;
 
-  threadedExecute(5, mutex, [&]{
-    for (int j = 0; j < 10; ++j) {
+  threadedExecute(5, mutex, [&] {
+    for (int j = 0; j < 50; ++j) {
       ScopedLock guard(mutex);
       count++;
     }
   });
 
-  ASSERT_EQ(count, 50);
+  ASSERT_EQ(count, 250);
 }
 
 TEST(MutexTest, ScopedUnlockNestedUnderScopedLockThreaded) {
@@ -182,8 +206,8 @@ TEST(MutexTest, ScopedUnlockNestedUnderScopedLockThreaded) {
   int count = 0;
   int badCount = 0;
 
-  threadedExecute(5, mutex, [&]{
-    for (int j = 0; j < 10; ++j) {
+  threadedExecute(5, mutex, [&] {
+    for (int j = 0; j < 50; ++j) {
       ScopedLock guard(mutex);
       {
         ScopedUnlock unguard(mutex);
@@ -193,30 +217,30 @@ TEST(MutexTest, ScopedUnlockNestedUnderScopedLockThreaded) {
     }
   });
 
-  ASSERT_EQ(count, 50);
+  ASSERT_EQ(count, 250);
 }
 
 TEST(MutexTest, CriticalSectionThreaded) {
   Mutex mutex(/* checked = */ true);
   int count = 0;
 
-  threadedExecute(5, mutex, [&]{
-    for (int j = 0; j < 10; ++j) {
+  threadedExecute(5, mutex, [&] {
+    for (int j = 0; j < 50; ++j) {
       mutex.lock([&] {
         count++;
       });
     }
   });
 
-  ASSERT_EQ(count, 50);
+  ASSERT_EQ(count, 250);
 }
 
 static bool trace = false;
 
 template<typename ConsumerBody, typename ProducerBody>
-void threadedExecute(const Mutex& mutex,
-                     const Condition& condition,
-                     bool& done,
+void threadedExecute(const Mutex &mutex,
+                     const Condition &condition,
+                     bool &done,
                      ConsumerBody consumerBody,
                      ProducerBody producerBody) {
 
@@ -226,15 +250,15 @@ void threadedExecute(const Mutex& mutex,
   // Block the threads we are about to create.
   mutex.lock();
 
-  for(int i = 1; i <= 5; ++i){
-    consumers.push_back(std::thread([&, i]{
+  for (int i = 1; i <= 8; ++i){
+    consumers.push_back(std::thread([&, i] {
       consumerBody(i);
       if (trace) printf("### Consumer[%d] thread exiting.\n", i);
     }));
   }
 
-  for(int i = 1; i <= 3; ++i){
-    producers.push_back(std::thread([&, i]{
+  for (int i = 1; i <= 5; ++i){
+    producers.push_back(std::thread([&, i] {
       producerBody(i);
       if (trace) printf("### Producer[%d] thread exiting.\n", i);
     }));
@@ -244,7 +268,7 @@ void threadedExecute(const Mutex& mutex,
   mutex.unlock();
 
   // Wait until all of our producer threads have finished.
-  for (auto& thread : producers){
+  for (auto &thread : producers) {
     thread.join();
   }
 
@@ -252,11 +276,10 @@ void threadedExecute(const Mutex& mutex,
   mutex.lockAndNotifyAll(condition, [&] {
     if (trace) printf("### Informing consumers we are done.\n");
     done = true;
-    condition.notifyAll();
   });
 
   // Wait for consumers to finish.
-  for (auto& thread : consumers){
+  for (auto &thread : consumers) {
     thread.join();
   }
 }
@@ -269,9 +292,9 @@ TEST(MutexTest, ConditionThreaded) {
   int count = 200;
 
   threadedExecute(mutex, condition, done,
-    [&] (int index) {
+    [&](int index) {
       ScopedLock guard(mutex);
-      while(true) {
+      while (true) {
         if (count - index >= 50) {
           count -= index;
           mutex.unlock(); mutex.lock(); // Only to give others a chance
@@ -284,12 +307,11 @@ TEST(MutexTest, ConditionThreaded) {
         guard.wait(condition);
       }
     },
-    [&] (int index) {
+    [&](int index) {
       for (int j = 0; j < 10; j++) {
         mutex.lock();
         count += index;
-        if (trace) printf("Producer[%d] count+%d = %d\n",
-               index, index, count);
+        if (trace) printf("Producer[%d] count+%d = %d\n", index, index, count);
         condition.notifyOne();
         mutex.unlock();
       }
@@ -308,9 +330,9 @@ TEST(MutexTest, ConditionLockOrWaitLockAndNotifyThreaded) {
   int count = 200;
 
   threadedExecute(mutex, condition, done,
-    [&] (int index) {
+    [&](int index) {
       mutex.lockOrWait(condition, [&, index] {
-        while(true) {
+        while (true) {
           if (count - index >= 50) {
             count -= index;
             mutex.unlock(); mutex.lock(); // Only to give others a chance.
@@ -324,9 +346,9 @@ TEST(MutexTest, ConditionLockOrWaitLockAndNotifyThreaded) {
         }
       });
     },
-    [&] (int index) {
+    [&](int index) {
       for (int j = 0; j < 10; j++) {
-        mutex.lockAndNotifyOne(condition,  [&, index] {
+        mutex.lockAndNotifyOne(condition, [&, index] {
           count += index;
           if (trace) printf("Producer[%d] count+%d = %d\n", index, index, count);
         });
