@@ -51,6 +51,18 @@ public:
   friend class CallerAnalysis;
 };
 
+/// CallerAnalysis relies on keeping the Caller/Callee relation up-to-date
+/// lazily. i.e. when a function is invalidated, instead of recomputing the
+/// function it calls right away, its kept in a recompute list and
+/// CallerAnalysis recomputes and empty the recompute list before any query.
+///
+/// We also considered the possibility of keeping a computed list, instead of
+/// recompute Every time we need to complete the computed list (i.e. we want
+/// to the computed list to contain every function in the module). We need to
+/// walk through every function in the module. This leads to O(n) And we need
+/// to run every function through the a sequence of function passes which might
+/// invalidate the functions and make the computed list incomplete. So
+/// O(n) * O(n) = O(n^2).
 class CallerAnalysis : public SILAnalysis {
 
   /// Current module we are analyzing.
