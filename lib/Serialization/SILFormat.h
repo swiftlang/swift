@@ -91,8 +91,8 @@ namespace sil_index_block {
     SIL_VTABLE_OFFSETS,
     SIL_GLOBALVAR_NAMES,
     SIL_GLOBALVAR_OFFSETS,
-    SIL_WITNESSTABLE_NAMES,
-    SIL_WITNESSTABLE_OFFSETS
+    SIL_WITNESS_TABLE_NAMES,
+    SIL_WITNESS_TABLE_OFFSETS
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -114,7 +114,8 @@ namespace sil_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
   enum RecordKind : uint8_t {
-    SIL_FUNCTION = 1,
+    // To avoid overlapping with BOUND_GENERIC_SUBSTITUTION, we start from +1.
+    SIL_FUNCTION = decls_block::BOUND_GENERIC_SUBSTITUTION + 1,
     SIL_BASIC_BLOCK,
     SIL_ONE_VALUE_ONE_OPERAND,
     SIL_ONE_TYPE,
@@ -129,11 +130,9 @@ namespace sil_block {
     SIL_GLOBALVAR,
     SIL_INST_CAST, // It has a cast kind instead of an attribute.
     SIL_INIT_EXISTENTIAL,
-    SIL_WITNESSTABLE,
+    SIL_WITNESS_TABLE,
     SIL_WITNESS_METHOD_ENTRY,
-    // To avoid overlapping with BOUND_GENERIC_SUBSTITUTION, we start from +1.
-    // FIXME: another option is to start SIL_FUNCTION at a large number.
-    SIL_WITNESS_BASE_ENTRY = decls_block::BOUND_GENERIC_SUBSTITUTION + 1,
+    SIL_WITNESS_BASE_ENTRY,
     SIL_WITNESS_ASSOC_PROTOCOL,
     SIL_WITNESS_ASSOC_ENTRY,
     SIL_GENERIC_OUTER_PARAMS,
@@ -171,7 +170,7 @@ namespace sil_block {
   >;
 
   using WitnessTableLayout = BCRecordLayout<
-    SIL_WITNESSTABLE,
+    SIL_WITNESS_TABLE,
     SILLinkageField,     // Linkage
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
