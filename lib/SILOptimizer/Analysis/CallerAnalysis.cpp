@@ -24,7 +24,7 @@ void CallerAnalysis::processFunctionCallSites(SILFunction *F) {
   for (auto &BB : *F) {
     for (auto &II : BB) {
       if (auto Apply = FullApplySite::isa(&II)) {
-        SILFunction *CalleeFn = Apply.getCalledFunction();
+        SILFunction *CalleeFn = Apply.getCalleeFunction();
         if (!CalleeFn)
           continue;
         // Update the callee information for this function.
