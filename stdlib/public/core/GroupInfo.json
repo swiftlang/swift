@@ -38,6 +38,7 @@
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
+    "ClosedRange.swift",
     "CollectionOfOne.swift",
     "HeapBuffer.swift",
     "Sequence.swift",
