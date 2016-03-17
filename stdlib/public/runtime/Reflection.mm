@@ -1068,61 +1068,65 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
   
 // -- MagicMirror implementation.
 
-// TODO: There are other non-Apple platforms that underscore asm symbols.
-#if defined(__APPLE__)
-# define UNDERSCORE "_"
-#else
-# define UNDERSCORE
+#if !defined(__USER_LABEL_PREFIX__)
+#error __USER_LABEL_PREFIX__ is undefined
 #endif
+
+#define GLUE_EXPANDED(a,b) a##b
+#define GLUE(a,b) GLUE_EXPANDED(a,b)
+#define SYMBOL_NAME(name) GLUE(__USER_LABEL_PREFIX__,name)
+
+#define QUOTE_EXPANDED(literal) #literal
+#define QUOTE(literal) QUOTE_EXPANDED(literal)
+
+#define QUOTED_SYMBOL_NAME(name) QUOTE(SYMBOL_NAME(name))
 
 // Addresses of the type metadata and Mirror witness tables for the primitive
 // mirrors.
 extern "C" const Metadata OpaqueMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs13_OpaqueMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs13_OpaqueMirror));
 extern "C" const MirrorWitnessTable OpaqueMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs13_OpaqueMirrors7_Mirrors");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs13_OpaqueMirrors7_Mirrors));
 extern "C" const Metadata TupleMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs12_TupleMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs12_TupleMirror));
 extern "C" const MirrorWitnessTable TupleMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs12_TupleMirrors7_Mirrors");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs12_TupleMirrors7_Mirrors));
 
 extern "C" const Metadata StructMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs13_StructMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs13_StructMirror));
 extern "C" const MirrorWitnessTable StructMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs13_StructMirrors7_Mirrors");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs13_StructMirrors7_Mirrors));
 
 extern "C" const Metadata EnumMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs11_EnumMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs11_EnumMirror));
 extern "C" const MirrorWitnessTable EnumMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs11_EnumMirrors7_Mirrors");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs11_EnumMirrors7_Mirrors));
 
 extern "C" const Metadata ClassMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs12_ClassMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs12_ClassMirror));
 extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs12_ClassMirrors7_Mirrors");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs12_ClassMirrors7_Mirrors));
 
 extern "C" const Metadata ClassSuperMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs17_ClassSuperMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs17_ClassSuperMirror));
 extern "C" const MirrorWitnessTable ClassSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs17_ClassSuperMirrors7_Mirrors");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs17_ClassSuperMirrors7_Mirrors));
 
 extern "C" const Metadata MetatypeMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs15_MetatypeMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs15_MetatypeMirror));
 extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs15_MetatypeMirrors7_Mirrors");
-  
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs15_MetatypeMirrors7_Mirrors));
+
 #if SWIFT_OBJC_INTEROP
 extern "C" const Metadata ObjCMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs11_ObjCMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs11_ObjCMirror));
 extern "C" const MirrorWitnessTable ObjCMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs11_ObjCMirrors7_Mirrors");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs11_ObjCMirrors7_Mirrors));
 extern "C" const Metadata ObjCSuperMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs16_ObjCSuperMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs16_ObjCSuperMirror));
 extern "C" const MirrorWitnessTable ObjCSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs16_ObjCSuperMirrors7_Mirrors");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs16_ObjCSuperMirrors7_Mirrors));
 #endif
-
-#undef UNDERSCORE
 
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
