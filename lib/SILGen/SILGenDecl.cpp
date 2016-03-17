@@ -1943,7 +1943,7 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
                               CanSILFunctionType toType,
                               IsFragile_t Fragile) {
   // Mangle the reabstraction thunk.
-  std::string name ;
+  std::string name;
   {
     Mangler mangler;
 
