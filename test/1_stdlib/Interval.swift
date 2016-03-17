@@ -153,7 +153,8 @@ IntervalTestSuite.test("start/end") {
 }
 
 // Something to test with that distinguishes debugDescription from description
-struct X<T : Comparable> : Comparable, CustomStringConvertible, CustomDebugStringConvertible {
+struct X<T : Comparable>
+  : Comparable, CustomStringConvertible, CustomDebugStringConvertible {
   init(_ a: T) {
     self.a = a
   }
