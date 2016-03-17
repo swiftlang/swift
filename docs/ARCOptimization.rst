@@ -162,11 +162,13 @@ Some interesting examples of where RC identity differs from alias analysis are:
 
 The corresponding value projection operations have analogous properties.
 
-*NOTE* An important consequence of RC Identity is that value types with only one
-RCIdentity are a simple case for ARC optimization to handle. The ARC optimizer
-relies on other optimizations like SROA, Function Signature Opts, and
-SimplifyCFG (for block arguments) to try and eliminate cases where value types
-have multiple reference counted subtypes.
+.. admonition:: NOTE
+
+    An important consequence of RC Identity is that value types with only one
+    RCIdentity are a simple case for ARC optimization to handle. The ARC
+    optimizer relies on other optimizations like SROA, Function Signature Opts,
+    and SimplifyCFG (for block arguments) to try and eliminate cases where value
+    types have multiple reference counted subtypes.
 
 Casts
 -----
@@ -311,8 +313,10 @@ correction of the algorithm and describes its design. In the following
 discussion we talk about the algorithm conceptually and show its safety and
 considerations necessary for good performance.
 
-*NOTE* In the following when we refer to "hoisting", we are not just talking
-about upward code motion of retains, but also downward code motion of releases.
+.. admonition:: NOTE
+
+    In the following when we refer to "hoisting", we are not just talking about
+    upward code motion of retains, but also downward code motion of releases.
 
 Loop Canonicalization
 ---------------------
