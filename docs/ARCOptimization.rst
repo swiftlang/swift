@@ -11,6 +11,18 @@ ARC Optimization for Swift
    This is an evolving document on ARC optimization in the swift
    compiler. Please extend it.
 
+Terms
+=====
+
+Some terms that are used often times in this document that must be
+defined. These may have more general definitions else where, but we define them
+with enough information for our purposes here::
+
+1. Reference type: This is referring to a retainable pointer, not an aggregate
+   that can contain a reference counted value.
+2. A trivial type: A type for which a retain_value on a value of this type is a
+   no-op.
+
 Reference Counting Instructions
 ===============================
 
