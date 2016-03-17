@@ -3207,6 +3207,8 @@ void SILWitnessTable::verify(const SILModule &M) const {
     assert(getEntries().size() == 0 &&
            "A witness table declaration should not have any entries.");
 
+  auto *protocol = getConformance()->getProtocol();
+
   // Currently all witness tables have public conformances, thus witness tables
   // should not reference SILFunctions without public/public_external linkage.
   // FIXME: Once we support private conformances, update this.
@@ -3216,6 +3218,16 @@ void SILWitnessTable::verify(const SILModule &M) const {
       if (F) {
         assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
                "Witness tables should not reference less visible functions.");
+        assert(F->getLoweredFunctionType()->getRepresentation() ==
+               SILFunctionTypeRepresentation::WitnessMethod &&
+               "Witnesses must have witness_method representation.");
+        auto *witnessSelfProtocol = F->getLoweredFunctionType()
+            ->getDefaultWitnessMethodProtocol(*M.getSwiftModule());
+        assert((witnessSelfProtocol == nullptr ||
+                witnessSelfProtocol == protocol) &&
+               "Witnesses must either have a concrete Self, or an "
+               "an abstract Self that is constrained to their "
+               "protocol.");
       }
     }
 #endif
@@ -3247,6 +3259,11 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
     assert(F->getLoweredFunctionType()->getRepresentation() ==
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
+    auto *witnessSelfProtocol = F->getLoweredFunctionType()
+        ->getDefaultWitnessMethodProtocol(*M.getSwiftModule());
+    assert(witnessSelfProtocol == getProtocol() &&
+           "Default witnesses must have an abstract Self parameter "
+           "constrained to their protocol.");
   }
 #endif
 }
