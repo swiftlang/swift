@@ -19,6 +19,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -342,6 +343,7 @@ public:
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
   unsigned NumAnonVars = 0;
+  unsigned NumCondFails = 0;
 
   /// Notes about instructions for which we're supposed to perform some
   /// sort of non-standard emission.  This enables some really simply local
@@ -4747,6 +4749,22 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   Builder.CreateCondBr(cond, failBB, contBB);
   Builder.emitBlock(failBB);
+
+  // Emit unique side-effecting inline asm calls in order to eliminate
+  // the possibility that an LLVM optimization or code generation pass
+  // will merge these blocks back together again. We emit an empty asm
+  // string with the side-effect flag set, and with a unique integer
+  // argument for each cond_fail we see in the function.
+  llvm::IntegerType *asmArgTy = IGM.Int32Ty;
+  llvm::Type *argTys = { asmArgTy };
+  llvm::FunctionType *asmFnTy =
+    llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
+  llvm::InlineAsm *inlineAsm =
+    llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
+  Builder.CreateCall(inlineAsm,
+                     llvm::ConstantInt::get(asmArgTy, NumCondFails++));
+
+  // Emit the trap instruction.
   llvm::Function *trapIntrinsic =
       llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
   Builder.CreateCall(trapIntrinsic, {});
