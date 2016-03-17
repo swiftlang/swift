@@ -137,12 +137,11 @@ changes in SSA form that still yield manipulations of the same reference count.
 Contrasts with Alias Analysis
 -----------------------------
 
-In practice, RC Identical operations are unary operations such as casts. This
-would make it seem like RC Identity is an extension of alias analysis. But this
-is only true at a shallow glance. While alias analysis is attempting to
-determine if two memory location are the same, RC identity analysis is
-attempting to determine if reference counting operations on different values
-would result in the same reference count being read or written to.
+A common question is what is the difference in between RC Identity analysis and
+alias analysis. While alias analysis is attempting to determine if two memory
+location are the same, RC identity analysis is attempting to determine if
+reference counting operations on different values would result in the same
+reference count being read or written to.
 
 Some interesting examples of where RC identity differs from alias analysis are:
 
@@ -181,15 +180,15 @@ identity must have the following properties:
 1. Both of its arguments must be non-trivial values with the same ownership
    semantics (i.e. unowned, strong, weak). This means that conversions such as:
 
-   a. address_to_pointer.
-   b. pointer_to_address.
-   d. unchecked_trivial_bitcast.
-   f. ref_to_raw_pointer.
-   g. raw_pointer_to_ref.
-   h. ref_to_unowned.
-   i. unowned_to_ref.
-   j. ref_to_unmanaged.
-   k. unmanaged_to_ref.
+   - address_to_pointer
+   - pointer_to_address
+   - unchecked_trivial_bitcast
+   - ref_to_raw_pointer
+   - raw_pointer_to_ref
+   - ref_to_unowned
+   - unowned_to_ref
+   - ref_to_unmanaged
+   - unmanaged_to_ref
 
    The reason why we want the ownership semantics to be the same is that
    whenever there is a change in ownership semantics, we want the programmer to
@@ -198,8 +197,8 @@ identity must have the following properties:
 2. The instruction must not introduce type aliasing. This disqualifies such
    casts as:
 
-   a. unchecked_addr_cast.
-   b. unchecked_bitwise_cast.
+   - unchecked_addr_cast
+   - unchecked_bitwise_cast
 
 This means in sum that conversions that preserve types and preserve
 non-trivialness are the interesting instructions.
