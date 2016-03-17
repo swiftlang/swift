@@ -1855,8 +1855,9 @@ public:
 
   SmallVector<SILDefaultWitnessTable::Entry, 8> DefaultWitnesses;
 
-  SILGenDefaultWitnessTable(SILGenModule &SGM, ProtocolDecl *proto)
-      : SGM(SGM), Proto(proto), Linkage(SILLinkage::Public) { }
+  SILGenDefaultWitnessTable(SILGenModule &SGM, ProtocolDecl *proto,
+                            SILLinkage linkage)
+      : SGM(SGM), Proto(proto), Linkage(linkage) { }
 
   void addMissingDefault() {
     DefaultWitnesses.push_back(SILDefaultWitnessTable::Entry());
@@ -1929,12 +1930,15 @@ public:
 }
 
 void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
-  SILDefaultWitnessTable *defaultWitnesses =
-      M.createDefaultWitnessTableDeclaration(protocol);
+  SILLinkage linkage =
+      getSILLinkage(getDeclLinkage(protocol, /*internalAsVersioned=*/false),
+                    ForDefinition);
 
-  SILGenDefaultWitnessTable builder(*this, protocol);
+  SILGenDefaultWitnessTable builder(*this, protocol, linkage);
   builder.visitProtocolDecl(protocol);
 
+  SILDefaultWitnessTable *defaultWitnesses =
+      M.createDefaultWitnessTableDeclaration(protocol);
   defaultWitnesses->convertToDefinition(builder.DefaultWitnesses);
 }
 
