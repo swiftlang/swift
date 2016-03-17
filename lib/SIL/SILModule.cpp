@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-module"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
@@ -161,43 +162,52 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
     return nullptr;
   }
 
-  SILWitnessTable *wT = found->second;
-  assert(wT != nullptr && "Should never map a conformance to a null witness"
+  SILWitnessTable *wtable = found->second;
+  assert(wtable != nullptr && "Should never map a conformance to a null witness"
                           " table.");
 
   // If we have a definition, return it.
-  if (wT->isDefinition())
-    return wT;
+  if (wtable->isDefinition())
+    return wtable;
 
   // Otherwise try to deserialize it. If we succeed return the deserialized
   // function.
   //
-  // *NOTE* In practice, wT will be deserializedTable, but I do not want to rely
+  // *NOTE* In practice, wtable will be deserializedTable, but I do not want to rely
   // on that behavior for now.
   if (deserializeLazily)
-    if (auto deserializedTable = getSILLoader()->lookupWitnessTable(wT))
-      return deserializedTable;
+    if (auto deserialized = getSILLoader()->lookupWitnessTable(wtable))
+      return deserialized;
 
   // If we fail, just return the declaration.
-  return wT;
+  return wtable;
 }
 
 SILDefaultWitnessTable *
-SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol) {
+SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
+                                     bool deserializeLazily) {
   // Note: we only ever look up default witness tables in the translation unit
   // that is currently being compiled, since they SILGen generates them when it
   // visits the protocol declaration, and IRGen emits them when emitting the
   // protocol descriptor metadata for the protocol.
 
   auto found = DefaultWitnessTableMap.find(Protocol);
-  assert(found != DefaultWitnessTableMap.end() &&
-         "Missing default witness table for protocol");
+  if (found == DefaultWitnessTableMap.end()) {
+    if (deserializeLazily) {
+      SILLinkage linkage =
+        getSILLinkage(getDeclLinkage(Protocol, /*internalAsVersioned=*/ false),
+                      ForDefinition);
+      SILDefaultWitnessTable *wtable =
+        SILDefaultWitnessTable::create(*this, linkage, Protocol);
+      wtable = getSILLoader()->lookupDefaultWitnessTable(wtable);
+      DefaultWitnessTableMap[Protocol] = wtable;
+      return wtable;
+    }
 
-  SILDefaultWitnessTable *wtable = found->second;
+    return nullptr;
+  }
 
-
-  // Just return the declaration.
-  return wtable;
+  return found->second;
 }
 
 SILDefaultWitnessTable *

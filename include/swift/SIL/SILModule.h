@@ -508,7 +508,8 @@ public:
 
   /// Look up the SILDefaultWitnessTable representing the default witnesses
   /// of a resilient protocol, if any.
-  SILDefaultWitnessTable *lookUpDefaultWitnessTable(const ProtocolDecl *Protocol);
+  SILDefaultWitnessTable *lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
+                                                    bool deserializeLazily=true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
   SILVTable *lookUpVTable(const ClassDecl *C);
