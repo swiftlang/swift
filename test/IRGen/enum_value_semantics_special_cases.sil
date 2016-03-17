@@ -137,12 +137,12 @@ enum MultipleEmptyRefcounted {
 // CHECK:     i64 0, label %5
 // CHECK:     i64 2, label %5
 // CHECK:   ]
-// CHECK: ; <label>:3                                       ; preds = %entry
+// CHECK: ; <label>:3:                                      ; preds = %entry
 // CHECK:   %4 = bitcast %O34enum_value_semantics_special_cases23MultipleEmptyRefcounted* %0 to %swift.refcounted**
 // CHECK:   %toDestroy = load %swift.refcounted*, %swift.refcounted** %4, align 8
 // CHECK:   call void @rt_swift_release(%swift.refcounted* %toDestroy) {{#[0-9]+}}
 // CHECK:   br label %5
-// CHECK: ; <label>:5                                       ; preds = %3, %entry, %entry
+// CHECK: ; <label>:5:                                      ; preds = %3, %entry, %entry
 // CHECK:   ret void
 // CHECK: }
 
