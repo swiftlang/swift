@@ -57,12 +57,22 @@ RC Identity
 ===========
 
 A core ARC concept in Swift optimization is the concept of ``Reference Count
-Identity`` (RC Identity) and RC Identity preserving instructions. An instruction
-``I`` with n SSA arguments and m SSA results is (i,j) RC Identity preserving if
-performing a ``retain_value`` on the ith SSA argument immediately before ``I``
-is executed is equivalent to performing a ``retain_value`` on the jth SSA result
-of ``I`` immediately following the execution of ``I``. For example in the
-following, if::
+Identity`` (RC Identity) and RC Identity preserving instructions. In this
+section, we::
+
+1. Define concepts related to RC identity.
+2. Contrast RC identity analysis with alias analysis.
+3. Discuss instructions/properties that cause certain instructions which "seem"
+   to be RC identical to not be so.
+
+Definitions
+-----------
+
+Let ``I`` be a SIL instruction with n operands and m results. We say that ``I``
+is a (i,j) RC Identity preserving instruction if performing a ``retain_value``
+on the ith SSA argument immediately before ``I`` is executed is equivalent to
+performing a ``retain_value`` on the jth SSA result of ``I`` immediately
+following the execution of ``I``. For example in the following, if::
 
     retain_value %x
     %y = unary_instruction %x
@@ -73,18 +83,71 @@ is equivalent to::
     retain_value %y
 
 then we say that unary_instruction is a (0,0) RC Identity preserving
-operation. In a case of a unary instruction, we omit (0,0) and just say that
+instruction. In a case of a unary instruction, we omit (0,0) and just say that
 the instruction is RC Identity preserving.
 
-In practice generally RC Identical operations are unary operations such as
-casts. This would make it seem like RC Identity is an extension of alias
-analysis. But RC Identity also has significantly more power than alias analysis
-since:
+TODO: This section defines RC identity only for loadable types. We also need to
+define it for instructions on addresses and instructions that mix addresses and
+values. It should be pretty straight forward to do this.
+
+Given two SSA values ``%a``, ``%b``, we define ``%a`` as immediately RC
+identical to ``%b`` (or ``%a ~rci %b``) if there exists an instruction ``I``
+such that:
+
+- ``%a`` is the jth result of ``I``.
+- ``%b`` is the ith argument of ``I``.
+- ``I`` is (i,j) RC identity preserving.
+
+Due to the nature of SSA form, we can not even speak of symmetry or
+reflexivity. But we do get transitivity! Easily if ``%b ~rci %a`` and ``%c ~rci
+%b``, we must by these two assumptions be able to do the following::
+
+  retain_value %a
+  %b = unary_instruction %a
+  %c = unary_instruction %b
+
+which by our assumption means that we can perform the following code motion::
+
+  %b = unary_instruction %a
+  %c = unary_instruction %b
+  retain_value %c
+
+our desired result. But we would really like for this operation to be reflexive
+and symmetric. To get around this issue, we define the equivalent relation RC
+identity as follows: We say that ``%a ~rc %b`` if:
+
+1. ``%a == %b``
+2. ``%a ~rci %b`` or ``%b ~rci %a``.
+3. There exists a finite sequence of ``n`` SSA values ``{%a[i]}`` such that:
+   a. ``%a ~rci %a[0]``
+   b. ``%a[i] ~rci %a[i+1]`` for all ``i < n``.
+   c. ``%a[n] ~rci %b``.
+
+These equivalence classes consisting of chains of RC identical values are
+computed via the SILAnalysis called ``RC Identity Analysis``. By performing ARC
+optimization on RC Identical operations, our optimizations are able to operate
+on the level of granularity that we actually care about, ignoring superficial
+changes in SSA form that still yield manipulations of the same reference count.
+
+*NOTE* RCIdentityAnalysis is a flow insensitive analysis. Dataflow that needs to
+ be flow sensitive must handle phi nodes in the dataflow itself.
+
+Contrasts with Alias Analysis
+-----------------------------
+
+In practice, RC Identical operations are unary operations such as casts. This
+would make it seem like RC Identity is an extension of alias analysis. But this
+is only true at a shallow glance. While alias analysis is attempting to
+determine if two memory location are the same, RC identity analysis is
+attempting to determine if reference counting operations on different values
+would result in the same reference count being read or written to.
+
+Some interesting examples of where RC identity differs from alias analysis are:
 
  - ``struct`` is an RC identity preserving operation if the ``struct`` literal
-   only has one non-trivial operand. This means for instance that any struct with
-   one reference counted field used as an owning pointer is RC Identical with its
-   owning pointer (a useful property for Arrays).
+   only has one non-trivial operand. This means for instance that any struct
+   with one reference counted field used as an owning pointer is RC Identical
+   with its owning pointer (a useful property for Arrays).
 
  - An ``enum`` instruction is always RC Identical with the given tuple payload.
 
@@ -97,35 +160,16 @@ since:
 
 The corresponding value projection operations have analogous properties.
 
-Given two SSA values ``%a``, ``%b``, we define ``%a`` as immediately RC
-identical to ``%b`` if there exists an instruction ``I`` such that:
-
-- ``%a`` is the jth result of ``I``.
-- ``%b`` is the ith argument of ``I``.
-- ``I`` is (i,j) RC identity preserving.
-
-Easily the immediate RC identical relation must be reflexive and symmetric but
-by its nature is not transitive. Then define the equivalence relation RC
-Identity, ``~rc``, by the relations that ``%a ~rc %b`` if ``%a`` is immediately
-RC identical to ``%b`` or if there is a finite sequence of n SSA values
-``{%a[i]}`` such that ``%a`` is immediately RC identical to ``%a[0]`` and ``%b``
-is immediately RC identical to ``%a[n]``. We currently always assume that each
-equivalence class has one dominating definition.
-
-These equivalence classes consisting of chains of RC identical values are
-computed via the SILAnalysis called ``RC Identity Analysis``. By performing ARC
-optimization on RC Identical operations, our optimizations are able to operate
-on the level of granularity that we actually care about, ignoring superficial
-changes in SSA form that still yield manipulations of the same reference count.
-
-*NOTE* RCIdentityAnalysis is a flow insensitive analysis. Dataflow that needs to
- be flow sensitive must handle phi nodes in the dataflow itself.
-
 *NOTE* An important consequence of RC Identity is that value types with only one
 RCIdentity are a simple case for ARC optimization to handle. The ARC optimizer
 relies on other optimizations like SROA, Function Signature Opts, and
 SimplifyCFG (for block arguments) to try and eliminate cases where value types
 have multiple reference counted subtypes.
+
+Casts
+-----
+
+
 
 Copy-On-Write Considerations
 ============================
