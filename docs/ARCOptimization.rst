@@ -129,8 +129,10 @@ optimization on RC Identical operations, our optimizations are able to operate
 on the level of granularity that we actually care about, ignoring superficial
 changes in SSA form that still yield manipulations of the same reference count.
 
-*NOTE* RCIdentityAnalysis is a flow insensitive analysis. Dataflow that needs to
- be flow sensitive must handle phi nodes in the dataflow itself.
+.. admonition:: NOTE
+
+   RCIdentityAnalysis is a flow insensitive analysis. Dataflow that needs to
+   be flow sensitive must handle phi nodes in the dataflow itself.
 
 Contrasts with Alias Analysis
 -----------------------------
