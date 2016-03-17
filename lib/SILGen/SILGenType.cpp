@@ -332,9 +332,8 @@ public:
     }
 
     if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
-      if (!protocol->hasFixedLayout())
+      if (!protocol->isObjC())
         SGM.emitDefaultWitnessTable(protocol);
-
       return;
     }
 

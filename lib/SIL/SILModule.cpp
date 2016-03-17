@@ -189,12 +189,14 @@ SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol) {
   // protocol descriptor metadata for the protocol.
 
   auto found = DefaultWitnessTableMap.find(Protocol);
-  if (found == DefaultWitnessTableMap.end()) {
-    return nullptr;
-  }
+  assert(found != DefaultWitnessTableMap.end() &&
+         "Missing default witness table for protocol");
+
+  SILDefaultWitnessTable *wtable = found->second;
 
 
-  return found->second;
+  // Just return the declaration.
+  return wtable;
 }
 
 SILDefaultWitnessTable *

@@ -5051,7 +5051,9 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
     return;
   }
 
-  auto *defaultWitnesses = SILMod->lookUpDefaultWitnessTable(protocol);
+  SILDefaultWitnessTable *defaultWitnesses = nullptr;
+  if (!protocol->hasFixedLayout())
+    defaultWitnesses = SILMod->lookUpDefaultWitnessTable(protocol);
   ProtocolDescriptorBuilder builder(*this, protocol, defaultWitnesses);
   builder.layout();
 
