@@ -2477,15 +2477,25 @@ namespace {
 
       auto swiftResultTy = Impl.importFunctionReturnType(
           decl, decl->getReturnType(), allowNSUIntegerAsInt);
+      auto fnType = ParameterList::getFullType(swiftResultTy, bodyParams);
 
       auto loc = Impl.importSourceLoc(decl->getLocation());
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
-      auto result = FuncDecl::create(
-          SwiftCtx, noLoc, StaticSpellingKind::None, loc, name, nameLoc, noLoc,
-          noLoc,
-          /*GenericParams=*/nullptr,
-          ParameterList::getFullType(swiftResultTy, bodyParams),
-          bodyParams, TypeLoc::withoutLoc(swiftResultTy), dc, decl);
+      auto result =
+          FuncDecl::create(SwiftCtx, noLoc, StaticSpellingKind::None, loc, name,
+                           nameLoc, noLoc, noLoc,
+                           /*GenericParams=*/nullptr, Type(), bodyParams,
+                           TypeLoc::withoutLoc(swiftResultTy), dc, decl);
+
+      if (auto proto = dc->getAsProtocolOrProtocolExtensionContext()) {
+        Type interfaceType;
+        std::tie(fnType, interfaceType) =
+            getProtocolMethodType(proto, fnType->castTo<AnyFunctionType>());
+        result->setType(fnType);
+        result->setInterfaceType(interfaceType);
+      } else {
+        result->setType(fnType);
+      }
 
       result->setBodyResultType(swiftResultTy);
       result->setAccessibility(Accessibility::Public);
@@ -5853,8 +5863,32 @@ ClangImporter::Implementation::importDeclContextOf(
   ext->setCheckedInheritanceClause();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
-  if (auto protoDecl = ext->getAsProtocolExtensionContext())
+  if (auto protoDecl = ext->getAsProtocolExtensionContext()) {
     ext->setGenericParams(protoDecl->createGenericParams(ext));
+    auto protoArchetype = protoDecl->getProtocolSelf()->getArchetype();
+    auto extSelf = ext->getProtocolSelf();
+
+    SmallVector<ProtocolDecl *, 4> conformsTo(
+        protoArchetype->getConformsTo().begin(),
+        protoArchetype->getConformsTo().end());
+    ArchetypeType *extSelfArchetype = ArchetypeType::getNew(
+        SwiftContext, protoArchetype->getParent(),
+        protoArchetype->getAssocTypeOrProtocol(), protoArchetype->getName(),
+        conformsTo, protoArchetype->getSuperclass(),
+        protoArchetype->getIsRecursive());
+    extSelf->setArchetype(extSelfArchetype);
+    ext->getGenericParams()->setAllArchetypes(
+        SwiftContext.AllocateCopy(llvm::makeArrayRef(extSelfArchetype)));
+
+    auto genericParam =
+        extSelf->getDeclaredType()->castTo<GenericTypeParamType>();
+    Requirement genericRequirements[2] = {
+        Requirement(RequirementKind::WitnessMarker, genericParam, Type()),
+        Requirement(RequirementKind::Conformance, genericParam,
+                    protoDecl->getDeclaredType())};
+    auto sig = GenericSignature::get(genericParam, genericRequirements);
+    ext->setGenericSignature(sig);
+  }
 
   // Add the extension to the nominal type.
   nominal->addExtension(ext);
