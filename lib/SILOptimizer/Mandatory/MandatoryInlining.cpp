@@ -340,6 +340,14 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
           CalleeFunction->isTransparent() == IsNotTransparent)
         continue;
 
+      if(F->isFragile() &&
+         !(CalleeFunction->isFragile() || CalleeFunction->isThunk())) {
+        llvm::errs() << "caller: " << F->getName() << "\n";
+        llvm::errs() << "callee: " << CalleeFunction->getName() << "\n";
+        llvm_unreachable("Should never be inlining a less visible "
+                         "@_transparent function");
+      }
+
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(CalleeFunction, InnerAI, Mode,
                                     FullyInlinedSet, SetFactory,
