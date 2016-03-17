@@ -126,7 +126,8 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
 }
 
 SILWitnessTable *
-SILModule::lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily){
+SILModule::lookUpWitnessTable(ProtocolConformanceRef C,
+                              bool deserializeLazily) {
   // If we have an abstract conformance passed in (a legal value), just return
   // nullptr.
   if (!C.isConcrete())

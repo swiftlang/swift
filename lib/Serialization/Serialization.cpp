@@ -487,7 +487,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_GLOBALVAR);
   BLOCK_RECORD(sil_block, SIL_INST_CAST);
   BLOCK_RECORD(sil_block, SIL_INIT_EXISTENTIAL);
-  BLOCK_RECORD(sil_block, SIL_WITNESSTABLE);
+  BLOCK_RECORD(sil_block, SIL_WITNESS_TABLE);
   BLOCK_RECORD(sil_block, SIL_WITNESS_METHOD_ENTRY);
   BLOCK_RECORD(sil_block, SIL_WITNESS_BASE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_PROTOCOL);
@@ -527,8 +527,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_VTABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_GLOBALVAR_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_GLOBALVAR_OFFSETS);
-  BLOCK_RECORD(sil_index_block, SIL_WITNESSTABLE_NAMES);
-  BLOCK_RECORD(sil_index_block, SIL_WITNESSTABLE_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_WITNESS_TABLE_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_WITNESS_TABLE_OFFSETS);
 
 #undef BLOCK
 #undef BLOCK_RECORD

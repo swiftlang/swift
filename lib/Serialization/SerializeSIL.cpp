@@ -1461,7 +1461,7 @@ static void writeIndexTable(const sil_index_block::ListLayout &List,
   assert((kind == sil_index_block::SIL_FUNC_NAMES ||
           kind == sil_index_block::SIL_VTABLE_NAMES ||
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
-          kind == sil_index_block::SIL_WITNESSTABLE_NAMES) &&
+          kind == sil_index_block::SIL_WITNESS_TABLE_NAMES) &&
          "SIL function table, global, vtable and witness table are supported");
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
@@ -1502,8 +1502,9 @@ void SILSerializer::writeIndexTables() {
   }
 
   if (!WitnessTableList.empty()) {
-    writeIndexTable(List, sil_index_block::SIL_WITNESSTABLE_NAMES, WitnessTableList);
-    Offset.emit(ScratchRecord, sil_index_block::SIL_WITNESSTABLE_OFFSETS,
+    writeIndexTable(List, sil_index_block::SIL_WITNESS_TABLE_NAMES,
+                    WitnessTableList);
+    Offset.emit(ScratchRecord, sil_index_block::SIL_WITNESS_TABLE_OFFSETS,
                 WitnessTableOffset);
   }
 }

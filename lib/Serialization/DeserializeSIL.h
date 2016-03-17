@@ -98,8 +98,7 @@ namespace swift {
     SILGlobalVariable *getGlobalForReference(StringRef Name);
     SILGlobalVariable *readGlobalVar(StringRef Name);
     SILWitnessTable *readWitnessTable(serialization::DeclID,
-                                      SILWitnessTable *existingWt,
-                                      bool declarationOnly);
+                                      SILWitnessTable *existingWt);
 
 public:
     Identifier getModuleIdentifier() const {

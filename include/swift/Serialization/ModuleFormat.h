@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 242; // Last change: serialize ProtocolDecl::DefaultWitnesses
+const uint16_t VERSION_MINOR = 243; // Last change: re-number SIL stuff
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
