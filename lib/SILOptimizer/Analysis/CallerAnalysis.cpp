@@ -18,32 +18,16 @@
 
 using namespace swift;
 
-static SILFunction *getCallee(FullApplySite &Apply) {
-  SILValue Callee = Apply.getCallee();
-  //  Strip ThinToThickFunctionInst.
-  if (auto TTTF = dyn_cast<ThinToThickFunctionInst>(Callee)) {
-    Callee = TTTF->getOperand();
-  }   
-
-  // Find the target function.
-  auto *FRI = dyn_cast<FunctionRefInst>(Callee);
-  if (!FRI)
-    return nullptr;
-
-  return FRI->getReferencedFunction();
-}
-
 void CallerAnalysis::processFunctionCallSites(SILFunction *F) {
   // Scan the whole module and search Apply sites.
+  CallerAnalysisFunctionInfo &CallerInfo = CallInfo.FindAndConstruct(F).second;
   for (auto &BB : *F) {
     for (auto &II : BB) {
       if (auto Apply = FullApplySite::isa(&II)) {
-        SILFunction *CalleeFn = getCallee(Apply);
+        SILFunction *CalleeFn = Apply.getCalledFunction();
         if (!CalleeFn)
           continue;
         // Update the callee information for this function.
-        CallerAnalysisFunctionInfo &CallerInfo
-                             = CallInfo.FindAndConstruct(F).second;
         CallerInfo.Callees.push_back(CalleeFn);
         
         // Update the callsite information for the callee.

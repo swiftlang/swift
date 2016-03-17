@@ -97,9 +97,10 @@ namespace swift {
     void injectFunction(SILFunction *Func) { F = Func; }
 
     /// \brief Notify the pass manager of a function that needs to be
-    /// processed by the function passes.
+    /// processed by the function passes and the analyses.
     void notifyPassManagerOfFunction(SILFunction *F) {
-      PM->addFunctionToWorklist(F);
+      PM->notifyTransformationOfFunction(F);
+      PM->notifyAnalysisOfFunction(F);
     }
 
     /// \brief Reoptimize the current function by restarting the pass
@@ -143,7 +144,6 @@ namespace swift {
     void invalidateAnalysis(SILFunction *F, SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(F, K);
     }
-
   };
 
 } // end namespace swift

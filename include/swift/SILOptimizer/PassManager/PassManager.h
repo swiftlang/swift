@@ -103,7 +103,6 @@ public:
     FunctionWorklist.push_back(F);
   }
 
-
   /// \brief Restart the function pass pipeline on the same function
   /// that is currently being processed.
   void restartWithCurrentFunction(SILTransform *T);
@@ -125,6 +124,15 @@ public:
     CompletedPassesMap.clear();
   }
 
+  /// \brief Add the function to the function pass worklist.
+  void notifyTransformationOfFunction(SILFunction *F) {
+    addFunctionToWorklist(F);
+  }
+
+  /// \brief Iterate over all analysis and notify them of the function.
+  /// This function does not necessarily have to be newly created function. It
+  /// is the job of the analysis to make sure no extra work is done if the
+  /// particular analysis has been done on the function.
   void notifyAnalysisOfFunction(SILFunction *F) {
     for (auto AP : Analysis)
       AP->notifyAnalysisOfFunction(F);

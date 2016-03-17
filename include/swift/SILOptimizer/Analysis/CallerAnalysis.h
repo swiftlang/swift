@@ -31,7 +31,7 @@ struct CallerAnalysisFunctionInfo {
   llvm::SmallVector<SILFunction *, 4> Callees;
   /// A map between all the callers and the callsites in them which
   /// calls this function.
-  llvm::DenseMap<SILFunction *, ApplyList> CallSites; 
+  llvm::SmallDenseMap<SILFunction *, ApplyList, 1> CallSites; 
 };
 
 class CallerAnalysis : public SILAnalysis {
@@ -45,7 +45,7 @@ class CallerAnalysis : public SILAnalysis {
   llvm::DenseSet<SILFunction *> RecomputeFunctionList;
 
   /// Iterate over all the call sites in the function and update
-  /// FuncToCallsites.
+  /// CallInfo.
   void processFunctionCallSites(SILFunction *F); 
 
   /// This function is about to become "unknown" to us. Invalidate any 
@@ -65,6 +65,9 @@ public:
   }
 
   virtual void notifyAnalysisOfFunction(SILFunction *F) {
+    // This is not a new function.
+    if (RecomputeFunctionList.find(F) != RecomputeFunctionList.end())
+      return;
     RecomputeFunctionList.insert(F);
   }
 
@@ -77,7 +80,7 @@ public:
   }
 
   /// Return true if the function has a caller inside current module.
-  bool existCaller(SILFunction *F) {
+  bool hasCaller(SILFunction *F) {
     // Recompute every function in the invalidated function list and empty the
     // list.
     for (auto &F : RecomputeFunctionList) {
@@ -88,7 +91,6 @@ public:
     auto Iter = CallInfo.FindAndConstruct(F);
     return !Iter.second.CallSites.empty();
   }
-
 };
 
 } // end namespace swift
