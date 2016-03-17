@@ -3236,15 +3236,6 @@ void SILWitnessTable::verify(const SILModule &M) const {
 /// Verify that a default witness table follows invariants.
 void SILDefaultWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
-  assert(!isDeclaration() &&
-         "Default witness table declarations should not exist.");
-  assert(getProtocol()->getParentModule() == M.getSwiftModule() &&
-         "Default witness table declarations must appear in the same "
-         "module as their protocol.");
-
-  // All default witness tables have public conformances, thus default
-  // witness tables should not reference SILFunctions without
-  // public/public_external linkage.
   for (const Entry &E : getEntries()) {
     if (!E.isValid())
       continue;

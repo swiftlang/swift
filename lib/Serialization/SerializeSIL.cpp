@@ -150,6 +150,12 @@ namespace {
     std::vector<BitOffset> WitnessTableOffset;
     uint32_t /*DeclID*/ NextWitnessTableID = 1;
 
+    /// Maps default witness table identifier to an ID.
+    Table DefaultWitnessTableList;
+    /// Holds the list of DefaultWitnessTables.
+    std::vector<BitOffset> DefaultWitnessTableOffset;
+    uint32_t /*DeclID*/ NextDefaultWitnessTableID = 1;
+
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock*, unsigned> BasicBlockMap;
 
@@ -180,6 +186,7 @@ namespace {
     void writeSILVTable(const SILVTable &vt);
     void writeSILGlobalVar(const SILGlobalVariable &g);
     void writeSILWitnessTable(const SILWitnessTable &wt);
+    void writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt);
 
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
@@ -1461,8 +1468,10 @@ static void writeIndexTable(const sil_index_block::ListLayout &List,
   assert((kind == sil_index_block::SIL_FUNC_NAMES ||
           kind == sil_index_block::SIL_VTABLE_NAMES ||
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
-          kind == sil_index_block::SIL_WITNESS_TABLE_NAMES) &&
-         "SIL function table, global, vtable and witness table are supported");
+          kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
+          kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES) &&
+         "SIL function table, global, vtable and (default) witness table "
+         "are supported");
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
@@ -1506,6 +1515,14 @@ void SILSerializer::writeIndexTables() {
                     WitnessTableList);
     Offset.emit(ScratchRecord, sil_index_block::SIL_WITNESS_TABLE_OFFSETS,
                 WitnessTableOffset);
+  }
+
+  if (!DefaultWitnessTableList.empty()) {
+    writeIndexTable(List, sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES,
+                    DefaultWitnessTableList);
+    Offset.emit(ScratchRecord,
+                sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
+                DefaultWitnessTableOffset);
   }
 }
 
@@ -1605,6 +1622,41 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
   }
 }
 
+void SILSerializer::
+writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
+  if (wt.isDeclaration())
+    return;
+
+  DefaultWitnessTableList[wt.getIdentifier()] = NextDefaultWitnessTableID++;
+  DefaultWitnessTableOffset.push_back(Out.GetCurrentBitNo());
+
+  DefaultWitnessTableLayout::emitRecord(
+    Out, ScratchRecord,
+    SILAbbrCodes[DefaultWitnessTableLayout::Code],
+    S.addDeclRef(wt.getProtocol()),
+    toStableSILLinkage(wt.getLinkage()));
+
+  for (auto &entry : wt.getEntries()) {
+    if (!entry.isValid()) {
+      DefaultWitnessTableNoEntryLayout::emitRecord(Out, ScratchRecord,
+          SILAbbrCodes[DefaultWitnessTableNoEntryLayout::Code]);
+      continue;
+    }
+
+    SmallVector<ValueID, 4> ListOfValues;
+    handleSILDeclRef(S, entry.getRequirement(), ListOfValues);
+    SILFunction *witness = entry.getWitness();
+    FuncsToDeclare.insert(witness);
+    IdentifierID witnessID = S.addIdentifierRef(
+        Ctx.getIdentifier(witness->getName()));
+    DefaultWitnessTableEntryLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[DefaultWitnessTableEntryLayout::Code],
+        // SILFunction name
+        witnessID,
+        ListOfValues);
+  }
+}
+
 /// Helper function for whether to emit a function body.
 bool SILSerializer::shouldEmitFunctionBody(const SILFunction &F) {
   // If F is a declaration, it has no body to emit...
@@ -1643,6 +1695,9 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<WitnessBaseEntryLayout>();
   registerSILAbbr<WitnessAssocProtocolLayout>();
   registerSILAbbr<WitnessAssocEntryLayout>();
+  registerSILAbbr<DefaultWitnessTableLayout>();
+  registerSILAbbr<DefaultWitnessTableEntryLayout>();
+  registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
   registerSILAbbr<SILGenericOuterParamsLayout>();
 
   registerSILAbbr<SILInstCastLayout>();
@@ -1684,6 +1739,14 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     if (ShouldSerializeAll &&
         wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
       writeSILWitnessTable(wt);
+  }
+
+  // Write out DefaultWitnessTables.
+  for (const SILDefaultWitnessTable &wt : SILMod->getDefaultWitnessTables()) {
+    // FIXME: Don't need to serialize private and internal default witness
+    // tables.
+    if (wt.getProtocol()->getDeclContext()->isChildContextOf(assocDC))
+      writeSILDefaultWitnessTable(wt);
   }
 
   // Emit only declarations if it is a module with pre-specializations.
