@@ -464,11 +464,9 @@ void swift::ide::printSubmoduleInterface(
             }
             continue;
           }
-
-          // Print synthesized extensions.
           SynthesizedExtensionAnalyzer Analyzer(NTD, AdjustedOptions);
-
           Analyzer.forEachExtensionMergeGroup(
+            SynthesizedExtensionAnalyzer::MergeGroupKind::All,
             [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
               for (auto ET : Decls) {
                 AdjustedOptions.shouldOpenExtension =

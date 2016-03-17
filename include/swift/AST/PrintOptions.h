@@ -58,6 +58,8 @@ private:
 };
 
 typedef std::pair<ExtensionDecl*, bool> ExtensionAndIsSynthesized;
+typedef llvm::function_ref<void(ArrayRef<ExtensionAndIsSynthesized>)>
+  ExtensionGroupOperation;
 
 class SynthesizedExtensionAnalyzer {
   struct Implementation;
@@ -67,12 +69,18 @@ public:
                                PrintOptions Options,
                                bool IncludeUnconditional = true);
   ~SynthesizedExtensionAnalyzer();
-  void forEachSynthesizedExtension(
-    llvm::function_ref<void(ExtensionDecl*)> Fn);
-  void forEachExtensionMergeGroup(
-    llvm::function_ref<void(ArrayRef<ExtensionAndIsSynthesized>)> Fn);
+
+  enum class MergeGroupKind : char {
+    All,
+    Contraint,
+    Uncontraint,
+  };
+
+  void forEachExtensionMergeGroup(MergeGroupKind Kind,
+                                  ExtensionGroupOperation Fn);
   bool isInSynthesizedExtension(const ValueDecl *VD);
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
+  bool hasMergeGroup(MergeGroupKind Kind);
 };
 
 /// Options for printing AST nodes.
