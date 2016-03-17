@@ -72,6 +72,11 @@ public:
   }
 
   virtual void invalidate(SILFunction *F, InvalidationKind K) {
+    // Should we invalidate based on the invalidation kind.
+    bool shouldInvalidate = K & InvalidationKind::Calls;
+    if (!shouldInvalidate)
+      return;
+
     // This function has become "unknown" to us. Invalidate any callsite
     // information related to this function.
     invalidateExistingCalleeRelation(F);
@@ -79,11 +84,27 @@ public:
     RecomputeFunctionList.insert(F);
   }
 
+  virtual void invalidateForDeadFunction(SILFunction *F, InvalidationKind K) {
+    invalidateExistingCalleeRelation(F);
+  }
+
+  virtual void invalidate(InvalidationKind K) {
+    // Should we invalidate based on the invalidation kind.
+    bool shouldInvalidate = K & InvalidationKind::Calls;
+    if (!shouldInvalidate)
+      return;
+
+    CallInfo.clear();
+    for(auto &F : Mod) {
+      RecomputeFunctionList.insert(&F);
+    }
+  }
+
   /// Return true if the function has a caller inside current module.
   bool hasCaller(SILFunction *F) {
     // Recompute every function in the invalidated function list and empty the
     // list.
-    for (auto &F : RecomputeFunctionList) {
+    for (auto &RF : RecomputeFunctionList) {
       processFunctionCallSites(F);
     }
     RecomputeFunctionList.clear(); 

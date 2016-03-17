@@ -414,7 +414,8 @@ public:
       if (!isAlive(F)) {
         DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
         NumDeadFunc++;
-        DFEPass->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+        DFEPass->invalidateAnalysisForDeadFunction(F,
+                                     SILAnalysis::InvalidationKind::Everything);
         Module->eraseFunction(F);
       }
     }
@@ -514,7 +515,7 @@ public:
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
-          DFEPass->invalidateAnalysis(F,
+          DFEPass->invalidateAnalysisForDeadFunction(F,
                                     SILAnalysis::InvalidationKind::Everything);
           if (F->getRefCount() == 0)
             F->getModule().eraseFunction(F);

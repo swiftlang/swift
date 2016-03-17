@@ -144,8 +144,14 @@ namespace swift {
     void invalidateAnalysis(SILFunction *F, SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(F, K);
     }
-  };
 
+    /// Invalidate only the function \p F, using invalidation information \p K.
+    /// But we also know this function is going to be dead.
+    void invalidateAnalysisForDeadFunction(SILFunction *F,
+                                           SILAnalysis::InvalidationKind K) {
+      PM->invalidateAnalysisForDeadFunction(F, K);
+    }
+  };
 } // end namespace swift
 
 #endif

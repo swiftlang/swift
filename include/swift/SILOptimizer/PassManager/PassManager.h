@@ -151,6 +151,21 @@ public:
     CompletedPassesMap[F].reset();
   }
 
+  /// \brief Broadcast the invalidation of the function to all analysis.
+  /// And we also know this function is dead and will be removed from the
+  /// module.
+  void invalidateAnalysisForDeadFunction(SILFunction *F,
+                                         SILAnalysis::InvalidationKind K) {
+    // Invalidate the analysis (unless they are locked)
+    for (auto AP : Analysis)
+      if (!AP->isLocked())
+        AP->invalidateForDeadFunction(F, K);
+    
+    CurrentPassHasInvalidated = true;
+    // Any change let all passes run again.
+    CompletedPassesMap[F].reset();
+  }
+
   /// \brief Reset the state of the pass manager and remove all transformation
   /// owned by the pass manager. Analysis passes will be kept.
   void resetAndRemoveTransformations();
