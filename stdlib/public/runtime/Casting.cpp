@@ -32,8 +32,11 @@
 #include "stddef.h"
 
 #include <cstring>
-#include <mutex>
 #include <type_traits>
+
+// FIXME: SR-946 - we ideally want to switch off of using pthread_rwlock
+//                 directly and instead expand Mutex.h to support rwlocks.
+#include <mutex>
 
 // FIXME: Clang defines max_align_t in stddef.h since 3.6.
 // Remove this hack when we don't care about older Clangs on all platforms.
