@@ -403,6 +403,11 @@ ProtocolConformance::getRootNormalConformance() const {
   return cast<NormalProtocolConformance>(C);
 }
 
+bool ProtocolConformance::isVisibleFrom(DeclContext *dc) const {
+  // FIXME: Implement me!
+  return true;
+}
+
 ProtocolConformance *ProtocolConformance::subst(Module *module,
                                       Type substType,
                                       ArrayRef<Substitution> subs,

@@ -95,12 +95,6 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   return emitBridgeNativeToObjectiveC(gen, loc, swiftValue, conformance);
 }
 
-static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
-                                               SILLocation loc,
-                                               ManagedValue str) {
-  llvm_unreachable("Handled via the _bridgeToObjectiveC witness");
-}
-
 /// Bridge the given Objective-C object to its corresponding Swift
 /// value, using the appropriate witness for the
 /// _ObjectiveCBridgeable._unconditionallyBridgeFromObjectiveC requirement.

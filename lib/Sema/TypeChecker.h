@@ -532,21 +532,11 @@ private:
   /// The \c Swift.UnsafeMutablePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
 
-  /// A set of types that can be trivially mapped to Objective-C types.
-  llvm::DenseSet<CanType> ObjCMappedTypes;
-
   /// A set of types that can be mapped to C integer types.
   llvm::DenseSet<CanType> CIntegerTypes;
 
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
-
-  /// A set of types that are representable in Objective-C, but require
-  /// non-trivial bridging.
-  ///
-  /// The value of the map is a flag indicating whether the bridged
-  /// type can be optional.
-  llvm::DenseMap<CanType, bool> ObjCRepresentableTypes;
 
   Module *StdlibModule = nullptr;
 
@@ -1645,8 +1635,6 @@ public:
                              Optional<ForeignErrorConvention> &errorConvention);
   bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
   bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
-  bool isTriviallyRepresentableInObjC(const DeclContext *DC, Type T);
-  bool isRepresentableInObjC(const DeclContext *DC, Type T);
 
   void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
                                           Type T, SourceRange TypeRange);

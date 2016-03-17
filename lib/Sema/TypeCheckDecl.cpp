@@ -2171,7 +2171,7 @@ static void checkBridgedFunctions(TypeChecker &TC) {
   }
   #include "swift/SIL/BridgedTypes.def"
   
-  if (Module *module = TC.Context.getLoadedModule(ID_Foundation)) {
+  if (Module *module = TC.Context.getLoadedModule(TC.Context.Id_Foundation)) {
     checkObjCBridgingFunctions(TC, module,
                                TC.Context.getSwiftName(
                                  KnownFoundationEntity::NSArray),

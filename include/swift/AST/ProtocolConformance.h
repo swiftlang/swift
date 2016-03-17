@@ -252,6 +252,10 @@ public:
                ->getRootNormalConformance());
   }
 
+  /// Determine whether this protocol conformance is visible from the
+  /// given declaration context.
+  bool isVisibleFrom(DeclContext *dc) const;
+
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   ///

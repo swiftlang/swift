@@ -760,7 +760,8 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
       if (auto nominal = ty->getAnyNominal())
         if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
           if (nominal->classifyAsOptionalType() == OTK_None)
-            if (TC.isTriviallyRepresentableInObjC(cast<FuncDecl>(D), ty))
+            if (ty->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC,
+                                               cast<FuncDecl>(D)))
               break;  // Looks ok.
     }
     if (checkObjectOrOptionalObjectType(TC, D, paramList->get(0)))
