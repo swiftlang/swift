@@ -10,9 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+// WORKAROUND rdar://25214598 - should be:
+// protocol Strideable : Comparable {...}
+
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
-public protocol Strideable : Comparable {
+public protocol _Strideable : Equatable {
   // FIXME(ABI)(compiler limitation): We'd like to name this type "Distance"
   // but for <rdar://problem/17619038>
   /// A type that can represent the distance between two values of `Self`.
@@ -39,6 +42,8 @@ public protocol Strideable : Comparable {
   func advanced(by n: Stride) -> Self
 }
 
+// WORKAROUND rdar://25214598 (see above)
+public protocol Strideable : _Strideable, Comparable {}
 
 /// Compare two `Strideable`s.
 public func < <T : Strideable>(x: T, y: T) -> Bool {

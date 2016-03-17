@@ -91,7 +91,8 @@ extension _HalfOpenRange {
   }
 }
 
-extension _HalfOpenRange where Bound : Strideable {
+// WORKAROUND rdar://25214598 - should be Bound : Strideable
+extension _HalfOpenRange where Bound : _Strideable {
   public var count: Bound.Stride {
     return lowerBound.distance(to: upperBound)
   }
@@ -127,14 +128,33 @@ extension _HalfOpenRange where Bound : Strideable {
 }
 
 public struct RangeOfStrideable<
-  Bound : Strideable
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : Comparable where Bound : _Strideable
 > : Equatable, RandomAccessCollection,
   CustomStringConvertible, CustomDebugStringConvertible, 
   _HalfOpenRange {
 
   public typealias Element = Bound
   public typealias Index = Element
-  
+
+  // WORKAROUND - default should be picked up from Collection
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: tests.
+    _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+
+    return i.advanced(by: 1)
+  }
+
+  // WORKAROUND - default should be picked up from Collection
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
+    //_failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+
+    return i.advanced(by: -1)
+  }
+
   public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
@@ -304,7 +324,8 @@ public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
 /// - Precondition: `start <= end`.
 @_transparent
 @warn_unused_result
-public func ..< <Bound : Strideable> (
+// WORKAROUND rdar://25214598 - should be just Bound : Strideable
+public func ..< <Bound : _Strideable where Bound : Comparable> (
   start: Bound, end: Bound
 ) -> RangeOfStrideable<Bound> {
   // FIXME: swift-3-indexing-model: tests for traps.
