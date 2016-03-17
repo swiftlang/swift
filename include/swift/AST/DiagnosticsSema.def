@@ -2587,6 +2587,10 @@ ERROR(objc_override_property_name_mismatch,none,
       "Objective-C property has a different name from the "
       "property it overrides (%0 vs. %1)", (Identifier, Identifier))
 
+ERROR(nonlocal_bridged_to_objc,none,
+      "conformance of %0 to %1 can only be written in module %2",
+      (Identifier, Identifier, Identifier))
+
 ERROR(broken_bridged_to_objc_protocol,none,
       "_BridgedToObjectiveC protocol is broken", ())
 

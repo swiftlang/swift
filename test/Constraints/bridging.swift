@@ -4,14 +4,48 @@
 
 import Foundation
 
-class BridgedClass : NSObject, NSCopying { 
+public class BridgedClass : NSObject, NSCopying {
   @objc(copyWithZone:)
-  func copy(with zone: NSZone) -> AnyObject {
+  public func copy(with zone: NSZone) -> AnyObject {
     return self
   }
 }
 
-class BridgedClassSub : BridgedClass { }
+public class BridgedClassSub : BridgedClass { }
+
+// Attempt to bridge to a non-whitelisted type from another module.
+extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{conformance of 'LazyFilterIterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
+  public typealias _ObjectiveCType = BridgedClassSub
+
+  public static func _isBridgedToObjectiveC() -> Bool { return true }
+
+  public static func _getObjectiveCType() -> Any.Type {
+    return BridgedClassSub.self
+  }
+
+  public func _bridgeToObjectiveC() -> _ObjectiveCType {
+    return BridgedClassSub()
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    source: _ObjectiveCType,
+    result: inout LazyFilterIterator?
+  ) { }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    source: _ObjectiveCType,
+    result: inout LazyFilterIterator?
+  ) -> Bool {
+    return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> LazyFilterIterator {
+    let result: LazyFilterIterator?
+    return result!
+  }
+}
+
 
 struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
   var hashValue: Int { return 0 }

@@ -3772,6 +3772,21 @@ ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
   }
 }
 
+bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
+     NominalTypeDecl *nominal) const {
+  return (nominal == getBoolDecl() ||
+          nominal == getIntDecl() ||
+          nominal == getUIntDecl() ||
+          nominal == getFloatDecl() ||
+          nominal == getDoubleDecl() ||
+          nominal == getArrayDecl() ||
+          nominal == getDictionaryDecl() ||
+          nominal == getSetDecl() ||
+          nominal == getStringDecl() ||
+          // Weird one-off case where CGFloat is bridged to NSNumber.
+          nominal->getName() == Id_CGFloat);
+}
+
 Optional<Type>
 ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
                              LazyResolver *resolver) const {
@@ -3780,18 +3795,14 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 
   // Whitelist certain types even if Foundation is not imported, to ensure
   // that casts from AnyObject to one of these types are not optimized away.
+  //
+  // Outside of these standard library types to which Foundation
+  // bridges, an _ObjectiveCBridgeable conformance can only be added
+  // in the same module where the Swift type itself is defined, so the
+  // optimizer will be guaranteed to see the conformance if it exists.
   bool knownBridgedToObjC = false;
-  if (auto ntd = type->getAnyNominal()) {
-    knownBridgedToObjC = (ntd == getBoolDecl() ||
-                          ntd == getIntDecl() ||
-                          ntd == getUIntDecl() ||
-                          ntd == getFloatDecl() ||
-                          ntd == getDoubleDecl() ||
-                          ntd == getArrayDecl() ||
-                          ntd == getDictionaryDecl() ||
-                          ntd == getSetDecl() ||
-                          ntd == getStringDecl());
-  }
+  if (auto ntd = type->getAnyNominal())
+    knownBridgedToObjC = isStandardLibraryTypeBridgedInFoundation(ntd);
 
   // If the type is generic, check whether its generic arguments are also
   // bridged to Objective-C.
