@@ -200,7 +200,8 @@ SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
       SILDefaultWitnessTable *wtable =
         SILDefaultWitnessTable::create(*this, linkage, Protocol);
       wtable = getSILLoader()->lookupDefaultWitnessTable(wtable);
-      DefaultWitnessTableMap[Protocol] = wtable;
+      if (wtable)
+        DefaultWitnessTableMap[Protocol] = wtable;
       return wtable;
     }
 
@@ -615,14 +616,12 @@ getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
   return Subs;
 }
 
-/// \brief Given a protocol \p Proto, a member method \p Member and a concrete
-/// class type \p ConcreteTy, search the witness tables and return the static
-/// function that matches the member with any specializations may be
-/// required. Notice that we do not scan the class hierarchy, just the concrete
-/// class type.
+/// \brief Given a conformance \p C and a protocol requirement \p Requirement,
+/// search the witness table for the conformance and return the witness thunk
+/// for the requirement, together with any substitutions for the conformance.
 std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
 SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
-                                        SILDeclRef Member) {
+                                        SILDeclRef Requirement) {
   // Look up the witness table associated with our protocol conformance from the
   // SILModule.
   auto Ret = lookUpWitnessTable(C);
@@ -630,7 +629,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   // If no witness table was found, bail.
   if (!Ret) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
-          C.dump(); Member.dump());
+          C.dump(); Requirement.dump());
     return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
   }
 
@@ -642,7 +641,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
 
     SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
     // Check if this is the member we were looking for.
-    if (MethodEntry.Requirement != Member)
+    if (MethodEntry.Requirement != Requirement)
       continue;
 
     return std::make_tuple(MethodEntry.Witness, Ret,
@@ -650,6 +649,46 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   }
 
   return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
+}
+
+/// \brief Given a protocol \p Protocol and a requirement \p Requirement,
+/// search the protocol's default witness table and return the default
+/// witness thunk for the requirement.
+std::pair<SILFunction *, SILDefaultWitnessTable *>
+SILModule::lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
+                                               SILDeclRef Requirement,
+                                               bool deserializeLazily) {
+  // Look up the default witness table associated with our protocol from the
+  // SILModule.
+  auto Ret = lookUpDefaultWitnessTable(Protocol, deserializeLazily);
+
+  // If no default witness table was found, bail.
+  //
+  // FIXME: Could be an assert if we fix non-single-frontend mode to link
+  // together serialized SIL emitted by each translation unit.
+  if (!Ret) {
+    DEBUG(llvm::dbgs() << "        Failed speculative lookup of default "
+          "witness for " << Protocol->getName() << " ";
+          Requirement.dump());
+    return std::make_pair(nullptr, nullptr);
+  }
+
+  // Okay, we found the correct default witness table. Now look for the method.
+  for (auto &Entry : Ret->getEntries()) {
+    // Ignore dummy entries semitted for non-method requirements, as well as
+    // requirements without default implementations.
+    if (!Entry.isValid())
+      continue;
+
+    // Check if this is the member we were looking for.
+    if (Entry.getRequirement() != Requirement)
+      continue;
+
+    return std::make_pair(Entry.getWitness(), Ret);
+  }
+
+  // This requirement doesn't have a default implementation.
+  return std::make_pair(nullptr, nullptr);
 }
 
 static ClassDecl *getClassDeclSuperClass(ClassDecl *Class) {
