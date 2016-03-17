@@ -293,8 +293,8 @@ public func == <Bound>(lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {
 /// `maximum`.
 @_transparent
 @warn_unused_result
-public func ..< <Pos : Comparable> (minimum: Pos, maximum: Pos)
-  -> Range<Pos> {
+public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
+  -> Range<Bound> {
   _precondition(minimum <= maximum, "Can't form Range with end < start")
   return Range(_uncheckedBounds: (lower: minimum, upper: maximum))
 }
@@ -304,9 +304,9 @@ public func ..< <Pos : Comparable> (minimum: Pos, maximum: Pos)
 /// - Precondition: `start <= end`.
 @_transparent
 @warn_unused_result
-public func ..< <Pos : Strideable> (
-  start: Pos, end: Pos
-) -> RangeOfStrideable<Pos> {
+public func ..< <Bound : Strideable> (
+  start: Bound, end: Bound
+) -> RangeOfStrideable<Bound> {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
   return RangeOfStrideable(_uncheckedBounds: (lower: start, upper: end))
