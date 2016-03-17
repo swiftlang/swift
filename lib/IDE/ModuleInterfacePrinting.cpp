@@ -431,9 +431,18 @@ void swift::ide::printSubmoduleInterface(
           return false;
       }
     }
-
+    std::unique_ptr<SynthesizedExtensionAnalyzer> pAnalyzer;
+    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+      if (PrintSynthesizedExtensions) {
+        pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
+        AdjustedOptions.shouldCloseNominal = !pAnalyzer->hasMergeGroup(
+          SynthesizedExtensionAnalyzer::MergeGroupKind::Uncontraint);
+      }
+    }
     if (D->print(Printer, AdjustedOptions)) {
-      Printer << "\n";
+      if (AdjustedOptions.shouldCloseNominal)
+        Printer << "\n";
+      AdjustedOptions.shouldCloseNominal = true;
       if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
         std::queue<NominalTypeDecl *> SubDecls{{NTD}};
 
@@ -464,9 +473,45 @@ void swift::ide::printSubmoduleInterface(
             }
             continue;
           }
-          SynthesizedExtensionAnalyzer Analyzer(NTD, AdjustedOptions);
-          Analyzer.forEachExtensionMergeGroup(
-            SynthesizedExtensionAnalyzer::MergeGroupKind::All,
+
+          bool IsTopLevelDecl = D == NTD;
+
+          // If printed Decl is the top-level, merge the contraint-free extensions
+          // into the main body.
+          if (IsTopLevelDecl) {
+          // Print the part that should be merged with the type decl.
+          pAnalyzer->forEachExtensionMergeGroup(
+            SynthesizedExtensionAnalyzer::MergeGroupKind::Uncontraint,
+            [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
+              for (auto ET : Decls) {
+                AdjustedOptions.shouldOpenExtension = false;
+                AdjustedOptions.shouldCloseExtension =
+                  Decls.back().first == ET.first;
+                if (ET.second)
+                  AdjustedOptions.
+                    initArchetypeTransformerForSynthesizedExtensions(NTD,
+                                                               pAnalyzer.get());
+                ET.first->print(Printer, AdjustedOptions);
+                if (ET.second)
+                  AdjustedOptions.
+                    clearArchetypeTransformerForSynthesizedExtensions();
+                if (AdjustedOptions.shouldCloseExtension)
+                  Printer << "\n";
+              }
+          });
+          }
+
+          // If the printed Decl is not the top-level one, reset analyzer.
+          if (!IsTopLevelDecl)
+            pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
+
+          // Print the rest as synthesized extensions.
+          pAnalyzer->forEachExtensionMergeGroup(
+            // For top-level decls, only contraint extensions are to print;
+            // Since the rest are merged into the main body.
+            IsTopLevelDecl ? SynthesizedExtensionAnalyzer::MergeGroupKind::Contraint :
+            // For sub-decls, all extensions should be printed.
+                       SynthesizedExtensionAnalyzer::MergeGroupKind::All,
             [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
               for (auto ET : Decls) {
                 AdjustedOptions.shouldOpenExtension =
@@ -476,12 +521,13 @@ void swift::ide::printSubmoduleInterface(
                 if (AdjustedOptions.shouldOpenExtension)
                   Printer << "\n";
                 if (ET.second)
-                  AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
-                                                                                   &Analyzer);
+                  AdjustedOptions.
+                    initArchetypeTransformerForSynthesizedExtensions(NTD,
+                                                               pAnalyzer.get());
                 ET.first->print(Printer, AdjustedOptions);
                 if (ET.second)
-                  AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
-
+                  AdjustedOptions.
+                    clearArchetypeTransformerForSynthesizedExtensions();
                 if (AdjustedOptions.shouldCloseExtension)
                   Printer << "\n";
             }

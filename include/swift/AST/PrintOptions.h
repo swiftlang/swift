@@ -279,6 +279,8 @@ struct PrintOptions {
 
   bool shouldCloseExtension = true;
 
+  bool shouldCloseNominal = true;
+
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
     PrintOptions result;

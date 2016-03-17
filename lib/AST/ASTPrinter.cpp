@@ -2170,7 +2170,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
     printInherited(decl);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl);
+    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
   }
 }
 
@@ -2195,7 +2195,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
     printInherited(decl);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl);
+    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
   }
 }
 
@@ -2222,7 +2222,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   }
 
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl);
+    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
   }
 }
 
@@ -2264,7 +2264,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     printInherited(decl, explicitClass);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl);
+    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
   }
 }
 
