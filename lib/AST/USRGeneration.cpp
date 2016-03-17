@@ -126,7 +126,7 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
       return printDeclUSR(VD, OS);
     }
   }
-  if (ED->getExtendedType()) {
+  if (ED->getExtendedType() && ED->getExtendedType()->getAnyNominal()) {
     OS << getUSRSpacePrefix() << "e:";
     printDeclUSR(ED->getExtendedType()->getAnyNominal(), OS);
   } else {
