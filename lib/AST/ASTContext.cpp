@@ -3617,7 +3617,7 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
   initialize(C, baseName, names);
 }
 
-/// Find the implementation of the the named type in the given module.
+/// Find the implementation of the named type in the given module.
 static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx, 
                                                    StringRef name,
                                                    Module *module) {
