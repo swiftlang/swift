@@ -604,8 +604,9 @@ struct _ParentProcess {
           }
           if stderrSeenCrashDelimiter {
             capturedCrashStderr.append(line)
+          } else {
+            print("err>>> \(line)")
           }
-          print("err>>> \(line)")
         }
         continue
       }
