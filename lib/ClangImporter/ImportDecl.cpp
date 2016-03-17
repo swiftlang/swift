@@ -2491,10 +2491,14 @@ namespace {
       result->setAccessibility(Accessibility::Public);
       if (selfIsInOut)
         result->setMutating();
-      if (selfIdx)
+      if (selfIdx) {
         result->setSelfIndex(selfIdx.getValue());
-      else
+      } else {
         result->setStatic();
+        result->setImportAsStaticMember();
+      }
+      assert(selfIdx ? result->getSelfIndex() == *selfIdx
+                     : result->isImportAsStaticMember());
 
       if (dc->getAsClassOrClassExtensionContext())
         // FIXME: only if the class itself is not marked final

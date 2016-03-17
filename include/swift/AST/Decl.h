@@ -4484,10 +4484,30 @@ protected:
 
   CaptureInfo Captures;
 
-  // If this is imported-as-a-member, the index at which self is passed.
-  // Internally, stored as 0 for no self index, and stored at n+1 for self index
-  // of n
-  uint8_t selfIndex = 0;
+  // Encodes imported-as-member status.
+  struct ImportAsMemberStatus {
+    // non-0 denotes import-as-member. 1 denotes no self index. n+2 denotes self
+    // index of n
+    uint8_t rawValue = 0;
+
+    bool isImportAsMember() const { return rawValue != 0; }
+    bool isInstance() const { return rawValue >= 2; }
+    bool isStatic() const { return rawValue == 1; }
+    uint8_t getSelfIndex() const {
+      assert(isInstance() && "not set");
+      return rawValue - 2;
+    }
+    void setStatic() {
+      assert(!isStatic() && "already set");
+      rawValue = 1;
+    }
+    void setSelfIndex(uint8_t idx) {
+      assert(!isImportAsMember() && "already set");
+      assert(idx <= UINT8_MAX-2 && "out of bounds");
+      rawValue = idx + 2;
+    }
+  };
+  ImportAsMemberStatus iamStatus;
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, unsigned NumParameterLists,
@@ -4520,18 +4540,14 @@ public:
     return GenericSig;
   }
 
-  bool hasSelfIndex() const { return selfIndex != 0; }
+  // Expose our import as member status
+  bool isImportAsMember() const { return iamStatus.isImportAsMember(); }
+  bool isImportAsInstanceMember() const { return iamStatus.isInstance(); }
+  bool isImportAsStaticMember() const { return iamStatus.isStatic(); }
+  uint8_t getSelfIndex() const { return iamStatus.getSelfIndex(); }
 
-  uint8_t getSelfIndex() const {
-    assert(hasSelfIndex() && "not set");
-    return selfIndex - 1;
-  }
-
-  void setSelfIndex(uint8_t idx) {
-    assert(!hasSelfIndex() && "already set");
-    assert(idx != UINT8_MAX && "out of bounds");
-    selfIndex = idx + 1;
-  }
+  void setImportAsStaticMember() { iamStatus.setStatic(); }
+  void setSelfIndex(uint8_t idx) { return iamStatus.setSelfIndex(idx); }
 
 public:
   // FIXME: Hack that provides names with keyword arguments for accessors.
