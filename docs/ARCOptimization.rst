@@ -8,8 +8,8 @@ ARC Optimization for Swift
 
 .. admonition:: TODO
 
-   This is currently a place holder for design documentation on ARC
-   optimization.
+   This is an evolving document on ARC optimization in the swift
+   compiler. Please extend it.
 
 Reference Counting Instructions
 ===============================
