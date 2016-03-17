@@ -148,8 +148,8 @@ IntervalTestSuite.test("Emptiness") {
 IntervalTestSuite.test("start/end") {
   expectEqual(0.0, (0.0..<0.1).lowerBound)
   expectEqual(0.0, (0.0...0.1).lowerBound)
-  expectEqual(0.1, (0.0..<0.1).end)
-  expectEqual(0.1, (0.0...0.1).end)
+  expectEqual(0.1, (0.0..<0.1).upperBound)
+  expectEqual(0.1, (0.0...0.1).upperBound)
 }
 
 // Something to test with that distinguishes debugDescription from description
