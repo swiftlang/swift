@@ -2393,40 +2393,50 @@ private:
 class TypeReconstructWalker : public SourceEntityWalker {
   ASTContext &Ctx;
   llvm::raw_ostream &Stream;
+  llvm::DenseSet<ValueDecl *> SeenDecls;
 
 public:
   TypeReconstructWalker(ASTContext &Ctx, llvm::raw_ostream &Stream)
       : Ctx(Ctx), Stream(Stream) {}
 
   bool walkToDeclPre(Decl *D, CharSourceRange range) override {
-    if (auto *VD = dyn_cast<ValueDecl>(D))
-      tryDemangleDecl(VD, range);
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (SeenDecls.insert(VD).second)
+        tryDemangleDecl(VD, range, /*isRef=*/false);
+    }
     return true;
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, Type T) override {
-    if (T.isNull())
-      return true;
-    T = T->getRValueType();
+    if (SeenDecls.insert(D).second)
+      tryDemangleDecl(D, Range, /*isRef=*/true);
+
+    if (T) {
+      T = T->getRValueType();
+      tryDemangleType(T, D->getDeclContext(), Range);
+    }
+    return true;
+  }
+
+private:
+  void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
     Mangle::Mangler Man(/* DWARFMangling */true);
-    Man.mangleTypeForDebugger(T, D->getDeclContext());
-    std::string MangledName(Man.finalize());
+    Man.mangleTypeForDebugger(T, DC);
+    std::string mangledName(Man.finalize());
     std::string Error;
-    Type ReconstructedType = getTypeFromMangledSymbolname(Ctx, MangledName,
-                                                        Error);
+    Type ReconstructedType =
+        getTypeFromMangledSymbolname(Ctx, mangledName, Error);
     Stream << "type: ";
     if (ReconstructedType) {
       ReconstructedType->print(Stream);
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << Range.str() << "' mangled=" << MangledName << "\n";
-    return true;
+    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << "\n";
   }
 
-private:
-  void tryDemangleDecl(ValueDecl *VD, CharSourceRange range) {
+  void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
     std::string USR;
     {
       llvm::raw_string_ostream OS(USR);
@@ -2434,7 +2444,12 @@ private:
     }
 
     std::string error;
-    Stream << "decl: ";
+    if (isRef) {
+      Stream << "dref: ";
+    } else {
+      Stream << "decl: ";
+    }
+
     if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
       reDecl->print(Stream, PrintOptions());
     } else {

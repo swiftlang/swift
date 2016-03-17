@@ -18,6 +18,8 @@ func f1() {
 // CHECK: decl: func f1()
   var s1ins = Mystruct1()
 // CHECK: decl: var s1ins: Mystruct1
+// FIXME: missing init()?
+// CHECK: dref: FAILURE	for 'Mystruct1' usr=s:FV14swift_ide_test9Mystruct1cFT_S0_
 // CHECK: type: Mystruct1
 
   s1ins.intField = 34
@@ -25,6 +27,7 @@ func f1() {
 
   var c1ins = Myclass1()
 // CHECK: decl: var c1ins: Myclass1
+// CHECK: dref: init()	for 'Myclass1'
 // CHECK: type: Myclass1
 
   c1ins.intField = 3
@@ -50,6 +53,8 @@ class Myclass2 {
 // CHECK: type: Array<Int>
 
     arr1.append(1)
+// FIXME: missing append()
+// CHECK: dref: FAILURE	for 'append' usr=s:FSa6appendFxT_
 // CHECK: type: @lvalue Array<Int> -> Int -> ()
 
     var arr2 : [Mystruct1]
