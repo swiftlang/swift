@@ -529,7 +529,7 @@ func testRoundTrip() {
 
       // Clear out the stats before returning array
       BridgedSwift.resetStats()
-      return result
+      return result as NSArray
     }
   }
   
@@ -540,7 +540,7 @@ func testRoundTrip() {
     BridgedSwift(40), BridgedSwift(50) ]
   
   BridgedSwift.resetStats()
-  test.call(array)
+  test.call(array as NSArray)
   
   // CHECK-NEXT: ---Returned Array---
   print("---Returned Array---")
