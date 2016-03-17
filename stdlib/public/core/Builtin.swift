@@ -236,7 +236,7 @@ public func _unsafeReferenceCast<T, U>(x: T, to: U.Type) -> U {
 @_transparent
 @warn_unused_result
 public func unsafeDowncast<T : AnyObject>(x: AnyObject, to: T.Type) -> T {
-  _stdlibAssert(x is T, "invalid unsafeDowncast")
+  _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 
