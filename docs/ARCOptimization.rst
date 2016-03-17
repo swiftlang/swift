@@ -16,7 +16,7 @@ Terms
 
 Some terms that are used often times in this document that must be
 defined. These may have more general definitions else where, but we define them
-with enough information for our purposes here::
+with enough information for our purposes here:
 
 1. Reference type: This is referring to a retainable pointer, not an aggregate
    that can contain a reference counted value.
@@ -70,7 +70,7 @@ RC Identity
 
 A core ARC concept in Swift optimization is the concept of ``Reference Count
 Identity`` (RC Identity) and RC Identity preserving instructions. In this
-section, we::
+section, we:
 
 1. Define concepts related to RC identity.
 2. Contrast RC identity analysis with alias analysis.
@@ -180,6 +180,33 @@ The corresponding value projection operations have analogous properties.
     optimizer relies on other optimizations like SROA, Function Signature Opts,
     and SimplifyCFG (for block arguments) to try and eliminate cases where value
     types have multiple reference counted subtypes.
+
+what is ``retain_value`` and why is it important
+------------------------------------------------
+
+Notice in the section above how we defined RC identity using the SIL
+``retain_value`` instruction. ``retain_value`` and ``release_value`` are the
+catch-all please retain or please release this value at the SIL level. The
+following table is a quick summary of what ``retain_value`` (``release_value``)
+does when applied to various types of objects:
+
++-----------+--------------+-------------------------------------------------------------------------------------+
+| Ownership | Type         | Effect                                                                              |
++===========+==============+=====================================================================================+
+| Strong    | Class        | Increment strong ref count of class                                                 |
++-----------+--------------+-------------------------------------------------------------------------------------+
+| Any       | Struct/Tuple | retain_value each field                                                             |
++-----------+--------------+-------------------------------------------------------------------------------------+
+| Any       | Enum         | switch on the enum and apply retain_value to the enum case's payload (if it exists) |
++-----------+--------------+-------------------------------------------------------------------------------------+
+| Unowned   | Class        | Increment the unowned ref count of class                                            |
++-----------+--------------+-------------------------------------------------------------------------------------+
+
+.. admonition:: Notice
+
+  Aggregate value types like struct/tuple/enums's definitions are defined
+  recursively via retain_value on payloads/fields. This is why operations like
+  ``struct_extract`` do not always propagate RC identity.
 
 Conversions
 -----------
