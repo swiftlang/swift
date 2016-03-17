@@ -1,4 +1,8 @@
+#if __has_feature(objc_modules)
 @import Foundation;
+#else
+#import <Foundation/Foundation.h>
+#endif
 
 __attribute__((swift_bridge("Refrigerator")))
 @interface APPRefrigerator : NSObject <NSCopying>
