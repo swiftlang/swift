@@ -491,10 +491,10 @@ function set_deployment_target_based_options() {
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=$(false_true ${SKIP_IOS})
 
-                # FIXME: Enable these once compiler-rt support for {watch,tv}os is no
+                # FIXME: Test for these once compiler-rt support for {watch,tv}os is no
                 # longer marked as experimental.
-                # -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=$(false_true ${SKIP_WATCHOS})
-                # -DCOMPILER_RT_ENABLE_TVOS:BOOL=$(false_true ${SKIP_TVOS})
+                -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
             )
 	    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
