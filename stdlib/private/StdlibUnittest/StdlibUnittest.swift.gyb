@@ -412,6 +412,8 @@ extension ProcessTerminationStatus {
       return false
     case .signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
+    default:
+      fatalError("Bad ProcessTerminationStatus")
     }
   }
 }
