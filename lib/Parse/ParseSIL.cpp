@@ -4394,15 +4394,20 @@ bool Parser::parseSILWitnessTable() {
 }
 
 /// decl-sil-default-witness ::= 'sil_default_witness_table' 
-///                              identifier minimum-witness-table-size
+///                              sil-linkage identifier
 ///                              decl-sil-default-witness-body
 /// decl-sil-default-witness-body:
 ///   '{' sil-default-witness-entry* '}'
 /// sil-default-witness-entry:
 ///   'method' SILDeclRef ':' @SILFunctionName
+///   'no_default'
 bool Parser::parseSILDefaultWitnessTable() {
   consumeToken(tok::kw_sil_default_witness_table);
   SILParser WitnessState(*this);
+  
+  // Parse the linkage.
+  Optional<SILLinkage> Linkage;
+  parseSILLinkage(Linkage, *this);
   
   Scope S(this, ScopeKind::TopLevel);
   // We should use WitnessTableBody. This ensures that the generic params
@@ -4465,7 +4470,11 @@ bool Parser::parseSILDefaultWitnessTable() {
   parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                      LBraceLoc);
   
-  SILDefaultWitnessTable::create(*SIL->M, protocol, witnessEntries);
+  // Default to public linkage.
+  if (!Linkage)
+    Linkage = SILLinkage::Public;
+
+  SILDefaultWitnessTable::create(*SIL->M, *Linkage, protocol, witnessEntries);
   BodyScope.reset();
   return false;
 }

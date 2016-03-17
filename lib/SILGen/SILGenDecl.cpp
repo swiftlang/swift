@@ -1938,7 +1938,7 @@ void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
   builder.visitProtocolDecl(protocol);
 
   SILDefaultWitnessTable *defaultWitnesses =
-      M.createDefaultWitnessTableDeclaration(protocol);
+      M.createDefaultWitnessTableDeclaration(protocol, linkage);
   defaultWitnesses->convertToDefinition(builder.DefaultWitnesses);
 }
 

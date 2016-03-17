@@ -190,23 +190,17 @@ SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol) {
 
   auto found = DefaultWitnessTableMap.find(Protocol);
   if (found == DefaultWitnessTableMap.end()) {
-    assert(Protocol->hasFixedLayout() &&
-           "Resilient protocol must have a default witness table");
     return nullptr;
   }
 
-  assert(!Protocol->hasFixedLayout() &&
-         "Fixed-layout protocol cannot have a default witness table");
 
   return found->second;
 }
 
 SILDefaultWitnessTable *
-SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol) {
-  assert(!Protocol->hasFixedLayout() &&
-         "Fixed-layout protocol cannot have a default witness table");
-
-  return SILDefaultWitnessTable::create(*this, Protocol);
+SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
+                                                SILLinkage Linkage) {
+  return SILDefaultWitnessTable::create(*this, Linkage, Protocol);
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,

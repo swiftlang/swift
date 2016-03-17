@@ -3238,9 +3238,6 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
   assert(!isDeclaration() &&
          "Default witness table declarations should not exist.");
-  assert(!getProtocol()->hasFixedLayout() &&
-         "Default witness table declarations for fixed-layout protocols should "
-         "not exist.");
   assert(getProtocol()->getParentModule() == M.getSwiftModule() &&
          "Default witness table declarations must appear in the same "
          "module as their protocol.");
@@ -3253,9 +3250,9 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
       continue;
 
     SILFunction *F = E.getWitness();
-    assert(!isLessVisibleThan(F->getLinkage(), SILLinkage::Public) &&
-           "Default witness tables should not reference internal "
-           "or private functions.");
+    assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
+           "Default witness tables should not reference "
+           "less visible functions.");
     assert(F->getLoweredFunctionType()->getRepresentation() ==
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");

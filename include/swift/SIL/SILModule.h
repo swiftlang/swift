@@ -525,7 +525,8 @@ public:
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
   SILDefaultWitnessTable *
-  createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol);
+  createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
+                                       SILLinkage Linkage);
 
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
