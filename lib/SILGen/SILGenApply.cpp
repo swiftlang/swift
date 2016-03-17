@@ -2585,7 +2585,12 @@ namespace {
                               unsigned skip)
       : Params(params), SkipParamIndex(skip)
     {
-      assert(skip == NoSkip || skip < Params.size());
+      // Eagerly chop a skipped parameter off either end.
+      if (SkipParamIndex == 0) {
+        Params = Params.slice(1);
+        SkipParamIndex = NoSkip;
+      }
+      assert(!hasSkip() || SkipParamIndex < Params.size());
     }
     
     bool hasSkip() const {

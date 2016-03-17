@@ -373,11 +373,58 @@ enum class ConventionsKind : uint8_t {
     }
 
   private:
+    bool isClangTypeMoreIndirectThanSubstType(const clang::Type *clangTy,
+                                              CanType substTy) {
+      // A const pointer argument might have been imported as
+      // UnsafePointer, COpaquePointer, or a CF foreign class.
+      // (An ObjC class type wouldn't be const-qualified.)
+      if (clangTy->isPointerType()
+          && clangTy->getPointeeType().isConstQualified()) {
+        // Void pointers aren't usefully indirectable.
+        if (clangTy->isVoidPointerType())
+          return false;
+        
+        if (auto eltTy = substTy->getAnyPointerElementType())
+          return isClangTypeMoreIndirectThanSubstType(
+                        clangTy->getPointeeType().getTypePtr(), CanType(eltTy));
+        
+        if (substTy->getAnyNominal() ==
+              M.getASTContext().getCOpaquePointerDecl())
+          // TODO: We could conceivably have an indirect opaque ** imported
+          // as COpaquePointer. That shouldn't ever happen today, though,
+          // since we only ever indirect the 'self' parameter of functions
+          // imported as methods.
+          return false;
+        
+        // Peek through optionals.
+        if (auto substObjTy = substTy.getAnyOptionalObjectType())
+          substTy = substObjTy;
+        
+        if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
+          // CF type as foreign class
+          if (substTy->getClassOrBoundGenericClass()
+              && substTy->getClassOrBoundGenericClass()->isForeign())
+            return false;
+        }
+        
+        return true;
+      }
+      return false;
+    }
+  
     /// Query whether the original type is address-only given complete
     /// lowering information about its substitution.
     bool isPassedIndirectly(AbstractionPattern origType, CanType substType,
                             const TypeLowering &substTL) {
       auto &mod = *M.getSwiftModule();
+
+      // If the C type of the argument is a const pointer, but the Swift type
+      // isn't, treat it as indirect.
+      if (origType.isClangType()
+          && isClangTypeMoreIndirectThanSubstType(origType.getClangType(),
+                                                  substType)) {
+        return true;
+      }
 
       // If the substituted type is passed indirectly, so must the
       // unsubstituted type.
@@ -944,8 +991,9 @@ static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
 ///
 /// Generally, whether the parameter is +1 is handled before this.
 static ParameterConvention getIndirectCParameterConvention(clang::QualType type) {
-  // Non-trivial C++ types are Indirect_Inout (at least in Itanium).
-  llvm_unreachable("no address-only C types currently supported!");
+  // Non-trivial C++ types would be Indirect_Inout (at least in Itanium).
+  // A trivial const * parameter in C should be considered @in.
+  return ParameterConvention::Indirect_In;
 }
 
 /// Given a C parameter declaration whose type is passed indirectly,

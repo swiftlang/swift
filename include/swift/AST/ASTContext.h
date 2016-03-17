@@ -420,6 +420,9 @@ public:
   /// Retrieve the declaration of Swift.OptionSetType.
   NominalTypeDecl *getOptionSetTypeDecl() const;
   
+  /// Retrieve the declaration of Swift.COpaquePointer.
+  NominalTypeDecl *getCOpaquePointerDecl() const;
+  
   /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *getUnsafeMutablePointerDecl() const;
 

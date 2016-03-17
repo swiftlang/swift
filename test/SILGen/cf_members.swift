@@ -39,10 +39,10 @@ public func foo(x: Double) {
   // CHECK: apply [[FN]]([[Z]])
   z.invert()
 
-  // C/HECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
-  // CH/ECK: [[ZVAL:%.*]] = load [[Z]]
-  // CHE/CK: store [[Z]] to [[TMP:%.*]] :
-  // CHEC/K: apply [[FN]]([[ZTMP]], [[X]])
+  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
+  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: store [[ZVAL]] to [[ZTMP:%.*]] :
+  // CHECK: apply [[FN]]([[ZTMP]], [[X]])
   z = z.translate(radians: x)
 
 /* TODO: Partial applications
