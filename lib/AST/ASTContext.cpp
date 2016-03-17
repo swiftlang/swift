@@ -31,6 +31,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
@@ -1913,6 +1914,38 @@ AbstractFunctionDecl::getForeignErrorConvention() const {
   auto it = conventionsMap.find(this);
   if (it == conventionsMap.end()) return None;
   return it->second;
+}
+
+Optional<int>
+AbstractFunctionDecl::getForeignFunctionAsMethodSelfParameterIndex() const {
+  // TODO: This should be populated by the Clang importer somehow, since the
+  // mapping may come either from an explicit swift-name attribute or by
+  // inference.
+  if (!getDeclContext()->isTypeContext()) return None;
+  if (!hasClangNode()) return None;
+  auto clangDecl = dyn_cast<clang::ValueDecl>(getClangDecl());
+  if (!clangDecl)
+    return None;
+  
+  int selfIndex;
+  
+  // Check if there's an explicit attribute.
+  if (auto swiftName = clangDecl->getAttr<clang::SwiftNameAttr>()) {
+    auto name = swiftName->getName();
+    auto selfOffset = name.find("self:");
+    if (selfOffset == StringRef::npos) {
+      // If no `self:` was named, this is imported as a static method.
+      selfIndex = -1;
+    } else {
+      // Count the ':'s before it.
+      auto preSelf = name.slice(0, selfOffset);
+      selfIndex = std::count(preSelf.begin(), preSelf.end(), ':');
+    }
+  } else {
+    // FIXME: Assume an instance method with index zero if there's no attribute.
+    selfIndex = 0;
+  }
+  return selfIndex;
 }
 
 bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {

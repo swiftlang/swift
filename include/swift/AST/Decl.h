@@ -4758,6 +4758,13 @@ public:
   /// declaration, given that it is @objc and 'throws'.
   Optional<ForeignErrorConvention> getForeignErrorConvention() const;
 
+  /// If this is a foreign C function imported as a method, get the index of
+  /// the foreign parameter imported as `self`. If the function is imported
+  /// as a static method, `-1` is returned to represent the `self` parameter
+  /// being dropped altogether. `None` is returned for a normal function
+  /// or method.
+  Optional<int> getForeignFunctionAsMethodSelfParameterIndex() const;
+  
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
            D->getKind() <= DeclKind::Last_AbstractFunctionDecl;

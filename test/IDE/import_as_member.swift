@@ -22,6 +22,7 @@
 // PRINT-NEXT:   func inverted() -> Struct1
 // PRINT-NEXT:   mutating func invert()
 // PRINT-NEXT:   func translate(radians radians: Double) -> Struct1
+// PRINT-NEXT:   func scale(_ radians: Double) -> Struct1
 // PRINT-NEXT:   var radius: Double { get nonmutating set }
 // PRINT-NEXT:   var altitude: Double{{$}}
 // PRINT-NEXT:   var magnitude: Double { get }

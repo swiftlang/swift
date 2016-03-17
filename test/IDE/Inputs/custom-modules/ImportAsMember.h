@@ -21,6 +21,10 @@ extern struct IAMStruct1 IAMStruct1Rotate(const struct IAMStruct1 *s,
                                           double radians)
     __attribute__((swift_name("Struct1.translate(self:radians:)")));
 
+extern struct IAMStruct1 IAMStruct1Scale(struct IAMStruct1 s,
+                                         double radians)
+    __attribute__((swift_name("Struct1.scale(self:_:)")));
+
 extern double IAMStruct1GetRadius(struct IAMStruct1 s)
     __attribute__((swift_name("getter:Struct1.radius(self:)")));
 
@@ -36,9 +40,9 @@ extern void IAMStruct1SetAltitude(struct IAMStruct1 *s, double altitude)
 extern double IAMStruct1GetMagnitude(struct IAMStruct1 s)
     __attribute__((swift_name("getter:Struct1.magnitude(self:)")));
 
-extern int IAMStruct1StaticMethod()
+extern int IAMStruct1StaticMethod(void)
     __attribute__((swift_name("Struct1.staticMethod()")));
-extern int IAMStruct1StaticGetProperty()
+extern int IAMStruct1StaticGetProperty(void)
     __attribute__((swift_name("getter:Struct1.property()")));
 extern int IAMStruct1StaticSetProperty(int i)
     __attribute__((swift_name("setter:Struct1.property(i:)")));

@@ -423,7 +423,7 @@ public:
   }
 
   std::tuple<ManagedValue, CanSILFunctionType,
-             Optional<ForeignErrorConvention>, ApplyOptions>
+             Optional<ForeignErrorConvention>, Optional<int>, ApplyOptions>
   getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
     ManagedValue mv;
     ApplyOptions options = ApplyOptions::None;
@@ -571,15 +571,17 @@ public:
     }
 
     Optional<ForeignErrorConvention> foreignError;
+    Optional<int> foreignSelf;
     if (constant && constant->isForeign) {
-      foreignError = cast<AbstractFunctionDecl>(constant->getDecl())
-                       ->getForeignErrorConvention();
+      auto func = cast<AbstractFunctionDecl>(constant->getDecl());
+      foreignError = func->getForeignErrorConvention();
+      foreignSelf = func->getForeignFunctionAsMethodSelfParameterIndex();
     }
 
     CanSILFunctionType substFnType =
       getSubstFunctionType(gen.SGM, mv.getType().castTo<SILFunctionType>());
 
-    return std::make_tuple(mv, substFnType, foreignError, options);
+    return std::make_tuple(mv, substFnType, foreignError, foreignSelf, options);
   }
 
   ArrayRef<Substitution> getSubstitutions() const {
@@ -727,6 +729,14 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
 
   return Callee::forArchetype(gen, openingSite, selfTy,
                               constant, substFnType, loc);
+}
+
+/// For ObjC init methods, we generate a shared-linkage Swift allocating entry
+/// point that does the [[T alloc] init] dance. We want to use this native
+/// thunk where we expect to be calling an allocating entry point for an ObjC
+/// constructor.
+static bool isConstructorWithGeneratedAllocatorThunk(ValueDecl *vd) {
+  return vd->isObjC() && isa<ConstructorDecl>(vd);
 }
 
 /// An ASTVisitor for decomposing a nesting of ApplyExprs into an initial
@@ -1109,7 +1119,8 @@ public:
     SILDeclRef constant(e->getDecl(),
                         SILDeclRef::ConstructAtBestResilienceExpansion,
                         SILDeclRef::ConstructAtNaturalUncurryLevel,
-                        requiresObjCDispatch(e->getDecl()));
+                        !isConstructorWithGeneratedAllocatorThunk(e->getDecl())
+                          && requiresObjCDispatch(e->getDecl()));
 
     // Otherwise, we have a statically-dispatched call.
     CanFunctionType substFnType = getSubstFnType();
@@ -2372,7 +2383,12 @@ RValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
 /// Count the number of SILParameterInfos that are needed in order to
 /// pass the given argument.
 static unsigned getFlattenedValueCount(AbstractionPattern origType,
-                                       CanType substType) {
+                                       CanType substType,
+                                       Optional<int> foreignSelf) {
+  // C functions imported as static methods don't consume any real arguments.
+  if (foreignSelf && *foreignSelf == -1)
+    return 0;
+
   // The count is always 1 unless the substituted type is a tuple.
   auto substTuple = dyn_cast<TupleType>(substType);
   if (!substTuple) return 1;
@@ -2386,7 +2402,7 @@ static unsigned getFlattenedValueCount(AbstractionPattern origType,
   unsigned count = 0;
   for (auto i : indices(substTuple.getElementTypes())) {
     count += getFlattenedValueCount(origType.getTupleElementType(i),
-                                    substTuple.getElementType(i));
+                                    substTuple.getElementType(i), None);
   }
   return count;
 }
@@ -2553,13 +2569,167 @@ namespace {
     }
   };
 
+  /// A possibly-discontiguous slice of function parameters claimed by a
+  /// function application.
+  class ClaimedParamsRef {
+  public:
+    static constexpr const unsigned NoSkip = (unsigned)-1;
+  private:
+    ArrayRef<SILParameterInfo> Params;
+    
+    // The index of the param excluded from this range, if any, or ~0.
+    unsigned SkipParamIndex;
+    
+    friend struct ParamLowering;
+    explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params,
+                              unsigned skip)
+      : Params(params), SkipParamIndex(skip)
+    {
+      assert(skip == NoSkip || skip < Params.size());
+    }
+    
+    bool hasSkip() const {
+      return SkipParamIndex != (unsigned)NoSkip;
+    }
+  public:
+    ClaimedParamsRef() : Params({}), SkipParamIndex(-1) {}
+    explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params)
+      : Params(params), SkipParamIndex(NoSkip)
+    {}
+
+    struct iterator : public std::iterator<std::random_access_iterator_tag,
+                                           SILParameterInfo>
+    {
+      const SILParameterInfo *Base;
+      unsigned I, SkipParamIndex;
+      
+      iterator(const SILParameterInfo *Base,
+               unsigned I, unsigned SkipParamIndex)
+        : Base(Base), I(I), SkipParamIndex(SkipParamIndex)
+      {}
+      
+      iterator &operator++() {
+        ++I;
+        if (I == SkipParamIndex)
+          ++I;
+        return *this;
+      }
+      iterator operator++(int) {
+        iterator old(*this);
+        ++*this;
+        return old;
+      }
+      iterator &operator--() {
+        --I;
+        if (I == SkipParamIndex)
+          --I;
+        return *this;
+      }
+      iterator operator--(int) {
+        iterator old(*this);
+        --*this;
+        return old;
+      }
+      
+      const SILParameterInfo &operator*() const {
+        return Base[I];
+      }
+      const SILParameterInfo *operator->() const {
+        return Base + I;
+      }
+      
+      bool operator==(iterator other) const {
+        return Base == other.Base && I == other.I
+            && SkipParamIndex == other.SkipParamIndex;
+      }
+      
+      bool operator!=(iterator other) const {
+        return !(*this == other);
+      }
+      
+      iterator operator+(std::ptrdiff_t distance) const {
+        if (distance > 0)
+          return goForward(distance);
+        if (distance < 0)
+          return goBackward(distance);
+        return *this;
+      }
+      iterator operator-(std::ptrdiff_t distance) const {
+        if (distance > 0)
+          return goBackward(distance);
+        if (distance < 0)
+          return goForward(distance);
+        return *this;
+      }
+      std::ptrdiff_t operator-(iterator other) const {
+        assert(Base == other.Base && SkipParamIndex == other.SkipParamIndex);
+        auto baseDistance = (std::ptrdiff_t)I - (std::ptrdiff_t)other.I;
+        if (std::min(I, other.I) < SkipParamIndex &&
+            std::max(I, other.I) > SkipParamIndex)
+          return baseDistance - 1;
+        return baseDistance;
+      }
+      
+      iterator goBackward(unsigned distance) const {
+        auto result = *this;
+        if (I > SkipParamIndex && I <= SkipParamIndex + distance)
+          result.I -= (distance + 1);
+        result.I -= distance;
+        return result;
+      }
+      
+      iterator goForward(unsigned distance) const {
+        auto result = *this;
+        if (I < SkipParamIndex && I + distance >= SkipParamIndex)
+          result.I += distance + 1;
+        result.I += distance;
+        return result;
+      }
+    };
+    
+    iterator begin() const {
+      return iterator{Params.data(), 0, SkipParamIndex};
+    }
+    
+    iterator end() const {
+      return iterator{Params.data(), (unsigned)Params.size(), SkipParamIndex};
+    }
+    
+    unsigned size() const {
+      return Params.size() - (hasSkip() ? 1 : 0);
+    }
+    
+    bool empty() const { return size() == 0; }
+    
+    SILParameterInfo front() const { return *begin(); }
+    
+    ClaimedParamsRef slice(unsigned start) const {
+      if (start >= SkipParamIndex)
+        return ClaimedParamsRef(Params.slice(start + 1), NoSkip);
+      return ClaimedParamsRef(Params.slice(start),
+                              hasSkip() ? SkipParamIndex - start : NoSkip);
+    }
+    ClaimedParamsRef slice(unsigned start, unsigned count) const {
+      if (start >= SkipParamIndex)
+        return ClaimedParamsRef(Params.slice(start + 1, count), NoSkip);
+      unsigned newSkip = SkipParamIndex;
+      if (hasSkip())
+        newSkip -= start;
+      
+      if (newSkip < count)
+        return ClaimedParamsRef(Params.slice(start, count+1), newSkip);
+      return ClaimedParamsRef(Params.slice(start, count), NoSkip);
+    }
+  };
+
   using ArgSpecialDestArray = MutableArrayRef<ArgSpecialDest>;
 
   class ArgEmitter {
     SILGenFunction &SGF;
     SILFunctionTypeRepresentation Rep;
     const Optional<ForeignErrorConvention> &ForeignError;
-    ArrayRef<SILParameterInfo> ParamInfos;
+    Optional<int> ForeignSelf;
+    ClaimedParamsRef ParamInfos;
     SmallVectorImpl<ManagedValue> &Args;
 
     /// Track any inout arguments that are emitted.  Each corresponds
@@ -2569,12 +2739,15 @@ namespace {
     Optional<ArgSpecialDestArray> SpecialDests;
   public:
     ArgEmitter(SILGenFunction &SGF, SILFunctionTypeRepresentation Rep,
-               ArrayRef<SILParameterInfo> paramInfos,
+               ClaimedParamsRef paramInfos,
                SmallVectorImpl<ManagedValue> &args,
                SmallVectorImpl<InOutArgument> &inoutArgs,
                const Optional<ForeignErrorConvention> &foreignError,
+               Optional<int> foreignSelf,
                Optional<ArgSpecialDestArray> specialDests = None)
-      : SGF(SGF), Rep(Rep), ForeignError(foreignError), ParamInfos(paramInfos),
+      : SGF(SGF), Rep(Rep), ForeignError(foreignError),
+        ForeignSelf(foreignSelf),
+        ParamInfos(paramInfos),
         Args(args), InOutArguments(inoutArgs), SpecialDests(specialDests) {
       assert(!specialDests || specialDests->size() == paramInfos.size());
     }
@@ -2610,6 +2783,13 @@ namespace {
 
       // Okay, everything else will be passed as a single value, one
       // way or another.
+
+      // If this is a discarded foreign 'self' parameter, force the argument
+      // and discard it.
+      if (ForeignSelf && *ForeignSelf == -1) {
+        std::move(arg).getAsRValue(SGF);
+        return;
+      }
 
       // Adjust for the foreign-error argument if necessary.
       maybeEmitForeignErrorArgument();
@@ -2923,7 +3103,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
   struct ElementExtent {
     /// The parameters which go into this tuple element.
     /// This is set in the first pass.
-    ArrayRef<SILParameterInfo> Params;
+    ClaimedParamsRef Params;
     /// The destination index, if any.
     /// This is set in the first pass.
     unsigned DestIndex : 30;
@@ -2966,7 +3146,8 @@ void ArgEmitter::emitShuffle(Expr *inner,
       CanType substEltType = outerTuple.getElementType(outerIndex);
       AbstractionPattern origEltType =
         origParamType.getTupleElementType(outerIndex);
-      unsigned numParams = getFlattenedValueCount(origEltType, substEltType);
+      unsigned numParams = getFlattenedValueCount(origEltType, substEltType,
+                                                  ForeignSelf);
 
       // Skip the foreign-error parameter.
       assert((!ForeignError ||
@@ -3037,7 +3218,8 @@ void ArgEmitter::emitShuffle(Expr *inner,
             innerExtents[innerIndex].DestIndex = i++;
 
             // Use the singleton param info we prepared before.
-            innerExtents[innerIndex].Params = variadicParamInfo;
+            innerExtents[innerIndex].Params =
+              ClaimedParamsRef(variadicParamInfo);
 
             // Propagate the element abstraction pattern.
             origInnerElts[innerIndex] =
@@ -3090,8 +3272,8 @@ void ArgEmitter::emitShuffle(Expr *inner,
   // Emit the inner expression.
   SmallVector<ManagedValue, 8> innerArgs;
   SmallVector<InOutArgument, 2> innerInOutArgs;
-  ArgEmitter(SGF, Rep, innerParams, innerArgs, innerInOutArgs,
-             /*foreign error*/ None,
+  ArgEmitter(SGF, Rep, ClaimedParamsRef(innerParams), innerArgs, innerInOutArgs,
+             /*foreign error*/ None, /*foreign self*/ None,
              (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
                                 : Optional<ArgSpecialDestArray>()))
     .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
@@ -3364,21 +3546,45 @@ namespace {
   /// A structure for conveniently claiming sets of uncurried parameters.
   struct ParamLowering {
     ArrayRef<SILParameterInfo> Params;
+    unsigned ClaimedForeignSelf = -1;
     SILFunctionTypeRepresentation Rep;
 
     ParamLowering(CanSILFunctionType fnType)
       : Params(fnType->getParameters()),
         Rep(fnType->getRepresentation()) {}
 
-    ArrayRef<SILParameterInfo>
+    ClaimedParamsRef
     claimParams(AbstractionPattern origParamType, CanType substParamType,
-                const Optional<ForeignErrorConvention> &foreignError) {
-      unsigned count = getFlattenedValueCount(origParamType, substParamType);
+                const Optional<ForeignErrorConvention> &foreignError,
+                const Optional<int> &foreignSelf) {
+      unsigned count = getFlattenedValueCount(origParamType, substParamType,
+                                              foreignSelf);
       if (foreignError) count++;
+      
+      if (foreignSelf) {
+        // Claim only the self parameter.
+        assert(ClaimedForeignSelf == (unsigned)-1
+               && "already claimed foreign self?!");
+        if (*foreignSelf == -1) {
+          // Imported as a static method, no real self param to claim.
+          return {};
+        }
+        ClaimedForeignSelf = *foreignSelf;
+        return ClaimedParamsRef(Params[*foreignSelf], (unsigned)-1);
+      }
+      
+      if (ClaimedForeignSelf != (unsigned)-1) {
+        assert(count + 1 == Params.size()
+               && "not claiming all params after foreign self?!");
+        auto result = Params;
+        Params = {};
+        return ClaimedParamsRef(result, ClaimedForeignSelf);
+      }
+      
       assert(count <= Params.size());
       auto result = Params.slice(Params.size() - count, count);
       Params = Params.slice(0, Params.size() - count);
-      return result;
+      return ClaimedParamsRef(result, (unsigned)-1);
     }
     
     ArrayRef<SILParameterInfo>
@@ -3449,12 +3655,13 @@ namespace {
     void emit(SILGenFunction &gen, AbstractionPattern origParamType,
               ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
               SmallVectorImpl<InOutArgument> &inoutArgs,
-              const Optional<ForeignErrorConvention> &foreignError) && {
+              const Optional<ForeignErrorConvention> &foreignError,
+              const Optional<int> &foreignSelf) && {
       auto params = lowering.claimParams(origParamType, getSubstArgType(),
-                                         foreignError);
+                                         foreignError, foreignSelf);
 
       ArgEmitter emitter(gen, lowering.Rep, params, args, inoutArgs,
-                         foreignError);
+                         foreignError, foreignSelf);
       emitter.emitTopLevel(std::move(ArgValue), origParamType);
     }
 
@@ -3610,6 +3817,7 @@ namespace {
       CanSILFunctionType substFnType;
       ManagedValue mv;
       Optional<ForeignErrorConvention> foreignError;
+      Optional<int> foreignSelf;
       ApplyOptions initialOptions = ApplyOptions::None;
 
       AbstractionPattern origFormalType(callee.getOrigFormalType());
@@ -3632,7 +3840,7 @@ namespace {
                                          uncurryLevel)
           .castTo<SILFunctionType>();
       } else {
-        std::tie(mv, substFnType, foreignError, initialOptions) =
+        std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
           callee.getAtUncurryLevel(gen, uncurryLevel);
       }
 
@@ -3756,11 +3964,20 @@ namespace {
             uncurriedLoc = site.Loc;
             args.push_back({});
 
+            bool isParamSite = &site == &uncurriedSites.back();
+
             std::move(site).emit(gen, origParamType, paramLowering,
                                  args.back(), inoutArgs,
-                                 &site == &uncurriedSites.back()
+                                 // Claim the foreign error with the method
+                                 // formal params.
+                                 isParamSite
                                    ? foreignError
-                                   : static_cast<decltype(foreignError)>(None));
+                                   : decltype(foreignError)(),
+                                 // Claim the foreign "self" with the self
+                                 // param.
+                                 isParamSite
+                                   ? decltype(foreignSelf)()
+                                   : foreignSelf);
           }
         }
         assert(uncurriedLoc);
@@ -3776,6 +3993,15 @@ namespace {
         for (auto &argSet : reversed(args))
           uncurriedArgs.append(argSet.begin(), argSet.end());
         args = {};
+        
+        // Move the foreign "self" argument into position.
+        if (foreignSelf && *foreignSelf != -1) {
+          auto selfArg = uncurriedArgs.back();
+          std::move_backward(uncurriedArgs.begin() + *foreignSelf,
+                             uncurriedArgs.end() - 1,
+                             uncurriedArgs.end());
+          uncurriedArgs[*foreignSelf] = selfArg;
+        }
         
         // Emit the uncurried call.
         
@@ -3887,7 +4113,8 @@ namespace {
         AbstractionPattern origResultType(formalType.getResult());
         AbstractionPattern origParamType(claimNextParamClause(formalType));
         std::move(extraSites[i]).emit(gen, origParamType, paramLowering,
-                                      siteArgs, inoutArgs, foreignError);
+                                      siteArgs, inoutArgs, foreignError,
+                                      foreignSelf);
         if (!inoutArgs.empty()) {
           beginInOutFormalAccesses(gen, inoutArgs, siteArgs);
         }
@@ -3983,11 +4210,13 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   ManagedValue mv;
   CanSILFunctionType substFnType;
   Optional<ForeignErrorConvention> foreignError;
+  Optional<int> foreignSelf;
   ApplyOptions options;
-  std::tie(mv, substFnType, foreignError, options)
+  std::tie(mv, substFnType, foreignError, foreignSelf, options)
     = callee.getAtUncurryLevel(*this, 0);
 
   assert(!foreignError);
+  assert(!foreignSelf);
   assert(substFnType->getExtInfo().getLanguage()
            == SILFunctionLanguage::Swift);
 

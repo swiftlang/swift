@@ -2228,8 +2228,16 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
           AbstractionPattern::getCurriedObjCMethod(fnType, method,
                                                    foreignError);
       } else if (auto value = dyn_cast<clang::ValueDecl>(clangDecl)) {
-        bridgingFnPattern =
-          AbstractionPattern(fnType, value->getType().getTypePtr());
+        if (uncurryLevel == 0) {
+          // C function imported as a function.
+          bridgingFnPattern =
+            AbstractionPattern(fnType, value->getType().getTypePtr());
+        } else {
+          // C function imported as a method.
+          assert(uncurryLevel == 1);
+          bridgingFnPattern =
+            AbstractionPattern::getCurriedCFunctionAsMethod(fnType, bridgedFn);
+        }
       }
     }
   }
@@ -2307,7 +2315,39 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
     break;
   }
 
-  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::CFunctionPointer: {
+    // A C function imported as a method.
+    assert(inputs.size() == 2);
+
+    // Bridge the parameters.
+    auto partialFnPattern = bridgingFnPattern.getFunctionResultType();
+    inputs[1] = inputs[1].getWithType(
+                getBridgedInputType(rep, partialFnPattern.getFunctionInputType(),
+                                    CanType(inputs[1].getType())));
+
+    // If the 'self' parameter is a metatype, we'll throw it away.
+    // Otherwise, splice it in to the parameters at the right position.
+    if (!inputs[0].getType()->is<AnyMetatypeType>()) {
+      int selfIndex = bridgingFnPattern.getCFunctionAsMethodSelfIndex();
+      assert(selfIndex >= 0 && "static method with non-metatype self?!");
+      SmallVector<TupleTypeElt, 4> fields;
+      if (auto tuple = inputs[1].getType()->getAs<TupleType>()) {
+        fields.append(tuple->getElements().begin(), tuple->getElements().end());
+      } else {
+        fields.push_back(inputs[1].getType());
+      }
+      fields.insert(fields.begin() + selfIndex,
+                    inputs[0].getType());
+      inputs[1] = inputs[1].getWithType(TupleType::get(fields, Context));
+    }
+    inputs.erase(inputs.begin());
+    
+    resultType = getBridgedResultType(rep,
+                                      partialFnPattern.getFunctionResultType(),
+                                      resultType, suppressOptionalResult);
+    break;
+  }
+
   case SILFunctionTypeRepresentation::Block:
     llvm_unreachable("Cannot uncurry native representation");
   }
@@ -2316,7 +2356,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   std::reverse(inputs.begin(), inputs.end());
 
   // Create the new function type.
-  CanType inputType = CanType(TupleType::get(inputs, Context));
+  CanType inputType = TupleType::get(inputs, Context)->getCanonicalType();
   if (genericSig) {
     return CanGenericFunctionType::get(genericSig,
                                        inputType, resultType, extInfo);
