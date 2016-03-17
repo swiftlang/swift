@@ -1107,6 +1107,7 @@ public:
                                 RValue &&optionalSubscripts,
                                 SILValue buffer, SILValue callbackStorage);
   bool maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
+                                       SILLinkage linkage,
                                        FuncDecl *requirement,
                                        FuncDecl *witness,
                                        ArrayRef<Substitution> witnessSubs);

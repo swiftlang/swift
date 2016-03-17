@@ -1646,6 +1646,7 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
 
 static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
                                          ProtocolConformance *conformance,
+                                         SILLinkage linkage,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
                                          ArrayRef<Substitution> witnessSubs) {
@@ -1653,7 +1654,8 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
     if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
       auto reqFn = cast<FuncDecl>(requirement.getDecl());
       assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
-      return gen.maybeEmitMaterializeForSetThunk(conformance, reqFn, witnessFn,
+      return gen.maybeEmitMaterializeForSetThunk(conformance, linkage,
+                                                 reqFn, witnessFn,
                                                  witnessSubs);
     }
   }
@@ -1824,7 +1826,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   SILGenFunction gen(*this, *f);
 
   // Open-code certain protocol witness "thunks".
-  if (maybeOpenCodeProtocolWitness(gen, conformance, requirement,
+  if (maybeOpenCodeProtocolWitness(gen, conformance, linkage, requirement,
                                    witness, witnessSubs)) {
     assert(!isFree);
     return f;
