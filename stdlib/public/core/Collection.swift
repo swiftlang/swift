@@ -57,6 +57,10 @@ public protocol Indexable {
   /// - Complexity: O(1)
   subscript(position: Index) -> _Element { get }
 
+  // WORKAROUND: rdar://25214066
+  associatedtype SubSequence
+  subscript(bounds: Range<Index>) -> SubSequence { get }
+  
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
   ///
@@ -820,6 +824,28 @@ extension Collection {
   }
 }
 
+// WORKAROUND rdar://25214066 - should be on Collection
+extension Indexable {
+  subscript(bounds: ClosedRange<Index>) -> SubSequence {
+    return self[
+      Range(
+        _uncheckedBounds: (
+          lower: bounds.lowerBound,
+          upper: next(bounds.upperBound)))
+    ]
+  }
+}
+
+// WORKAROUND rdar://25214066 - should be on Collection
+extension Indexable where Index : Strideable {
+  subscript(bounds: RangeOfStrideable<Index>) -> SubSequence {
+    return self[Range(bounds)]
+  }
+  
+  subscript(bounds: ClosedRangeOfStrideable<Index>) -> SubSequence {
+    return self[ClosedRange(bounds)]
+  }
+}
 @available(*, unavailable, message: "Bit enum has been deprecated. Please use Int instead.")
 public enum Bit {}
 

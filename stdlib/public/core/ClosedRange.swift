@@ -103,6 +103,8 @@ public struct ClosedRangeOfStrideable<
   _ClosedRange {
 
   public typealias Element = Bound
+  // Not sure why this isn't deduced, but without it this doesn't conform.
+  public typealias _Element = Bound
   public typealias Index = Element
   
   public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
