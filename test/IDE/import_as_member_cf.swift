@@ -10,7 +10,7 @@
 
 // PRINTC:      extension CCRefrigerator {
 // PRINTC-NEXT:   /*not inherited*/ init(powerSupply power: CCPowerSupply)
-// PRINTC-NEXT:   final func open()
+// PRINTC-NEXT:   func open()
 // PRINTC-NEXT:   var powerSupply: CCPowerSupply
 // PRINTC-NEXT: }
 
