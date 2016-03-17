@@ -27,7 +27,6 @@ namespace swift {
 using ApplyList = llvm::SmallVector<FullApplySite, 4>;
 
 class CallerAnalysisFunctionInfo {
-public:
   /// A list of all the functions this function calls.
   llvm::SmallVector<SILFunction *, 4> Callees;
   /// A list of all the functions that calls this function.
@@ -48,9 +47,12 @@ public:
     }
     return Sites;
   }
+
+  friend class CallerAnalysis;
 };
 
 class CallerAnalysis : public SILAnalysis {
+
   /// Current module we are analyzing.
   SILModule &Mod;
 
