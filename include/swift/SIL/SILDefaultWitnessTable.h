@@ -113,6 +113,8 @@ public:
                                         const ProtocolDecl *Protocol,
                                         ArrayRef<Entry> entries);
 
+  Identifier getIdentifier() const;
+
   /// Get the linkage of the default witness table.
   SILLinkage getLinkage() const { return Linkage; }
 
