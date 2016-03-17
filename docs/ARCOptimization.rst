@@ -170,10 +170,39 @@ The corresponding value projection operations have analogous properties.
     and SimplifyCFG (for block arguments) to try and eliminate cases where value
     types have multiple reference counted subtypes.
 
-Casts
------
+Conversions
+-----------
 
+Conversions are a common operation that propagate RC identity. But not all
+conversions have these properties. In this section, we attempt to explain why
+this is true. The rule for conversions is that a conversion that preserves RC
+identity must have the following properties:
 
+1. Both of its arguments must be non-trivial values with the same ownership
+   semantics (i.e. unowned, strong, weak). This means that conversions such as:
+
+   a. address_to_pointer.
+   b. pointer_to_address.
+   d. unchecked_trivial_bitcast.
+   f. ref_to_raw_pointer.
+   g. raw_pointer_to_ref.
+   h. ref_to_unowned.
+   i. unowned_to_ref.
+   j. ref_to_unmanaged.
+   k. unmanaged_to_ref.
+
+   The reason why we want the ownership semantics to be the same is that
+   whenever there is a change in ownership semantics, we want the programmer to
+   explicitly reason about the change in ownership semantics.
+
+2. The instruction must not introduce type aliasing. This disqualifies such
+   casts as:
+
+   a. unchecked_addr_cast.
+   b. unchecked_bitwise_cast.
+
+This means in sum that conversions that preserve types and preserve
+non-trivialness are the interesting instructions.
 
 Copy-On-Write Considerations
 ============================
