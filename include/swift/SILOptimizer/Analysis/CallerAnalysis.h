@@ -71,12 +71,8 @@ class CallerAnalysis : public SILAnalysis {
   /// A map between all the functions and their callsites in the module.
   llvm::DenseMap<SILFunction *, CallerAnalysisFunctionInfo> CallInfo;
 
-  /// A set of functions that needs to be recomputed. This is used to make sure
-  /// a function is not pushed to the RecomputeFunctionList more than once.
-  llvm::DenseSet<SILFunction *> RecomputeFunctionSet;
-
   /// A list of functions that needs to be recomputed.
-  llvm::SmallVector<SILFunction *, 16> RecomputeFunctionList;
+  llvm::SetVector<SILFunction *> RecomputeFunctionList;
 
   /// Iterate over all the call sites in the function and update
   /// CallInfo.
@@ -91,15 +87,13 @@ class CallerAnalysis : public SILAnalysis {
       processFunctionCallSites(F);
     }
     RecomputeFunctionList.clear(); 
-    RecomputeFunctionSet.clear();
   }
 
 public:
   CallerAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Caller), Mod(*M) {
     // Make sure we compute everything first time called.
     for(auto &F : Mod) {
-      RecomputeFunctionSet.insert(&F);
-      RecomputeFunctionList.push_back(&F);
+      RecomputeFunctionList.insert(&F);
     }
   }
 
@@ -108,11 +102,7 @@ public:
   }
 
   virtual void notifyAnalysisOfFunction(SILFunction *F) {
-    // This is not a new function.
-    if (RecomputeFunctionSet.find(F) != RecomputeFunctionSet.end())
-      return;
-    RecomputeFunctionSet.insert(F);
-    RecomputeFunctionList.push_back(F);
+    RecomputeFunctionList.insert(F);
   }
 
   virtual void invalidate(SILFunction *F, InvalidationKind K) {
@@ -124,15 +114,13 @@ public:
     // This function has become "unknown" to us. Invalidate any callsite
     // information related to this function.
     invalidateExistingCalleeRelation(F);
-    if (RecomputeFunctionSet.find(F) != RecomputeFunctionSet.end())
-      return;
     // Make sure this function is recomputed next time.
-    RecomputeFunctionSet.insert(F);
-    RecomputeFunctionList.push_back(F);
+    RecomputeFunctionList.insert(F);
   }
 
   virtual void invalidateForDeadFunction(SILFunction *F, InvalidationKind K) {
     invalidateExistingCalleeRelation(F);
+    RecomputeFunctionList.remove(F);
   }
 
   virtual void invalidate(InvalidationKind K) {
@@ -143,10 +131,8 @@ public:
 
     CallInfo.clear();
     RecomputeFunctionList.clear();
-    RecomputeFunctionSet.clear();
     for(auto &F : Mod) {
-      RecomputeFunctionSet.insert(&F);
-      RecomputeFunctionList.push_back(&F);
+      RecomputeFunctionList.insert(&F);
     }
   }
 
