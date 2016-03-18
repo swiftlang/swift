@@ -242,23 +242,15 @@ func testUnderestimatedCount() {
 }
 testUnderestimatedCount()
 
-func testIsEmptyFirstLast() {
-  // CHECK: testing isEmpty
-  print("testing isEmpty")
-  // FIXME: swift-3-indexing-model: cast shouldn't be necessary
-  // CHECK-NEXT: true
-  print((10..<10 as RangeOfStrideable).isEmpty)
+CollectionTests.test("isEmptyFirstLast") {
+  expectTrue((10..<10).isEmpty)
+  expectFalse((10...10).isEmpty)
   
-  // FIXME: swift-3-indexing-model: cast shouldn't be necessary
-  // CHECK-NEXT: false
-  print((10...10 as RangeOfStrideable).isEmpty)
-  
-  // CHECK-NEXT: 10
-  print((10..<100).first)
-  // CHECK-NEXT: 99
-  print((10..<100).last)
+  expectEqual(10, (10..<100).first)
+  expectEqual(10, (10...100).first)
+  expectEqual(99, (10..<100).last)
+  expectEqual(100, (10...100).last)
 }
-testIsEmptyFirstLast()
 
 /// A `Collection` that vends just the default implementations for
 /// `CollectionType` methods.
@@ -289,7 +281,7 @@ print("all done.")
 CollectionTests.test("first/performance") {
   // accessing `first` should not perform duplicate work on lazy collections
   var log: [Int] = []
-  let col_ = (0..<10).lazy.filter({ log.append($0); return (2..<8 as RangeOfStrideable).contains($0) })
+  let col_ = (0..<10).lazy.filter({ log.append($0); return (2..<8).contains($0) })
   let col = CollectionOnly(base: col_)
   expectEqual(2, col.first)
   expectEqual([0, 1, 2], log)

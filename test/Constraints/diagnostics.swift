@@ -164,7 +164,7 @@ func rdar20142523() {
 // <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, IntegerLiteralConvertible)' is not convertible to 'IntegerLiteralConvertible
 func rdar21080030() {
   var s = "Hello"
-  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'Distance'}}
+  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'IndexDistance'}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments

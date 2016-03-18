@@ -375,7 +375,7 @@ extension Collection {
     return count
   }
 
-  /// Do not use this method directly; call advancedBy(n) instead.
+  /// Do not use this method directly; call advanced(by: n) instead.
   @inline(__always)
   @warn_unused_result
   internal func _advanceForward(i: Index, by n: IndexDistance) -> Index {
@@ -389,7 +389,7 @@ extension Collection {
     return i
   }
 
-  /// Do not use this method directly; call advancedBy(n, limit) instead.
+  /// Do not use this method directly; call advanced(by: n, limit) instead.
   @inline(__always)
   @warn_unused_result
   internal

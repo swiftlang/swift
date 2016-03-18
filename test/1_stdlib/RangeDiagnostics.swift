@@ -28,7 +28,7 @@ func typeInference_Strideable<S : Strideable>(v: S) {
   }
   do {
     var range = v...v
-    expectType(RangeOfStrideable<S>.self, &range)
+    expectType(ClosedRangeOfStrideable<S>.self, &range)
   }
 }
 
@@ -44,10 +44,10 @@ func typeInference_Strideable<S : Strideable>(v: S) {
 // failing because the error message improves, obviously, update the
 // test!
 
-let r0: Range = 10..<100        
-let r1: Range = UInt(10)..<100
-let r2: Range = 10...100
-let r3: Range = UInt(10)...100
+let r0 = 10..<100        
+let r1 = UInt(10)..<100
+let r2 = 10...100
+let r3 = UInt(10)...100
 r0[0]       // expected-error {{ambiguous use of 'subscript'}}
 r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
 r1[0]       // expected-error {{ambiguous use of 'subscript'}}

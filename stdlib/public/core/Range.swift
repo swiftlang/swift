@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME swift-3-indexing-model: Decide whether to de-underscore these
+// protocols and/or to incorporate their default implementations into
+// the concrete models.
+
 public // implementation sharing
 protocol _RangeProtocol {
   associatedtype Bound : Comparable
@@ -41,7 +45,9 @@ extension _RangeProtocol {
   }
   
   @inline(__always)
-  public func overlaps(other: Self) -> Bool {
+  public func overlaps<
+    Other: _RangeProtocol where Other.Bound == Bound
+  >(other: Other) -> Bool {
     return (!other.isEmpty && self.contains(other.lowerBound))
         || (!self.isEmpty && other.contains(lowerBound))
   }
@@ -309,7 +315,7 @@ public func == <Bound>(lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {
     lhs.upperBound == rhs.upperBound
 }
 
-/// Forms a half-open range that contains `minimum`, but not
+/// Returns a half-open range that contains `minimum`, but not
 /// `maximum`.
 @_transparent
 @warn_unused_result
@@ -319,7 +325,7 @@ public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
   return Range(_uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
-/// Forms a half-open range that contains `start`, but not `end`.
+/// Returns a half-open range that contains `start`, but not `end`.
 ///
 /// - Precondition: `start <= end`.
 @_transparent
@@ -331,20 +337,6 @@ public func ..< <Bound : _Strideable where Bound : Comparable> (
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
   return RangeOfStrideable(_uncheckedBounds: (lower: start, upper: end))
-}
-
-/// Forms a closed range that contains both `start` and `end`.
-/// - Precondition: `start <= end`.
-@_transparent
-@warn_unused_result
-public func ... <Pos : Strideable> (
-  start: Pos, end: Pos
-) -> RangeOfStrideable<Pos> {
-  let endPlusOne = end.advanced(by: 1)
-  // FIXME: swift-3-indexing-model: tests for traps.
-  _precondition(start <= end, "Can't form Range with end < start")
-  _precondition(endPlusOne > end, "Range end has no valid successor")
-  return RangeOfStrideable(_uncheckedBounds: (lower: start, upper: endPlusOne))
 }
 
 @warn_unused_result

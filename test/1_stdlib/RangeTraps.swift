@@ -48,7 +48,7 @@ RangeTraps.test("Closed")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var range = 1...1
-  expectType(Range<Int>.self, &range)
+  expectType(ClosedRangeOfStrideable<Int>.self, &range)
 
   expectCrashLater()
   _ = 1...0
@@ -61,17 +61,8 @@ RangeTraps.test("OutOfRange")
   .code {
   _ = 0..<Int.max // This is a RangeOfStrideable
 
-  // This works for Intervals, but...
-  expectTrue(ClosedInterval(0...Int.max).contains(Int.max))
-
-  // ...no support yet for Ranges containing the maximum representable value
-  expectCrashLater()
-#if arch(i386)  ||  arch(arm)
-  // FIXME <rdar://17670791> Range<Int> bounds checking not enforced in optimized 32-bit
-  1...0  // crash some other way
-#else
-  0...Int.max
-#endif
+  // This works for Ranges now!
+  expectTrue((0...Int.max).contains(Int.max))
 }
 
 runAllTests()

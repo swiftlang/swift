@@ -236,8 +236,23 @@ extension RangeReplaceableCollection {
     return result
   }
 
-  public mutating func removeSubrange(bounds: Range<Index>) {
-    replaceSubrange(bounds, with: EmptyCollection())
+  public mutating func removeSubrange<
+    R: _HalfOpenRange where R.Bound == Index
+  >(bounds: R) {
+    replaceSubrange(Range(bounds), with: EmptyCollection())
+  }
+
+  internal func makeHalfOpen<
+    R: _ClosedRange where R.Bound == Index
+  >(r: R) -> Range<Index> {
+    return Range(
+      _uncheckedBounds: (lower: r.lowerBound, upper: next(r.upperBound)))
+  }
+  
+  public mutating func removeSubrange<
+    R: _ClosedRange where R.Bound == Index
+  >(bounds: R) {
+    replaceSubrange(makeHalfOpen(bounds), with: EmptyCollection())
   }
 
   public mutating func removeFirst(n: Int) {
@@ -294,7 +309,27 @@ extension RangeReplaceableCollection where SubSequence == Self {
   }
 }
 
+extension RangeReplaceableCollection where Index : Strideable {
+  public mutating func replaceSubrange<
+    C : Collection where C.Iterator.Element == Iterator.Element
+  >(
+    subRange: RangeOfStrideable<Index>, with newElements: C
+  ) {
+    self.replaceSubrange(Range(subRange), with: newElements)
+  }
+}
+
 extension RangeReplaceableCollection {
+  public mutating func replaceSubrange<
+    R : _ClosedRange, C : Collection 
+	where 
+    R.Bound == Self.Index, C.Iterator.Element == Iterator.Element
+  >(
+    subRange: R, with newElements: C
+  ) {
+    self.replaceSubrange(makeHalfOpen(subRange), with: newElements)
+  }
+  
   @warn_unused_result
   public mutating func _customRemoveLast() -> Iterator.Element? {
     return nil

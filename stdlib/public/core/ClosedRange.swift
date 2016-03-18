@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME: swift-3-indexing-model: Generalize all tests to check both
+// [Closed]Range and [Closed]RangeOfStrideable.
+
 public // implementation sharing
 protocol _ClosedRange : _RangeProtocol {}
 
@@ -34,17 +37,61 @@ extension _ClosedRange {
   }
 }
 
-internal enum _ClosedRangeIndex<Bound: Strideable> {
+// WORKAROUND rdar://25214598 - should be Bound : Strideable
+internal enum _ClosedRangeIndex<Bound : Comparable where Bound : _Strideable> {
 case pastEnd
 case inRange(Bound)
 }
 
-public struct ClosedRangeIndex<Bound: Strideable> : Comparable {
-  internal var value : _ClosedRangeIndex<Bound>
+public struct ClosedRangeIndex<
+  // WORKAROUND rdar://25214598 - should be Bound : Strideable
+  Bound : Comparable where Bound : _Strideable
+> : Comparable {
+  internal init() { _value = .pastEnd }
+  internal init(_ x: Bound) { _value = .inRange(x) }
+  
+  internal func _successor(upperBound limit: Bound) -> ClosedRangeIndex {
+    switch _value {
+    case .inRange(let x): return x == limit
+      ? ClosedRangeIndex() : ClosedRangeIndex(x.advanced(by: 1))
+    case .pastEnd: _preconditionFailure("Incrementing past end index")
+    }
+  }
+  
+  internal func _predecessor(upperBound limit: Bound) -> ClosedRangeIndex {
+    switch _value {
+    case .inRange(let x): return ClosedRangeIndex(x.advanced(by: -1))
+    case .pastEnd: return ClosedRangeIndex(limit)
+    }
+  }
+  
+  internal func _advancedBy(
+    n: Bound.Stride, upperBound limit: Bound
+  ) -> ClosedRangeIndex {
+    switch _value {
+    case .inRange(let x):
+      let d = x.distance(to: limit)
+      if n <= d { return ClosedRangeIndex(x.advanced(by: n)) }
+      if d - -1 == n { return ClosedRangeIndex() }
+      _preconditionFailure("Advancing past end index")
+    case .pastEnd:
+      return n == 0
+      ? self :
+      ClosedRangeIndex(limit)._advancedBy(n, upperBound: limit)
+    }
+  }
+  
+  internal var _value : _ClosedRangeIndex<Bound>
+  internal var _dereferenced : Bound {
+    switch _value {
+    case .inRange(let x): return x
+    case .pastEnd: _preconditionFailure("Index out of range")
+    }
+  }
 }
 
 public func == <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
-  switch (lhs.value, rhs.value) {
+  switch (lhs._value, rhs._value) {
   case (.inRange(let l), .inRange(let r)):
     return l == r
   case (.pastEnd, .pastEnd):
@@ -55,7 +102,7 @@ public func == <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
 }
 
 public func < <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
-  switch (lhs.value, rhs.value) {
+  switch (lhs._value, rhs._value) {
   case (.inRange(let l), .inRange(let r)):
     return l < r
   case (.inRange(_), .pastEnd):
@@ -65,7 +112,8 @@ public func < <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
   }
 }
 
-extension _ClosedRange where Bound : Strideable {
+// WORKAROUND rdar://25214598 - should be Bound : Strideable
+extension _ClosedRange where Bound : _Strideable {
   public var count: Bound.Stride {
     return lowerBound.distance(to: upperBound)
   }
@@ -74,57 +122,77 @@ extension _ClosedRange where Bound : Strideable {
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != upperBound`.
-  public subscript(position: Bound) -> Bound {
-    _stdlibAssert(self.contains(position), "Index out of range")
-    return position
+  public subscript(position: ClosedRangeIndex<Bound>) -> Bound {
+    return position._dereferenced
   }
 
-  public subscript(bounds: ClosedRange<Bound>) -> Self {
-    return Self(bounds)
-  }
-
-  public subscript(bounds: Self) -> Self {
-    return bounds
-  }
-
-  public var startIndex: Bound {
-    return lowerBound
+  public var startIndex: ClosedRangeIndex<Bound> {
+    return ClosedRangeIndex(lowerBound)
   }
   
-  public var endIndex: Bound {
-    return upperBound
+  public var endIndex: ClosedRangeIndex<Bound> {
+    return ClosedRangeIndex()
   }
 }
 
+// WORKAROUND: for some reason
+// IndexingIterator<ClosedRangeOfStrideable> doesn't conform to
+// IteratorProtocol?!
+public struct ClosedRangeIterator<
+  Bound : Comparable where Bound : _Strideable
+> : IteratorProtocol, Sequence {
+
+  init(_ r: ClosedRangeOfStrideable<Bound>) {
+    _nextResult = r.lowerBound
+    _upperBound = r.upperBound
+  }
+  
+  public func makeIterator() -> ClosedRangeIterator {
+    return self
+  }
+
+  public mutating func next() -> Bound? {
+    let r = _nextResult
+    if let x = r {
+      _nextResult = x == _upperBound ? nil : x.advanced(by: 1)
+    }
+    return r
+  }
+  internal var _nextResult: Bound?
+  internal let _upperBound: Bound
+}
+
 public struct ClosedRangeOfStrideable<
-  Bound : Strideable
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : Comparable where Bound : _Strideable
 > : Equatable, RandomAccessCollection,
   CustomStringConvertible, CustomDebugStringConvertible, 
   _ClosedRange {
 
   public typealias Element = Bound
-  // Not sure why this isn't deduced, but without it this doesn't conform.
-  public typealias _Element = Bound
-  public typealias Index = Element
+  public typealias Index = ClosedRangeIndex<Bound>
+  public typealias Iterator = ClosedRangeIterator<Bound>
   
+  public func makeIterator() -> ClosedRangeIterator<Bound> {
+    return ClosedRangeIterator(self)
+  }
+
+  
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    return i._successor(upperBound: upperBound)
+  }
+
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    return i._predecessor(upperBound: upperBound)
+  }
+
   public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
-  
-  // FIXME(compiler limitation): this typealias should be inferred.
-  public typealias SubSequence = ClosedRangeOfStrideable<Bound>
 
-  public subscript(bounds: Range<Element>) -> ClosedRangeOfStrideable<Bound> {
-    fatalError("implement")
-  }
-
-  public subscript(
-    bounds: RangeOfStrideable<Bound>
-  ) -> RangeOfStrideable<Bound> {
-    fatalError("implement")
-  }
-  
   /// The range's lower bound.
   ///
   /// Identical to `upperBound` in an empty range.
@@ -149,7 +217,11 @@ public struct ClosedRangeOfStrideable<
 
   public // ambiguity resolution between _RangeProtocol and Collection defaults
   var isEmpty: Bool {
-    return lowerBound == upperBound
+    return false
+  }
+
+  public subscript(bounds: Range<Index>) -> Slice<ClosedRangeOfStrideable> {
+    return Slice(_base: self, bounds: bounds)
   }
 }
 
@@ -224,24 +296,23 @@ public struct ClosedRange<
   /// `upperBound` is not a valid argument to `subscript`, and is always
   /// reachable from `lowerBound` by zero or more applications of
   /// `successor()`.
-  // FIXME: swift-3-indexing-model: rename to `end`.
   public let upperBound: Bound
 
   // FIXME: does not implement a requirement in `Collection`.
   // We need to implement `_customContainsEquatableElement` instead.
   @warn_unused_result
   public func contains(element: Bound) -> Bool {
-    return element >= self.lowerBound && element < self.upperBound
+    return element >= self.lowerBound && element <= self.upperBound
   }
 
   /// A textual representation of `self`.
   public var description: String {
-    return "\(lowerBound)..<\(upperBound)"
+    return "\(lowerBound)...\(upperBound)"
   }
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "Range(\(String(reflecting: lowerBound))..<\(String(reflecting: upperBound)))"
+    return "ClosedRange(\(String(reflecting: lowerBound))...\(String(reflecting: upperBound)))"
   }
 }
 
@@ -258,5 +329,31 @@ public func == <Bound>(
   return
     lhs.lowerBound == rhs.lowerBound &&
     lhs.upperBound == rhs.upperBound
+}
+
+/// Returns a closed range that contains `minimum` and
+/// `maximum`.
+///
+/// - Precondition: `minimum <= maximum`.
+@_transparent
+@warn_unused_result
+public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
+  -> ClosedRange<Bound> {
+  _precondition(minimum <= maximum, "Can't form Range with end < start")
+  return ClosedRange(_uncheckedBounds: (lower: minimum, upper: maximum))
+}
+
+/// Returns a closed range that contains `start` and `end`.
+///
+/// - Precondition: `start <= end`.
+@_transparent
+@warn_unused_result
+// WORKAROUND rdar://25214598 - should be just Bound : Strideable
+public func ... <Bound : _Strideable where Bound : Comparable> (
+  start: Bound, end: Bound
+) -> ClosedRangeOfStrideable<Bound> {
+  // FIXME: swift-3-indexing-model: tests for traps.
+  _precondition(start <= end, "Can't form Range with end < start")
+  return ClosedRangeOfStrideable(_uncheckedBounds: (lower: start, upper: end))
 }
 

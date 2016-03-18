@@ -26,7 +26,9 @@ import StdlibUnittest
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-final class X : Comparable, CustomStringConvertible, IntegerLiteralConvertible 
+final class X
+  : Comparable, CustomStringConvertible, 
+    IntegerLiteralConvertible, Strideable
 {
   required init(_ value: Int) {
     xCount += 1
@@ -54,6 +56,16 @@ final class X : Comparable, CustomStringConvertible, IntegerLiteralConvertible
     self.init(value)
   }
 
+  @warn_unused_result
+  func distance(to other: X) -> Int {
+    return value.distance(to: other.value)
+  }
+
+  @warn_unused_result
+  func advanced(by n: Int) -> X {
+    return X(value.advanced(by: n))
+  }
+  
   var value: Int
   var serial: Int
 }
@@ -114,7 +126,8 @@ func test<
   T.Iterator.Element == T._Buffer.Element,
   T._Buffer.Element == T.Element,
   T.Element == X,
-  T.Index == Int
+  T.Index == Int,
+  T : RandomAccessCollection
 >(_: T.Type, _ label: String) {
   print("test: \(label)...", terminator: "")
 
@@ -245,7 +258,7 @@ func testCocoa() {
   printSequence(a)
   // CHECK-NEXT: [foo, bar, baz]
   
-  var b = a
+  let b = a
   
   a[1] = "garply"
   printSequence(a)
@@ -279,7 +292,7 @@ testCocoa()
 
 extension ArraySlice {
   mutating func qsort(compare: (Element, Element) -> Bool) {
-    _introSort(&self, subRange: self.indices, isOrderedBefore: compare)
+    _introSort(&self, subRange: Range(self.indices), isOrderedBefore: compare)
   }
 }
 
@@ -308,7 +321,7 @@ func testSlice() {
   print("bSlice2: \(bSlice)")     // CHECK-NEXT: bSlice2: [32, 4, 5, 6, 7]
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
 
-  var c = b
+  let c = b
   b[b.startIndex..<b.endIndex].qsort(<)
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 7, 8, 9, 41]
   printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]

@@ -27,39 +27,42 @@ import ObjectiveC
 // Check that the generic parameter is called 'Bound'.
 protocol TestProtocol1 {}
 
-extension HalfOpenInterval where Bound : TestProtocol1 {
+extension Range where Bound : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension ClosedInterval where Bound : TestProtocol1 {
+extension ClosedRange where Bound : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-var IntervalTestSuite = TestSuite("Interval")
+var tests = TestSuite("Range")
 
-IntervalTestSuite.test("Ambiguity") {
+tests.test("Ambiguity") {
   // Ensure type deduction still works as expected; these will fail to
   // compile if it's broken
   var pieToPie = -3.1415927..<3.1415927
-  expectType(HalfOpenInterval<Double>.self, &pieToPie)
+  
+  // FIXME: the plan is for floating point numbers to no longer be
+  // strideable; then this will drop the "OfStrideable"
+  expectType(RangeOfStrideable<Double>.self, &pieToPie)
 
+  // FIXME: the plan is for floating point numbers to no longer be
+  // strideable; then this will drop the "OfStrideable"
   var pieThruPie = -3.1415927...3.1415927
-  expectType(ClosedInterval<Double>.self, &pieThruPie)
+  expectType(ClosedRangeOfStrideable<Double>.self, &pieThruPie)
 
   var zeroToOne = 0..<1
-  expectType(Range<Int>.self, &zeroToOne)
+  expectType(RangeOfStrideable<Int>.self, &zeroToOne)
 
   var zeroThruOne = 0...1
-  // If/when we get a separate ClosedRange representation, this test
-  // will have to change.
-  expectType(Range<Int>.self, &zeroThruOne)
+  expectType(ClosedRangeOfStrideable<Int>.self, &zeroThruOne)
 }
 
-IntervalTestSuite.test("PatternMatching") {
+tests.test("PatternMatching") {
 
   let pie = 3.1415927
 
@@ -93,10 +96,10 @@ IntervalTestSuite.test("PatternMatching") {
   }
 }
 
-IntervalTestSuite.test("Overlaps") {
+tests.test("Overlaps") {
   
   func expectOverlaps<
-    I0: Interval, I1: Interval where I0.Bound == I1.Bound
+    I0: _RangeProtocol, I1: _RangeProtocol where I0.Bound == I1.Bound
   >(expectation: Bool, _ lhs: I0, _ rhs: I1) {
     if expectation {
       expectTrue(lhs.overlaps(rhs))
@@ -138,14 +141,14 @@ IntervalTestSuite.test("Overlaps") {
   
 }
 
-IntervalTestSuite.test("Emptiness") {
+tests.test("Emptiness") {
   expectTrue((0.0..<0.0).isEmpty)
   expectFalse((0.0...0.0).isEmpty)
   expectFalse((0.0..<0.1).isEmpty)
   expectFalse((0.0..<0.1).isEmpty)
 }
 
-IntervalTestSuite.test("start/end") {
+tests.test("start/end") {
   expectEqual(0.0, (0.0..<0.1).lowerBound)
   expectEqual(0.0, (0.0...0.1).lowerBound)
   expectEqual(0.1, (0.0..<0.1).upperBound)
@@ -178,19 +181,19 @@ func == <T : Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 
-IntervalTestSuite.test("CustomStringConvertible/CustomDebugStringConvertible") {
+tests.test("CustomStringConvertible/CustomDebugStringConvertible") {
   expectEqual("0.0..<0.1", String(X(0.0)..<X(0.1)))
   expectEqual("0.0...0.1", String(X(0.0)...X(0.1)))
   
   expectEqual(
-    "HalfOpenInterval(X(0.0)..<X(0.5))",
-    String(reflecting: HalfOpenInterval(X(0.0)..<X(0.5))))
+    "Range(X(0.0)..<X(0.5))",
+    String(reflecting: Range(X(0.0)..<X(0.5))))
   expectEqual(
-    "ClosedInterval(X(0.0)...X(0.5))",
-    String(reflecting: ClosedInterval(X(0.0)...X(0.5))))
+    "ClosedRange(X(0.0)...X(0.5))",
+    String(reflecting: ClosedRange(X(0.0)...X(0.5))))
 }
 
-IntervalTestSuite.test("rdar12016900") {
+tests.test("rdar12016900") {
   if true {
     let wc = 0
     expectFalse((0x00D800 ..< 0x00E000).contains(wc))
@@ -201,7 +204,7 @@ IntervalTestSuite.test("rdar12016900") {
   }
 }
 
-IntervalTestSuite.test("clamp") {
+tests.test("clamp") {
   expectEqual(
     (0..<3).clamped(to: 5..<10), 5..<5)
   expectEqual(
