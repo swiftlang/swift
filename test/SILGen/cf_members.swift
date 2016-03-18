@@ -76,15 +76,28 @@ public func foo(x: Double) {
   // let h: @convention(c) (Struct1, Double) -> Struct1 = Struct1.scale
   // z = h(z, x)
 
-/* TODO: properties
+  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: store [[ZVAL]] to [[ZTMP:%.*]] :
+  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c) (@in Struct1) -> Double
+  // CHECK: apply [[GET]]([[ZTMP]])
   _ = z.radius
+  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetRadius : $@convention(c) (Struct1, Double) -> ()
+  // CHECK: apply [[SET]]([[ZVAL]], [[X]])
   z.radius = x
 
+  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetAltitude : $@convention(c) (Struct1) -> Double
+  // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.altitude
+  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
+  // CHECK: apply [[SET]]([[Z]], [[X]])
   z.altitude = x
   
+  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetMagnitude : $@convention(c) (Struct1) -> Double
+  // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.magnitude
- */
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1StaticMethod
   // CHECK: apply [[FN]]()
@@ -98,11 +111,31 @@ public func foo(x: Double) {
   // let j: @convention(c) () -> Int32 = Struct1.staticMethod
   // y = j()
 
-/* TODO: properties
+  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetProperty
+  // CHECK: apply [[GET]]()
   _ = Struct1.property
+  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1StaticSetProperty
+  // CHECK: apply [[SET]](%{{[0-9]+}})
   Struct1.property = y
+  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetOnlyProperty
+  // CHECK: apply [[GET]]()
   _ = Struct1.getOnlyProperty
- */
+
+  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_TF10cf_members12makeMetatype
+  // CHECK: apply [[MAKE_METATYPE]]()
+  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetProperty
+  // CHECK: apply [[GET]]()
+  _ = makeMetatype().property
+  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_TF10cf_members12makeMetatype
+  // CHECK: apply [[MAKE_METATYPE]]()
+  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1StaticSetProperty
+  // CHECK: apply [[SET]](%{{[0-9]+}})
+  makeMetatype().property = y
+  // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_TF10cf_members12makeMetatype
+  // CHECK: apply [[MAKE_METATYPE]]()
+  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetOnlyProperty
+  // CHECK: apply [[GET]]()
+  _ = makeMetatype().getOnlyProperty
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesLast : $@convention(c) (Double, Struct1) -> ()
   // CHECK: [[ZVAL:%.*]] = load [[Z]]

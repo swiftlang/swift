@@ -1037,7 +1037,7 @@ public:
         if (ctor->isRequired() &&
             thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
             !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
-          if (requiresObjCDispatch(afd)) {
+          if (requiresForeignEntryPoint(afd)) {
             // When we're performing Objective-C dispatch, we don't have an
             // allocating constructor to call. So, perform an alloc_ref_dynamic
             // and pass that along to the initializer.
@@ -1087,7 +1087,7 @@ public:
         SILDeclRef constant(afd, kind.getValue(),
                             SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                            requiresObjCDispatch(afd));
+                            requiresForeignEntryPoint(afd));
 
         setCallee(Callee::forClassMethod(SGF, selfValue,
                                          constant, getSubstFnType(), e));
@@ -1120,7 +1120,7 @@ public:
                         SILDeclRef::ConstructAtBestResilienceExpansion,
                         SILDeclRef::ConstructAtNaturalUncurryLevel,
                         !isConstructorWithGeneratedAllocatorThunk(e->getDecl())
-                          && requiresObjCDispatch(e->getDecl()));
+                          && requiresForeignEntryPoint(e->getDecl()));
 
     // Otherwise, we have a statically-dispatched call.
     CanFunctionType substFnType = getSubstFnType();
@@ -1265,7 +1265,7 @@ public:
       constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,
                          SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         requiresObjCDispatch(ctorRef->getDecl()));
+                         requiresForeignEntryPoint(ctorRef->getDecl()));
 
       if (ctorRef->getDeclRef().isSpecialized())
         substitutions = ctorRef->getDeclRef().getSubstitutions();
@@ -1274,7 +1274,7 @@ public:
       constant = SILDeclRef(declRef->getDecl(),
                          SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         requiresObjCDispatch(declRef->getDecl()));
+                         requiresForeignEntryPoint(declRef->getDecl()));
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
@@ -1451,7 +1451,7 @@ public:
                                : SILDeclRef::Kind::Initializer,
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             requiresObjCDispatch(ctorRef->getDecl()));
+                             requiresForeignEntryPoint(ctorRef->getDecl()));
       setCallee(Callee::forArchetype(SGF, SILValue(),
                      self.getType().getSwiftRValueType(), constant,
                      cast<AnyFunctionType>(expr->getType()->getCanonicalType()),
@@ -1468,7 +1468,7 @@ public:
                                : SILDeclRef::Kind::Initializer,
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             requiresObjCDispatch(ctorRef->getDecl())),
+                             requiresForeignEntryPoint(ctorRef->getDecl())),
                   getSubstFnType(), fn));
     } else {
       // Directly call the peer constructor.
@@ -4397,8 +4397,7 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                       ManagedValue base,
                                                       CanType baseFormalType,
                                                       SILDeclRef accessor) {
-  auto accessorType = SGM.Types.getConstantFunctionType(accessor);
-  SILParameterInfo selfParam = accessorType->getParameters().back();
+  SILParameterInfo selfParam = SGM.Types.getConstantSelfParameter(accessor);
 
   assert(!base.isInContext());
   assert(!base.isLValue() || !base.hasCleanup());
@@ -4511,12 +4510,26 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                baseFormalType, base));
 }
 
+static bool shouldReferenceForeignAccessor(AbstractStorageDecl *storage,
+                                           bool isDirectUse) {
+  // C functions imported as members should be referenced as C functions.
+  if (storage->getGetter()->isImportAsMember())
+    return true;
+  
+  // Otherwise, favor native entry points for direct accesses.
+  if (isDirectUse)
+    return false;
+  
+  return storage->requiresForeignGetterAndSetter();
+}
+
 SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage,
                                             bool isDirectUse) {
+  // Use the ObjC entry point
   return SILDeclRef(storage->getGetter(), SILDeclRef::Kind::Func,
                     SILDeclRef::ConstructAtBestResilienceExpansion,
                     SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    !isDirectUse && storage->requiresObjCGetterAndSetter());
+                    shouldReferenceForeignAccessor(storage, isDirectUse));
 }
 
 /// Emit a call to a getter.
@@ -4561,7 +4574,7 @@ SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage,
   return SILDeclRef(storage->getSetter(), SILDeclRef::Kind::Func,
                     SILDeclRef::ConstructAtBestResilienceExpansion,
                     SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    !isDirectUse && storage->requiresObjCGetterAndSetter());
+                    shouldReferenceForeignAccessor(storage, isDirectUse));
 }
 
 void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,

@@ -25,7 +25,7 @@ extern struct IAMStruct1 IAMStruct1Scale(struct IAMStruct1 s,
                                          double radians)
     __attribute__((swift_name("Struct1.scale(self:_:)")));
 
-extern double IAMStruct1GetRadius(struct IAMStruct1 s)
+extern double IAMStruct1GetRadius(const struct IAMStruct1 *s)
     __attribute__((swift_name("getter:Struct1.radius(self:)")));
 
 extern void IAMStruct1SetRadius(struct IAMStruct1 s, double radius)

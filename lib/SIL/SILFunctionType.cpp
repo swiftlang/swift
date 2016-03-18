@@ -1897,6 +1897,27 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
                               Context);
 }
 
+/// Returns the SILParameterInfo for the given declaration's `self` parameter.
+/// `constant` must refer to a method.
+SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
+  auto ty = getConstantFunctionType(constant);
+
+  // In most cases the "self" parameter is lowered as the back parameter.
+  // The exception is C functions imported as methods.
+  if (!constant.isForeign)
+    return ty->getParameters().back();
+  if (!constant.hasDecl())
+    return ty->getParameters().back();
+  auto fn = dyn_cast<AbstractFunctionDecl>(constant.getDecl());
+  if (!fn)
+    return ty->getParameters().back();
+  if (fn->isImportAsStaticMember())
+    return SILParameterInfo();
+  if (fn->isImportAsInstanceMember())
+    return ty->getParameters()[fn->getSelfIndex()];
+  return ty->getParameters().back();
+}
+
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
 /// Will be the same as getConstantInfo if the declaration does not override.
 SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
@@ -2247,6 +2268,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
       // currying.
       if (uncurryLevel == 1 &&
           isa<FuncDecl>(bridgedFn) &&
+          !cast<FuncDecl>(bridgedFn)->isImportAsMember() &&
           cast<FuncDecl>(bridgedFn)->isAccessor() &&
           extInfo.getSILRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer) {
 

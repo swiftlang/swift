@@ -73,9 +73,9 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
   return false;
 }
 
-/// FIXME: merge requiresObjCDispatch() into getMethodDispatch() and add
+/// FIXME: merge requiresForeignEntryPoint() into getMethodDispatch() and add
 /// an ObjectiveC case to the MethodDispatch enum.
-bool swift::requiresObjCDispatch(ValueDecl *vd) {
+bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   // Final functions never require ObjC dispatch.
   if (vd->isFinal())
     return false;
@@ -84,9 +84,12 @@ bool swift::requiresObjCDispatch(ValueDecl *vd) {
     return true;
 
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
+    if (fd->isImportAsMember())
+      return true;
+  
     // Property accessors should be generated alongside the property.
     if (fd->isGetterOrSetter())
-      return requiresObjCDispatch(fd->getAccessorStorageDecl());
+      return requiresForeignEntryPoint(fd->getAccessorStorageDecl());
 
     return fd->getAttrs().hasAttribute<DynamicAttr>();
   }
@@ -99,7 +102,7 @@ bool swift::requiresObjCDispatch(ValueDecl *vd) {
   }
 
   if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
-    return asd->requiresObjCGetterAndSetter();
+    return asd->requiresForeignGetterAndSetter();
 
   return vd->getAttrs().hasAttribute<DynamicAttr>();
 }

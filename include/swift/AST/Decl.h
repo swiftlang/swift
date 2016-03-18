@@ -4003,11 +4003,11 @@ public:
 
   /// Return true if this storage can (but doesn't have to) be accessed with
   /// Objective-C-compatible getters and setters.
-  bool hasObjCGetterAndSetter() const;
+  bool hasForeignGetterAndSetter() const;
 
   /// Return true if this storage *must* be accessed with Objective-C-compatible
   /// getters and setters.
-  bool requiresObjCGetterAndSetter() const;
+  bool requiresForeignGetterAndSetter() const;
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
