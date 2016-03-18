@@ -234,7 +234,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     };
 
     bool HasDocComment;
-    bool HasInherits;
+    unsigned InheritsCount;
     std::set<Requirement> Requirements;
     void addRequirement(Type First, Type Second, RequirementReprKind Kind) {
       Requirements.insert({First, Second, Kind});
@@ -243,12 +243,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       // Trivially unmergable.
       if (HasDocComment || Another.HasDocComment)
         return false;
-      if (HasInherits || Another.HasInherits)
+      if (InheritsCount != 0 || Another.InheritsCount != 0)
         return false;
       return Requirements == Another.Requirements;
     }
     bool isMergableWithTypeDef() {
-      return !HasDocComment && !HasInherits && Requirements.empty();
+      return !HasDocComment && InheritsCount == 0 && Requirements.empty();
     }
   };
 
@@ -256,13 +256,24 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   typedef llvm::MapVector<ExtensionDecl*, ExtensionMergeInfo> ExtensionMergeInfoMap;
 
   struct ExtensionMergeGroup {
+    unsigned InheritanceCount;
+    unsigned RequirementsCount;
     MergeGroupKind Kind;
     std::vector<SynthesizedExtensionInfo*> Members;
     ExtensionMergeGroup(SynthesizedExtensionInfo *Info,
-                        bool MergableWithType) {
+                        unsigned RequirementsCount,
+                        unsigned InheritanceCount,
+                        bool MergableWithType) :
+      InheritanceCount(InheritanceCount),
+      RequirementsCount(RequirementsCount),
+      Kind(MergableWithType ? MergeGroupKind::MergableWithTypeDef :
+                              MergeGroupKind::UnmergableWithTypeDef) {
       Members.push_back(Info);
-      Kind = MergableWithType ? MergeGroupKind::MergableWithTypeDef :
-                                MergeGroupKind::UnmergableWithTypeDef;
+    }
+    bool operator< (const ExtensionMergeGroup& Rhs) const {
+      if (RequirementsCount == Rhs.RequirementsCount)
+        return InheritanceCount < Rhs.InheritanceCount;
+      return RequirementsCount < Rhs.RequirementsCount;
     }
   };
 
@@ -351,12 +362,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   }
 
 
-  bool hasInherits(ExtensionDecl *ED) {
+  unsigned countInherits(ExtensionDecl *ED) {
+    unsigned Count = 0;
     for (auto TL : ED->getInherited()) {
       if (shouldPrint(TL.getType()->getAnyNominal(), Options))
-        return true;
+        Count ++;
     }
-    return false;
+    return Count;
   }
 
   std::pair<SynthesizedExtensionInfo, ExtensionMergeInfo>
@@ -364,7 +376,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     SynthesizedExtensionInfo Result(IsSynthesized);
     ExtensionMergeInfo MergeInfo;
     MergeInfo.HasDocComment = !Ext->getRawComment().isEmpty();
-    MergeInfo.HasInherits = hasInherits(Ext);
+    MergeInfo.InheritsCount = countInherits(Ext);
     if (!Ext->isConstrainedExtension()) {
       if (IncludeUnconditional)
         Result.Ext = Ext;
@@ -424,7 +436,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         return MergeInfo == MergeInfoMap[Group.Members.front()->Ext];
       });
       if (Found == Results.end()) {
-        Results.push_back({&ExtInfo, MergeInfo.isMergableWithTypeDef()});
+        Results.push_back({&ExtInfo,
+                          (unsigned)MergeInfo.Requirements.size(),
+                          MergeInfo.InheritsCount,
+                          MergeInfo.isMergableWithTypeDef()});
       } else {
         Found->Members.push_back(&ExtInfo);
       }
@@ -477,6 +492,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
 
     populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups);
+    std::sort(AllGroups.begin(), AllGroups.end());
     return InfoMap;
   }
 };
