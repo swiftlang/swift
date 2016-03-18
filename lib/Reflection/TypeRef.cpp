@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Demangle.h"
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -70,7 +71,14 @@ public:
   }
 
   void visitNominalTypeRef(const NominalTypeRef *N) {
-    printHeader("nominal");
+    if (N->isStruct())
+      printHeader("struct");
+    else if (N->isEnum())
+      printHeader("enum");
+    else if (N->isClass())
+      printHeader("class");
+    else
+      printHeader("nominal");
     auto demangled = Demangle::demangleTypeAsString(N->getMangledName());
     printField("", demangled);
     if (auto parent = N->getParent())
@@ -79,7 +87,15 @@ public:
   }
 
   void visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    printHeader("bound-generic");
+    if (BG->isStruct())
+      printHeader("bound-generic struct");
+    else if (BG->isEnum())
+      printHeader("bound-generic enum");
+    else if (BG->isClass())
+      printHeader("bound-generic class");
+    else
+      printHeader("bound-generic");
+
     auto demangled = Demangle::demangleTypeAsString(BG->getMangledName());
     printField("", demangled);
     for (auto param : BG->getGenericParams())
@@ -423,4 +439,57 @@ GenericArgumentMap TypeRef::getSubstMap() const {
       break;
   }
   return Substitutions;
+}
+
+namespace {
+bool isStruct(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+    case Demangle::Node::Kind::Type:
+      return isStruct(Node->getChild(0));
+    case Demangle::Node::Kind::Structure:
+    case Demangle::Node::Kind::BoundGenericStructure:
+      return true;
+    default:
+      return false;
+  }
+}
+bool isEnum(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+    case Demangle::Node::Kind::Type:
+      return isEnum(Node->getChild(0));
+    case Demangle::Node::Kind::Enum:
+    case Demangle::Node::Kind::BoundGenericEnum:
+      return true;
+    default:
+      return false;
+  }
+}
+bool isClass(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+    case Demangle::Node::Kind::Type:
+      return isClass(Node->getChild(0));
+    case Demangle::Node::Kind::Class:
+    case Demangle::Node::Kind::BoundGenericClass:
+      return true;
+    default:
+      return false;
+  }
+}
+}
+
+bool NominalTypeTrait::isStruct() const {
+  auto Demangled = Demangle::demangleTypeAsNode(MangledName);
+  return ::isStruct(Demangled);
+}
+
+
+bool NominalTypeTrait::isEnum() const {
+  auto Demangled = Demangle::demangleTypeAsNode(MangledName);
+  return ::isEnum(Demangled);
+}
+
+
+bool NominalTypeTrait::isClass() const {
+  auto Demangled = Demangle::demangleTypeAsNode(MangledName);
+  return ::isClass(Demangled);
 }

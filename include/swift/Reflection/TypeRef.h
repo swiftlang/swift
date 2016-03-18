@@ -95,21 +95,32 @@ public:
   }
 };
 
-class NominalTypeRef final : public TypeRef {
+class NominalTypeTrait {
   std::string MangledName;
+
+public:
+  NominalTypeTrait(std::string MangledName) : MangledName(MangledName) {}
+
+  const std::string &getMangledName() const {
+    return MangledName;
+  }
+
+  bool isStruct() const;
+  bool isEnum() const;
+  bool isClass() const;
+};
+
+class NominalTypeRef final : public TypeRef, public NominalTypeTrait {
   TypeRefPointer Parent;
 
 public:
   NominalTypeRef(std::string MangledName, TypeRefPointer Parent = nullptr)
-    : TypeRef(TypeRefKind::Nominal), MangledName(MangledName), Parent(Parent) {}
+    : TypeRef(TypeRefKind::Nominal), NominalTypeTrait(MangledName),
+      Parent(Parent) {}
 
   static std::shared_ptr<NominalTypeRef>
   create(std::string MangledName, TypeRefPointer Parent = nullptr) {
     return std::make_shared<NominalTypeRef>(MangledName, Parent);
-  }
-
-  const std::string &getMangledName() const {
-    return MangledName;
   }
 
   ConstTypeRefPointer getParent() const {
@@ -131,8 +142,7 @@ public:
   }
 };
 
-class BoundGenericTypeRef final : public TypeRef {
-  std::string MangledName;
+class BoundGenericTypeRef final : public TypeRef, public NominalTypeTrait {
   TypeRefVector GenericParams;
   TypeRefPointer Parent;
 
@@ -140,7 +150,7 @@ public:
   BoundGenericTypeRef(std::string MangledName, TypeRefVector GenericParams,
                       TypeRefPointer Parent = nullptr)
     : TypeRef(TypeRefKind::BoundGeneric),
-      MangledName(MangledName),
+      NominalTypeTrait(MangledName),
       GenericParams(GenericParams),
       Parent(Parent) {}
 
@@ -149,10 +159,6 @@ public:
          TypeRefPointer Parent = nullptr) {
     return std::make_shared<BoundGenericTypeRef>(MangledName, GenericParams,
                                                  Parent);
-  }
-
-  const std::string &getMangledName() const {
-    return MangledName;
   }
 
   const TypeRefVector &getGenericParams() const {
