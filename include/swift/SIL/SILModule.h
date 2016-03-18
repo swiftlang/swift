@@ -33,6 +33,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -570,6 +571,18 @@ public:
   /// \param PrintASTDecls If set to true print AST decls.
   void print(raw_ostream &OS, bool Verbose = false,
              ModuleDecl *M = nullptr, bool ShouldSort = false,
+             bool PrintASTDecls = true) const {
+    SILPrintContext PrintCtx(OS, Verbose, ShouldSort);
+    print(PrintCtx, M, PrintASTDecls);
+  }
+
+  /// Pretty-print the module with the context \p PrintCtx.
+  ///
+  /// \param M If present, the types and declarations from this module will be
+  ///        printed. The module would usually contain the types and Decls that
+  ///        the SIL module depends on.
+  /// \param PrintASTDecls If set to true print AST decls.
+  void print(SILPrintContext &PrintCtx, ModuleDecl *M = nullptr,
              bool PrintASTDecls = true) const;
 
   /// Allocate memory using the module's internal allocator.
