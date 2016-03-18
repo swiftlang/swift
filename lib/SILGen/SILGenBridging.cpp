@@ -973,12 +973,13 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   auto nativeFnTy = F.getLoweredFunctionType();
   assert(nativeFnTy == nativeCI.SILFnType);
 
-  // Find the foreign error convention.
+  // Find the foreign error convention and 'self' parameter index.
   Optional<ForeignErrorConvention> foreignError;
   if (nativeFnTy->hasErrorResult()) {
     foreignError = fd->getForeignErrorConvention();
     assert(foreignError && "couldn't find foreign error convention!");
   }
+  ImportAsMemberStatus memberStatus = fd->getImportAsMemberStatus();
 
   // Forward the arguments.
   auto forwardedParameters = fd->getParameterLists();
@@ -987,7 +988,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   // formally present in the constructor body.
   Type allocatorSelfType;
   if (thunk.kind == SILDeclRef::Kind::Allocator) {
-    allocatorSelfType = forwardedParameters[0]->getType(getASTContext());
+    allocatorSelfType = forwardedParameters[0]->getType(getASTContext())
+      ->getLValueOrInOutObjectType();
     forwardedParameters = forwardedParameters.slice(1);
   }
 
@@ -996,11 +998,11 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     bindParametersForForwarding(paramList, params);
 
   if (allocatorSelfType) {
-    auto selfMetatype = CanMetatypeType::get(allocatorSelfType->getCanonicalType(),
-                                             MetatypeRepresentation::Thick);
+    auto selfMetatype =
+      CanMetatypeType::get(allocatorSelfType->getCanonicalType());
     auto selfArg = new (F.getModule()) SILArgument(
                                  F.begin(),
-                                 SILType::getPrimitiveObjectType(selfMetatype),
+                                 getLoweredLoadableType(selfMetatype),
                                  fd->getImplicitSelfDecl());
     params.push_back(selfArg);
   }
@@ -1062,15 +1064,46 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
       maybeAddForeignErrorArg();
 
-      SILType foreignArgTy =
-        foreignFnTy->getParameters()[foreignArgIndex++].getSILType();
-      args.push_back(emitNativeToBridgedValue(fd, param,
+      bool isSelf = nativeParamIndex == params.size() - 1;
+
+      if (memberStatus.isInstance()) {
+        // Leave space for `self` to be filled in later.
+        if (foreignArgIndex == memberStatus.getSelfIndex()) {
+          args.push_back({});
+          foreignArgIndex++;
+        }
+        
+        // Use the `self` space we skipped earlier if it's time.
+        if (isSelf) {
+          foreignArgIndex = memberStatus.getSelfIndex();
+        }
+      } else if (memberStatus.isStatic() && isSelf) {
+        // Lose a static `self` parameter.
+        break;
+      }
+
+      auto foreignParam = foreignFnTy->getParameters()[foreignArgIndex++];
+      SILType foreignArgTy = foreignParam.getSILType();
+      auto bridged = emitNativeToBridgedValue(fd, param,
                                 SILFunctionTypeRepresentation::CFunctionPointer,
-                                foreignArgTy.getSwiftRValueType()));
+                                foreignArgTy.getSwiftRValueType());
+      // Handle C pointer arguments imported as indirect `self` arguments.
+      if (foreignParam.getConvention() == ParameterConvention::Indirect_In) {
+        auto temp = emitTemporaryAllocation(fd, bridged.getType());
+        bridged.forwardInto(*this, fd, temp);
+        bridged = emitManagedBufferWithCleanup(temp);
+      }
+      
+      if (memberStatus.isInstance() && isSelf) {
+        // Fill in the `self` space.
+        args[memberStatus.getSelfIndex()] = bridged;
+      } else {
+        args.push_back(bridged);
+      }
     }
 
     maybeAddForeignErrorArg();
-
+    
     // Call the original.
     auto subs = getForwardingSubstitutions();
     auto fn = getThunkedForeignFunctionRef(*this, fd, foreignDeclRef, args, subs,
