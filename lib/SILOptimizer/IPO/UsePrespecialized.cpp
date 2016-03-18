@@ -84,7 +84,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (Subs.empty())
       continue;
 
-    ReabstractionInfo ReInfo(ReferencedF, AI);
+    ReabstractionInfo ReInfo(ReferencedF, Subs);
 
     auto SpecType = ReInfo.getSpecializedType();
     if (!SpecType)
@@ -103,10 +103,10 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // Create a name of the specialization.
     std::string ClonedName;
     {
-      Mangle::Mangler M;
-      GenericSpecializationMangler Mangler(M, ReferencedF, Subs);
-      Mangler.mangle();
-      ClonedName = M.finalize();
+      Mangle::Mangler Mangler;
+      GenericSpecializationMangler GenericMangler(Mangler, ReferencedF, Subs);
+      GenericMangler.mangle();
+      ClonedName = Mangler.finalize();
     }
 
     SILFunction *NewF = nullptr;
@@ -116,7 +116,9 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       if (PrevF->getLinkage() != SILLinkage::SharedExternal)
         NewF = PrevF;
     } else {
-      PrevF = getExistingSpecialization(M, ClonedName);
+      // Check for the existence of this function in another module without
+      // loading the function body.
+      PrevF = lookupPrespecializedSymbol(M, ClonedName);
       if (!PrevF)
         continue;
       NewF = PrevF;
