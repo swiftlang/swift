@@ -1,6 +1,15 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 // CHECK: ![[EMPTY:.*]] = !{}
+
+enum Either {
+  case First(Int64), Second(String), Neither
+// CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Either",
+// CHECK-SAME:             line: [[@LINE-3]],
+// CHECK-SAME:             size: 200,
+}
+let E : Either = .Neither;
+
 // CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Color",
 // CHECK-SAME:             line: [[@LINE+3]]
 // CHECK-SAME:             size: 8, align: 8,
