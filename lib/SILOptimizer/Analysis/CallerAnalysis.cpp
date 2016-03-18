@@ -20,26 +20,22 @@ using namespace swift;
 
 void CallerAnalysis::processFunctionCallSites(SILFunction *F) {
   // Scan the whole module and search Apply sites.
-  CallerAnalysisFunctionInfo &CallerInfo = CallInfo.FindAndConstruct(F).second;
   for (auto &BB : *F) {
     for (auto &II : BB) {
       if (auto Apply = FullApplySite::isa(&II)) {
         SILFunction *CalleeFn = Apply.getCalleeFunction();
         if (!CalleeFn)
           continue;
+
         // Update the callee information for this function.
-        CallerInfo.Callees.push_back(CalleeFn);
+        CallerAnalysisFunctionInfo &CallerInfo
+                               = CallInfo.FindAndConstruct(F).second;
+        CallerInfo.Callees.insert(CalleeFn);
         
         // Update the callsite information for the callee.
         CallerAnalysisFunctionInfo &CalleeInfo
-                           = CallInfo.FindAndConstruct(CalleeFn).second;
-
-        // Record it if this is the first time we see this caller.
-        if (CalleeInfo.CallSites.find(F) == CalleeInfo.CallSites.end())
-          CalleeInfo.Callers.push_back(F);
-
-        // Record the callsite. 
-        CalleeInfo.CallSites[F].push_back(Apply);
+                               = CallInfo.FindAndConstruct(CalleeFn).second;
+        CalleeInfo.Callers.insert(F);
       }   
     }   
   }   
@@ -48,8 +44,9 @@ void CallerAnalysis::processFunctionCallSites(SILFunction *F) {
 void CallerAnalysis::invalidateExistingCalleeRelation(SILFunction *F) {
   CallerAnalysisFunctionInfo &CallerInfo = CallInfo.FindAndConstruct(F).second;
   for (auto Callee : CallerInfo.Callees) {
-    CallerAnalysisFunctionInfo &CalleeInfo = CallInfo.find(Callee)->second;
-    CalleeInfo.CallSites[F].clear();
+    CallerAnalysisFunctionInfo &CalleeInfo
+                                    = CallInfo.FindAndConstruct(Callee).second;
+    CalleeInfo.Callers.remove(F);
   }
 }
 

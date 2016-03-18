@@ -24,31 +24,12 @@
 
 namespace swift {
 
-using ApplyList = llvm::SmallVector<FullApplySite, 4>;
-
-class CallerAnalysisFunctionInfo {
+/// NOTE: this can be extended to contain the callsites of the function.
+struct CallerAnalysisFunctionInfo {
   /// A list of all the functions this function calls.
-  llvm::SmallVector<SILFunction *, 4> Callees;
-  /// A list of all the functions that calls this function.
-  /// Keeping this list allows us to iterate over the CallSites
-  /// deterministically.
-  llvm::SmallVector<SILFunction *, 4> Callers;
-  /// A map between all the callers and the callsites in them which
-  /// calls this function.
-  llvm::SmallDenseMap<SILFunction *, ApplyList, 1> CallSites; 
-
-public:
-  /// Return a list of all the callsites for this function.
-  ApplyList getCallSites() {
-    ApplyList Sites;
-    for (auto &F : Callers) {
-      for (auto &S : CallSites[F])
-        Sites.push_back(S);
-    }
-    return Sites;
-  }
-
-  friend class CallerAnalysis;
+  llvm::SetVector<SILFunction *> Callees;
+  /// A list of all the callers this function has.
+  llvm::SetVector<SILFunction *> Callers;
 };
 
 /// CallerAnalysis relies on keeping the Caller/Callee relation up-to-date
@@ -93,6 +74,7 @@ public:
   CallerAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Caller), Mod(*M) {
     // Make sure we compute everything first time called.
     for(auto &F : Mod) {
+      CallInfo.FindAndConstruct(&F);
       RecomputeFunctionList.insert(&F);
     }
   }
@@ -142,17 +124,7 @@ public:
     // list.
     processRecomputeFunctionList();
     auto Iter = CallInfo.FindAndConstruct(F);
-    return !Iter.second.CallSites.empty();
-  }
-
-
-  /// Return all the callsites to this function in the current module.
-  ApplyList getCallSites(SILFunction *F) {
-    // Recompute every function in the invalidated function list and empty the
-    // list.
-    processRecomputeFunctionList();
-    auto Iter = CallInfo.FindAndConstruct(F);
-    return Iter.second.getCallSites();
+    return !Iter.second.Callers.empty();
   }
 };
 

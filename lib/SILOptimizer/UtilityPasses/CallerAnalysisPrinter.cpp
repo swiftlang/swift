@@ -31,16 +31,10 @@ class CallerAnalysisPrinterPass : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
     auto *CA = getAnalysis<CallerAnalysis>();
-    auto &M = *getModule();
-
-    for (auto &F : M) {
-      for (auto &X : CA->getCallSites(&F)) {
-        SILFunction *C = X.getInstruction()->getFunction();
-        llvm::outs() << "CallSite: " << C->getName() << " " << F.getName() << "\n";
-      }
+    for (auto &F : *getModule()) {
+      const char *hasCaller = CA->hasCaller(&F) ? "true" : "false";
+      llvm::outs() << "Function " << F.getName() << " has caller: " << hasCaller << "\n";
     }
-
-    llvm::outs() << "\n";
   }
 
   StringRef getName() override { return "Caller Analysis Printer"; }
