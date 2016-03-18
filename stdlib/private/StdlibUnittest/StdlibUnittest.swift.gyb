@@ -443,6 +443,7 @@ var _allTestSuites: [TestSuite] = []
 var _testSuiteNameToIndex: [String : Int] = [:]
 
 let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
+let _crashedPrefix = "CRASHED:"
 
 @_silgen_name("swift_stdlib_installTrapInterceptor")
 func _stdlib_installTrapInterceptor()
@@ -579,7 +580,7 @@ struct _ParentProcess {
           if stdoutSeenCrashDelimiter {
             capturedCrashStdout.append(line)
           }
-          print("out>>> \(line)")
+          print("stdout>>> \(line)")
         }
         continue
       }
@@ -604,8 +605,11 @@ struct _ParentProcess {
           }
           if stderrSeenCrashDelimiter {
             capturedCrashStderr.append(line)
+            if findSubstring(line, _crashedPrefix) != nil {
+              line = "OK: saw expected \"\(line.lowercased())\""
+            }
           }
-          print("err>>> \(line)")
+          print("stderr>>> \(line)")
         }
         continue
       }

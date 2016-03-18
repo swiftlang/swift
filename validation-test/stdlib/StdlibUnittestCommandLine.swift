@@ -19,10 +19,10 @@ var CommandLineArguments = TestSuite("CommandLineArguments")
 CommandLineArguments.test("printCommandLineArguments") {
   debugPrint(Process.arguments)
 }
-// CHECK-EMPTY: {{^}}out>>> ["{{[^"]+}}", "--stdlib-unittest-run-child"]{{$}}
-// CHECK-1: {{^}}out>>> ["{{[^"]+}}", "--stdlib-unittest-run-child", "--abc"]{{$}}
-// CHECK-2: {{^}}out>>> ["{{[^"]+}}", "--stdlib-unittest-run-child", "--abc", "def"]{{$}}
-// CHECK-3: {{^}}out>>> ["{{[^"]+}}", "--stdlib-unittest-run-child", "a", "--bcd", "efghijk"]{{$}}
+// CHECK-EMPTY: {{^}}stdout>>> ["{{[^"]+}}", "--stdlib-unittest-run-child"]{{$}}
+// CHECK-1: {{^}}stdout>>> ["{{[^"]+}}", "--stdlib-unittest-run-child", "--abc"]{{$}}
+// CHECK-2: {{^}}stdout>>> ["{{[^"]+}}", "--stdlib-unittest-run-child", "--abc", "def"]{{$}}
+// CHECK-3: {{^}}stdout>>> ["{{[^"]+}}", "--stdlib-unittest-run-child", "a", "--bcd", "efghijk"]{{$}}
 
 runAllTests()
 
