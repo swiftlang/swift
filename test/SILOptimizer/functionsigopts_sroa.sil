@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opt-rewriter -function-signature-opt-cloner %s | FileCheck %s
 
 import Builtin
 
