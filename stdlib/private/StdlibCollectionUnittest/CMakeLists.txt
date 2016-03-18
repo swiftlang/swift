@@ -14,10 +14,12 @@ add_swift_library(swiftStdlibCollectionUnittest SHARED IS_STDLIB
   # filename.
   StdlibCollectionUnittest.swift
 
+  CheckCollectionInstance.swift.gyb
   CheckCollectionType.swift
   CheckMutableCollectionType.swift.gyb
   CheckRangeReplaceableCollectionType.swift
   CheckRangeReplaceableSliceType.swift
+  CheckSequenceInstance.swift.gyb
   CheckSequenceType.swift
   LoggingWrappers.swift.gyb
   MinimalCollections.swift.gyb

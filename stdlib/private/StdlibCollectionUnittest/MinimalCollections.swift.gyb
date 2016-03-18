@@ -12,7 +12,12 @@
 
 %{
 from gyb_stdlib_unittest_support import TRACE, TRACE1, stackTrace, trace
-from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName,
+    protocolsForCollectionFeatures
+)
 }%
 
 import StdlibUnittest
@@ -492,13 +497,15 @@ Int64 distances.
   public typealias Distance = {Distance}
 */
 
-% for Kind in ['Collection', 'MutableCollection', 'RangeReplaceableCollection']:
-%   for Traversal in TRAVERSALS:
-%     Self = 'Minimal' + Kind.replace('Collection', collectionForTraversal(Traversal))
-%     Protocols = ', '.join(set([Kind, collectionForTraversal(Traversal)]))
+% for Traversal in TRAVERSALS:
+%   for Mutable in [ False, True ]:
+%     for RangeReplaceable in [ False, True ]:
+%       SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
+%       Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 
 /// A minimal implementation of `Collection` with extra checks.
-public struct ${Self}<T> : ${Protocols} {
+public struct ${Self}<T> : ${SelfProtocols} {
   /// Creates a collection with given contents, but a unique modification
   /// history.  No other instance has the same modification history.
   public init<S : Sequence where S.Iterator.Element == T>(
@@ -525,7 +532,7 @@ public struct ${Self}<T> : ${Protocols} {
     }
   }
 
-%     if Kind == 'RangeReplaceableCollection':
+%     if RangeReplaceable:
   public init() {
     self.underestimatedCount = 0
     self._elements = []
@@ -545,6 +552,9 @@ public struct ${Self}<T> : ${Protocols} {
   public func makeIterator() -> MinimalIterator<T> {
     return MinimalIterator(_elements)
   }
+
+  public typealias Index = MinimalIndex
+  public typealias IndexDistance = Int
 
   internal func _index(forPosition i: Int) -> MinimalIndex {
     return MinimalIndex(
@@ -630,13 +640,12 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
 
 */
 
-
   public subscript(i: MinimalIndex) -> T {
     get {
       _expectCompatibleIndices(advance(startIndex, by: i.position), i)
       return _elements[i.position]
     }
-%     if Kind == 'MutableCollection':
+%     if Mutable:
     set {
       _expectCompatibleIndices(advance(startIndex, by: i.position), i)
       _elements[i.position] = newValue
@@ -644,7 +653,21 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
 %     end
   }
 
-%     if Kind == 'RangeReplaceableCollection':
+  public typealias SubSequence = ${SelfSlice}<${Self}<T>>
+
+  public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<T>> {
+    get {
+      return ${SelfSlice}(base: self, bounds: bounds)
+    }
+%     if Mutable:
+    set {
+      // _writeBackMutableSlice() is not accessible here :(
+      fatalError("FIXME: swift-3-indexing-model")
+    }
+%     end
+  }
+
+%     if RangeReplaceable:
   public mutating func reserveCapacity(n: Int) {
     _willMutate(.reserveCapacity(capacity: n))
     _elements.reserveCapacity(n)
@@ -734,18 +757,19 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
 %     end
 
   public var underestimatedCount: Int
-%     if Kind == 'RangeReplaceableCollection':
+%     if RangeReplaceable:
   public var reservedCapacity: Int = 0
 %     end
 
   internal var _elements: [T]
-%   if Kind in ['Collection', 'MutableCollection']:
-  internal let _collectionState: _CollectionState
-%   else:
+%   if RangeReplaceable:
   internal var _collectionState: _CollectionState
+%   else:
+  internal let _collectionState: _CollectionState
 %   end
 }
 
+%     end
 %   end
 % end
 
@@ -759,23 +783,26 @@ public struct DefaultedSequence<Element> : StrictSequence {
   }
 }
 
-% for Kind in ['Collection', 'MutableCollection', 'RangeReplaceableCollection']:
-%   for Traversal in TRAVERSALS:
-%     Self = 'Defaulted' + Kind.replace('Collection', collectionForTraversal(Traversal))
-%     Base = 'Minimal' + Kind.replace('Collection', collectionForTraversal(Traversal))
-%     Protocols = ', '.join(set([Kind, collectionForTraversal(Traversal)]))
+% for Traversal in TRAVERSALS:
+%   for Mutable in [ False, True ]:
+%     for RangeReplaceable in [ False, True ]:
+%       SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
+%       Self = 'Defaulted' + SelfSlice.replace('Slice', 'Collection')
+%       Base = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 
 /// A Collection that uses as many default implementations as
 /// `Collection` can provide.
-public struct ${Self}<Element> : ${Protocols} {
+public struct ${Self}<Element> : ${SelfProtocols} {
   public typealias Base = ${Base}<Element>
   public typealias Iterator = MinimalIterator<Element>
   public typealias Index = MinimalIndex
+  public typealias IndexDistance = Int
 
-%   if Kind == 'Collection':
-  public let base: Base
-%   else:
+%   if Mutable or RangeReplaceable:
   public var base: Base
+%   else:
+  public let base: Base
 %   end
 
   public init(base: Base) {
@@ -833,7 +860,7 @@ public struct ${Self}<Element> : ${Protocols} {
       _expectCompatibleIndices(self.startIndex, i)
       return base[i]
     }
-%     if Kind == 'MutableCollection':
+%     if Mutable:
     set {
       _expectCompatibleIndices(self.startIndex, i)
       base[i] = newValue
@@ -841,7 +868,24 @@ public struct ${Self}<Element> : ${Protocols} {
 %     end
   }
 
-%   if Kind == 'RangeReplaceableCollection':
+    // FIXME: swift-3-indexing-model: use defaults.
+//     if Self not in ['DefaultedCollection', 'DefaultedBidirectionalCollection', 'DefaultedRandomAccessCollection', 'DefaultedMutableCollection', 'DefaultedRangeReplaceableCollection']:
+  public typealias SubSequence = ${SelfSlice}<${Self}<Base._Element>>
+
+  public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<Base._Element>> {
+    get {
+      return ${SelfSlice}(base: self, bounds: bounds)
+      fatalError("FIXME: swift-3-indexing-model")
+    }
+%     if Mutable:
+    set {
+      // _writeBackMutableSlice() is not accessible here :(
+      fatalError("FIXME: swift-3-indexing-model")
+    }
+%     end
+  }
+
+%   if RangeReplaceable:
   public init() {
     base = Base()
   }
@@ -854,8 +898,6 @@ public struct ${Self}<Element> : ${Protocols} {
   }
 %   end
 }
-
-% if Kind == 'Collection':
 
 /*
 FIXME: swift-3-indexing-model: uncomment this.
@@ -944,8 +986,7 @@ public struct Defaulted${Traversal}RangeReplaceableSlice<Element>
 }
 */
 
-% end
-
+%     end
 %   end
 % end
 
