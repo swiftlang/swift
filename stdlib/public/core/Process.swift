@@ -10,6 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
+/// Box the string arguments so that _stdlib_atomicInitializeARCRef can be
+/// used to atomically initialize process arguments.
+internal class StringArgument {
+  var args = [String]()
+  init(a : [String]) { args = a }
+}
+
 /// Command-line arguments for the current process.
 public enum Process {
   /// Return an array of string containing the list of command-line arguments
@@ -35,8 +44,6 @@ public enum Process {
     case computedArguments([String])
   }
 
-  internal static var _arguments: [String]? = nil 
-
   /// Access to the raw argc value from C.
   public static var argc: CInt {
     return _argc
@@ -56,10 +63,19 @@ public enum Process {
   /// around by the optimizer which will break the data dependence on argc
   /// and argv.
   public static var arguments: [String] {
-    if _arguments == nil { 
-      _arguments = _computeArguments()
+    let argumentsPtr = UnsafeMutablePointer<AnyObject?>(
+                       Builtin.addressof(&_swift_stdlib_ProcessArguments))
+
+    // Check whether argument has been initialized.
+    if let arguments = _stdlib_atomicLoadARCRef(object: argumentsPtr) {
+      return (arguments as! StringArgument).args
     }
-    return _arguments!
+
+    // Initialize argument.
+    let arguments = StringArgument(a: _computeArguments())
+    _stdlib_atomicInitializeARCRef(object: argumentsPtr, desired: arguments)
+
+    return arguments.args;
   } 
 }
 
