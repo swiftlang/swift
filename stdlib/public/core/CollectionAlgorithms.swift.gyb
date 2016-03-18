@@ -295,6 +295,59 @@ ${orderingRequirementForPredicate}
   }
 }
 
+% for Self in 'Indexable', 'MutableIndexable':
+// WORKAROUND rdar://25214066 - should be on Collection
+extension ${Self} {
+  public subscript(bounds: ClosedRange<Index>) -> SubSequence {
+    get {
+      return self[
+        Range(
+          _uncheckedBounds: (
+            lower: bounds.lowerBound,
+            upper: next(bounds.upperBound)))
+      ]
+    }
+%   if 'Mutable' in Self:
+    set {
+      self[
+        Range(
+          _uncheckedBounds: (
+            lower: bounds.lowerBound,
+            upper: next(bounds.upperBound)))
+      ] = newValue
+    }
+%   end
+  }
+}
+
+// WORKAROUND rdar://25214066 - should be on Collection
+extension ${Self} where Index : Strideable {
+  public subscript(bounds: RangeOfStrideable<Index>) -> SubSequence {
+    get {
+      return self[Range(bounds)]
+    }
+%   if 'Mutable' in Self:
+    set {
+      self[Range(bounds)] = newValue
+    }
+%   end
+  }
+  
+  public subscript(bounds: ClosedRangeOfStrideable<Index>) -> SubSequence {
+    get {
+      return self[ClosedRange(bounds)]
+    }
+%   if 'Mutable' in Self:
+    set {
+      self[ClosedRange(bounds)] = newValue
+    }
+%   end
+  }
+}
+% end
+
+//===--- Unavailable stuff ------------------------------------------------===//
+    
 extension MutableCollection where Self : RandomAccessCollection {
 
   @available(*, unavailable, message: "slice the collection using the range, and call partition(isOrderedBefore:)")

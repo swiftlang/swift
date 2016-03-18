@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// TODO: swift-3-indexing-model - can this extend Indexable instead of all this duplication?
 /// A type that supports subscript assignment to a mutable collection.
-public protocol MutableIndexable {
+public protocol MutableIndexable : Indexable {
   // This protocol is almost an implementation detail of the standard
   // library; it is used to deduce things like the `SubSequence` and
   // `Iterator` type from a minimal collection, but it is also used in
@@ -56,6 +55,8 @@ public protocol MutableIndexable {
   /// - Complexity: O(1)
   subscript(position: Index) -> _Element { get set }
 
+  subscript(bounds: Range<Index>) -> SubSequence { get set }
+  
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
   ///

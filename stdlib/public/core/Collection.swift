@@ -824,28 +824,6 @@ extension Collection {
   }
 }
 
-// WORKAROUND rdar://25214066 - should be on Collection
-extension Indexable {
-  public subscript(bounds: ClosedRange<Index>) -> SubSequence {
-    return self[
-      Range(
-        _uncheckedBounds: (
-          lower: bounds.lowerBound,
-          upper: next(bounds.upperBound)))
-    ]
-  }
-}
-
-// WORKAROUND rdar://25214066 - should be on Collection
-extension Indexable where Index : Strideable {
-  public subscript(bounds: RangeOfStrideable<Index>) -> SubSequence {
-    return self[Range(bounds)]
-  }
-  
-  public subscript(bounds: ClosedRangeOfStrideable<Index>) -> SubSequence {
-    return self[ClosedRange(bounds)]
-  }
-}
 @available(*, unavailable, message: "Bit enum has been deprecated. Please use Int instead.")
 public enum Bit {}
 
