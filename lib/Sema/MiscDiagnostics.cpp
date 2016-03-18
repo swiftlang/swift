@@ -1825,7 +1825,8 @@ static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, con
 }
 
 static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
-  // If we're missing semi-colons we'll already be erroring out, and this may not even have been intended as C-style.
+  // If we're missing semi-colons we'll already be erroring out, and this may
+  // not even have been intended as C-style.
   if (FS->getFirstSemicolonLoc().isInvalid() || FS->getSecondSemicolonLoc().isInvalid())
     return;
     
@@ -1835,7 +1836,8 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
 
   // Verify that there is only one loop variable, and it is declared here.
   auto initializers = FS->getInitializerVarDecls();
-  PatternBindingDecl *loopVarDecl = initializers.size() == 2 ? dyn_cast<PatternBindingDecl>(initializers[0]) : nullptr;
+  PatternBindingDecl *loopVarDecl = initializers.size() == 2 ?
+    dyn_cast<PatternBindingDecl>(initializers[0]) : nullptr;
   if (!loopVarDecl || loopVarDecl->getNumPatternEntries() != 1)
     return;
 
@@ -1843,7 +1845,7 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   Expr *startValue = loopVarDecl->getInit(0);
   Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar);
   bool strideByOne = unaryIncrementForConvertingCStyleForLoop(FS, loopVar) ||
-                     plusEqualOneIncrementForConvertingCStyleForLoop(TC, FS, loopVar);
+               plusEqualOneIncrementForConvertingCStyleForLoop(TC, FS, loopVar);
 
   if (!loopVar || !startValue || !endValue || !strideByOne)
     return;
@@ -1859,15 +1861,77 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
     return;
   }
     
-  SourceLoc loopPatternEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, loopVarDecl->getPattern(0)->getEndLoc());
-  SourceLoc endOfIncrementLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FS->getIncrement().getPtrOrNull()->getEndLoc());
+  SourceLoc loopPatternEnd =
+    Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                               loopVarDecl->getPattern(0)->getEndLoc());
+  SourceLoc endOfIncrementLoc =
+    Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                               FS->getIncrement().getPtrOrNull()->getEndLoc());
     
   diagnostic
    .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
-   .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(), " ..< ")
+   .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
+                      " ..< ")
    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
 }
+
+
+// Perform MiscDiagnostics on Switch Statements.
+static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
+  // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
+  // clause only applies to the second case, and this is surprising.
+  for (auto cs : stmt->getCases()) {
+    // The case statement can have multiple case items, each can have a where.
+    // If we find a "where", and there is a preceding item without a where, and
+    // if they are on the same source line, then warn.
+    auto items = cs->getCaseLabelItems();
+    
+    // Don't do any work for the vastly most common case.
+    if (items.size() == 1) continue;
+    
+    // Ignore the first item, since it can't have preceding ones.
+    for (unsigned i = 1, e = items.size(); i != e; ++i) {
+      // Must have a where clause.
+      auto where = items[i].getGuardExpr();
+      if (!where)
+        continue;
+      
+      // Preceding item must not.
+      if (items[i-1].getGuardExpr())
+        continue;
+      
+      // Must be on the same source line.
+      auto prevLoc = items[i-1].getStartLoc();
+      auto thisLoc = items[i].getStartLoc();
+      if (prevLoc.isInvalid() || thisLoc.isInvalid())
+        continue;
+      
+      auto &SM = TC.Context.SourceMgr;
+      auto prevLineCol = SM.getLineAndColumn(prevLoc);
+      if (SM.getLineNumber(thisLoc) != prevLineCol.first)
+        continue;
+      
+      TC.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
+        .highlight(items[i].getPattern()->getSourceRange())
+        .highlight(where->getSourceRange());
+      
+      // Whitespace it out to the same column as the previous item.
+      std::string whitespace(prevLineCol.second-1, ' ');
+      TC.diagnose(thisLoc, diag::add_where_newline)
+        .fixItInsert(thisLoc, "\n"+whitespace);
+
+      auto whereRange = SourceRange(items[i].getWhereLoc(),
+                                    where->getEndLoc());
+      auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
+      auto whereText = SM.extractText(charRange);
+      TC.diagnose(prevLoc, diag::duplicate_where)
+        .fixItInsertAfter(items[i-1].getEndLoc(), " " + whereText.str())
+        .highlight(items[i-1].getSourceRange());
+    }
+  }
+}
+
 
 static Optional<ObjCSelector>
 parseObjCSelector(ASTContext &ctx, StringRef string) {
@@ -2250,6 +2314,9 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
     
   if (auto forStmt = dyn_cast<ForStmt>(S))
     checkCStyleForLoop(TC, forStmt);
+  
+  if (auto switchStmt = dyn_cast<SwitchStmt>(S))
+    checkSwitch(TC, switchStmt);
 }
 
 //===----------------------------------------------------------------------===//

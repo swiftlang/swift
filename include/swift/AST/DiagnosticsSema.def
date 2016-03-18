@@ -2176,6 +2176,15 @@ ERROR(unnecessary_cast_over_optionset,none,
 ERROR(type_mismatch_multiple_pattern_list,none,
       "pattern variable bound to type %0, expected type %1", (Type, Type))
 
+WARNING(where_on_one_item, none,
+        "'where' only applies to the second pattern match in this case", ())
+
+NOTE(add_where_newline, none,
+     "disambiguate by adding a line break between them if this is desired", ())
+
+NOTE(duplicate_where, none,
+     "duplicate the 'where' on both patterns to check both patterns",())
+
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
