@@ -816,7 +816,6 @@ func r22913570() {
 func swift22_deprecation_increment_decrement() {
   var i = 0
   var f = 1.0
-  var si = "foo".startIndex
 
   i++     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{4-6= += 1}}
   --i     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= -= 1}}
