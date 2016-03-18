@@ -103,8 +103,12 @@ for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
 }
 
 // Mutating algorithms.
+
+// FIXME swift-3-indexing-model: check with Doug G
+// (author of d0ab6890f8ca8aed73059e43372db894a96bea81) to make sure this
+// added constraint is still valid.
 extension MutableCollection
-  where Self.Index: RandomAccessIndex, Self.Iterator.Element : Comparable {
+  where Self: RandomAccessCollection, Self.Iterator.Element : Comparable {
 
   public final mutating func myPartition() -> Index {
     return self.partition()
