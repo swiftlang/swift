@@ -213,6 +213,29 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     operator bool() const { return Ext; }
     SynthesizedExtensionInfo(bool IsSynthesized = true) :
       IsSynthesized(IsSynthesized) {}
+    bool operator< (const SynthesizedExtensionInfo& Rhs) const {
+
+      // Synthesized are always after actual ones.
+       if (IsSynthesized != Rhs.IsSynthesized)
+         return !IsSynthesized;
+
+      // If not from the same file, sort by file name.
+      if (auto LFile = Ext->getSourceFileName()) {
+        if (auto RFile = Rhs.Ext->getSourceFileName()) {
+          int Result = LFile.getValue().compare(RFile.getValue());
+          if (Result != 0)
+            return Result < 0;
+        }
+      }
+
+      // Otherwise, sort by source order.
+      if (auto LeftOrder = Ext->getSourceOrder()) {
+        if (auto RightOrder = Rhs.Ext->getSourceOrder()) {
+          return LeftOrder.getValue() < RightOrder.getValue();
+        }
+      }
+      return false;
+    }
   };
 
   struct ExtensionMergeInfo {
@@ -270,6 +293,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
                               MergeGroupKind::UnmergableWithTypeDef) {
       Members.push_back(Info);
     }
+
+    void sortMembers() {
+      std::sort(Members.begin(), Members.end(),
+                [](SynthesizedExtensionInfo *LHS, SynthesizedExtensionInfo *RHS) {
+                  return (*LHS) < (*RHS);
+                });
+    }
+
     bool operator< (const ExtensionMergeGroup& Rhs) const {
       if (RequirementsCount == Rhs.RequirementsCount)
         return InheritanceCount < Rhs.InheritanceCount;
@@ -493,6 +524,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
     populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups);
     std::sort(AllGroups.begin(), AllGroups.end());
+    for (auto &Group : AllGroups) {
+      Group.sortMembers();
+    }
     return InfoMap;
   }
 };
