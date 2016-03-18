@@ -1,4 +1,4 @@
-//===---- SILPrintContext - Context for SIL print functions -----*- C++ -*-===//
+//===--- SILPrintContext.h - Context for SIL print functions ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
