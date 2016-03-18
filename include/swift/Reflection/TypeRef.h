@@ -68,8 +68,7 @@ public:
 
   template <typename Runtime>
   TypeRefPointer
-  subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs,
-        typename Runtime::StoredPointer MetadatAddress);
+  subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs);
 
   GenericArgumentMap getSubstMap() const;
 
@@ -468,15 +467,12 @@ class TypeRefSubstitution
   using StoredPointer = typename Runtime::StoredPointer;
   ReflectionContext<Runtime> &RC;
   GenericArgumentMap Substitutions;
-  StoredPointer MetadataAddress;
 public:
   using TypeRefVisitor<TypeRefSubstitution<Runtime>, TypeRefPointer>::visit;
   TypeRefSubstitution(ReflectionContext<Runtime> &RC,
-                      GenericArgumentMap Substitutions,
-                      StoredPointer MetadataAddress)
+                      GenericArgumentMap Substitutions)
   : RC(RC),
-    Substitutions(Substitutions),
-    MetadataAddress(MetadataAddress) {}
+    Substitutions(Substitutions) {}
 
   TypeRefPointer visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return std::make_shared<BuiltinTypeRef>(*B);
@@ -563,16 +559,12 @@ public:
     switch (SubstBase->getKind()) {
     case TypeRefKind::Nominal: {
       auto Nominal = cast<NominalTypeRef>(SubstBase.get());
-      TypeWitness = RC.getDependentMemberTypeRef(MetadataAddress,
-                                                 Nominal->getMangledName(),
-                                                 DM);
+      TypeWitness = RC.getDependentMemberTypeRef(Nominal->getMangledName(), DM);
       break;
     }
     case TypeRefKind::BoundGeneric: {
       auto BG = cast<BoundGenericTypeRef>(SubstBase.get());
-      TypeWitness = RC.getDependentMemberTypeRef(MetadataAddress,
-                                                 BG->getMangledName(),
-                                                 DM);
+      TypeWitness = RC.getDependentMemberTypeRef(BG->getMangledName(), DM);
       break;
     }
     default:
@@ -599,9 +591,8 @@ public:
 
 template <typename Runtime>
 TypeRefPointer
-TypeRef::subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs,
-               typename Runtime::StoredPointer MetadataAddress) {
-  return TypeRefSubstitution<Runtime>(RC, Subs, MetadataAddress).visit(this);
+TypeRef::subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs) {
+  return TypeRefSubstitution<Runtime>(RC, Subs).visit(this);
 }
 
 } // end namespace reflection
