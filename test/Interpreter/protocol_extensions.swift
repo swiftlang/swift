@@ -16,12 +16,8 @@ extension Sequence {
 print(["a", "b", "c", "d"].myCount)
 
 // Extend a protocol with a function.
-
-// FIXME swift-3-indexing-model: check with Doug G
-// (author of d0ab6890f8ca8aed73059e43372db894a96bea81) to make sure this
-// added constraint is still valid.
-extension Collection where Index : Strideable {  
-  final var myIndices: RangeOfStrideable<Index> {
+extension Collection {
+  final var myIndices: Range<Index> {
     return startIndex..<endIndex
   }
 
@@ -103,10 +99,6 @@ for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
 }
 
 // Mutating algorithms.
-
-// FIXME swift-3-indexing-model: check with Doug G
-// (author of d0ab6890f8ca8aed73059e43372db894a96bea81) to make sure this
-// added constraint is still valid.
 extension MutableCollection
   where Self: RandomAccessCollection, Self.Iterator.Element : Comparable {
 
