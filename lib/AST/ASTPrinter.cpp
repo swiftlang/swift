@@ -458,22 +458,24 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         }
       }
     };
-    for (auto TL : Target->getInherited()) {
-      addTypeLocNominal(TL);
-    }
-    while(!Unhandled.empty()) {
-      NominalTypeDecl* Back = Unhandled.back();
-      Unhandled.pop_back();
-      for (ExtensionDecl *E : Back->getExtensions()) {
-        if (!shouldPrint(E, Options))
-          continue;
-        auto Pair = isApplicable(E, /*Synthesized*/true);
-        if (Pair.first) {
-          InfoMap->insert({E, Pair.first});
-          MergeInfoMap.insert({E, Pair.second});
-        }
-        for (auto TL : Back->getInherited()) {
-          addTypeLocNominal(TL);
+    if (Target->getKind() != DeclKind::Protocol) {
+      for (auto TL : Target->getInherited()) {
+        addTypeLocNominal(TL);
+      }
+      while(!Unhandled.empty()) {
+        NominalTypeDecl* Back = Unhandled.back();
+        Unhandled.pop_back();
+        for (ExtensionDecl *E : Back->getExtensions()) {
+          if (!shouldPrint(E, Options))
+            continue;
+          auto Pair = isApplicable(E, /*Synthesized*/true);
+          if (Pair.first) {
+            InfoMap->insert({E, Pair.first});
+            MergeInfoMap.insert({E, Pair.second});
+          }
+          for (auto TL : Back->getInherited()) {
+            addTypeLocNominal(TL);
+          }
         }
       }
     }
