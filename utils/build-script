@@ -39,13 +39,14 @@ from SwiftBuildSupport import (
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 
-import swift_build_support.clang    # noqa (E402 module level import not at top of file)
-import swift_build_support.cmake    # noqa (E402)
-import swift_build_support.debug    # noqa (E402)
+# E402 means module level import not at top of file
+import swift_build_support.toolchain  # noqa (E402)
+import swift_build_support.cmake      # noqa (E402)
+import swift_build_support.debug      # noqa (E402)
 from swift_build_support.migration import migrate_impl_args  # noqa (E402)
-import swift_build_support.ninja    # noqa (E402)
-import swift_build_support.tar      # noqa (E402)
-import swift_build_support.targets  # noqa (E402)
+import swift_build_support.ninja      # noqa (E402)
+import swift_build_support.tar        # noqa (E402)
+import swift_build_support.targets    # noqa (E402)
 
 
 # Main entry point for the preset mode.
@@ -1018,7 +1019,7 @@ the number of parallel build jobs to use""",
     if args.clean and os.path.isdir(build_dir):
         shutil.rmtree(build_dir)
 
-    host_clang = swift_build_support.clang.host_clang(
+    host_clang = swift_build_support.toolchain.host_clang(
         xcrun_toolchain=args.darwin_xcrun_toolchain)
     if not host_clang:
         print_with_argv0(
