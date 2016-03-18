@@ -85,7 +85,7 @@ func foo(x: _Pointer) {} // Checks that this protocol actually exists.
 // RUN: %target-swift-ide-test -print-module -module-group "Math/Integers" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
 // RUN: %target-swift-ide-test -print-module -module-group "Reflection" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
 // RUN: %target-swift-ide-test -print-module -module-group "Misc" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Collection" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
+// RUN: %target-swift-ide-test -print-module -module-group "Collection" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-COLLECTION-GROUP
 // RUN: %target-swift-ide-test -print-module -module-group "Bool" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
 // RUN: %target-swift-ide-test -print-module -module-group "Assert" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
 // RUN: %target-swift-ide-test -print-module -module-group "String" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
@@ -96,3 +96,4 @@ func foo(x: _Pointer) {} // Checks that this protocol actually exists.
 // CHECK-FREQUENT-WORD: ///
 // CHECK-FREQUENT-WORD-NOT: where Slice<Dictionary<Key, Value>> == Slice<Self>
 // CHECK-FREQUENT-WORD-NOT: @warn_unused_result
+// CHECK-COLLECTION-GROUP: extension MutableCollection

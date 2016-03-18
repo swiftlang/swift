@@ -449,8 +449,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   std::unique_ptr<ExtensionInfoMap>
   collectSynthesizedExtensionInfo(MergeGroupVector &AllGroups) {
     std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
-    if (Target->getKind() == DeclKind::Protocol)
-      return InfoMap;
     ExtensionMergeInfoMap MergeInfoMap;
     std::vector<NominalTypeDecl*> Unhandled;
     auto addTypeLocNominal = [&](TypeLoc TL){
