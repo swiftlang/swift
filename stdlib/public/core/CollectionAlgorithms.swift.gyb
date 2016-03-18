@@ -111,8 +111,18 @@ orderingRequirementForComparable = """\
 % for preds in [ True, False ]:
 
 %   if preds:
-extension MutableCollection where Self : RandomAccessCollection {
 
+extension MutableCollection where Self : RandomAccessCollection
+
+%   else:
+
+extension MutableCollection
+  where Self : RandomAccessCollection, ${IElement} : Comparable
+
+%   end
+{
+
+%   if preds:
 ${partitionDocComment}
   ///
 ${orderingRequirementForPredicate}
@@ -120,21 +130,18 @@ ${orderingRequirementForPredicate}
   public mutating func partition(
     @noescape isOrderedBefore isOrderedBefore:
       (${IElement}, ${IElement}) -> Bool
-  ) -> Index {
+  ) -> Index
 
 %   else:
-
-extension MutableCollection
-  where Self : RandomAccessCollection, ${IElement} : Comparable {
 
 ${partitionDocComment}
   ///
 ${orderingRequirementForComparable}
   @warn_unused_result
-  public mutating func partition() -> Index {
+  public mutating func partition() -> Index
 
 %   end
-
+  {
     let maybeOffset = _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Int in
       var bufferPointer =
