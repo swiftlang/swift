@@ -2391,14 +2391,13 @@ public func nth<C: Collection>(x: C, _ n: Int) -> C.Iterator.Element {
 }
 
 // TODO: swift-3-indexing-model - review the following
-#if false
-
 public func checkRangeReplaceable<
   C: RangeReplaceableCollection,
   N: Collection
   where
   C.Iterator.Element : Equatable,
-  C.Iterator.Element == N.Iterator.Element
+  C.Iterator.Element == N.Iterator.Element,
+  C.Indices.Iterator.Element == C.Index
 >(
   makeCollection: () -> C,
   _ makeNewValues: (Int) -> N
@@ -2454,8 +2453,6 @@ public func checkRangeReplaceable<
     }
   }
 }
-
-#endif
 
 public func expectEqualSequence<
   Expected: Sequence,
