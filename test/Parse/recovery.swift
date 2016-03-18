@@ -510,15 +510,6 @@ func foo1(bar!=baz) {}
 // expected-error@+1{{unnamed parameters must be written with the empty name '_'}}
 func foo2(bar! = baz) {}
 
-
-
-// <rdar://problem/18662272> Infinite loop and unbounded memory consumption in parser
-class Baz {}
-class Bar<T> {}
-func f1(a: Bar<Baz!>) {}
-func f2(a: Bar<Baz /* some comment */!>) {}
-
-
 // rdar://19605567
 // expected-error@+1{{use of unresolved identifier 'esp'}}
 switch esp {
