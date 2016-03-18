@@ -1437,9 +1437,9 @@ func computeCountLeadingZeroes(x: Int64) -> Int64 {
 
 BitTwiddlingTestSuite.test("_pointerSize") {
 #if arch(i386) || arch(arm)
-  expectFalse(sizeof(Optional<AnyObject>.self) == 4)
+  expectEqual(4, sizeof(Optional<AnyObject>.self))
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
-  expectTrue(sizeof(Optional<AnyObject>.self) == 8)
+  expectEqual(8, sizeof(Optional<AnyObject>.self))
 #else
   fatalError("implement")
 #endif
