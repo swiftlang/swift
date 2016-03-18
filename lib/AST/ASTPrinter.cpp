@@ -261,8 +261,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     ExtensionMergeGroup(SynthesizedExtensionInfo *Info,
                         bool MergableWithType) {
       Members.push_back(Info);
-      Kind = MergableWithType ? MergeGroupKind::Uncontraint :
-                                MergeGroupKind::Contraint;
+      Kind = MergableWithType ? MergeGroupKind::MergableWithTypeDef :
+                                MergeGroupKind::UnmergableWithTypeDef;
     }
   };
 

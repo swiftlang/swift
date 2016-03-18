@@ -436,7 +436,7 @@ void swift::ide::printSubmoduleInterface(
       if (PrintSynthesizedExtensions) {
         pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
         AdjustedOptions.shouldCloseNominal = !pAnalyzer->hasMergeGroup(
-          SynthesizedExtensionAnalyzer::MergeGroupKind::Uncontraint);
+          SynthesizedExtensionAnalyzer::MergeGroupKind::MergableWithTypeDef);
       }
     }
     if (D->print(Printer, AdjustedOptions)) {
@@ -476,12 +476,12 @@ void swift::ide::printSubmoduleInterface(
 
           bool IsTopLevelDecl = D == NTD;
 
-          // If printed Decl is the top-level, merge the contraint-free extensions
+          // If printed Decl is the top-level, merge the constraint-free extensions
           // into the main body.
           if (IsTopLevelDecl) {
           // Print the part that should be merged with the type decl.
           pAnalyzer->forEachExtensionMergeGroup(
-            SynthesizedExtensionAnalyzer::MergeGroupKind::Uncontraint,
+            SynthesizedExtensionAnalyzer::MergeGroupKind::MergableWithTypeDef,
             [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
               for (auto ET : Decls) {
                 AdjustedOptions.shouldOpenExtension = false;
@@ -509,9 +509,10 @@ void swift::ide::printSubmoduleInterface(
           pAnalyzer->forEachExtensionMergeGroup(
             // For top-level decls, only contraint extensions are to print;
             // Since the rest are merged into the main body.
-            IsTopLevelDecl ? SynthesizedExtensionAnalyzer::MergeGroupKind::Contraint :
+            IsTopLevelDecl ?
+              SynthesizedExtensionAnalyzer::MergeGroupKind::UnmergableWithTypeDef :
             // For sub-decls, all extensions should be printed.
-                       SynthesizedExtensionAnalyzer::MergeGroupKind::All,
+              SynthesizedExtensionAnalyzer::MergeGroupKind::All,
             [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
               for (auto ET : Decls) {
                 AdjustedOptions.shouldOpenExtension =
