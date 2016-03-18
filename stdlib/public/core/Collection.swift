@@ -826,7 +826,7 @@ extension Collection {
 
 // WORKAROUND rdar://25214066 - should be on Collection
 extension Indexable {
-  subscript(bounds: ClosedRange<Index>) -> SubSequence {
+  public subscript(bounds: ClosedRange<Index>) -> SubSequence {
     return self[
       Range(
         _uncheckedBounds: (
@@ -838,11 +838,11 @@ extension Indexable {
 
 // WORKAROUND rdar://25214066 - should be on Collection
 extension Indexable where Index : Strideable {
-  subscript(bounds: RangeOfStrideable<Index>) -> SubSequence {
+  public subscript(bounds: RangeOfStrideable<Index>) -> SubSequence {
     return self[Range(bounds)]
   }
   
-  subscript(bounds: ClosedRangeOfStrideable<Index>) -> SubSequence {
+  public subscript(bounds: ClosedRangeOfStrideable<Index>) -> SubSequence {
     return self[ClosedRange(bounds)]
   }
 }
