@@ -166,7 +166,9 @@ public protocol RangeReplaceableCollection : Collection {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func removeSubrange(bounds: Range<Index>)
+  mutating func removeSubrange<
+    Bounds : _RangeProtocol where Bounds.Bound == Index
+  >(bounds: Range<Index>)
 
   /// Remove all elements.
   ///
@@ -236,21 +238,17 @@ extension RangeReplaceableCollection {
     return result
   }
 
-  public mutating func removeSubrange<
-    R: _HalfOpenRange where R.Bound == Index
-  >(bounds: R) {
-    replaceSubrange(Range(bounds), with: EmptyCollection())
-  }
-
   internal func makeHalfOpen<
-    R: _ClosedRange where R.Bound == Index
+    R: _RangeProtocol where R.Bound == Index
   >(r: R) -> Range<Index> {
     return Range(
-      _uncheckedBounds: (lower: r.lowerBound, upper: next(r.upperBound)))
+      _uncheckedBounds: (
+        lower: r.lowerBound,
+        upper: r.contains(r.upperBound) ? next(r.upperBound) : r.upperBound))
   }
   
   public mutating func removeSubrange<
-    R: _ClosedRange where R.Bound == Index
+    R: _RangeProtocol where R.Bound == Index
   >(bounds: R) {
     replaceSubrange(makeHalfOpen(bounds), with: EmptyCollection())
   }
@@ -321,7 +319,7 @@ extension RangeReplaceableCollection where Index : Strideable {
 
 extension RangeReplaceableCollection {
   public mutating func replaceSubrange<
-    R : _ClosedRange, C : Collection 
+    R : _RangeProtocol, C : Collection 
 	where 
     R.Bound == Self.Index, C.Iterator.Element == Iterator.Element
   >(

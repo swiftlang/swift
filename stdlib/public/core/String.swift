@@ -690,25 +690,14 @@ extension String {
   /// - Complexity: O(`bounds.count`) if `bounds.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
-    C: Collection where C.Iterator.Element == Character
+    Bounds: _RangeProtocol, C: Collection 
+  where C.Iterator.Element == Character, Bounds.Bound == Index
   >(
-    bounds: Range<Index>, with newElements: C
+    bounds: Bounds, with newElements: C
   ) {
     withMutableCharacters {
       (v: inout CharacterView) in v.replaceSubrange(bounds, with: newElements)
     }
-  }
-
-  /// Replace the text in `bounds` with `replacement`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
-  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceSubrange(
-    bounds: Range<Index>, with newElements: String
-  ) {
-    replaceSubrange(bounds, with: newElements.characters)
   }
 
   /// Insert `newElement` at position `i`.
