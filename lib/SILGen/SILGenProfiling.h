@@ -16,6 +16,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Stmt.h"
+#include "swift/SIL/FormalLinkage.h"
 
 namespace swift {
 
@@ -41,6 +42,8 @@ private:
 
   // The current function's name and counter data.
   std::string CurrentFuncName;
+  StringRef CurrentFileName;
+  FormalLinkage CurrentFuncLinkage;
   unsigned NumRegionCounters;
   uint64_t FunctionHash;
   llvm::DenseMap<ASTNode, unsigned> RegionCounterMap;

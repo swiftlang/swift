@@ -17,9 +17,12 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/ProfileData/CoverageMapping.h"
 #include "llvm/ProfileData/CoverageMappingWriter.h"
+#include "llvm/ProfileData/InstrProf.h"
 
 #include <forward_list>
 
@@ -395,12 +398,11 @@ public:
   /// \brief Generate the coverage counter mapping regions from collected
   /// source regions.
   SILCoverageMap *
-  emitSourceRegions(SILModule &M, StringRef Name, uint64_t Hash,
-                    llvm::DenseMap<ASTNode, unsigned> &CounterIndices) {
+  emitSourceRegions(SILModule &M, StringRef Name, bool External, uint64_t Hash,
+                    llvm::DenseMap<ASTNode, unsigned> &CounterIndices,
+                    StringRef Filename) {
     if (SourceRegions.empty())
       return nullptr;
-    StringRef Filename = SM.getIdentifierForBuffer(
-        SM.findBufferContainingLoc(SourceRegions.front().getStartLoc()));
 
     llvm::coverage::CounterExpressionBuilder Builder;
     std::vector<SILCoverageMap::MappedRegion> Regions;
@@ -415,7 +417,7 @@ public:
       Regions.emplace_back(Start.first, Start.second, End.first, End.second,
                            Region.getCounter().expand(Builder, CounterIndices));
     }
-    return SILCoverageMap::create(M, Filename, Name, Hash, Regions,
+    return SILCoverageMap::create(M, Filename, Name, External, Hash, Regions,
                                   Builder.getExpressions());
   }
 
@@ -606,8 +608,21 @@ static void walkForProfiling(AbstractFunctionDecl *Root, ASTWalker &Walker) {
   }
 }
 
+static llvm::GlobalValue::LinkageTypes
+getEquivalentPGOLinkage(FormalLinkage Linkage) {
+  return (Linkage == FormalLinkage::HiddenUnique ||
+          Linkage == FormalLinkage::HiddenNonUnique ||
+          Linkage == FormalLinkage::Private)
+             ? llvm::GlobalValue::PrivateLinkage
+             : llvm::GlobalValue::ExternalLinkage;
+}
+
 void SILGenProfiling::assignRegionCounters(AbstractFunctionDecl *Root) {
   CurrentFuncName = SILDeclRef(Root).mangle();
+  CurrentFuncLinkage = getDeclLinkage(Root);
+
+  if (auto *ParentFile = Root->getParentSourceFile())
+    CurrentFileName = ParentFile->getFilename();
 
   MapRegionCounters Mapper(RegionCounterMap);
   walkForProfiling(Root, Mapper);
@@ -619,8 +634,10 @@ void SILGenProfiling::assignRegionCounters(AbstractFunctionDecl *Root) {
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SGM.M.getASTContext().SourceMgr);
     walkForProfiling(Root, Coverage);
-    Coverage.emitSourceRegions(SGM.M, CurrentFuncName, FunctionHash,
-                               RegionCounterMap);
+    Coverage.emitSourceRegions(SGM.M, CurrentFuncName,
+                               !llvm::GlobalValue::isLocalLinkage(
+                                   getEquivalentPGOLinkage(CurrentFuncLinkage)),
+                               FunctionHash, RegionCounterMap, CurrentFileName);
   }
 }
 
@@ -645,11 +662,15 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
   auto Int32Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(32, C));
   auto Int64Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(64, C));
 
+  std::string PGOFuncName = llvm::getPGOFuncName(
+      CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
+      CurrentFileName);
+
   SILLocation Loc = getLocation(Node);
   SILValue Args[] = {
       // The intrinsic must refer to the function profiling name var, which is
       // inaccessible during SILGen. Rely on irgen to rewrite the function name.
-      Builder.createStringLiteral(Loc, StringRef(CurrentFuncName),
+      Builder.createStringLiteral(Loc, StringRef(PGOFuncName),
                                   StringLiteralInst::Encoding::UTF8),
       Builder.createIntegerLiteral(Loc, Int64Ty, FunctionHash),
       Builder.createIntegerLiteral(Loc, Int32Ty, NumRegionCounters),

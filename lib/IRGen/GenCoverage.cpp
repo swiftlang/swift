@@ -105,7 +105,10 @@ void IRGenModule::emitCoverageMapping() {
     W.write(OS);
 
     std::string NameValue = llvm::getPGOFuncName(
-        M.getName(), llvm::GlobalValue::LinkOnceAnyLinkage, M.getFile());
+        M.getName(),
+        M.isPossiblyUsedExternally() ? llvm::GlobalValue::ExternalLinkage
+                                     : llvm::GlobalValue::PrivateLinkage,
+        M.getFile());
     llvm::GlobalVariable *NamePtr = llvm::createPGOFuncNameVar(
         *getModule(), llvm::GlobalValue::LinkOnceAnyLinkage, NameValue);
 
