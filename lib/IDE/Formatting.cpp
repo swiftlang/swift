@@ -1,4 +1,4 @@
-//===--- FormatContext.cpp --------------------------------------------------===//
+//===--- Formatting.cpp --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "FormatContext.h"
+#include "swift/IDE/Formatting.h"
 
 size_t swift::ide::getOffsetOfLine(unsigned LineIndex, StringRef Text) {
   //  SourceLoc start = SourceLoc(llvm::SMLoc::getFromPointer(Text.begin()));
@@ -67,3 +67,4 @@ size_t swift::ide::getExpandedIndentForLine(unsigned LineIndex,
   }
   return Indent;
 }
+

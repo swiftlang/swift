@@ -1,4 +1,4 @@
-//===--- FormatContext.h --------------------------------------------------===//
+//===--- Formatting.h --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_FORMATCONTEXT_H
-#define SWIFT_FORMATCONTEXT_H
+#ifndef SWIFT_FORMATTING_H
+#define SWIFT_FORMATTING_H
 
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
@@ -824,4 +824,4 @@ public:
 } // namespace ide
 } // namespace swift
 
-#endif // LLVM_SWIFT_FORMATCONTEXT_H
+#endif // LLVM_SWIFT_FORMATTING_H

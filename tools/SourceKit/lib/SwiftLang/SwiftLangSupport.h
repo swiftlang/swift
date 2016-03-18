@@ -14,13 +14,13 @@
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTLANGSUPPORT_H
 
 #include "CodeCompletion.h"
-#include "FormatContext.h"
 #include "SwiftInterfaceGenContext.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/ThreadSafeRefCntPtr.h"
 #include "SourceKit/Support/Tracing.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/IDE/Formatting.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Mutex.h"

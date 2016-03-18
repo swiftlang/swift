@@ -13,7 +13,6 @@
 #include "SwiftASTManager.h"
 #include "SwiftEditorDiagConsumer.h"
 #include "SwiftLangSupport.h"
-#include "FormatContext.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/NotificationCenter.h"
 #include "SourceKit/Support/ImmutableTextBuffer.h"
@@ -31,6 +30,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/Formatting.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Subsystems.h"
@@ -208,7 +208,7 @@ bool SwiftEditorDocumentFileMap::getOrUpdate(
       found = true;
     }
   });
-  
+
   return found;
 }
 
@@ -269,18 +269,18 @@ public:
     assert(Line > 0);
     if (Lines.size() < Line)
       return false;
-    
+
     unsigned LineOffset = Line - 1;
     const SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
     if (LineMap.empty())
       return false;
-    
+
     const SwiftSyntaxToken &Tok = LineMap.front();
     if (Tok.Column == Token.Column && Tok.Length == Token.Length
         && Tok.Kind == Token.Kind) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -493,7 +493,7 @@ public:
       Info.Files.push_back(std::make_pair(PrimaryFile, Text));
       TracedOp.start(trace::OperationKind::SimpleParse, Info);
     }
-    
+
     bool Done = false;
     while (!Done) {
       P.parseTopLevel();
@@ -928,7 +928,7 @@ struct SwiftEditorDocument::Implementation {
     llvm::sys::ScopedLock L(AccessMtx);
     return SyntaxInfo;
   }
-  
+
   llvm::sys::Mutex AccessMtx;
 
   Implementation(StringRef FilePath, SwiftLangSupport &LangSupport,
@@ -1874,7 +1874,7 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   FormatContext FC = walker.walkToLocation(Loc);
   CodeFormatOptions Options = getFormatOptions();
   CodeFormatter CF(Options);
-  std::pair<LineRange, std::string> indented = CF.indent(Line, FC, Text);
+  auto indented = CF.indent(Line, FC, Text);
 
   LineRange LineRange = indented.first;
   StringRef ModifiedText = indented.second;
@@ -2071,7 +2071,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
   if (Consumer.needsSemanticInfo()) {
     EditorDoc->updateSemaInfo();
   }
-  
+
   EditorDoc->readSyntaxInfo(Consumer);
   EditorDoc->readSemanticInfo(Snapshot, Consumer);
 }
@@ -2137,7 +2137,7 @@ void SwiftLangSupport::editorFormatText(StringRef Name, unsigned Line,
     Consumer.handleRequestError("No associated Editor Document");
     return;
   }
-  
+
   EditorDoc->formatText(Line, Length, Consumer);
 }
 
