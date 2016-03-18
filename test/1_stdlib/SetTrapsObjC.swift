@@ -94,10 +94,6 @@ struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
 
   var hashValue: Int { return value }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCKeyTy.self
-  }
-
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
     return TestObjCKeyTy(value)
   }

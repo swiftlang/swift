@@ -227,10 +227,6 @@ struct TestBridgedKeyTy
     return true
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCKeyTy.self
-  }
-
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
     _bridgedKeyBridgeOperations.fetchAndAdd(1)
     return TestObjCKeyTy(value)
@@ -292,10 +288,6 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
     return true
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCValueTy.self
-  }
-
   func _bridgeToObjectiveC() -> TestObjCValueTy {
     TestBridgedValueTy.bridgeOperations += 1
     return TestObjCValueTy(value)
@@ -348,10 +340,6 @@ struct TestBridgedEquatableValueTy
 
   static func _isBridgedToObjectiveC() -> Bool {
     return true
-  }
-
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCValueTy.self
   }
 
   func _bridgeToObjectiveC() -> TestObjCEquatableValueTy {

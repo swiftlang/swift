@@ -97,10 +97,6 @@ var bridgeFromOperationCount = 0
 var bridgeToOperationCount = 0
 
 struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedObjC.self
-  }
-  
   func _bridgeToObjectiveC() -> BridgedObjC {
     bridgeToOperationCount += 1
     return BridgedObjC(trak.value)

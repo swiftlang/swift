@@ -9,10 +9,6 @@ extension Refrigerator : _ObjectiveCBridgeable {
 
   public static func _isBridgedToObjectiveC() -> Bool { return true }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return _ObjectiveCType.self
-  }
-
   public func _bridgeToObjectiveC() -> _ObjectiveCType {
     return APPRefrigerator(temperature: temperature)
   }

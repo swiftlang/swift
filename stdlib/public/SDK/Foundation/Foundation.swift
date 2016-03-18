@@ -126,10 +126,6 @@ extension String : _ObjectiveCBridgeable {
     return true
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSString.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSString {
     // This method should not do anything extra except calling into the
@@ -180,10 +176,6 @@ extension Int : _ObjectiveCBridgeable {
     self = number.integerValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(integer: self)
@@ -218,10 +210,6 @@ extension UInt : _ObjectiveCBridgeable {
 
   public init(_ number: NSNumber) {
     self = number.unsignedIntegerValue
-  }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
   }
 
   @_semantics("convertToObjectiveC")
@@ -260,10 +248,6 @@ extension Float : _ObjectiveCBridgeable {
     self = number.floatValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(float: self)
@@ -298,10 +282,6 @@ extension Double : _ObjectiveCBridgeable {
 
   public init(_ number: NSNumber) {
     self = number.doubleValue
-  }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
   }
 
   @_semantics("convertToObjectiveC")
@@ -340,10 +320,6 @@ extension Bool: _ObjectiveCBridgeable {
     self = number.boolValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(bool: self)
@@ -379,10 +355,6 @@ extension CGFloat : _ObjectiveCBridgeable {
 
   public init(_ number: NSNumber) {
     self.native = CGFloat.NativeType(number)
-  }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
   }
 
   @_semantics("convertToObjectiveC")
@@ -477,10 +449,6 @@ extension Array : _ObjectiveCBridgeable {
 
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Element.self)
-  }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSArray.self
   }
 
   @_semantics("convertToObjectiveC")
@@ -591,10 +559,6 @@ extension Dictionary {
 
 // Dictionary<Key, Value> is conditionally bridged to NSDictionary
 extension Dictionary : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSDictionary.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
     return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSDictionary.self)
@@ -842,10 +806,6 @@ extension NSIndexSet : Sequence {
 
 // Set<Element> is conditionally bridged to NSSet
 extension Set : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSSet.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSSet {
     return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSSet.self)

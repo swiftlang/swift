@@ -19,10 +19,6 @@ extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{confor
 
   public static func _isBridgedToObjectiveC() -> Bool { return true }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return BridgedClassSub.self
-  }
-
   public func _bridgeToObjectiveC() -> _ObjectiveCType {
     return BridgedClassSub()
   }
@@ -54,10 +50,6 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedClass.self
-  }
-
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
   }

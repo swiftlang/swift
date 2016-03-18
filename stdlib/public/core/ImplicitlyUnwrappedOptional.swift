@@ -78,10 +78,6 @@ func _stdlib_ImplicitlyUnwrappedOptional_unwrapped<Wrapped>
 
 #if _runtime(_ObjC)
 extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return Swift._getBridgedObjectiveCType(Wrapped.self)!
-  }
-
   public func _bridgeToObjectiveC() -> AnyObject {
     switch self {
     case .none:

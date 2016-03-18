@@ -68,10 +68,6 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     self.value = value
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return ClassA.self
-  }
-
   func _bridgeToObjectiveC() -> ClassA {
     return ClassA(value: value)
   }
@@ -115,10 +111,6 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
     value5 = value
     value6 = value
     value7 = value
-  }
-
-  static func _getObjectiveCType() -> Any.Type {
-    return ClassA.self
   }
 
   func _bridgeToObjectiveC() -> ClassA {
@@ -167,10 +159,6 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
 struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
   init(value: Int) {
     self.value = value
-  }
-
-  static func _getObjectiveCType() -> Any.Type {
-    return ClassA.self
   }
 
   func _bridgeToObjectiveC() -> ClassA {
