@@ -915,7 +915,7 @@ struct SwiftEditorDocument::Implementation {
   EditableTextBufferRef EditableBuffer;
 
   SwiftSyntaxMap SyntaxMap;
-  SwiftEditorLineRange EditedLineRange;
+  LineRange EditedLineRange;
   SwiftEditorCharRange AffectedRange;
 
   std::vector<DiagnosticEntryInfo> ParserDiagnostics;
@@ -1278,7 +1278,7 @@ public:
 
 class SwiftEditorSyntaxWalker: public ide::SyntaxModelWalker {
   SwiftSyntaxMap &SyntaxMap;
-  SwiftEditorLineRange EditedLineRange;
+  LineRange EditedLineRange;
   SwiftEditorCharRange &AffectedRange;
   SourceManager &SrcManager;
   EditorConsumer &Consumer;
@@ -1288,7 +1288,7 @@ class SwiftEditorSyntaxWalker: public ide::SyntaxModelWalker {
   unsigned NestingLevel = 0;
 public:
   SwiftEditorSyntaxWalker(SwiftSyntaxMap &SyntaxMap,
-                          SwiftEditorLineRange EditedLineRange,
+                          LineRange EditedLineRange,
                           SwiftEditorCharRange &AffectedRange,
                           SourceManager &SrcManager, EditorConsumer &Consumer,
                           unsigned BufferID)
@@ -1874,9 +1874,9 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   FormatContext FC = walker.walkToLocation(Loc);
   CodeFormatOptions Options = getFormatOptions();
   CodeFormatter CF(Options);
-  std::pair<SwiftEditorLineRange, std::string> indented = CF.indent(Line, FC, Text);
+  std::pair<LineRange, std::string> indented = CF.indent(Line, FC, Text);
 
-  SwiftEditorLineRange LineRange = indented.first;
+  LineRange LineRange = indented.first;
   StringRef ModifiedText = indented.second;
   Consumer.recordFormattedText(ModifiedText);
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());

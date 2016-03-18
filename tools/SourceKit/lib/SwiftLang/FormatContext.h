@@ -713,16 +713,16 @@ StringRef getTrimmedTextForLine(unsigned LineIndex, StringRef Text);
 size_t getExpandedIndentForLine(unsigned LineIndex, CodeFormatOptions Options,
                                 StringRef Text);
 
-class SwiftEditorLineRange {
+class LineRange {
   unsigned StartLine;
   unsigned Length;
 
 public:
-  SwiftEditorLineRange()
+  LineRange()
     :StartLine(0), Length(0) { }
-  SwiftEditorLineRange(unsigned StartLine, unsigned Length)
+  LineRange(unsigned StartLine, unsigned Length)
     :StartLine(StartLine), Length(Length) { }
-  SwiftEditorLineRange(const SwiftEditorLineRange &Other)
+  LineRange(const LineRange &Other)
     :StartLine(Other.StartLine), Length(Other.Length) { }
 
   bool isValid() const {
@@ -732,7 +732,7 @@ public:
   unsigned startLine() const {
     return StartLine;
   }
-  
+
   unsigned endLine() const {
     return isValid() ? StartLine + Length - 1 : 0;
   }
@@ -740,7 +740,7 @@ public:
   unsigned lineCount() const {
     return Length;
   }
-  
+
   void setRange(unsigned NewStartLine, unsigned NewLength) {
     StartLine = NewStartLine;
     Length = NewLength;
@@ -764,7 +764,7 @@ public:
   CodeFormatter(CodeFormatOptions &Options)
     :FmtOptions(Options) { }
 
-  std::pair<SwiftEditorLineRange, std::string> indent(unsigned LineIndex, FormatContext &FC, StringRef Text) {
+  std::pair<LineRange, std::string> indent(unsigned LineIndex, FormatContext &FC, StringRef Text) {
 
     // If having sibling locs to align with, respect siblings.
     if (FC.HasSibling()) {
@@ -778,8 +778,7 @@ public:
           Builder.append(FmtOptions.IndentWidth, ' ');
       }
       Builder.append(Line);
-      return std::make_pair(SwiftEditorLineRange(LineIndex, 1),
-                            Builder.str().str());
+      return std::make_pair(LineRange(LineIndex, 1), Builder.str().str());
     }
 
     // Take the current indent position of the outer context, then add another
@@ -816,7 +815,7 @@ public:
     IndentedLine.append(Line);
 
     // Return affected line range, which can later be more than one line.
-    SwiftEditorLineRange range = SwiftEditorLineRange(LineIndex, 1);
+    LineRange range = LineRange(LineIndex, 1);
     return std::make_pair(range, IndentedLine);
   }
 
