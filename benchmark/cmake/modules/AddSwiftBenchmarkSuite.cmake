@@ -296,6 +296,7 @@ function (swift_benchmark_compile_archopts)
         "-O3"
         "-target" "${target}"
         "-isysroot" "${sdk}"
+        "-fobjc-arc"
         "-arch" "${BENCH_COMPILE_ARCHOPTS_ARCH}"
         "-F" "${sdk}/../../../Developer/Library/Frameworks"
         "-m${triple_platform}-version-min=${ver}"
