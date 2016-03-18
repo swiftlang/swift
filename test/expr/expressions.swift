@@ -701,7 +701,7 @@ func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
 
 
 // <rdar://problem/19657458> Nil Coalescing operator (??) should have a higher precedence
-func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
+func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRangeOfStrideable<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=(}} {{17-17= != nil)}}
@@ -712,7 +712,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'Range<Int>?' and 'Int'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'ClosedRangeOfStrideable<Int>?' and 'Int'}}
   // expected-note @-1 {{overloads for '??' exist with these partially matching parameter lists:}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
 }
