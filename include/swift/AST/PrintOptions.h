@@ -275,11 +275,11 @@ struct PrintOptions {
   /// \brief The information for converting archetypes to specialized types.
   std::shared_ptr<ArchetypeTransformContext> TransformContext;
 
-  bool shouldOpenExtension = true;
-
-  bool shouldCloseExtension = true;
-
-  bool shouldCloseNominal = true;
+  struct BracketOptions {
+    bool shouldOpenExtension = true;
+    bool shouldCloseExtension = true;
+    bool shouldCloseNominal = true;
+  } BracketOptions;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {

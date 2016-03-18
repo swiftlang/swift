@@ -435,14 +435,15 @@ void swift::ide::printSubmoduleInterface(
     if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       if (PrintSynthesizedExtensions) {
         pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
-        AdjustedOptions.shouldCloseNominal = !pAnalyzer->hasMergeGroup(
-          SynthesizedExtensionAnalyzer::MergeGroupKind::MergableWithTypeDef);
+        AdjustedOptions.BracketOptions.shouldCloseNominal =
+          !pAnalyzer->hasMergeGroup(SynthesizedExtensionAnalyzer::
+                                    MergeGroupKind::MergableWithTypeDef);
       }
     }
     if (D->print(Printer, AdjustedOptions)) {
-      if (AdjustedOptions.shouldCloseNominal)
+      if (AdjustedOptions.BracketOptions.shouldCloseNominal)
         Printer << "\n";
-      AdjustedOptions.shouldCloseNominal = true;
+      AdjustedOptions.BracketOptions.shouldCloseNominal = true;
       if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
         std::queue<NominalTypeDecl *> SubDecls{{NTD}};
 
@@ -484,8 +485,8 @@ void swift::ide::printSubmoduleInterface(
             SynthesizedExtensionAnalyzer::MergeGroupKind::MergableWithTypeDef,
             [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
               for (auto ET : Decls) {
-                AdjustedOptions.shouldOpenExtension = false;
-                AdjustedOptions.shouldCloseExtension =
+                AdjustedOptions.BracketOptions.shouldOpenExtension = false;
+                AdjustedOptions.BracketOptions.shouldCloseExtension =
                   Decls.back().first == ET.first;
                 if (ET.second)
                   AdjustedOptions.
@@ -495,7 +496,7 @@ void swift::ide::printSubmoduleInterface(
                 if (ET.second)
                   AdjustedOptions.
                     clearArchetypeTransformerForSynthesizedExtensions();
-                if (AdjustedOptions.shouldCloseExtension)
+                if (AdjustedOptions.BracketOptions.shouldCloseExtension)
                   Printer << "\n";
               }
           });
@@ -515,11 +516,11 @@ void swift::ide::printSubmoduleInterface(
               SynthesizedExtensionAnalyzer::MergeGroupKind::All,
             [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
               for (auto ET : Decls) {
-                AdjustedOptions.shouldOpenExtension =
+                AdjustedOptions.BracketOptions.shouldOpenExtension =
                   Decls.front().first == ET.first;
-                AdjustedOptions.shouldCloseExtension =
+                AdjustedOptions.BracketOptions.shouldCloseExtension =
                   Decls.back().first == ET.first;
-                if (AdjustedOptions.shouldOpenExtension)
+                if (AdjustedOptions.BracketOptions.shouldOpenExtension)
                   Printer << "\n";
                 if (ET.second)
                   AdjustedOptions.
@@ -529,7 +530,7 @@ void swift::ide::printSubmoduleInterface(
                 if (ET.second)
                   AdjustedOptions.
                     clearArchetypeTransformerForSynthesizedExtensions();
-                if (AdjustedOptions.shouldCloseExtension)
+                if (AdjustedOptions.BracketOptions.shouldCloseExtension)
                   Printer << "\n";
             }
           });

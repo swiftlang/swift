@@ -1991,7 +1991,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
 
 void PrintAST::
 printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
-  if (Options.shouldOpenExtension) {
+  if (Options.BracketOptions.shouldOpenExtension) {
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";
@@ -2011,13 +2011,13 @@ printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(ExtDecl, false,
-                       Options.shouldOpenExtension,
-                       Options.shouldCloseExtension);
+                       Options.BracketOptions.shouldOpenExtension,
+                       Options.BracketOptions.shouldCloseExtension);
   }
 }
 
 void PrintAST::printExtension(ExtensionDecl* decl) {
-  if (Options.shouldOpenExtension) {
+  if (Options.BracketOptions.shouldOpenExtension) {
     printDocumentationComment(decl);
     printAttributes(decl);
     Printer << "extension ";
@@ -2039,8 +2039,8 @@ void PrintAST::printExtension(ExtensionDecl* decl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false,
-                       Options.shouldOpenExtension,
-                       Options.shouldCloseExtension);
+                       Options.BracketOptions.shouldOpenExtension,
+                       Options.BracketOptions.shouldCloseExtension);
   }
 }
 
@@ -2186,7 +2186,8 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
     printInherited(decl);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal);
   }
 }
 
@@ -2211,7 +2212,8 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
     printInherited(decl);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal);
   }
 }
 
@@ -2238,7 +2240,8 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   }
 
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal);
   }
 }
 
@@ -2280,7 +2283,8 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     printInherited(decl, explicitClass);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal);
   }
 }
 
