@@ -43,8 +43,6 @@ namespace irgen {
 
 class IRGenFunction;
 
-typedef struct { SILLocation::DebugLoc LocForLinetable, Loc; } FullLocation;
-
 typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
     TrackingDIRefMap;
 

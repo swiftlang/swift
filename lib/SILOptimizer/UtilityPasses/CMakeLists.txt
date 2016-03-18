@@ -19,5 +19,6 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/MemBehaviorDumper.cpp
   UtilityPasses/RCIdentityDumper.cpp
   UtilityPasses/SideEffectsDumper.cpp
+  UtilityPasses/SILDebugInfoGenerator.cpp
   UtilityPasses/StripDebugInfo.cpp
   PARENT_SCOPE)
