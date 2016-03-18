@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_SILOPTIONS_H
 #define SWIFT_AST_SILOPTIONS_H
 
+#include "llvm/ADT/StringRef.h"
 #include <string>
 #include <climits>
 
@@ -96,11 +97,14 @@ public:
   bool EmitProfileCoverageMapping = false;
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
-  StringRef ExternalPassPipelineFilename;
+  llvm::StringRef ExternalPassPipelineFilename;
   
   /// Emit captures and function contexts using +0 caller-guaranteed ARC
   /// conventions.
   bool EnableGuaranteedClosureContexts = false;
+
+  /// The name of the SIL outputfile if compiled with SIL debugging (-gsil).
+  std::string SILOutputFileNameForDebugging;
 };
 
 } // end namespace swift

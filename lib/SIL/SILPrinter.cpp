@@ -17,6 +17,7 @@
 #include "swift/Strings.h"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCoverageMap.h"
@@ -379,19 +380,16 @@ namespace {
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
 class SILPrinter : public SILVisitor<SILPrinter> {
+  SILPrintContext &Ctx;
   struct {
     llvm::formatted_raw_ostream OS;
     PrintOptions ASTOptions;
   } PrintState;
   SILValue subjectValue;
-  bool Verbose;
-  bool SortedSIL;
   unsigned LastBufferID;
 
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
   llvm::DenseMap<const ValueBase *, unsigned> ValueToIDMap;
-  SILFunction::ScopeSlotTracker *ScopeSlots;
-  std::unique_ptr<SILFunction::ScopeSlotTracker> ManagedScopeSlotTracker;
 
   // Printers for the underlying stream.
 #define SIMPLE_PRINTER(TYPE) \
@@ -428,20 +426,12 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   
 public:
   SILPrinter(
-    raw_ostream &OS,
-      bool V = false, bool SortedSIL = false,
-      llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr,
-      SILFunction::ScopeSlotTracker *ScopeTracker = nullptr)
-      : PrintState{{OS}, PrintOptions::printSIL()}, Verbose(V),
-        SortedSIL(SortedSIL), LastBufferID(0) {
+      SILPrintContext &PrintCtx,
+      llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr )
+      : Ctx(PrintCtx),
+        PrintState{{PrintCtx.OS()}, PrintOptions::printSIL()},
+        LastBufferID(0) {
     PrintState.ASTOptions.AlternativeTypeNames = AlternativeTypeNames;
-    if (ScopeTracker)
-      ScopeSlots = ScopeTracker;
-    else {
-      ManagedScopeSlotTracker =
-          llvm::make_unique<SILFunction::ScopeSlotTracker>();
-      ScopeSlots = ManagedScopeSlotTracker.get();
-    }
   }
 
   ID getID(const SILBasicBlock *B);
@@ -454,7 +444,7 @@ public:
   // Big entrypoints.
   void print(const SILFunction *F) {
     // If we are asked to emit sorted SIL, print out our BBs in RPOT order.
-    if (SortedSIL) {
+    if (Ctx.sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(F);
       std::copy(po_begin(UnsafeF), po_end(UnsafeF),
@@ -532,8 +522,10 @@ public:
     }
     *this << '\n';
 
-    for (const SILInstruction &I : *BB)
+    for (const SILInstruction &I : *BB) {
+      Ctx.printInstructionCallBack(&I);
       print(&I);
+    }
   }
 
   //===--------------------------------------------------------------------===//
@@ -584,11 +576,10 @@ public:
     if (!DS)
       return;
 
-    if (!ScopeSlots->ScopeToIDMap.count(DS)) {
+    if (!Ctx.hasScopeID(DS)) {
       printDebugScope(DS->Parent.dyn_cast<const SILDebugScope *>(), SM);
       printDebugScope(DS->InlinedCallSite, SM);
-      unsigned ID = ++(ScopeSlots->ScopeIndex);
-      ScopeSlots->ScopeToIDMap.insert({DS, ID});
+      unsigned ID = Ctx.assignScopeID(DS);
       *this << "sil_scope " << ID << " { ";
       printDebugLocRef(DS->Loc, SM, false);
       *this << " parent ";
@@ -596,10 +587,10 @@ public:
         *this << "@" << F->getName() << " : $" << F->getLoweredFunctionType();
       else {
         auto *PS = DS->Parent.get<const SILDebugScope *>();
-        *this << ScopeSlots->ScopeToIDMap[PS];
+        *this << Ctx.getScopeID(PS);
       }
       if (auto *CS = DS->InlinedCallSite)
-        *this << " inlined_at " << ScopeSlots->ScopeToIDMap[CS];
+        *this << " inlined_at " << Ctx.getScopeID(CS);
       *this << " }\n";
     }
   }
@@ -609,7 +600,7 @@ public:
     if (DS) {
       if (PrintComma)
         *this << ", ";
-      *this << "scope " << ScopeSlots->ScopeToIDMap[DS];
+      *this << "scope " << Ctx.getScopeID(DS);
     }
   }
 
@@ -732,7 +723,7 @@ public:
     bool printedSlashes = printUsersOfSILValue(V);
 
     // Print SIL location.
-    if (Verbose) {
+    if (Ctx.printVerbose()) {
       if (auto *I = dyn_cast<SILInstruction>(V)) {
         printSILLocation(I->getLoc(), I->getModule(), I->getDebugScope(),
                          printedSlashes);
@@ -1605,7 +1596,8 @@ ID SILPrinter::getID(SILValue V) {
 }
 
 void SILBasicBlock::printAsOperand(raw_ostream &OS, bool PrintType) {
-  OS << SILPrinter(OS).getID(this);
+  SILPrintContext Ctx(OS);
+  OS << SILPrinter(Ctx).getID(this);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1617,7 +1609,8 @@ void ValueBase::dump() const {
 }
 
 void ValueBase::print(raw_ostream &OS) const {
-  SILPrinter(OS).print(this);
+  SILPrintContext Ctx(OS);
+  SILPrinter(Ctx).print(this);
 }
 
 /// Pretty-print the SILBasicBlock to errs.
@@ -1627,12 +1620,14 @@ void SILBasicBlock::dump() const {
 
 /// Pretty-print the SILBasicBlock to the designated stream.
 void SILBasicBlock::print(raw_ostream &OS) const {
-  SILPrinter(OS).print(this);
+  SILPrintContext Ctx(OS);
+  SILPrinter(Ctx).print(this);
 }
 
 /// Pretty-print the SILFunction to errs.
 void SILFunction::dump(bool Verbose) const {
-  print(llvm::errs(), Verbose);
+  SILPrintContext Ctx(llvm::errs(), Verbose);
+  print(Ctx);
 }
 
 // This is out of line so the debugger can find it.
@@ -1643,7 +1638,7 @@ void SILFunction::dump() const {
 void SILFunction::dump(const char *FileName) const {
   std::error_code EC;
   llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
-  print(os, false);
+  print(os);
 }
 
 static StringRef getLinkageString(SILLinkage linkage) {
@@ -1670,17 +1665,16 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
 }
 
 /// Pretty-print the SILFunction to the designated stream.
-void SILFunction::print(llvm::raw_ostream &OS,
-                        SILFunction::ScopeSlotTracker &MDT, bool Verbose,
-                        bool SortedSIL) const {
+void SILFunction::print(SILPrintContext &PrintCtx) const {
   auto &SM = getModule().getASTContext().SourceMgr;
+  llvm::raw_ostream &OS = PrintCtx.OS();
   for (auto &BB : *this)
     for (auto &I : BB) {
-      SILPrinter P(OS, Verbose, SortedSIL, nullptr, &MDT);
+      SILPrinter P(PrintCtx);
       P.printDebugScope(I.getDebugScope(), SM);
     }
   OS << "\n";
-  
+
   OS << "// " << demangleSymbol(getName()) << '\n';
   OS << "sil ";
   printLinkage(OS, getLinkage(), isDefinition());
@@ -1763,8 +1757,7 @@ void SILFunction::print(llvm::raw_ostream &OS,
   if (!isExternalDeclaration()) {
     OS << " {\n";
 
-    SILPrinter(OS, Verbose, SortedSIL, (Aliases.empty() ? nullptr : &Aliases),
-               &MDT)
+    SILPrinter(PrintCtx, (Aliases.empty() ? nullptr : &Aliases))
         .print(this);
     OS << "}";
   }
@@ -1813,22 +1806,23 @@ void SILGlobalVariable::printName(raw_ostream &OS) const {
       
 /// Pretty-print the SILModule to errs.
 void SILModule::dump(bool Verbose) const {
-  print(llvm::errs(), Verbose);
+  SILPrintContext Ctx(llvm::errs(), Verbose);
+  print(Ctx);
 }
 
 void SILModule::dump(const char *FileName, bool Verbose,
                      bool PrintASTDecls) const {
   std::error_code EC;
   llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
-  print(os, Verbose, getSwiftModule(), false, PrintASTDecls);
+  SILPrintContext Ctx(os, Verbose);
+  print(Ctx, getSwiftModule(), PrintASTDecls);
 }
 
-static void printSILGlobals(llvm::raw_ostream &OS, bool Verbose,
-                            bool ShouldSort,
+static void printSILGlobals(SILPrintContext &Ctx,
                             const SILModule::GlobalListType &Globals) {
-  if (!ShouldSort) {
+  if (!Ctx.sortSIL()) {
     for (const SILGlobalVariable &g : Globals)
-      g.print(OS, Verbose);
+      g.print(Ctx.OS(), Ctx.printVerbose());
     return;
   }
 
@@ -1842,16 +1836,14 @@ static void printSILGlobals(llvm::raw_ostream &OS, bool Verbose,
     }
   );
   for (const SILGlobalVariable *g : globals)
-    g->print(OS, Verbose);
+    g->print(Ctx.OS(), Ctx.printVerbose());
 }
 
-static void printSILFunctions(llvm::raw_ostream &OS,
-                              bool Verbose, bool ShouldSort,
+static void printSILFunctions(SILPrintContext &Ctx,
                               const SILModule::FunctionListType &Functions) {
-  SILFunction::ScopeSlotTracker Tracker;
-  if (!ShouldSort) {
+  if (!Ctx.sortSIL()) {
     for (const SILFunction &f : Functions)
-      f.print(OS, Tracker, Verbose, false);
+      f.print(Ctx);
     return;
   }
 
@@ -1865,15 +1857,14 @@ static void printSILFunctions(llvm::raw_ostream &OS,
     }
   );
   for (const SILFunction *f : functions)
-    f->print(OS, Tracker, Verbose, true);
+    f->print(Ctx);
 }
 
-static void printSILVTables(llvm::raw_ostream &OS, bool Verbose,
-                            bool ShouldSort,
+static void printSILVTables(SILPrintContext &Ctx,
                             const SILModule::VTableListType &VTables) {
-  if (!ShouldSort) {
+  if (!Ctx.sortSIL()) {
     for (const SILVTable &vt : VTables)
-      vt.print(OS, Verbose);
+      vt.print(Ctx.OS(), Ctx.printVerbose());
     return;
   }
 
@@ -1889,16 +1880,15 @@ static void printSILVTables(llvm::raw_ostream &OS, bool Verbose,
     }
   );
   for (const SILVTable *vt : vtables)
-    vt->print(OS, Verbose);
+    vt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
 static void
-printSILWitnessTables(llvm::raw_ostream &OS, bool Verbose,
-                      bool ShouldSort,
+printSILWitnessTables(SILPrintContext &Ctx,
                       const SILModule::WitnessTableListType &WTables) {
-  if (!ShouldSort) {
+  if (!Ctx.sortSIL()) {
     for (const SILWitnessTable &wt : WTables)
-      wt.print(OS, Verbose);
+      wt.print(Ctx.OS(), Ctx.printVerbose());
     return;
   }
 
@@ -1912,16 +1902,15 @@ printSILWitnessTables(llvm::raw_ostream &OS, bool Verbose,
     }
   );
   for (const SILWitnessTable *wt : witnesstables)
-    wt->print(OS, Verbose);
+    wt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
 static void
-printSILDefaultWitnessTables(llvm::raw_ostream &OS, bool Verbose,
-                             bool ShouldSort,
+printSILDefaultWitnessTables(SILPrintContext &Ctx,
                         const SILModule::DefaultWitnessTableListType &WTables) {
-  if (!ShouldSort) {
+  if (!Ctx.sortSIL()) {
     for (const SILDefaultWitnessTable &wt : WTables)
-      wt.print(OS, Verbose);
+      wt.print(Ctx.OS(), Ctx.printVerbose());
     return;
   }
 
@@ -1937,15 +1926,15 @@ printSILDefaultWitnessTables(llvm::raw_ostream &OS, bool Verbose,
     }
   );
   for (const SILDefaultWitnessTable *wt : witnesstables)
-    wt->print(OS, Verbose);
+    wt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
 static void
-printSILCoverageMaps(llvm::raw_ostream &OS, bool Verbose, bool ShouldSort,
+printSILCoverageMaps(SILPrintContext &Ctx,
                      const SILModule::CoverageMapListType &CoverageMaps) {
-  if (!ShouldSort) {
+  if (!Ctx.sortSIL()) {
     for (const SILCoverageMap &M : CoverageMaps)
-      M.print(OS, ShouldSort, Verbose);
+      M.print(Ctx);
     return;
   }
 
@@ -1958,12 +1947,13 @@ printSILCoverageMaps(llvm::raw_ostream &OS, bool Verbose, bool ShouldSort,
               return LHS->getName().compare(RHS->getName()) == -1;
             });
   for (const SILCoverageMap *M : Maps)
-    M->print(OS, ShouldSort, Verbose);
+    M->print(Ctx);
 }
 
 /// Pretty-print the SILModule to the designated stream.
-void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
-                      Module *M, bool ShouldSort, bool PrintASTDecls) const {
+void SILModule::print(SILPrintContext &PrintCtx, Module *M,
+                      bool PrintASTDecls) const {
+  llvm::raw_ostream &OS = PrintCtx.OS();
   OS << "sil_stage ";
   switch (Stage) {
   case SILStage::Raw:
@@ -2005,12 +1995,12 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     }
   }
 
-  printSILGlobals(OS, Verbose, ShouldSort, getSILGlobalList());
-  printSILFunctions(OS, Verbose, ShouldSort, getFunctionList());
-  printSILVTables(OS, Verbose, ShouldSort, getVTableList());
-  printSILWitnessTables(OS, Verbose, ShouldSort, getWitnessTableList());
-  printSILDefaultWitnessTables(OS, Verbose, ShouldSort, getDefaultWitnessTableList());
-  printSILCoverageMaps(OS, Verbose, ShouldSort, getCoverageMapList());
+  printSILGlobals(PrintCtx, getSILGlobalList());
+  printSILFunctions(PrintCtx, getFunctionList());
+  printSILVTables(PrintCtx, getVTableList());
+  printSILWitnessTables(PrintCtx, getWitnessTableList());
+  printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
+  printSILCoverageMaps(PrintCtx, getCoverageMapList());
   
   OS << "\n\n";
 }
@@ -2019,7 +2009,8 @@ void ValueBase::dumpInContext() const {
   printInContext(llvm::errs());
 }
 void ValueBase::printInContext(llvm::raw_ostream &OS) const {
-  SILPrinter(OS).printInContext(this);
+  SILPrintContext Ctx(OS);
+  SILPrinter(Ctx).printInContext(this);
 }
 
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
@@ -2148,12 +2139,12 @@ void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
 
-void SILCoverageMap::print(llvm::raw_ostream &OS, bool ShouldSort,
-                           bool Verbose) const {
+void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
+  llvm::raw_ostream &OS = PrintCtx.OS();
   OS << "sil_coverage_map " << QuotedString(getFile()) << " " << getName()
      << " " << getHash() << " {\t// " << demangleSymbol(getName())
      << "\n";
-  if (ShouldSort)
+  if (PrintCtx.sortSIL())
     std::sort(MappedRegions, MappedRegions + NumMappedRegions,
               [](const MappedRegion &LHS, const MappedRegion &RHS) {
       return std::tie(LHS.StartLine, LHS.StartCol, LHS.EndLine, LHS.EndCol) <
@@ -2211,5 +2202,16 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
 }
 
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
-  SILPrinter(OS).printSubstitutions(getSubstitutions());
+  SILPrintContext Ctx(OS);
+  SILPrinter(Ctx).printSubstitutions(getSubstitutions());
+}
+
+//===----------------------------------------------------------------------===//
+// SILPrintContext members
+//===----------------------------------------------------------------------===//
+
+SILPrintContext::~SILPrintContext() {
+}
+
+void SILPrintContext::printInstructionCallBack(const SILInstruction *I) {
 }

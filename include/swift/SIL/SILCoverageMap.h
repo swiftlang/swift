@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ProfileData/CoverageMapping.h"
@@ -118,8 +119,14 @@ public:
   void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const;
 
   /// Print the coverage map.
-  void print(llvm::raw_ostream &OS, bool ShouldSort = false,
-             bool Verbose = false) const;
+  void print(llvm::raw_ostream &OS, bool Verbose = false,
+             bool ShouldSort = false) const {
+    SILPrintContext Ctx(OS, Verbose, ShouldSort);
+    print(Ctx);
+  }
+
+  void print(SILPrintContext &PrintCtx) const;
+
   void dump() const;
 };
 

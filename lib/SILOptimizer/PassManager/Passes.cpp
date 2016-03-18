@@ -367,12 +367,16 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addSimplifyCFG();
   PM.runOneIteration();
 
+  PM.resetAndRemoveTransformations();
+  
+  // Has only an effect if the -gsil option is specified.
+  PM.addSILDebugInfoGenerator();
+
   // Call the CFG viewer.
   if (SILViewCFG) {
-    PM.resetAndRemoveTransformations();
     PM.addCFGPrinter();
-    PM.runOneIteration();
   }
+  PM.runOneIteration();
 
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)
@@ -400,6 +404,9 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   // Here we just convert external definitions to declarations. LLVM will
   // eventually remove unused declarations.
   PM.addExternalDefsToDecls();
+
+  // Has only an effect if the -gsil option is specified.
+  PM.addSILDebugInfoGenerator();
 
   PM.runOneIteration();
 

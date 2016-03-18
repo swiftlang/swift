@@ -293,6 +293,10 @@ def print_inst_counts : Flag<["-"], "print-inst-counts">,
   HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
            "in conjunction with -print-stats.">;
 
+def debug_on_sil : Flag<["-"], "gsil">,
+  HelpText<"Write the SIL into a file and generate debug-info to debug on SIL "
+           " level.">;
+
 def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
   HelpText<"Print the LLVM inline tree.">;
 
