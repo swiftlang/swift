@@ -1071,6 +1071,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
 
+  if (Args.hasArg(OPT_debug_on_sil)) {
+    // Derive the name of the SIL file for debugging from
+    // the regular outputfile.
+    StringRef BaseName = FEOpts.getSingleOutputFilename();
+    // If there are no or multiple outputfiles, derive the name
+    // from the module name.
+    if (BaseName.empty())
+      BaseName = FEOpts.ModuleName;
+    Opts.SILOutputFileNameForDebugging = BaseName.str();
+  }
   return false;
 }
 
@@ -1107,12 +1117,15 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
+                           const SILOptions &SILOpts,
                            StringRef SDKPath,
                            StringRef ResourceDir,
                            const llvm::Triple &Triple) {
   using namespace options;
 
-  if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
+  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
+      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+  } else if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
     if (A->getOption().matches(OPT_g))
       Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
@@ -1178,7 +1191,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
-  if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {
+  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
+    Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
+  } else if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {
     unsigned Index = FrontendOpts.PrimaryInput->Index;
     Opts.MainInputFilename = FrontendOpts.InputFilenames[Index];
   } else if (FrontendOpts.InputFilenames.size() == 1) {
@@ -1310,7 +1325,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts,
+  if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts, SILOpts,
                      getSDKPath(), SearchPathOpts.RuntimeResourcePath,
                      LangOpts.Target)) {
     return true;

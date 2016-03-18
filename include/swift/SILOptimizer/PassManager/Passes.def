@@ -187,6 +187,8 @@ PASS(SILCleanup, "cleanup",
      "Cleanup SIL in preparation for IRGen")
 PASS(SILCombine, "sil-combine",
      "Perform small peepholes and combine operations")
+PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
+     "Write a SIL file for debugging")
 PASS(SILLinker, "linker",
      "Link in all of the serialized SIL referenced in the module")
 PASS(SROA, "sroa",
