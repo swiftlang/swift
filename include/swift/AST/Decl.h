@@ -649,6 +649,10 @@ public:
   /// for instance, self.
   bool isUserAccessible() const;
 
+  /// Determine if the decl can have a comment.  If false, a comment will
+  /// not be serialized.
+  bool canHaveComment() const;
+
   DeclContext *getDeclContext() const {
     if (auto dc = Context.dyn_cast<DeclContext *>())
       return dc;

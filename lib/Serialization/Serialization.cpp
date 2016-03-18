@@ -3764,10 +3764,28 @@ static void writeDeclCommentTable(
       if (!VD)
         return true;
 
-      // Skip the decl if it does not have a comment.
       RawComment Raw = VD->getRawComment();
-      if (Raw.Comments.empty() && !GroupContext.isEnable())
-        return true;
+      // When building the stdlib we intend to
+      // serialize unusual comments.  This situation is represented by
+      // GroupContext.isEnable().  In that case, we perform fewer serialization checks.
+      if (!GroupContext.isEnable()) {
+        // Skip the decl if it cannot have a comment.
+        if (!VD->canHaveComment()) {
+          return true;
+        }
+
+        // Skip the decl if it does not have a comment.
+        if (Raw.Comments.empty())
+          return true;
+
+        // Skip the decl if it's not visible to clients.
+        // The use of getEffectiveAccess is unusual here;
+        // we want to take the testability state into account
+        // and emit documentation if and only if they are visible to clients
+        // (which means public ordinarily, but public+internal when testing enabled).
+        if (VD->getEffectiveAccess() != Accessibility::Public)
+          return true;
+      }
 
       // Compute USR.
       {
