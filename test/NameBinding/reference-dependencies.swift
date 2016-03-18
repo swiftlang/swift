@@ -153,7 +153,7 @@ func lookUpManyTopLevelNames() {
   // "CInt" is not used as a top-level name here.
   // CHECK-DAG: !private "StringLiteralType"
   // NEGATIVE-NOT: "CInt"
-  let CInt = "abc"
+  _ = "abc"
 
   // NEGATIVE-NOT: - "max"
   print(Int.max)
@@ -223,7 +223,7 @@ func lookUpMembers() {
   TopLevelForMemberLookup.m1()
   TopLevelForMemberLookup.m3()
 }
-public let publicUseOfMember = TopLevelForMemberLookup.m2()
+public let publicUseOfMember: () = TopLevelForMemberLookup.m2()
 
 struct Outer {
   struct Inner {
@@ -297,7 +297,7 @@ private struct Private2 : PrivateProto1 {
 }
 // CHECK-DAG: !private "privateTopLevel3"
 func outerPrivate3() {
-  let private3 = { privateTopLevel3() }
+  let _ = { privateTopLevel3() }
 }
 
 // CHECK-DAG: !private "PrivateTopLevelTy1"

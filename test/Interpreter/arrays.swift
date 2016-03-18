@@ -146,7 +146,7 @@ let afd: [Float] = [
 
 // Check equality on arrays
 func test() {
-  var a = [42]
+  let a = [42]
   print(a == [42])
 }
 test()
