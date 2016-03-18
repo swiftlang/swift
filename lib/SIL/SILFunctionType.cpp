@@ -2376,15 +2376,16 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
     // If the 'self' parameter is a metatype, we'll throw it away.
     // Otherwise, splice it in to the parameters at the right position.
     if (!inputs[0].getType()->is<AnyMetatypeType>()) {
-      int selfIndex = bridgingFnPattern.getCFunctionAsMethodSelfIndex();
-      assert(selfIndex >= 0 && "static method with non-metatype self?!");
+      auto memberStatus = bridgingFnPattern.getImportAsMemberStatus();
+      assert(memberStatus.isInstance() &&
+             "static method with non-metatype self?!");
       SmallVector<TupleTypeElt, 4> fields;
       if (auto tuple = inputs[1].getType()->getAs<TupleType>()) {
         fields.append(tuple->getElements().begin(), tuple->getElements().end());
       } else {
         fields.push_back(inputs[1].getType());
       }
-      fields.insert(fields.begin() + selfIndex,
+      fields.insert(fields.begin() + memberStatus.getSelfIndex(),
                     inputs[0].getType());
       inputs[1] = inputs[1].getWithType(TupleType::get(fields, Context));
     }

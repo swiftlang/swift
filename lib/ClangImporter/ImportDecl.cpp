@@ -2429,6 +2429,7 @@ namespace {
           parameterList,
           /*GenericParams=*/nullptr, noLoc, dc);
       result->setInitKind(initKind);
+      result->setImportAsStaticMember();
 
       // Set the constructor's type(s).
       Type argType = parameterList->getType(Impl.SwiftContext);

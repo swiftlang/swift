@@ -4427,6 +4427,31 @@ public:
   using Decl::getASTContext;
 };
 
+/// Encodes imported-as-member status for C functions that get imported
+/// as methods.
+struct ImportAsMemberStatus {
+  // non-0 denotes import-as-member. 1 denotes no self index. n+2 denotes self
+  // index of n
+  uint8_t rawValue = 0;
+
+  bool isImportAsMember() const { return rawValue != 0; }
+  bool isInstance() const { return rawValue >= 2; }
+  bool isStatic() const { return rawValue == 1; }
+  uint8_t getSelfIndex() const {
+    assert(isInstance() && "not set");
+    return rawValue - 2;
+  }
+  void setStatic() {
+    assert(!isStatic() && "already set");
+    rawValue = 1;
+  }
+  void setSelfIndex(uint8_t idx) {
+    assert(!isImportAsMember() && "already set");
+    assert(idx <= UINT8_MAX-2 && "out of bounds");
+    rawValue = idx + 2;
+  }
+};
+
 /// \brief Base class for function-like declarations.
 class AbstractFunctionDecl : public ValueDecl, public DeclContext {
 public:
@@ -4484,30 +4509,7 @@ protected:
 
   CaptureInfo Captures;
 
-  // Encodes imported-as-member status.
-  struct ImportAsMemberStatus {
-    // non-0 denotes import-as-member. 1 denotes no self index. n+2 denotes self
-    // index of n
-    uint8_t rawValue = 0;
-
-    bool isImportAsMember() const { return rawValue != 0; }
-    bool isInstance() const { return rawValue >= 2; }
-    bool isStatic() const { return rawValue == 1; }
-    uint8_t getSelfIndex() const {
-      assert(isInstance() && "not set");
-      return rawValue - 2;
-    }
-    void setStatic() {
-      assert(!isStatic() && "already set");
-      rawValue = 1;
-    }
-    void setSelfIndex(uint8_t idx) {
-      assert(!isImportAsMember() && "already set");
-      assert(idx <= UINT8_MAX-2 && "out of bounds");
-      rawValue = idx + 2;
-    }
-  };
-  ImportAsMemberStatus iamStatus;
+  ImportAsMemberStatus IAMStatus;
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, unsigned NumParameterLists,
@@ -4541,13 +4543,14 @@ public:
   }
 
   // Expose our import as member status
-  bool isImportAsMember() const { return iamStatus.isImportAsMember(); }
-  bool isImportAsInstanceMember() const { return iamStatus.isInstance(); }
-  bool isImportAsStaticMember() const { return iamStatus.isStatic(); }
-  uint8_t getSelfIndex() const { return iamStatus.getSelfIndex(); }
+  bool isImportAsMember() const { return IAMStatus.isImportAsMember(); }
+  bool isImportAsInstanceMember() const { return IAMStatus.isInstance(); }
+  bool isImportAsStaticMember() const { return IAMStatus.isStatic(); }
+  uint8_t getSelfIndex() const { return IAMStatus.getSelfIndex(); }
+  ImportAsMemberStatus getImportAsMemberStatus() const { return IAMStatus; }
 
-  void setImportAsStaticMember() { iamStatus.setStatic(); }
-  void setSelfIndex(uint8_t idx) { return iamStatus.setSelfIndex(idx); }
+  void setImportAsStaticMember() { IAMStatus.setStatic(); }
+  void setSelfIndex(uint8_t idx) { return IAMStatus.setSelfIndex(idx); }
 
 public:
   // FIXME: Hack that provides names with keyword arguments for accessors.

@@ -129,7 +129,7 @@ AbstractionPattern::getCurriedCFunctionAsMethod(CanType origType,
   auto clangFn = cast<clang::ValueDecl>(function->getClangDecl());
   return getCurriedCFunctionAsMethod(origType,
                      clangFn->getType().getTypePtr(),
-                     *function->getForeignFunctionAsMethodSelfParameterIndex());
+                     function->getImportAsMemberStatus());
 }
 
 AbstractionPattern
@@ -292,8 +292,8 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::CFunctionAsMethodFormalParamTupleType: {
     // Jump over the self parameter in the Clang type.
     unsigned clangIndex = index;
-    int selfIndex = getCFunctionAsMethodSelfIndex();
-    if (selfIndex >= 0 && clangIndex >= (unsigned)selfIndex)
+    auto memberStatus = getImportAsMemberStatus();
+    if (memberStatus.isInstance() && clangIndex >= memberStatus.getSelfIndex())
       ++clangIndex;
     return AbstractionPattern(getGenericSignature(),
                           cast<TupleType>(getType()).getElementType(index),
@@ -334,13 +334,13 @@ AbstractionPattern::getObjCMethodSelfPattern(CanType selfType) const {
 /// C function imported as a method.
 AbstractionPattern
 AbstractionPattern::getCFunctionAsMethodSelfPattern(CanType selfType) const {
-  int selfIndex = getCFunctionAsMethodSelfIndex();
-  if (selfIndex >= 0) {
+  auto memberStatus = getImportAsMemberStatus();
+  if (memberStatus.isInstance()) {
     // Use the clang type for the receiver type.  If this is ever
     // insufficient --- if we have interesting bridging to do to
     // 'self' --- we have the right information to be more exact.
     auto clangSelfType =
-      getClangFunctionParameterType(getClangType(), selfIndex);
+      getClangFunctionParameterType(getClangType(),memberStatus.getSelfIndex());
 
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               selfType, clangSelfType);
@@ -367,14 +367,15 @@ getCFunctionAsMethodFormalParamPattern(CanType paramType) const {
   // method-formal-parameters abstraction pattern.
   if (isa<TupleType>(paramType)) {
     return getCFunctionAsMethodFormalParamTuple(sig, paramType,
-                                                clangType, OtherData);
+                                                clangType,
+                                                getImportAsMemberStatus());
   }
   
   // Otherwise, we imported a single parameter.
   // Get the non-self parameter from the Clang type.
   unsigned paramIndex = 0;
-  int selfIndex = getCFunctionAsMethodSelfIndex();
-  if (selfIndex == 0)
+  auto selfIndex = getImportAsMemberStatus();
+  if (selfIndex.isInstance() && selfIndex.getSelfIndex() == 0)
     paramIndex = 1;
   
   return AbstractionPattern(sig, paramType,
@@ -450,10 +451,11 @@ AbstractionPattern AbstractionPattern::transformType(
   case Kind::PartialCurriedCFunctionAsMethodType:
     return getPartialCurriedCFunctionAsMethod(getGenericSignature(),
                                               transform(getType()),
-                                              getClangType(), OtherData);
+                                              getClangType(),
+                                              getImportAsMemberStatus());
   case Kind::CurriedCFunctionAsMethodType:
     return getCurriedCFunctionAsMethod(transform(getType()), getClangType(),
-                                       OtherData);
+                                       getImportAsMemberStatus());
   case Kind::ObjCMethodType:
     return getObjCMethod(transform(getType()), getObjCMethod(),
                          getEncodedForeignErrorInfo());
@@ -500,7 +502,7 @@ AbstractionPattern AbstractionPattern::transformType(
     if (isa<TupleType>(newType)) {
       return getCFunctionAsMethodFormalParamTuple(getGenericSignature(),
                                                   newType, getClangType(),
-                                                  OtherData);
+                                                  getImportAsMemberStatus());
     }
   }
   }
@@ -631,7 +633,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
                                       getGenericSignatureForFunctionComponent(),
                                       getResultType(getType()),
                                       getClangType(),
-                                      OtherData);
+                                      getImportAsMemberStatus());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType:
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
@@ -789,8 +791,14 @@ void AbstractionPattern::print(raw_ostream &out) const {
     // It would be better to use print, but we need a PrintingPolicy
     // for that, for which we need a clang LangOptions, and... ugh.
     clang::QualType(getClangType(), 0).dump();
-    if (hasCFunctionAsMethodSelfIndex()) {
-      out << ", selfIndex=" << getCFunctionAsMethodSelfIndex();
+    if (hasImportAsMemberStatus()) {
+      out << ", member=";
+      auto status = getImportAsMemberStatus();
+      if (status.isInstance()) {
+        out << "instance, self=" << status.getSelfIndex();
+      } else if (status.isStatic()) {
+        out << "static";
+      }
     }
     out << ")";
     return;

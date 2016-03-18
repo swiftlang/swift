@@ -306,7 +306,7 @@ class AbstractionPattern {
     return hasStoredObjCMethod();
   }
 
-  bool hasCFunctionAsMethodSelfIndex() const {
+  bool hasImportAsMemberStatus() const {
     return getKind() == Kind::CurriedCFunctionAsMethodType ||
            getKind() == Kind::PartialCurriedCFunctionAsMethodType ||
            getKind() == Kind::CFunctionAsMethodFormalParamTupleType;
@@ -340,10 +340,9 @@ class AbstractionPattern {
   void initCFunctionAsMethod(CanGenericSignature signature,
                              CanType origType, const clang::Type *clangType,
                              Kind kind,
-                             int selfIndex) {
+                             ImportAsMemberStatus memberStatus) {
     initClangType(signature, origType, clangType, kind);
-    assert(selfIndex >= -1);
-    OtherData = selfIndex == -1 ? MaxOtherData : selfIndex;
+    OtherData = memberStatus.rawValue;
   }
 
   AbstractionPattern() {}
@@ -427,11 +426,11 @@ public:
   /// get the index of the C function parameter that was imported as the
   /// `self` parameter of the imported method, or None if this is a static
   /// method with no `self` parameter.
-  int getCFunctionAsMethodSelfIndex() const {
-    assert(hasCFunctionAsMethodSelfIndex());
-    if (OtherData == MaxOtherData)
-      return -1;
-    return OtherData;
+  ImportAsMemberStatus getImportAsMemberStatus() const {
+    assert(hasImportAsMemberStatus());
+    ImportAsMemberStatus status;
+    status.rawValue = OtherData;
+    return status;
   }
   
   /// Return an abstraction pattern for a value that is discarded after being
@@ -459,12 +458,12 @@ private:
   static AbstractionPattern
   getCurriedCFunctionAsMethod(CanType origType,
                               const clang::Type *clangType,
-                              int selfIndex) {
+                              ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCFunctionAsMethod(nullptr, origType, clangType,
                                   Kind::CurriedCFunctionAsMethodType,
-                                  selfIndex);
+                                  memberStatus);
     return pattern;
   }
 
@@ -486,12 +485,12 @@ private:
   getPartialCurriedCFunctionAsMethod(CanGenericSignature signature,
                                      CanType origType,
                                      const clang::Type *clangType,
-                                     unsigned encodedSelfIndex) {
+                                     ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCFunctionAsMethod(signature, origType, clangType,
                                   Kind::PartialCurriedCFunctionAsMethodType,
-                                  encodedSelfIndex);
+                                  memberStatus);
     return pattern;
   }
 
@@ -564,12 +563,12 @@ private:
   getCFunctionAsMethodFormalParamTuple(CanGenericSignature signature,
                                        CanType origType,
                                        const clang::Type *type,
-                                       unsigned encodedSelfIndex) {
+                                       ImportAsMemberStatus memberStatus) {
     assert(isa<TupleType>(origType));
     AbstractionPattern pattern;
     pattern.initCFunctionAsMethod(signature, origType, type,
                                   Kind::CFunctionAsMethodFormalParamTupleType,
-                                  encodedSelfIndex);
+                                  memberStatus);
     return pattern;
   }
 

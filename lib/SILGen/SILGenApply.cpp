@@ -423,7 +423,7 @@ public:
   }
 
   std::tuple<ManagedValue, CanSILFunctionType,
-             Optional<ForeignErrorConvention>, Optional<int>, ApplyOptions>
+             Optional<ForeignErrorConvention>, ImportAsMemberStatus, ApplyOptions>
   getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
     ManagedValue mv;
     ApplyOptions options = ApplyOptions::None;
@@ -571,11 +571,11 @@ public:
     }
 
     Optional<ForeignErrorConvention> foreignError;
-    Optional<int> foreignSelf;
+    ImportAsMemberStatus foreignSelf;
     if (constant && constant->isForeign) {
       auto func = cast<AbstractFunctionDecl>(constant->getDecl());
       foreignError = func->getForeignErrorConvention();
-      foreignSelf = func->getForeignFunctionAsMethodSelfParameterIndex();
+      foreignSelf = func->getImportAsMemberStatus();
     }
 
     CanSILFunctionType substFnType =
@@ -2384,9 +2384,9 @@ RValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
 /// pass the given argument.
 static unsigned getFlattenedValueCount(AbstractionPattern origType,
                                        CanType substType,
-                                       Optional<int> foreignSelf) {
+                                       ImportAsMemberStatus foreignSelf) {
   // C functions imported as static methods don't consume any real arguments.
-  if (foreignSelf && *foreignSelf == -1)
+  if (foreignSelf.isStatic())
     return 0;
 
   // The count is always 1 unless the substituted type is a tuple.
@@ -2402,7 +2402,8 @@ static unsigned getFlattenedValueCount(AbstractionPattern origType,
   unsigned count = 0;
   for (auto i : indices(substTuple.getElementTypes())) {
     count += getFlattenedValueCount(origType.getTupleElementType(i),
-                                    substTuple.getElementType(i), None);
+                                    substTuple.getElementType(i),
+                                    ImportAsMemberStatus());
   }
   return count;
 }
@@ -2733,7 +2734,7 @@ namespace {
     SILGenFunction &SGF;
     SILFunctionTypeRepresentation Rep;
     const Optional<ForeignErrorConvention> &ForeignError;
-    Optional<int> ForeignSelf;
+    ImportAsMemberStatus ForeignSelf;
     ClaimedParamsRef ParamInfos;
     SmallVectorImpl<ManagedValue> &Args;
 
@@ -2748,7 +2749,7 @@ namespace {
                SmallVectorImpl<ManagedValue> &args,
                SmallVectorImpl<InOutArgument> &inoutArgs,
                const Optional<ForeignErrorConvention> &foreignError,
-               Optional<int> foreignSelf,
+               ImportAsMemberStatus foreignSelf,
                Optional<ArgSpecialDestArray> specialDests = None)
       : SGF(SGF), Rep(Rep), ForeignError(foreignError),
         ForeignSelf(foreignSelf),
@@ -2789,9 +2790,9 @@ namespace {
       // Okay, everything else will be passed as a single value, one
       // way or another.
 
-      // If this is a discarded foreign 'self' parameter, force the argument
-      // and discard it.
-      if (ForeignSelf && *ForeignSelf == -1) {
+      // If this is a discarded foreign static 'self' parameter, force the
+      // argument and discard it.
+      if (ForeignSelf.isStatic()) {
         std::move(arg).getAsRValue(SGF);
         return;
       }
@@ -3278,7 +3279,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
   SmallVector<ManagedValue, 8> innerArgs;
   SmallVector<InOutArgument, 2> innerInOutArgs;
   ArgEmitter(SGF, Rep, ClaimedParamsRef(innerParams), innerArgs, innerInOutArgs,
-             /*foreign error*/ None, /*foreign self*/ None,
+             /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
              (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
                                 : Optional<ArgSpecialDestArray>()))
     .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
@@ -3561,21 +3562,22 @@ namespace {
     ClaimedParamsRef
     claimParams(AbstractionPattern origParamType, CanType substParamType,
                 const Optional<ForeignErrorConvention> &foreignError,
-                const Optional<int> &foreignSelf) {
+                const ImportAsMemberStatus &foreignSelf) {
       unsigned count = getFlattenedValueCount(origParamType, substParamType,
                                               foreignSelf);
       if (foreignError) count++;
       
-      if (foreignSelf) {
+      if (foreignSelf.isImportAsMember()) {
         // Claim only the self parameter.
         assert(ClaimedForeignSelf == (unsigned)-1
                && "already claimed foreign self?!");
-        if (*foreignSelf == -1) {
+        if (foreignSelf.isStatic()) {
           // Imported as a static method, no real self param to claim.
           return {};
         }
-        ClaimedForeignSelf = *foreignSelf;
-        return ClaimedParamsRef(Params[*foreignSelf], (unsigned)-1);
+        ClaimedForeignSelf = foreignSelf.getSelfIndex();
+        return ClaimedParamsRef(Params[ClaimedForeignSelf],
+                                ClaimedParamsRef::NoSkip);
       }
       
       if (ClaimedForeignSelf != (unsigned)-1) {
@@ -3661,7 +3663,7 @@ namespace {
               ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
               SmallVectorImpl<InOutArgument> &inoutArgs,
               const Optional<ForeignErrorConvention> &foreignError,
-              const Optional<int> &foreignSelf) && {
+              const ImportAsMemberStatus &foreignSelf) && {
       auto params = lowering.claimParams(origParamType, getSubstArgType(),
                                          foreignError, foreignSelf);
 
@@ -3822,7 +3824,7 @@ namespace {
       CanSILFunctionType substFnType;
       ManagedValue mv;
       Optional<ForeignErrorConvention> foreignError;
-      Optional<int> foreignSelf;
+      ImportAsMemberStatus foreignSelf;
       ApplyOptions initialOptions = ApplyOptions::None;
 
       AbstractionPattern origFormalType(callee.getOrigFormalType());
@@ -4000,12 +4002,12 @@ namespace {
         args = {};
         
         // Move the foreign "self" argument into position.
-        if (foreignSelf && *foreignSelf != -1) {
+        if (foreignSelf.isInstance()) {
           auto selfArg = uncurriedArgs.back();
-          std::move_backward(uncurriedArgs.begin() + *foreignSelf,
+          std::move_backward(uncurriedArgs.begin() + foreignSelf.getSelfIndex(),
                              uncurriedArgs.end() - 1,
                              uncurriedArgs.end());
-          uncurriedArgs[*foreignSelf] = selfArg;
+          uncurriedArgs[foreignSelf.getSelfIndex()] = selfArg;
         }
         
         // Emit the uncurried call.
@@ -4215,13 +4217,13 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   ManagedValue mv;
   CanSILFunctionType substFnType;
   Optional<ForeignErrorConvention> foreignError;
-  Optional<int> foreignSelf;
+  ImportAsMemberStatus foreignSelf;
   ApplyOptions options;
   std::tie(mv, substFnType, foreignError, foreignSelf, options)
     = callee.getAtUncurryLevel(*this, 0);
 
   assert(!foreignError);
-  assert(!foreignSelf);
+  assert(!foreignSelf.isImportAsMember());
   assert(substFnType->getExtInfo().getLanguage()
            == SILFunctionLanguage::Swift);
 
