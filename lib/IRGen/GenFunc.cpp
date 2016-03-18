@@ -1806,30 +1806,27 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // At that stage, the function name GV used by the profiling pass is hidden.
   // Fix the intrinsic call here by pointing it to the correct GV.
   if (IID == llvm::Intrinsic::instrprof_increment) {
-    // Extract the PGO function name.
+    // Extract the function name.
     auto *NameGEP = cast<llvm::User>(args.claimNext());
-    auto *NameGV = dyn_cast<llvm::GlobalVariable>(NameGEP->stripPointerCasts());
-    if (NameGV) {
-      auto *NameC = NameGV->getInitializer();
-      StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
-      StringRef PGOFuncName = Name.rtrim(StringRef("\0", 1));
+    auto *NameGV = cast<llvm::GlobalVariable>(NameGEP->getOperand(0));
+    auto *NameC = NameGV->getInitializer();
+    StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
 
-      // Point the increment call to the right function name variable.
-      std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
-          PGOFuncName, llvm::GlobalValue::LinkOnceAnyLinkage);
-      auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(PGOFuncNameVar);
+    // Find the existing function name pointer.
+    std::string NameValue = llvm::getInstrProfNameVarPrefix();
+    NameValue += Name;
+    StringRef ProfName = StringRef(NameValue).rtrim(StringRef("\0", 1));
+    auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(ProfName);
+    assert(FuncNamePtr && "No function name pointer for counter update");
 
-      if (FuncNamePtr) {
-        llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
-        NameGEP = llvm::GetElementPtrInst::CreateInBounds(
-            FuncNamePtr, makeArrayRef(Indices), "",
-            IGF.Builder.GetInsertBlock());
-      }
-    }
+    // Create a GEP into the function name.
+    llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
+    auto *FuncName = llvm::GetElementPtrInst::CreateInBounds(
+        FuncNamePtr, makeArrayRef(Indices), "", IGF.Builder.GetInsertBlock());
 
     // Replace the placeholder value with the new GEP.
     Explosion replacement;
-    replacement.add(NameGEP);
+    replacement.add(FuncName);
     replacement.add(args.claimAll());
     args = std::move(replacement);
   }
