@@ -448,8 +448,24 @@ let _crashedPrefix = "CRASHED:"
 @_silgen_name("swift_stdlib_installTrapInterceptor")
 func _stdlib_installTrapInterceptor()
 
+@objc protocol _StdlibUnittestNSException {
+  optional var name: String { get }
+}
+
 func _childProcess() {
   _stdlib_installTrapInterceptor()
+  objc_setUncaughtExceptionHandler {
+    var stderr = _Stderr()
+    let maybeNSException = unsafeBitCast($0, to:_StdlibUnittestNSException.self)
+    if let name = maybeNSException.name {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception " +
+        "\(name): \($0)",
+        to: &stderr)
+    } else {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception: \($0)",
+        to: &stderr)      
+    }
+  }
   while let line = _stdlib_getline() {
     let parts = line._split(separator: ";")
     let testSuiteName = parts[0]
