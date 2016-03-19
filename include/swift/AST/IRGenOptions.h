@@ -165,7 +165,7 @@ public:
                    EmitStackPromotionChecks(false), GenerateProfile(false),
                    PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
-                   StripReflectionNames(false), StripReflectionMetadata(false),
+                   StripReflectionNames(true), StripReflectionMetadata(true),
                    CmdArgs(), UseIncrementalLLVMCodeGen(true)
                    {}
 
