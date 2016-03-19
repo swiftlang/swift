@@ -390,18 +390,7 @@ const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
   auto isa = _swift_getClass(object);
   return swift_getObjCClassMetadata(isa);
 }
-  
-// -- Tuple destructuring.
-  
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-intptr_t swift_TupleMirror_count(HeapObject *owner,
-                                 const OpaqueValue *value,
-                                 const Metadata *type) {
-  auto Tuple = static_cast<const TupleTypeMetadata *>(type);
-  return Tuple->NumElements;
-}
-  
+ 
 static std::tuple<const _ReflectableWitnessTable *, const Metadata *,
                   const OpaqueValue *>
 getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
@@ -497,7 +486,18 @@ static Mirror reflect(HeapObject *owner,
   ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
   return result;
 }
+
+// -- Tuple destructuring.
   
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C"
+intptr_t swift_TupleMirror_count(HeapObject *owner,
+                                 const OpaqueValue *value,
+                                 const Metadata *type) {
+  auto Tuple = static_cast<const TupleTypeMetadata *>(type);
+  return Tuple->NumElements;
+}
+
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 SWIFT_RUNTIME_STDLIB_INTERFACE
