@@ -700,7 +700,8 @@ func testForcePeephole(f: () throws -> Int?) -> Int {
 // CHECK-NEXT: release_value [[RESULT]] : $Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<Cat>)
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorProtocol):
@@ -725,7 +726,8 @@ func testOptionalTry() {
 // CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorProtocol):
@@ -753,7 +755,8 @@ func testOptionalTryVar() {
 // CHECK-NEXT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorProtocol):
@@ -782,7 +785,8 @@ func testOptionalTryAddressOnly<T>(obj: T) {
 // CHECK-NEXT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorProtocol):
@@ -808,7 +812,8 @@ func testOptionalTryAddressOnlyVar<T>(obj: T) {
 // CHECK-NEXT: release_value [[RESULT]] : $Optional<(Cat, Cat)>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<(Cat, Cat)>)
 // CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : $ErrorProtocol):
