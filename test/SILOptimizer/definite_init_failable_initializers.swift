@@ -521,9 +521,10 @@ struct ThrowStruct {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]] : $Optional<ThrowStruct>
 // CHECK:       bb6:
+// CHECK-NEXT:    strong_release [[ERROR:%.*]] : $ErrorProtocol
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
 // CHECK-NEXT:    br bb2([[NEW_SELF]] : $Optional<ThrowStruct>)
-// CHECK:       bb7([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb7([[ERROR]] : $ErrorProtocol):
 // CHECK-NEXT:    br bb6
   init?(throwsToOptional: Int) {
     try? self.init(failDuringDelegation: throwsToOptional)
