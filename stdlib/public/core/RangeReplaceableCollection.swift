@@ -14,9 +14,43 @@
 //
 //===----------------------------------------------------------------------===//
 
+public protocol RangeReplaceableIndexable : Indexable {
+  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // to exist apart from missing compiler features that we emulate with it.
+  //
+  // This protocol is almost an implementation detail of the standard
+  // library.
+
+  init()
+
+  init(repeating repeatedValue: _Element, count: Int)
+
+  init<
+    S : Sequence where S.Iterator.Element == _Element
+  >(_ elements: S)
+
+  mutating func replaceSubrange<
+    C : Collection where C.Iterator.Element == _Element
+  >(
+    subRange: Range<Index>, with newElements: C
+  )
+
+  mutating func insert(newElement: _Element, at i: Index)
+
+  mutating func insert<
+    S : Collection where S.Iterator.Element == _Element
+  >(contentsOf newElements: S, at i: Index)
+
+  mutating func remove(at i: Index) -> _Element
+
+  mutating func removeSubrange(bounds: Range<Index>)
+}
+
 /// A collection that supports replacement of an arbitrary subrange
 /// of elements with the elements of another collection.
-public protocol RangeReplaceableCollection : Collection {
+public protocol RangeReplaceableCollection
+  : RangeReplaceableIndexable, Collection
+{
   //===--- Fundamental Requirements ---------------------------------------===//
 
   /// Create an empty instance.

@@ -11,6 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 %{
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName,
+    protocolsForCollectionFeatures
+)
+
 def get_slice_doc_comment(Self):
   return """\
 /// A view into a sub-sequence of elements of another collection.
@@ -39,73 +47,46 @@ def get_slice_doc_comment(Self):
 """ % (Self, Self, Self, Self, Self)
 }%
 
-${get_slice_doc_comment('Slice')}
-public struct Slice<Base : Indexable> : Collection {
+// FIXME(ABI)(compiler limitation): There should be just one slice type
+// that has conditional conformances to `BidirectionalCollection`,
+// `RandomAccessCollection`, `RangeReplaceableCollection`, and
+// `MutableCollection`.
+
+% for Traversal in TRAVERSALS:
+%   for Mutable in [ False, True ]:
+%     for RangeReplaceable in [ False, True ]:
+%       Self = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
+%       BaseRequirements = [collectionForTraversal(Traversal).replace('Collection', 'Indexable')]
+%       if Mutable:
+%         BaseRequirements.append('MutableIndexable')
+%       if RangeReplaceable:
+%         BaseRequirements.append('RangeReplaceableIndexable')
+%       BaseRequirements = 'protocol<' + ', '.join(BaseRequirements) + '>'
+%       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
+
+${get_slice_doc_comment(Self)}
+%     if Mutable:
+///
+/// - Warning: `${Self}` requires the setter of `Base.subscript(_: Index)`
+///   to not invalidate indices.  If you are writing a collection and mutations
+///   need to invalidate indices, don't use `${Self}`, use `Slice` or
+///   define your own `Base.SubSequence` type that takes that into account.
+%     end
+public struct ${Self}<Base : ${BaseRequirements}>
+  : ${SelfProtocols} {
 
   public typealias Index = Base.Index
+  //public typealias IndexDistance = Base.IndexDistance
 
   public let startIndex: Index
   public let endIndex: Index
-
-  public subscript(index: Index) -> Base._Element {
-    _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
-    return _base[index]
-  }
-
-  public subscript(bounds: Range<Index>) -> Slice {
-    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-    return Slice(_base: _base, bounds: bounds)
-  }
-
-  @warn_unused_result
-  public func next(i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range check.
-    fatalError("implement")
-  }
-
-  public func _nextInPlace(i: inout Index) {
-    // FIXME: swift-3-indexing-model: range check.
-    fatalError("implement")
-  }
-
-  // FIXME: swift-3-indexing-model: forward advance() and distance().
-
-  /// Create a view into collection `base` that allows access within `bounds`.
-  ///
-  /// - Complexity: O(1).
-  public // @testable
-  init(_base: Base, bounds: Range<Index>) {
-    self._base = _base
-    self.startIndex = bounds.lowerBound
-    self.endIndex = bounds.upperBound
-  }
-
-  internal let _base: Base
-}
-
-${get_slice_doc_comment('MutableSlice')}
-///
-/// - Warning: `MutableSlice` requires the setter of `Base.subscript(_: Index)`
-///   to not invalidate indices.  If you are writing a collection and mutations
-///   need to invalidate indices, don't use `MutableSlice`, use `Slice` or
-///   define your own `Base.SubSequence` type that takes that into account.
-public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
-
-  public typealias Index = Base.Index
-
-  public var startIndex: Index {
-    return _startIndex
-  }
-
-  public var endIndex: Index {
-    return _endIndex
-  }
 
   public subscript(index: Index) -> Base._Element {
     get {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
       return _base[index]
     }
+%     if Mutable:
     set {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
       _base[index] = newValue
@@ -113,53 +94,137 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
       // setter does not invalidate indices, so our `startIndex` and `endIndex`
       // continue to be valid.
     }
+%     end
   }
 
-  public subscript(bounds: Range<Index>) -> MutableSlice {
+  public typealias SubSequence = ${Self}<Base>
+
+  public subscript(bounds: Range<Index>) -> ${Self}<Base> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableSlice(_base: _base, bounds: bounds)
+      return ${Self}(base: _base, bounds: bounds)
     }
+%     if Mutable:
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
+%     end
   }
 
   @warn_unused_result
   public func next(i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
-    fatalError("implement")
+    return _base.next(i)
   }
 
   public func _nextInPlace(i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
-    fatalError("implement")
+    _base._nextInPlace(&i)
   }
+
+%     if Traversal in ['Bidirectional', 'RandomAccess']:
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return _base.previous(i)
+  }
+
+  public func _previousInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    _base._previousInPlace(&i)
+  }
+%     end
+/*
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    return _base.advance(i, by: n)
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    return _base.advance(i, by: n, limit: limit)
+  }
+
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return _base.distance(from: start, to: end)
+  }
+*/
+%     if RangeReplaceable:
+  public init() {
+    self._base = Base()
+    self.startIndex = _base.startIndex
+    self.endIndex = _base.endIndex
+  }
+
+  public init(repeating repeatedValue: Base._Element, count: Int) {
+    self._base = Base(repeating: repeatedValue, count: count)
+    self.startIndex = _base.startIndex
+    self.endIndex = _base.endIndex
+  }
+
+  public init<
+    S : Sequence where S.Iterator.Element == Base._Element
+  >(_ elements: S) {
+    self._base = Base(elements)
+    self.startIndex = _base.startIndex
+    self.endIndex = _base.endIndex
+  }
+
+  public mutating func replaceSubrange<
+    C : Collection where C.Iterator.Element == Base._Element
+  >(
+    subRange: Range<Index>, with newElements: C
+  ) {
+    _base.replaceSubrange(subRange, with: newElements)
+  }
+
+  public mutating func insert(newElement: Base._Element, at i: Index) {
+    _base.insert(newElement, at: i)
+  }
+
+  public mutating func insert<
+    S : Collection where S.Iterator.Element == Base._Element
+  >(contentsOf newElements: S, at i: Index) {
+    _base.insert(contentsOf: newElements, at: i)
+  }
+
+  public mutating func remove(at i: Index) -> Base._Element {
+    return _base.remove(at: i)
+  }
+
+  public mutating func removeSubrange(bounds: Range<Index>) {
+    _base.removeSubrange(bounds)
+  }
+%     end
 
   // FIXME: swift-3-indexing-model: forward advance() and distance().
 
-  public // @testable
-  init(_base: Base, bounds: Range<Index>) {
+  /// Create a view into collection `base` that allows access within `bounds`.
+  ///
+  /// - Complexity: O(1).
+  public init(base: Base, bounds: Range<Index>) {
+    self._base = base
+    self.startIndex = bounds.lowerBound
+    self.endIndex = bounds.upperBound
+  }
+
+  internal init(_base: Base, bounds: Range<Index>) {
+    // FIXME: swift-3-indexing-model: remove this initializer in favor of the
+    // one above.
     self._base = _base
-    self._startIndex = bounds.lowerBound
-    self._endIndex = bounds.upperBound
+    self.startIndex = bounds.lowerBound
+    self.endIndex = bounds.upperBound
   }
 
+%     if Mutable or RangeReplaceable:
   internal var _base: Base
-  internal var _startIndex: Index
-  internal var _endIndex: Index
+%     else:
+  internal let _base: Base
+%     end
 }
 
-extension Slice {
-  @available(*, unavailable, message: "use the slicing syntax")
-  public init(base: Base, bounds: Range<Index>) {
-    fatalError("unavailable function can't be called")
-  }
-}
+%     end
+%   end
+% end
 
-extension MutableSlice {
-  @available(*, unavailable, message: "use the slicing syntax")
-  public init(base: Base, bounds: Range<Index>) {
-    fatalError("unavailable function can't be called")
-  }
-}
