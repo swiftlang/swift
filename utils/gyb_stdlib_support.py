@@ -19,3 +19,19 @@ def collectionForTraversal(traversal):
         return 'RandomAccessCollection'
     assert False, 'unknown traversal'
 
+def sliceTypeName(traversal, mutable, rangeReplaceable):
+    name = collectionForTraversal(traversal).replace('Collection', 'Slice')
+    if rangeReplaceable:
+        name = 'RangeReplaceable' + name
+    if mutable:
+        name = 'Mutable' + name
+    return name
+
+def protocolsForCollectionFeatures(traversal, mutable, rangeReplaceable):
+    protocols = [collectionForTraversal(traversal)]
+    if mutable:
+        protocols.append('MutableCollection')
+    if rangeReplaceable:
+        protocols.append('RangeReplaceableCollection')
+    return protocols
+

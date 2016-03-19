@@ -10,8 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+public protocol RandomAccessIndexable : BidirectionalIndexable {
+  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // to exist apart from missing compiler features that we emulate with it.
+  //
+  // This protocol is almost an implementation detail of the standard
+  // library.
+}
+
 // TODO: swift-3-indexing-model - Add in RandomAccessCollection protocol documentation
-public protocol RandomAccessCollection : BidirectionalCollection {
+public protocol RandomAccessCollection :
+  RandomAccessIndexable, BidirectionalCollection
+{
 
   // FIXME(compiler limitation):
   // associatedtype SubSequence : RandomAccessCollection

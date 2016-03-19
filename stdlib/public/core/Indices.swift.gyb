@@ -10,11 +10,31 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct DefaultIndices<
-  Elements : Indexable
+%{
+from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+
+def defaultIndicesForTraversal(traversal):
+    if traversal == 'Forward':
+        return 'DefaultIndices'
+    if traversal == 'Bidirectional':
+        return 'DefaultBidirectionalIndices'
+    if traversal == 'RandomAccess':
+        return 'DefaultRandomAccessIndices'
+    assert False, 'unknown traversal'
+}%
+
+% for Traversal in TRAVERSALS:
+%   Self = defaultIndicesForTraversal(Traversal)
+
+// FIXME(ABI)(compiler limitation): There should be just one default
+// indices type that has conditional conformances to
+// `BidirectionalCollection` and `RandomAccessCollection`.
+
+public struct ${Self}<
+  Elements : ${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
   // FIXME(ABI)(compiler limitation):
   // Elements : Collection
-> : Collection {
+> : ${collectionForTraversal(Traversal)} {
 
   // FIXME(compiler limitation): this typealias should be inferred.
   public typealias Index = Elements.Index
@@ -43,11 +63,11 @@ public struct DefaultIndices<
   }
 
   // FIXME(compiler limitation): this typealias should be inferred.
-  public typealias SubSequence = DefaultIndices<Elements>
+  public typealias SubSequence = ${Self}<Elements>
 
-  public subscript(bounds: Range<Index>) -> DefaultIndices<Elements> {
+  public subscript(bounds: Range<Index>) -> ${Self}<Elements> {
     // FIXME: swift-3-indexing-model: range check.
-    return DefaultIndices(
+    return ${Self}(
       _elements: _elements,
       startIndex: bounds.lowerBound,
       endIndex: bounds.upperBound)
@@ -64,8 +84,21 @@ public struct DefaultIndices<
     _elements._nextInPlace(&i)
   }
 
+%     if Traversal in ['Bidirectional', 'RandomAccess']:
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return _elements.previous(i)
+  }
+
+  public func _previousInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    _elements._previousInPlace(&i)
+  }
+%     end
+
   // FIXME(compiler limitation): this typealias should be inferred.
-  public typealias Indices = DefaultIndices<Elements>
+  public typealias Indices = ${Self}<Elements>
 
   public var indices: Indices {
     return self
@@ -76,12 +109,17 @@ public struct DefaultIndices<
   internal var _endIndex: Elements.Index
 }
 
-extension Collection where Indices == DefaultIndices<Self> {
-  public var indices: DefaultIndices<Self> {
-    return DefaultIndices(
+extension ${collectionForTraversal(Traversal)} where Indices == ${Self}<Self> {
+  public var indices: ${Self}<Self> {
+    return ${Self}(
       _elements: self,
       startIndex: self.startIndex,
       endIndex: self.endIndex)
   }
 }
 
+% end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

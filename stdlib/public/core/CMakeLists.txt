@@ -57,7 +57,7 @@ set(SWIFTLIB_ESSENTIAL
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift
   Index.swift
-  Indices.swift
+  Indices.swift.gyb
   InputStream.swift
   IntegerArithmetic.swift.gyb
   IntegerParsing.swift.gyb

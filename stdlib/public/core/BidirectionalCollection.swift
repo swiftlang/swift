@@ -10,8 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
+public protocol BidirectionalIndexable : Indexable {
+  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // to exist apart from missing compiler features that we emulate with it.
+  //
+  // This protocol is almost an implementation detail of the standard
+  // library.
+
+  @warn_unused_result
+  func previous(i: Index) -> Index
+
+  func _previousInPlace(i: inout Index)
+}
+
 // TODO: swift-3-indexing-model - Add in BidirectionalCollection protocol documentation
-public protocol BidirectionalCollection : Collection {
+public protocol BidirectionalCollection
+  : BidirectionalIndexable, Collection {
+
 // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   /// Returns the previous consecutive `Index` in a discrete sequence of
   /// `Index` values.
