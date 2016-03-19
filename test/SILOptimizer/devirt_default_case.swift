@@ -108,12 +108,7 @@ class E3 :C3 {}
 func foo(a: A3) -> Int {
 // Check that call to A3.f() can be devirtualized.
 //
-// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
-// CHECK: function_ref @{{.*}}TFC19devirt_default_case2B31f
-// CHECK: function_ref @{{.*}}TFC19devirt_default_case2A31f
-// CHECK-NORMAL-NOT: class_method
-// CHECK-TESTABLE: class_method %0 : $A3, #A3.f!1
-// CHECK: }
+// CHECK-LABEL: sil{{( hidden)?}} [thunk] [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
   return a.f()
 }
 
@@ -166,13 +161,22 @@ class D6 : C6 {
 func check_static_class_devirt(c: C6) -> Int { 
 // Check that C.bar() and D.bar() are devirtualized.
 //
-// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
+// CHECK-LABEL: sil{{( hidden)?}} [thunk] [noinline] @_TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
+  return c.bar() 
+}
+
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TTSf4g___TF19devirt_default_case3fooFCS_2A3Si
+// CHECK: function_ref @{{.*}}TFC19devirt_default_case2B31f
+// CHECK: function_ref @{{.*}}TFC19devirt_default_case2A31f
+// CHECK-NORMAL-NOT: class_method
+// CHECK-TESTABLE: class_method %0 : $A3, #A3.f!1
+// CHECK: }
+
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TTSf4g___TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
 // CHECK: checked_cast_br [exact] %0 : $C6 to $C6
 // CHECK: checked_cast_br [exact] %0 : $C6 to $D6
 // CHECK: class_method
 // CHECK: return
-  return c.bar() 
-}
 
 public func test_check_static_class_devirt() -> Int {
   return check_static_class_devirt(D6())
@@ -246,7 +250,6 @@ internal class M33: M3 {
   }
 }
 
-
 // Check that speculative devirtualization tries to devirtualize the first N
 // alternatives, if it has too many.
 // The alternatives should be taken in a breadth-first order, starting with
@@ -263,6 +266,7 @@ func foo(a: A2) -> Int {
   return a.f()
 }
 
+
 @inline(never)
 func check_call_on_downcasted_instance(a: A7) -> Bool {
   if a is B7 {
@@ -270,3 +274,5 @@ func check_call_on_downcasted_instance(a: A7) -> Bool {
   }
   return a.foo()
 }
+
+
