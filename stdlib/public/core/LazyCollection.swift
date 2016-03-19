@@ -137,7 +137,7 @@ extension LazyCollection : Collection {
   ///
   /// - Complexity: O(1)
   public subscript(bounds: Range<Index>) -> LazyCollection<Slice<Base>> {
-    return Slice(_base: _base, bounds: bounds).lazy
+    return Slice(base: _base, bounds: bounds).lazy
   }
   
   /// Returns `true` iff `self` is empty.

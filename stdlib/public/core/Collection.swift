@@ -471,7 +471,7 @@ extension Collection where Iterator == IndexingIterator<Self> {
 extension Collection where SubSequence == Slice<Self> {
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-    return Slice(_base: self, bounds: bounds)
+    return Slice(base: self, bounds: bounds)
   }
 }
 

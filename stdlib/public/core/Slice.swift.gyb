@@ -209,14 +209,6 @@ public struct ${Self}<Base : ${BaseRequirements}>
     self.endIndex = bounds.upperBound
   }
 
-  internal init(_base: Base, bounds: Range<Index>) {
-    // FIXME: swift-3-indexing-model: remove this initializer in favor of the
-    // one above.
-    self._base = _base
-    self.startIndex = bounds.lowerBound
-    self.endIndex = bounds.upperBound
-  }
-
 %     if Mutable or RangeReplaceable:
   internal var _base: Base
 %     else:

@@ -175,7 +175,7 @@ extension MutableCollection {
   public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableSlice(_base: self, bounds: bounds)
+      return MutableSlice(base: self, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)

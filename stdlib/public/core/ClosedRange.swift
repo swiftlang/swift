@@ -221,7 +221,7 @@ public struct ClosedRangeOfStrideable<
   }
 
   public subscript(bounds: Range<Index>) -> Slice<ClosedRangeOfStrideable> {
-    return Slice(_base: self, bounds: bounds)
+    return Slice(base: self, bounds: bounds)
   }
 }
 

@@ -44,7 +44,7 @@ SliceTests.test("Slice/AssociatedTypes") {
 SliceTests.test("Slice/init(_base:bounds:)") {
   for test in subscriptRangeTests {
     let base = MinimalForwardCollection(elements: test.collection)
-    var result = Slice(_base: base, bounds: test.boundsIn(base))
+    var result = Slice(base: base, bounds: test.boundsIn(base))
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &result)
@@ -61,7 +61,7 @@ SliceTests.test("Slice.{startIndex,endIndex}") {
   for test in subscriptRangeTests {
     let base = MinimalForwardCollection(elements: test.collection)
     let bounds = test.boundsIn(base)
-    var slice = Slice(_base: base, bounds: bounds)
+    var slice = Slice(base: base, bounds: bounds)
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &slice)
@@ -77,7 +77,7 @@ SliceTests.test("Slice.subscript(_: Index)") {
     Base.Index.trapOnRangeCheckFailure.value = false
     let base = Base(elements: test.collection)
     let bounds = test.boundsIn(base)
-    var slice = Slice(_base: base, bounds: bounds)
+    var slice = Slice(base: base, bounds: bounds)
     expectType(Slice<Base>.self, &slice)
 
     for i in bounds {
@@ -105,7 +105,7 @@ SliceTests.test("Slice.subscript(_: Range<Index>)") {
     typealias Base = MinimalForwardCollection<OpaqueValue<Int>>
     Base.Index.trapOnRangeCheckFailure.value = false
     let base = Base(elements: test.collection)
-    var slice = Slice(_base: base, bounds: base.indices)
+    var slice = Slice(base: base, bounds: base.indices)
     expectType(Slice<Base>.self, &slice)
 
     var result = slice[test.boundsIn(slice)]
@@ -182,7 +182,7 @@ extension MutableSlice {
 SliceTests.test("MutableSlice/init(_base:bounds:)") {
   for test in subscriptRangeTests {
     let c = MinimalForwardMutableCollection(elements: test.collection)
-    var result = MutableSlice(_base: c, bounds: test.boundsIn(c))
+    var result = MutableSlice(base: c, bounds: test.boundsIn(c))
     expectType(
       MutableSlice<MinimalForwardMutableCollection<OpaqueValue<Int>>>.self,
       &result)
@@ -199,7 +199,7 @@ SliceTests.test("MutableSlice.{startIndex,endIndex}") {
   for test in subscriptRangeTests {
     let c = MinimalForwardMutableCollection(elements: test.collection)
     let bounds = test.boundsIn(c)
-    var slice = MutableSlice(_base: c, bounds: bounds)
+    var slice = MutableSlice(base: c, bounds: bounds)
     expectType(
       MutableSlice<MinimalForwardMutableCollection<OpaqueValue<Int>>>.self,
       &slice)
@@ -215,7 +215,7 @@ SliceTests.test("MutableSlice.subscript(_: Index)/{get,set}") {
     Base.Index.trapOnRangeCheckFailure.value = false
     let base = Base(elements: test.collection)
     let bounds = test.boundsIn(base)
-    var slice = MutableSlice(_base: base, bounds: bounds)
+    var slice = MutableSlice(base: base, bounds: bounds)
     expectType(MutableSlice<Base>.self, &slice)
 
     for i in bounds {
