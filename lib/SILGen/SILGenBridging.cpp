@@ -419,6 +419,9 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
                                               SILLocation loc,
                                               ManagedValue v,
                                               SILType bridgedTy) {
+  assert(v.getType().isLoadable(gen.F.getModule()) &&
+         "Cannot bridge address-only types");
+
   CanType loweredBridgedTy = bridgedTy.getSwiftRValueType();
   CanType loweredNativeTy = v.getType().getSwiftRValueType();
   if (loweredNativeTy == loweredBridgedTy)
@@ -556,6 +559,9 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
                                               SILLocation loc,
                                               ManagedValue v,
                                               SILType nativeTy) {
+  assert(nativeTy.isLoadable(gen.F.getModule()) &&
+         "Cannot bridge address-only types");
+
   CanType loweredNativeTy = nativeTy.getSwiftRValueType();
   CanType loweredBridgedTy = v.getType().getSwiftRValueType();
   if (loweredNativeTy == loweredBridgedTy)
@@ -797,7 +803,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   assert(bridgedArgs.size() + unsigned(foreignError.hasValue())
            == objcFnTy->getParameters().size() &&
          "objc inputs don't match number of arguments?!");
-  assert(bridgedArgs.size() == swiftFnTy->getNumSILArguments() &&
+  assert(bridgedArgs.size() == swiftFnTy->getParameters().size() &&
          "swift inputs don't match number of arguments?!");
   assert((foreignErrorSlot || !foreignError) &&
          "didn't find foreign error slot");
