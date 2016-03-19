@@ -1866,15 +1866,9 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
     TracedOp.start(trace::OperationKind::FormatText, SwiftArgs, OpArgs);
   }
 
-  FormatWalker walker(SF, SM);
-  StringRef Text = Impl.EditableBuffer->getBuffer()->getText();
-
-  size_t Offset = getOffsetOfTrimmedLine(Line, Text);
-  SourceLoc Loc = SM.getLocForBufferStart(BufID).getAdvancedLoc(Offset);
-  FormatContext FC = walker.walkToLocation(Loc);
+  LineRange inputRange = LineRange(Line, Length);
   CodeFormatOptions Options = getFormatOptions();
-  CodeFormatter CF(Options);
-  auto indented = CF.indent(Line, FC, Text);
+  auto indented = reformat(inputRange, Options, SM, SF);
 
   LineRange LineRange = indented.first;
   StringRef ModifiedText = indented.second;
