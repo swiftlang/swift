@@ -832,7 +832,7 @@ public:
                [&] { *this << ", "; });
     *this << '>';
   }
-  
+
   void visitApplyInst(ApplyInst *AI) {
     *this << "apply ";
     if (AI->isNonThrowing())
@@ -1710,6 +1710,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   for (auto &Attr : getSemanticsAttrs())
     OS << "[_semantics \"" << Attr << "\"] ";
 
+  for (auto *Attr : getSpecializeAttrs()) {
+    OS << "[_specialize "; Attr->print(OS); OS << "] ";
+  }
   printName(OS);
   OS << " : $";
   
@@ -2198,6 +2201,11 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   OS << "}\n";
 }
 
+void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
+  SILPrintContext Ctx(OS);
+  SILPrinter(Ctx).printSubstitutions(getSubstitutions());
+}
+
 //===----------------------------------------------------------------------===//
 // SILPrintContext members
 //===----------------------------------------------------------------------===//
@@ -2207,4 +2215,3 @@ SILPrintContext::~SILPrintContext() {
 
 void SILPrintContext::printInstructionCallBack(const SILInstruction *I) {
 }
-
