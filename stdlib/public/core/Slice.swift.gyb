@@ -76,7 +76,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   : ${SelfProtocols} {
 
   public typealias Index = Base.Index
-  //public typealias IndexDistance = Base.IndexDistance
+  public typealias IndexDistance = Base.IndexDistance
 
   public let startIndex: Index
   public let endIndex: Index
@@ -134,7 +134,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
     _base._previousInPlace(&i)
   }
 %     end
-/*
+
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
     return _base.advance(i, by: n)
@@ -149,7 +149,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     return _base.distance(from: start, to: end)
   }
-*/
+
 %     if RangeReplaceable:
   public init() {
     self._base = Base()

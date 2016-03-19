@@ -14,7 +14,7 @@
 ///
 /// - Important: In most cases, it's best to ignore this protocol and use
 ///   `CollectionType` instead, as it has a more complete interface.
-public protocol Indexable {
+public protocol IndexableBase {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
   //
@@ -115,9 +115,27 @@ public protocol Indexable {
   func _nextInPlace(i: inout Index)
 }
 
+public protocol Indexable : IndexableBase {
+  /// A type that can represent the number of steps between pairs of
+  /// `Index` values where one value is reachable from the other.
+  ///
+  /// Reachability is defined by the ability to produce one value from
+  /// the other via zero or more applications of `next(i)`.
+  associatedtype IndexDistance : SignedInteger = Int
+
+  @warn_unused_result
+  func advance(i: Index, by n: IndexDistance) -> Index
+
+  @warn_unused_result
+  func advance(i: Index, by n: IndexDistance, limit: Index) -> Index
+
+  @warn_unused_result
+  func distance(from start: Index, to end: Index) -> IndexDistance
+}
+
 /// The iterator used for collections that don't specify one.
 public struct IndexingIterator<
-  Elements : Indexable
+  Elements : IndexableBase
   // FIXME(compiler limitation):
   // Elements : Collection
 > : IteratorProtocol, Sequence {
@@ -186,7 +204,7 @@ public protocol Collection : Indexable, Sequence {
   ///   `Sequence`, but is restated here with stricter
   ///   constraints: in a `Collection`, the `SubSequence` should
   ///   also be a `Collection`.
-  associatedtype SubSequence : Indexable, Sequence = Slice<Self>
+  associatedtype SubSequence : IndexableBase, Sequence = Slice<Self>
   // FIXME(compiler limitation):
   // associatedtype SubSequence : Collection
   //   where
@@ -215,7 +233,7 @@ public protocol Collection : Indexable, Sequence {
   /// itself, causing the collection to be non-uniquely referenced.  If you
   /// need to mutate the collection while iterating over its indices, use the
   /// `next()` method to produce indices instead.
-  associatedtype Indices : Indexable, Sequence = DefaultIndices<Self>
+  associatedtype Indices : IndexableBase, Sequence = DefaultIndices<Self>
   // FIXME(compiler limitation):
   // associatedtype Indices : Collection
   //   where
@@ -317,7 +335,7 @@ public protocol Collection : Indexable, Sequence {
 }
 
 /// Default implementation for forward collections.
-extension Collection {
+extension Indexable {
   @inline(__always)
   public func _nextInPlace(i: inout Index) {
     // FIXME: swift-3-indexing-model: tests.
@@ -413,7 +431,7 @@ extension Collection {
 
 /// Supply optimized defaults for `Collection` models that use some model
 /// of `Strideable` as their `Index`.
-extension Collection where Index : Strideable {
+extension Indexable where Index : Strideable {
   @warn_unused_result
   public func next(i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
@@ -829,7 +847,7 @@ extension Collection {
 public enum Bit {}
 
 @available(*, unavailable, renamed: "IndexingIterator")
-public struct IndexingGenerator<Elements : Indexable> {}
+public struct IndexingGenerator<Elements : IndexableBase> {}
 
 @available(*, unavailable, renamed: "Collection")
 public typealias CollectionType = Collection
