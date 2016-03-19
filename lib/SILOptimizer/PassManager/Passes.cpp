@@ -274,8 +274,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Run an iteration of the high-level SSA passes.
   PM.setStageName("HighLevel+EarlyLoopOpt");
-  // FIXME: update this to be a function pass.
-  PM.addEagerSpecializer();
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
   AddHighLevelLoopOptPasses(PM);
   PM.runOneIteration();

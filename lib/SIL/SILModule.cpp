@@ -360,15 +360,8 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
       F->setForeignBody(HasForeignBody);
 
     auto Attrs = constant.getDecl()->getAttrs();
-    for (auto *A : Attrs.getAttributes<SemanticsAttr, false /*AllowInvalid*/>())
+    for (auto A : Attrs.getAttributes<SemanticsAttr, false /*AllowInvalid*/>())
       F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
-
-    for (auto *A :
-           Attrs.getAttributes<SpecializeAttr, false /*AllowInvalid*/>()) {
-      auto *SA = cast<SpecializeAttr>(A);
-      auto subs = SA->getConcreteDecl().getSubstitutions();
-      F->addSpecializeAttr(SILSpecializeAttr::create(*this, subs));
-    }
   }
 
   F->setDeclContext(constant.hasDecl() ? constant.getDecl() : nullptr);

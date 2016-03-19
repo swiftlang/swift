@@ -89,10 +89,6 @@ namespace {
     Type replacement;
   };
 
-  struct ParsedSpecAttr {
-    SmallVector<ParsedSubstitution, 4> subs;
-  };
-
   class SILParser {
   public:
     Parser &P;
@@ -113,6 +109,8 @@ namespace {
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     bool performTypeLocChecking(TypeLoc &T, bool IsSIL = true);
+    bool parseApplySubstitutions(
+                   SmallVectorImpl<ParsedSubstitution> &parsed);
     bool parseSpecConformanceSubstitutions(
                    SmallVectorImpl<ParsedSubstitution> &parsed);
     ProtocolConformance *parseProtocolConformanceHelper(ProtocolDecl *&proto,
@@ -279,9 +277,6 @@ namespace {
     bool parseSILBasicBlock();
     
     bool isStartOfSILInstruction();
-
-    bool parseApplySubstitutions(
-                   SmallVectorImpl<ParsedSubstitution> &parsed);
 
     ProtocolConformance *parseProtocolConformance(ProtocolDecl *&proto,
                              GenericParamList *&generics, bool localScope);
@@ -668,7 +663,6 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
                                  IsThunk_t *isThunk, bool *isGlobalInit,
                                  Inline_t *inlineStrategy, bool *isLet,
                                  SmallVectorImpl<std::string> *Semantics,
-                                 SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  EffectsKind *MRK, Parser &P) {
   while (P.consumeIf(tok::l_square)) {
     if (isLet && P.Tok.is(tok::kw_let)) {
@@ -711,23 +705,6 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       StringRef rawString = P.Tok.getText().drop_front().drop_back();
       Semantics->push_back(rawString);
       P.consumeToken(tok::string_literal);
-
-      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
-      continue;
-    }
-    else if (SpecAttrs && P.Tok.getText() == "_specialize") {
-      P.consumeToken(tok::identifier);
-
-      /// Parse a specialized attributed, building a parsed substitution list
-      /// and pushing a new ParsedSpecAttr on the SpecAttrs list. Conformances
-      /// cannot be generated until the function declaration is fully parsed so
-      /// that the function's generic signature can be consulted.
-      SILParser SpecAttrState(P);
-      ParsedSpecAttr SpecAttr;
-      if (SpecAttrState.parseApplySubstitutions(SpecAttr.subs))
-        return true;
-
-      SpecAttrs->emplace_back(SpecAttr);
 
       P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
@@ -1386,7 +1363,8 @@ static bool allowAbstractConformance(Parser &P, Type subReplacement,
 /// Collect conformances by looking up the conformance from replacement
 /// type and protocol decl in GenericParamList.
 static bool getConformancesForSubstitution(Parser &P,
-              ArchetypeType *subArchetype, Type subReplacement, SourceLoc loc,
+              GenericParamList *gp, ArchetypeType *subArchetype,
+              Type subReplacement, SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
   for (auto proto : subArchetype->getConformsTo()) {
     // Try looking up a concrete conformance.
@@ -1427,7 +1405,7 @@ bool getApplySubstitutionsFromParsed(
     parses = parses.slice(1);
 
     SmallVector<ProtocolConformanceRef, 2> conformances;
-    if (getConformancesForSubstitution(SP.P, subArchetype,
+    if (getConformancesForSubstitution(SP.P, gp, subArchetype,
                                        parsed.replacement,
                                        parsed.loc, conformances))
       return true;
@@ -3772,12 +3750,10 @@ bool Parser::parseDeclSIL() {
   bool isGlobalInit = false;
   Inline_t inlineStrategy = InlineDefault;
   SmallVector<std::string, 1> Semantics;
-  SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
       parseDeclSILOptional(&isTransparent, &isFragile, &isThunk, &isGlobalInit,
-                           &inlineStrategy, nullptr, &Semantics, &SpecAttrs,
-                           &MRK, *this) ||
+                           &inlineStrategy, nullptr, &Semantics, &MRK, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -3807,6 +3783,7 @@ bool Parser::parseDeclSIL() {
     for (auto &Attr : Semantics) {
       FunctionState.F->addSemanticsAttr(Attr);
     }
+
     // Now that we have a SILFunction parse the body, if present.
 
     bool isDefinition = false;
@@ -3818,17 +3795,6 @@ bool Parser::parseDeclSIL() {
       // to parse this from the TypeRepr when SILFunctionType loses its context
       // params.
       FunctionState.F->setContextGenericParams(ContextParams);
-
-      // Resolve specialization attributes after setting ContextParams.
-      for (auto &Attr : SpecAttrs) {
-        SmallVector<Substitution, 4> Subs;
-        if (getApplySubstitutionsFromParsed(FunctionState, ContextParams,
-                                            Attr.subs, Subs)) {
-          return true;
-        }
-        FunctionState.F->addSpecializeAttr(
-          SILSpecializeAttr::create(FunctionState.F->getModule(), Subs));
-      }
       
       // Parse the basic block list.
       do {
@@ -3908,7 +3874,7 @@ bool Parser::parseSILGlobal() {
   Scope S(this, ScopeKind::TopLevel);
   if (parseSILLinkage(GlobalLinkage, *this) ||
       parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
-                           nullptr, &isLet, nullptr, nullptr, nullptr, *this) ||
+                           nullptr, &isLet, nullptr, nullptr, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -4251,7 +4217,7 @@ bool Parser::parseSILWitnessTable() {
   
   bool isFragile = false;
   if (parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, *this))
+                           nullptr, nullptr, nullptr, nullptr, *this))
     return true;
 
   Scope S(this, ScopeKind::TopLevel);
