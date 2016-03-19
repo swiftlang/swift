@@ -56,11 +56,6 @@ public protocol RangeReplaceableCollection
   /// Create an empty instance.
   init()
 
-  /// Construct a Collection of `count` elements, each initialized to
-  /// `repeatedValue`.
-  init(repeating repeatedValue: Iterator.Element, count: Int)
-
-
   /// Replace the given `subRange` of elements with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -111,6 +106,10 @@ public protocol RangeReplaceableCollection
   mutating func reserveCapacity(n: IndexDistance)
 
   //===--- Derivable Requirements -----------------------------------------===//
+
+  /// Construct a Collection of `count` elements, each initialized to
+  /// `repeatedValue`.
+  init(repeating repeatedValue: Iterator.Element, count: Int)
 
   /// Creates a collection instance that contains `elements`.
   init<
