@@ -456,7 +456,6 @@ extension Collection where Index : Strideable {
   */
 }
 
-// TODO: swift-3-indexing-model - review the following
 /// Supply the default `makeIterator()` method for `Collection` models
 /// that accept the default associated `Iterator`,
 /// `IndexingIterator<Self>`.
