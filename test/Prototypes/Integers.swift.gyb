@@ -125,12 +125,22 @@ public func _log(@autoclosure message: ()->String) {
 //===----------------------------------------------------------------------===//
 //===--- Arithmetic -------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
+
+/// Arithmetic protocol declares methods backing binary arithmetic operators,
+/// such as  `+`, `-` and `*`; and their mutating counterparts. These methods
+/// operate on arguments of the same type.
+///
+/// Both mutating and non-mutating operations are declared in the protocol, but
+/// only the mutating ones are required. Should conforming type omit
+/// non-mutating implementations, they will be provided by a protocol extension.
+/// Implementation in that case will copy `self`, perform a mutating operation
+/// on it and return the resulting value.
 public protocol Arithmetic {
   /// Initialize to zero
   init()
 
 % for x in binaryArithmetic:
-  // defaulted using an InPlace counterpart, but can be used as an
+  // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
   @warn_unused_result
   func ${x.name}(${x.firstArg} rhs: Self) -> Self
@@ -151,6 +161,11 @@ extension Arithmetic {
 % end
 }
 
+/// SignedArithmetic protocol will only be conformed to by signed numbers,
+/// otherwise it would be posible to negate an unsigned value.
+///
+/// The only method of this protocol has the default implementation in an
+/// extension, that uses a parameterless initializer and subtraction.
 public protocol SignedArithmetic : Arithmetic {
   func negate() -> Self
 }
@@ -187,15 +202,45 @@ public prefix func -<T: SignedArithmetic>(x: T) -> T {
 public typealias Word = Int${word_bits}
 public typealias UWord = UInt${word_bits}
 
-% IntegerBase = 'Comparable, Arithmetic,' + \
+% IntegerBase = 'Comparable, Arithmetic, ' + \
 %               'IntegerLiteralConvertible, CustomStringConvertible'
 
+/// Integer protocol is a base for all the integer types that are available in
+/// the standard library, and besides should be suffecient to implement
+/// arbitrary precision integer types.
+///
+/// `isEqual(to:)` and `isLess(than:)` methods are the ones responsible for
+/// `Equatable` and `Comparable` protocol conformances. In a way similar to how
+/// arithmetic operations are dispatched in `Arithmetic`, `==` and `<` operators
+/// for homogenous comparisons have default implementations that call
+/// `isEqual(to:)` and `isLess(than:)` respectively.
+///
+/// This protocol adds 3 new initializers to the parameterless one, inherited
+/// from `Arithmetic`. These initializers allow to construct values of type
+/// from instances of any other type, conforming to `Integer`, using different
+/// strategies:
+///   - Perform checks whether the value is representable in `Self`
+///   - Try to represent the value without bounds checking
+///   - Substitute values beyond `Self` bounds with maximum/minimum value of
+///     `Self` respectively
 public protocol Integer : ${IntegerBase} {
 
   // FIXME(compiler limitation): Ideally, this constraint would just be :
   // Integer.  Until we get recursive protocol requirements, that isn't
   // possible.
+
+  /// A type that can hold absolute values of all the possible values of `Self`.
+  /// Concrete types do not have to provide a typealias for it as it can be
+  /// inferred from an `absoluteValue` property. This property (and type) can be
+  /// useful in operations that are simpler to implement in terms of
+  /// (potentially larger) unsigned values, for example, printing a value of an
+  /// integer (it's just adding a '-' character in front of an absolute value).
+  /// Please note, that `absoluteValue` property should not in general be used
+  /// as a substitute for an `abs` free function, that returns a value of the
+  /// same type.
   associatedtype AbsoluteValue : ${IntegerBase}
+
+  static var isSigned: Bool { get }
 
   /// An absolute value of the represented number.
   ///
@@ -207,28 +252,26 @@ public protocol Integer : ${IntegerBase} {
   // the interface and error messages (and on the type checker) than
   // does having many operator overloads.
   @warn_unused_result
-  func isEqualTo(rhs: Self) -> Bool
-
+  func isEqual(to rhs: Self) -> Bool
   @warn_unused_result
-  func isLessThan(rhs: Self) -> Bool
+  func isLess(than rhs: Self) -> Bool
 
   init<T : Integer>(_ source: T)
-
   init<T : Integer>(extendingOrTruncating source: T)
   init<T : Integer>(clamping source: T)
 
+  /// Return n-th word in the underlying representation of `self`.
   @warn_unused_result
   func nthWord(n: Word) -> UWord
 
-  static var isSigned: Bool { get }
-
-  // A number of bits in current representation of `self`
-  // Will be constant for fixed-width integer types.
+  /// A number of bits in current representation of `self`
+  /// Will be constant for fixed-width integer types.
   var bitWidth : Word { get }
 
   /// If `self` is negative, returns the index of the least significant bit of
   /// our representation such that all more-significant bits are 1.
   /// Has the value -1 if `self` is 0.
+  /// Has the value equal to `bitWidth - 1` for fixed width integers.
   var signBitIndex: Word { get }
 }
 
@@ -242,13 +285,13 @@ extension Integer {
 @_transparent
 @warn_unused_result
 public func == <T : Integer>(lhs:T, rhs: T) -> Bool {
-  return lhs.isEqualTo(rhs)
+  return lhs.isEqual(to: rhs)
 }
 
 @_transparent
 @warn_unused_result
 public func < <T : Integer>(lhs: T, rhs: T) -> Bool {
-  return lhs.isLessThan(rhs)
+  return lhs.isLess(than: rhs)
 }
 
 //===--- Heterogeneous comparison -----------------------------------------===//
@@ -353,15 +396,34 @@ public enum ArithmeticOverflow {
   case none, overflow
 }
 
+/// A protocol for all the fixed width integer types. Main addition to the
+/// `Integer` protocol is binary bitwise operations and bit shifts.
+///
+/// `WithOverflow` family of methods is used in default implementations of
+/// mutating arithmetic methods (from `Arithmetic` protocol), provided by a
+/// protocol extension. Having these methods allows to provide both safe
+/// (trapping) and unsafe implementation of arithmetic operations without
+/// duplicating code.
+///
+/// Bitwise binary and shift operators are implemented the same way as
+/// arithmetic operations: free function dispatches a call to a corresponding
+/// protocol method.
+///
+/// `doubleWidthMultiply` method is a necessary building block to implement
+/// support for integer types of a greater width and as a consequence, arbitrary
+/// precision integers.
 public protocol FixedWidthInteger : Integer {
   static var bitWidth : Word { get }
+
+  static var max: Self { get }
+  static var min: Self { get }
 
 % for x in binaryArithmetic:
 %{
 comment = '''
-  /// Return a pair consisting of `self` ${x.operator} `rhs`,
+  /// Return a pair consisting of `self` {} `rhs`,
   /// truncated to fit if necessary, and a flag indicating whether an
-  /// arithmetic overflow occurred.''' + ('''
+  /// arithmetic overflow occurred.'''.format(x.operator) + ('''
   ///
   /// - Precondition: `rhs != 0`''' if x.kind == '/' else '')
 }%
@@ -372,17 +434,13 @@ ${comment}
   ) -> (partialValue: Self, overflow: ArithmeticOverflow)
 % end
 
-  @warn_unused_result
-  func doubleWidthMultiply(other: Self) -> (high: Self, low: AbsoluteValue)
-
-  static var max: Self { get }
-
-  static var min: Self { get }
-
 % for x in binaryBitwise + maskingShifts:
   @warn_unused_result
   func ${x.name}(rhs: Self) -> Self
 % end
+
+  @warn_unused_result
+  func doubleWidthMultiply(other: Self) -> (high: Self, low: AbsoluteValue)
 
   init(_truncatingBits bits: UWord)
 }
@@ -695,12 +753,12 @@ public struct ${Self}
   }
 
   @warn_unused_result
-  public func isEqualTo(rhs: ${Self}) -> Bool {
+  public func isEqual(to rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_Int${bits}(_storage, rhs._storage))
   }
 
   @warn_unused_result
-  public func isLessThan(rhs: ${Self}) -> Bool {
+  public func isLess(than rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_${u}lt_Int${bits}(_storage, rhs._storage))
   }
 
@@ -889,13 +947,13 @@ public struct DoubleWidth<
   }
 
   @warn_unused_result
-  public func isEqualTo(rhs: DoubleWidth<T>) -> Bool {
+  public func isEqual(to rhs: DoubleWidth<T>) -> Bool {
     return (_storage.high == rhs._storage.high) &&
            (_storage.low == rhs._storage.low)
   }
 
   @warn_unused_result
-  public func isLessThan(rhs: DoubleWidth<T>) -> Bool {
+  public func isLess(than rhs: DoubleWidth<T>) -> Bool {
     if _storage.high < rhs._storage.high {
       return true
     }
@@ -910,10 +968,6 @@ public struct DoubleWidth<
   }
 
   public init<T : Integer>(extendingOrTruncating source: T) {
-    fatalError()
-  }
-
-  public init<T : Integer>(clamping source: T) {
     fatalError()
   }
 
@@ -1101,13 +1155,13 @@ public struct ${Self}
   }
 
   @warn_unused_result
-  public func isEqualTo(rhs: ${Self}) -> Bool {
-    return _storage.isEqualTo(rhs._storage)
+  public func isEqual(to rhs: ${Self}) -> Bool {
+    return _storage.isEqual(to: rhs._storage)
   }
 
   @warn_unused_result
-  public func isLessThan(rhs: ${Self}) -> Bool {
-    return _storage.isLessThan(rhs._storage)
+  public func isLess(than rhs: ${Self}) -> Bool {
+    return _storage.isLess(than: rhs._storage)
   }
 
 %   for x in binaryArithmetic:
@@ -1705,7 +1759,7 @@ tests.test("DoubleWidth/Int8/not equal") {
   expectNotEqual(a, b)
 }
 
-tests.test("DoubleWidth/Int8/isLessThan") {
+tests.test("DoubleWidth/Int8/isLess(than:)") {
   let a = DoubleWidth<Int8>.min
   let z = DoubleWidth<Int8>()
   let b = DoubleWidth<Int8>.max
