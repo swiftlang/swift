@@ -12,11 +12,9 @@
 
 import SwiftShims
 
-/// Box the string arguments so that _stdlib_atomicInitializeARCRef can be
-/// used to atomically initialize process arguments.
-internal class StringArgument {
-  var args = [String]()
-  init(a : [String]) { args = a }
+internal class _Box<T> {
+  var value = [String]()
+  init(value : [String]) { self.value = value }
 }
 
 /// Command-line arguments for the current process.
@@ -64,18 +62,17 @@ public enum Process {
   /// and argv.
   public static var arguments: [String] {
     let argumentsPtr = UnsafeMutablePointer<AnyObject?>(
-                       Builtin.addressof(&_swift_stdlib_ProcessArguments))
+                         Builtin.addressof(&_swift_stdlib_ProcessArguments))
 
     // Check whether argument has been initialized.
     if let arguments = _stdlib_atomicLoadARCRef(object: argumentsPtr) {
-      return (arguments as! StringArgument).args
+      return (arguments as! _Box<[String]>).value
     }
 
-    // Initialize argument.
-    let arguments = StringArgument(a: _computeArguments())
+    let arguments = _Box<[String]>(value: _computeArguments())
     _stdlib_atomicInitializeARCRef(object: argumentsPtr, desired: arguments)
 
-    return arguments.args;
+    return arguments.value;
   } 
 }
 

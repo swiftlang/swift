@@ -42,7 +42,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 __swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride = 0;
 
-// Backing storage for Swift.Process.arguments.
+/// Backing storage for Swift.Process.arguments.
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 void *_swift_stdlib_ProcessArguments = nullptr;
