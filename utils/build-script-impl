@@ -1916,6 +1916,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                         -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTest \
                         SWIFT_EXEC="${SWIFTC_BIN}" \
+                        SWIFT_LINK_OBJC_RUNTIME=YES \
                         SKIP_INSTALL=NO \
                         DEPLOYMENT_LOCATION=YES \
                         DSTROOT="${XCTEST_BUILD_DIR}" \
@@ -2183,7 +2184,8 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     xcodebuild \
                         -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTestFunctionalTests \
-                        SWIFT_EXEC="${SWIFTC_BIN}"
+                        SWIFT_EXEC="${SWIFTC_BIN}" \
+                        SWIFT_LINK_OBJC_RUNTIME=YES
                     { set +x; } 2>/dev/null
                 else
                     FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
