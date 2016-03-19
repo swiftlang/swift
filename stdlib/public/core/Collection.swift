@@ -15,6 +15,9 @@
 /// - Important: In most cases, it's best to ignore this protocol and use
 ///   `CollectionType` instead, as it has a more complete interface.
 public protocol Indexable {
+  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // to exist apart from missing compiler features that we emulate with it.
+  //
   // This protocol is almost an implementation detail of the standard
   // library; it is used to deduce things like the `SubSequence` and
   // `Iterator` type from a minimal collection, but it is also used in
