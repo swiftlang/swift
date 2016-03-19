@@ -468,8 +468,7 @@ extension Collection where Iterator == IndexingIterator<Self> {
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
-/// Supply the default "slicing" `subscript`  for `Collection` models
+/// Supply the default "slicing" `subscript` for `Collection` models
 /// that accept the default associated `SubSequence`, `Slice<Self>`.
 extension Collection where SubSequence == Slice<Self> {
   public subscript(bounds: Range<Index>) -> Slice<Self> {
