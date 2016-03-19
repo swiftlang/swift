@@ -2,11 +2,13 @@
 
 // CHECK: ![[EMPTY:.*]] = !{}
 
+protocol P {}
+
 enum Either {
-  case First(Int64), Second(String), Neither
+  case First(Int64), Second(P), Neither
 // CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Either",
 // CHECK-SAME:             line: [[@LINE-3]],
-// CHECK-SAME:             size: 200,
+// CHECK-SAME:             size: {{328|168}},
 }
 let E : Either = .Neither;
 
