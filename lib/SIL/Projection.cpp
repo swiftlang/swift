@@ -875,6 +875,19 @@ createProjection(SILBuilder &B, SILLocation Loc, SILValue Arg) const {
   return Proj->createProjection(B, Loc, Arg);
 }
 
+std::string
+ProjectionTreeNode::getNameEncoding(const ProjectionTree &PT) const {
+  std::string Encoding;
+  const ProjectionTreeNode *Node = this;
+  while(Node) {
+    if (Node->isRoot())
+      break;
+    Encoding += std::to_string(Node->Proj->getIndex());
+    Node = Node->getParent(PT);
+  }
+  return Encoding;
+}
+
 void
 ProjectionTreeNode::
 processUsersOfValue(ProjectionTree &Tree,
@@ -1180,6 +1193,15 @@ ProjectionTree::initializeWithExistingTree(const ProjectionTree &PT) {
   for (const auto &N : PT.ProjectionTreeNodes) {
     ProjectionTreeNodes.push_back(new (Allocator) ProjectionTreeNode(*N));
   }
+}
+
+std::string ProjectionTree::getNameEncoding() const {
+  std::string Encoding;
+  for (unsigned index : LiveLeafIndices) {
+    const ProjectionTreeNode *Node = ProjectionTreeNodes[index];
+    Encoding += Node->getNameEncoding(*this);
+  }
+  return Encoding;
 }
 
 SILValue
