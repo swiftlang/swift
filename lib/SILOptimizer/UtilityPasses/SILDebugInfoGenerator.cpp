@@ -1,4 +1,4 @@
-//===--- SILDebugInfoGenerator.cc - Writes a SIL file for debugging -------===//
+//===--- SILDebugInfoGenerator.cpp - Writes a SIL file for debugging ------===//
 //
 // This source file is part of the Swift.org open source project
 //

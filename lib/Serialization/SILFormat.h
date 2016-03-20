@@ -142,7 +142,6 @@ namespace sil_block {
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
     SIL_GENERIC_OUTER_PARAMS,
     SIL_INST_WITNESS_METHOD,
-    SIL_SPECIALIZE_ATTR,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -246,17 +245,9 @@ namespace sil_block {
                      BCFixed<1>, // global_init
                      BCFixed<2>, // inlineStrategy
                      BCFixed<2>, // side effect info.
-                     BCFixed<2>, // number of specialize attributes
                      TypeIDField,
                      BCArray<IdentifierIDField> // Semantics Attribute
-                     // followed by specialize attributes
                      // followed by generic param list, if any
-                     >;
-
-  using SILSpecializeAttrLayout =
-      BCRecordLayout<SIL_SPECIALIZE_ATTR,
-                     BCFixed<5> // number of substitutions
-                     // followed by bound generic substitutions
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.

@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 244; // Last change: @_specialize attribute
+const uint16_t VERSION_MINOR = 245; // Last change: re-number SIL stuff
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1377,11 +1377,6 @@ namespace decls_block {
     BCVBR<6>,  // index at the end of the message,
     BCBlob     // blob contains the message and mutating-version
                // strings, separated by the prior index
-  >;
-
-  using SpecializeDeclAttrLayout = BCRecordLayout<
-    Specialize_DECL_ATTR,
-    BCArray<TypeIDField> // concrete types
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \

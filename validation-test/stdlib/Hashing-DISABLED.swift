@@ -1,4 +1,15 @@
-// RUN: %target-run-stdlib-swift
+// FIXME: This test fails with some expected probability because
+// it is testing the statistical nature of the hashing.
+// The test failing probabilistically is bad for regression testing,
+// which causes test failures for this test to both be largely
+// ignored but also can cause the entire test suite to fail
+// unexpectedly.
+//
+// This test is being DISABLED until it is written in a way
+// for it to be reliable and useful.
+//
+
+// NOTRUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
 import Swift

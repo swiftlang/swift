@@ -272,25 +272,15 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     Linkage = addExternalToLinkage(Linkage);
   }
 
-  unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isFragile(),
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
-      (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(),
-      (unsigned)numSpecAttrs, FnID, SemanticsIDs);
+      (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(), FnID,
+      SemanticsIDs);
 
   if (NoBody)
     return;
-
-  for (auto *SA : F.getSpecializeAttrs()) {
-    unsigned specAttrAbbrCode = SILAbbrCodes[SILSpecializeAttrLayout::Code];
-
-    auto subs = SA->getSubstitutions();
-    SILSpecializeAttrLayout::emitRecord(
-      Out, ScratchRecord, specAttrAbbrCode, (unsigned)subs.size());
-    S.writeSubstitutions(subs, SILAbbrCodes);
-  }
 
   // Write the body's context archetypes, unless we don't actually have a body.
   if (!F.isExternalDeclaration()) {
@@ -1712,7 +1702,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
-  registerSILAbbr<SILSpecializeAttrLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.

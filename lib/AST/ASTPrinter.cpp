@@ -263,14 +263,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       Requirements.insert({First, Second, Kind});
     }
     bool operator== (const ExtensionMergeInfo& Another) const {
-      // Trivially unmergable.
+      // Trivially unmergeable.
       if (HasDocComment || Another.HasDocComment)
         return false;
       if (InheritsCount != 0 || Another.InheritsCount != 0)
         return false;
       return Requirements == Another.Requirements;
     }
-    bool isMergableWithTypeDef() {
+    bool isMergeableWithTypeDef() {
       return !HasDocComment && InheritsCount == 0 && Requirements.empty();
     }
   };
@@ -286,11 +286,11 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     ExtensionMergeGroup(SynthesizedExtensionInfo *Info,
                         unsigned RequirementsCount,
                         unsigned InheritanceCount,
-                        bool MergableWithType) :
+                        bool MergeableWithType) :
       InheritanceCount(InheritanceCount),
       RequirementsCount(RequirementsCount),
-      Kind(MergableWithType ? MergeGroupKind::MergableWithTypeDef :
-                              MergeGroupKind::UnmergableWithTypeDef) {
+      Kind(MergeableWithType ? MergeGroupKind::MergeableWithTypeDef :
+                               MergeGroupKind::UnmergeableWithTypeDef) {
       Members.push_back(Info);
     }
 
@@ -470,7 +470,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         Results.push_back({&ExtInfo,
                           (unsigned)MergeInfo.Requirements.size(),
                           MergeInfo.InheritsCount,
-                          MergeInfo.isMergableWithTypeDef()});
+                          MergeInfo.isMergeableWithTypeDef()});
       } else {
         Found->Members.push_back(&ExtInfo);
       }

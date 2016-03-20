@@ -378,12 +378,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
-    inlineStrategy, effect, numSpecAttrs;
+           inlineStrategy, effect;
   ArrayRef<uint64_t> SemanticsIDs;
   // TODO: read fragile
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
                                 isThunk, isGlobal, inlineStrategy, effect,
-                                numSpecAttrs, funcTyID, SemanticsIDs);
+                                funcTyID, SemanticsIDs);
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -455,28 +455,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     fn->setDebugScope(DS);
   }
 
-  // Read and instantiate the specialize attributes.
-  while (numSpecAttrs--) {
-    auto next = SILCursor.advance(AF_DontPopBlockAtEnd);
-    assert(next.Kind == llvm::BitstreamEntry::Record);
-
-    scratch.clear();
-    kind = SILCursor.readRecord(next.ID, scratch);
-    assert(kind == SIL_SPECIALIZE_ATTR && "Missing specialization attribute");
-    
-    unsigned NumSubstitutions;
-    SILSpecializeAttrLayout::readRecord(scratch, NumSubstitutions);
-
-    // Read the substitution list and construct a SILSpecializeAttr.
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSubstitutions--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "Missing substitution?");
-      Substitutions.push_back(*sub);
-    }
-    fn->addSpecializeAttr(SILSpecializeAttr::create(SILMod, Substitutions));
-  }
-
   GenericParamList *contextParams = nullptr;
   if (!declarationOnly) {
     // We need to construct a linked list of GenericParamList. The outermost
@@ -522,13 +500,13 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   }
 
   NumDeserializedFunc++;
+  scratch.clear();
 
   assert(!(fn->getContextGenericParams() && !fn->empty())
          && "function already has context generic params?!");
   if (contextParams)
     fn->setContextGenericParams(contextParams);
 
-  scratch.clear();
   kind = SILCursor.readRecord(entry.ID, scratch);
 
   SILBasicBlock *CurrentBB = nullptr;

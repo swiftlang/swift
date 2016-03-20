@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opt-rewriter -function-signature-opt-cloner %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opt-rewriter -function-signature-opt-cloner %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
 
 import Builtin
 import Swift
@@ -92,7 +92,7 @@ bb0(%0 : $lotsoffield):
 // Make sure argument is exploded and the baz part is not passed in as argument, as its only use
 // is a release.
 // CHECK-LABEL: sil [thunk] @dead_argument_due_to_more_than_release_user
-// CHECK: [[FN1:%.*]] = function_ref @_TTSf4gs__dead_argument_due_to_more_than_release_user : $@convention(thin) (@guaranteed baz, Int) -> (Int, Int)
+// CHECK: [[FN1:%.*]] = function_ref @_TTSf4gs__dead_argument_due_to_more_than_release_user_arg0_01 : $@convention(thin) (@guaranteed baz, Int) -> (Int, Int)
 sil @dead_argument_due_to_more_than_release_user : $@convention(thin) (@owned boo) -> (Int, Int) {
 bb0(%0 : $boo):
   %1 = struct_extract %0 : $boo, #boo.tbaz
@@ -193,7 +193,7 @@ bb3(%4 : $boo):
 
 // CHECK-LABEL: sil [thunk] @single_owned_return_value_with_interfering_release
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @_TTSf4s__single_owned_return_value_with_interfering_release
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4g_n_n___TTSf4s__single_owned_return_value_with_interfering_release_arg0_00101
 // CHECK-NOT: retain_value
 // CHECK: return
 sil @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) -> @owned boo {
@@ -777,9 +777,11 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-NOT: retain_value
 // CHECK: return
 
-// CHECK-LABEL: sil @_TTSf4s__single_owned_return_value_with_interfering_release : $@convention(thin) (@owned foo, @owned foo, Int) -> @owned boo {
+// CHECK-LABEL: sil [thunk] @_TTSf4s__single_owned_return_value_with_interfering_release_arg0_00101 : $@convention(thin) (@owned foo, @owned foo, Int) -> @owned boo {
 // CHECK: retain_value
 // CHECK: release_value
+
+// CHECK-LABEL: sil [thunk] @_TTSf4g_n_n___TTSf4s__single_owned_return_value_with_interfering_release_arg0_00101
 
 // CHECK-LABEL: @_TTSf4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorProtocol) {
 // CHECK: bb2
