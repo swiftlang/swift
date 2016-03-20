@@ -14,7 +14,7 @@ import SwiftShims
 
 internal class _Box<T> {
   var value = [String]()
-  init(value : [String]) { self.value = value }
+  init(_ value : [String]) { self.value = value }
 }
 
 /// Command-line arguments for the current process.
@@ -62,7 +62,7 @@ public enum Process {
   /// and argv.
   public static var arguments: [String] {
     let argumentsPtr = UnsafeMutablePointer<AnyObject?>(
-                         Builtin.addressof(&_swift_stdlib_ProcessArguments))
+      Builtin.addressof(&_swift_stdlib_ProcessArguments))
 
     // Check whether argument has been initialized.
     if let arguments = _stdlib_atomicLoadARCRef(object: argumentsPtr) {
@@ -72,7 +72,7 @@ public enum Process {
     let arguments = _Box<[String]>(value: _computeArguments())
     _stdlib_atomicInitializeARCRef(object: argumentsPtr, desired: arguments)
 
-    return arguments.value;
+    return arguments.value
   } 
 }
 
