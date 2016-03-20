@@ -443,7 +443,7 @@ private:
   struct SubregionData {
     /// The RPO number of the header block of this loop or function. This is
     /// used as the RPO number for the whole region.
-    unsigned RPONumOfHeaderBlock;
+    unsigned HeaderBlockRPONumber;
 
     /// The RPO number of the back edge blocks of this loop. We use a
     /// SmallVector of size 1 since after loop canonicalization we will always
@@ -683,13 +683,34 @@ public:
       OptionalTransformRange<InnerSuccRange, SuccessorID::ToLiveLocalSucc>;
   using NonLocalSuccRange =
       OptionalTransformRange<InnerSuccRange, SuccessorID::ToLiveNonLocalSucc>;
+
   SuccRange getSuccs() const;
+
   LocalSuccRange getLocalSuccs() const;
+
+  /// Return true if this region has successors that are in the same loop.
+  bool hasLocalSuccs() const {
+    auto Range = getLocalSuccs();
+    return Range.begin() != Range.end();
+  }
+
   NonLocalSuccRange getNonLocalSuccs() const;
+
+  /// Return true if this region has successors that are not in the same loop
+  /// and can be accessed via traversing up the loop nest hierarchy's non-local
+  /// successor edges.
+  bool hasNonLocalSuccs() const {
+    auto Range = getNonLocalSuccs();
+    return Range.begin() != Range.end();
+  }
 
   BlockTy *getBlock() const;
   LoopTy *getLoop() const;
   FunctionTy *getFunction() const;
+
+  NullablePtr<BlockTy> getBlockOrNull() const {
+    return isBlock() ? getBlock() : nullptr;
+  }
 
   bool isBlock() const { return Ptr.is<BlockTy *>(); }
   bool isLoop() const { return Ptr.is<LoopTy *>(); }
@@ -723,7 +744,7 @@ public:
   unsigned getRPONumber() const {
     if (isBlock())
       return getID();
-    return getSubregionData().RPONumOfHeaderBlock;
+    return getSubregionData().HeaderBlockRPONumber;
   }
 
   void dump() const;

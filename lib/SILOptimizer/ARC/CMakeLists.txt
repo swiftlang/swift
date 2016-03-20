@@ -1,5 +1,6 @@
 set(ARC_SOURCES
   ARC/ARCBBState.cpp
+  ARC/ARCLoopHoisting.cpp
   ARC/ARCLoopOpts.cpp
   ARC/ARCMatchingSet.cpp
   ARC/ARCRegionState.cpp

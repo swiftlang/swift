@@ -109,6 +109,8 @@ PASS(ARCSequenceOpts, "arc-sequence-opts",
      "retain/release sequences")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "Run all arc loop passes")
+PASS(ARCLoopHoisting, "arc-loop-hoisting",
+     "Hoist retains, releases outside of loops")
 PASS(RedundantLoadElimination, "redundant-load-elim",
      "Multiple basic block redundant load elimination")
 PASS(DeadStoreElimination, "dead-store-elim",

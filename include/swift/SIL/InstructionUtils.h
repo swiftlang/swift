@@ -14,6 +14,7 @@
 #define SWIFT_SIL_INSTRUCTIONUTILS_H
 
 #include "swift/SIL/SILInstruction.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
 
@@ -59,6 +60,33 @@ SILValue stripIndexingInsts(SILValue V);
 /// Returns the underlying value after stripping off a builtin expect
 /// intrinsic call.
 SILValue stripExpectIntrinsic(SILValue V);
+
+/// A RAII struct that removes instructions from their parent block but does not
+/// delete them until the RAII struct is torn down.
+class DelayedInstructionDestroyer {
+  /// The module that we used to allocate/deallocate memory.
+  SILModule &Mod;
+
+  // TODO: We /could/ use an inst list here perhaps. Then we could do quick
+  // transfering of instructions via splice.
+  llvm::SmallSetVector<SILInstruction *, 32> Insts;
+
+public:
+  DelayedInstructionDestroyer(SILModule &Mod) : Mod(Mod), Insts() {}
+  DelayedInstructionDestroyer(const DelayedInstructionDestroyer &) = delete;
+  DelayedInstructionDestroyer(DelayedInstructionDestroyer &&) = delete;
+  ~DelayedInstructionDestroyer();
+
+  /// Clean up \p I by removing it from its parent iplist and destroying I. Do
+  /// not deallocate I's memory though.
+  void remove(SILInstruction *I);
+
+  /// \returns true if \p I is an instruction that was removed from its parent
+  /// and that will be deleted.
+  bool count(SILInstruction *I) {
+    return Insts.count(I);
+  }
+};
 
 } // end namespace swift
 

@@ -21,6 +21,7 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "ARCSequenceOpts.h"
+#include "ARCLoopHoisting.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
@@ -69,18 +70,33 @@ class ARCLoopOpts : public SILFunctionTransform {
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
+    auto *SEA = getAnalysis<SideEffectAnalysis>();
     ProgramTerminationFunctionInfo PTFI(F);
 
     // Create all of our visitors, register them with the visitor group, and
     // run.
-    LoopARCPairingContext LoopARCContext(*F, AA, LRFI, LI, RCFI, &PTFI);
+    LoopHoister Hoister(F, LI, AA, RCFI, LRFI, &PTFI, SEA);
+    LoopARCPairingContext ARCSequenceOptsCtx(*F, AA, LRFI, LI, RCFI, &PTFI);
     SILLoopVisitorGroup VisitorGroup(F, LI);
-    VisitorGroup.addVisitor(&LoopARCContext);
+    static unsigned SequenceCount = 0;
+    unsigned SequenceLimit = -1;
+    if (auto *Op = getenv("LIMIT")) {
+      SequenceLimit = atoi(Op);
+    }
+
+    if (SequenceCount < SequenceLimit) {
+      SequenceCount++;
+      VisitorGroup.addVisitor(&Hoister);
+    }
+
+    if (SequenceCount < SequenceLimit) {
+      SequenceCount++;
+      VisitorGroup.addVisitor(&ARCSequenceOptsCtx);
+    }
     VisitorGroup.run();
 
-    if (LoopARCContext.madeChange()) {
+    if (Hoister.madeChange() || ARCSequenceOptsCtx.madeChange())
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
-    }
   }
 
   StringRef getName() override { return "ARC Loop Opts"; }

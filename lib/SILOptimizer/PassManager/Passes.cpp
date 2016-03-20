@@ -237,7 +237,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   // Perform retain/release code motion and run the first ARC optimizer.
   PM.addCSE();
   PM.addEarlyCodeMotion();
-  PM.addARCSequenceOpts();
+  PM.addARCLoopOpts();
 
   PM.addSimplifyCFG();
   // Only hoist releases very late.
@@ -245,7 +245,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
     PM.addLateCodeMotion();
   else
     PM.addEarlyCodeMotion();
-  PM.addARCSequenceOpts();
+  PM.addARCLoopOpts();
   PM.addRemovePins();
 }
 

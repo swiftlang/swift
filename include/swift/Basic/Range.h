@@ -295,6 +295,11 @@ inline auto count_if(const Range &R, Predicate &&P)
   return std::count_if(R.begin(), R.end(), std::forward<Predicate>(P));
 }
 
+// An adaptor of std::distance for ranges.
+template <class Range> inline unsigned distance(Range &&R) {
+  return std::distance(R.begin(), R.end());
+}
+
 } // namespace swift
 
 #endif
