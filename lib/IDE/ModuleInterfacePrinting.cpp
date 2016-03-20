@@ -437,7 +437,7 @@ void swift::ide::printSubmoduleInterface(
         pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
         AdjustedOptions.BracketOptions.shouldCloseNominal =
           !pAnalyzer->hasMergeGroup(SynthesizedExtensionAnalyzer::
-                                    MergeGroupKind::MergableWithTypeDef);
+                                    MergeGroupKind::MergeableWithTypeDef);
       }
     }
     if (D->print(Printer, AdjustedOptions)) {
@@ -482,7 +482,7 @@ void swift::ide::printSubmoduleInterface(
           if (IsTopLevelDecl) {
           // Print the part that should be merged with the type decl.
           pAnalyzer->forEachExtensionMergeGroup(
-            SynthesizedExtensionAnalyzer::MergeGroupKind::MergableWithTypeDef,
+            SynthesizedExtensionAnalyzer::MergeGroupKind::MergeableWithTypeDef,
             [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
               for (auto ET : Decls) {
                 AdjustedOptions.BracketOptions.shouldOpenExtension = false;
@@ -508,10 +508,10 @@ void swift::ide::printSubmoduleInterface(
 
           // Print the rest as synthesized extensions.
           pAnalyzer->forEachExtensionMergeGroup(
-            // For top-level decls, only contraint extensions are to print;
+            // For top-level decls, only constraint extensions are to print;
             // Since the rest are merged into the main body.
             IsTopLevelDecl ?
-              SynthesizedExtensionAnalyzer::MergeGroupKind::UnmergableWithTypeDef :
+              SynthesizedExtensionAnalyzer::MergeGroupKind::UnmergeableWithTypeDef :
             // For sub-decls, all extensions should be printed.
               SynthesizedExtensionAnalyzer::MergeGroupKind::All,
             [&](ArrayRef<ExtensionAndIsSynthesized> Decls){

@@ -72,8 +72,8 @@ public:
 
   enum class MergeGroupKind : char {
     All,
-    MergableWithTypeDef,
-    UnmergableWithTypeDef,
+    MergeableWithTypeDef,
+    UnmergeableWithTypeDef,
   };
 
   void forEachExtensionMergeGroup(MergeGroupKind Kind,
