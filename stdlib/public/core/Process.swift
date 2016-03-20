@@ -37,11 +37,6 @@ public enum Process {
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
     = nil
 
-  internal enum _ProcessArgumentsState {
-    case notYetComputed
-    case computedArguments([String])
-  }
-
   /// Access to the raw argc value from C.
   public static var argc: CInt {
     return _argc
@@ -69,7 +64,7 @@ public enum Process {
       return (arguments as! _Box<[String]>).value
     }
 
-    let arguments = _Box<[String]>(value: _computeArguments())
+    let arguments = _Box<[String]>(_computeArguments())
     _stdlib_atomicInitializeARCRef(object: argumentsPtr, desired: arguments)
 
     return arguments.value
