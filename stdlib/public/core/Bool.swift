@@ -94,6 +94,7 @@ public prefix func !(a: Bool) -> Bool {
   return Bool(Builtin.xor_Int1(a._value, true._value))
 }
 
+// Binary Equivalence Check
 @_transparent
 @warn_unused_result
 public func ==(lhs: Bool, rhs: Bool) -> Bool {
