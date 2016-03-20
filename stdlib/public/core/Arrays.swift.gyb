@@ -504,18 +504,6 @@ extension ${Self} : _ArrayProtocol {
       shiftedToStartIndex: 0))
   }
 
-  /// Construct a ${Self} of `count` elements, each initialized to
-  /// `repeatedValue`.
-  @_semantics("array.init")
-  public init(repeating repeatedValue: Element, count: Int) {
-    var p: UnsafeMutablePointer<Element>
-    (self, p) = ${Self}._allocateUninitialized(count)
-    for _ in 0..<count {
-      p.initialize(with: repeatedValue)
-      p += 1
-    }
-  }
-
   @inline(never)
   internal static func _allocateBufferUninitialized(
     minimumCapacity minimumCapacity: Int
