@@ -121,7 +121,7 @@ namespace swift {
     /// know that this function is a dead function and going to be deleted from
     /// the module.
     virtual void invalidateForDeadFunction(SILFunction *F, InvalidationKind K) {
-      // Call the normal invaldate fucntion unless overridden by specific
+      // Call the normal invalidate function unless overridden by specific
       // analysis.
       invalidate(F, K);
     }

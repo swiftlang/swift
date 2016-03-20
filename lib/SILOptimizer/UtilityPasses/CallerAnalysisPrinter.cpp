@@ -1,4 +1,4 @@
-//===--- CallerAnalysisPrinter.cpp - Caller Analysis test  pass -----------===//
+//===--- CallerAnalysisPrinter.cpp - Caller Analysis test pass ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
