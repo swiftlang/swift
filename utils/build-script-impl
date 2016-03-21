@@ -379,8 +379,8 @@ function set_deployment_target_based_options() {
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
-                -DLLVM_BUILD_EXTERNAL_COMPILER_RT=$(true_false "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS}")
-                -DCOMPILER_RT_ENABLE_IOS:BOOL=$(false_true ${SKIP_IOS})
+                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(true_false ${#CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]})"
+                -DCOMPILER_RT_ENABLE_IOS:BOOL="$(false_true ${SKIP_IOS})"
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
             )
