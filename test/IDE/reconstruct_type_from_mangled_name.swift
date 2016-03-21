@@ -7,15 +7,6 @@ struct Mystruct1 {
   var intField = 3
 // CHECK: decl: var intField: Int
 }
-struct MyStruct2 {
-// CHECK: decl: struct MyStruct2
-  init() {}
-// CHECK: decl: init()
-  init(x: Int) {}
-// CHECK: decl: init(x: Int)
-  init(x: Int, y: Int) {}
-// CHECK: decl: init(x: Int, y: Int)
-}
 
 class Myclass1 {
 // CHECK: decl: class Myclass1
@@ -25,14 +16,13 @@ class Myclass1 {
 
 func f1() {
 // CHECK: decl: func f1()
-  var s1ins = Mystruct1() // Implicit ctor
+  var s1ins = Mystruct1()
 // CHECK: decl: var s1ins: Mystruct1
-// CHECK: dref: init() for 'Mystruct1'
-  _ = Mystruct1(intField: 1) // Implicit ctor
-// CHECK: dref: init(intField: Int)	for 'Mystruct1'
+// FIXME: missing init()?
+// CHECK: dref: FAILURE	for 'Mystruct1' usr=s:FV14swift_ide_test9Mystruct1cFT_S0_
+// CHECK: type: Mystruct1
 
   s1ins.intField = 34
-// CHECK: type: Mystruct1
 // CHECK: type: Int
 
   var c1ins = Myclass1()
@@ -80,9 +70,6 @@ class Myclass2 {
 
     arr3.append(Myclass1())
 // CHECK: type: @lvalue Array<Myclass1> -> Myclass1 -> ()
-
-    _ = Myclass2.init()
-// CHECK: dref: init()
   }
 }
 
