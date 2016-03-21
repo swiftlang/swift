@@ -809,7 +809,11 @@ function true_false() {
 }
 
 function false_true() {
-    true_false $(not "$1")
+    if [[ $(true_false "$1") = "TRUE" ]]; then
+        echo "FALSE"
+    else
+        echo "TRUE"
+    fi
 }
 
 function cmake_version() {
