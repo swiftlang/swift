@@ -581,6 +581,11 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   if (auto IFaceGenRef = IFaceGenContexts.find(Info.ModuleName, Invok))
     Info.ModuleInterfaceName = IFaceGenRef->getDocumentName();
   Info.IsSystem = Mod.isSystemModule();
+  std::vector<StringRef> Groups;
+  if (auto MD = Mod.getAsSwiftModule()) {
+    Info.ModuleGroupArray = ide::collectModuleGroups(const_cast<ModuleDecl*>(MD),
+                                                     Groups);
+  }
   Receiver(Info);
   return false;
 }

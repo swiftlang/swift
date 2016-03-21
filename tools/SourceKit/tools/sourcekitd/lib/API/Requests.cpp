@@ -1299,6 +1299,13 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
       Override.set(KeyUSR, USR);
     }
   }
+  if (!Info.ModuleGroupArray.empty()) {
+    auto Groups = Elem.setArray(KeyModuleGroups);
+    for (auto Name : Info.ModuleGroupArray) {
+      auto Entry = Groups.appendDictionary();
+      Entry.set(KeyGroupName, Name);
+    }
+  }
   if (!Info.AnnotatedRelatedDeclarations.empty()) {
     auto RelDecls = Elem.setArray(KeyRelatedDecls);
     for (auto AnnotDecl : Info.AnnotatedRelatedDeclarations) {

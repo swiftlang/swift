@@ -294,6 +294,8 @@ struct CursorInfo {
   ArrayRef<StringRef> OverrideUSRs;
   /// Related declarations, overloaded functions etc., in annotated XML form.
   ArrayRef<StringRef> AnnotatedRelatedDeclarations;
+  /// All groups of the module name under cursor.
+  ArrayRef<StringRef> ModuleGroupArray;
   bool IsSystem = false;
 };
 
