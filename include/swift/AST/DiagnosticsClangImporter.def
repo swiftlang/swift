@@ -58,6 +58,7 @@ WARNING(invalid_swift_name_method,none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
   "got %2)", (bool, unsigned, unsigned))
 
+NOTE(note_while_importing, none, "while importing '%0'", (StringRef))
 ERROR(swift_name_protocol_static, Fatal, "swift_name cannot be used to define "
                                          "%select{static member|init}0 on "
                                          "protocol.",

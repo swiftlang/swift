@@ -2389,6 +2389,8 @@ namespace {
         // FIXME: clang source location
         Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
                                          /*isInit=*/true);
+        Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
+                                         decl->getName());
         return nullptr;
       }
 
@@ -2449,6 +2451,8 @@ namespace {
         // FIXME: source location...
         Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
                                          /*isInit=*/false);
+        Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
+                                         decl->getName());
         return nullptr;
       }
 
