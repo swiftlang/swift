@@ -35,9 +35,10 @@ public struct UnsafeBufferPointerIterator<Element>
 ///
 /// The pointer should be aligned to `alignof(Element.self)`.
 public struct Unsafe${Mutable}BufferPointer<Element>
-  : ${Mutable}Collection, RandomAccessCollection {
+  : ${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
 
   public typealias Index = Int
+  public typealias IndexDistance = Int
   public typealias Iterator =
     IndexingIterator<Unsafe${Mutable}BufferPointer<Element>>
 
@@ -70,6 +71,24 @@ public struct Unsafe${Mutable}BufferPointer<Element>
       _position[i] = newValue
     }
 %end
+  }
+
+  public subscript(bounds: Range<Int>)
+    -> ${Mutable}RandomAccessSlice<Unsafe${Mutable}BufferPointer<Element>>
+  {
+    get {
+      // FIXME: swift-3-indexing-model: range check.
+      // FIXME: swift-3-indexing-model: tests.
+      return ${Mutable}RandomAccessSlice(
+        base: self, bounds: bounds)
+    }
+%  if Mutable:
+    set {
+      // FIXME: swift-3-indexing-model: range check.
+      // FIXME: swift-3-indexing-model: tests.
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+%  end
   }
 
   /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous

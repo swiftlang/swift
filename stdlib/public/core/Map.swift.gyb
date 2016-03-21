@@ -11,16 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 %{
-traversals = ['Forward', 'Bidirectional', 'RandomAccess']
-
-def collectionForTraversal(traversal):
-    if traversal == 'Forward':
-        return 'Collection'
-    if traversal == 'Bidirectional':
-        return 'BidirectionalCollection'
-    if traversal == 'RandomAccess':
-        return 'RandomAccessCollection'
-    assert False, "unknown traversal"
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName
+)
 }%
 
 /// The `IteratorProtocol` used by `MapSequence` and `MapCollection`.
@@ -86,13 +81,15 @@ public struct LazyMapSequence<Base : Sequence, Element>
 // collapsed into one `LazyMapCollection` using conditional conformances.
 // Maybe even combined with `LazyMapSequence`.
 
-% for Traversal in traversals:
+% for Traversal in TRAVERSALS:
+%   Self = "LazyMap" + collectionForTraversal(Traversal)
+%   Slice = sliceTypeName(traversal=Traversal, mutable=False, rangeReplaceable=False)
 
 /// A `Collection` whose elements consist of those in a `Base`
 /// `Collection` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct LazyMap${collectionForTraversal(Traversal)}<
+public struct ${Self}<
   Base : ${collectionForTraversal(Traversal)}, Element
 > : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
 
@@ -126,6 +123,20 @@ public struct LazyMap${collectionForTraversal(Traversal)}<
     return _transform(_base[position])
   }
 
+  public subscript(bounds: Range<Base.Index>) -> ${Slice}<${Self}> {
+    return ${Slice}(base: self, bounds: bounds)
+  }
+
+  // FIXME(ABI)(compiler limitation): we actually want to add:
+  //
+  //   typealias SubSequence = ${Self}<Base.SubSequence, Element>
+  //
+  // so that all slicing optimizations of the base collection can kick in.
+  //
+  // We can't do that right now though, because that would force a lot of
+  // constraints on `Base.SubSequence`, limiting the possible contexts where
+  // the `.lazy.map` API can be used.
+
   public typealias IndexDistance = Base.IndexDistance
 
   public typealias Indices = Base.Indices
@@ -144,7 +155,6 @@ public struct LazyMap${collectionForTraversal(Traversal)}<
   public var count: Base.IndexDistance {
     return _base.count
   }
-
 
   public var first: Element? { return _base.first.map(_transform) }
 
@@ -205,7 +215,7 @@ extension LazySequenceProtocol {
   }
 }
 
-% for Traversal in traversals:
+% for Traversal in TRAVERSALS:
 
 extension LazyCollectionProtocol
   where

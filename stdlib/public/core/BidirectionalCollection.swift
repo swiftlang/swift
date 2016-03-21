@@ -40,9 +40,11 @@ public protocol BidirectionalCollection
 
   func _previousInPlace(i: inout Index)
 
+  associatedtype SubSequence : BidirectionalIndexable, Collection = BidirectionalSlice<Self>
   // FIXME(compiler limitation):
   // associatedtype SubSequence : BidirectionalCollection
 
+  associatedtype Indices : Collection = DefaultBidirectionalIndices<Self>
   // FIXME(compiler limitation):
   // associatedtype Indices : BidirectionalCollection
 
@@ -51,7 +53,7 @@ public protocol BidirectionalCollection
 }
 
 /// Default implementation for bidirectional collections.
-extension BidirectionalCollection {
+extension BidirectionalIndexable {
 
   @inline(__always)
   public func _previousInPlace(i: inout Index) {
@@ -113,7 +115,7 @@ extension BidirectionalCollection {
 
 /// Supply optimized defaults for `BidirectionalCollection` models that use
 /// some model of `Strideable` as their `Index`.
-extension BidirectionalCollection where Index : Strideable {
+extension BidirectionalIndexable where Index : Strideable {
   @warn_unused_result
   public func previous(i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
@@ -151,6 +153,16 @@ extension BidirectionalCollection where Index : Strideable {
     return start.distance(to: end)
   }
   */
+}
+
+/// Supply the default "slicing" `subscript` for `BidirectionalCollection`
+/// models that accept the default associated `SubSequence`,
+/// `BidirectionalSlice<Self>`.
+extension BidirectionalIndexable where SubSequence == BidirectionalSlice<Self> {
+  public subscript(bounds: Range<Index>) -> BidirectionalSlice<Self> {
+    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+    return BidirectionalSlice(base: self, bounds: bounds)
+  }
 }
 
 extension BidirectionalCollection where SubSequence == Self {

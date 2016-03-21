@@ -61,6 +61,7 @@ public protocol MutableIndexable : Indexable {
   /// - Complexity: O(1)
   subscript(position: Index) -> _Element { get set }
 
+  associatedtype SubSequence
   subscript(bounds: Range<Index>) -> SubSequence { get set }
   
   /// Performs a range check in O(1), or a no-op when a range check is not

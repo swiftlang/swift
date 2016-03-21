@@ -172,12 +172,13 @@ public struct ClosedRangeOfStrideable<
   public typealias Element = Bound
   public typealias Index = ClosedRangeIndex<Bound>
   public typealias Iterator = ClosedRangeIterator<Bound>
+  //public typealias IndexDistance = Int
+  // FIXME: swift-3-indexing-model: IndexDistance = Bound.Stride
   
   public func makeIterator() -> ClosedRangeIterator<Bound> {
     return ClosedRangeIterator(self)
   }
 
-  
   @warn_unused_result
   public func next(i: Index) -> Index {
     return i._successor(upperBound: upperBound)
@@ -186,6 +187,13 @@ public struct ClosedRangeOfStrideable<
   @warn_unused_result
   public func previous(i: Index) -> Index {
     return i._predecessor(upperBound: upperBound)
+  }
+
+  public var indices: DefaultRandomAccessIndices<ClosedRangeOfStrideable<Bound>> {
+    return DefaultRandomAccessIndices(
+      _elements: self,
+      startIndex: self.startIndex,
+      endIndex: self.endIndex)
   }
 
   public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
@@ -220,8 +228,8 @@ public struct ClosedRangeOfStrideable<
     return false
   }
 
-  public subscript(bounds: Range<Index>) -> Slice<ClosedRangeOfStrideable> {
-    return Slice(base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> RandomAccessSlice<ClosedRangeOfStrideable> {
+    return RandomAccessSlice(base: self, bounds: bounds)
   }
 }
 

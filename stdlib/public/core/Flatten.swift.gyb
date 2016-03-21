@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+%{
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName
+)
+}%
+
 /// An iterator that produces the elements contained in each segment
 /// produced by some `Base` Iterator.
 ///
@@ -112,42 +120,20 @@ extension LazySequenceProtocol
   }
 }
 
-%{
-def collectionForTraversal(traversal):
-    if traversal == 'Forward':
-        return 'Collection'
-    if traversal == 'Bidirectional':
-        return 'BidirectionalCollection'
-    if traversal == 'RandomAccess':
-        return 'RandomAccessCollection'
-    assert False, "unknown traversal"
-}%
-
-%{
-def indexConfromsToForTraversal(traversal):
-    if traversal == 'Forward':
-        return 'Comparable'
-    if traversal == 'Bidirectional':
-        return 'Comparable'
-    if traversal == 'RandomAccess':
-        return 'Strideable'
-    assert False, "unknown traversal"
-}%
-
 % for traversal in ['Forward', 'Bidirectional']:
-%   t = '' if traversal == 'Forward' else traversal
-%   Collection = 'Flatten%sCollection' % t
+%   Collection = 'Flatten' + collectionForTraversal(traversal)
 %   if traversal == 'Forward':
 %     constraints = '%(Base)sIterator.Element : Collection'
 %   if traversal == 'Bidirectional':
 %     constraints = '%(Base)sIterator.Element : BidirectionalCollection'
 %   Index = Collection + 'Index'
+%   Slice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=False)
 /// A position in a `${Collection}`.
 public struct ${Index}<
   BaseElements : ${collectionForTraversal(traversal)}
   where
   ${constraints % {'Base': 'BaseElements.'}}
-> : ${indexConfromsToForTraversal(traversal)} {
+> : Comparable {
 
   internal init(
     _ _outer: BaseElements.Index,
@@ -325,6 +311,11 @@ public struct ${Collection}<
     return _base[position._outer][position._inner!]
   }
 
+  public subscript(bounds: Range<Index>)
+    -> ${Slice}<${Collection}> {
+    return ${Slice}(base: self, bounds: bounds)
+  }
+
   // To return any estimate of the number of elements, we have to start
   // evaluating the collections.  That is a bad default for `flatMap()`, so
   // just return zero.
@@ -394,9 +385,7 @@ extension FlattenSequence {
 }
 
 % for traversal in ('Forward', 'Bidirectional'):
-%   t = '' if traversal == 'Forward' else traversal
-%   Collection = 'Flatten%sCollection' % t
-extension ${Collection} {
+extension Flatten${collectionForTraversal(traversal)} {
   @available(*, unavailable, message: "Please use underestimatedCount property instead.")
   public func underestimateCount() -> Int {
     fatalError("unavailable function can't be called")

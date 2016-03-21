@@ -23,11 +23,23 @@ public protocol RandomAccessCollection :
   RandomAccessIndexable, BidirectionalCollection
 {
 
+  //associatedtype SubSequence : RandomAccessIndexable, Collection = RandomAccessSlice<Self>
   // FIXME(compiler limitation):
   // associatedtype SubSequence : RandomAccessCollection
 
+  associatedtype Indices : Collection = DefaultRandomAccessIndices<Self>
   // FIXME(compiler limitation):
   // associatedtype Indices : RandomAccessCollection
+}
+
+/// Supply the default "slicing" `subscript` for `RandomAccessCollection`
+/// models that accept the default associated `SubSequence`,
+/// `RandomAccessSlice<Self>`.
+extension RandomAccessCollection where SubSequence == RandomAccessSlice<Self> {
+  public subscript(bounds: Range<Index>) -> RandomAccessSlice<Self> {
+    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+    return RandomAccessSlice(base: self, bounds: bounds)
+  }
 }
 
 /// Default implementation for random access collections.
