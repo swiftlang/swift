@@ -41,7 +41,9 @@ struct A2X<T : StaticArrayProtocol> : StaticArrayProtocol {
   func count() -> Int { return upper.count() + lower.count() }
 }
 
-struct StaticArray<T : StaticArrayProtocol> : StaticArrayProtocol, MutableCollection {
+struct StaticArray<
+  T : StaticArrayProtocol
+> : StaticArrayProtocol, RandomAccessCollection, MutableCollection {
   init(_ defaultValue : T.ElemTy) { values = T(defaultValue) }
   var values : T
   func get(idx : Int) -> T.ElemTy { return values.get(idx) }
