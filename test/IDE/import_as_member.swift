@@ -1,9 +1,10 @@
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=ImportAsMember.A -enable-omit-needless-words -always-argument-labels > %t.printed.A.txt
-
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=ImportAsMember.B -enable-omit-needless-words -always-argument-labels > %t.printed.B.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=ImportAsMember.Proto -enable-omit-needless-words -always-argument-labels > %t.printed.Proto.txt
 
 // RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 // RUN: FileCheck %s -check-prefix=PRINTB -strict-whitespace < %t.printed.B.txt
+// RUN: FileCheck %s -check-prefix=PRINT-PROTO -strict-whitespace < %t.printed.Proto.txt
 
 // PRINT: struct Struct1 {
 // PRINT-NEXT:   var x: Double
@@ -34,7 +35,6 @@
 // PRINT-NEXT: }
 // PRINT-NOT: static var static1: Double
 
-// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
 
 // Make sure the other extension isn't here.
 // PRINTB-NOT: static var globalVar: Double
@@ -50,10 +50,22 @@
 
 // PRINTB-NOT: static var globalVar: Double
 
+// PRINT-PROTO-LABEL: protocol ImportedProtocolBase {
+// PRINT-PROTO-NEXT:  }
+// PRINT-PROTO-NEXT:  typealias ImportedProtocolBase_t = protocol<ImportedProtocolBase, NSObjectProtocol>
+// PRINT-PROTO-NEXT:  protocol IAMProto : ImportedProtocolBase {
+// PRINT-PROTO-NEXT:  }
+// PRINT-PROTO-NEXT:  typealias IAMProto_t = NSObject
+// PRINT-PROTO-NEXT:  extension IAMProto {
+// PRINT-PROTO-NEXT:    func mutateSomeState()
+// PRINT-PROTO-NEXT:  }
+
+// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
 // RUN: %target-swift-frontend %s -parse -I %S/Inputs/custom-modules -verify
 
 import ImportAsMember
 import ImportAsMember.B
+import ImportAsMember.ProtoErr
 
 let iamStructFail = IAMStruct1CreateSimple()
   // expected-error@-1{{use of unresolved identifier 'IAMStruct1CreateSimple'}}
@@ -79,3 +91,17 @@ iamStruct = Struct1.zero
 
 // Global properties
 currentStruct1.x += 1.5
+
+// Protocols
+class Foo : IAMProto {}
+struct Bar : IAMProto {}
+  // expected-error@-1{{non-class type 'Bar' cannot conform to class protocol 'IAMProto'}}
+  // expected-error@-2{{non-class type 'Bar' cannot conform to class protocol 'ImportedProtocolBase'}}
+
+let foo = Foo()
+foo.mutateSomeState()
+Foo.mutateSomeStaticState()
+  // expected-error@-1{{type 'Foo' has no member 'mutateSomeStaticState'}}
+
+// TODO: error: "swift_name cannot be used to define static member on protocol"
+

@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -I %S/Inputs/custom-modules %s 2>&1 | FileCheck --check-prefix=SIL %s
 import ImportAsMember
+import ImportAsMember.Proto
 
 public func returnGlobalVar() -> Double {
 	return Struct1.globalVar
@@ -9,6 +10,12 @@ public func returnGlobalVar() -> Double {
 // SIL:   %2 = load %0 : $*Double
 // SIL:   return %2 : $Double
 // SIL-NEXT: }
+
+// FIXME: this crashes
+public func useProto(p: IAMProto) {
+	p.mutateSomeState()
+}
+// XFAIL:
 
 // SIL-LABEL: sil {{.*}}anchor{{.*}} () -> () {
 func anchor() {}

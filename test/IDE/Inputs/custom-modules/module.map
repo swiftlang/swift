@@ -18,6 +18,16 @@ module ImportAsMember {
     requires objc
     header "ImportAsMemberC.h"
   }
+
+  module Proto {
+    requires objc
+    header "ImportAsMemberProto.h"
+  }
+
+  module ProtoErr {
+    requires objc
+    header "ImportAsMemberProto.h"
+  }
 }
 
 module InferImportAsMember {
