@@ -23,27 +23,42 @@
 // BCANALYZER-NOT: UnknownCode
 
 /// first_decl_generic_class_1 Aaa.
-class first_decl_generic_class_1<T> {
+public class first_decl_generic_class_1<T> {
   /// deinit of first_decl_generic_class_1 Aaa.
   deinit {
   }
 }
 
 /// first_decl_class_1 Aaa.
-class first_decl_class_1 {
+public class first_decl_class_1 {
 
   /// decl_func_1 Aaa.
-  func decl_func_1() {}
+  public func decl_func_1() {}
 
   /**
    * decl_func_3 Aaa.
    */
-  func decl_func_2() {}
+  public func decl_func_2() {}
 
   /// decl_func_3 Aaa.
   /** Bbb. */
-  func decl_func_3() {}
+  public func decl_func_3() {}
 }
+
+/// Comment for bar1
+extension first_decl_class_1 {
+  func bar1(){}
+}
+
+/// Comment for bar2
+extension first_decl_class_1 {
+  func bar2(){}
+}
+
+public protocol P1 { }
+
+/// Comment for no member extension
+extension first_decl_class_1 : P1 {}
 
 // FIRST: Class/first_decl_generic_class_1 RawComment=[/// first_decl_generic_class_1 Aaa.\n]
 // FIRST: Destructor/first_decl_generic_class_1.deinit RawComment=[/// deinit of first_decl_generic_class_1 Aaa.\n]
@@ -53,4 +68,6 @@ class first_decl_class_1 {
 // FIRST: Func/first_decl_class_1.decl_func_3 RawComment=[/// decl_func_3 Aaa.\n/** Bbb. */]
 
 // SECOND: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
-
+// SECOND: Extension/ RawComment=[/// Comment for bar1\n] BriefComment=[Comment for bar1]
+// SECOND: Extension/ RawComment=[/// Comment for bar2\n] BriefComment=[Comment for bar2]
+// SECOND: Extension/ RawComment=[/// Comment for no member extension\n] BriefComment=[Comment for no member extension]

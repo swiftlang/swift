@@ -24,6 +24,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -2353,4 +2354,31 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
   }
 
   return ABIDifference::Trivial;
+}
+
+SILLinkage
+TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
+                                                ForDefinition_t definition) {
+  // Behavior conformances are always private.
+  if (C->isBehaviorConformance())
+    return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+  
+  // If the conformance is imported from Clang, give it shared linkage.
+  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
+  auto typeUnit = typeDecl->getModuleScopeContext();
+  if (isa<ClangModuleUnit>(typeUnit)
+      && C->getDeclContext()->getParentModule() == typeUnit->getParentModule())
+    return SILLinkage::Shared;
+
+  // FIXME: This should be using std::min(protocol's access, type's access).
+  switch (C->getProtocol()->getEffectiveAccess()) {
+    case Accessibility::Private:
+      return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+
+    case Accessibility::Internal:
+      return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
+
+    default:
+      return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
+  }
 }

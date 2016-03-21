@@ -19,6 +19,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -342,6 +343,7 @@ public:
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
   unsigned NumAnonVars = 0;
+  unsigned NumCondFails = 0;
 
   /// Notes about instructions for which we're supposed to perform some
   /// sort of non-standard emission.  This enables some really simply local
@@ -733,6 +735,7 @@ public:
   void visitRetainValueInst(RetainValueInst *i);
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
+  void visitSetDeallocatingInst(SetDeallocatingInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
@@ -3030,6 +3033,40 @@ void IRGenSILFunction::visitAutoreleaseValueInst(swift::AutoreleaseValueInst *i)
   emitObjCAutoreleaseCall(val);
 }
 
+void IRGenSILFunction::visitSetDeallocatingInst(SetDeallocatingInst *i) {
+  auto *ARI = dyn_cast<AllocRefInst>(i->getOperand());
+  if (ARI && StackAllocs.count(ARI)) {
+    // A small peep-hole optimization: If the operand is allocated on stack and
+    // there is no "significant" code between the set_deallocating and the final
+    // dealloc_ref, the set_deallocating is not required.
+    //   %0 = alloc_ref [stack]
+    //     ...
+    //   set_deallocating %0 // not needed
+    //     // code which does not depend on the RC_DEALLOCATING_FLAG flag.
+    //   dealloc_ref %0      // not needed (stems from the inlined deallocator)
+    //     ...
+    //   dealloc_ref [stack] %0
+    SILBasicBlock::iterator Iter(i);
+    SILBasicBlock::iterator End = i->getParent()->end();
+    for (++Iter; Iter != End; ++Iter) {
+      SILInstruction *I = &*Iter;
+      if (auto *DRI = dyn_cast<DeallocRefInst>(I)) {
+        if (DRI->getOperand() == ARI) {
+          // The set_deallocating is followed by a dealloc_ref -> we can ignore
+          // it.
+          return;
+        }
+      }
+      // Assume that any instruction with side-effects may depend on the
+      // RC_DEALLOCATING_FLAG flag.
+      if (I->mayHaveSideEffects())
+        break;
+    }
+  }
+  Explosion lowered = getLoweredExplosion(i->getOperand());
+  emitNativeSetDeallocating(lowered.claimNext());
+}
+
 void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
@@ -3579,7 +3616,20 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
   // Lower the operand.
   Explosion self = getLoweredExplosion(i->getOperand());
   auto selfValue = self.claimNext();
+  auto *ARI = dyn_cast<AllocRefInst>(i->getOperand());
   if (!i->canAllocOnStack()) {
+    if (ARI && StackAllocs.count(ARI)) {
+      // We can ignore dealloc_refs (without [stack]) for stack allocated
+      // objects.
+      //
+      //   %0 = alloc_ref [stack]
+      //     ...
+      //   dealloc_ref %0     // not needed (stems from the inlined deallocator)
+      //     ...
+      //   dealloc_ref [stack] %0
+      return;
+    }
+
     auto classType = i->getOperand()->getType();
     emitClassDeallocation(*this, classType, selfValue);
     return;
@@ -3587,7 +3637,6 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
   // It's a dealloc_ref [stack]. Even if the alloc_ref did not allocate the
   // object on the stack, we don't have to deallocate it, because it is
   // deallocated in the final release.
-  auto *ARI = cast<AllocRefInst>(i->getOperand());
   assert(ARI->canAllocOnStack());
   if (StackAllocs.count(ARI)) {
     if (IGM.Opts.EmitStackPromotionChecks) {
@@ -4700,6 +4749,22 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   Builder.CreateCondBr(cond, failBB, contBB);
   Builder.emitBlock(failBB);
+
+  // Emit unique side-effecting inline asm calls in order to eliminate
+  // the possibility that an LLVM optimization or code generation pass
+  // will merge these blocks back together again. We emit an empty asm
+  // string with the side-effect flag set, and with a unique integer
+  // argument for each cond_fail we see in the function.
+  llvm::IntegerType *asmArgTy = IGM.Int32Ty;
+  llvm::Type *argTys = { asmArgTy };
+  llvm::FunctionType *asmFnTy =
+    llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
+  llvm::InlineAsm *inlineAsm =
+    llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
+  Builder.CreateCall(inlineAsm,
+                     llvm::ConstantInt::get(asmArgTy, NumCondFails++));
+
+  // Emit the trap instruction.
   llvm::Function *trapIntrinsic =
       llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
   Builder.CreateCall(trapIntrinsic, {});
@@ -4813,40 +4878,34 @@ static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
   return llvm::ConstantStruct::get(STy, Elts);
 }
 
-void IRGenModule::emitSILStaticInitializer() {
-  SmallVector<SILFunction*, 8> StaticInitializers;
-  for (SILGlobalVariable &v : SILMod->getSILGlobals()) {
-    auto *staticInit = v.getInitializer();
-    if (!staticInit)
+void IRGenModule::emitSILStaticInitializers() {
+  SmallVector<SILFunction *, 8> StaticInitializers;
+  for (SILGlobalVariable &Global : SILMod->getSILGlobals()) {
+    if (!Global.getInitializer())
       continue;
 
-    auto *gvar = Module.getGlobalVariable(v.getName(),
-                                          /*allowInternal*/true);
+    auto *IRGlobal =
+        Module.getGlobalVariable(Global.getName(), true /* = AllowLocal */);
 
     // A check for multi-threaded compilation: Is this the llvm module where the
     // global is defined and not only referenced (or not referenced at all).
-    if (!gvar || !gvar->hasInitializer())
+    if (!IRGlobal || !IRGlobal->hasInitializer())
       continue;
 
-    if (auto *STy = dyn_cast<llvm::StructType>(gvar->getInitializer()->getType())) {
-      auto *InitValue = v.getValueOfStaticInitializer();
+    auto *STy = cast<llvm::StructType>(IRGlobal->getInitializer()->getType());
+    auto *InitValue = Global.getValueOfStaticInitializer();
 
-      // Get the StructInst that we write to the SILGlobalVariable.
-      if (auto *SI = dyn_cast<StructInst>(InitValue)) {
-        gvar->setInitializer(getConstantValue(*this, STy, SI));
-        continue;
-      }
-
-      // Get the TupleInst that we write to the SILGlobalVariable.
-      if (auto *TI = dyn_cast<TupleInst>(InitValue)) {
-        gvar->setInitializer(getConstantValue(*this, STy, TI));
-        continue;
-      }
-
-      llvm_unreachable("We only handle StructInst and TupleInst for now!");
+    // Set the IR global's initializer to the constant for this SIL
+    // struct.
+    if (auto *SI = dyn_cast<StructInst>(InitValue)) {
+      IRGlobal->setInitializer(getConstantValue(*this, STy, SI));
+      continue;
     }
 
-    llvm_unreachable("We only handle StructType for now!");
+    // Set the IR global's initializer to the constant for this SIL
+    // tuple.
+    auto *TI = cast<TupleInst>(InitValue);
+    IRGlobal->setInitializer(getConstantValue(*this, STy, TI));
   }
 }
 

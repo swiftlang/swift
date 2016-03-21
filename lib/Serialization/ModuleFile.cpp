@@ -1525,6 +1525,17 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   if (D->isImplicit())
     return None;
 
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    // Compute the USR.
+    llvm::SmallString<128> USRBuffer;
+    {
+      llvm::raw_svector_ostream OS(USRBuffer);
+      if (ide::printExtensionUSR(ED, OS))
+        return None;
+    }
+     return getCommentForDeclByUSR(USRBuffer.str());
+  }
+
   auto *VD = dyn_cast<ValueDecl>(D);
   if (!VD)
     return None;

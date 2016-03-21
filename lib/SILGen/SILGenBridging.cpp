@@ -77,30 +77,6 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(bridgedValue);
 }
 
-/// Bridge the given Swift value to its corresponding Objective-C
-/// object, using the appropriate witness for the
-/// _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
-static Optional<ManagedValue>
-emitBridgeNativeToObjectiveC(SILGenFunction &gen,
-                             SILLocation loc,
-                             ManagedValue swiftValue) {
-  // Dig out the nominal type we're bridging from.
-  Type swiftValueType = swiftValue.getSwiftType()->getRValueType();
-
-  // Dig out its conformance to _ObjectiveCBridgeable.
-  auto conformance =
-      gen.SGM.getConformanceToObjectiveCBridgeable(loc, swiftValueType);
-  if (!conformance) return None;
-
-  return emitBridgeNativeToObjectiveC(gen, loc, swiftValue, conformance);
-}
-
-static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
-                                               SILLocation loc,
-                                               ManagedValue str) {
-  llvm_unreachable("Handled via the _bridgeToObjectiveC witness");
-}
-
 /// Bridge the given Objective-C object to its corresponding Swift
 /// value, using the appropriate witness for the
 /// _ObjectiveCBridgeable._unconditionallyBridgeFromObjectiveC requirement.
@@ -131,10 +107,6 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
     // Compute the substitutions.
     substitutions = valueTypeBGT->getSubstitutions(gen.SGM.SwiftModule,
                                                    nullptr);
-  } else {
-    // FIXME: We should always be using these substitutions, but they
-    // aren't reliable with specialized conformances.
-    substitutions = witness.getSubstitutions();
   }
 
   // Substitute into the witness function type.
@@ -179,36 +151,6 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
                        ApplyOptions::None, None, None,
                        SGFContext())
     .getAsSingleValue(gen, loc);
-}
-
-static ManagedValue emitBridgeCollectionToNative(SILGenFunction &gen,
-                                                 SILLocation loc,
-                                                 SILDeclRef bridgeFnRef,
-                                                 ManagedValue collection,
-                                                 SILType nativeTy) {
-  SILValue bridgeFn = gen.emitGlobalFunctionRef(loc, bridgeFnRef);
-
-  auto collectionTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
-  auto subs = collectionTy->getSubstitutions(gen.SGM.M.getSwiftModule(),
-                                             nullptr);
-  auto substFnType = bridgeFn->getType().substGenericArgs(gen.SGM.M, subs);
-
-  Type inputType = collection.getType().getSwiftRValueType();
-  if (!inputType->getOptionalObjectType()) {
-    SILType loweredOptTy = gen.SGM.getLoweredType(OptionalType::get(inputType));
-    auto *someDecl = gen.getASTContext().getOptionalSomeDecl();
-    auto *enumInst = gen.B.createEnum(loc, collection.getValue(), someDecl,
-                                      loweredOptTy);
-    collection = ManagedValue(enumInst, collection.getCleanup());
-  }
-
-  SILValue result = gen.B.createApply(loc, bridgeFn,
-                                      substFnType,
-                                      nativeTy,
-                                      subs,
-                                      { collection.forward(gen) });
-
-  return gen.emitManagedRValueWithCleanup(result);
 }
 
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
@@ -431,16 +373,6 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   if (loweredNativeTy == loweredBridgedTy)
     return v;
 
-  // FIXME: Handle this via an _ObjectiveCBridgeable query rather than
-  // hardcoding String -> NSString.
-  if (loweredNativeTy == gen.SGM.Types.getStringType()
-      && loweredBridgedTy == gen.SGM.Types.getNSStringType()) {
-    if (auto result = emitBridgeNativeToObjectiveC(gen, loc, v))
-      return *result;
-
-    return gen.emitUndef(loc, bridgedTy);
-  }
-
   // If the input is a native type with a bridged mapping, convert it.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
   if (loweredNativeTy == gen.SGM.Types.get##NativeType##Type()              \
@@ -475,6 +407,8 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
     if (auto result = emitBridgeNativeToObjectiveC(gen, loc, v, conformance))
       return *result;
 
+    assert(gen.SGM.getASTContext().Diags.hadAnyError() &&
+           "Bridging code should have complained");
     return gen.emitUndef(loc, bridgedTy);
   }
 
@@ -663,42 +597,15 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
       return gen.emitBlockToFunc(loc, v, nativeFTy);
   }
 
-  // Bridge NSString to String.
-  if (auto stringDecl = gen.getASTContext().getStringDecl()) {
-    if (nativeTy.getSwiftRValueType()->getAnyNominal() == stringDecl) {
-      auto conformance =
-        gen.SGM.getConformanceToObjectiveCBridgeable(loc, loweredNativeTy);
-      assert(conformance &&
-             "Missing String conformation to _ObjectiveCBridgeable?");
-      if (auto result = emitBridgeObjectiveCToNative(gen, loc, v, conformance))
-        return *result;
+  // Bridge via _ObjectiveCBridgeable.
+  if (auto conformance =
+        gen.SGM.getConformanceToObjectiveCBridgeable(loc, loweredNativeTy)) {
+    if (auto result = emitBridgeObjectiveCToNative(gen, loc, v, conformance))
+      return *result;
 
-      return gen.emitUndef(loc, nativeTy);
-    }
-  }
-
-  // Bridge NSArray to Array.
-  if (auto arrayDecl = gen.getASTContext().getArrayDecl()) {
-    if (nativeTy.getSwiftRValueType()->getAnyNominal() == arrayDecl) {
-      SILDeclRef bridgeFn = gen.SGM.getNSArrayToArrayFn();
-      return emitBridgeCollectionToNative(gen, loc, bridgeFn, v, nativeTy);
-    }
-  }
-
-  // Bridge NSDictionary to Dictionary.
-  if (auto dictDecl = gen.getASTContext().getDictionaryDecl()) {
-    if (nativeTy.getSwiftRValueType()->getAnyNominal() == dictDecl) {
-      SILDeclRef bridgeFn = gen.SGM.getNSDictionaryToDictionaryFn();
-      return emitBridgeCollectionToNative(gen, loc, bridgeFn, v, nativeTy);
-    }
-  }
-
-  // Bridge NSSet to Set.
-  if (auto setDecl = gen.getASTContext().getSetDecl()) {
-    if (nativeTy.getSwiftRValueType()->getAnyNominal() == setDecl) {
-      SILDeclRef bridgeFn = gen.SGM.getNSSetToSetFn();
-      return emitBridgeCollectionToNative(gen, loc, bridgeFn, v, nativeTy);
-    }
+    assert(gen.SGM.getASTContext().Diags.hadAnyError() &&
+           "Bridging code should have complained");
+    return gen.emitUndef(loc, nativeTy);
   }
 
   return v;

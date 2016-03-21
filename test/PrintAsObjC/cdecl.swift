@@ -13,7 +13,7 @@
 
 /// What a nightmare!
 @_cdecl("block_nightmare")
-func block_nightmare(x: @convention(block) Int -> Float)
+public func block_nightmare(x: @convention(block) Int -> Float)
   -> @convention(block) CChar -> Double { return { _ in 0 } }
 
 // CHECK-LABEL: void foo_bar(NSInteger x, NSInteger y);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-silgen -enable-resilience %s | FileCheck %s --check-prefix=CHECK --check-prefix=GLOBAL
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-silgen -enable-resilience %s | FileCheck %s --check-prefix=CHECK
 
 import resilient_protocol
 
@@ -240,11 +240,18 @@ func inoutResilientProtocol(x: inout OtherConformingType) {
   inoutFunc(&OtherConformingType.staticPropertyInExtension)
 }
 
-// Protocol is not public -- doesn't need default witness table
+// Protocol is not public -- make sure default witnesses have the right linkage
 protocol InternalProtocol {
-  func f()
+  func noDefaultF()
+  func defaultG()
 }
 
+extension InternalProtocol {
+
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TFP19protocol_resilience16InternalProtocol8defaultGfT_T_
+  // CHECK: return
+  func defaultG() {}
+}
 
 // CHECK-LABEL: sil_default_witness_table P {
 // CHECK-NEXT: }
@@ -308,4 +315,7 @@ protocol InternalProtocol {
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!materializeForSet.1: @_TFP19protocol_resilience21ReabstractSelfRefinedm8callbackFxx
 // CHECK-NEXT: }
 
-// GLOBAL-NOT: sil_default_witness_table InternalProtocol
+// CHECK-LABEL: sil_default_witness_table hidden InternalProtocol {
+// CHECK-NEXT:   no_default
+// CHECK-NEXT:   method #InternalProtocol.defaultG!1: @_TFP19protocol_resilience16InternalProtocol8defaultGfT_T_
+// CHECK-NEXT: }

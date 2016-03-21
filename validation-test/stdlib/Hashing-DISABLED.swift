@@ -1,4 +1,15 @@
-// RUN: %target-run-stdlib-swift
+// FIXME: This test fails with some expected probability because
+// it is testing the statistical nature of the hashing.
+// The test failing probabilistically is bad for regression testing,
+// which causes test failures for this test to both be largely
+// ignored but also can cause the entire test suite to fail
+// unexpectedly.
+//
+// This test is being DISABLED until it is written in a way
+// for it to be reliable and useful.
+//
+
+// NOTRUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
 import Swift
@@ -80,14 +91,14 @@ HashingTestSuite.test("_squeezeHashValue/Int") {
   // Check that the function can return values that cover the whole range.
   func checkRange(r: Range<Int>) {
     var results = [Int : Void]()
-    for _ in 0..<(10 * (r.upperBound - r.lowerBound)) {
+    for _ in 0..<(14 * (r.upperBound - r.lowerBound)) {
       let v = _squeezeHashValue(randInt(), r)
       expectTrue(r ~= v)
       if results[v] == nil {
         results[v] = Void()
       }
     }
-    expectEqual(results.count, r.upperBound - r.lowerBound)
+    expectEqual(r.upperBound - r.lowerBound, results.count)
   }
   checkRange(Int.min..<(Int.min+10))
   checkRange(0..<4)
@@ -111,15 +122,20 @@ HashingTestSuite.test("_squeezeHashValue/UInt") {
   // Check that the function can return values that cover the whole range.
   func checkRange(r: Range<UInt>) {
     var results = [UInt : Void]()
+<<<<<<< HEAD:validation-test/stdlib/Hashing.swift
     let cardinality = r.upperBound - r.lowerBound
     for _ in 0..<(10*cardinality) {
+=======
+    let cardinality = r.endIndex - r.startIndex
+    for _ in 0..<(14 * cardinality) {
+>>>>>>> origin/master:validation-test/stdlib/Hashing-DISABLED.swift
       let v = _squeezeHashValue(randInt(), r)
       expectTrue(r ~= v)
       if results[v] == nil {
         results[v] = Void()
       }
     }
-    expectEqual(results.count, Int(cardinality))
+    expectEqual(Int(cardinality), results.count)
   }
   checkRange(0..<4)
   checkRange(0..<8)

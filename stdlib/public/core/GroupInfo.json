@@ -34,7 +34,6 @@
     "CollectionAlgorithms.swift",
     "EmptyCollection.swift",
     "Stride.swift",
-    "HashedCollections.swift",
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
@@ -74,7 +73,9 @@
         "CocoaArray.swift",
         "ContiguousArrayBuffer.swift",
         "SliceBuffer.swift",
-        "SwiftNativeNSArray.swift"]
+        "SwiftNativeNSArray.swift"],
+      "HashedCollections": [
+        "HashedCollections.swift"]
     }
   ],
   "C": [
@@ -91,14 +92,17 @@
     "ObjCMirrors.swift"
   ],
   "Math": [
-    "FloatingPoint.swift",
-    "FloatingPointOperations.swift",
-    "FloatingPointParsing.swift",
-    "IntegerArithmetic.swift",
-    "FixedPoint.swift",
-    "IntegerParsing.swift",
     "SetAlgebra.swift",
-    "BuiltinMath.swift"
+    "BuiltinMath.swift",
+    {
+    "Integers": [
+      "IntegerArithmetic.swift",
+      "FixedPoint.swift",
+      "IntegerParsing.swift"],
+    "Floating": [
+      "FloatingPoint.swift",
+      "FloatingPointOperations.swift",
+      "FloatingPointParsing.swift"]}
   ],
   "Optional": [
     "ImplicitlyUnwrappedOptional.swift",

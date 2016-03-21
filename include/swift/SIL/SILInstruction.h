@@ -132,6 +132,11 @@ public:
   const SILDebugScope *getDebugScope() const;
   SILDebugLocation getDebugLocation() const { return Location; }
 
+  /// Sets the debug location.
+  /// Note: Usually it should not be needed to use this function as the location
+  /// is already set in when creating an instruction.
+  void setDebugLocation(SILDebugLocation Loc) { Location = Loc; }
+
   /// removeFromParent - This method unlinks 'self' from the containing basic
   /// block, but does not delete it.
   ///
@@ -2319,6 +2324,20 @@ class AutoreleaseValueInst
   friend class SILBuilder;
 
   AutoreleaseValueInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand) {}
+};
+
+/// SetDeallocatingInst - Sets the operand in deallocating state.
+///
+/// This is the same operation what's done by a strong_release immediately
+/// before it calls the deallocator of the object.
+class SetDeallocatingInst
+                 : public UnaryInstructionBase<ValueKind::SetDeallocatingInst,
+                                                RefCountingInst,
+                                                /*HasValue*/ false> {
+  friend class SILBuilder;
+
+  SetDeallocatingInst(SILDebugLocation DebugLoc, SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand) {}
 };
 

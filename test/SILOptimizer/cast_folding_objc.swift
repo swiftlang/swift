@@ -17,10 +17,6 @@ struct CX: _ObjectiveCBridgeable {
     return true
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return String.self
-  }
-
   func _bridgeToObjectiveC() -> ObjCX {
     return ObjCX()
   }

@@ -116,7 +116,7 @@ func testConvertToArrayOfImplicitUnwrappedClass() {
   nsarr.add(X(value: 1))
   nsarr.add(X(value: 2))
 
-  var arr: [X!] = _convertNSArrayToArray(nsarr)
+  var arr: [X!] = nsarr as! [X!]
   
   // CHECK: Class array count = 2
   // CHECK: Element 0 has value X(1)
@@ -140,7 +140,7 @@ func testConvertToArrayOfImplicitUnwrappedString() {
   nsarr.add(NSString(string: "Hello"))
   nsarr.add(NSString(string: "World"))
 
-  var arr: [String!] = _convertNSArrayToArray(nsarr)
+  var arr: [String!] = nsarr as! [String!]
   
   // CHECK: String array count = 2
   // CHECK: Element 0 has value Hello

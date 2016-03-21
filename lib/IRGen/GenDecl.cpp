@@ -807,7 +807,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
   // Emit static initializers.
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
-    IGM->emitSILStaticInitializer();
+    IGM->emitSILStaticInitializers();
   }
 
   // Emit witness tables.
@@ -1376,7 +1376,7 @@ bool LinkInfo::isUsed(llvm::GlobalValue::LinkageTypes Linkage,
 llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
                                                llvm::Type *storageType,
                                                Alignment alignment,
-                                               DebugTypeInfo DebugType,
+                                               DebugTypeInfo DbgTy,
                                                Optional<SILLocation> DebugLoc,
                                                StringRef DebugName) {
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(getName());
@@ -1406,11 +1406,10 @@ llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
     IGM.addUsedGlobal(var);
   }
 
-  if (IGM.DebugInfo && ForDefinition)
-    IGM.DebugInfo->
-      emitGlobalVariableDeclaration(var,
-                                    DebugName.empty() ? getName() : DebugName,
-                                    getName(), DebugType, DebugLoc);
+  if (IGM.DebugInfo && !DbgTy.isNull() && ForDefinition)
+    IGM.DebugInfo->emitGlobalVariableDeclaration(
+        var, DebugName.empty() ? getName() : DebugName, getName(), DbgTy,
+        DebugLoc);
 
   return var;
 }
@@ -1720,7 +1719,7 @@ llvm::Constant *
 IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
                                    llvm::Type *definitionType,
                                    llvm::Type *defaultType,
-                                   DebugTypeInfo debugType) {
+                                   DebugTypeInfo DbgTy) {
   // This function assumes that 'globals' only contains GlobalValue
   // values for the entities that it will look up.
 
@@ -1762,7 +1761,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
   if (!definitionType) definitionType = defaultType;
 
   // Create the variable.
-  auto var = link.createVariable(*this, definitionType, alignment, debugType);
+  auto var = link.createVariable(*this, definitionType, alignment, DbgTy);
 
   // If we have an existing entry, destroy it, replacing it with the
   // new variable.
@@ -2579,11 +2578,8 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
 llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
                                                   llvm::Type *definitionType) {
   LinkEntity entity = LinkEntity::forValueWitnessTable(concreteType);
-  DebugTypeInfo DbgTy(concreteType, WitnessTablePtrTy,
-                      getPointerSize(), getPointerAlignment(),
-                      nullptr);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), definitionType,
-                               WitnessTableTy, DbgTy);
+                               WitnessTableTy, DebugTypeInfo());
 }
 
 static Address getAddrOfSimpleVariable(IRGenModule &IGM,

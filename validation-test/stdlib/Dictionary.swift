@@ -1170,18 +1170,18 @@ func getAsNSMutableDictionary(d: Dictionary<Int, Int>) -> NSMutableDictionary {
 
 func getBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
   let nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
-  return _convertNSDictionaryToDictionary(nsd)
+  return convertNSDictionaryToDictionary(nsd)
 }
 
 func getBridgedVerbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, AnyObject> {
   let nsd = getAsNSDictionary(d)
-  return _convertNSDictionaryToDictionary(nsd)
+  return convertNSDictionaryToDictionary(nsd)
 }
 
 func getBridgedVerbatimDictionaryAndNSMutableDictionary()
     -> (Dictionary<NSObject, AnyObject>, NSMutableDictionary) {
   let nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
-  return (_convertNSDictionaryToDictionary(nsd), nsd)
+  return (convertNSDictionaryToDictionary(nsd), nsd)
 }
 
 func getBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
@@ -1202,7 +1202,7 @@ func getBridgedNonverbatimDictionaryAndNSMutableDictionary()
 
 func getBridgedVerbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, TestObjCEquatableValueTy> {
   let nsd = getAsEquatableNSDictionary(d)
-  return _convertNSDictionaryToDictionary(nsd)
+  return convertNSDictionaryToDictionary(nsd)
 }
 
 func getBridgedNonverbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedEquatableValueTy> {
@@ -1219,7 +1219,7 @@ func getHugeBridgedVerbatimDictionaryHelper() -> NSDictionary {
 
 func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
   let nsd = getHugeBridgedVerbatimDictionaryHelper()
-  return _convertNSDictionaryToDictionary(nsd)
+  return convertNSDictionaryToDictionary(nsd)
 }
 
 func getHugeBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
@@ -1287,7 +1287,7 @@ class ParallelArrayDictionary : NSDictionary {
 
 func getParallelArrayBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
   let nsd: NSDictionary = ParallelArrayDictionary()
-  return _convertNSDictionaryToDictionary(nsd)
+  return convertNSDictionaryToDictionary(nsd)
 }
 
 func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
@@ -1400,9 +1400,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
   var nsd: NSDictionary = NSDictionary(dictionary:
     getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]))
 
-  var d: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(nsd)
+  var d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
 
-  var bridgedBack: NSDictionary = _convertDictionaryToNSDictionary(d)
+  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
 
   expectEqual(
     unsafeBitCast(nsd, to: Int.self),
@@ -1418,9 +1418,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
     getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]))
 
   var d: [TestBridgedKeyTy : TestBridgedValueTy] =
-    _convertNSDictionaryToDictionary(nsd)
+    convertNSDictionaryToDictionary(nsd)
 
-  var bridgedBack: NSDictionary = _convertDictionaryToNSDictionary(d)
+  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
 
   expectNotEqual(
     unsafeBitCast(nsd, to: Int.self),
@@ -1439,13 +1439,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained
   CustomImmutableNSDictionary.timesObjectForKeyWasCalled = 0
   CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled = 0
   CustomImmutableNSDictionary.timesCountWasCalled = 0
-  var d: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(nsd)
+  var d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
   expectEqual(1, CustomImmutableNSDictionary.timesCopyWithZoneWasCalled)
   expectEqual(0, CustomImmutableNSDictionary.timesObjectForKeyWasCalled)
   expectEqual(0, CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled)
   expectEqual(0, CustomImmutableNSDictionary.timesCountWasCalled)
 
-  var bridgedBack: NSDictionary = _convertDictionaryToNSDictionary(d)
+  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
   expectEqual(
     unsafeBitCast(nsd, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
@@ -1464,14 +1464,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopie
   CustomImmutableNSDictionary.timesCountWasCalled = 0
   TestBridgedValueTy.bridgeOperations = 0
   var d: [TestBridgedKeyTy : TestBridgedValueTy] =
-    _convertNSDictionaryToDictionary(nsd)
+    convertNSDictionaryToDictionary(nsd)
   expectEqual(0, CustomImmutableNSDictionary.timesCopyWithZoneWasCalled)
   expectEqual(3, CustomImmutableNSDictionary.timesObjectForKeyWasCalled)
   expectEqual(1, CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled)
   expectNotEqual(0, CustomImmutableNSDictionary.timesCountWasCalled)
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
 
-  var bridgedBack: NSDictionary = _convertDictionaryToNSDictionary(d)
+  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
   expectNotEqual(
     unsafeBitCast(nsd, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
@@ -2800,7 +2800,7 @@ func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
   d[TestBridgedKeyTy(20)] = TestObjCValueTy(1020)
   d[TestBridgedKeyTy(30)] = TestObjCValueTy(1030)
 
-  let bridged = _convertDictionaryToNSDictionary(d)
+  let bridged = convertDictionaryToNSDictionary(d)
   assert(isNativeNSDictionary(bridged))
 
   return bridged
@@ -2830,7 +2830,7 @@ func getBridgedNSDictionaryOfValue_ValueTypeCustomBridged() -> NSDictionary {
   d[TestObjCKeyTy(20)] = TestBridgedValueTy(1020)
   d[TestObjCKeyTy(30)] = TestBridgedValueTy(1030)
 
-  let bridged = _convertDictionaryToNSDictionary(d)
+  let bridged = convertDictionaryToNSDictionary(d)
   assert(isNativeNSDictionary(bridged))
 
   return bridged
@@ -2862,9 +2862,9 @@ func getRoundtripBridgedNSDictionary() -> NSDictionary {
 
   let nsd = NSDictionary(objects: values, forKeys: keys)
 
-  let d: Dictionary<NSObject, AnyObject> = _convertNSDictionaryToDictionary(nsd)
+  let d: Dictionary<NSObject, AnyObject> = convertNSDictionaryToDictionary(nsd)
 
-  let bridgedBack = _convertDictionaryToNSDictionary(d)
+  let bridgedBack = convertDictionaryToNSDictionary(d)
   assert(isCocoaNSDictionary(bridgedBack))
   // FIXME: this should be true.
   //assert(unsafeBitCast(nsd, Int.self) == unsafeBitCast(bridgedBack, Int.self))

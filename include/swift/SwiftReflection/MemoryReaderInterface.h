@@ -65,6 +65,11 @@ typedef struct MemoryReaderImpl {
   /// \returns The length of the string or 0 if the scan was unsuccessful.
   uint64_t (*getStringLength)(addr_t address);
 
+  /// Get the address of a symbol in the target address space.
+  ///
+  /// \returns true if the lookup was successful.
+  addr_t (*getSymbolAddress)(const char *name, uint64_t name_length);
+
 #pragma clang diagnostic pop
 
 } MemoryReaderImpl;

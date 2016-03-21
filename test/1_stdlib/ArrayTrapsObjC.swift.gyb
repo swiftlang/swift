@@ -115,7 +115,7 @@ class ViolateInoutSafetySwitchToObjcBuffer {
 
   @inline(never)
   func accessArrayViaInoutViolation() {
-    anArray = _convertNSArrayToArray(nsArray)
+    anArray = nsArray as! [ElementClass]
   }
 
   @inline(never)

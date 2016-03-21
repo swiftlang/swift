@@ -163,8 +163,7 @@ bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
     // Check whether the type conforms to _BridgedToObjectiveC.
     auto conformance = M->lookupConformance(Ty, bridgedProto, nullptr);
-
-    return (conformance.getInt() != ConformanceKind::DoesNotConform);
+    return conformance.hasValue();
   }
   return false;
 }
@@ -179,8 +178,7 @@ bool swift::isErrorProtocol(Module *M, CanType Ty) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
     // Check whether the type conforms to _BridgedToObjectiveC.
     auto conformance = M->lookupConformance(Ty, errorTypeProto, nullptr);
-
-    return (conformance.getInt() != ConformanceKind::DoesNotConform);
+    return conformance.hasValue();
   }
   return false;
 }

@@ -46,7 +46,8 @@ SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   return Entry;
 }
 
-FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
+FormalLinkage swift::getDeclLinkage(const ValueDecl *D,
+                                    bool treatInternalAsVersioned) {
   const DeclContext *fileContext = D->getDeclContext()->getModuleScopeContext();
 
   // Clang declarations are public and can't be assured of having a
@@ -66,7 +67,9 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
     // FIXME: This ought to be "hidden" as well, but that causes problems when
     // inlining code from the standard library, which may reference internal
     // declarations.
-    return FormalLinkage::PublicUnique;
+    if (treatInternalAsVersioned)
+      return FormalLinkage::PublicUnique;
+    return FormalLinkage::HiddenUnique;
   case Accessibility::Private:
     // Why "hidden" instead of "private"? Because the debugger may need to
     // access these symbols.

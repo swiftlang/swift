@@ -33,14 +33,19 @@ using namespace swift;
 namespace swift {
   class SILParserTUState {
   public:
-    SILParserTUState() {}
+    SILParserTUState(SILModule &M) : M(M) {}
     ~SILParserTUState();
+
+    SILModule &M;
     
     /// This is all of the forward referenced functions with
     /// the location for where the reference is.
     llvm::DenseMap<Identifier,
                    std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
+    /// A list of all functions forward-declared by a sil_scope.
+    std::vector<SILFunction *> PotentialZombieFns;
 
+    /// A map from textual .sil scope number to SILDebugScopes.
     llvm::DenseMap<unsigned, SILDebugScope *> ScopeSlots;
 
     /// Did we parse a sil_stage for this module?
@@ -51,7 +56,7 @@ namespace swift {
 }
 
 SILParserState::SILParserState(SILModule *M) : M(M) {
-  S = M ? new SILParserTUState() : nullptr;
+  S = M ? new SILParserTUState(*M) : nullptr;
 }
 
 SILParserState::~SILParserState() {
@@ -64,6 +69,13 @@ SILParserTUState::~SILParserTUState() {
       if (Entry.second.second.isValid())
         Diags->diagnose(Entry.second.second, diag::sil_use_of_undefined_value,
                         Entry.first.str());
+
+  // Turn any debug-info-only function declarations into zombies.
+  for (auto *Fn : PotentialZombieFns)
+    if (Fn->isExternalDeclaration()) {
+      Fn->setInlined();
+      M.eraseFunction(Fn);
+    }
 }
 
 
@@ -1162,6 +1174,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("select_enum", ValueKind::SelectEnumInst)
     .Case("select_enum_addr", ValueKind::SelectEnumAddrInst)
     .Case("select_value", ValueKind::SelectValueInst)
+    .Case("set_deallocating", ValueKind::SetDeallocatingInst)
     .Case("store", ValueKind::StoreInst)
     .Case("store_unowned", ValueKind::StoreUnownedInst)
     .Case("store_weak", ValueKind::StoreWeakInst)
@@ -1311,7 +1324,9 @@ getConformanceOfReplacement(Parser &P, Type subReplacement,
                             ProtocolDecl *proto) {
   auto conformance = P.SF.getParentModule()->lookupConformance(
                        subReplacement, proto, nullptr);
-  return conformance.getPointer();
+  if (conformance && conformance->isConcrete())
+    return conformance->getConcrete();
+  return nullptr;
 }
 
 static bool isImpliedBy(ProtocolDecl *proto, ArrayRef<ProtocolDecl*> derived) {
@@ -1877,6 +1892,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   UNARY_INSTRUCTION(IsUniqueOrPinned)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(AutoreleaseValue)
+  UNARY_INSTRUCTION(SetDeallocating)
   UNARY_INSTRUCTION(ReleaseValue)
   UNARY_INSTRUCTION(RetainValue)
   UNARY_INSTRUCTION(Load)
@@ -2843,11 +2859,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (!isa<ArchetypeType>(LookupTy)) {
       auto lookup = P.SF.getParentModule()->lookupConformance(
                                                       LookupTy, proto, nullptr);
-      if (lookup.getInt() != ConformanceKind::Conforms) {
+      if (!lookup) {
         P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
         return true;
       }
-      Conformance = ProtocolConformanceRef(lookup.getPointer());
+      Conformance = ProtocolConformanceRef(*lookup);
     }
     
     ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
@@ -4044,17 +4060,15 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
                                        P.Context);
   auto lookup = P.SF.getParentModule()->lookupConformance(
                          lookupTy, proto, nullptr);
-  if (!lookup.getPointer()) {
+  if (!lookup) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
     return nullptr;
   }
-  NormalProtocolConformance *theConformance =
-      dyn_cast<NormalProtocolConformance>(lookup.getPointer());
-  if (!theConformance) {
+  if (!lookup->isConcrete()) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
     return nullptr;
   }
-  return theConformance;
+  return lookup->getConcrete()->getRootNormalConformance();
 }
 
 /// Parse the substitution list for a specialized conformance.
@@ -4380,15 +4394,20 @@ bool Parser::parseSILWitnessTable() {
 }
 
 /// decl-sil-default-witness ::= 'sil_default_witness_table' 
-///                              identifier minimum-witness-table-size
+///                              sil-linkage identifier
 ///                              decl-sil-default-witness-body
 /// decl-sil-default-witness-body:
 ///   '{' sil-default-witness-entry* '}'
 /// sil-default-witness-entry:
 ///   'method' SILDeclRef ':' @SILFunctionName
+///   'no_default'
 bool Parser::parseSILDefaultWitnessTable() {
   consumeToken(tok::kw_sil_default_witness_table);
   SILParser WitnessState(*this);
+  
+  // Parse the linkage.
+  Optional<SILLinkage> Linkage;
+  parseSILLinkage(Linkage, *this);
   
   Scope S(this, ScopeKind::TopLevel);
   // We should use WitnessTableBody. This ensures that the generic params
@@ -4451,7 +4470,11 @@ bool Parser::parseSILDefaultWitnessTable() {
   parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                      LBraceLoc);
   
-  SILDefaultWitnessTable::create(*SIL->M, protocol, witnessEntries);
+  // Default to public linkage.
+  if (!Linkage)
+    Linkage = SILLinkage::Public;
+
+  SILDefaultWitnessTable::create(*SIL->M, *Linkage, protocol, witnessEntries);
   BodyScope.reset();
   return false;
 }
@@ -4590,8 +4613,9 @@ bool Parser::parseSILCoverageMap() {
                      LBraceLoc);
 
   if (!BodyHasError)
-    SILCoverageMap::create(*SIL->M, Filename.str(), FuncName.str(), Hash,
-                           Regions, Builder.getExpressions());
+    SILCoverageMap::create(*SIL->M, Filename.str(), FuncName.str(),
+                           Func->isPossiblyUsedExternally(), Hash, Regions,
+                           Builder.getExpressions());
   return false;
 }
 
@@ -4643,12 +4667,14 @@ bool Parser::parseSILScope() {
         ScopeState.parseSILType(Ty, Ignored, true))
       return true;
 
+    // The function doesn't exist yet. Create a zombie forward declaration.
     auto FnTy = Ty.getAs<SILFunctionType>();
     if (!FnTy || !Ty.isObject()) {
       diagnose(FnLoc, diag::expected_sil_function_type);
       return true;
     }
     ParentFn = ScopeState.getGlobalNameForReference(FnName, FnTy, FnLoc, true);
+    ScopeState.TUState.PotentialZombieFns.push_back(ParentFn);
   }
 
   SILDebugScope *InlinedAt = nullptr;

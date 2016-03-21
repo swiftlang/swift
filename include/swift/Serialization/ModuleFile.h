@@ -435,6 +435,15 @@ private:
   /// after reading. Nothing should ever follow a MEMBERS record.
   bool readMembers(SmallVectorImpl<Decl *> &Members);
 
+  /// Populates the protocol's default witness table.
+  ///
+  /// Returns true if there is an error.
+  ///
+  /// Note: this destroys the cursor's position in the stream. Furthermore,
+  /// because it reads from the cursor, it is not possible to reset the cursor
+  /// after reading. Nothing should ever follow a DEFAULT_WITNESS_TABLE record.
+  bool readDefaultWitnessTable(ProtocolDecl *proto);
+
   /// Resolves a cross-reference, starting from the given module.
   ///
   /// Note: this destroys the cursor's position in the stream. Furthermore,

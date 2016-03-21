@@ -39,9 +39,6 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return C.self
-  }
   func _bridgeToObjectiveC() -> C {
     return C()
   }
@@ -79,9 +76,6 @@ testBridging(PlainClass(), "PlainClass")
 
 //===----------------------------------------------------------------------===//
 struct ConditionallyBridged<T> : _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return C.self
-  }
   func _bridgeToObjectiveC() -> C {
     return C()
   }

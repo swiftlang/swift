@@ -250,11 +250,11 @@ struct Use4 : TopLevelProto1 {
 }
 
 // CHECK-DAG: - "*"
-print(42 * 30)
+_ = 42 * 30
 
 // FIXME: Incorrectly marked non-private dependencies
 // CHECK-DAG: - "topLevel6"
-print(topLevel6())
+_ = topLevel6()
 // CHECK-DAG: - "topLevel7"
 private var use7 = topLevel7()
 // CHECK-DAG: - "topLevel8"

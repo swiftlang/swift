@@ -36,10 +36,6 @@ struct X : _ObjectiveCBridgeable {
     self.value = value
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return LifetimeTracked.self
-  }
-
   func _bridgeToObjectiveC() -> LifetimeTracked {
     return LifetimeTracked(value)
   }

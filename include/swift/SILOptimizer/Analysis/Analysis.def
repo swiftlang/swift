@@ -25,10 +25,12 @@
 
 ANALYSIS(Alias)
 ANALYSIS(BasicCallee)
+ANALYSIS(Caller)
 ANALYSIS(ClassHierarchy)
 ANALYSIS(Destructor)
 ANALYSIS(Dominance)
 ANALYSIS(Escape)
+ANALYSIS(FunctionSignature)
 ANALYSIS(InductionVariable)
 ANALYSIS(Loop)
 ANALYSIS(LoopRegion)

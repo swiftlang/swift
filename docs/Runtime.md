@@ -160,6 +160,7 @@ Returns a random number. Only used by allocation profiling tools.
 000000000002b290 T _swift_isUniquelyReferencedOrPinned_nonNull_native
 000000000002af00 T _swift_isUniquelyReferenced_native
 000000000002aea0 T _swift_isUniquelyReferenced_nonNull_native
+00000000000????? T _swift_setDeallocating
 000000000001d280 T _swift_isDeallocating
 ```
 

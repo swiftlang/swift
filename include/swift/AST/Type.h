@@ -70,6 +70,29 @@ inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
   return SubstOptions(lhs) | rhs;
 }
 
+/// Enumeration describing foreign languages to which Swift may be
+/// bridged.
+enum class ForeignLanguage {
+  C,
+  ObjectiveC,
+};
+
+/// Describes how a particular type is representable in a foreign language.
+enum class ForeignRepresentableKind : uint8_t {
+  /// This type is not representable in the foreign language.
+  None,
+  /// This type is trivially representable in the foreign language.
+  Trivial,
+  /// This type is trivially representable as an object in the foreign
+  /// language.
+  Object,
+  /// This type is representable in the foreign language via bridging.
+  Bridged,
+  /// This type is representable in the foreign language via static
+  /// bridging code, only (which is not available at runtime).
+  StaticBridged,
+};
+
 /// Type - This is a simple value object that contains a pointer to a type
 /// class.  This is potentially sugared.  We use this throughout the codebase
 /// instead of a raw "TypeBase*" to disable equality comparison, which is unsafe

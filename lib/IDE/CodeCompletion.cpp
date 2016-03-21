@@ -3087,7 +3087,7 @@ public:
     }
 
     if (leadingSequence.empty() && LHS->getType() &&
-        LHS->getType()->isAssignableType()) {
+        LHS->getType()->isLValueType()) {
       addAssignmentOperator(LHS->getType()->getRValueType(),
                             CurrDeclContext->getASTContext().TheEmptyTupleType);
     }
@@ -3505,8 +3505,10 @@ public:
       if (PossibleTypes.empty() &&
           !typeCheckUnresolvedExpr(DC, CallE->getArg(), CallE, PossibleTypes))
         return false;
-      if (RemoveUnlikelyOverloads)
+      if (RemoveUnlikelyOverloads) {
         removeUnlikelyOverloads(PossibleTypes, TupleEleTypesBeforeTarget, &DC);
+        return !PossibleTypes.empty();
+      }
     } else if (CallE->getArg()->getKind() == ExprKind::Paren) {
       Position = 0;
       HasName = false;

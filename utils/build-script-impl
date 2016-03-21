@@ -148,7 +148,6 @@ KNOWN_SETTINGS=(
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
-    xcode-ide-only              ""               "set to configure Xcode project for IDE use only, not building"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
     enable-llvm-assertions      "1"              "set to enable llvm assertions"
     build-llvm                  "1"              "set to 1 to build LLVM and Clang"
@@ -159,6 +158,7 @@ KNOWN_SETTINGS=(
     build-swift-static-stdlib   "0"              "set to 1 to build static versions of the Swift standard library and SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
+    build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
@@ -489,6 +489,10 @@ function set_deployment_target_based_options() {
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
+                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${#CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]})"
+                -DCOMPILER_RT_ENABLE_IOS:BOOL="$(false_true ${SKIP_IOS})"
+                -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
             )
 	    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
@@ -806,6 +810,14 @@ function true_false() {
     esac
 }
 
+function false_true() {
+    if [[ $(true_false "$1") = "TRUE" ]]; then
+        echo "FALSE"
+    else
+        echo "TRUE"
+    fi
+}
+
 function cmake_version() {
     echo $("${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " ")
 }
@@ -974,6 +986,14 @@ if [ ! -e "${WORKSPACE}/clang" ] ; then
 fi
 if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
     ln -sf "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
+fi
+
+# Symlink compiler-rt into the llvm tree, if it exists.
+COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
+if [ -e "${WORKSPACE}/compiler-rt" ] ; then
+    if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
+        ln -sf "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
+    fi
 fi
 
 PRODUCTS=(cmark llvm swift)
@@ -1210,12 +1230,6 @@ case "${CMAKE_GENERATOR}" in
             "${COMMON_CMAKE_OPTIONS[@]}"
             -DCMAKE_CONFIGURATION_TYPES="Debug;Release;MinSizeRel;RelWithDebInfo"
         )
-        if [[ "${XCODE_IDE_ONLY}" ]]; then
-          COMMON_CMAKE_OPTIONS=(
-              "${COMMON_CMAKE_OPTIONS[@]}"
-              -DSWIFT_XCODE_GENERATE_FOR_IDE_ONLY=ON
-          )
-        fi
         ;;
 esac
 
@@ -1718,6 +1732,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DSWIFT_BUILD_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
                     -DSWIFT_BUILD_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STDLIB}")
                     -DSWIFT_SERIALIZE_STDLIB_UNITTEST:BOOL=$(true_false "${BUILD_SERIALIZED_STDLIB_UNITTEST}")
+                    -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_BUILD_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_SDK_OVERLAY}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")

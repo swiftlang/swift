@@ -344,6 +344,10 @@ void SWIFT_RT_ENTRY_IMPL(swift_release_n)(HeapObject *object, uint32_t n)
   }
 }
 
+void swift::swift_setDeallocating(HeapObject *object) {
+  object->refCount.decrementFromOneAndDeallocateNonAtomic();
+}
+
 size_t swift::swift_retainCount(HeapObject *object) {
   return object->refCount.getCount();
 }

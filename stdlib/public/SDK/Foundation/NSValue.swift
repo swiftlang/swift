@@ -15,10 +15,6 @@ extension NSRange : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSValue.self
-  }
-
   public func _bridgeToObjectiveC() -> NSValue {
     return NSValue(range: self)
   }

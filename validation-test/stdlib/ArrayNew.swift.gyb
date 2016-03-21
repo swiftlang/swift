@@ -840,8 +840,8 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
   let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
-  var a: Array<AnyObject> = _convertNSArrayToArray(nsa)
-  var bridgedBack: NSArray = _convertArrayToNSArray(a)
+  var a: Array<AnyObject> = convertNSArrayToArray(nsa)
+  var bridgedBack: NSArray = convertArrayToNSArray(a)
 
   expectEqual(
     unsafeBitCast(nsa, to: Int.self),
@@ -854,8 +854,8 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
   let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
-  var a: Array<TestBridgedValueTy> = _convertNSArrayToArray(nsa)
-  var bridgedBack: NSArray = _convertArrayToNSArray(a)
+  var a: Array<TestBridgedValueTy> = convertNSArrayToArray(nsa)
+  var bridgedBack: NSArray = convertArrayToNSArray(a)
 
   expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
@@ -873,12 +873,12 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
   CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
   CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
   CustomImmutableNSArray.timesCountWasCalled = 0
-  let a: Array<AnyObject> = _convertNSArrayToArray(nsa)
+  let a: Array<AnyObject> = convertNSArrayToArray(nsa)
   expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
   expectEqual(0, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
   expectEqual(0, CustomImmutableNSArray.timesCountWasCalled)
 
-  let bridgedBack: NSArray = _convertArrayToNSArray(a)
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
 
   expectEqual(
     unsafeBitCast(nsa, to: Int.self),
@@ -900,14 +900,14 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
 
   // FIXME: bridging shouldn't dump array contents into the autorelease pool.
   autoreleasepoolIfUnoptimizedReturnAutoreleased {
-    a = _convertNSArrayToArray(nsa)
+    a = convertNSArrayToArray(nsa)
     expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
     expectEqual(3, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
     expectNotEqual(0, CustomImmutableNSArray.timesCountWasCalled)
     expectEqual(3, TestBridgedValueTy.bridgeOperations)
   }
 
-  let bridgedBack: NSArray = _convertArrayToNSArray(a)
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
 
   expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
@@ -1159,7 +1159,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   // Bridge back to native array.
-  var native: [TestObjCValueTy] = _convertNSArrayToArray(a)
+  var native: [TestObjCValueTy] = convertNSArrayToArray(a)
   native[0] = TestObjCValueTy(110)
   native[1] = TestObjCValueTy(120)
   native[2] = TestObjCValueTy(130)
@@ -1179,7 +1179,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
   // Bridge back to native array.
-  var native: [TestObjCValueTy] = _convertNSArrayToArray(
+  var native: [TestObjCValueTy] = convertNSArrayToArray(
     getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3))
   let identity1 = unsafeBitCast(native, to: UInt.self)
 
@@ -1452,7 +1452,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   // Bridge back to native array with a cast.
-  var native: [TestObjCValueTy] = _convertNSArrayToArray(a)
+  var native: [TestObjCValueTy] = convertNSArrayToArray(a)
   native[0] = TestObjCValueTy(110)
   native[1] = TestObjCValueTy(120)
   native[2] = TestObjCValueTy(130)
@@ -1486,7 +1486,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   // Bridge back to native array.
-  var native: [TestBridgedValueTy] = _convertNSArrayToArray(a)
+  var native: [TestBridgedValueTy] = convertNSArrayToArray(a)
   native[0] = TestBridgedValueTy(110)
   native[1] = TestBridgedValueTy(120)
   native[2] = TestBridgedValueTy(130)
@@ -1506,7 +1506,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
 
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {
   // Bridge back to native array.
-  var native: [TestBridgedValueTy] = _convertNSArrayToArray(
+  var native: [TestBridgedValueTy] = convertNSArrayToArray(
     getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3))
   let identity1 = unsafeBitCast(native, to: UInt.self)
 
@@ -1530,8 +1530,8 @@ ArrayTestSuite.test("BridgedToObjC.Verbatim.RoundtripThroughSwiftArray") {
 % ]:
   do {
     let nsa: NSArray = getAsImmutableNSArray([ 10, 20, 30 ])
-    let a: ${MiddleType} = _convertNSArrayToArray(nsa)
-    let bridgedBack = _convertArrayToNSArray(a)
+    let a: ${MiddleType} = convertNSArrayToArray(nsa)
+    let bridgedBack = convertArrayToNSArray(a)
 
     expectEqual(
       unsafeBitCast(nsa, to: Int.self),
@@ -1561,8 +1561,8 @@ ArrayTestSuite.test("BridgedToObjC.Nonverbatim.RoundtripThroughSwiftArray") {
   do {
     TestBridgedValueTy.bridgeOperations = 0
     let nsa: NSArray = getAsImmutableNSArray([ 10, 20, 30 ])
-    let a: Array<TestBridgedValueTy> = _convertNSArrayToArray(nsa)
-    let bridgedBack = _convertArrayToNSArray(a)
+    let a: Array<TestBridgedValueTy> = convertNSArrayToArray(nsa)
+    let bridgedBack = convertArrayToNSArray(a)
     expectEqual(3, TestBridgedValueTy.bridgeOperations)
   }
   do {

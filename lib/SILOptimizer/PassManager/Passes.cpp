@@ -197,6 +197,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   // current function (after optimizing any new callees).
   PM.addDevirtualizer();
   PM.addGenericSpecializer();
+
   switch (OpLevel) {
     case OptimizationLevelKind::HighLevel:
       // Does not inline functions with defined semantics.
@@ -245,6 +246,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
     PM.addLateCodeMotion();
   else
     PM.addEarlyCodeMotion();
+
   PM.addARCSequenceOpts();
   PM.addRemovePins();
 }
@@ -327,8 +329,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // We do this late since it is a pass like the inline caches that we only want
   // to run once very late. Make sure to run at least one round of the ARC
   // optimizer after this.
-  PM.addFunctionSignatureOpts();
-
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
@@ -338,11 +338,20 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.setStageName("LowLevel");
 
+  // Rewrite to get the benefit of release devirtualizer.
+  // Also, Make sure the run the rewriter to create the optimized functions before
+  // the cloner on the current function is run !.
+  PM.addFunctionSignatureOptRewriter();
+
   // Should be after FunctionSignatureOpts and before the last inliner.
   PM.addReleaseDevirtualizer();
 
   AddSSAPasses(PM, OptimizationLevelKind::LowLevel);
   PM.addDeadStoreElimination();
+
+  // We've done a lot of optimizations on this function, attempt to FSO.
+  PM.addFunctionSignatureOptCloner();
+
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
@@ -365,12 +374,16 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addSimplifyCFG();
   PM.runOneIteration();
 
+  PM.resetAndRemoveTransformations();
+  
+  // Has only an effect if the -gsil option is specified.
+  PM.addSILDebugInfoGenerator();
+
   // Call the CFG viewer.
   if (SILViewCFG) {
-    PM.resetAndRemoveTransformations();
     PM.addCFGPrinter();
-    PM.runOneIteration();
   }
+  PM.runOneIteration();
 
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)
@@ -398,6 +411,9 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   // Here we just convert external definitions to declarations. LLVM will
   // eventually remove unused declarations.
   PM.addExternalDefsToDecls();
+
+  // Has only an effect if the -gsil option is specified.
+  PM.addSILDebugInfoGenerator();
 
   PM.runOneIteration();
 

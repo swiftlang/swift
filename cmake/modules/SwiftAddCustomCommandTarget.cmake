@@ -147,38 +147,16 @@ function(add_custom_command_target dependency_out_var_name)
       IMPLICIT_DEPENDS WORKING_DIRECTORY COMMENT VERBATIM APPEND)
     add_custom_command(${ACCT_COMMANDS} ${args})
 
-    # Skip generating the target if we are generating an Xcode project only
-    # for IDE use. The volume of dependencies here causes performance problems
-    # in Xcode that make it impractical to use.
-    if(NOT (SWIFT_XCODE_GENERATE_FOR_IDE_ONLY
-            AND "${ACCT_CUSTOM_TARGET_NAME}" STREQUAL ""))
-      _make_acct_argument_list(ALL WORKING_DIRECTORY SOURCES)
-      add_custom_target(
-          "${target_name}" ${args}
-          DEPENDS ${ACCT_OUTPUT}
-          COMMENT "${ACCT_OUTPUT}")
-      set_target_properties(
-          "${target_name}" PROPERTIES
-          FOLDER "add_custom_command_target artifacts")
-    endif()
+    _make_acct_argument_list(ALL WORKING_DIRECTORY SOURCES)
+    add_custom_target(
+        "${target_name}" ${args}
+        DEPENDS ${ACCT_OUTPUT}
+        COMMENT "${ACCT_OUTPUT}")
+    set_target_properties(
+        "${target_name}" PROPERTIES
+        FOLDER "add_custom_command_target artifacts")
   endif()
 
   # "Return" the name of the custom target
-  if(SWIFT_XCODE_GENERATE_FOR_IDE_ONLY
-     AND "${ACCT_CUSTOM_TARGET_NAME}" STREQUAL "")
-    set("${dependency_out_var_name}" xcode_generate_for_ide_only_dummy
-        PARENT_SCOPE)
-  else()
-    set("${dependency_out_var_name}" "${target_name}" PARENT_SCOPE)
-  endif()
+  set("${dependency_out_var_name}" "${target_name}" PARENT_SCOPE)
 endfunction()
-
-# A dummy target for XCODE_GENERATE_FOR_IDE_ONLY targets that stands in for
-# the targets we don't generate in that mode.
-if(SWIFT_XCODE_GENERATE_FOR_IDE_ONLY)
-  add_custom_command(OUTPUT xcode_generate_for_ide_only_dummy.txt
-      COMMAND echo "This Xcode project is configured for IDE use only and cannot build Swift."
-      COMMAND false)
-  add_custom_target(xcode_generate_for_ide_only_dummy ALL
-      DEPENDS xcode_generate_for_ide_only_dummy.txt)
-endif()

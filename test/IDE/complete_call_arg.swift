@@ -37,6 +37,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_1 | FileCheck %s -check-prefix=BOUND_GENERIC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_2 | FileCheck %s -check-prefix=BOUND_GENERIC_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_1 | FileCheck %s -check-prefix=EMPTY_OVERLOAD
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_2 | FileCheck %s -check-prefix=EMPTY_OVERLOAD
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -364,3 +367,18 @@ struct TestBoundGeneric1 {
 // BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      x[#[Int]#];
 // BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      y[#[Int]#];
 }
+
+func emptyOverload() {}
+func emptyOverload(foo foo: Int) {}
+emptyOverload(foo: #^EMPTY_OVERLOAD_1^#)
+struct EmptyOverload {
+  init() {}
+  init(frame: Int) {}
+}
+_ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
+// FIXME: we should have a TypeRelation[Identical] here for Ints. For now just
+// check it's not empty.
+// EMPTY_OVERLOAD: Begin completions
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local: i2[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local: i1[#Int#];
+// EMPTY_OVERLOAD: End completions

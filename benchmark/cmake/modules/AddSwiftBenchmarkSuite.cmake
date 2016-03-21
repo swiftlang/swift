@@ -49,7 +49,8 @@ function (swift_benchmark_compile_archopts)
       "-${BENCH_COMPILE_ARCHOPTS_OPT}"
       "-D" "INTERNAL_CHECKS_ENABLED"
       "-D" "SWIFT_ENABLE_OBJECT_LITERALS"
-      "-no-link-objc-runtime")
+      "-no-link-objc-runtime"
+      "-I" "${srcdir}/utils/ObjectiveCTests")
 
   # Always optimize the driver modules.
   # Note that we compile the driver for Ounchecked also with -Ounchecked
@@ -281,10 +282,34 @@ function (swift_benchmark_compile_archopts)
     set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
   endif()
 
+  set(objcfile "${objdir}/ObjectiveCTests.o")
+  add_custom_command(
+      OUTPUT "${objcfile}"
+      DEPENDS "${srcdir}/utils/ObjectiveCTests/ObjectiveCTests.m"
+        "${srcdir}/utils/ObjectiveCTests/ObjectiveCTests.h"
+      COMMAND
+        "${CLANG_EXEC}"
+        "-fno-stack-protector"
+        "-fPIC"
+        "-Werror=date-time"
+        "-fcolor-diagnostics"
+        "-O3"
+        "-target" "${target}"
+        "-isysroot" "${sdk}"
+        "-fobjc-arc"
+        "-arch" "${BENCH_COMPILE_ARCHOPTS_ARCH}"
+        "-F" "${sdk}/../../../Developer/Library/Frameworks"
+        "-m${triple_platform}-version-min=${ver}"
+        "-I" "${srcdir}/utils/ObjectiveCTests"
+        "${srcdir}/utils/ObjectiveCTests/ObjectiveCTests.m"
+        "-c"
+        "-o" "${objcfile}")
+
   add_custom_command(
       OUTPUT "${OUTPUT_EXEC}"
       DEPENDS
         ${bench_library_objects} ${SWIFT_BENCH_OBJFILES}
+        "${objcfile}"
         "adhoc-sign-swift-stdlib-${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
       COMMAND
         "${CLANG_EXEC}"
@@ -306,6 +331,7 @@ function (swift_benchmark_compile_archopts)
         "-Xlinker" "@executable_path/../lib/swift/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
         ${bench_library_objects}
         ${SWIFT_BENCH_OBJFILES}
+        ${objcfile}
         "-o" "${OUTPUT_EXEC}"
       COMMAND
         "codesign" "-f" "-s" "-" "${OUTPUT_EXEC}")

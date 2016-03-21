@@ -119,6 +119,14 @@ SILWitnessTable *SerializedSILLoader::lookupWitnessTable(SILWitnessTable *WT) {
   return nullptr;
 }
 
+SILDefaultWitnessTable *SerializedSILLoader::
+lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
+  for (auto &Des : LoadedSILSections)
+    if (auto wT = Des->lookupDefaultWitnessTable(WT))
+      return wT;
+  return nullptr;
+}
+
 void SerializedSILLoader::invalidateCaches() {
   for (auto &Des : LoadedSILSections)
     Des->invalidateFunctionCache();
@@ -163,6 +171,12 @@ void SerializedSILLoader::getAllVTables() {
 void SerializedSILLoader::getAllWitnessTables() {
   for (auto &Des : LoadedSILSections)
     Des->getAllWitnessTables();
+}
+
+/// Deserialize all DefaultWitnessTables in all SILModules.
+void SerializedSILLoader::getAllDefaultWitnessTables() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDefaultWitnessTables();
 }
 
 // Anchor the SerializedSILLoader v-table.

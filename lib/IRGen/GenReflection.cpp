@@ -30,7 +30,9 @@ using namespace irgen;
 class ReflectionMetadataBuilder : public ConstantBuilder<> {
 protected:
   void addTypeRef(Module *ModuleContext, CanType type) {
-    Mangle::Mangler mangler;
+    Mangle::Mangler mangler(/*DWARFMangling*/false,
+                            /*usePunyCode*/ true,
+                            /*OptimizeProtocolNames*/ false);
     mangler.setModuleContext(ModuleContext);
     mangler.mangleType(type, 0);
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
@@ -45,9 +47,9 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   static const uint32_t AssociatedTypeRecordSize = 8;
   ArrayRef<const NominalTypeDecl *> NominalTypeDecls;
 
-  void addDecl(const NominalTypeDecl *Decl) {
-    PrettyStackTraceDecl DebugStack("emitting associated type metadata", Decl);
-    for (auto Conformance : Decl->getAllConformances()) {
+  void addDecl(const NominalTypeDecl *decl) {
+    PrettyStackTraceDecl DebugStack("emitting associated type metadata", decl);
+    for (auto Conformance : decl->getAllConformances()) {
       SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
 
       auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
@@ -64,10 +66,10 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
         return false;
       };
 
-      auto ModuleContext = Decl->getModuleContext();
-      addTypeRef(ModuleContext, Decl->getDeclaredType()->getCanonicalType());
+      auto ModuleContext = decl->getModuleContext();
+      addTypeRef(ModuleContext, decl->getDeclaredType()->getCanonicalType());
 
-      auto ProtoTy = Conformance->getProtocol()->getInterfaceType();
+      auto ProtoTy = Conformance->getProtocol()->getDeclaredType();
       addTypeRef(ModuleContext, ProtoTy->getCanonicalType());
 
       Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
@@ -101,6 +103,9 @@ public:
 
     layout();
     auto init = getInit();
+    if (!init)
+      return nullptr;
+
     auto var = new llvm::GlobalVariable(*IGM.getModule(), init->getType(),
                                         /*isConstant*/ true,
                                         llvm::GlobalValue::PrivateLinkage,
@@ -179,6 +184,7 @@ public:
   }
 
   llvm::GlobalVariable *emit() {
+
     auto tempBase = std::unique_ptr<llvm::GlobalVariable>(
         new llvm::GlobalVariable(IGM.Int8Ty, /*isConstant*/ true,
                                  llvm::GlobalValue::PrivateLinkage));
@@ -186,6 +192,10 @@ public:
 
     layout();
     auto init = getInit();
+
+    if (!init)
+      return nullptr;
+
     auto var = new llvm::GlobalVariable(*IGM.getModule(), init->getType(),
                                         /*isConstant*/ true,
                                         llvm::GlobalValue::PrivateLinkage,
@@ -266,6 +276,9 @@ llvm::Constant *IRGenModule::emitFieldTypeMetadataRecords() {
 
   FieldTypeMetadataBuilder builder(*this, NominalTypeDecls);
   auto var = builder.emit();
+  if (!var)
+    return nullptr;
+
   addUsedGlobal(var);
   return var;
 }
@@ -279,6 +292,9 @@ llvm::Constant *IRGenModule::emitAssociatedTypeMetadataRecords() {
 
   AssociatedTypeMetadataBuilder builder(*this, NominalTypeDecls);
   auto var = builder.emit();
+  if (!var)
+    return nullptr;
+
   addUsedGlobal(var);
   return var;
 }

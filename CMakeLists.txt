@@ -32,6 +32,10 @@ option(SWIFT_SERIALIZE_STDLIB_UNITTEST
     "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
     FALSE)
 
+option(SWIFT_STDLIB_SIL_DEBUGGING
+    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    FALSE)
+
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
@@ -210,10 +214,6 @@ if(SWIFT_SERIALIZE_STDLIB_UNITTEST AND SWIFT_STDLIB_ENABLE_RESILIENCE)
   message(WARNING "Ignoring SWIFT_SERIALIZE_STDLIB_UNITTEST because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
   set(SWIFT_SERIALIZE_STDLIB_UNITTEST FALSE)
 endif()
-
-option(SWIFT_XCODE_GENERATE_FOR_IDE_ONLY
-    "Generate an Xcode project suitable for IDE use, but which cannot build"
-    FALSE)
 
 #
 # End of user-configurable options.

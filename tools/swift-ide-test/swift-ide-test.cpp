@@ -527,6 +527,11 @@ HeaderToPrint("header-to-print",
 
 static llvm::cl::opt<std::string>
 LineColumnPair("pos", llvm::cl::desc("Line:Column pair"));
+
+static llvm::cl::opt<bool>
+NoEmptyLineBetweenMembers("no-empty-line-between-members",
+                          llvm::cl::desc("Print no empty line between members."),
+                          llvm::cl::init(false));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -1640,7 +1645,8 @@ struct GroupNamesPrinter {
   void addDecl(const Decl *D) {
     if(auto VD = dyn_cast<ValueDecl>(D)) {
       if (!VD->isImplicit() && !VD->isPrivateStdlibDecl()) {
-        StringRef Name = VD->getGroupName().getValue();
+        StringRef Name = VD->getGroupName().hasValue() ?
+          VD->getGroupName().getValue() : "";
         Groups.insert(Name.empty() ? "<NULL>" : Name);
       }
     }
@@ -2120,6 +2126,21 @@ public:
       OS << " ";
       printDocComment(D);
       OS << "\n";
+    } else if (D->getKind() == DeclKind::Extension) {
+      SourceLoc Loc = D->getLoc();
+      if (Loc.isValid()) {
+        auto LineAndColumn = SM.getLineAndColumn(Loc);
+        OS << getBufferIdentifier(D->getLoc())
+        << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
+      }
+      OS << Decl::getKindName(D->getKind()) << "/";
+      OS << " ";
+      printRawComment(D->getRawComment());
+      OS << " ";
+      printBriefComment(D->getBriefComment());
+      OS << " ";
+      printDocComment(D);
+      OS << "\n";
     }
     return true;
   }
@@ -2372,61 +2393,69 @@ private:
 class TypeReconstructWalker : public SourceEntityWalker {
   ASTContext &Ctx;
   llvm::raw_ostream &Stream;
+  llvm::DenseSet<ValueDecl *> SeenDecls;
 
 public:
   TypeReconstructWalker(ASTContext &Ctx, llvm::raw_ostream &Stream)
       : Ctx(Ctx), Stream(Stream) {}
 
   bool walkToDeclPre(Decl *D, CharSourceRange range) override {
-    if (auto *VD = dyn_cast<ValueDecl>(D))
-      tryDemangleDecl(VD, range);
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (SeenDecls.insert(VD).second)
+        tryDemangleDecl(VD, range, /*isRef=*/false);
+    }
     return true;
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, Type T) override {
-    if (T.isNull())
-      return true;
-    T = T->getRValueType();
-    Mangle::Mangler Man(/* DWARFMangling */true);
-    Man.mangleTypeForDebugger(T, D->getDeclContext());
-    std::string MangledName(Man.finalize());
-    std::string Error;
-    Type ReconstructedType = getTypeFromMangledSymbolname(Ctx, MangledName,
-                                                        Error);
-    if (ReconstructedType) {
-      Stream << "reconstructed type from usr for '" << Range.str() << "' is '";
-      ReconstructedType->print(Stream);
-      Stream << "'\n";
-    } else {
-      Stream << "cannot reconstruct type from usr for '" << Range.str()
-             << "'\n";
+    if (SeenDecls.insert(D).second)
+      tryDemangleDecl(D, Range, /*isRef=*/true);
+
+    if (T) {
+      T = T->getRValueType();
+      tryDemangleType(T, D->getDeclContext(), Range);
     }
     return true;
   }
 
 private:
-  void tryDemangleDecl(ValueDecl *VD, CharSourceRange range) {
-    std::string mangledName;
+  void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
+    Mangle::Mangler Man(/* DWARFMangling */true);
+    Man.mangleTypeForDebugger(T, DC);
+    std::string mangledName(Man.finalize());
+    std::string Error;
+    Type ReconstructedType =
+        getTypeFromMangledSymbolname(Ctx, mangledName, Error);
+    Stream << "type: ";
+    if (ReconstructedType) {
+      ReconstructedType->print(Stream);
+    } else {
+      Stream << "FAILURE";
+    }
+    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << "\n";
+  }
+
+  void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
+    std::string USR;
     {
-      llvm::raw_string_ostream OS(mangledName);
+      llvm::raw_string_ostream OS(USR);
       printDeclUSR(VD, OS);
     }
 
-    // Put the expected symbol _T prefix on the name by replacing the s:.
-    assert(StringRef(mangledName).startswith("s:"));
-    mangledName[0] = '_';
-    mangledName[1] = 'T';
-
     std::string error;
-    if (Decl *reDecl = getDeclFromMangledSymbolName(Ctx, mangledName, error)) {
-      Stream << "reconstructed decl from usr for '" << range.str() << "' is '";
-      reDecl->print(Stream, PrintOptions());
-      Stream << "'\n";
+    if (isRef) {
+      Stream << "dref: ";
     } else {
-      Stream << "cannot reconstruct decl from usr for '" << range.str()
-             << "'\n";
+      Stream << "decl: ";
     }
+
+    if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
+      reDecl->print(Stream, PrintOptions());
+    } else {
+      Stream << "FAILURE";
+    }
+    Stream << "\tfor '" << range.str() << "' usr=" << USR << "\n";
   }
 };
 
@@ -2791,11 +2820,14 @@ int main(int argc, char *argv[]) {
 
     if (options::Action == ActionType::PrintModuleGroups)
       ExitCode = doPrintModuleGroups(InitInvok, options::ModuleToPrint);
-    else
+    else {
+      if (options::NoEmptyLineBetweenMembers.getNumOccurrences() > 0)
+        PrintOpts.EmptyLineBetweenMembers = !options::NoEmptyLineBetweenMembers;
       ExitCode = doPrintModules(
         InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
         TraversalOptions, PrintOpts, options::AnnotatePrint,
         options::SynthesizeExtension);
+    }
     break;
   }
 

@@ -151,7 +151,8 @@ ProtocolConformance::getInheritedConformances() const {
 
 /// Determine whether the witness for the given requirement
 /// is either the default definition or was otherwise deduced.
-bool ProtocolConformance::usesDefaultDefinition(ValueDecl *requirement) const {
+bool ProtocolConformance::
+usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
@@ -358,12 +359,13 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   for (auto proto : assocType->getConformingProtocols(resolver)) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
                                                         resolver);
-    assert((conforms.getInt() == ConformanceKind::Conforms ||
+    assert((conforms ||
             specializedType->is<TypeVariableType>() ||
             specializedType->isTypeParameter() ||
             specializedType->is<ErrorType>()) &&
            "Improperly checked substitution");
-    conformances.push_back(ProtocolConformanceRef(proto, conforms.getPointer()));
+    conformances.push_back(conforms ? *conforms 
+                                    : ProtocolConformanceRef(proto));
   }
 
   // Form the substitution.
@@ -400,6 +402,11 @@ ProtocolConformance::getRootNormalConformance() const {
     }
   }
   return cast<NormalProtocolConformance>(C);
+}
+
+bool ProtocolConformance::isVisibleFrom(DeclContext *dc) const {
+  // FIXME: Implement me!
+  return true;
 }
 
 ProtocolConformance *ProtocolConformance::subst(Module *module,

@@ -35,9 +35,6 @@ struct B : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return A.self
-  }
   func _bridgeToObjectiveC() -> A {
     return A()
   }

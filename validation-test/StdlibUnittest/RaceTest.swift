@@ -83,9 +83,9 @@ RaceTestSuite.test("passes") {
   runRaceTest(RaceTest1.self, trials: 10)
 }
 // CHECK: [ RUN      ] Race.passes
-// CHECK: out>>> Pass: {{.*}} times
-// CHECK: out>>> Pass (2): 4 times
-// CHECK: out>>> Failure: 0 times
+// CHECK: stdout>>> Pass: {{.*}} times
+// CHECK: stdout>>> Pass (2): 4 times
+// CHECK: stdout>>> Failure: 0 times
 // CHECK: [       OK ] Race.passes
 
 RaceTestSuite.test("fails") {
@@ -95,10 +95,10 @@ RaceTestSuite.test("fails") {
 }
 // CHECK: [ RUN      ] Race.fails
 // REQUIRES: executable_test
-// CHECK: out>>> Pass: {{.*}} times
-// CHECK: out>>> Pass (2): 1 times
-// CHECK: out>>> Failure: 1 times
-// CHECK: out>>> Failure (65534): 3 times
+// CHECK: stdout>>> Pass: {{.*}} times
+// CHECK: stdout>>> Pass (2): 1 times
+// CHECK: stdout>>> Failure: 1 times
+// CHECK: stdout>>> Failure (65534): 3 times
 // CHECK: [     FAIL ] Race.fails
 // CHECK: Race: Some tests failed, aborting
 

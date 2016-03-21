@@ -2300,6 +2300,21 @@ zero, the object is destroyed and ``@weak`` references are cleared.  When both
 its strong and unowned reference counts reach zero, the object's memory is
 deallocated.
 
+set_deallocating
+````````````````
+::
+
+  set_deallocating %0 : $T
+  // $T must be a reference type.
+
+Explicitly sets the state of the object referenced by ``%0`` to deallocated.
+This is the same operation what's done by a strong_release immediately before
+it calls the deallocator of the object.
+
+It is expected that the strong reference count of the object is one.
+Furthermore, no other thread may increment the strong reference count during
+execution of this instruction.
+
 strong_retain_unowned
 `````````````````````
 ::
@@ -3720,7 +3735,7 @@ unchecked_addr_cast
 
 Converts an address to a different address type. Using the resulting
 address is undefined unless ``B`` is layout compatible with ``A``. The
-layout of ``A`` may be smaller than that of ``B`` as long as the lower
+layout of ``B`` may be smaller than that of ``A`` as long as the lower
 order bytes have identical layout.
 
 unchecked_trivial_bit_cast

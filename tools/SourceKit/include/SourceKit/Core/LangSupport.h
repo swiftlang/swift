@@ -458,6 +458,11 @@ public:
                              ArrayRef<const char *> Args,
                           std::function<void(const CursorInfo &)> Receiver) = 0;
 
+  virtual void
+  getCursorInfoFromUSR(StringRef Filename, StringRef USR,
+                       ArrayRef<const char *> Args,
+                       std::function<void(const CursorInfo &)> Receiver) = 0;
+
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,
                                             ArrayRef<const char *> Args,

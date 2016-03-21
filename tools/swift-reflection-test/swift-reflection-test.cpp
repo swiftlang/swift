@@ -21,13 +21,11 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/CommandLine.h"
 
-#if __APPLE__
-#include "mach_messages.h"
-#include "mach_helpers.h"
-#endif
+#include "messages.h"
 
 #include <unistd.h>
 
+#include <algorithm>
 #include <iostream>
 #include <csignal>
 
@@ -76,6 +74,11 @@ Architecture("arch", llvm::cl::desc("Architecture to inspect in the binary"),
 static void guardError(std::error_code error) {
   if (!error) return;
   std::cerr << "swift-reflection-test error: " << error.message() << "\n";
+  exit(EXIT_FAILURE);
+}
+
+static void errorAndExit(const std::string &message) {
+  std::cerr << message << ": " << strerror(errno) << std::endl;
   exit(EXIT_FAILURE);
 }
 
@@ -200,206 +203,234 @@ static int doDumpReflectionSections(std::string BinaryFilename,
   return EXIT_SUCCESS;
 }
 
-#if __APPLE__
+#define READ_END 0
+#define WRITE_END 1
 
-static mach_port_t createReceivePort() {
-  kern_return_t error;
-  mach_port_t port = MACH_PORT_NULL;
+#define PARENT_END 1
+#define CHILD_END 0
 
-  error = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &port);
-  guardMachError(error, "mach_port_allocate");
+static int to_child[2];
+static int from_child[2];
 
-  error = mach_port_insert_right(mach_task_self(), port, port,
-                                 MACH_MSG_TYPE_MAKE_SEND);
+#define PARENT_WRITE_FD (to_child[WRITE_END])
+#define CHILD_READ_FD (to_child[READ_END])
+#define PARENT_READ_FD (from_child[READ_END])
+#define CHILD_WRITE_FD (from_child[WRITE_END])
 
-  guardMachError(error, "mach_port_insert_right");
-  return port;
+static uint8_t pipeGetPointerSize() {
+  // FIXME: Return based on -arch argument to the test tool
+  return 8;
 }
 
-static mach_port_t receivePort(mach_port_t fromPort) {
-  kern_return_t error;
-
-  ReceivePortMessage message;
-
-  error = mach_msg (&message.header, MACH_RCV_MSG,
-                    MACH_RCV_LARGE, sizeof(message), fromPort,
-                    MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
-
-  guardMachError(error, "mach_msg MACH_RCV_MSG");
-  return message.taskPort.name;
+static uint8_t pipeGetSizeSize() {
+  // FIXME: Return based on -arch argument to the test tool
+  return 8;
 }
 
-ReflectionInfo receiveReflectionInfo(MemoryReader &Reader,
-                                     mach_port_t childPort,
-                                     task_t childTask) {
-  ReceiveReflectionInfoMessage message;
-  kern_return_t error = mach_msg(&message.header,
-                                 MACH_RCV_MSG | MACH_RCV_INTERRUPT,
-                                 0,
-                                 sizeof(message),
-                                 childPort,
-                                 MACH_MSG_TIMEOUT_NONE,
-                                 MACH_PORT_NULL);
-
-  guardMachError(error, "mach_msg (MACH_RCV_MSG)");
-  RemoteReflectionInfo RemoteInfo;
-  RemoteInfo.image_name_addr = extractUInt64(message.image_name_addr);
-
-  RemoteInfo.fieldmd.addr = extractUInt64(message.fieldmd_start_addr);
-  RemoteInfo.fieldmd.size = extractUInt64(message.fieldmd_size);
-  RemoteInfo.typeref.addr = extractUInt64(message.typeref_start_addr);
-  RemoteInfo.typeref.size = extractUInt64(message.typeref_size);
-  RemoteInfo.reflstr.addr = extractUInt64(message.reflstr_start_addr);
-  RemoteInfo.reflstr.size = extractUInt64(message.reflstr_size);
-  RemoteInfo.assocty.addr = extractUInt64(message.assocty_start_addr);
-  RemoteInfo.assocty.size = extractUInt64(message.assocty_size);
-
-  uint64_t MinAddress = RemoteInfo.fieldmd.addr;
-  MinAddress = std::min(MinAddress, RemoteInfo.typeref.addr);
-  MinAddress = std::min(MinAddress, RemoteInfo.reflstr.addr);
-  MinAddress = std::min(MinAddress, RemoteInfo.assocty.addr);
-  auto totalSizeOfReflectionSections = RemoteInfo.fieldmd.size +
-    RemoteInfo.typeref.size +
-    RemoteInfo.reflstr.size +
-    RemoteInfo.assocty.size;
-
-  vm_address_t LocalAddress = 0;
-  vm_prot_t CurrentProtection;
-  vm_prot_t MaxProtection;
-  error = vm_remap(mach_task_self(),
-                   &LocalAddress,
-                   totalSizeOfReflectionSections,
-                   /*mask*/ 0,
-                   VM_FLAGS_ANYWHERE | VM_FLAGS_RETURN_DATA_ADDR | VM_FLAGS_RESILIENT_CODESIGN,
-                   childTask,
-                   MinAddress,
-                   /*copy*/ true,
-                   &CurrentProtection,
-                   &MaxProtection,
-                   VM_INHERIT_DEFAULT);
-  guardMachError(error, "vm_map reflection sections");
-
-  auto Base_fieldmd = LocalAddress + (RemoteInfo.fieldmd.addr - MinAddress);
-  FieldSection Fields(Base_fieldmd, Base_fieldmd + RemoteInfo.fieldmd.size);
-
-  auto Base_assocty = LocalAddress + (RemoteInfo.assocty.addr - MinAddress);
-  AssociatedTypeSection AssociatedTypes(Base_assocty,
-                                        Base_assocty + RemoteInfo.assocty.size);
-
-  auto Base_typeref = LocalAddress + (RemoteInfo.typeref.addr - MinAddress);
-  GenericSection Typerefs(Base_typeref, Base_typeref + RemoteInfo.typeref.size);
-
-  auto Base_reflstr = LocalAddress + (RemoteInfo.reflstr.addr - MinAddress);
-  GenericSection Reflstr(Base_reflstr, Base_reflstr + RemoteInfo.reflstr.size);
-
-  auto ImageName = Reader.readString(RemoteInfo.image_name_addr);
-  if (ImageName.empty())
-    llvm_unreachable("No image name for reflection info!");
-
-  return { ImageName, Fields, AssociatedTypes, Typerefs, Reflstr };
+static bool pipeReadBytes(addr_t Address, uint8_t *Dest, uint64_t Size) {
+  write(PARENT_WRITE_FD, REQUEST_READ_BYTES, 2);
+  write(PARENT_WRITE_FD, &Address, sizeof(Address));
+  write(PARENT_WRITE_FD, &Size, sizeof(Size));
+  auto bytesRead = read(PARENT_READ_FD, Dest, Size);
+  return bytesRead == (int64_t)Size;
 }
 
-static task_t childTask;
+static bool pipeReadInteger(addr_t Address, uint64_t *Value, uint8_t Size) {
+  return pipeReadBytes(Address, (uint8_t*)Value, Size);
+}
 
-static uint8_t machGetPointerSize() {
-  return sizeof(uintptr_t);
-};
+template <typename StoredPointer>
+static uint64_t pipeGetStringLength(addr_t Address) {
+  write(PARENT_WRITE_FD, REQUEST_STRING_LENGTH, 2);
+  StoredPointer Length;
+  write(PARENT_WRITE_FD, &Address, sizeof(Address));
+  read(PARENT_READ_FD, &Length, sizeof(Length));
+  return static_cast<uint64_t>(Length);
+}
 
-static uint8_t machGetSizeSize() {
-  return sizeof(size_t);
-};
+template <typename StoredPointer>
+static addr_t pipeGetSymbolAddress(const char *Name, uint64_t NameLength) {
+  StoredPointer Address = 0;
+  write(PARENT_WRITE_FD, REQUEST_SYMBOL_ADDRESS, 2);
+  write(PARENT_WRITE_FD, Name, NameLength);
+  write(PARENT_WRITE_FD, "\n", 1);
+  read(PARENT_READ_FD, &Address, sizeof(Address));
+  return static_cast<addr_t>(Address);
+}
 
-static bool machReadBytes(const addr_t Address, uint8_t *Dest, uint64_t Size) {
-  mach_msg_type_number_t SizeRead = 0;
-  vm_offset_t Data = 0;
-  auto Result = vm_read(childTask, Address, Size, &Data, &SizeRead);
-  guardMachError(Result, "vm_read");
-  if (Result == KERN_SUCCESS && SizeRead == Size) {
-    memmove(reinterpret_cast<void *>(Dest),
-            reinterpret_cast<void *>(Data), Size);
-    vm_deallocate(childTask, Data, SizeRead);
-    return true;
+namespace {
+struct Section {
+  addr_t StartAddress;
+  addr_t Size;
+
+  addr_t getEndAddress() const {
+    return StartAddress + Size;
   }
-  return false;
-}
-
-static bool machReadInteger(const addr_t Address, uint64_t *Value, uint8_t Size) {
-  return machReadBytes(Address, reinterpret_cast<uint8_t *>(Value), Size);
 };
 
-uint64_t machGetStringLength(const addr_t BaseAddress) {
-  addr_t Limit = BaseAddress + 1024 * 1024;
-  addr_t Address = BaseAddress;
-  uint64_t Length = 0;
-  std::vector<uint8_t> Bytes;
-  mach_msg_type_number_t SizeRead = 0;
-  vm_offset_t DataOffset = 0;
-  const size_t ChunkSize = 8;
-  while (Address < Limit) {
-    auto Result = vm_read(childTask, Address, ChunkSize, &DataOffset,
-                          &SizeRead);
-    guardMachError(Result, "vm_read");
-    auto *Data = reinterpret_cast<uint8_t *>(DataOffset);
-    for (size_t i = 0; i < 8; ++i) {
-      if (Data[i] == 0) {
-        vm_deallocate(childTask, DataOffset, SizeRead);
-        return Length;
-      }
-      ++Length;
+struct RemoteReflectionInfo {
+  const std::string ImageName;
+  const Section fieldmd;
+  const Section assocty;
+  const Section reflstr;
+  const Section typeref;
+  const addr_t StartAddress;
+  const size_t TotalSize;
+
+  RemoteReflectionInfo(std::string ImageName, Section fieldmd, Section assocty,
+                       Section reflstr, Section typeref)
+    : fieldmd(fieldmd), assocty(assocty), reflstr(reflstr), typeref(typeref),
+      StartAddress(std::min({
+        fieldmd.StartAddress, typeref.StartAddress,
+        reflstr.StartAddress, assocty.StartAddress})),
+      TotalSize(std::max({fieldmd.getEndAddress(), assocty.getEndAddress(),
+                         reflstr.getEndAddress(), typeref.getEndAddress()}) - StartAddress) {}
+};
+}
+
+std::vector<ReflectionInfo> receiveReflectionInfo(MemoryReader &Reader) {
+  write(PARENT_WRITE_FD, REQUEST_REFLECTION_INFO, 2);
+  uint64_t NumReflectionInfos = 0;
+  read(PARENT_READ_FD, &NumReflectionInfos, sizeof(NumReflectionInfos));
+
+  std::vector<RemoteReflectionInfo> RemoteInfos;
+  for (uint64_t i = 0; i < NumReflectionInfos; ++i) {
+    uint64_t ImageNameLength;
+    read(PARENT_READ_FD, &ImageNameLength, sizeof(ImageNameLength));
+    char c;
+    std::string ImageName;
+    for (uint64_t i = 0; i < ImageNameLength; ++i) {
+      read(PARENT_READ_FD, &c, 1);
+      ImageName.push_back(c);
     }
-    Address += ChunkSize;
-    vm_deallocate(childTask, DataOffset, SizeRead);
-  }
-  return 0;
-};
 
-static std::unique_ptr<MemoryReaderImpl> getMachMemoryReaderImpl() {
+    addr_t fieldmd_start;
+    addr_t fieldmd_size;
+    addr_t typeref_start;
+    addr_t typeref_size;
+    addr_t reflstr_start;
+    addr_t reflstr_size;
+    addr_t assocty_start;
+    addr_t assocty_size;
+
+    read(PARENT_READ_FD, &fieldmd_start, sizeof(fieldmd_start));
+    read(PARENT_READ_FD, &fieldmd_size, sizeof(fieldmd_size));
+    read(PARENT_READ_FD, &typeref_start, sizeof(typeref_start));
+    read(PARENT_READ_FD, &typeref_size, sizeof(typeref_size));
+    read(PARENT_READ_FD, &reflstr_start, sizeof(reflstr_start));
+    read(PARENT_READ_FD, &reflstr_size, sizeof(reflstr_size));
+    read(PARENT_READ_FD, &assocty_start, sizeof(assocty_start));
+    read(PARENT_READ_FD, &assocty_size, sizeof(assocty_size));
+
+    RemoteInfos.push_back({
+      ImageName,
+      {fieldmd_start, fieldmd_size},
+      {typeref_start, typeref_size},
+      {reflstr_start, reflstr_size},
+      {assocty_start, assocty_size},
+    });
+  }
+
+  std::vector<ReflectionInfo> Infos;
+  for (auto &RemoteInfo : RemoteInfos) {
+
+    auto buffer = (uint8_t *)malloc(RemoteInfo.TotalSize);
+
+    Reader.readBytes(RemoteInfo.StartAddress, buffer, RemoteInfo.TotalSize);
+
+    auto fieldmd_base = buffer + RemoteInfo.fieldmd.StartAddress - RemoteInfo.StartAddress;
+    auto typeref_base = buffer + RemoteInfo.typeref.StartAddress - RemoteInfo.StartAddress;
+    auto reflstr_base = buffer + RemoteInfo.reflstr.StartAddress - RemoteInfo.StartAddress;
+    auto assocty_base = buffer + RemoteInfo.assocty.StartAddress - RemoteInfo.StartAddress;
+    ReflectionInfo Info {
+      RemoteInfo.ImageName,
+      {fieldmd_base, fieldmd_base + RemoteInfo.fieldmd.Size},
+      {typeref_base, typeref_base + RemoteInfo.typeref.Size},
+      {reflstr_base, reflstr_base + RemoteInfo.reflstr.Size},
+      {assocty_base, assocty_base + RemoteInfo.assocty.Size},
+    };
+    Infos.push_back(Info);
+  }
+
+  return Infos;
+}
+
+template <typename StoredPointer>
+static std::unique_ptr<MemoryReaderImpl> getPipeMemoryReaderImpl() {
   auto Impl = std::unique_ptr<MemoryReaderImpl>(new MemoryReaderImpl());
-  Impl->getPointerSize = machGetPointerSize;
-  Impl->getSizeSize = machGetSizeSize;
-  Impl->readBytes = machReadBytes;
-  Impl->readInteger = machReadInteger;
-  Impl->getStringLength = machGetStringLength;
+  Impl->getPointerSize = pipeGetPointerSize;
+  Impl->getSizeSize = pipeGetSizeSize;
+  Impl->readBytes = pipeReadBytes;
+  Impl->readInteger = pipeReadInteger;
+  Impl->getStringLength = pipeGetStringLength<StoredPointer>;
+  Impl->getSymbolAddress = pipeGetSymbolAddress<StoredPointer>;
   return Impl;
 }
 
+addr_t receiveInstanceAddress() {
+  write(PARENT_WRITE_FD, REQUEST_INSTANCE_ADDRESS, 2);
+  addr_t InstanceAddress = 0;
+  read(PARENT_READ_FD, &InstanceAddress, sizeof(InstanceAddress));
+  return InstanceAddress;
+}
+
+uint8_t receivePointerSize() {
+  write(PARENT_WRITE_FD, REQUEST_POINTER_SIZE, 2);
+  uint8_t PointerSize;
+  read(PARENT_READ_FD, &PointerSize, sizeof(PointerSize));
+  return PointerSize;
+}
+
+void sendExitMessage() {
+  write(PARENT_WRITE_FD, REQUEST_EXIT, 2);
+}
+
+template <typename Runtime>
 static int doDumpHeapInstance(std::string BinaryFilename) {
-  auto childPort = createReceivePort();
-  mach_error_t error = task_set_bootstrap_port(mach_task_self(), childPort);
-  guardMachError(error, "task_set_bootstrap_port");
+  using StoredPointer = typename Runtime::StoredPointer;
+
+  if (pipe(to_child))
+    errorAndExit("Couldn't create pipes to child process");
+  if (pipe(from_child))
+    errorAndExit("Couldn't create pipes from child process");
 
   pid_t pid = fork();
   switch (pid) {
     case -1:
-      error = mach_port_deallocate(mach_task_self(), childPort);
-      guardMachError(error, "mach_port_deallocate");
+      errorAndExit("Couldn't fork child process");
       exit(EXIT_FAILURE);
     case 0: { // Child:
+      close(PARENT_WRITE_FD);
+      close(PARENT_READ_FD);
+      dup2(CHILD_READ_FD, STDIN_FILENO);
+      dup2(CHILD_WRITE_FD, STDOUT_FILENO);
       execv(BinaryFilename.c_str(), NULL);
       exit(EXIT_SUCCESS);
     }
     default: { // Parent
-      error = task_get_bootstrap_port(mach_task_self(), &bootstrap_port);
-      guardMachError(error, "reset task_get_bootstrap_port");
-      std::cerr << "Parent: Getting child's Mach port ..." << std::endl;
-      childTask = receivePort(childPort);
-      std::cerr << "Parent: Mach child task is: " << childTask << std::endl;
+      close(CHILD_READ_FD);
+      close(CHILD_WRITE_FD);
 
-      uint64_t numReflectionInfos = receive_uint64_t(childPort);
-      std::cout << "Parent: " << numReflectionInfos;
-      std::cout << " reflection info bundles" << std::endl;
+      MemoryReader Reader(getPipeMemoryReaderImpl<StoredPointer>());
+      ReflectionContext<External<Runtime>> RC(Reader);
 
-      MemoryReader Reader(getMachMemoryReaderImpl());
-      ReflectionContext<External<RuntimeTarget<8>>> RC(Reader);
+      uint8_t PointerSize = receivePointerSize();
+      if (PointerSize != Runtime::PointerSize)
+        errorAndExit("Child process had unexpected architecture");
 
-      for (uint64_t i = 0; i < numReflectionInfos; ++i) {
-        auto info = receiveReflectionInfo(Reader, childPort, childTask);
-        RC.addReflectionInfo(info);
-      }
+      addr_t instance = receiveInstanceAddress();
+      assert(instance);
+      std::cerr << "Parent: instance pointer in child address space: 0x";
+      std::cerr << std::hex << instance << std::endl;
 
-      addr_t isa = receive_uint64_t(childPort);
+      addr_t isa;
+      if (!Reader.readInteger(instance, &isa))
+        errorAndExit("Couldn't get heap object's metadata address");
 
-      std::cerr << "Parent: isa pointer in child address space: 0x";
+      for (auto &Info : receiveReflectionInfo(Reader))
+        RC.addReflectionInfo(Info);
+
+      std::cerr << "Parent: metadata pointer in child address space: 0x";
       std::cerr << std::hex << isa << std::endl;
 
       std::cerr << "Decoding type reference ..." << std::endl;
@@ -413,33 +444,13 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
         // TODO: Print field layout here.
         std::cout << std::endl;
       }
-
-      vm_offset_t address;
-      mach_msg_type_number_t size_read;
-      error = vm_read(childTask, isa, 256, &address, &size_read);
-
-      struct task_basic_info childTaskBasicInfo;
-      mach_msg_type_number_t size = TASK_BASIC_INFO_COUNT;
-      error = task_info(childTask, TASK_BASIC_INFO,
-                        (task_info_t)&childTaskBasicInfo, &size);
-
-      error = mach_port_deallocate(mach_task_self(), childPort);
-      guardMachError(error, "mach_port_deallocate");
     }
   }
 
-  kill(pid, SIGTERM);
-
-  error = task_set_bootstrap_port(mach_task_self(), bootstrap_port);
-  guardMachError(error, "reset task_set_bootstrap_port");
-
-  error = mach_port_deallocate(mach_task_self(), childPort);
-  guardMachError(error, "mach_port_deallocate");
+  sendExitMessage();
 
   return EXIT_SUCCESS;
 }
-
-#endif // __APPLE__
 
 int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Test\n");
@@ -447,14 +458,27 @@ int main(int argc, char *argv[]) {
   case ActionType::DumpReflectionSections:
     return doDumpReflectionSections(options::BinaryFilename,
                                     options::Architecture);
-  case ActionType::DumpHeapInstance:
-#if __APPLE__
-    return doDumpHeapInstance(options::BinaryFilename);
-#else
-    std::cerr << "Dumping heap instances not available on this platform";
-    std::cerr << std::endl;
-    return EXIT_FAILURE;
-#endif
+  case ActionType::DumpHeapInstance: {
+    StringRef arch = options::Architecture;
+    unsigned PointerSize = 0;
+    if (arch == "x86_64")
+      PointerSize = 8;
+    else if (arch == "i386")
+      PointerSize = 4;
+    else if (arch == "arm64")
+      PointerSize = 8;
+    else if (arch == "arm" || arch == "armv7" || arch == "armv7s")
+      PointerSize = 4;
+    else if (arch == "armv7k")
+      PointerSize = 4;
+    else
+      errorAndExit("Unsupported architecture");
+
+    if (PointerSize == 4)
+      return doDumpHeapInstance<External<RuntimeTarget<4>>>(options::BinaryFilename);
+    else
+      return doDumpHeapInstance<External<RuntimeTarget<8>>>(options::BinaryFilename);
+  }
   case ActionType::None:
     llvm::cl::PrintHelpMessage();
     return EXIT_FAILURE;

@@ -160,10 +160,7 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            StringRef ModuleName,
                                            ArrayRef<const char *> Args);
 
-static void reportCursorInfo(StringRef Filename,
-                             int64_t Offset,
-                             ArrayRef<const char *> Args,
-                             ResponseReceiver Rec);
+static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec);
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
@@ -704,10 +701,22 @@ handleSemanticRequest(RequestDict Req,
       return Rec(createErrorRequestFailed("semantic editor is disabled"));
 
   if (ReqUID == RequestCursorInfo) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+
     int64_t Offset;
-    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
-      return Rec(createErrorRequestInvalid("missing 'key.offset'"));
-    return reportCursorInfo(*SourceFile, Offset, Args, Rec);
+    if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
+      return Lang.getCursorInfo(
+          *SourceFile, Offset, Args,
+          [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
+    }
+    if (auto USR = Req.getString(KeyUSR)) {
+      return Lang.getCursorInfoFromUSR(
+          *SourceFile, *USR, Args,
+          [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
+    }
+
+    return Rec(createErrorRequestInvalid(
+        "either 'key.offset' or 'key.usr' is required"));
   }
 
   if (ReqUID == RequestRelatedIdents) {
@@ -1249,65 +1258,60 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
 // ReportCursorInfo
 //===----------------------------------------------------------------------===//
 
-static void reportCursorInfo(StringRef Filename,
-                             int64_t Offset,
-                             ArrayRef<const char *> Args,
-                             ResponseReceiver Rec) {
-  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getCursorInfo(Filename, Offset, Args, [Rec](const CursorInfo &Info) {
-    if (Info.IsCancelled)
-      return Rec(createErrorRequestCancelled());
+static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
 
-    ResponseBuilder RespBuilder;
-    if (Info.Kind.isInvalid())
-      return Rec(RespBuilder.createResponse());
+  if (Info.IsCancelled)
+    return Rec(createErrorRequestCancelled());
 
-    auto Elem = RespBuilder.getDictionary();
-    Elem.set(KeyKind, Info.Kind);
-    Elem.set(KeyName, Info.Name);
-    if (!Info.USR.empty())
-      Elem.set(KeyUSR, Info.USR);
-    if (!Info.TypeName.empty())
-      Elem.set(KeyTypeName, Info.TypeName);
-    if (!Info.DocComment.empty())
-      Elem.set(KeyDocFullAsXML, Info.DocComment);
-    if (!Info.AnnotatedDeclaration.empty())
-      Elem.set(KeyAnnotatedDecl, Info.AnnotatedDeclaration);
-    if (!Info.FullyAnnotatedDeclaration.empty())
-      Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDeclaration);
-    if (!Info.ModuleName.empty())
-      Elem.set(KeyModuleName, Info.ModuleName);
-    if (!Info.GroupName.empty())
-      Elem.set(KeyGroupName, Info.GroupName);
-    if (!Info.ModuleInterfaceName.empty())
-      Elem.set(KeyModuleInterfaceName, Info.ModuleInterfaceName);
-    if (Info.DeclarationLoc.hasValue()) {
-      Elem.set(KeyOffset, Info.DeclarationLoc.getValue().first);
-      Elem.set(KeyLength, Info.DeclarationLoc.getValue().second);
-      if (!Info.Filename.empty())
-        Elem.set(KeyFilePath, Info.Filename);
-    }
-    if (!Info.OverrideUSRs.empty()) {
-      auto Overrides = Elem.setArray(KeyOverrides);
-      for (auto USR : Info.OverrideUSRs) {
-        auto Override = Overrides.appendDictionary();
-        Override.set(KeyUSR, USR);
-      }
-    }
-    if (!Info.AnnotatedRelatedDeclarations.empty()) {
-      auto RelDecls = Elem.setArray(KeyRelatedDecls);
-      for (auto AnnotDecl : Info.AnnotatedRelatedDeclarations) {
-        auto RelDecl = RelDecls.appendDictionary();
-        RelDecl.set(KeyAnnotatedDecl, AnnotDecl);
-      }
-    }
-    if (Info.IsSystem)
-      Elem.setBool(KeyIsSystem, true);
-    if (!Info.TypeInterface.empty())
-      Elem.set(KeyTypeInterface, Info.TypeInterface);
-
+  ResponseBuilder RespBuilder;
+  if (Info.Kind.isInvalid())
     return Rec(RespBuilder.createResponse());
-  });
+
+  auto Elem = RespBuilder.getDictionary();
+  Elem.set(KeyKind, Info.Kind);
+  Elem.set(KeyName, Info.Name);
+  if (!Info.USR.empty())
+    Elem.set(KeyUSR, Info.USR);
+  if (!Info.TypeName.empty())
+    Elem.set(KeyTypeName, Info.TypeName);
+  if (!Info.DocComment.empty())
+    Elem.set(KeyDocFullAsXML, Info.DocComment);
+  if (!Info.AnnotatedDeclaration.empty())
+    Elem.set(KeyAnnotatedDecl, Info.AnnotatedDeclaration);
+  if (!Info.FullyAnnotatedDeclaration.empty())
+    Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDeclaration);
+  if (!Info.ModuleName.empty())
+    Elem.set(KeyModuleName, Info.ModuleName);
+  if (!Info.GroupName.empty())
+    Elem.set(KeyGroupName, Info.GroupName);
+  if (!Info.ModuleInterfaceName.empty())
+    Elem.set(KeyModuleInterfaceName, Info.ModuleInterfaceName);
+  if (Info.DeclarationLoc.hasValue()) {
+    Elem.set(KeyOffset, Info.DeclarationLoc.getValue().first);
+    Elem.set(KeyLength, Info.DeclarationLoc.getValue().second);
+    if (!Info.Filename.empty())
+      Elem.set(KeyFilePath, Info.Filename);
+  }
+  if (!Info.OverrideUSRs.empty()) {
+    auto Overrides = Elem.setArray(KeyOverrides);
+    for (auto USR : Info.OverrideUSRs) {
+      auto Override = Overrides.appendDictionary();
+      Override.set(KeyUSR, USR);
+    }
+  }
+  if (!Info.AnnotatedRelatedDeclarations.empty()) {
+    auto RelDecls = Elem.setArray(KeyRelatedDecls);
+    for (auto AnnotDecl : Info.AnnotatedRelatedDeclarations) {
+      auto RelDecl = RelDecls.appendDictionary();
+      RelDecl.set(KeyAnnotatedDecl, AnnotDecl);
+    }
+  }
+  if (Info.IsSystem)
+    Elem.setBool(KeyIsSystem, true);
+  if (!Info.TypeInterface.empty())
+    Elem.set(KeyTypeInterface, Info.TypeInterface);
+
+  return Rec(RespBuilder.createResponse());
 }
 
 //===----------------------------------------------------------------------===//

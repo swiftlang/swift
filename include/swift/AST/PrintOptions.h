@@ -50,8 +50,6 @@ struct ArchetypeTransformContext {
   StringRef transform(StringRef Input);
 
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
-  bool shouldOpenExtension;
-  bool shouldCloseExtension;
 
   ~ArchetypeTransformContext();
 private:
@@ -59,21 +57,30 @@ private:
   Implementation &Impl;
 };
 
+typedef std::pair<ExtensionDecl*, bool> ExtensionAndIsSynthesized;
+typedef llvm::function_ref<void(ArrayRef<ExtensionAndIsSynthesized>)>
+  ExtensionGroupOperation;
+
 class SynthesizedExtensionAnalyzer {
   struct Implementation;
   Implementation &Impl;
-
 public:
   SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
                                PrintOptions Options,
                                bool IncludeUnconditional = true);
   ~SynthesizedExtensionAnalyzer();
-  void forEachSynthesizedExtension(
-    llvm::function_ref<void(ExtensionDecl*)> Fn);
-  void forEachSynthesizedExtensionMergeGroup(
-    llvm::function_ref<void(ArrayRef<ExtensionDecl*>)> Fn);
+
+  enum class MergeGroupKind : char {
+    All,
+    MergeableWithTypeDef,
+    UnmergeableWithTypeDef,
+  };
+
+  void forEachExtensionMergeGroup(MergeGroupKind Kind,
+                                  ExtensionGroupOperation Fn);
   bool isInSynthesizedExtension(const ValueDecl *VD);
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
+  bool hasMergeGroup(MergeGroupKind Kind);
 };
 
 /// Options for printing AST nodes.
@@ -268,6 +275,12 @@ struct PrintOptions {
   /// \brief The information for converting archetypes to specialized types.
   std::shared_ptr<ArchetypeTransformContext> TransformContext;
 
+  struct BracketOptions {
+    bool shouldOpenExtension = true;
+    bool shouldCloseExtension = true;
+    bool shouldCloseNominal = true;
+  } BracketOptions;
+
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
     PrintOptions result;
@@ -391,6 +404,7 @@ struct PrintOptions {
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.ExcludeAttrList.push_back(DAK_Swift3Migration);
+    PO.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
     PO.SkipPrivateStdlibDecls = true;
     PO.ExplodeEnumCaseDecls = true;
     return PO;

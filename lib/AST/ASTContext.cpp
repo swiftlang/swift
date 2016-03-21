@@ -329,6 +329,67 @@ struct ASTContext::Implementation {
   /// checking unintended Objective-C overrides.
   std::vector<AbstractFunctionDecl *> ObjCMethods;
 
+  /// An entry in the foreign-representable cache.
+  class ForeignRepresentableCacheEntry {
+    /// The low three bits store a ForeignRepresentableKind.
+    ///
+    /// When the ForeignRepresentableKind == None, the upper bits are
+    /// the generation count at which this negative result was last
+    /// checked. Otherwise, masking off the lower bits produces a
+    /// ProtocolConformance* that describes the conformance.
+    uintptr_t Storage;
+
+  public:
+    /// Retrieve a cache entry for a non-foreign-representable type.
+    static ForeignRepresentableCacheEntry forNone(unsigned generation) {
+      ForeignRepresentableCacheEntry result;
+      result.Storage = static_cast<uintptr_t>(generation) << 3;
+      result.Storage |= static_cast<uintptr_t>(ForeignRepresentableKind::None);
+      return result;
+    }
+
+    // Retrieve a cache entry for a trivially representable type.
+    static ForeignRepresentableCacheEntry forTrivial() {
+      ForeignRepresentableCacheEntry result;
+      result.Storage = reinterpret_cast<uintptr_t>(nullptr);
+      result.Storage |=
+          static_cast<uintptr_t>(ForeignRepresentableKind::Trivial);
+      return result;
+    }
+
+    // Retrieve a cache entry for a bridged representable type.
+    static ForeignRepresentableCacheEntry
+    forBridged(ProtocolConformance *conformance) {
+      ForeignRepresentableCacheEntry result;
+      result.Storage = reinterpret_cast<uintptr_t>(conformance);
+      result.Storage
+        |= static_cast<uintptr_t>(ForeignRepresentableKind::Bridged);
+      return result;
+    }
+
+    /// Retrieve the foreign representable kind.
+    ForeignRepresentableKind getKind() const {
+      return static_cast<ForeignRepresentableKind>(Storage & 0x07);
+    }
+
+    /// Retrieve the generation for a non-representable type.
+    unsigned getGeneration() const {
+      assert(getKind() == ForeignRepresentableKind::None);
+      return static_cast<unsigned>(Storage >> 3);
+    }
+
+    /// Retrieve the protocol conformance that makes it representable.
+    ProtocolConformance *getConformance() const {
+      assert(getKind() != ForeignRepresentableKind::None);
+      return reinterpret_cast<ProtocolConformance *>(Storage & ~0x07);
+    }
+  };
+
+  /// A cache of information about whether particular nominal types
+  /// are representable in a foreign language.
+  llvm::DenseMap<NominalTypeDecl *, ForeignRepresentableCacheEntry>
+    ForeignRepresentableCache;
+
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
   /// \brief The permanent arena.
@@ -474,6 +535,10 @@ void ASTContext::setLazyResolver(LazyResolver *resolver) {
   } else {
     assert(Impl.Resolver != nullptr && "no resolver to remove");
     Impl.Resolver = resolver;
+
+    // DelayedConformanceDiags callbacks contain pointers to the TypeChecker, so
+    // they must be removed when the TypeChecker goes away.
+    Impl.DelayedConformanceDiags.clear();
   }
 }
 
@@ -3556,6 +3621,176 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
   initialize(C, baseName, names);
 }
 
+/// Find the implementation of the named type in the given module.
+static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx, 
+                                                   StringRef name,
+                                                   Module *module) {
+  // Find all of the declarations with this name in the Swift module.
+  SmallVector<ValueDecl *, 1> results;
+  auto identifier = ctx.getIdentifier(name);
+  module->lookupValue({ }, identifier, NLKind::UnqualifiedLookup, results);
+  for (auto result : results) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(result))
+      return nominal;
+
+    // Look through typealiases.
+    if (auto typealias = dyn_cast<TypeAliasDecl>(result)) {
+      if (auto resolver = ctx.getLazyResolver())
+        resolver->resolveDeclSignature(typealias);
+      return typealias->getUnderlyingType()->getAnyNominal();
+    }
+  }
+
+  return nullptr;
+}
+
+std::pair<ForeignRepresentableKind, ProtocolConformance *>
+ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
+                                    ForeignLanguage language,
+                                    DeclContext *dc) {
+  using CacheEntry = Implementation::ForeignRepresentableCacheEntry;
+
+  if (Impl.ForeignRepresentableCache.empty()) {
+    // Local function to add a type with the given name and module as
+    // trivially-representable.
+    auto addTrivial = [&](StringRef name, Module *module) {
+      if (auto type = findUnderlyingTypeInModule(*this, name, module)) {
+        Impl.ForeignRepresentableCache.insert({type, CacheEntry::forTrivial()});
+      }
+    };
+
+    // Pre-populate the foreign-representable cache with known types.
+    if (auto stdlib = getStdlibModule()) {
+      addTrivial("OpaquePointer", stdlib);
+
+      // Builtin types
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
+      addTrivial(#SWIFT_TYPE_NAME, stdlib);
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+#define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,                     \
+                    NATIVE_MODULE, NATIVE_TYPE, OPTIONAL_IS_BRIDGED)  \
+      assert(StringRef(#NATIVE_MODULE) == "Swift");                   \
+      addTrivial(#NATIVE_TYPE, stdlib);
+#include "swift/SIL/BridgedTypes.def"
+    }
+
+    if (auto darwin = getLoadedModule(getIdentifier("Darwin"))) {
+      // Note: DarwinBoolean is odd because it's bridged to Bool in APIs,
+      // but can also be trivially bridged.
+      addTrivial("DarwinBoolean", darwin);
+    }
+
+    if (auto objectiveC = getLoadedModule(getIdentifier("ObjectiveC"))) {
+      addTrivial("Selector", objectiveC);
+
+      // Note: ObjCBool is odd because it's bridged to Bool in APIs,
+      // but can also be trivially bridged.
+      addTrivial("ObjCBool", objectiveC);
+
+      addTrivial(getSwiftId(KnownFoundationEntity::NSZone).str(), objectiveC);
+    }
+
+    if (auto coreGraphics = getLoadedModule(getIdentifier("CoreGraphics"))) {
+      addTrivial("CGFloat", coreGraphics);
+    }
+
+    if (auto foundation = getLoadedModule(Id_Foundation)) {
+      // FIXME: Why do we care?
+      addTrivial(getSwiftId(KnownFoundationEntity::NSErrorPointer).str(),
+                 foundation);
+    }
+
+    // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
+    // FIXME: Layering violation to use the ClangImporter's define.
+    const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
+    if (auto simd = getLoadedModule(Id_simd)) {
+#define MAP_SIMD_TYPE(BASENAME, __)                                     \
+      {                                                                 \
+        char name[] = #BASENAME "0";                                    \
+        for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) { \
+          *(std::end(name) - 2) = '0' + i;                              \
+          addTrivial(name, simd);                                       \
+        }                                                               \
+      }
+#include "swift/ClangImporter/SIMDMappedTypes.def"      
+    }
+  }
+
+  // Determine whether we know anything about this nominal type
+  // yet. If we've never seen this nominal type before, or if we have
+  // an out-of-date negative cached value, we'll have to go looking.
+  auto known = Impl.ForeignRepresentableCache.find(nominal);
+  if (known == Impl.ForeignRepresentableCache.end() ||
+      (known->second.getKind() == ForeignRepresentableKind::None &&
+       known->second.getGeneration() < CurrentGeneration)) {
+    Optional<CacheEntry> result;
+
+    // Look for a conformance to _ObjectiveCBridgeable.
+    //
+    // FIXME: We're implicitly depending on the fact that lookupConformance
+    // is global, ignoring the module we provide for it.
+    if (auto objcBridgeable
+          = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
+      if (auto conformance
+            = dc->getParentModule()->lookupConformance(
+                nominal->getDeclaredType(), objcBridgeable,
+                getLazyResolver())) {
+        result = CacheEntry::forBridged(conformance->getConcrete());
+      }
+    }
+
+    // If we didn't find anything, mark the result as "None".
+    if (!result)
+      result = CacheEntry::forNone(CurrentGeneration);
+    
+    // Cache the result.
+    known = Impl.ForeignRepresentableCache.insert({ nominal, *result }).first;
+  }
+
+  // Map a cache entry to a result for this specific 
+  auto entry = known->second;
+  if (entry.getKind() == ForeignRepresentableKind::None)
+    return { ForeignRepresentableKind::None, nullptr };
+
+  // Extract the protocol conformance.
+  auto conformance = entry.getConformance();
+
+  // If the conformance is not visible, fail.
+  if (conformance && !conformance->isVisibleFrom(dc))
+    return { ForeignRepresentableKind::None, nullptr };
+
+  // Language-specific filtering.
+  switch (language) {
+  case ForeignLanguage::C:
+    // Ignore _ObjectiveCBridgeable conformances in C.
+    if (conformance &&
+        conformance->getProtocol()->isSpecificProtocol(
+          KnownProtocolKind::ObjectiveCBridgeable))
+      return { ForeignRepresentableKind::None, nullptr };
+
+    return { entry.getKind(), conformance };
+
+  case ForeignLanguage::ObjectiveC:
+    return { entry.getKind(), conformance };
+  }
+}
+
+bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
+     NominalTypeDecl *nominal) const {
+  return (nominal == getBoolDecl() ||
+          nominal == getIntDecl() ||
+          nominal == getUIntDecl() ||
+          nominal == getFloatDecl() ||
+          nominal == getDoubleDecl() ||
+          nominal == getArrayDecl() ||
+          nominal == getDictionaryDecl() ||
+          nominal == getSetDecl() ||
+          nominal == getStringDecl() ||
+          // Weird one-off case where CGFloat is bridged to NSNumber.
+          nominal->getName() == Id_CGFloat);
+}
+
 Optional<Type>
 ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
                              LazyResolver *resolver) const {
@@ -3564,18 +3799,14 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 
   // Whitelist certain types even if Foundation is not imported, to ensure
   // that casts from AnyObject to one of these types are not optimized away.
+  //
+  // Outside of these standard library types to which Foundation
+  // bridges, an _ObjectiveCBridgeable conformance can only be added
+  // in the same module where the Swift type itself is defined, so the
+  // optimizer will be guaranteed to see the conformance if it exists.
   bool knownBridgedToObjC = false;
-  if (auto ntd = type->getAnyNominal()) {
-    knownBridgedToObjC = (ntd == getBoolDecl() ||
-                          ntd == getIntDecl() ||
-                          ntd == getUIntDecl() ||
-                          ntd == getFloatDecl() ||
-                          ntd == getDoubleDecl() ||
-                          ntd == getArrayDecl() ||
-                          ntd == getDictionaryDecl() ||
-                          ntd == getSetDecl() ||
-                          ntd == getStringDecl());
-  }
+  if (auto ntd = type->getAnyNominal())
+    knownBridgedToObjC = isStandardLibraryTypeBridgedInFoundation(ntd);
 
   // If the type is generic, check whether its generic arguments are also
   // bridged to Objective-C.
@@ -3605,17 +3836,7 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   // Check whether the type conforms to _BridgedToObjectiveC.
   auto conformance
     = dc->getParentModule()->lookupConformance(type, bridgedProto, resolver);
-
-  switch (conformance.getInt()) {
-  case ConformanceKind::Conforms:
-    // The type conforms, and we know the conformance, so we can look up the
-    // bridged type below.
-    break;
-  case ConformanceKind::UncheckedConforms:
-    // The type conforms, but we don't have a conformance yet. Return
-    // Optional(nullptr) to signal this.
-    return Type();
-  case ConformanceKind::DoesNotConform:
+  if (!conformance) {
     // If we haven't imported Foundation but this is a whitelisted type,
     // behave as above.
     if (knownBridgedToObjC)
@@ -3625,7 +3846,7 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 
   // Find the type we bridge to.
   return ProtocolConformance::getTypeWitnessByName(type,
-                                               conformance.getPointer(),
+                                               conformance->getConcrete(),
                                                getIdentifier("_ObjectiveCType"),
                                                resolver);
 }

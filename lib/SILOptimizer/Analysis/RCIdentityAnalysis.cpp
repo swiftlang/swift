@@ -34,6 +34,14 @@ static bool isNoPayloadEnum(SILValue V) {
   return !EI->hasOperand();
 }
 
+/// RC identity is more than a guarantee that references refer to the same
+/// object. It also means that reference counting operations on those references
+/// have the same semantics. If the types on either side of a cast do not have
+/// equivalent reference counting semantics, then the source and destination
+/// values are not RC identical. For example, unchecked_addr_cast does not
+/// necessarily preserve RC identity because it may cast from a
+/// reference-counted type to a non-reference counted type, or from a larger to
+/// a smaller struct with fewer references.
 static bool isRCIdentityPreservingCast(ValueKind Kind) {
   switch (Kind) {
   case ValueKind::UpcastInst:

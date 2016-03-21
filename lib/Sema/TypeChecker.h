@@ -423,7 +423,12 @@ enum class ConformanceCheckFlags {
   /// Whether we will be using the conformance in the AST.
   ///
   /// This implies that the conformance will have to be complete.
-  Used = 0x02
+  Used = 0x02,
+  /// Whether to suppress dependency tracking entirely.
+  ///
+  /// FIXME: This deals with some oddities with the
+  /// _ObjectiveCBridgeable conformances.
+  SuppressDependencyTracking = 0x04,
 };
 
 /// Options that control protocol conformance checking.
@@ -527,21 +532,11 @@ private:
   /// The \c Swift.UnsafeMutablePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
 
-  /// A set of types that can be trivially mapped to Objective-C types.
-  llvm::DenseSet<CanType> ObjCMappedTypes;
-
   /// A set of types that can be mapped to C integer types.
   llvm::DenseSet<CanType> CIntegerTypes;
 
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
-
-  /// A set of types that are representable in Objective-C, but require
-  /// non-trivial bridging.
-  ///
-  /// The value of the map is a flag indicating whether the bridged
-  /// type can be optional.
-  llvm::DenseMap<CanType, bool> ObjCRepresentableTypes;
 
   Module *StdlibModule = nullptr;
 
@@ -1469,6 +1464,9 @@ public:
                           ProtocolConformance **Conformance = nullptr,
                           SourceLoc ComplainLoc = SourceLoc());
 
+  /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+  void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
+
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
   ///
@@ -1637,8 +1635,6 @@ public:
                              Optional<ForeignErrorConvention> &errorConvention);
   bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
   bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
-  bool isTriviallyRepresentableInObjC(const DeclContext *DC, Type T);
-  bool isRepresentableInObjC(const DeclContext *DC, Type T);
 
   void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
                                           Type T, SourceRange TypeRange);

@@ -384,6 +384,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
           getBufferForFilename(SourceFile)->getBuffer(), SourceFile);
   }
 
+  // FIXME: we should detect if offset is required but not set.
   unsigned ByteOffset = Opts.Offset;
   if (Opts.Line != 0) {
     ByteOffset = resolveFromLineCol(Opts.Line, Opts.Col, SourceBuf.get());
@@ -486,7 +487,11 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   case SourceKitRequest::CursorInfo:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCursorInfo);
-    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    if (!Opts.USR.empty()) {
+      sourcekitd_request_dictionary_set_string(Req, KeyUSR, Opts.USR.c_str());
+    } else {
+      sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    }
     break;
 
   case SourceKitRequest::RelatedIdents:

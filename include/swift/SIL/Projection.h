@@ -772,6 +772,8 @@ public:
   NullablePtr<SILInstruction> createProjection(SILBuilder &B, SILLocation Loc,
                                                SILValue Arg) const;
 
+  std::string getNameEncoding(const ProjectionTree &PT) const;
+
   SILInstruction *
   createAggregate(SILBuilder &B, SILLocation Loc,
                   ArrayRef<SILValue> Args) const;
@@ -832,6 +834,10 @@ public:
   ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
                  SILType BaseTy, ProjectionTreeNode::LivenessKind Kind, 
                  llvm::DenseSet<SILInstruction*> Insts);
+  /// Construct an uninitialized projection tree, which can then be
+  /// initialized by initializeWithExistingTree.
+  ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator) 
+    : Mod(Mod), Allocator(Allocator) {}
   ~ProjectionTree();
   ProjectionTree(const ProjectionTree &) = delete;
   ProjectionTree(ProjectionTree &&) = default;
@@ -841,6 +847,13 @@ public:
   /// Compute liveness and use information in this projection tree using Base.
   /// All debug instructions (debug_value, debug_value_addr) are ignored.
   void computeUsesAndLiveness(SILValue Base);
+
+  /// Return a name encoding of the projection tree.
+  std::string getNameEncoding() const; 
+
+  /// Initialize an empty projection tree with an existing, computed projection
+  /// tree.
+  void initializeWithExistingTree(const ProjectionTree &PT);
 
   /// Create a root SILValue iout of the given leaf node values by walking on
   /// the projection tree.

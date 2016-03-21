@@ -1770,37 +1770,6 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
   return result;
 }
 
-namespace {
-  /// A CRTP type visitor for deciding whether the metatype for a type
-  /// has trivial representation.
-  struct HasTrivialMetatype : CanTypeVisitor<HasTrivialMetatype, bool> {
-    /// Class metatypes have non-trivial representation due to the
-    /// possibility of subclassing.
-    bool visitClassType(CanClassType type) {
-      return false;
-    }
-    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return false;
-    }
-
-    /// Archetype metatypes have non-trivial representation in case
-    /// they instantiate to a class metatype.
-    bool visitArchetypeType(CanArchetypeType type) {
-      return false;
-    }
-    
-    /// All levels of class metatypes support subtyping.
-    bool visitMetatypeType(CanMetatypeType type) {
-      return visit(type.getInstanceType());
-    }
-
-    /// Everything else is trivial.
-    bool visitType(CanType type) {
-      return false;
-    }
-  };
-}
-
 /// Emit a metatype value for a known type.
 void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                             Explosion &explosion) {
@@ -5051,7 +5020,9 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
     return;
   }
 
-  auto *defaultWitnesses = SILMod->lookUpDefaultWitnessTable(protocol);
+  SILDefaultWitnessTable *defaultWitnesses = nullptr;
+  if (!protocol->hasFixedLayout())
+    defaultWitnesses = SILMod->lookUpDefaultWitnessTable(protocol);
   ProtocolDescriptorBuilder builder(*this, protocol, defaultWitnesses);
   builder.layout();
 

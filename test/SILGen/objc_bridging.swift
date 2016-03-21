@@ -1,11 +1,12 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-silgen-test-overlays
-
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
+// RUN: %target-swift-frontend -emit-module -o %t -sdk %S/Inputs -I %S/../Inputs/ObjCBridging %S/../Inputs/ObjCBridging/Appliances.swift -I %t
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../Inputs/ObjCBridging) -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
 
 // REQUIRES: objc_interop
 
 import Foundation
+import Appliances
 
 func getDescription(o: NSObject) -> String {
   return o.description
@@ -337,9 +338,10 @@ class Bas : NSObject {
   // CHECK: bb0([[NSARRAY:%[0-9]+]] : $NSArray, [[SELF:%[0-9]+]] : $Bas):
   // CHECK:   strong_retain [[NSARRAY]] : $NSArray
   // CHECK:   strong_retain [[SELF]] : $Bas
-  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray{{.*}} : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
+  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
   // CHECK-NEXT: [[OPT_NSARRAY:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[NSARRAY]] : $NSArray
-  // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
+  // CHECK-NEXT: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
+  // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]], [[ARRAY_META]])
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   strong_release [[SELF]] : $Bas
@@ -440,4 +442,44 @@ func bools(x: Bool) -> (Bool, Bool) {
   return (getBOOL(), getBool())
 }
 
+// CHECK-LABEL: sil hidden @_TF13objc_bridging9getFridge
+// CHECK: bb0([[HOME:%[0-9]+]] : $APPHouse):
+func getFridge(home: APPHouse) -> Refrigerator {
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
+  // CHECK: [[OBJC_RESULT:%[0-9]+]] = apply [[GETTER]]([[HOME]])
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TZFV10Appliances12Refrigerator36_unconditionallyBridgeFromObjectiveC
+  // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[BRIDGE_FN]]([[OBJC_RESULT]], [[REFRIGERATOR_META]])
+  // CHECK: strong_release [[HOME]] : $APPHouse
+  // CHECK: return [[RESULT]] : $Refrigerator
+  return home.fridge
+}
 
+// CHECK-LABEL: sil hidden @_TF13objc_bridging16updateFridgeTemp
+// CHECK: bb0([[HOME:%[0-9]+]] : $APPHouse, [[DELTA:%[0-9]+]] : $Double):
+func updateFridgeTemp(home: APPHouse, delta: Double) {
+  // +=
+  // CHECK: [[PLUS_EQ:%[0-9]+]] = function_ref @_TZFsoi2peFTRSdSd_T_
+
+  // Temporary fridge
+  // CHECK: [[TEMP_FRIDGE:%[0-9]+]]  = alloc_stack $Refrigerator
+
+  // Get operation
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
+  // CHECK: [[OBJC_FRIDGE:%[0-9]+]] = apply [[GETTER]]([[HOME]])
+  // CHECK: [[BRIDGE_FROM_FN:%[0-9]+]] = function_ref @_TZFV10Appliances12Refrigerator36_unconditionallyBridgeFromObjectiveC
+  // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
+  // CHECK: [[FRIDGE:%[0-9]+]] = apply [[BRIDGE_FROM_FN]]([[OBJC_FRIDGE]], [[REFRIGERATOR_META]])
+
+  // Addition
+  // CHECK: [[TEMP:%[0-9]+]] = struct_element_addr [[TEMP_FRIDGE]] : $*Refrigerator, #Refrigerator.temperature
+  // CHECK: apply [[PLUS_EQ]]([[TEMP]], [[DELTA]])
+
+  // Setter
+  // CHECK: [[FRIDGE:%[0-9]+]] = load [[TEMP_FRIDGE]] : $*Refrigerator
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [volatile] [[HOME]] : $APPHouse, #APPHouse.fridge!setter.1.foreign
+  // CHECK: [[BRIDGE_TO_FN:%[0-9]+]] = function_ref @_TFV10Appliances12Refrigerator19_bridgeToObjectiveCfT_CSo15APPRefrigerator
+  // CHECK: [[OBJC_ARG:%[0-9]+]] = apply [[BRIDGE_TO_FN]]([[FRIDGE]])
+  // CHECK: apply [[SETTER]]([[OBJC_ARG]], [[HOME]])
+  home.fridge.temperature += delta
+}

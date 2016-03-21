@@ -34,20 +34,14 @@ var x: Int
 // CHECK1-NEXT: s:Si
 // CHECK1-NEXT: Int.Type
 // CHECK1-NEXT: Swift{{$}}
-// CHECK1-NEXT: <Group>Math</Group>
+// CHECK1-NEXT: <Group>Math/Integers</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
 // CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps13SignedInteger">SignedInteger</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>
 
 // RUN: %sourcekitd-test -req=module-groups -module Swift | FileCheck -check-prefix=GROUP1 %s
 // GROUP1: <GROUPS>
-// GROUP1-DAG: Assert
-// GROUP1-DAG: String
-// GROUP1-DAG: Collection
-// GROUP1-DAG: Collection/Lazy Views
-// GROUP1-DAG: Bool
-// GROUP1-DAG: Math
-// GROUP1-DAG: Misc
+// GROUP1-NOT: <NULL>
 // GROUP1: <\GROUPS>
 
 // RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Bool > %t.Bool.response

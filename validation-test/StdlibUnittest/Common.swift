@@ -240,12 +240,12 @@ PassThroughStdoutStderr.test("hasNewline") {
   print("stderr third", to: &stderr)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.hasNewline
-// CHECK-DAG: out>>> stdout first
-// CHECK-DAG: out>>> stdout second
-// CHECK-DAG: out>>> stdout third
-// CHECK-DAG: err>>> stderr first
-// CHECK-DAG: err>>> stderr second
-// CHECK-DAG: err>>> stderr third
+// CHECK-DAG: stdout>>> stdout first
+// CHECK-DAG: stdout>>> stdout second
+// CHECK-DAG: stdout>>> stdout third
+// CHECK-DAG: stderr>>> stderr first
+// CHECK-DAG: stderr>>> stderr second
+// CHECK-DAG: stderr>>> stderr third
 // CHECK: [       OK ] PassThroughStdoutStderr.hasNewline
 
 PassThroughStdoutStderr.test("noNewline") {
@@ -259,12 +259,12 @@ PassThroughStdoutStderr.test("noNewline") {
   print("stderr third", terminator: "", to: &stderr)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.noNewline
-// CHECK-DAG: out>>> stdout first
-// CHECK-DAG: out>>> stdout second
-// CHECK-DAG: out>>> stdout third
-// CHECK-DAG: err>>> stderr first
-// CHECK-DAG: err>>> stderr second
-// CHECK-DAG: err>>> stderr third
+// CHECK-DAG: stdout>>> stdout first
+// CHECK-DAG: stdout>>> stdout second
+// CHECK-DAG: stdout>>> stdout third
+// CHECK-DAG: stderr>>> stderr first
+// CHECK-DAG: stderr>>> stderr second
+// CHECK-DAG: stderr>>> stderr third
 // CHECK: [       OK ] PassThroughStdoutStderr.noNewline
 // CHECK: PassThroughStdoutStderr: All tests passed
 
@@ -282,8 +282,8 @@ TestSuiteWithSetUpPasses.setUp {
   print("setUp")
 }
 // CHECK: [ RUN      ] TestSuiteWithSetUpPasses.passes
-// CHECK: out>>> setUp
-// CHECK: out>>> test body
+// CHECK: stdout>>> setUp
+// CHECK: stdout>>> test body
 // CHECK: [       OK ] TestSuiteWithSetUpPasses.passes
 // CHECK: TestSuiteWithSetUpPasses: All tests passed
 
@@ -298,9 +298,9 @@ TestSuiteWithSetUpFails.setUp {
   expectEqual(1, 2)
 }
 // CHECK: [ RUN      ] TestSuiteWithSetUpFails.fails
-// CHECK: out>>> setUp
-// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> test body
+// CHECK: stdout>>> setUp
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> test body
 // CHECK: [     FAIL ] TestSuiteWithSetUpFails.fails
 // CHECK: TestSuiteWithSetUpFails: Some tests failed, aborting
 
@@ -314,8 +314,8 @@ TestSuiteWithTearDownPasses.tearDown {
   print("tearDown")
 }
 // CHECK: [ RUN      ] TestSuiteWithTearDownPasses.passes
-// CHECK: out>>> test body
-// CHECK: out>>> tearDown
+// CHECK: stdout>>> test body
+// CHECK: stdout>>> tearDown
 // CHECK: [       OK ] TestSuiteWithTearDownPasses.passes
 
 var TestSuiteWithTearDownFails = TestSuite("TestSuiteWithTearDownFails")
@@ -330,9 +330,9 @@ TestSuiteWithTearDownFails.tearDown {
 }
 // CHECK: TestSuiteWithTearDownPasses: All tests passed
 // CHECK: [ RUN      ] TestSuiteWithTearDownFails.fails
-// CHECK: out>>> test body
-// CHECK: out>>> tearDown
-// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
+// CHECK: stdout>>> test body
+// CHECK: stdout>>> tearDown
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
 // CHECK: [     FAIL ] TestSuiteWithTearDownFails.fails
 // CHECK: TestSuiteWithTearDownFails: Some tests failed, aborting
 
@@ -349,9 +349,9 @@ AssertionsTestSuite.test("expectFailure/Pass") {
   }
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/Pass
-// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> expected: 1 (of type Swift.Int)
-// CHECK: out>>> actual: 2 (of type Swift.Int)
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> expected: 1 (of type Swift.Int)
+// CHECK: stdout>>> actual: 2 (of type Swift.Int)
 // CHECK: [       OK ] Assertions.expectFailure/Pass
 
 AssertionsTestSuite.test("expectFailure/UXPass")
@@ -363,9 +363,9 @@ AssertionsTestSuite.test("expectFailure/UXPass")
   }
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/UXPass ({{X}}FAIL: [Custom(reason: test)])
-// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> expected: 1 (of type Swift.Int)
-// CHECK: out>>> actual: 2 (of type Swift.Int)
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> expected: 1 (of type Swift.Int)
+// CHECK: stdout>>> actual: 2 (of type Swift.Int)
 // CHECK: [   UXPASS ] Assertions.expectFailure/UXPass
 
 AssertionsTestSuite.test("expectFailure/Fail") {
@@ -374,9 +374,9 @@ AssertionsTestSuite.test("expectFailure/Fail") {
   }
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/Fail
-// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> expected: true
-// CHECK: out>>> running `body` should produce an expected failure
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> expected: true
+// CHECK: stdout>>> running `body` should produce an expected failure
 // CHECK: [     FAIL ] Assertions.expectFailure/Fail
 
 AssertionsTestSuite.test("expectFailure/XFail")
@@ -387,9 +387,9 @@ AssertionsTestSuite.test("expectFailure/XFail")
   }
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/XFail ({{X}}FAIL: [Custom(reason: test)])
-// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> expected: true
-// CHECK: out>>> running `body` should produce an expected failure
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> expected: true
+// CHECK: stdout>>> running `body` should produce an expected failure
 // CHECK: [    XFAIL ] Assertions.expectFailure/XFail
 
 AssertionsTestSuite.test("expectFailure/AfterFailure/Fail") {
@@ -400,12 +400,12 @@ AssertionsTestSuite.test("expectFailure/AfterFailure/Fail") {
   }
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/AfterFailure/Fail
-// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> expected: 1 (of type Swift.Int)
-// CHECK: out>>> actual: 2 (of type Swift.Int)
-// CHECK: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> expected: 3 (of type Swift.Int)
-// CHECK: out>>> actual: 4 (of type Swift.Int)
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> expected: 1 (of type Swift.Int)
+// CHECK: stdout>>> actual: 2 (of type Swift.Int)
+// CHECK: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> expected: 3 (of type Swift.Int)
+// CHECK: stdout>>> actual: 4 (of type Swift.Int)
 // CHECK: [     FAIL ] Assertions.expectFailure/AfterFailure/Fail
 
 AssertionsTestSuite.test("expectFailure/AfterFailure/XFail")
@@ -418,20 +418,20 @@ AssertionsTestSuite.test("expectFailure/AfterFailure/XFail")
   }
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/AfterFailure/XFail ({{X}}FAIL: [Custom(reason: test)])
-// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> expected: 1 (of type Swift.Int)
-// CHECK: out>>> actual: 2 (of type Swift.Int)
-// CHECK: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> expected: 3 (of type Swift.Int)
-// CHECK: out>>> actual: 4 (of type Swift.Int)
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> expected: 1 (of type Swift.Int)
+// CHECK: stdout>>> actual: 2 (of type Swift.Int)
+// CHECK: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> expected: 3 (of type Swift.Int)
+// CHECK: stdout>>> actual: 4 (of type Swift.Int)
 // CHECK: [    XFAIL ] Assertions.expectFailure/AfterFailure/XFail
 
 AssertionsTestSuite.test("expectUnreachable") {
   expectUnreachable()
 }
 // CHECK: [ RUN      ] Assertions.expectUnreachable
-// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
-// CHECK: out>>> this code should not be executed
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> this code should not be executed
 // CHECK: [     FAIL ] Assertions.expectUnreachable
 
 AssertionsTestSuite.test("expectCrashLater/Pass") {
@@ -440,7 +440,7 @@ AssertionsTestSuite.test("expectCrashLater/Pass") {
   _blackHole(array[0])
 }
 // CHECK: [ RUN      ] Assertions.expectCrashLater/Pass
-// CHECK: err>>> CRASHED: SIG{{.*}}
+// CHECK: stderr>>> OK: saw expected "crashed: sig{{.*}}
 // CHECK: [       OK ] Assertions.expectCrashLater/Pass
 
 AssertionsTestSuite.test("expectCrashLater/UXPass")
@@ -451,7 +451,7 @@ AssertionsTestSuite.test("expectCrashLater/UXPass")
   _blackHole(array[0])
 }
 // CHECK: [ RUN      ] Assertions.expectCrashLater/UXPass ({{X}}FAIL: [Custom(reason: test)])
-// CHECK: err>>> CRASHED: SIG{{.*}}
+// CHECK: stderr>>> OK: saw expected "crashed: sig{{.*}}
 // CHECK: [   UXPASS ] Assertions.expectCrashLater/UXPass
 
 AssertionsTestSuite.test("expectCrashLater/Fail") {
@@ -475,7 +475,7 @@ AssertionsTestSuite.test("UnexpectedCrash/RuntimeTrap") {
   _blackHole(array[0])
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/RuntimeTrap
-// CHECK: err>>> CRASHED: SIG{{.*}}
+// CHECK: stderr>>> CRASHED: SIG
 // CHECK: the test crashed unexpectedly
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/RuntimeTrap
 
@@ -484,7 +484,7 @@ AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
   _blackHole(ptr.pointee)
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/NullPointerDereference
-// CHECK: err>>> CRASHED: SIG{{.*}}
+// CHECK: stderr>>> CRASHED: SIG
 // CHECK: the test crashed unexpectedly
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/NullPointerDereference
 
@@ -494,9 +494,9 @@ TestSuiteLifetimeTracked.test("failsIfLifetimeTrackedAreLeaked") {
   leakMe = LifetimeTracked(0)
 }
 // CHECK: [ RUN      ] TestSuiteLifetimeTracked.failsIfLifetimeTrackedAreLeaked
-// CHECK-NEXT: out>>> check failed at {{.*}}.swift, line [[@LINE-4]]
-// CHECK: out>>> expected: 0 (of type Swift.Int)
-// CHECK: out>>> actual: 1 (of type Swift.Int)
+// CHECK-NEXT: stdout>>> check failed at {{.*}}.swift, line [[@LINE-4]]
+// CHECK: stdout>>> expected: 0 (of type Swift.Int)
+// CHECK: stdout>>> actual: 1 (of type Swift.Int)
 // CHECK: [     FAIL ] TestSuiteLifetimeTracked.failsIfLifetimeTrackedAreLeaked
 
 TestSuiteLifetimeTracked.test("passesIfLifetimeTrackedAreResetAfterFailure") {}

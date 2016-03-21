@@ -37,10 +37,12 @@ struct Item {
   std::string name;
   std::string description;
   uint8_t kind : 2;
+  uint8_t isExactMatch : 1;
   double matchScore = 0.0; ///< The quality of the filter matching.
   double finalScore = -1.0; ///< The final score including match and context.
   ItemKind getKind() const { return static_cast<ItemKind>(kind); }
-  Item(ItemKind k = ItemKind::None) : kind(static_cast<decltype(kind)>(k)) {}
+  Item(ItemKind k = ItemKind::None)
+      : kind(static_cast<decltype(kind)>(k)), isExactMatch(0) {}
   virtual ~Item() {}
 };
 struct Result : public Item {
@@ -563,7 +565,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
       match = completion->getName().startswith_lower(filterText);
     }
 
-    if (match && completion->getName().equals_lower(filterText)) {
+    bool isExactMatch = match && completion->getName().equals_lower(filterText);
+
+    if (isExactMatch) {
       if (!exactMatch)
         exactMatch = completion;
       match = (options.addInnerResults || options.addInnerOperators)
@@ -574,8 +578,11 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     // Build wrapper and add to results.
     if (match) {
       auto wrapper = make_result(completion);
-      if (options.fuzzyMatching)
+      if (options.fuzzyMatching) {
         wrapper->matchScore = pattern.scoreCandidate(completion->getName());
+      }
+      wrapper->isExactMatch = isExactMatch;
+
       contents.push_back(std::move(wrapper));
     }
   }
@@ -596,13 +603,17 @@ static double getSemanticContextScore(bool useImportDepth,
     if (useImportDepth && completion->getModuleImportDepth())
       depth = *completion->getModuleImportDepth();
     // We treat depth == 0 the same as CurrentModule.
+    // Note: there is a gap in between that we use for keywords.
     order = (depth == 0) ? 5.0 : 6.0; // Base value.
     order += double(depth) / (Completion::maxModuleImportDepth + 1);
     assert((depth == 0 && order == 5.0) ||
            (depth && 6.0 <= order && order <= 7.0));
     break;
   }
-  case SemanticContextKind::None: order = 8.0; break;
+  case SemanticContextKind::None: {
+    order = completion->getKind() == Completion::Keyword ? 5.5 : 8.0;
+    break;
+  }
   }
   assert(0.0 <= order && order <= 8.0);
   return (8.0 - order) / 8.0;
@@ -651,10 +662,14 @@ enum class ResultBucket {
   LiteralTypeMatch,
   HighPriorityKeyword,
   ExpressionSpecific,
+  ExactMatch,
 };
 } // end anonymous namespace
 
 static ResultBucket getResultBucket(Item &item, bool hasExpectedTypes) {
+  if (item.isExactMatch)
+    return ResultBucket::ExactMatch;
+
   if (isa<Group>(item))
     return ResultBucket::Normal; // FIXME: take best contained result.
   auto *completion = cast<Result>(item).value;

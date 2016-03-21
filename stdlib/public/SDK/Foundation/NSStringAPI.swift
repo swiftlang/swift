@@ -389,7 +389,7 @@ extension String {
     if let matches = nsMatches {
       // Since this function is effectively a bridge thunk, use the
       // bridge thunk semantics for the NSArray conversion
-      matchesIntoArray._setIfNonNil { _convertNSArrayToArray(matches) }
+      matchesIntoArray._setIfNonNil { return matches as! [String] }
     }
 
     if let n = nsOutputName {
@@ -411,7 +411,7 @@ extension String {
     let nsa = _ns.componentsSeparatedByCharacters(in: separator) as NSArray
     // Since this function is effectively a bridge thunk, use the
     // bridge thunk semantics for the NSArray conversion
-    return _convertNSArrayToArray(nsa)
+    return nsa as! [String]
   }
 
 
@@ -423,7 +423,7 @@ extension String {
     let nsa = _ns.componentsSeparated(by: separator) as NSArray
     // Since this function is effectively a bridge thunk, use the
     // bridge thunk semantics for the NSArray conversion
-    return _convertNSArrayToArray(nsa)
+    return nsa as! [String]
   }
 
   // - (const char *)cStringUsingEncoding:(NSStringEncoding)encoding
@@ -1045,7 +1045,7 @@ extension String {
       }
     }
 
-    return _convertNSArrayToArray(result)
+    return result as! [String]
   }
 
   // - (NSComparisonResult)localizedCaseInsensitiveCompare:(NSString *)aString
@@ -1361,7 +1361,7 @@ extension String {
   /// string constructed from a given format string and the following
   /// arguments.
   @warn_unused_result
-  public func stringByAppendingFormat(
+  public func appendingFormat(
     format: String, _ arguments: CVarArg...
   ) -> String {
     return _ns.appending(
@@ -1906,8 +1906,8 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "stringByAppendingFormat")
-  public func appendingFormat(
+  @available(*, unavailable, renamed: "appendingFormat")
+  public func stringByAppendingFormat(
     format: String, _ arguments: CVarArg...
   ) -> String {
     fatalError("unavailable function can't be called")

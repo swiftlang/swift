@@ -4,14 +4,44 @@
 
 import Foundation
 
-class BridgedClass : NSObject, NSCopying { 
+public class BridgedClass : NSObject, NSCopying {
   @objc(copyWithZone:)
-  func copy(with zone: NSZone) -> AnyObject {
+  public func copy(with zone: NSZone) -> AnyObject {
     return self
   }
 }
 
-class BridgedClassSub : BridgedClass { }
+public class BridgedClassSub : BridgedClass { }
+
+// Attempt to bridge to a non-whitelisted type from another module.
+extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{conformance of 'LazyFilterIterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
+  public typealias _ObjectiveCType = BridgedClassSub
+
+  public static func _isBridgedToObjectiveC() -> Bool { return true }
+
+  public func _bridgeToObjectiveC() -> _ObjectiveCType {
+    return BridgedClassSub()
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    source: _ObjectiveCType,
+    result: inout LazyFilterIterator?
+  ) { }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    source: _ObjectiveCType,
+    result: inout LazyFilterIterator?
+  ) -> Bool {
+    return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> LazyFilterIterator {
+    let result: LazyFilterIterator?
+    return result!
+  }
+}
+
 
 struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
   var hashValue: Int { return 0 }
@@ -20,10 +50,6 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedClass.self
-  }
-
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
   }
@@ -66,12 +92,12 @@ func bridgeToAnyObject(s: BridgedStruct) -> AnyObject {
 }
 
 func bridgeFromObjC(c: BridgedClass) -> BridgedStruct {
-  return c // expected-error{{cannot convert return expression of type 'BridgedClass' to return type 'BridgedStruct'}}
+  return c // expected-error{{'BridgedClass' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}
   return c as BridgedStruct
 }
 
 func bridgeFromObjCDerived(s: BridgedClassSub) -> BridgedStruct {
-  return s // expected-error{{cannot convert return expression of type 'BridgedClassSub' to return type 'BridgedStruct'}}
+  return s // expected-error{{'BridgedClassSub' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}
   return s as BridgedStruct
 }
 
@@ -286,4 +312,9 @@ func force_cast_fixit(a : [NSString]) -> [NSString] {
 func rdar21244068(n: NSString!) -> String {
   return n  // expected-error {{'NSString!' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{11-11= as String}}
 }
+
+func forceBridgeDiag(obj: BridgedClass!) -> BridgedStruct {
+  return obj // expected-error{{'BridgedClass!' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}{{13-13= as BridgedStruct}}
+}
+
 

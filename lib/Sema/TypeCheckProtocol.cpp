@@ -1419,13 +1419,9 @@ namespace {
     /// \param fromDC The DeclContext from which this associated type was
     /// computed, which may be different from the context associated with the
     /// protocol conformance.
-    ///
-    /// \param wasDeducedOrDefaulted Whether this witness was deduced or
-    /// defaulted (rather than being explicitly provided).
     void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
                            TypeDecl *typeDecl, DeclContext *fromDC,
-                           bool wasDeducedOrDefaulted,
-                           bool performRedeclarationCheck = true);
+                           bool performRedeclarationCheck);
 
     /// Resolve a (non-type) witness via name lookup.
     ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
@@ -1955,7 +1951,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
                                            TypeDecl *typeDecl,
                                            DeclContext *fromDC,
-                                           bool wasDeducedOrDefaulted,
                                            bool performRedeclarationCheck) {
   // If the declaration context from which the type witness was determined
   // differs from that of the conformance, adjust the type so that it is
@@ -2064,10 +2059,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     assocType,
     getArchetypeSubstitution(TC, DC, assocType->getArchetype(), type),
     typeDecl);
-
-  // Note whether this witness was deduced or defaulted.
-  if (wasDeducedOrDefaulted)
-    Conformance->addDefaultDefinition(assocType);
 }
 
 ResolveWitnessResult
@@ -2509,13 +2500,12 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
     recordTypeWitness(assocType, viable.front().second, viable.front().first,
-                      viable.front().first->getDeclContext(), false);
+                      viable.front().first->getDeclContext(), true);
     return ResolveWitnessResult::Success;
   }
 
   // Record an error.
-  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, DC, true,
-                    false);
+  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, DC, false);
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
@@ -3784,6 +3774,26 @@ void ConformanceChecker::checkConformance() {
   }
 
   emitDelayedDiags();
+
+  // Except in specific whitelisted cases for Foundation/Swift
+  // standard library compatibility, an _ObjectiveCBridgeable
+  // conformance must appear in the same module as the definition of
+  // the conforming type.
+  //
+  // Note that we check the module name to smooth over the difference
+  // between an imported Objective-C module and its overlay.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
+    if (auto nominal = Adoptee->getAnyNominal()) {
+      if (!TC.Context.isStandardLibraryTypeBridgedInFoundation(nominal)) {
+        auto nominalModule = nominal->getParentModule();
+        auto conformanceModule = DC->getParentModule();
+        if (nominalModule->getName() != conformanceModule->getName()) {
+          TC.diagnose(Loc, diag::nonlocal_bridged_to_objc, nominal->getName(),
+                      Proto->getName(), nominalModule->getName());
+        }
+      }
+    }
+  }
 }
 
 static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
@@ -4010,6 +4020,9 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
   const DeclContext *topLevelContext = DC->getModuleScopeContext();
   auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
+    if (options.contains(ConformanceCheckFlags::SuppressDependencyTracking))
+      return;
+
     // Record that we depend on the type's conformance.
     auto *constSF = dyn_cast<SourceFile>(topLevelContext);
     if (!constSF)
@@ -4038,32 +4051,68 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   // Look up conformance in the module.
   Module *M = topLevelContext->getParentModule();
   auto lookupResult = M->lookupConformance(T, Proto, this);
-  switch (lookupResult.getInt()) {
-  case ConformanceKind::Conforms:
-    if (Conformance)
-      *Conformance = lookupResult.getPointer();
-    recordDependency(lookupResult.getPointer());
-
-    // If we're using this conformance and it is incomplete, queue it for
-    // completion.
-    if (options.contains(ConformanceCheckFlags::Used) &&
-        lookupResult.getPointer() &&
-        lookupResult.getPointer()->isIncomplete()) {
-      auto normalConf = lookupResult.getPointer()->getRootNormalConformance();
-      UsedConformances.insert(normalConf);
-    }
-    return true;
-
-  case ConformanceKind::DoesNotConform:
+  if (!lookupResult) {
     if (ComplainLoc.isValid())
       diagnoseConformanceFailure(*this, T, Proto, DC, ComplainLoc);
     else
       recordDependency();
-    return false;
 
-  case ConformanceKind::UncheckedConforms:
-    llvm_unreachable("Can't get here!");
+    return false;
   }
+
+  // Store the conformance and record the dependency.
+  if (lookupResult->isConcrete()) {
+    if (Conformance)
+      *Conformance = lookupResult->getConcrete();
+    recordDependency(lookupResult->getConcrete());
+  } else {
+    if (Conformance)
+      *Conformance = nullptr;
+    recordDependency(nullptr);
+  }
+
+  // If we're using this conformance and it is incomplete, queue it for
+  // completion.
+  if (options.contains(ConformanceCheckFlags::Used) &&
+      lookupResult->isConcrete() &&
+      lookupResult->getConcrete()->isIncomplete()) {
+    auto normalConf = lookupResult->getConcrete()->getRootNormalConformance();
+    UsedConformances.insert(normalConf);
+  }
+  return true;
+}
+
+/// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
+                                                      Type type) {
+  class Walker : public TypeWalker {
+    TypeChecker &TC;
+    DeclContext *DC;
+    ProtocolDecl *Proto;
+
+  public:
+    Walker(TypeChecker &tc, DeclContext *dc, ProtocolDecl *proto)
+      : TC(tc), DC(dc), Proto(proto) { }
+
+    virtual Action walkToTypePre(Type ty) {
+      // If we have a nominal type, "use" its conformance to
+      // _ObjectiveCBridgeable if it has one.
+      if (ty->getAnyNominal()) {
+        ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
+            | ConformanceCheckFlags::Used
+            | ConformanceCheckFlags::SuppressDependencyTracking;
+        (void)TC.conformsToProtocol(ty, Proto, DC, options);
+      }
+
+      return Action::Continue;
+    }
+  };
+
+  auto proto = getProtocol(SourceLoc(),
+                           KnownProtocolKind::ObjectiveCBridgeable);
+  if (!proto) return;
+
+  type.walk(Walker(*this, dc, proto));
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {

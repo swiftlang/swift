@@ -228,6 +228,6 @@ func _swift_FreeBSD_getEnv(
 ) -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
 
 public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
-  return _swift_FreeBSD_getEnv().memory
+  return _swift_FreeBSD_getEnv().pointee
 }
 #endif

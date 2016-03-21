@@ -414,8 +414,9 @@ public:
       if (!isAlive(F)) {
         DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
         NumDeadFunc++;
+        DFEPass->invalidateAnalysisForDeadFunction(F,
+                                     SILAnalysis::InvalidationKind::Everything);
         Module->eraseFunction(F);
-        DFEPass->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
       }
     }
   }
@@ -491,9 +492,6 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
     Blocks.clear();
     assert(F->isExternalDeclaration() &&
            "Function should be an external declaration");
-    if (F->getRefCount() == 0)
-      F->getModule().eraseFunction(F);
-
     NumEliminatedExternalDefs++;
     return true;
   }
@@ -511,16 +509,16 @@ public:
     findAliveFunctions();
     // Get rid of definitions for all global functions that are not marked as
     // alive.
-    bool NeedUpdate = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
       SILFunction *F = &*FI;
       ++FI;
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
-          NeedUpdate = true;
-          DFEPass->invalidateAnalysis(F,
+          DFEPass->invalidateAnalysisForDeadFunction(F,
                                     SILAnalysis::InvalidationKind::Everything);
+          if (F->getRefCount() == 0)
+            F->getModule().eraseFunction(F);
         }
       }
     }

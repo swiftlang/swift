@@ -58,6 +58,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
                                            /*TokenizeInterpolatedString=*/true);
   std::vector<SyntaxNode> Nodes;
   SourceLoc AttrLoc;
+  SourceLoc UnaryMinusLoc;
   auto LiteralStartLoc = Optional<SourceLoc>();
   for (unsigned I = 0, E = Tokens.size(); I != E; ++I) {
     auto &Tok = Tokens[I];
@@ -119,9 +120,28 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
           Kind = SyntaxNodeKind::Identifier;
         break;
       case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
-      case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;
-      case tok::floating_literal: Kind = SyntaxNodeKind::Floating; break;
       case tok::string_literal: Kind = SyntaxNodeKind::String; break;
+
+      case tok::integer_literal:
+        Kind = SyntaxNodeKind::Integer;
+        if (UnaryMinusLoc.isValid()) {
+          Loc = UnaryMinusLoc;
+          Length = *Length + SM.getByteDistance(UnaryMinusLoc, Tok.getLoc());
+        }
+        break;
+      case tok::floating_literal:
+        Kind = SyntaxNodeKind::Floating;
+        if (UnaryMinusLoc.isValid()) {
+          Loc = UnaryMinusLoc;
+          Length = *Length + SM.getByteDistance(UnaryMinusLoc, Tok.getLoc());
+        }
+        break;
+
+      case tok::oper_prefix:
+        if (Tok.getText() == "-")
+          UnaryMinusLoc = Loc;
+        continue;
+
       case tok::comment:
         if (Tok.getText().startswith("///") ||
             (IsPlayground && Tok.getText().startswith("//:")))
@@ -178,6 +198,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         continue;
       }
     }
+
+    UnaryMinusLoc = SourceLoc(); // Reset.
 
     assert(Loc.isValid());
     assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Range.getStart(),
@@ -1449,11 +1471,15 @@ bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
   if (Text.empty())
     return true;
 
-  auto FirstNewLine = Text.find('\n');
-  if (FirstNewLine == StringRef::npos)
+  llvm::SmallVector<StringRef, 8> RawLines;
+  Text.split(RawLines, '\n');
+  auto FirstNewLine = std::find_if(RawLines.begin(), RawLines.end(),
+    [](StringRef Line) { return !Line.trim().empty(); });
+
+  if (FirstNewLine == RawLines.end())
     return true;
 
-  Text = Text.substr(FirstNewLine + 1);
+  Text = Text.substr(FirstNewLine->data() - Text.data());
   if (Text.empty())
     return true;
 

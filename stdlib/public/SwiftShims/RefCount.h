@@ -158,6 +158,14 @@ class StrongRefCount {
     return doDecrementShouldDeallocateN<false>(n);
   }
 
+  // Set the RC_DEALLOCATING_FLAG flag non-atomically.
+  //
+  // Precondition: the reference count must be 1
+  void decrementFromOneAndDeallocateNonAtomic() {
+    assert(refCount == RC_ONE && "Expect a count of 1");
+    refCount = RC_DEALLOCATING_FLAG;
+  }
+
   // Return the reference count.
   // During deallocation the reference count is undefined.
   uint32_t getCount() const {
