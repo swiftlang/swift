@@ -116,25 +116,25 @@ func randomGraphemeCluster(minSize: Int, _ maxSize: Int) -> String {
 var CharacterTests = TestSuite("Character")
 
 CharacterTests.test("literal") {
-  if true {
+  do {
     // U+0041 LATIN CAPITAL LETTER A
     let ch: Character = "A"
     expectEqual("\u{0041}", String(ch))
   }
 
-  if true {
+  do {
     // U+3042 HIRAGANA LETTER A
     let ch: Character = "あ"
     expectEqual("\u{3042}", String(ch))
   }
 
-  if true {
+  do {
     // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
     let ch: Character = "例"
     expectEqual("\u{4F8B}", String(ch))
   }
 
-  if true {
+  do {
     // U+304B HIRAGANA LETTER KA
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let ch: Character = "\u{304b}\u{3099}"

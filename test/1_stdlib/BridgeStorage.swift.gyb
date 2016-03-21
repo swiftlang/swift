@@ -126,7 +126,7 @@ allTests.test("${Self}") {
   expectTrue(B(objC: oy).objCInstance == oy)
   
   for i in 0..<2 {
-    if true {
+    do {
       var b = B(native: C(), bits: i)
       expectFalse(b.isObjC)
       expectTrue(b.isNative)
@@ -137,7 +137,7 @@ allTests.test("${Self}") {
       expectEqual(i, b.spareBits)
     }
     
-    if true {
+    do {
       let c = C()
       var b = B(native: c, bits: i)
       expectFalse(b.isObjC)

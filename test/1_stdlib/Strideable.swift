@@ -142,33 +142,33 @@ StrideTestSuite.test("OperatorOverloads") {
   var r2 = R(70)
   var stride: Int = 5
 
-  if true {
+  do {
     var result = r1 + stride
     expectType(R.self, &result)
     expectEqual(55, result.x)
   }
-  if true {
+  do {
     var result = stride + r1
     expectType(R.self, &result)
     expectEqual(55, result.x)
   }
-  if true {
+  do {
     var result = r1 - stride
     expectType(R.self, &result)
     expectEqual(45, result.x)
   }
-  if true {
+  do {
     var result = r1 - r2
     expectType(Int.self, &result)
     expectEqual(-20, result)
   }
-  if true {
+  do {
     var result = r1
     result += stride
     expectType(R.self, &result)
     expectEqual(55, result.x)
   }
-  if true {
+  do {
     var result = r1
     result -= stride
     expectType(R.self, &result)
