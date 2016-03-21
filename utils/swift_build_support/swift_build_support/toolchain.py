@@ -65,6 +65,7 @@ def _first_common_toolchain(tools, suffixes=None):
     if suffixes is None:
         # No suffixes provided, default to using empty suffix only
         suffixes = ['']
+
     for suffix in suffixes:
         path_map = dict()
         for name, tool in tools.iteritems():
@@ -87,9 +88,15 @@ def host_toolchain(xcrun_toolchain='default', tools=None, suffixes=None):
     """
     if tools is None:
         tools = dict()
+
+    # Require cc and cxx for a toolchain; this ensures whatever llvm tool we
+    # find matches the version of clang returned by a previous run of
+    # this tool
     tools['cc'] = 'clang'
     tools['cxx'] = 'clang++'
+
     if platform.system() == 'Darwin':
+        # Only use xcrun on Darwin
         path_map = {}
         for name, tool in tools.iteritems():
             path = xcrun.find(xcrun_toolchain, tool)
