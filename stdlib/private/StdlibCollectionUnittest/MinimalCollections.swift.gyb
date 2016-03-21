@@ -653,8 +653,6 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
 %     end
   }
 
-  public typealias SubSequence = ${SelfSlice}<${Self}<T>>
-
   public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<T>> {
     get {
       return ${SelfSlice}(base: self, bounds: bounds)
@@ -870,7 +868,6 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 
     // FIXME: swift-3-indexing-model: use defaults.
 //     if Self not in ['DefaultedCollection', 'DefaultedBidirectionalCollection', 'DefaultedRandomAccessCollection', 'DefaultedMutableCollection', 'DefaultedRangeReplaceableCollection']:
-  public typealias SubSequence = ${SelfSlice}<${Self}<Base._Element>>
 
   public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<Base._Element>> {
     get {
