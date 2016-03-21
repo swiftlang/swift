@@ -108,7 +108,7 @@ extension _HalfOpenRange where Bound : _Strideable {
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != upperBound`.
   public subscript(position: Bound) -> Bound {
-    _stdlibAssert(self.contains(position), "Index out of range")
+    _debugPrecondition(self.contains(position), "Index out of range")
     return position
   }
 
