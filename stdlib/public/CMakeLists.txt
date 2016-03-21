@@ -36,6 +36,7 @@ endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   if(SWIFT_BUILD_SDK_OVERLAY)
+    add_subdirectory(Platform)
     add_subdirectory(SDK)
   endif()
 endif()
