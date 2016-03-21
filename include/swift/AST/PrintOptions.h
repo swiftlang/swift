@@ -243,6 +243,10 @@ struct PrintOptions {
     BothAlways,
   };
 
+  /// Whether to print the doc-comment from the conformance if a member decl
+  /// has no associated doc-comment by itself.
+  bool ElevateDocCommentFromConformance = false;
+
   /// Whether to print the content of an extension decl inside the type decl where it
   /// extends from.
   std::function<bool(const ExtensionDecl *)> printExtensionContentAsMembers =
@@ -322,6 +326,7 @@ struct PrintOptions {
     result.SkipDeinit = true;
     result.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
     result.EmptyLineBetweenMembers = true;
+    result.ElevateDocCommentFromConformance = true;
     return result;
   }
 

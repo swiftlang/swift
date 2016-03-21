@@ -145,12 +145,13 @@ getUnderlyingClangModuleForImport(ImportDecl *Import) {
   return nullptr;
 }
 
-void swift::ide::printModuleInterface(Module *M,
+void swift::ide::printModuleInterface(Module *M, Optional<StringRef> Group,
                                       ModuleTraversalOptions TraversalOptions,
                                       ASTPrinter &Printer,
                                       const PrintOptions &Options,
                                       const bool PrintSynthesizedExtensions) {
-  printSubmoduleInterface(M, M->getName().str(), ArrayRef<StringRef>(),
+  printSubmoduleInterface(M, M->getName().str(),
+                          Group.hasValue() ? Group.getValue() : ArrayRef<StringRef>(),
                           TraversalOptions, Printer, Options,
                           PrintSynthesizedExtensions);
 }

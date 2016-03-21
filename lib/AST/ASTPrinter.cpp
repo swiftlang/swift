@@ -46,6 +46,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
+#include <queue>
 
 using namespace swift;
 namespace swift {
@@ -708,6 +709,24 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   return Builder.str();
 }
 
+ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
+  assert(VD->getRawComment().isEmpty());
+  std::queue<ValueDecl*> AllConformances;
+  AllConformances.push(VD);
+  while(!AllConformances.empty()) {
+    auto *VD = AllConformances.front();
+    AllConformances.pop();
+    if (VD->getRawComment().isEmpty()) {
+      for (auto *Req : VD->getSatisfiedProtocolRequirements()) {
+        AllConformances.push(Req);
+      }
+    } else {
+      return VD;
+    }
+  }
+  return nullptr;
+}
+
 bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
                                     llvm::raw_ostream &OS) {
   if (!Ty)
@@ -969,11 +988,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printSwiftDocumentationComment(const Decl *D) {
-    auto RC = D->getRawComment();
-    if (RC.isEmpty())
-      return;
-
+  void printRawComment(RawComment RC) {
     indent();
 
     SmallVector<StringRef, 8> Lines;
@@ -988,6 +1003,23 @@ class PrintAST : public ASTVisitor<PrintAST> {
         Printer << Line;
         Printer.printNewline();
       }
+    }
+  }
+
+  void printSwiftDocumentationComment(const Decl *D) {
+    auto RC = D->getRawComment();
+    if (RC.isEmpty() && !Options.ElevateDocCommentFromConformance)
+      return;
+
+    if (RC.isEmpty()) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (auto *Req = ASTPrinter::findConformancesWithDocComment(
+            const_cast<ValueDecl*>(VD))) {
+          printRawComment(Req->getRawComment());
+        }
+      }
+    } else {
+      printRawComment(RC);
     }
   }
 

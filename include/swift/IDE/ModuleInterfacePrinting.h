@@ -43,7 +43,7 @@ typedef OptionSet<ModuleTraversal> ModuleTraversalOptions;
 ArrayRef<StringRef> collectModuleGroups(ModuleDecl *M,
                                         std::vector<StringRef> &Scratch);
 
-void printModuleInterface(ModuleDecl *M,
+void printModuleInterface(ModuleDecl *M, Optional<StringRef> Group,
                           ModuleTraversalOptions TraversalOptions,
                           ASTPrinter &Printer, const PrintOptions &Options,
                           const bool PrintSynthesizedExtensions);
