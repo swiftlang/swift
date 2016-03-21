@@ -178,6 +178,26 @@ func goo1(f : FooClass1) {
   f.fooFunc1()
 }
 
+public protocol P4 {
+  /// foo1 comment from P4
+  func foo1()
+  /// foo2 comment from P4
+  func foo2()
+}
+
+public class C8 : P4 {
+  public func foo1() {
+  }
+  /// foo2 comment from C1
+  public func foo2() {
+  }
+}
+
+func foo2(f: C8) {
+  f.foo1()
+  f.foo2()
+}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -623,3 +643,9 @@ func goo1(f : FooClass1) {
 
 // RUN: %sourcekitd-test -req=cursor -pos=178:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK77 %s
 // CHECK77-NOT: @warn_unused_result
+
+// RUN: %sourcekitd-test -req=cursor -pos=197:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK78 %s
+// RUN: %sourcekitd-test -req=cursor -pos=198:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK79 %s
+
+// CHECK78: foo1 comment from P4
+// CHECK79: foo2 comment from C1

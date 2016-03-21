@@ -632,6 +632,15 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   }
   unsigned DocCommentEnd = SS.size();
 
+  if (DocCommentEnd == DocCommentBegin) {
+    if (auto *Req = ASTPrinter::findConformancesWithDocComment(
+        const_cast<ValueDecl*>(VD))) {
+      llvm::raw_svector_ostream OS(SS);
+      ide::getDocumentationCommentAsXML(Req, OS);
+    }
+    DocCommentEnd = SS.size();
+  }
+
   unsigned DeclBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
