@@ -69,6 +69,7 @@ enum class PrintStructureKind {
   FunctionType,
   FunctionReturnType,
   BuiltinAttribute,
+  TupleType,
   TupleElement,
   NumberLiteral,
   StringLiteral,

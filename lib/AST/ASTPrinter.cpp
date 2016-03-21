@@ -3445,6 +3445,9 @@ public:
   }
 
   void visitTupleType(TupleType *T) {
+    Printer.callPrintStructurePre(PrintStructureKind::TupleType);
+    defer { Printer.printStructurePost(PrintStructureKind::TupleType); };
+
     Printer << "(";
 
     auto Fields = T->getElements();

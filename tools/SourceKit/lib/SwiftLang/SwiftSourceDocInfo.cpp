@@ -78,6 +78,8 @@ static StringRef getTagForParameter(PrintStructureKind context) {
     return "decl.function.returntype";
   case PrintStructureKind::FunctionType:
     return "";
+  case PrintStructureKind::TupleType:
+    return "tuple";
   case PrintStructureKind::TupleElement:
     return "tuple.element";
   case PrintStructureKind::GenericParameter:
@@ -217,8 +219,9 @@ private:
   }
 
   void printStructurePre(PrintStructureKind kind, const Decl *D) override {
-    if (kind == PrintStructureKind::TupleElement)
-      fixupTupleElement(kind);
+    if (kind == PrintStructureKind::TupleElement ||
+        kind == PrintStructureKind::TupleType)
+      fixupTuple(kind);
 
     contextStack.emplace_back(PrintContext(kind));
     auto tag = getTagForParameter(kind);
@@ -233,10 +236,11 @@ private:
     }
   }
   void printStructurePost(PrintStructureKind kind, const Decl *D) override {
-    if (kind == PrintStructureKind::TupleElement) {
+    if (kind == PrintStructureKind::TupleElement ||
+        kind == PrintStructureKind::TupleType) {
       auto prev = contextStack.pop_back_val();
       (void)prev;
-      fixupTupleElement(kind);
+      fixupTuple(kind);
       assert(prev.is(kind) && "unmatched printStructurePre");
     } else {
       assert(contextStack.back().is(kind) && "unmatched printStructurePre");
@@ -341,15 +345,20 @@ private:
     }
   }
 
-  /// 'Fix' a tuple element structure kind to be a function parameter if we are
-  /// currently inside a function type. This simplifies functions that need to
-  /// differentiate a tuple from the input part of a function type.
-  void fixupTupleElement(PrintStructureKind &kind) {
-    assert(kind == PrintStructureKind::TupleElement);
+  /// 'Fix' a tuple or tuple element structure kind to be a function parameter
+  /// or function type if we are currently inside a function type. This
+  /// simplifies functions that need to differentiate a tuple from the input
+  /// part of a function type.
+  void fixupTuple(PrintStructureKind &kind) {
+    assert(kind == PrintStructureKind::TupleElement ||
+           kind == PrintStructureKind::TupleType);
     // Skip over 'type's in the context stack.
     for (auto I = contextStack.rbegin(), E = contextStack.rend(); I != E; ++I) {
       if (I->is(PrintStructureKind::FunctionType)) {
-        kind = PrintStructureKind::FunctionParameter;
+        if (kind == PrintStructureKind::TupleElement)
+          kind = PrintStructureKind::FunctionParameter;
+        else
+          kind = PrintStructureKind::FunctionType;
         break;
       } else if (!I->isType()) {
         break;
