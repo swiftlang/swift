@@ -52,7 +52,7 @@ OptionalTests.test("nil comparison") {
   x = .some(1)
   expectTrue(x != nil)
 
-  if true {
+  do {
     var y1: Int? = .none
     expectTrue(y1 == nil)
 
