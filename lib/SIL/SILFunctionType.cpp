@@ -23,7 +23,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
-#include "swift/AST/SubstTypeVisitor.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/AST/Attr.h"
