@@ -21,6 +21,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
 #include "MetadataCache.h"
 #include <algorithm>
@@ -28,7 +29,6 @@
 #include <new>
 #include <cctype>
 #include <sys/mman.h>
-#include <pthread.h>
 #include <unistd.h>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -2344,12 +2344,8 @@ struct llvm::DenseMapInfo<GlobalString> {
 // StringMap because we don't need to actually copy the string.
 namespace {
 struct ForeignTypeState {
-  pthread_mutex_t Lock;
+  Mutex Lock;
   llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> Types;
-  
-  ForeignTypeState() {
-    pthread_mutex_init(&Lock, nullptr);
-  }
 };
 }
 
@@ -2364,7 +2360,8 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
 
   // Okay, insert a new row.
   auto &Foreign = ForeignTypes.get();
-  pthread_mutex_lock(&Foreign.Lock);
+  ScopedLock guard(Foreign.Lock);
+  
   auto insertResult = Foreign.Types.insert({GlobalString(nonUnique->getName()),
                                             nonUnique});
   auto uniqueMetadata = insertResult.first->second;
@@ -2382,7 +2379,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   // it will be possible for code to fast-path through this function
   // too soon.
   nonUnique->setCachedUniqueMetadata(uniqueMetadata);
-  pthread_mutex_unlock(&Foreign.Lock);
+
   return uniqueMetadata;
 }
 
