@@ -46,11 +46,16 @@ class HostToolchainTestCase(unittest.TestCase):
                          'llvm-cov is only guaranteed to exist on OS X')
     def test_can_find_llvm_cov(self):
         suffixes = ['', '-3.8', '-3.7', '-3.6']
-        exec_names = {'llvm-cov': 'llvm-cov'}
+        exec_names = {'llvm_cov': 'llvm-cov'}
         toolchain = host_toolchain(tools=exec_names, suffixes=suffixes)
 
         # must have clang, clang++, and llvm-cov
         self.assertTrue(len(toolchain.tools) == 3)
+
+        try:
+            toolchain.llvm_cov
+        except AttributeError:
+            self.fail("toolchain does not have llvm_cov")
 
 
 if __name__ == '__main__':
