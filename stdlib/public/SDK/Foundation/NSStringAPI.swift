@@ -1349,7 +1349,7 @@ extension String {
   /// string constructed from a given format string and the following
   /// arguments.
   @warn_unused_result
-  public func stringByAppendingFormat(
+  public func appendingFormat(
     format: String, _ arguments: CVarArg...
   ) -> String {
     return _ns.appending(
@@ -1892,8 +1892,8 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "stringByAppendingFormat")
-  public func appendingFormat(
+  @available(*, unavailable, renamed: "appendingFormat")
+  public func stringByAppendingFormat(
     format: String, _ arguments: CVarArg...
   ) -> String {
     fatalError("unavailable function can't be called")
