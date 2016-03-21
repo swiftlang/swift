@@ -11,6 +11,7 @@
 
 import os
 import unittest
+import platform
 
 from swift_build_support.toolchain import host_clang, host_toolchain
 
@@ -27,6 +28,8 @@ class HostClangTestCase(unittest.TestCase):
         self.assertTrue(os.path.split(clang.cc)[-1].startswith('clang'))
         self.assertTrue(os.path.split(clang.cxx)[-1].startswith('clang++'))
 
+
+class HostToolchainTestCase(unittest.TestCase):
     def test_found_executables_match(self):
         # Test that the raw incovation of _first_common_executables
         # either returns None or matching paths.
@@ -38,6 +41,16 @@ class HostClangTestCase(unittest.TestCase):
         toolchain = host_toolchain(tools=exec_names,
                                    suffixes=suffixes)
         self.assertIsNone(toolchain)
+
+    @unittest.skipUnless(platform.system() == 'Darwin',
+                         'llvm-cov is only guaranteed to exist on OS X')
+    def test_can_find_llvm_cov(self):
+        suffixes = ['', '-3.8', '-3.7', '-3.6']
+        exec_names = {'llvm-cov': 'llvm-cov'}
+        toolchain = host_toolchain(tools=exec_names, suffixes=suffixes)
+
+        # must have clang, clang++, and llvm-cov
+        self.assertTrue(len(toolchain.tools) == 3)
 
 
 if __name__ == '__main__':
