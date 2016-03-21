@@ -197,17 +197,8 @@ private:
   bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
 
   /// Return true if we have a release instruction for all the reference
-  /// semantics part of \p Argument.
-  bool releaseArgument(ReleaseList Insts, SILValue Argument);
-
-  /// Walk the basic block and find all the releases that match to function
-  /// arguments. 
-  void collectMatchingReleases(SILBasicBlock *BB);
-
-  /// For every argument in the function, check to see whether all epilogue
-  /// releases are found. Clear all releases for the argument if not all 
-  /// epilogue releases are found.
-  void processMatchingReleases();
+  /// semantics part of \p Base.
+  bool releaseAllNonTrivials(ReleaseList Insts, SILValue Base);
 
 public:
   /// Finds matching releases in the return block of the function \p F.
@@ -220,17 +211,11 @@ public:
 
   bool hasBlock() const { return HasBlock; }
 
-  bool isSingleRelease(SILArgument *Arg) const {
-    auto Iter = ArgInstMap.find(Arg);
-    assert(Iter != ArgInstMap.end() && "Failed to get release list for argument");
-    return Iter->second.size() == 1;
-  }
-
   SILInstruction *getSingleReleaseForArgument(SILArgument *Arg) {
     auto I = ArgInstMap.find(Arg);
     if (I == ArgInstMap.end())
       return nullptr;
-    if (!isSingleRelease(Arg))
+    if (I->second.size() > 1)
       return nullptr;
     return *I->second.begin();
   }
