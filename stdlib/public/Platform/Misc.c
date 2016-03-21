@@ -1,4 +1,4 @@
-//===--- Misc.c - Darwin overlay helpers ----------------------------------===//
+//===--- Misc.c - Platform overlay helpers --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <semaphore.h>
 
@@ -59,5 +61,13 @@ _swift_Darwin_lgamma_r(double x, int *psigngam) {
 extern long double
 _swift_Darwin_lgammal_r(long double x, int *psigngam) {
   return lgammal_r(x, psigngam);
+}
+#endif
+
+#if defined(__FreeBSD__)
+extern char **
+_swift_FreeBSD_getEnv() {
+  extern char **environ;
+  return environ;
 }
 #endif

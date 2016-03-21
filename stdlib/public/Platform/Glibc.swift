@@ -10,4 +10,4 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import Darwin // Clang module
+@_exported import SwiftGlibc // Clang module
