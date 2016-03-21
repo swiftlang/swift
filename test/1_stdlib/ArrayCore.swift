@@ -9,9 +9,10 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+import StdlibUnittest
 import Swift
 
 //===--- class Tracked ----------------------------------------------------===//
@@ -81,40 +82,22 @@ struct MrMcRange : Collection {
   var base: Base
 }
 
-func printSequence<T : Sequence>(x: T) {
-  print("<", terminator: "")
-  var prefix = ""
-  for a in x {
-    print(prefix, terminator: "")
-    print(a, terminator: "")
-    prefix = " "
-  }
-  print(">")
+let ArrayCoreTests = TestSuite("ArrayCore")
+
+ArrayCoreTests.test("Sequences can be converted") {
+  let n = ((Tracked(10)..<Tracked(27)).makeIterator())._copyToNativeArrayBuffer()
+  let out = n.map { "\($0)" }.joined(separator: " ")
+  expectPrinted("10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26", out)
 }
 
-
-
-// CHECK: testing...
-print("testing...")
-
-func test() {
-  //===--- Sequences can be converted -------------------------------------===//
-
-  let n0 = ((Tracked(10)..<Tracked(27)).makeIterator())._copyToNativeArrayBuffer()
-  // CHECK-NEXT: <10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26>
-  printSequence(n0)
-
-  //===--- Collections get measured ---------------------------------------===//
-
-  // CHECK-NEXT: using collection API
-  let n1 = MrMcRange(3..<23)._copyToNativeArrayBuffer()
-  // CHECK: <3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22>
-  printSequence(n1)
+ArrayCoreTests.test("Collections get measured") {
+  let n = MrMcRange(3..<23)._copyToNativeArrayBuffer()
+  let out = n.map { "\($0)" }.joined(separator: " ")
+  expectPrinted("3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22", out)
 }
-test()
 
-// CHECK-NEXT: trackedCount = 0
-print("trackedCount = \(trackedCount)")
+ArrayCoreTests.test("Check trackedCount") {
+  expectEqual(0, trackedCount)
+}
 
-// CHECK-NEXT: done.
-print("done.")
+runAllTests()
