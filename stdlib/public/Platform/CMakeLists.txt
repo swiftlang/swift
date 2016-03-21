@@ -2,7 +2,8 @@ set(swift_platform_name)
 set(swift_platform_flags)
 set(swift_platform_sources
     Platform.swift
-    Misc.c)
+    Misc.c
+    tgmath.swift.gyb)
 
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_platform_name swiftDarwin)
@@ -10,8 +11,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
       Darwin.swift
       ${swift_platform_sources}
       POSIXError.swift
-      MachError.swift
-      tgmath.swift.gyb)
+      MachError.swift)
   set(swift_platform_flags
       SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module
       API_NOTES_NON_OVERLAY)
