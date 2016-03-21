@@ -169,6 +169,14 @@ class C7 {
   func f() -> Self { return self }
 }
 
+public class FooClass1 {
+  @warn_unused_result
+  public func fooFunc1() {}
+}
+
+func goo1(f : FooClass1) {
+  f.fooFunc1()
+}
 
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
@@ -612,3 +620,6 @@ class C7 {
 // CHECK76: (Self) -> () -> Self
 // CHECK76: <Declaration>func f() -&gt; <Type usr="s:C11cursor_info2C7">Self</Type></Declaration>
 // CHECK76: <decl.function.returntype><ref.class usr="s:C11cursor_info2C7">Self</ref.class></decl.function.returntype>
+
+// RUN: %sourcekitd-test -req=cursor -pos=178:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK77 %s
+// CHECK77-NOT: @warn_unused_result
