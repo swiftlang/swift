@@ -1,4 +1,4 @@
-//===--- Formatting.h --------------------------------------------------===//
+//===--- Formatting.h -------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
