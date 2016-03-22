@@ -1,4 +1,4 @@
-//===--- module.freebsd.map.in --------------------------------------------===//
+//===--- glibc.freebsd.modulemap.in ---------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,8 +16,8 @@
 /// still be issues if imported into the same context as one in which someone
 /// included those headers directly.
 ///
-/// It's not named just FreeBSD libc so that it doesn't conflict in the event of a
-/// future official FreeBSD libc modulemap.
+/// It's not named just FreeBSD libc so that it doesn't conflict in the event of
+/// a future official FreeBSD libc modulemap.
 module SwiftGlibc [system] {
   link "pthread"
   link "dl"
