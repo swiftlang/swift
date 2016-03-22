@@ -174,11 +174,6 @@ if(PYTHONINTERP_FOUND)
 
         set(lit_command ${PYTHON_EXECUTABLE} "${LIT}" ${LIT_ARGS})
 
-        set(command_upload_stdlib)
-        if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
-          # These are supported testing SDKs.
-        endif()
-
         set(test_dependencies)
         get_test_dependencies("${SDK}" test_dependencies)
         list(APPEND test_dependencies
@@ -222,7 +217,6 @@ if(PYTHONINTERP_FOUND)
         endif()
 
         add_custom_target("check-swift${test_mode_target_suffix}${VARIANT_SUFFIX}"
-            ${command_upload_stdlib}
             ${command_clean_test_results_dir}
             ${command_profdata_merge_start}
             COMMAND ${lit_command} "${test_bin_dir}"
@@ -232,7 +226,6 @@ if(PYTHONINTERP_FOUND)
             ${cmake_3_2_USES_TERMINAL})
 
         add_custom_target("check-swift-validation${test_mode_target_suffix}${VARIANT_SUFFIX}"
-            ${command_upload_stdlib}
             ${command_clean_test_results_dir}
             ${command_profdata_merge_start}
             COMMAND ${lit_command} "${validation_test_bin_dir}"
@@ -242,7 +235,6 @@ if(PYTHONINTERP_FOUND)
             ${cmake_3_2_USES_TERMINAL})
 
         add_custom_target("check-swift-all${test_mode_target_suffix}${VARIANT_SUFFIX}"
-            ${command_upload_stdlib}
             ${command_clean_test_results_dir}
             ${command_profdata_merge_start}
             COMMAND ${lit_command} "${validation_test_bin_dir}" "${test_bin_dir}"
