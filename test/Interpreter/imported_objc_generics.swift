@@ -115,4 +115,19 @@ ImportedObjCGenerics.test("ClassConstraints") {
   expectEqual("woof", makeContainedAnimalMakeNoise(petCarrier))
 }
 
+class ClassWithMethodsUsingObjCGenerics: NSObject {
+  func copyContainer(_ x: CopyingContainer<NSString>) -> CopyingContainer<NSString> {
+    return x
+  }
+}
+
+ImportedObjCGenerics.test("ClassWithMethodsUsingObjCGenerics") {
+  let x: AnyObject = ClassWithMethodsUsingObjCGenerics()
+  let y = CopyingContainer<NSString>(object: "")
+  let z = x.copyContainer(y)
+  expectTrue(y === z)
+  let w = x.performSelector(#selector(ClassWithMethodsUsingObjCGenerics.copyContainer), withObject: y).takeUnretainedValue()
+  expectTrue(y === w)
+}
+
 runAllTests()
