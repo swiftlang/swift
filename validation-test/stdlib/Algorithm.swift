@@ -96,7 +96,7 @@ Algorithm.test("sorted/strings")
 
 // A wrapper around Array<T> that disables any type-specific algorithm
 // optimizations and forces bounds checking on.
-struct A<T> : MutableCollection {
+struct A<T> : MutableCollection, RandomAccessCollection {
   init(_ a: Array<T>) {
     impl = a
   }
