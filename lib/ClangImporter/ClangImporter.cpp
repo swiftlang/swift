@@ -1873,35 +1873,8 @@ Identifier ClangImporter::Implementation::importMacroName(
   if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
     return Identifier();
 
-  // If we aren't omitting needless words, no transformation is applied to the
-  // name.
+  // No transformation is applied to the name.
   StringRef name = clangIdentifier->getName();
-  if (!OmitNeedlessWords) return SwiftContext.getIdentifier(name);
-
-  // Determine which module defines this macro.
-  StringRef moduleName;
-  if (auto moduleID = macro->getOwningModuleID()) {
-    if (auto module = clangCtx.getExternalSource()->getModule(moduleID))
-      moduleName = module->getTopLevelModuleName();
-  }
-
-  if (moduleName.empty())
-    moduleName = clangCtx.getLangOpts().CurrentModule;
-
-  // Check whether we have a prefix to strip.
-  unsigned prefixLen = stripModulePrefixLength(ModulePrefixes, moduleName,
-                                               name);
-  if (prefixLen == 0) return SwiftContext.getIdentifier(name);
-
-  // Strip the prefix.
-  name = name.substr(prefixLen);
-
-  // If we should lowercase, do so.
-  StringScratchSpace scratch;
-  if (shouldLowercaseValueName(name))
-    name = camel_case::toLowercaseInitialisms(name, scratch);
-
-  // We're done.
   return SwiftContext.getIdentifier(name);
 }
 
@@ -2469,9 +2442,11 @@ auto ClangImporter::Implementation::importFullName(
   StringScratchSpace omitNeedlessWordsScratch;
   if (OmitNeedlessWords && !result.isSubscriptAccessor()) {
     // Check whether the module in which the declaration resides has a
-    // module prefix. If so, strip that prefix off when present.
+    // module prefix and will map into Swift as a type. If so, strip
+    // that prefix off when present.
     if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
-        D->getDeclName().getNameKind() == clang::DeclarationName::Identifier) {
+        (isa<clang::TypeDecl>(D) || isa<clang::ObjCInterfaceDecl>(D) ||
+         isa<clang::ObjCProtocolDecl>(D))) {
       // Find the original declaration, from which we can determine
       // the owning module.
       const clang::Decl *owningD = D->getCanonicalDecl();

@@ -172,31 +172,24 @@
 // "UTF8" initialisms.
 // CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>)
 
-// Lowercasing after prefix stripping.
-// CHECK-FOUNDATION: let globalConstant: String
-// CHECK-FOUNDATION: func globalFunction()
+// Don't strip prefixes from globals.
+// CHECK-FOUNDATION: let NSGlobalConstant: String
+// CHECK-FOUNDATION: func NSGlobalFunction()
 
 // Cannot strip because we end up with something that isn't an identifier
 // CHECK-FOUNDATION: func NS123()
 
-// Strip prefix, but don't lowercase ALL_CAPS.
-// CHECK-FOUNDATION: func YELLING()
-
-// Strip prefix along with '_', but don't lowercase ALL_CAPS.
-// CHECK-FOUNDATION: func SCREAMING()
-
-// Don't leave just a '_'.
+// CHECK-FOUNDATION: func NSYELLING()
+// CHECK-FOUNDATION: func NS_SCREAMING()
 // CHECK-FOUNDATION: func NS_()
-
-// Lowercasing initialisms.
-// CHECK-FOUNDATION: let httpRequestKey: String
+// CHECK-FOUNDATION: let NSHTTPRequestKey: String
 
 // Lowercasing initialisms with plurals.
 // CHECK-FOUNDATION: var urlsInText: [URL] { get }
 
-// Prefix stripping for macro names.
-// CHECK-FOUNDATION: var timeIntervalSince1970: Double { get }
-// CHECK-FOUNDATION: var DO_SOMETHING: Int
+// Don't strip prefixes from macro names.
+// CHECK-FOUNDATION: var NSTimeIntervalSince1970: Double { get }
+// CHECK-FOUNDATION: var NS_DO_SOMETHING: Int
 
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
