@@ -88,6 +88,8 @@ PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
      "Propagate constants and emit diagnostics")
+PASS(EagerSpecializer, "eager-specializer",
+     "Specialize speculatively and insert dispatch guarded by type checks")
 PASS(EarlyCodeMotion, "early-codemotion",
      "Code motion without release hoisting")
 PASS(EarlyInliner, "early-inline",

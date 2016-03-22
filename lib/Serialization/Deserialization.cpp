@@ -2095,6 +2095,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
+      case decls_block::Specialize_DECL_ATTR: {
+        ArrayRef<uint64_t> rawTypeIDs;
+        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
+          scratch, rawTypeIDs);
+
+        SmallVector<TypeLoc, 8> typeLocs;
+        for (auto tid : rawTypeIDs)
+          typeLocs.push_back(TypeLoc::withoutLoc(getType(tid)));
+
+        Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
+                                      typeLocs);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \
