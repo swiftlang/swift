@@ -18,4 +18,9 @@ typedef NSObject<IAMProto>
 void mutateSomeState(IAMProto_t)
 __attribute__((swift_name("IAMProto.mutateSomeState(self:)")));
 
+int getSomeValue(IAMProto_t)
+__attribute__((swift_name("getter:IAMProto.someValue(self:)")));
+int setSomeValue(IAMProto_t, int v)
+__attribute__((swift_name("setter:IAMProto.someValue(self:_:)")));
+
 #endif // IMPORT_AS_MEMBER_PROTO_H

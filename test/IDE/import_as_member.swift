@@ -58,6 +58,7 @@
 // PRINT-PROTO-NEXT:  typealias IAMProto_t = NSObject
 // PRINT-PROTO-NEXT:  extension IAMProto {
 // PRINT-PROTO-NEXT:    func mutateSomeState()
+// PRINT-PROTO-NEXT:    var someValue: Int32
 // PRINT-PROTO-NEXT:  }
 
 // RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules

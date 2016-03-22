@@ -14,6 +14,8 @@ public func returnGlobalVar() -> Double {
 // FIXME: this crashes
 public func useProto(p: IAMProto) {
 	p.mutateSomeState()
+	let v = p.someValue
+	p.someValue = v+1
 }
 // XFAIL:
 
