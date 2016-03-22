@@ -207,15 +207,13 @@ extension String {
   public init?(_ utf16: UTF16View) {
     let wholeString = String(utf16._core)
 
-    if let start = UTF16Index(
-      _offset: utf16._offset
-    ).samePosition(in: wholeString) {
-      if let end = UTF16Index(
-        _offset: utf16._offset + utf16._length
-      ).samePosition(in: wholeString) {
-        self = wholeString[start..<end]
-        return
-      }
+    let startUTF16 = UTF16Index(_offset: utf16._offset)
+    let endUTF16 = UTF16Index(_offset: utf16._offset + utf16._length)
+
+    if let start = wholeString._index(equivalentTo: startUTF16),
+       let end = wholeString._index(equivalentTo: endUTF16) {
+      self = wholeString[start..<end]
+      return
     }
     return nil
   }
@@ -241,81 +239,39 @@ public func < (
 }
 
 // Index conversions
-extension String.UTF16View.Index {
-  /// Construct the position in `utf16` that corresponds exactly to
-  /// `utf8Index`. If no such position exists, the result is `nil`.
-  ///
-  /// - Precondition: `utf8Index` is an element of
-  ///   `String(utf16)!.utf8.indices`.
-  public init?(
-    _ utf8Index: String.UTF8Index, within utf16: String.UTF16View
-  ) {
-    let core = utf16._core
-
+extension String.UTF16View {
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func _index(
+    equivalentTo utf8Index: String.UTF8Index
+  ) -> String.UTF16Index? {
     _precondition(
-      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
+      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= _core.endIndex,
       "Invalid String.UTF8Index for this UTF-16 view")
 
     // Detect positions that have no corresponding index.
     if !utf8Index._isOnUnicodeScalarBoundary {
       return nil
     }
-    _offset = utf8Index._coreIndex
+    return Index(_offset: utf8Index._coreIndex)
   }
 
-  /// Construct the position in `utf16` that corresponds exactly to
-  /// `unicodeScalarIndex`.
-  ///
-  /// - Precondition: `unicodeScalarIndex` is an element of
-  ///   `String(utf16)!.unicodeScalars.indices`.
-  public init(
-    _ unicodeScalarIndex: String.UnicodeScalarIndex,
-    within utf16: String.UTF16View) {
-    _offset = unicodeScalarIndex._position
-  }
-
-  /// Construct the position in `utf16` that corresponds exactly to
-  /// `characterIndex`.
-  ///
-  /// - Precondition: `characterIndex` is an element of
-  ///   `String(utf16)!.indices`.
-  public init(_ characterIndex: String.Index, within utf16: String.UTF16View) {
-    _offset = characterIndex._utf16Index
-  }
-
-  /// Returns the position in `utf8` that corresponds exactly
-  /// to `self`, or if no such position exists, `nil`.
-  ///
-  /// - Precondition: `self` is an element of
-  ///   `String(utf8)!.utf16.indices`.
+  // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func samePosition(
-    in utf8: String.UTF8View
-  ) -> String.UTF8View.Index? {
-    return String.UTF8View.Index(self, within: utf8)
+  public func _index(
+    equivalentTo unicodeScalarIndex: String.UnicodeScalarIndex
+  ) -> String.UTF16Index? {
+    // FIXME: swift-3-indexing-model: range check?
+    return Index(_offset: unicodeScalarIndex._position)
   }
 
-  /// Returns the position in `unicodeScalars` that corresponds exactly
-  /// to `self`, or if no such position exists, `nil`.
-  ///
-  /// - Precondition: `self` is an element of
-  ///   `String(unicodeScalars).utf16.indices`.
+  // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func samePosition(
-    in unicodeScalars: String.UnicodeScalarView
-  ) -> String.UnicodeScalarIndex? {
-    return String.UnicodeScalarIndex(self, within: unicodeScalars)
-  }
-
-  /// Returns the position in `characters` that corresponds exactly
-  /// to `self`, or if no such position exists, `nil`.
-  ///
-  /// - Precondition: `self` is an element of `characters.utf16.indices`.
-  @warn_unused_result
-  public func samePosition(
-    in characters: String
-  ) -> String.Index? {
-    return String.Index(self, within: characters)
+  public func _index(
+    equivalentTo stringIndex: String.Index
+  ) -> String.UTF16Index? {
+    // FIXME: swift-3-indexing-model: range check?
+    return Index(_offset: stringIndex._utf16Index)
   }
 }
 

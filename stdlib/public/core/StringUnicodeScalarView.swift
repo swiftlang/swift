@@ -56,57 +56,17 @@ extension String {
 
     /// A position in a `String.UnicodeScalarView`.
     public struct Index : Comparable {
-      public init(_ _position: Int, _ _core: _StringCore) {
+      public init(_ _position: Int) {
         self._position = _position
-        self._core = _core
-      }
-
-      /// Returns the next consecutive value after `self`.
-      ///
-      /// - Precondition: The next value is representable.
-      @warn_unused_result
-      public func successor() -> Index {
-        // FIXME: swift-3-indexing-model: remove `successor()`.
-        var scratch = _ScratchIterator(_core, _position)
-        var decoder = UTF16()
-        let (_, length) = decoder._decodeOne(&scratch)
-        return Index(_position + length, _core)
-      }
-
-      /// Returns the previous consecutive value before `self`.
-      ///
-      /// - Precondition: The previous value is representable.
-      @warn_unused_result
-      public func predecessor() -> Index {
-        // FIXME: swift-3-indexing-model: remove `predecessor()`.
-        var i = _position-1
-        let codeUnit = _core[i]
-        if _slowPath((codeUnit >> 10) == 0b1101_11) {
-          if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
-            i -= 1
-          }
-        }
-        return Index(i, _core)
-      }
-
-      /// The end index that for this view.
-      internal var _viewStartIndex: Index {
-        return Index(_core.startIndex, _core)
-      }
-
-      /// The end index that for this view.
-      internal var _viewEndIndex: Index {
-        return Index(_core.endIndex, _core)
       }
 
       internal var _position: Int
-      internal var _core: _StringCore
     }
 
     /// The position of the first `UnicodeScalar` if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
-      return Index(_core.startIndex, _core)
+      return Index(_core.startIndex)
     }
 
     /// The "past the end" position.
@@ -115,21 +75,30 @@ extension String {
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
     public var endIndex: Index {
-      return Index(_core.endIndex, _core)
+      return Index(_core.endIndex)
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
     public func next(i: Index) -> Index {
-      // FIXME: swift-3-indexing-model: move `successor()` implementation here.
-      return i.successor()
+      // FIXME: swift-3-indexing-model: range checks?
+      var scratch = _ScratchIterator(_core, i._position)
+      var decoder = UTF16()
+      let (_, length) = decoder._decodeOne(&scratch)
+      return Index(i._position + length)
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
     public func previous(i: Index) -> Index {
-      // FIXME: swift-3-indexing-model: move `predecessor()` implementation here.
-      return i.predecessor()
+      // FIXME: swift-3-indexing-model: range checks?
+      var position = i._position-1
+      if _slowPath((_core[position] >> 10) == 0b1101_11) {
+        if position != 0 && (_core[position - 1] >> 10) == 0b1101_10 {
+          position -= 1
+        }
+      }
+      return Index(position)
     }
 
     /// Access the element at `position`.
@@ -212,6 +181,7 @@ extension String {
           return UnicodeScalar(0xfffd)
         }
       }
+
       internal var _decoder: UTF16 = UTF16()
       internal let _baseSet: Bool
       internal let _ascii: Bool
@@ -308,23 +278,34 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
 }
 
 // Index conversions
-extension String.UnicodeScalarIndex {
-  /// Construct the position in `unicodeScalars` that corresponds exactly to
-  /// `utf16Index`. If no such position exists, the result is `nil`.
-  ///
-  /// - Precondition: `utf16Index` is an element of
-  ///   `String(unicodeScalars).utf16.indices`.
-  public init?(
-    _ utf16Index: String.UTF16Index,
-    within unicodeScalars: String.UnicodeScalarView
-  ) {
-    let utf16 = String.UTF16View(unicodeScalars._core)
+extension String.UnicodeScalarView {
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func _index(
+    equivalentTo utf8Index: String.UTF8Index
+  ) -> String.UnicodeScalarIndex? {
+    _precondition(
+      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= _core.endIndex,
+      "Invalid String.UTF8Index for this UnicodeScalar view")
 
-    if utf16Index != utf16.startIndex
-    && utf16Index != utf16.endIndex {
+    // Detect positions that have no corresponding index.
+    if !utf8Index._isOnUnicodeScalarBoundary {
+      return nil
+    }
+
+    return Index(utf8Index._coreIndex)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func _index(
+    equivalentTo utf16Index: String.UTF16Index
+  ) -> String.UnicodeScalarIndex? {
+    let utf16 = String.UTF16View(_core)
+
+    if utf16Index != utf16.startIndex && utf16Index != utf16.endIndex {
       _precondition(
-        utf16Index >= utf16.startIndex
-        && utf16Index <= utf16.endIndex,
+        utf16Index >= utf16.startIndex && utf16Index <= utf16.endIndex,
         "Invalid String.UTF16Index for this UnicodeScalar view")
 
       // Detect positions that have no corresponding index.  Note that
@@ -332,99 +313,132 @@ extension String.UnicodeScalarIndex {
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid.
       if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16.previous(utf16Index)]) {
+      && UTF16.isLeadSurrogate(utf16[utf16.previous(utf16Index)]) {
         return nil
       }
     }
-    self.init(utf16Index._offset, unicodeScalars._core)
+
+    return Index(utf16Index._offset)
   }
 
-  /// Construct the position in `unicodeScalars` that corresponds exactly to
-  /// `utf8Index`. If no such position exists, the result is `nil`.
-  ///
-  /// - Precondition: `utf8Index` is an element of
-  ///   `String(unicodeScalars).utf8.indices`.
-  public init?(
-    _ utf8Index: String.UTF8Index,
-    within unicodeScalars: String.UnicodeScalarView
-  ) {
-    let core = unicodeScalars._core
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func _index(
+    equivalentTo stringIndex: String.Index
+  ) -> String.UnicodeScalarIndex? {
+    // FIXME: swift-3-indexing-model: range check?
+    return Index(stringIndex._base._position)
+  }
+}
 
-    _precondition(
-      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
-      "Invalid String.UTF8Index for this UnicodeScalar view")
-
-    // Detect positions that have no corresponding index.
-    if !utf8Index._isOnUnicodeScalarBoundary {
-      return nil
+extension String.UnicodeScalarView {
+  /// Returns the length of the first extended grapheme cluster in UTF-16
+  /// code units.
+  @warn_unused_result
+  @inline(never)
+  internal func _measureExtendedGraphemeClusterForward(
+    from start: Index
+  ) -> Int {
+    let end = self.endIndex
+    if start == end {
+      return 0
     }
-    self.init(utf8Index._coreIndex, core)
+
+    let clusterBreakProperty = _UnicodeGraphemeClusterBreakPropertyTrie()
+    let clusterSegmenter = _UnicodeExtendedGraphemeClusterSegmenter()
+    var index = start
+
+    var gcb0 = clusterBreakProperty.getPropertyRawValue(
+      self[index].value
+    )
+
+    _nextInPlace(&index)
+
+    while index != end {
+      // FIXME(performance): consider removing this "fast path".  A branch
+      // that is hard to predict could be worse for performance than a few
+      // loads from cache to fetch the property 'gcb1'.
+      if clusterSegmenter.isBoundaryAfter(gcb0) {
+        break
+      }
+      let gcb1 = clusterBreakProperty.getPropertyRawValue(
+        self[index].value
+      )
+      if clusterSegmenter.isBoundary(gcb0, gcb1) {
+        break
+      }
+      gcb0 = gcb1
+      _nextInPlace(&index)
+    }
+
+    return index._position - start._position
   }
 
-  /// Construct the position in `unicodeScalars` that corresponds
-  /// exactly to `characterIndex`.
-  ///
-  /// - Precondition: `characterIndex` is an element of
-  ///   `String(unicodeScalars).indices`.
-  public init(
-    _ characterIndex: String.Index,
-    within unicodeScalars: String.UnicodeScalarView
-  ) {
-    self.init(characterIndex._base._position, unicodeScalars._core)
-  }
-
-  /// Returns the position in `utf8` that corresponds exactly
-  /// to `self`.
-  ///
-  /// - Precondition: `self` is an element of `String(utf8)!.indices`.
+  /// Returns the length of the previous extended grapheme cluster in UTF-16
+  /// code units.
   @warn_unused_result
-  public func samePosition(in utf8: String.UTF8View) -> String.UTF8View.Index {
-    return String.UTF8View.Index(self, within: utf8)
+  @inline(never)
+  internal func _measureExtendedGraphemeClusterBackward(
+    from end: Index
+  ) -> Int {
+    let start = self.startIndex
+    if start == end {
+      return 0
+    }
+
+    let clusterBreakProperty = _UnicodeGraphemeClusterBreakPropertyTrie()
+    let clusterSegmenter = _UnicodeExtendedGraphemeClusterSegmenter()
+    var index = end
+
+    _previousInPlace(&index)
+    var gcb0 = clusterBreakProperty.getPropertyRawValue(
+      self[index].value
+    )
+
+    while index != start {
+      _previousInPlace(&index)
+      let gcb1 = clusterBreakProperty.getPropertyRawValue(
+        self[index].value
+      )
+      if clusterSegmenter.isBoundary(gcb1, gcb0) {
+        break
+      }
+      gcb0 = gcb1
+    }
+
+    return end._position - index._position
   }
 
-  /// Returns the position in `utf16` that corresponds exactly
-  /// to `self`.
-  ///
-  /// - Precondition: `self` is an element of `String(utf16)!.indices`.
-  @warn_unused_result
-  public func samePosition(
-    in utf16: String.UTF16View
-  ) -> String.UTF16View.Index {
-    return String.UTF16View.Index(self, within: utf16)
-  }
+  internal func _isOnGraphemeClusterBoundary(
+    index: String.UnicodeScalarIndex
+  ) -> Bool {
+    fatalError("FIXME: swift-3-indexing-model: implement")
 
-  /// Returns the position in `characters` that corresponds exactly
-  /// to `self`, or if no such position exists, `nil`.
-  ///
-  /// - Precondition: `self` is an element of
-  ///   `characters.unicodeScalars.indices`.
-  @warn_unused_result
-  public func samePosition(in characters: String) -> String.Index? {
-    return String.Index(self, within: characters)
-  }
-
-  internal var _isOnGraphemeClusterBoundary: Bool {
+    // FIXME: swift-3-indexing-model: rework the following to work
+    //        against the supplied index
+    /*
     let scalars = String.UnicodeScalarView(_core)
     if self == scalars.startIndex || self == scalars.endIndex {
-      return true
+    return true
     }
     let precedingScalar = scalars[self.predecessor()]
 
     let graphemeClusterBreakProperty =
-      _UnicodeGraphemeClusterBreakPropertyTrie()
+    _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
 
     let gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
-      precedingScalar.value)
+    precedingScalar.value)
 
     if segmenter.isBoundaryAfter(gcb0) {
-      return true
+    return true
     }
 
     let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
-      scalars[self].value)
+    scalars[self].value)
 
     return segmenter.isBoundary(gcb0, gcb1)
+    */
   }
 }
 
