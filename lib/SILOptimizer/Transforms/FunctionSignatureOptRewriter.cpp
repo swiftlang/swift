@@ -205,7 +205,7 @@ public:
 
       // Check the signature of Callee to make sure that it is a function that
       // we can specialize. These are conditions independent of the call graph.
-      // If this function cant be specialized, that means we have not created
+      // If this function can't be specialized, that means we have not created
       // the function signature specialized version for it.
       if (!canSpecializeFunction(Callee))
         continue;
