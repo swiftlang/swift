@@ -100,6 +100,6 @@ public:
   }
 };
 
-}
+} // namespace swift
 
-#endif
+#endif /* SWIFT_BASIC_ARRAYREFVIEW_H */
