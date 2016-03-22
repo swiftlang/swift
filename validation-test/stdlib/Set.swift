@@ -1415,7 +1415,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
   var members = [Int]()
-  for i in startIndex..<endIndex {
+  for i in s.indices {
     var foundMember: AnyObject = s[i]
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
@@ -1443,7 +1443,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
   var members = [Int]()
-  for i in startIndex..<endIndex {
+  for i in s.indices {
     var foundMember: AnyObject = s[i]
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
