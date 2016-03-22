@@ -76,6 +76,9 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
 /// FIXME: merge requiresForeignEntryPoint() into getMethodDispatch() and add
 /// an ObjectiveC case to the MethodDispatch enum.
 bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
+  if (vd->isImportAsMember())
+    return true;
+
   // Final functions never require ObjC dispatch.
   if (vd->isFinal())
     return false;
@@ -84,8 +87,6 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
     return true;
 
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
-    if (fd->isImportAsMember())
-      return true;
   
     // Property accessors should be generated alongside the property.
     if (fd->isGetterOrSetter())

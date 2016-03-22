@@ -4,6 +4,7 @@ typedef const struct __attribute__((objc_bridge(id))) __CCPowerSupply *CCPowerSu
 typedef const struct __attribute__((objc_bridge(id))) __CCRefrigerator *CCRefrigeratorRef;
 typedef struct __CCRefrigerator *CCMutableRefrigeratorRef;
 
+#pragma clang arc_cf_code_audited begin
 _Nonnull CCPowerSupplyRef CCPowerSupplyCreate(double watts)
   __attribute__((swift_name("CCPowerSupply.init(watts:)")));
 
@@ -22,8 +23,5 @@ _Nonnull CCPowerSupplyRef CCRefrigeratorGetPowerSupply(CCRefrigeratorRef fridge)
 void CCRefrigeratorSetPowerSupply(CCRefrigeratorRef fridge,
                                   CCPowerSupplyRef _Nonnull powerSupply)
   __attribute__((swift_name("setter:CCRefrigerator.powerSupply(self:_:)")));
-
-
-
-
+#pragma clang arc_cf_code_audited end
 

@@ -2283,7 +2283,11 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&
            D->getKind() <= DeclKind::Last_ValueDecl;
-  }  
+  }
+  
+  /// True if this is a C function that was imported as a member of a type in
+  /// Swift.
+  bool isImportAsMember() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -5883,6 +5887,12 @@ inline bool ValueDecl::isStatic() const {
     return storage->isStatic();
   if (auto func = dyn_cast<FuncDecl>(this))
     return func->isStatic();
+  return false;
+}
+
+inline bool ValueDecl::isImportAsMember() const {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(this))
+    return func->isImportAsMember();
   return false;
 }
 

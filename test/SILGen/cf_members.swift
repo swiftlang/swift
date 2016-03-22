@@ -213,3 +213,25 @@ public func foo(x: Double) {
 // CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])
+
+// CHECK-LABEL: sil @_TF10cf_members3bar
+public func bar(x: Double) {
+  // CHECK: function_ref @CCPowerSupplyCreate : $@convention(c) (Double) -> @owned CCPowerSupply
+  let ps = CCPowerSupply(watts: x)
+  // CHECK: function_ref @CCRefrigeratorCreate : $@convention(c) (CCPowerSupply) -> @owned CCRefrigerator
+  let fridge = CCRefrigerator(powerSupply: ps)
+  // CHECK: function_ref @CCRefrigeratorOpen : $@convention(c) (CCRefrigerator) -> ()
+  fridge.open()
+  // CHECK: function_ref @CCRefrigeratorGetPowerSupply : $@convention(c) (CCRefrigerator) -> @autoreleased CCPowerSupply
+  let ps2 = fridge.powerSupply
+  // CHECK: function_ref @CCRefrigeratorSetPowerSupply : $@convention(c) (CCRefrigerator, CCPowerSupply) -> ()
+  fridge.powerSupply = ps2
+
+  let a: (Double) -> CCPowerSupply = CCPowerSupply.init(watts:)
+  let _ = a(x)
+  let b: (CCRefrigerator) -> () -> () = CCRefrigerator.open
+  b(fridge)()
+  let c = fridge.open
+  c()
+}
+
