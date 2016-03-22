@@ -83,8 +83,7 @@ unsigned extractFirstUnicodeScalar(StringRef S);
 /// Returns the number of code units in UTF16 representation
 uint64_t getUTF16Length(StringRef Str);
 
-} // namespace unicode
-} // namespace swift
+} // end namespace unicode
+} // end namespace swift
 
-#endif
-
+#endif // SWIFT_BASIC_UNICODE_H

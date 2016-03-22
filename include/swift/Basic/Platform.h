@@ -57,7 +57,7 @@ namespace swift {
 
   /// Returns the platform Kind for Darwin triples.
   DarwinPlatformKind getDarwinPlatformKind(const llvm::Triple &triple);
-}
+} // end namespace swift
 
 #endif // SWIFT_BASIC_PLATFORM_H
 

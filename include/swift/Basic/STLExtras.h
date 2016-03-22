@@ -693,4 +693,4 @@ inline bool is_sorted_and_uniqued(const Container &C) {
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_INTERLEAVE_H

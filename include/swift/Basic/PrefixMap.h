@@ -679,4 +679,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_PREFIXMAP_H
