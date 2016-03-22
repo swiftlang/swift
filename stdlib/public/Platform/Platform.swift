@@ -10,9 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import Darwin // Clang module
-
-
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 //===----------------------------------------------------------------------===//
 // MacTypes.h
 //===----------------------------------------------------------------------===//
@@ -94,6 +92,7 @@ public func || <T : Boolean>(
   return lhs.boolValue ? true : rhs().boolValue
 }
 
+#endif
 
 //===----------------------------------------------------------------------===//
 // sys/errno.h
@@ -101,10 +100,18 @@ public func || <T : Boolean>(
 
 public var errno : Int32 {
   get {
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
     return __error().pointee
+#else
+    return __errno_location().pointee
+#endif
   }
-  set {
-    __error().pointee = newValue
+  set(val) {
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
+    return __error().pointee = val
+#else
+    return __errno_location().pointee = val
+#endif
   }
 }
 
@@ -113,13 +120,14 @@ public var errno : Int32 {
 // stdio.h
 //===----------------------------------------------------------------------===//
 
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
 public var stdin : UnsafeMutablePointer<FILE> {
   get {
     return __stdinp
   }
   set {
     __stdinp = newValue
-  }   
+  }
 }
 
 public var stdout : UnsafeMutablePointer<FILE> {
@@ -128,7 +136,7 @@ public var stdout : UnsafeMutablePointer<FILE> {
   }
   set {
     __stdoutp = newValue
-  }   
+  }
 }
 
 public var stderr : UnsafeMutablePointer<FILE> {
@@ -137,8 +145,9 @@ public var stderr : UnsafeMutablePointer<FILE> {
   }
   set {
     __stderrp = newValue
-  }   
+  }
 }
+#endif
 
 
 //===----------------------------------------------------------------------===//
@@ -146,16 +155,16 @@ public var stderr : UnsafeMutablePointer<FILE> {
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-@_silgen_name("_swift_Darwin_open") 
-func _swift_Darwin_open(
+@_silgen_name("_swift_Platform_open")
+func _swift_Platform_open(
   path: UnsafePointer<CChar>,
   _ oflag: CInt,
   _ mode: mode_t
 ) -> CInt
 
 @warn_unused_result
-@_silgen_name("_swift_Darwin_openat")
-func _swift_Darwin_openat(fd: CInt,
+@_silgen_name("_swift_Platform_openat")
+func _swift_Platform_openat(fd: CInt,
   _ path: UnsafePointer<CChar>,
   _ oflag: CInt,
   _ mode: mode_t
@@ -166,7 +175,7 @@ public func open(
   path: UnsafePointer<CChar>,
   _ oflag: CInt
 ) -> CInt {
-  return _swift_Darwin_open(path, oflag, 0)
+  return _swift_Platform_open(path, oflag, 0)
 }
 
 @warn_unused_result
@@ -175,7 +184,7 @@ public func open(
   _ oflag: CInt,
   _ mode: mode_t
 ) -> CInt {
-  return _swift_Darwin_open(path, oflag, mode)
+  return _swift_Platform_open(path, oflag, mode)
 }
 
 @warn_unused_result
@@ -184,7 +193,7 @@ public func openat(
   _ path: UnsafePointer<CChar>,
   _ oflag: CInt
 ) -> CInt {
-  return _swift_Darwin_openat(fd, path, oflag, 0)
+  return _swift_Platform_openat(fd, path, oflag, 0)
 }
 
 @warn_unused_result
@@ -194,20 +203,20 @@ public func openat(
   _ oflag: CInt,
   _ mode: mode_t
 ) -> CInt {
-  return _swift_Darwin_openat(fd, path, oflag, mode)
+  return _swift_Platform_openat(fd, path, oflag, mode)
 }
 
 @warn_unused_result
-@_silgen_name("_swift_Darwin_fcntl")
-internal func _swift_Darwin_fcntl(
+@_silgen_name("_swift_Platform_fcntl")
+internal func _swift_Platform_fcntl(
   fd: CInt,
   _ cmd: CInt,
   _ value: CInt
 ) -> CInt
 
 @warn_unused_result
-@_silgen_name("_swift_Darwin_fcntlPtr")
-internal func _swift_Darwin_fcntlPtr(
+@_silgen_name("_swift_Platform_fcntlPtr")
+internal func _swift_Platform_fcntlPtr(
   fd: CInt,
   _ cmd: CInt,
   _ ptr: UnsafeMutablePointer<Void>
@@ -218,7 +227,7 @@ public func fcntl(
   fd: CInt,
   _ cmd: CInt
 ) -> CInt {
-  return _swift_Darwin_fcntl(fd, cmd, 0)
+  return _swift_Platform_fcntl(fd, cmd, 0)
 }
 
 @warn_unused_result
@@ -227,7 +236,7 @@ public func fcntl(
   _ cmd: CInt,
   _ value: CInt
 ) -> CInt {
-  return _swift_Darwin_fcntl(fd, cmd, value)
+  return _swift_Platform_fcntl(fd, cmd, value)
 }
 
 @warn_unused_result
@@ -236,7 +245,7 @@ public func fcntl(
   _ cmd: CInt,
   _ ptr: UnsafeMutablePointer<Void>
 ) -> CInt {
-  return _swift_Darwin_fcntlPtr(fd, cmd, ptr)
+  return _swift_Platform_fcntlPtr(fd, cmd, ptr)
 }
 
 public var S_IFMT: mode_t   { return mode_t(0o170000) }
@@ -247,7 +256,9 @@ public var S_IFBLK: mode_t  { return mode_t(0o060000) }
 public var S_IFREG: mode_t  { return mode_t(0o100000) }
 public var S_IFLNK: mode_t  { return mode_t(0o120000) }
 public var S_IFSOCK: mode_t { return mode_t(0o140000) }
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 public var S_IFWHT: mode_t  { return mode_t(0o160000) }
+#endif
 
 public var S_IRWXU: mode_t  { return mode_t(0o000700) }
 public var S_IRUSR: mode_t  { return mode_t(0o000400) }
@@ -268,15 +279,18 @@ public var S_ISUID: mode_t  { return mode_t(0o004000) }
 public var S_ISGID: mode_t  { return mode_t(0o002000) }
 public var S_ISVTX: mode_t  { return mode_t(0o001000) }
 
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 public var S_ISTXT: mode_t  { return S_ISVTX }
 public var S_IREAD: mode_t  { return S_IRUSR }
 public var S_IWRITE: mode_t { return S_IWUSR }
 public var S_IEXEC: mode_t  { return S_IXUSR }
+#endif
 
 //===----------------------------------------------------------------------===//
 // unistd.h
 //===----------------------------------------------------------------------===//
 
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 @available(*, unavailable, message: "Please use threads or posix_spawn*()")
 public func fork() -> Int32 {
   fatalError("unavailable function can't be called")
@@ -286,6 +300,7 @@ public func fork() -> Int32 {
 public func vfork() -> Int32 {
   fatalError("unavailable function can't be called")
 }
+#endif
 
 //===----------------------------------------------------------------------===//
 // signal.h
@@ -296,6 +311,19 @@ public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
+#elseif os(Linux) || os(FreeBSD)
+public typealias sighandler_t = __sighandler_t
+
+public var SIG_DFL: sighandler_t? { return nil }
+public var SIG_IGN: sighandler_t {
+  return unsafeBitCast(1, to: sighandler_t.self)
+}
+public var SIG_ERR: sighandler_t {
+  return unsafeBitCast(-1, to: sighandler_t.self)
+}
+public var SIG_HOLD: sighandler_t {
+  return unsafeBitCast(2, to: sighandler_t.self)
+}
 #else
 internal var _ignore = _UnsupportedPlatformError()
 #endif
@@ -309,21 +337,24 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
+#elseif os(Linux) || os(FreeBSD)
+  // The value is ABI.  Value verified to be correct on Glibc.
+  return UnsafeMutablePointer<sem_t>(bitPattern: 0)
 #else
   _UnsupportedPlatformError()
 #endif
 }
 
 @warn_unused_result
-@_silgen_name("_swift_Darwin_sem_open2")
-internal func _swift_Darwin_sem_open2(
+@_silgen_name("_swift_Platform_sem_open2")
+internal func _swift_Platform_sem_open2(
   name: UnsafePointer<CChar>,
   _ oflag: CInt
 ) -> UnsafeMutablePointer<sem_t>
 
 @warn_unused_result
-@_silgen_name("_swift_Darwin_sem_open4")
-internal func _swift_Darwin_sem_open4(
+@_silgen_name("_swift_Platform_sem_open4")
+internal func _swift_Platform_sem_open4(
   name: UnsafePointer<CChar>,
   _ oflag: CInt,
   _ mode: mode_t,
@@ -335,7 +366,7 @@ public func sem_open(
   name: UnsafePointer<CChar>,
   _ oflag: CInt
 ) -> UnsafeMutablePointer<sem_t> {
-  return _swift_Darwin_sem_open2(name, oflag)
+  return _swift_Platform_sem_open2(name, oflag)
 }
 
 @warn_unused_result
@@ -345,6 +376,22 @@ public func sem_open(
   _ mode: mode_t,
   _ value: CUnsignedInt
 ) -> UnsafeMutablePointer<sem_t> {
-  return _swift_Darwin_sem_open4(name, oflag, mode, value)
+  return _swift_Platform_sem_open4(name, oflag, mode, value)
 }
+
+//===----------------------------------------------------------------------===//
+// Misc.
+//===----------------------------------------------------------------------===//
+
+// FreeBSD defines extern char **environ differently than Linux.
+#if os(FreeBSD)
+@warn_unused_result
+@_silgen_name("_swift_FreeBSD_getEnv")
+func _swift_FreeBSD_getEnv(
+) -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+
+public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
+  return _swift_FreeBSD_getEnv().pointee
+}
+#endif
 

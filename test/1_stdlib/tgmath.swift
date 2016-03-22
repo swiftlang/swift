@@ -1,10 +1,19 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
+#if os(Linux) || os(FreeBSD)
+  import Glibc
+  // FIXME: this is a quick hack for non Darwin platforms
+  // where they doesn't have CoreGraphics module.
+  #if arch(i386) || arch(arm)
+    typealias CGFloat = Float
+  #elseif arch(x86_64) || arch(arm64)
+    typealias CGFloat = Double
+  #endif
+#else
 import Darwin.C.tgmath
 import CoreGraphics
+#endif
 
 // verifiers
 
@@ -146,8 +155,10 @@ print3("tan", d1, f1, g1)
 d1 = acosh(dx)
 f1 = acosh(fx)
 g1 = acosh(gx)
-print3("acosh", d1, f1, g1)
-// CHECK-NEXT: acosh nan nan acosh
+print3("acosh", d1.isNaN, f1.isNaN, g1.isNaN)
+// CHECK-NEXT: acosh true true acosh
+// Note: We cannot check the output with "nan nan" using  String interpolations
+// because glibc on Linux outputs the result as "-nan" instead of "nan".
 
 d1 = asinh(dx)
 f1 = asinh(fx)
