@@ -44,26 +44,6 @@ _swift_Platform_fcntlPtr(int fd, int cmd, void* ptr) {
   return fcntl(fd, cmd, ptr);
 }
 
-#if defined(__APPLE__)
-#define _REENTRANT
-#include <math.h>
-
-extern float
-_swift_Darwin_lgammaf_r(float x, int *psigngam) {
-  return lgammaf_r(x, psigngam);
-}
-
-extern double
-_swift_Darwin_lgamma_r(double x, int *psigngam) {
-  return lgamma_r(x, psigngam);
-}
-
-extern long double
-_swift_Darwin_lgammal_r(long double x, int *psigngam) {
-  return lgammal_r(x, psigngam);
-}
-#endif
-
 #if defined(__FreeBSD__)
 extern char **
 _swift_FreeBSD_getEnv() {

@@ -13,7 +13,9 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
       POSIXError.swift
       MachError.swift)
   set(swift_platform_flags
-      SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module
+      SWIFT_COMPILE_FLAGS
+          -Xfrontend -disable-objc-attr-requires-foundation-module
+          -Xcc -D_REENTRANT # Required to unveil lgamma_r used in tgmath.
       API_NOTES_NON_OVERLAY)
 else()
   set(swift_platform_name swiftGlibc)

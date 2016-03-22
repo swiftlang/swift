@@ -282,7 +282,6 @@ public func scalbn(x: ${T}, _ n: Int) -> ${T} {
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
-#if os(Linux) || os(FreeBSD)
 @_transparent
 @warn_unused_result
 public func lgamma(x: ${T}) -> (${T}, Int) {
@@ -290,25 +289,6 @@ public func lgamma(x: ${T}) -> (${T}, Int) {
   let value = lgamma${f}_r(${CT}(x), &sign)
   return (${T}(value), Int(sign))
 }
-#else
-% # On Darwin platform,
-% # The real lgamma_r is not imported because it hides behind macro _REENTRANT.
-@warn_unused_result
-@_silgen_name("_swift_Darwin_lgamma${f}_r")
-func _swift_Darwin_lgamma${f}_r(_: ${CT},
-                                _: UnsafeMutablePointer<CInt>) -> ${CT}
-
-@_transparent
-@warn_unused_result
-public func lgamma(x: ${T}) -> (${T}, Int) {
-  var sign = CInt(0)
-  let value = withUnsafeMutablePointer(&sign) { 
-    (signp: UnsafeMutablePointer<CInt>) -> ${CT} in
-    return _swift_Darwin_lgamma${f}_r(${CT}(x), signp)
-  }
-  return (${T}(value), Int(sign))
-}
-#endif
 
 % end
 
