@@ -159,7 +159,9 @@ extension String {
       /// True iff the index is at the end of its view or if the next
       /// byte begins a new UnicodeScalar.
       internal var _isOnUnicodeScalarBoundary : Bool {
-        return UTF8._isValidUTF8(UInt32(truncatingBitPattern: _buffer)) || _isAtEnd
+        let buffer = UInt32(truncatingBitPattern: _buffer)
+        let (codePoint, _) = UTF8._decodeOne(buffer)
+        return codePoint != nil || _isAtEnd
       }
 
       /// True iff the index is at the end of its view
