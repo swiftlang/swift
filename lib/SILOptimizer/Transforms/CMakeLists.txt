@@ -12,6 +12,7 @@ set(TRANSFORMS_SOURCES
   Transforms/FunctionSignatureOptRewriter.cpp
   Transforms/GenericSpecializer.cpp
   Transforms/MergeCondFail.cpp
+  Transforms/PerformanceInliner.cpp
   Transforms/RedundantLoadElimination.cpp
   Transforms/RedundantOverflowCheckRemoval.cpp
   Transforms/ReleaseDevirtualizer.cpp
