@@ -139,6 +139,6 @@ public:
   SmallBlotMapVector() {}
 };
 
-} // end namespace swift
+} // namespace swift
 
-#endif
+#endif /* SWIFT_BASIC_BLOTMAPVECTOR_H */
