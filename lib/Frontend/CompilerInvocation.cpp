@@ -764,6 +764,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
   Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
   Opts.StripNSPrefix = Args.hasArg(OPT_enable_strip_ns_prefix);
+  if (Args.hasArg(OPT_disable_infer_iuos)) {
+    Opts.InferIUOs = false;
+  }
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 

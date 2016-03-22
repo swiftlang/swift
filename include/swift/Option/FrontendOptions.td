@@ -244,6 +244,10 @@ def swift3_migration :
   Flag<["-"], "swift3-migration">,
   HelpText<"Enable Fix-It based migration aids for Swift 3">;
 
+def disable_infer_iuos :
+  Flag<["-"], "disable-infer-iuos">,
+  HelpText<"Disable inferring IUO type for otherwise unconstrained variables">;
+
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,
   HelpText<"Warn about needless words in names">;
