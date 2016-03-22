@@ -573,7 +573,10 @@ public:
           if (!Unsubstituted)
             return {};
           auto Substituted = Unsubstituted->subst(*this, Subs);
-          Fields.push_back({Field.getFieldName(), Substituted});
+          auto FieldName = Field.getFieldName();
+          if (FieldName.empty())
+            FieldName = "<Redacted Field Name>";
+          Fields.push_back({FieldName, Substituted});
         }
       }
     }
