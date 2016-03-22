@@ -26,4 +26,4 @@ namespace swift {
   }
 } // namespace swift
 
-#endif
+#endif /* SWIFT_BASIC_ALGORITHM_H */
