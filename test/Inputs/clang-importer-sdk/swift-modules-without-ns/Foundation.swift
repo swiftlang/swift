@@ -62,6 +62,11 @@ extension String : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSString?
+  ) -> String {
+    return String()
+  }
 }
 
 extension Int : _ObjectiveCBridgeable {
@@ -194,13 +199,13 @@ extension NSRange : _ObjectiveCBridgeable {
   }
 }
 
-extension NSError : ErrorProtocol {
+extension Error : ErrorProtocol {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
 
 @_silgen_name("swift_convertNSErrorToErrorProtocol")
-func _convertNSErrorToErrorProtocol(string: NSError?) -> ErrorProtocol
+func _convertNSErrorToErrorProtocol(string: Error?) -> ErrorProtocol
 
 @_silgen_name("swift_convertErrorProtocolToNSError")
-func _convertErrorProtocolToNSError(string: ErrorProtocol) -> NSError
+func _convertErrorProtocolToNSError(string: ErrorProtocol) -> Error

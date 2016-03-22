@@ -1,5 +1,3 @@
-// xfailing for swift-3-api-guidelines branch
-// XFAIL: *
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
@@ -56,28 +54,28 @@
 // CHECK-FOUNDATION: init(array: [AnyObject])
 
 // Note: struct name matching; don't drop "With".
-// CHECK-FOUNDATION: class func withRange(_: NSRange) -> NSValue
+// CHECK-FOUNDATION: class func withRange(_: NSRange) -> Value
 
 // Note: built-in types.
-// CHECK-FOUNDATION: func add(_: Double) -> NSNumber
+// CHECK-FOUNDATION: func add(_: Double) -> Number
 
 // Note: built-in types.
-// CHECK-FOUNDATION: func add(_: Bool) -> NSNumber
+// CHECK-FOUNDATION: func add(_: Bool) -> Number
 
 // Note: builtin-types.
-// CHECK-FOUNDATION: func add(_: UInt16) -> NSNumber
+// CHECK-FOUNDATION: func add(_: UInt16) -> Number
 
 // Note: builtin-types.
-// CHECK-FOUNDATION: func add(_: Int32) -> NSNumber
+// CHECK-FOUNDATION: func add(_: Int32) -> Number
 
 // Note: Typedefs with a "_t" suffix".
-// CHECK-FOUNDATION: func subtract(_: Int32) -> NSNumber
+// CHECK-FOUNDATION: func subtract(_: Int32) -> Number
 
 // Note: Respect the getter name for BOOL properties.
 // CHECK-FOUNDATION: var isMakingHoney: Bool
 
 // Note: multi-word enum name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func someMethod(deprecatedOptions _: NSDeprecatedOptions = [])
+// CHECK-FOUNDATION: func someMethod(_: DeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
 // CHECK-FOUNDATION: class func withString(_: String!) -> Self!
@@ -90,7 +88,7 @@
 // CHECK-FOUNDATION-NEXT: case binary
 
 // Note: Make sure NSURL works in various places
-// CHECK-FOUNDATION: open(_: NSURL!, completionHandler: ((Bool) -> Void)!)
+// CHECK-FOUNDATION: open(_: URL!, completionHandler: ((Bool) -> Void)!)
 
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercase: String
@@ -116,16 +114,16 @@
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
 // Note: Noun phrase puts preposition inside.
-// CHECK-FOUNDATION: func url(withAddedString _: String) -> NSURL?
+// CHECK-FOUNDATION: func url(withAddedString _: String) -> URL?
 
 // Note: CalendarUnits is not a set of "Options".
-// CHECK-FOUNDATION: class func forCalendarUnits(_: NSCalendarUnit) -> String!
+// CHECK-FOUNDATION: class func forCalendarUnits(_: CalendarUnit) -> String!
 
 // Note: <property type>By<gerund> --> <gerund>.
-// CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
+// CHECK-FOUNDATION: var deletingLastPathComponent: URL? { get }
 
 // Note: <property type><preposition> --> <preposition>.
-// CHECK-FOUNDATION: var withHTTPS: NSURL { get }
+// CHECK-FOUNDATION: var withHTTPS: URL { get }
 
 // Note: lowercasing option set values
 // CHECK-FOUNDATION: struct EnumerationOptions
@@ -152,15 +150,15 @@
 // CHECK-FOUNDATION: func remove(_: [AnyObject])
 
 // Note: Skipping "Type" suffix.
-// CHECK-FOUNDATION: func doSomething(with _: NSUnderlyingType)
+// CHECK-FOUNDATION: func doSomething(with _: UnderlyingType)
 
 // Don't introduce default arguments for lone parameters to setters.
-// CHECK-FOUNDATION: func setDefaultEnumerationOptions(_: NSEnumerationOptions)
+// CHECK-FOUNDATION: func setDefaultEnumerationOptions(_: EnumerationOptions)
 
 // CHECK-FOUNDATION: func normalizingXMLPreservingComments(_: Bool)
 
 // Collection element types.
-// CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<NSObject>
+// CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<Object>
 
 // Boolean properties follow the getter.
 // CHECK-FOUNDATION: var empty: Bool { get }
@@ -175,30 +173,30 @@
 // CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>)
 
 // Lowercasing after prefix stripping.
-// CHECK-FOUNDATION: let NSGlobalConstant: String
-// CHECK-FOUNDATION: func NSGlobalFunction()
+// CHECK-FOUNDATION: let globalConstant: String
+// CHECK-FOUNDATION: func globalFunction()
 
 // Cannot strip because we end up with something that isn't an identifier
 // CHECK-FOUNDATION: func NS123()
 
 // Strip prefix, but don't lowercase ALL_CAPS.
-// CHECK-FOUNDATION: func NSYELLING()
+// CHECK-FOUNDATION: func YELLING()
 
 // Strip prefix along with '_', but don't lowercase ALL_CAPS.
-// CHECK-FOUNDATION: func NS_SCREAMING()
+// CHECK-FOUNDATION: func SCREAMING()
 
 // Don't leave just a '_'.
 // CHECK-FOUNDATION: func NS_()
 
 // Lowercasing initialisms.
-// CHECK-FOUNDATION: let NSHTTPRequestKey: String
+// CHECK-FOUNDATION: let httpRequestKey: String
 
 // Lowercasing initialisms with plurals.
-// CHECK-FOUNDATION: var urlsInText: [NSURL] { get }
+// CHECK-FOUNDATION: var urlsInText: [URL] { get }
 
 // Prefix stripping for macro names.
-// CHECK-FOUNDATION: var NSTimeIntervalSince1970: Double { get }
-// CHECK-FOUNDATION: var NS_DO_SOMETHING: Int
+// CHECK-FOUNDATION: var timeIntervalSince1970: Double { get }
+// CHECK-FOUNDATION: var DO_SOMETHING: Int
 
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
@@ -222,8 +220,8 @@
 // CHECK-APPKIT: func draw(in _: NSView?)
 
 // Note: NSDictionary default arguments for "options"
-// CHECK-APPKIT: func drawAnywhere(in _: NSView?, options: [NSObject : AnyObject] = [:])
-// CHECK-APPKIT: func drawAnywhere(options _: [NSObject : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(in _: NSView?, options: [Object : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(options _: [Object : AnyObject] = [:])
 
 // Note: no lowercasing of initialisms when there might be a prefix.
 // CHECK-CORECOOLING: func CFBottom() ->
@@ -267,8 +265,8 @@
 // CHECK-APPKIT: func removeGestureRecognizer(_: NSGestureRecognizer)
 // CHECK-APPKIT: func favoriteView(for _: NSGestureRecognizer) -> NSView?
 // CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)
-// CHECK-APPKIT: func add(_: NSRect)
-// CHECK-APPKIT: class func conjureRect(_: NSRect)
+// CHECK-APPKIT: func add(_: Rect)
+// CHECK-APPKIT: class func conjureRect(_: Rect)
 
 // CHECK-OMIT-NEEDLESS-WORDS: func jump(to _: URL)
 // CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith _: AnyObject) -> Bool
