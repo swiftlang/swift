@@ -38,7 +38,7 @@ extension AnySequence where Element : TestProtocol1 {
   }
 }
 
-extension AnyForwardCollection where Element : TestProtocol1 {
+extension AnyCollection where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -64,8 +64,9 @@ tests.test("AnyIterator") {
     
     // This is a really complicated type of no interest to our
     // clients.
-    let iterator: LazyMapIterator<RangeIterator<Int>, String> =
-      lazyStrings.makeIterator()
+    let iterator: LazyMapIterator<
+        IndexingIterator<RangeOfStrideable<Int>>, String
+      > = lazyStrings.makeIterator()
     return AnyIterator(iterator)
   }
   expectEqual(["0", "1", "2", "3", "4"], Array(digits()))
@@ -82,53 +83,88 @@ tests.test("AnyIterator") {
 let initialCallCounts = [
   "successor": 0, "predecessor": 0,
   "_successorInPlace": 0, "_predecessorInPlace": 0,
-  "advanced(by:)": 0, "distance(to:)": 0
+  "advance(_:by:)": 0, "distance(from:to:)": 0
 ]
 
 var callCounts = initialCallCounts
-  
-struct InstrumentedIndex<I : RandomAccessIndex> : RandomAccessIndex {
-  typealias Distance = I.Distance
 
-  var base: I
-  
-  init(_ base: I) {
+struct InstrumentedCollection<
+  C : RandomAccessCollection
+> : RandomAccessCollection {
+
+  typealias Index = C.Index
+  typealias Iterator = C.Iterator
+  typealias IndexDistance = C.IndexDistance
+
+  typealias SubSequence = C.SubSequence
+  typealias Indices = C.Indices
+
+  var base: C
+
+  init(_ base: C) {
     self.base = base
   }
-  
+
   static func resetCounts() {
     callCounts = initialCallCounts
   }
-  
-  func successor() -> InstrumentedIndex {
+
+  @warn_unused_result
+  func next(i: Index) -> Index {
     callCounts["successor"]! += 1
-    return InstrumentedIndex(base.successor())
+    return base.next(i)
   }
-  
-  mutating func _successorInPlace() {
+
+  func _nextInPlace(i: inout Index) {
     callCounts["_successorInPlace"]! += 1
-    base._successorInPlace()
+    base._nextInPlace(&i)
   }
-  
-  func predecessor() -> InstrumentedIndex {
+
+  @warn_unused_result
+  func previous(i: Index) -> Index {
     callCounts["predecessor"]! += 1
-    return InstrumentedIndex(base.predecessor())
+    return base.previous(i)
   }
-  
-  mutating func _predecessorInPlace() {
+
+  func _previousInPlace(i: inout Index) {
     callCounts["_predecessorInPlace"]! += 1
-    base._predecessorInPlace()
+    base._previousInPlace(&i)
   }
-  
-  func advanced(by distance: Distance) -> InstrumentedIndex {
-    callCounts["advanced(by:)"]! += 1
-    return InstrumentedIndex(base.advanced(by: distance))
+
+  func advance(i: Index, by n: IndexDistance) -> Index {
+    callCounts["advance(_:by:)"]! += 1
+    return base.advance(i, by: n)
   }
-  
-  func distance(to other: InstrumentedIndex) -> Distance {
-    callCounts["distance(to:)"]! += 1
-    return base.distance(to: other.base)
+
+  func distance(from start: Index, to end: Index) -> IndexDistance {
+    callCounts["distance(from:to:)"]! += 1
+    return base.distance(from: start, to: end)
   }
+
+  var startIndex: Index {
+    return base.startIndex
+  }
+
+  var endIndex: Index {
+    return base.endIndex
+  }
+
+  subscript(i: Index) -> Iterator.Element {
+    fatalError()
+  }
+
+  subscript(bounds: Range<Index>) -> SubSequence {
+    fatalError()
+  }
+
+  func makeIterator() -> Iterator {
+    return base.makeIterator()
+  }
+
+  var indices: Indices {
+    return base.indices
+  }
+
 }
 
 tests.test("AnySequence.init(Sequence)") {
@@ -167,34 +203,42 @@ tests.test("AnySequence.init(() -> Generator)") {
   }
 }
 
-tests.test("ForwardIndex") {
-  var i = AnyForwardIndex(InstrumentedIndex(0))
-  i = i.successor()
+tests.test("AnyCollection successor/predecessor") {
+  let c = AnyCollection(InstrumentedCollection(0..<10))
+  var i = c.startIndex
+
+  i = c.next(i)
   expectEqual(1, callCounts["successor"])
   expectEqual(0, callCounts["_successorInPlace"])
-  i._successorInPlace()
+
+  c._nextInPlace(&i)
   expectEqual(1, callCounts["successor"])
   expectEqual(1, callCounts["_successorInPlace"])
+
   var x = i
-  i = i.successor()
+  i = c.next(i)
   expectEqual(2, callCounts["successor"])
   expectEqual(1, callCounts["_successorInPlace"])
   _blackHole(x)
 }
 
-tests.test("BidirectionalIndex") {
-  var i = AnyBidirectionalIndex(InstrumentedIndex(0))
+tests.test("AnyBidirectionalCollection successor/predecessor") {
+  let c = AnyBidirectionalCollection(InstrumentedCollection(0..<10))
+  var i = c.startIndex
+
   expectEqual(0, callCounts["predecessor"])
   expectEqual(0, callCounts["_predecessorInPlace"])
 
-  i = i.predecessor()
+  i = c.previous(i)
   expectEqual(1, callCounts["predecessor"])
   expectEqual(0, callCounts["_predecessorInPlace"])
-  i._predecessorInPlace()
+
+  c._previousInPlace(&i)
   expectEqual(1, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
+
   var x = i
-  i = i.predecessor()
+  i = c.previous(i)
   expectEqual(2, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
   _blackHole(x)
@@ -202,7 +246,7 @@ tests.test("BidirectionalIndex") {
 
 tests.test("ForwardCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(a0)
+  let fc0 = AnyCollection(a0)
   let a1 = ContiguousArray(fc0)
   expectEqual(a0, a1)
   for e in a0 {
@@ -218,17 +262,17 @@ tests.test("ForwardCollection") {
 
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(a0.lazy.reversed())
+  let fc0 = AnyCollection(a0.lazy.reversed())
   
-  let bc0_ = AnyBidirectionalCollection(fc0)         // upgrade!
+  let bc0_ = AnyBidirectionalCollection(fc0)  // upgrade!
   expectNotEmpty(bc0_)
   let bc0 = bc0_!
   expectTrue(fc0 === bc0)
 
-  let fc1 = AnyForwardCollection(a0.lazy.reversed()) // new collection
+  let fc1 = AnyCollection(a0.lazy.reversed()) // new collection
   expectFalse(fc1 === fc0)
 
-  let fc2 = AnyForwardCollection(bc0)                // downgrade
+  let fc2 = AnyCollection(bc0)                // downgrade
   expectTrue(fc2 === bc0)
   
   let a1 = ContiguousArray(bc0.lazy.reversed())
@@ -246,7 +290,7 @@ tests.test("BidirectionalCollection") {
   // Can't upgrade a non-random-access collection to random access
   let s0 = "Hello, Woyld".characters
   let bc1 = AnyBidirectionalCollection(s0)
-  let fc3 = AnyForwardCollection(bc1)
+  let fc3 = AnyCollection(bc1)
   expectTrue(fc3 === bc1)
   expectEmpty(AnyRandomAccessCollection(bc1))
   expectEmpty(AnyRandomAccessCollection(fc3))
@@ -254,7 +298,7 @@ tests.test("BidirectionalCollection") {
 
 tests.test("RandomAccessCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(a0.lazy.reversed())
+  let fc0 = AnyCollection(a0.lazy.reversed())
   let rc0_ = AnyRandomAccessCollection(fc0)         // upgrade!
   expectNotEmpty(rc0_)
   let rc0 = rc0_!
