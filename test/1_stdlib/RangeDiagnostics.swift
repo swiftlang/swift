@@ -43,20 +43,50 @@ func typeInference_Strideable<S : Strideable>(v: S) {
 // Many of these error messages are terrible.  If the test starts
 // failing because the error message improves, obviously, update the
 // test!
+do {
+  let r0 = 10..<100        
+  let r1 = UInt(10)..<100
+  let r2 = 10...100
+  let r3 = UInt(10)...100
+  r0[0]       // expected-error {{ambiguous use of 'subscript'}}
+  r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
+  r1[0]       // expected-error {{ambiguous use of 'subscript'}}
+  r2[0]       // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<Int>' with an index of type 'Int'}} expected-note {{overloads for 'subscript' exist}}
+  r3[0]       // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'Int'}} expected-note {{overloads for 'subscript' exist}}
+  r0[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
+  r1[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
+  r2[0..<4]   // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<Int>' with an index of type 'RangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  r3[0..<4]   // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'RangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
+  (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'RangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
 
-let r0 = 10..<100        
-let r1 = UInt(10)..<100
-let r2 = 10...100
-let r3 = UInt(10)...100
-r0[0]       // expected-error {{ambiguous use of 'subscript'}}
-r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
-r1[0]       // expected-error {{ambiguous use of 'subscript'}}
-r2[0]       // expected-error {{ambiguous use of 'subscript'}}
-r3[0]       // expected-error {{ambiguous use of 'subscript'}}
-r0[0..<4]   // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
-r1[0..<4]   // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
-r2[0..<4]   // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
-r3[0..<4]   // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
-(10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
-(UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
+  r0[0...4]   // expected-error {{ambiguous use of 'subscript'}}
+  r1[0...4]   // expected-error {{ambiguous use of 'subscript'}}
+  r2[0...4]   // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<Int>' with an index of type 'ClosedRangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  r3[0...4]   // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'ClosedRangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'ClosedRangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+}
 
+do {
+  let r0: Range = 10..<100        
+  let r1: Range = UInt(10)..<100
+  let r2: ClosedRange = 10...100
+  let r3: ClosedRange = UInt(10)...100
+  r0[0]       // expected-error {{ambiguous use of 'subscript'}}
+  r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
+  r1[0]       // expected-error {{ambiguous use of 'subscript'}}
+  r2[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'ClosedRangeIndex<Int>'}}
+  r3[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'ClosedRangeIndex<UInt>'}}
+  r0[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
+  r1[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
+  r2[0..<4]   // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRangeIndex<Int>'}} expected-note {{overloads for '..<' exist}}
+  r3[0..<4]   // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRangeIndex<UInt>'}} expected-note {{overloads for '..<' exist}}
+  (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
+  (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'RangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+
+  r0[0...4]   // expected-error {{ambiguous use of 'subscript'}}
+  r1[0...4]   // expected-error {{ambiguous use of 'subscript'}}
+  r2[0...4]   // expected-error {{no '...' candidates produce the expected contextual result type 'ClosedRangeIndex<Int>'}} expected-note {{overloads for '...' exist}}
+  r3[0...4]   // expected-error {{no '...' candidates produce the expected contextual result type 'ClosedRangeIndex<UInt>'}} expected-note {{overloads for '...' exist}}
+  (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'ClosedRangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+}

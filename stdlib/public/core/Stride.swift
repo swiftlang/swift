@@ -40,6 +40,8 @@ public protocol _Strideable : Equatable {
   ///   provides a stronger semantic guarantee.
   @warn_unused_result
   func advanced(by n: Stride) -> Self
+
+  associatedtype _DisabledRangeIndex = _DisabledRangeIndex_
 }
 
 // WORKAROUND rdar://25214598 (see above)

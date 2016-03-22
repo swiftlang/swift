@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// A dummy type that we can use when we /don't/ want to create an
+// ambiguity indexing RangeOfStrideable<T> outside a generic context.
+public enum _DisabledRangeIndex_ {}
+
 // FIXME swift-3-indexing-model: Decide whether to de-underscore these
 // protocols and/or to incorporate their default implementations into
 // the concrete models.
@@ -142,7 +146,7 @@ public struct RangeOfStrideable<
 
   public typealias Element = Bound
   public typealias Index = Element
-
+  
   // WORKAROUND - default should be picked up from Collection
   @warn_unused_result
   public func next(i: Index) -> Index {
@@ -209,6 +213,61 @@ public struct RangeOfStrideable<
     return lowerBound == upperBound
   }
 }
+
+//===--- Protection against 0-based indexing assumption -------------------===//
+// The following two extensions provide subscript overloads that
+// create *intentional* ambiguities to prevent the use of integers as
+// indices for ranges, outside a generic context.  This prevents mistakes
+// such as x = r[0], which will trap unless 0 happens to be contained in the
+// range r.
+extension RangeOfStrideable {
+  /// Access the element at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self` and
+  ///   `position != upperBound`.
+  public subscript(position: Bound) -> Bound {
+    _debugPrecondition(self.contains(position), "Index out of range")
+    return position
+  }
+
+  public subscript(_: Bound._DisabledRangeIndex) -> Bound {
+    fatalError("uncallable")
+  }
+}
+
+extension RangeOfStrideable where Bound._DisabledRangeIndex : Strideable {
+  public subscript(bounds: Range<Bound._DisabledRangeIndex>) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+
+  public subscript(
+    bounds: RangeOfStrideable<Bound._DisabledRangeIndex>
+  ) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+  
+  public subscript(bounds: ClosedRange<Bound._DisabledRangeIndex>) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+
+  public subscript(
+    bounds: ClosedRangeOfStrideable<Bound._DisabledRangeIndex>
+  ) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+
+  public subscript(bounds: ClosedRange<Bound>) -> RangeOfStrideable<Bound> {
+    return self[bounds.lowerBound..<(bounds.upperBound.advanced(by: 1))]
+  }
+
+  public subscript(
+    bounds: ClosedRangeOfStrideable<Bound>
+  ) -> RangeOfStrideable<Bound> {
+    return self[ClosedRange(bounds)]
+  }
+}
+
+//===--- End 0-based indexing protection ----------------------------------===//
 
 extension RangeOfStrideable : CustomReflectable {
   public var customMirror: Mirror {
@@ -307,6 +366,74 @@ extension Range : CustomReflectable {
     return Mirror(self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
 }
+
+//===--- Protection against 0-based indexing assumption -------------------===//
+// The following two extensions provide subscript overloads that
+// create *intentional* ambiguities to prevent the use of integers as
+// indices for ranges, outside a generic context.  This prevents mistakes
+// such as x = r[0], which will trap unless 0 happens to be contained in the
+// range r.
+extension Range where Bound : _Strideable {
+  /// Access the element at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self` and
+  ///   `position != upperBound`.
+  public subscript(position: Bound) -> Bound {
+    _debugPrecondition(self.contains(position), "Index out of range")
+    return position
+  }
+
+  public subscript(_: Bound._DisabledRangeIndex) -> Bound {
+    fatalError("uncallable")
+  }
+}
+
+extension Range where Bound : Strideable, Bound._DisabledRangeIndex : Strideable {
+  public subscript(bounds: Range<Bound>) -> Range {
+    fatalError("uncallable")
+  }
+
+  public subscript(
+    bounds: Range<Bound._DisabledRangeIndex>
+  ) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+
+  public subscript(
+    bounds: RangeOfStrideable<Bound>
+  ) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+
+  public subscript(
+    bounds: RangeOfStrideable<Bound._DisabledRangeIndex>
+  ) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+
+  public subscript(bounds: ClosedRange<Bound>) -> Range {
+    fatalError("uncallable")
+  }
+
+  public subscript(
+    bounds: ClosedRange<Bound._DisabledRangeIndex>
+  ) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+
+  public subscript(
+    bounds: ClosedRangeOfStrideable<Bound>
+  ) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+
+  public subscript(
+    bounds: ClosedRangeOfStrideable<Bound._DisabledRangeIndex>
+  ) -> RangeOfStrideable<Bound> {
+    fatalError("uncallable")
+  }
+}
+//===--- End 0-based indexing protection ----------------------------------===//
 
 @warn_unused_result
 public func == <Bound>(lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {

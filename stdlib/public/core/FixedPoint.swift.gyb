@@ -595,6 +595,13 @@ public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
 }
 % end
 
+// Create an ambiguity when indexing or slicing
+// Range[OfStrideable]<${Self}> outside a generic context.  See
+// Range.swift for details.
+extension ${Self} {
+  public typealias _DisabledRangeIndex = ${Self}
+}
+
 // Prefix and postfix increment and decrement.
 
 // FIXME: After <rdar://problem/20226526> is fixed, we should be able
