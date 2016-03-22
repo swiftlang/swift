@@ -58,6 +58,7 @@ namespace swift {
                                           &BaseClass::MemberName,               \
                                           &DerivedClass::MemberName>::value,    \
                 "" #DerivedClass " does not properly override " #MemberName)
-}
 
-#endif
+} // namespace swift
+
+#endif /* SWIFT_BASIC_ASSERT_IMPLEMENTS_H */
