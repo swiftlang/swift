@@ -1097,6 +1097,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyKeyword, Info.Argument);
   if (!Info.USR.empty())
     Elem.set(KeyUSR, Info.USR);
+  if (!Info.SynthesizedUSR.empty())
+    Elem.set(KeySynthesizedUSR, Info.SynthesizedUSR);
   if (Info.Length > 0) {
     Elem.set(KeyOffset, Info.Offset);
     Elem.set(KeyLength, Info.Length);

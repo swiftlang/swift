@@ -43,6 +43,7 @@ extern SourceKit::UIdent KeyKind;
 extern SourceKit::UIdent KeyAccessibility;
 extern SourceKit::UIdent KeySetterAccessibility;
 extern SourceKit::UIdent KeyUSR;
+extern SourceKit::UIdent KeySynthesizedUSR;
 extern SourceKit::UIdent KeyLine;
 extern SourceKit::UIdent KeyColumn;
 extern SourceKit::UIdent KeyReceiverUSR;

@@ -537,6 +537,7 @@ void swift::ide::printSubmoduleInterface(
                   Printer << "\n";
             }
           });
+          AdjustedOptions.BracketOptions.reset();
         }
       }
       return true;

@@ -87,6 +87,11 @@ struct BracketOptions {
   bool shouldOpenExtension = true;
   bool shouldCloseExtension = true;
   bool shouldCloseNominal = true;
+  void reset() {
+    shouldOpenExtension = true;
+    shouldCloseExtension = true;
+    shouldCloseNominal = true;
+  }
 };
 
 /// Options for printing AST nodes.
