@@ -380,7 +380,9 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags "-Xfrontend" "-group-info-path"
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
     if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
-      list(APPEND swift_flags "-Xfrontend" "-sil-serialize-all")
+      if (SWIFT_STDLIB_SIL_SERIALIZE_ALL)
+        list(APPEND swift_flags "-Xfrontend" "-sil-serialize-all")
+      endif()
     endif()
   endif()
 
