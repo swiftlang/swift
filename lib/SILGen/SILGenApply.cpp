@@ -4577,34 +4577,10 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
                                         SILValue method,
                                         SILValue self,
                                         CanFunctionType methodTy) {
-  // Pop the self type off of the function type.
-  // Just to be weird, partially applying an objc method produces a native
-  // function (?!)
-  auto fnTy = method->getType().castTo<SILFunctionType>();
-
-  // If the original method has an @unowned_inner_pointer return, the partial
-  // application thunk will lifetime-extend 'self' for us, converting the
-  // return value to @unowned.
-  //
-  // If the original method has an @autoreleased return, the partial application
-  // thunk will retain it for us, converting the return value to @owned.
-  SmallVector<SILResultInfo, 4> results;
-  results.append(fnTy->getAllResults().begin(), fnTy->getAllResults().end());
-  for (auto &result : results) {
-    if (result.getConvention() == ResultConvention::UnownedInnerPointer)
-      result = SILResultInfo(result.getType(), ResultConvention::Unowned);
-    else if (result.getConvention() == ResultConvention::Autoreleased)
-      result = SILResultInfo(result.getType(), ResultConvention::Owned);
-  }
-
-  auto partialApplyTy = SILFunctionType::get(fnTy->getGenericSignature(),
-                     fnTy->getExtInfo()
-                       .withRepresentation(SILFunctionType::Representation::Thick),
-                     ParameterConvention::Direct_Owned,
-                     fnTy->getParameters()
-                       .slice(0, fnTy->getParameters().size() - 1),
-                     results, fnTy->getOptionalErrorResult(),
-                     gen.getASTContext());
+  auto partialApplyTy = SILBuilder::getPartialApplyResultType(method->getType(),
+                                                              /*argCount*/1,
+                                                              gen.SGM.M,
+                                                              /*subs*/{});
 
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.
@@ -4618,11 +4594,11 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
 #endif
 
   SILValue result = gen.B.createPartialApply(loc, method, method->getType(), {},
-                        self, SILType::getPrimitiveObjectType(partialApplyTy));
+                                             self, partialApplyTy);
   // If necessary, thunk to the native ownership conventions and bridged types.
   auto nativeTy = gen.getLoweredLoadableType(methodTy).castTo<SILFunctionType>();
 
-  if (nativeTy != partialApplyTy) {
+  if (nativeTy != partialApplyTy.getSwiftRValueType()) {
     result = gen.emitBlockToFunc(loc, ManagedValue::forUnmanaged(result),
                                  nativeTy).forward(gen);
   }
