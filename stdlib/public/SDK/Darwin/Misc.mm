@@ -13,6 +13,9 @@
 #include <fcntl.h>
 #include <semaphore.h>
 
+#define _REENTRANT
+#include <math.h>
+
 extern "C" int 
 _swift_Darwin_open(const char *path, int oflag, mode_t mode) {
   return open(path, oflag, mode);
@@ -42,3 +45,17 @@ _swift_Darwin_fcntlPtr(int fd, int cmd, void* ptr) {
   return fcntl(fd, cmd, ptr);
 }
 
+extern "C" float
+_swift_Darwin_lgammaf_r(float x, int *psigngam) {
+  return lgammaf_r(x, psigngam);
+}
+
+extern "C" double
+_swift_Darwin_lgamma_r(double x, int *psigngam) {
+  return lgamma_r(x, psigngam);
+}
+
+extern "C" long double
+_swift_Darwin_lgammal_r(long double x, int *psigngam) {
+  return lgammal_r(x, psigngam);
+}

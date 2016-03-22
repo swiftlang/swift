@@ -259,9 +259,10 @@ public func scalbn(x: ${T}, _ n: Int) -> ${T} {
 % for T, CT, f in AllFloatTypes():
 % # The real lgamma_r is not imported because it hides behind macro _REENTRANT.
 @warn_unused_result
-@_silgen_name("lgamma${f}_r") 
+@_silgen_name("_swift_Darwin_lgamma${f}_r")
 func _swift_Darwin_lgamma${f}_r(_: ${CT},
                                 _: UnsafeMutablePointer<CInt>) -> ${CT}
+
 @_transparent
 @warn_unused_result
 public func lgamma(x: ${T}) -> (${T}, Int) {
