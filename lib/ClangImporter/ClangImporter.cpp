@@ -3961,7 +3961,8 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
                             Impl.OmitNeedlessWords,
-                            Impl.InferDefaultArguments);
+                            Impl.InferDefaultArguments,
+                            Impl.SwiftContext.LangOpts.StripNSPrefix);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
