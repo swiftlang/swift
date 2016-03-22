@@ -33,7 +33,7 @@ inline void *AlignedAlloc(size_t size, size_t align) {
   void *r;
   int res = posix_memalign(&r, align, size);
   assert(res == 0 && "posix_memalign failed");
-  (void)res; // Silence the unused variable warning
+  (void)res; // Silence the unused variable warning.
   return r;
 }
   
@@ -44,4 +44,4 @@ inline void AlignedFree(void *p) {
   
 }
 
-#endif
+#endif /* __SWIFT_MALLOC_H__ */
