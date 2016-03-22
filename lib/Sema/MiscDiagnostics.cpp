@@ -2056,12 +2056,31 @@ public:
     else if (!argNames[0].empty())
       return { true, expr };
 
+    // Track whether we had parentheses around the string literal.
+    bool hadParens = false;
+    auto lookThroughParens = [&](Expr *arg, bool outermost) -> Expr * {
+      if (auto parenExpr = dyn_cast<ParenExpr>(arg)) {
+        if (!outermost) {
+          hadParens = true;
+          return parenExpr->getSubExpr()->getSemanticsProvidingExpr();
+        }
+
+        arg = parenExpr->getSubExpr();
+        if (auto innerParenExpr = dyn_cast<ParenExpr>(arg)) {
+          hadParens = true;
+          arg = innerParenExpr->getSubExpr();
+        }
+      }
+
+      return arg->getSemanticsProvidingExpr();
+    };
+
     // Dig out the argument.
-    Expr *arg = call->getArg()->getSemanticsProvidingExpr();
+    Expr *arg = lookThroughParens(call->getArg(), /*outermost=*/true);
     if (auto tupleExpr = dyn_cast<TupleExpr>(arg)) {
       if (tupleExpr->getNumElements() == 1 &&
           tupleExpr->getElementName(0) == TC.Context.Id_stringLiteral)
-        arg = tupleExpr->getElement(0)->getSemanticsProvidingExpr();
+        arg = lookThroughParens(tupleExpr->getElement(0), /*outermost=*/false);
     }
 
     // If the argument is a call, it might be to
@@ -2074,9 +2093,8 @@ public:
               dyn_cast_or_null<ConstructorDecl>(ctorRefCall->getCalledValue())){
           auto argArgumentNames = argCtor->getFullName().getArgumentNames();
           if (argArgumentNames.size() == 3 &&
-              argArgumentNames[0] == TC.Context.Id_builtinStringLiteral) {
-            arg = argCall->getArg()->getSemanticsProvidingExpr();
-          }
+              argArgumentNames[0] == TC.Context.Id_builtinStringLiteral)
+            arg = lookThroughParens(argCall->getArg(), /*outermost=*/false);
         }
       }
     }
@@ -2137,10 +2155,28 @@ public:
 
     // If we didn't find any methods, complain.
     if (allMethods.empty()) {
-      auto diag =
-        TC.diagnose(stringLiteral->getLoc(), diag::selector_literal_undeclared,
-                    *selector);
-      addSelectorConstruction(diag);
+      // If this was Selector(("selector-name")), suppress, the
+      // diagnostic.
+      if (!fromStringLiteral && hadParens)
+        return { true, expr };
+
+      {
+        auto diag = TC.diagnose(stringLiteral->getLoc(),
+                                diag::selector_literal_undeclared,
+                                *selector);
+        addSelectorConstruction(diag);
+      }
+
+      // If the result was from a Selector("selector-name"), add a
+      // separate note that suggests wrapping the selector in
+      // parentheses to silence the warning.
+      if (!fromStringLiteral) {
+        TC.diagnose(stringLiteral->getLoc(),
+                    diag::selector_construction_suppress_warning)
+          .fixItInsert(stringLiteral->getStartLoc(), "(")
+          .fixItInsertAfter(stringLiteral->getEndLoc(), ")");
+      }
+
       return { true, expr };
     }
 

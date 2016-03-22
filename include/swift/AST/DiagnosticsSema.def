@@ -392,6 +392,8 @@ WARNING(selector_literal_deprecated_suggest,none,
         "use '#selector' instead", ())
 WARNING(selector_construction_suggest,none,
         "use '#selector' instead of explicitly constructing a 'Selector'", ())
+NOTE(selector_construction_suppress_warning,none,
+     "wrap the selector name in parentheses to suppress this warning", ())
 
 ERROR(cannot_return_value_from_void_func,none,
       "unexpected non-void return value in void function", ())
