@@ -56,7 +56,7 @@ UIdent sourcekitd::KeyKind("key.kind");
 UIdent sourcekitd::KeyAccessibility("key.accessibility");
 UIdent sourcekitd::KeySetterAccessibility("key.setter_accessibility");
 UIdent sourcekitd::KeyUSR("key.usr");
-UIdent sourcekitd::KeySynthesizedUSR("key.synthesizedusr");
+UIdent sourcekitd::KeyOriginalUSR("key.original-usr");
 UIdent sourcekitd::KeyLine("key.line");
 UIdent sourcekitd::KeyColumn("key.column");
 UIdent sourcekitd::KeyReceiverUSR("key.receiver_usr");
@@ -143,7 +143,7 @@ static UIdent *OrderedKeys[] = {
   &KeyKeyword,
   &KeyName,
   &KeyUSR,
-  &KeySynthesizedUSR,
+  &KeyOriginalUSR,
   &KeyGenericParams,
   &KeyGenericRequirements,
   &KeyDocFullAsXML,

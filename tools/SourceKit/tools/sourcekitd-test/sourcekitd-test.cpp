@@ -91,7 +91,7 @@ static sourcekitd_uid_t KeyModuleInterfaceName;
 static sourcekitd_uid_t KeyLength;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyUSR;
-static sourcekitd_uid_t KeySynthesizedUSR;
+static sourcekitd_uid_t KeyOriginalUSR;
 static sourcekitd_uid_t KeyTypename;
 static sourcekitd_uid_t KeyOverrides;
 static sourcekitd_uid_t KeyRelatedDecls;
@@ -185,7 +185,7 @@ static int skt_main(int argc, const char **argv) {
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyUSR = sourcekitd_uid_get_from_cstr("key.usr");
-  KeySynthesizedUSR = sourcekitd_uid_get_from_cstr("key.synthesizedusr");
+  KeyOriginalUSR = sourcekitd_uid_get_from_cstr("key.original-usr");
   KeyTypename = sourcekitd_uid_get_from_cstr("key.typename");
   KeyOverrides = sourcekitd_uid_get_from_cstr("key.overrides");
   KeyRelatedDecls = sourcekitd_uid_get_from_cstr("key.related_decls");

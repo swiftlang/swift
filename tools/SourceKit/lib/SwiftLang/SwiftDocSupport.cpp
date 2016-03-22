@@ -251,14 +251,17 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
   if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
     llvm::raw_svector_ostream NameOS(Info.Name);
     SwiftLangSupport::printDisplayName(VD, NameOS);
-
-    llvm::raw_svector_ostream OS(Info.USR);
-    SwiftLangSupport::printUSR(VD, OS);
-    if (SynthesizedTarget) {
-      llvm::raw_svector_ostream OS(Info.SynthesizedUSR);
+    {
+      llvm::raw_svector_ostream OS(Info.USR);
       SwiftLangSupport::printUSR(VD, OS);
-      OS << SwiftLangSupport::SynthesizedUSRSeparator;
-      SwiftLangSupport::printUSR(dyn_cast<ValueDecl>(SynthesizedTarget), OS);
+      if (SynthesizedTarget) {
+        OS << SwiftLangSupport::SynthesizedUSRSeparator;
+        SwiftLangSupport::printUSR(dyn_cast<ValueDecl>(SynthesizedTarget), OS);
+        {
+          llvm::raw_svector_ostream OS(Info.OriginalUSR);
+          SwiftLangSupport::printUSR(VD, OS);
+        }
+      }
     }
   }
 
