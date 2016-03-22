@@ -3017,8 +3017,8 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for classes.
-  if (auto *CT = T->getAs<ClassType>()) {
-    if (!CT->getDecl()->isObjC())
+  if (auto *CD = T->getClassOrBoundGenericClass()) {
+    if (!CD->isObjC())
       diagnose(TypeRange.Start, diag::not_objc_swift_class)
           .highlight(TypeRange);
     return;

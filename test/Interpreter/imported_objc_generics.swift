@@ -119,6 +119,9 @@ class ClassWithMethodsUsingObjCGenerics: NSObject {
   func copyContainer(_ x: CopyingContainer<NSString>) -> CopyingContainer<NSString> {
     return x
   }
+  func maybeCopyContainer(_ x: CopyingContainer<NSString>) -> CopyingContainer<NSString>? {
+    return x
+  }
 }
 
 ImportedObjCGenerics.test("ClassWithMethodsUsingObjCGenerics") {
@@ -128,6 +131,11 @@ ImportedObjCGenerics.test("ClassWithMethodsUsingObjCGenerics") {
   expectTrue(y === z)
   let w = x.performSelector(#selector(ClassWithMethodsUsingObjCGenerics.copyContainer), withObject: y).takeUnretainedValue()
   expectTrue(y === w)
+
+  let zq = x.maybeCopyContainer(y)
+  expectTrue(y === zq!)
+  let wq = x.performSelector(#selector(ClassWithMethodsUsingObjCGenerics.maybeCopyContainer), withObject: y).takeUnretainedValue()
+  expectTrue(y === wq)
 }
 
 runAllTests()

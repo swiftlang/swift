@@ -590,10 +590,10 @@ public class NonObjCClass { }
 
 // CHECK-LABEL: @interface UsesImportedGenerics
 @objc class UsesImportedGenerics {
-  // CHECK: - (GenericClass<id> * _Nonnull)takeAndReturnGenericClass:(GenericClass<NSString *> * _Nonnull)x;
-  @objc func takeAndReturnGenericClass(x: GenericClass<NSString>) -> GenericClass<AnyObject> { fatalError("") }
-  // CHECK: - (PettableContainer<id <Pettable>> * _Nonnull)takeAndReturnPettableContainer:(PettableContainer<Pet *> * _Nonnull)x;
-  @objc func takeAndReturnPettableContainer(x: PettableContainer<Pet>) -> PettableContainer<Pettable> { fatalError("") }
+  // CHECK: - (GenericClass<id> * _Nonnull)takeAndReturnGenericClass:(GenericClass<NSString *> * _Nullable)x;
+  @objc func takeAndReturnGenericClass(x: GenericClass<NSString>?) -> GenericClass<AnyObject> { fatalError("") }
+  // CHECK: - (PettableContainer<id <Pettable>> * _Null_unspecified)takeAndReturnPettableContainer:(PettableContainer<Pet *> * _Nonnull)x;
+  @objc func takeAndReturnPettableContainer(x: PettableContainer<Pet>) -> PettableContainer<Pettable>! { fatalError("") }
 }
 // CHECK: @end
 
