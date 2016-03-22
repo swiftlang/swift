@@ -23,11 +23,13 @@ public protocol RandomAccessCollection :
   RandomAccessIndexable, BidirectionalCollection
 {
 
-  //associatedtype SubSequence : RandomAccessIndexable, Collection = RandomAccessSlice<Self>
+  associatedtype SubSequence : RandomAccessIndexable, BidirectionalCollection
+    = RandomAccessSlice<Self>
   // FIXME(compiler limitation):
   // associatedtype SubSequence : RandomAccessCollection
 
-  associatedtype Indices : Collection = DefaultRandomAccessIndices<Self>
+  associatedtype Indices : RandomAccessIndexable, BidirectionalCollection
+    = DefaultRandomAccessIndices<Self>
   // FIXME(compiler limitation):
   // associatedtype Indices : RandomAccessCollection
 }

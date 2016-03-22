@@ -40,11 +40,13 @@ public protocol BidirectionalCollection
 
   func _previousInPlace(i: inout Index)
 
-  associatedtype SubSequence : BidirectionalIndexable, Collection = BidirectionalSlice<Self>
+  associatedtype SubSequence : BidirectionalIndexable, Collection
+    = BidirectionalSlice<Self>
   // FIXME(compiler limitation):
   // associatedtype SubSequence : BidirectionalCollection
 
-  associatedtype Indices : Collection = DefaultBidirectionalIndices<Self>
+  associatedtype Indices : BidirectionalIndexable, Collection
+    = DefaultBidirectionalIndices<Self>
   // FIXME(compiler limitation):
   // associatedtype Indices : BidirectionalCollection
 

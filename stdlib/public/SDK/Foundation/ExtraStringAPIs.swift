@@ -31,6 +31,6 @@ extension String.UTF16View.Index : Strideable {
   }
 }
 
-extension String.UTF16View : RandomAccessCollection {
-  // FIXME: swift-3-indexing-model: what rules, etc. to enforce?
-}
+extension String.UTF16View : RandomAccessCollection {}
+extension String.UTF16View.Indices : RandomAccessCollection {}
+

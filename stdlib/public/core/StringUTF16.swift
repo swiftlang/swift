@@ -44,6 +44,17 @@ extension String {
       return Index(_offset: _length)
     }
 
+    public struct Indices {
+      internal var _elements: String.UTF16View
+      internal var _startIndex: Index
+      internal var _endIndex: Index
+    }
+
+    public var indices: Indices {
+      return Indices(
+        _elements: self, startIndex: startIndex, endIndex: endIndex)
+    }
+
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
     public func next(i: Index) -> Index {
@@ -321,3 +332,87 @@ extension String.UTF16View : CustomPlaygroundQuickLookable {
     return .text(description)
   }
 }
+
+extension String.UTF16View.Indices : BidirectionalCollection {
+  public typealias Index = String.UTF16View.Index
+  public typealias IndexDistance = String.UTF16View.IndexDistance
+  public typealias Indices = String.UTF16View.Indices
+  public typealias SubSequence = String.UTF16View.Indices
+
+  internal init(
+    _elements: String.UTF16View,
+    startIndex: Index,
+    endIndex: Index
+  ) {
+    self._elements = _elements
+    self._startIndex = startIndex
+    self._endIndex = endIndex
+  }
+
+  public var startIndex: Index {
+    return _startIndex
+  }
+
+  public var endIndex: Index {
+    return _endIndex
+  }
+
+  public var indices: Indices {
+    return self
+  }
+
+  public subscript(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return i
+  }
+
+  public subscript(bounds: Range<Index>) -> String.UTF16View.Indices {
+    // FIXME: swift-3-indexing-model: range check.
+    return String.UTF16View.Indices(
+      _elements: _elements,
+      startIndex: bounds.lowerBound,
+      endIndex: bounds.upperBound)
+  }
+
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return _elements.next(i)
+  }
+
+  public func _nextInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    _elements._nextInPlace(&i)
+  }
+
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return _elements.previous(i)
+  }
+
+  public func _previousInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    _elements._previousInPlace(&i)
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    // FIXME: swift-3-indexing-model: range check i?
+    return _elements.advance(i, by: n)
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check i?
+    return _elements.advance(i, by: n, limit: limit)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    // FIXME: swift-3-indexing-model: range check start and end?
+    return _elements.distance(from: start, to: end)
+  }
+}
+
