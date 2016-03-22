@@ -83,6 +83,12 @@ public:
   bool hasMergeGroup(MergeGroupKind Kind);
 };
 
+struct BracketOptions {
+  bool shouldOpenExtension = true;
+  bool shouldCloseExtension = true;
+  bool shouldCloseNominal = true;
+};
+
 /// Options for printing AST nodes.
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;
@@ -279,11 +285,7 @@ struct PrintOptions {
   /// \brief The information for converting archetypes to specialized types.
   std::shared_ptr<ArchetypeTransformContext> TransformContext;
 
-  struct BracketOptions {
-    bool shouldOpenExtension = true;
-    bool shouldCloseExtension = true;
-    bool shouldCloseNominal = true;
-  } BracketOptions;
+  BracketOptions BracketOptions;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {

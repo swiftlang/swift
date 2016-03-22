@@ -151,8 +151,8 @@ public extension S6 {
 }
 
 // CHECK1: <synthesized>extension <ref:Struct>S1</ref> where T : P2 {
-// CHECK1-NEXT:     <decl:Func>public func <loc>p2member()</loc></decl></synthesized>
-// CHECK1-NEXT: <synthesized><decl:Func>public func <loc>ef1(<decl:Param>t: T</decl>)</loc></decl>
+// CHECK1-NEXT:     <decl:Func>public func <loc>p2member()</loc></decl>
+// CHECK1-NEXT:     <decl:Func>public func <loc>ef1(<decl:Param>t: T</decl>)</loc></decl>
 // CHECK1-NEXT:     <decl:Func>public func <loc>ef2(<decl:Param>t: <ref:Struct>S2</ref></decl>)</loc></decl>
 // CHECK1-NEXT: }</synthesized>
 
@@ -173,9 +173,9 @@ public extension S6 {
 // CHECK5-NEXT: <decl:TypeAlias>public typealias <loc>T2</loc> = <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S9</ref><<ref:Struct>Int</ref>></decl>
 // CHECK5-NEXT: <decl:Func>public func <loc>f1(<decl:Param>t: <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S10</ref>.Type.<ref:TypeAlias>T1</ref></decl>)</loc> -> <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S10</ref>.Type.<ref:TypeAlias>T1</ref></decl>
 // CHECK5-NEXT: <decl:Func>public func <loc>f2(<decl:Param>t: <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S10</ref>.Type.<ref:TypeAlias>T2</ref></decl>)</loc> -> <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S10</ref>.Type.<ref:TypeAlias>T2</ref></decl></decl>
-// CHECK5-NEXT: <synthesized><decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl></synthesized>
-// CHECK5-NEXT: <synthesized><decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S9</ref><<ref:Struct>Int</ref>></decl>)</loc></decl></synthesized>
-// CHECK5-NEXT: <synthesized><decl:Func>public func <loc>S9IntFunc()</loc></decl>
+// CHECK5-NEXT: <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK5-NEXT: <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S9</ref><<ref:Struct>Int</ref>></decl>)</loc></decl>
+// CHECK5-NEXT: <decl:Func>public func <loc>S9IntFunc()</loc></decl>
 // CHECK5-NEXT: }</synthesized>
 
 // CHECK6:  <synthesized>/// Extension on P4Func1
@@ -193,7 +193,7 @@ public extension S6 {
 // CHECK8-NEXT:   <decl:TypeAlias>public typealias <loc>T2</loc> = <ref:Struct>Int</ref></decl>
 // CHECK8-NEXT:   <decl:Func>public func <loc>f1(<decl:Param>t: <ref:TypeAlias>T1</ref></decl>)</loc> -> <ref:TypeAlias>T1</ref></decl>
 // CHECK8-NEXT:   <decl:Func>public func <loc>f2(<decl:Param>t: <ref:TypeAlias>T2</ref></decl>)</loc> -> <ref:TypeAlias>T2</ref></decl></decl>
-// CHECK8-NEXT:   <synthesized><decl:Func>public func <loc>p1IntFunc(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK8-NEXT:   <decl:Func>public func <loc>p1IntFunc(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
 // CHECK8-NEXT:   }</synthesized>
 
 // CHECK9:      <decl:Struct>public struct <loc>S6<<decl:GenericTypeParam>T</decl>></loc> : <ref:Protocol>P1</ref> {
@@ -203,11 +203,11 @@ public extension S6 {
 // CHECK9-NEXT:    <decl:Func>public func <loc>f2(<decl:Param>t: <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S6</ref>.Type.<ref:TypeAlias>T2</ref></decl>)</loc> -> <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S6</ref>.Type.<ref:TypeAlias>T2</ref></decl></decl>
 // CHECK9-NEXT:    <decl:Extension><decl:Func>public func <loc>f3()</loc></decl></decl>
 // CHECK9-NEXT:    <decl:Extension><decl:Func>public func <loc>fromActualExtension()</loc></decl></decl>
-// CHECK9-NEXT:    <synthesized><decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl></synthesized>
-// CHECK9-NEXT:    <synthesized><decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S5</ref></decl>)</loc></decl>
+// CHECK9-NEXT:    <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK9-NEXT:    <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S5</ref></decl>)</loc></decl>
 // CHECK9-NEXT: }</synthesized>
 
 // CHECK10: <synthesized>extension <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S7</ref>.<ref:Struct>S8</ref> {
-// CHECK10-NEXT:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl></synthesized>
-// CHECK10-NEXT: <synthesized><decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S5</ref></decl>)</loc></decl>
+// CHECK10-NEXT:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK10-NEXT:     <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S5</ref></decl>)</loc></decl>
 // CHECK10-NEXT: }</synthesized>

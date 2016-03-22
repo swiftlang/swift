@@ -811,13 +811,14 @@ void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
 }
 
-void ASTPrinter::callPrintDeclPre(const Decl *D) {
+void ASTPrinter::callPrintDeclPre(const Decl *D,
+                                  Optional<BracketOptions> Bracket) {
   forceNewlines();
 
   if (SynthesizeTarget && D->getKind() == DeclKind::Extension)
-    printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget);
+    printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget, Bracket);
   else
-    printDeclPre(D);
+    printDeclPre(D, Bracket);
 }
 
 ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
@@ -1199,14 +1200,15 @@ public:
       }
     }
 
-    Printer.callPrintDeclPre(D);
+    Printer.callPrintDeclPre(D, Options.BracketOptions);
     ASTVisitor::visit(D);
     if (Synthesize) {
       Printer.setSynthesizedTarget(nullptr);
       Printer.printSynthesizedExtensionPost(
-          cast<ExtensionDecl>(D), Options.TransformContext->getNominal());
+          cast<ExtensionDecl>(D), Options.TransformContext->getNominal(),
+          Options.BracketOptions);
     } else {
-      Printer.callPrintDeclPost(D);
+      Printer.callPrintDeclPost(D, Options.BracketOptions);
     }
     return true;
   }

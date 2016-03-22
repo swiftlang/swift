@@ -91,7 +91,7 @@ public:
     assert(EntitiesStack.empty());
   }
 
-  void printDeclPre(const Decl *D) override {
+  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
     if (isa<ParamDecl>(D))
       return; // Parameters are handled specially in addParameters().
     unsigned StartOffset = OS.tell();
@@ -105,7 +105,7 @@ public:
     }
   }
 
-  void printDeclPost(const Decl *D) override {
+  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
     if (isa<ParamDecl>(D))
       return; // Parameters are handled specially in addParameters().
 
