@@ -64,6 +64,11 @@ struct StaticArray<
   }
 
   typealias Iterator = IndexingIterator<StaticArray>
+
+  subscript(bounds: Range<Index>) -> StaticArray<T> {
+    get { fatalError() }
+    set { fatalError() }
+  }
 }
 
 typealias SA2Int   = StaticArray<A0<Int>>
