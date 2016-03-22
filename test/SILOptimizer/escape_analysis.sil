@@ -1214,3 +1214,38 @@ sil [_semantics "array.get_element_address"] @get_element_address : $@convention
 sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed Array<X>) -> Int32
 sil [_semantics "array.get_capacity"] @get_capacity : $@convention(method) (@guaranteed Array<X>) -> Int32
 
+sil [_semantics "pair_no_escaping_closure"] @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+sil [_semantics "self_no_escaping_closure"] @unsafeWithNotEscapedSelfPointer: $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+
+// CHECK-LABEL: CG of semantics_pair_no_escaping_closure
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:   Arg %1 Esc: A, Succ:
+// CHECK-NEXT:   Arg %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:   Con %2.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %4 Esc: %5, Succ:
+// CHECK-NEXT: End
+sil @semantics_pair_no_escaping_closure : $@convention(thin) (@owned X, @guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType)) -> () {
+bb(%0 : $X, %1 : $X, %2: $@callee_owned (X, X) -> (@out X, @error ErrorType)):
+  %3 = function_ref @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  %4 = alloc_stack $X
+  %6 = apply [nothrow] %3(%4, %0, %2, %1) : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  dealloc_stack %4 : $*X
+  %7 = tuple()
+	return %7 : $()
+}
+
+// CHECK-LABEL: CG of semantics_self_no_escaping_closure
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:   Arg %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:   Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %3 Esc: %4, Succ:
+// CHECK-NEXT: End
+sil @semantics_self_no_escaping_closure : $@convention(thin) (@guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType)) -> () {
+bb(%0 : $X, %1: $@callee_owned (X, X) -> (@out X, @error ErrorType)):
+  %2 = function_ref @unsafeWithNotEscapedSelfPointer : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  %3 = alloc_stack $X
+  %6 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  dealloc_stack %3 : $*X
+  %7 = tuple()
+	return %7 : $()
+}

@@ -1173,6 +1173,36 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
     }
 
+    if (FAS.getReferencedFunction() &&
+        FAS.getReferencedFunction()->hasSemanticsAttr(
+            "self_no_escaping_closure") &&
+        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 3) ||
+         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 2)) &&
+        FAS.hasSelfArgument()) {
+      // The programmer has guaranteed that the closure will not capture the
+      // self pointer passed to it or anything that is transitively reachable
+      // from the pointer.
+      auto Args = FAS.getArgumentsWithoutIndirectResults();
+      // The first not indirect result argument is the closure.
+      setEscapesGlobal(ConGraph, Args[0]);
+      return;
+    }
+
+    if (FAS.getReferencedFunction() &&
+        FAS.getReferencedFunction()->hasSemanticsAttr(
+            "pair_no_escaping_closure") &&
+        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 4) ||
+         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 3)) &&
+        FAS.hasSelfArgument()) {
+      // The programmer has guaranteed that the closure will not capture the
+      // self pointer passed to it or anything that is transitively reachable
+      // from the pointer.
+      auto Args = FAS.getArgumentsWithoutIndirectResults();
+      // The second not indirect result argument is the closure.
+      setEscapesGlobal(ConGraph, Args[1]);
+      return;
+    }
+
     if (RecursionDepth < MaxRecursionDepth) {
       CalleeList Callees = BCA->getCalleeList(FAS);
       if (Callees.allCalleesVisible()) {
