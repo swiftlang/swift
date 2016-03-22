@@ -477,7 +477,7 @@ func testInOut(arg: inout Int) {
   var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
 
-  takesExplicitInt(5) // expected-error {{cannot convert value of type 'Int' to expected argument type 'inout Int'}}
+  takesExplicitInt(5) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -840,7 +840,7 @@ var y = 1
 let _ = (x, x.successor()).0
 let _ = (x, 3).1
 (x,y) = (2,3)
-(x,4) = (1,2) // expected-error {{cannot assign to value: function call returns immutable value}}
+(x,4) = (1,2) // expected-error {{cannot assign to value: literals are not mutable}}
 (x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
 x = (x,(3,y)).1.1
 
