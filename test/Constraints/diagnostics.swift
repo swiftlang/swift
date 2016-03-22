@@ -754,5 +754,10 @@ func r24251022() {
     b // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
 }
 
+func overloadSetResultType(a : Int, b : Int) -> Int {
+  // https://twitter.com/_jlfischer/status/712337382175952896
+  return a == b && 1 == 2  // expected-error {{'&&' produces 'Bool', not the expected contextual result type 'Int'}}
+}
+
 
 

@@ -2970,6 +2970,24 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
              contextualResultType);
     return true;
   default:
+    // Check to see if all of the viable candidates produce the same result,
+    // this happens for things like "==" and "&&" operators.
+    if (auto resultTy = calleeInfo[0].getResultType()) {
+      for (unsigned i = 1, e = calleeInfo.size(); i != e; ++i)
+        if (auto ty = calleeInfo[i].getResultType())
+          if (!resultTy->isEqual(ty)) {
+            resultTy = Type();
+            break;
+          }
+      if (resultTy) {
+        diagnose(expr->getLoc(), diag::candidates_no_match_result_type,
+                 calleeInfo.declName, calleeInfo[0].getResultType(),
+                 contextualResultType);
+        return true;
+      }
+    }
+
+    // Otherwise, produce a candidate set.
     diagnose(expr->getLoc(), diag::no_candidates_match_result_type,
              calleeInfo.declName, contextualResultType);
     calleeInfo.suggestPotentialOverloads(expr->getLoc(), /*isResult*/true);
