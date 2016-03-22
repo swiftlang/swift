@@ -141,4 +141,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_BLOTMAPVECTOR_H
