@@ -34,11 +34,12 @@ tests.test("RangeIteratorConformsToSequence") {
 tests.test("IteratorSequence") {
   var r = 1..<7
   var x = MinimalIterator(Array(r))
+  var rangeIndex = r.lowerBound
   for a in IteratorSequence(x) {
-    expectEqual(r.lowerBound, a)
-    r.lowerBound = r.lowerBound.successor()
+    expectEqual(rangeIndex, a)
+    rangeIndex = r.next(rangeIndex)
   }
-  expectEqual(r.lowerBound, r.upperBound)
+  expectEqual(rangeIndex, r.upperBound)
 }
 
 struct MyIterator : IteratorProtocol {
