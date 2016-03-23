@@ -877,6 +877,8 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
     Elem.set(KeyLine, Info.Line);
     Elem.set(KeyColumn, Info.Column);
   }
+  if (!Info.Group.empty())
+    Elem.set(KeyGroupName, Info.Group);
 
   if (Info.EntityType == EntityInfo::FuncDecl) {
     const FuncDeclEntityInfo &FDInfo =

@@ -511,6 +511,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     Info.Kind = SwiftLangSupport::getUIDForAccessor(D, AccKind, IsRef);
     Info.Name.clear();
     Info.USR.clear();
+    Info.Group.clear();
     llvm::raw_svector_ostream OS(Info.USR);
     SwiftLangSupport::printAccessorUSR(D, AccKind, OS);
 
@@ -698,7 +699,10 @@ bool IndexSwiftASTWalker::initEntityInfo(ValueDecl *D,
   if (SwiftLangSupport::printUSR(D, OS))
     return true;
   std::tie(Info.Line, Info.Column) = getLineCol(Loc);
-
+  if (auto Group = D->getGroupName()) {
+    Info.Group.clear();
+    Info.Group.append(Group.getValue());
+  }
   return false;
 }
 
@@ -742,6 +746,10 @@ bool IndexSwiftASTWalker::initFuncDeclEntityInfo(ValueDecl *D,
     return true;
 
   Info.IsTestCandidate = isTestCandidate(D);
+  if (auto Group = D->getGroupName()) {
+    Info.Group.clear();
+    Info.Group.append(Group.getValue());
+  }
   return false;
 }
 

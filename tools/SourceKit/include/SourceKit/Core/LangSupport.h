@@ -40,6 +40,7 @@ struct EntityInfo {
   UIdent Kind;
   llvm::SmallString<32> Name;
   llvm::SmallString<64> USR;
+  llvm::SmallString<16> Group;
   unsigned Line = 0;
   unsigned Column = 0;
 
