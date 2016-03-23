@@ -832,6 +832,28 @@ static void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
                           getPlatformNameForTriple(TC.getTriple()));
 }
 
+/// Get the runtime library link path for static linking,
+/// which is platform-specific and found relative to the compiler.
+static void getRuntimeStaticLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
+                                  const llvm::opt::ArgList &args,
+                                  const ToolChain &TC) {
+  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
+  // library link path and the standard library module import path don't
+  // need to be the same.
+  if (const Arg *A = args.getLastArg(options::OPT_resource_dir)) {
+    StringRef value = A->getValue();
+    runtimeLibPath.append(value.begin(), value.end());
+  } else {
+    auto programPath = TC.getDriver().getSwiftProgramPath();
+    runtimeLibPath.append(programPath.begin(), programPath.end());
+    llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
+    llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
+    llvm::sys::path::append(runtimeLibPath, "lib", "swift_static");
+  }
+  llvm::sys::path::append(runtimeLibPath,
+                          getPlatformNameForTriple(TC.getTriple()));
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
                                         const JobContext &context) const {
@@ -1054,8 +1076,22 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   // relative to the compiler.
   SmallString<128> RuntimeLibPath;
   getRuntimeLibraryPath(RuntimeLibPath, context.Args, *this);
+
+  // Link the standard library.
   Arguments.push_back("-L");
-  Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+  if (context.Args.hasFlag(options::OPT_static_stdlib,
+                            options::OPT_no_static_stdlib,
+                            false)) {
+    SmallString<128> StaticRuntimeLibPath;
+    getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
+    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
+    Arguments.push_back("-lc++");
+    Arguments.push_back("-framework");
+    Arguments.push_back("Foundation");
+    Arguments.push_back("-force_load_swift_libs");
+  } else {
+    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+  }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
     SmallString<128> LibProfile(RuntimeLibPath);
