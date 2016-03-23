@@ -2570,8 +2570,8 @@ bb4:
 // CHECK:   [[T:%T]] = load %swift.type*, %swift.type** [[T0]],
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 3
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*
 // CHECK:   store i8* [[T0]], i8** [[T1]]
 // CHECK:   [[VWT:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 5
 // CHECK:   [[T0:%.*]] = bitcast i8** [[VWT]] to i8*
@@ -2613,7 +2613,7 @@ bb4:
 
 // -- Fill function for dynamic single-payload. Call into the runtime to
 //    calculate the size.
-// CHECK: define{{( protected)?}} private %swift.type* @create_generic_metadata_DynamicSinglePayload(%swift.type_pattern*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_DynamicSinglePayload(%swift.type_pattern*, i8**) {{.*}} {
 // CHECK:   call void @swift_initEnumValueWitnessTableSinglePayload
 
 // CHECK-64-LABEL: define linkonce_odr hidden void @_TwxsV4enum17StructWithWeakVar(%swift.opaque* %dest, i32 %index, %swift.type* %StructWithWeakVar)

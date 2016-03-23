@@ -105,7 +105,8 @@ public:
     class_addProtocol = IGM.getClassAddProtocolFn();
 
     CanType origTy = ext->getDeclaredTypeOfContext()->getCanonicalType();
-    classMetadata = tryEmitConstantTypeMetadataRef(IGM, origTy);
+    classMetadata =
+      tryEmitConstantHeapMetadataRef(IGM, origTy, /*allowUninit*/ true);
     assert(classMetadata &&
            "extended objc class doesn't have constant metadata?!");
     classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,
@@ -1698,6 +1699,42 @@ static llvm::Constant *getElementBitCast(llvm::Constant *ptr,
   }
 }
 
+/// Return a reference to an object that's suitable for being used for
+/// the given kind of reference.
+///
+/// Note that, if the requested reference kind is a relative reference.
+/// the returned constant will not actually be a relative reference.
+/// To form the actual relative reference, you must pass the returned
+/// result to emitRelativeReference, passing the correct base-address
+/// information.
+ConstantReference
+IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
+                                   llvm::Type *definitionType,
+                                   llvm::Type *defaultType,
+                                   DebugTypeInfo debugType,
+                                   SymbolReferenceKind refKind) {
+  switch (refKind) {
+  case SymbolReferenceKind::Relative_Direct:
+  case SymbolReferenceKind::Far_Relative_Direct:
+    assert(definitionType == nullptr);
+    // FIXME: don't just fall through; force the creation of a weak
+    // definition so that we can emit a relative reference.
+    SWIFT_FALLTHROUGH;
+
+  case SymbolReferenceKind::Absolute:
+    return { getAddrOfLLVMVariable(entity, alignment, definitionType,
+                                   defaultType, debugType),
+             ConstantReference::Direct };
+
+
+  case SymbolReferenceKind::Relative_Indirectable:
+  case SymbolReferenceKind::Far_Relative_Indirectable:
+    assert(definitionType == nullptr);
+    return getAddrOfLLVMVariableOrGOTEquivalent(entity, alignment, defaultType);
+  }
+  llvm_unreachable("bad reference kind");
+}
+
 /// A convenient wrapper around getAddrOfLLVMVariable which uses the
 /// default type as the definition type.
 llvm::Constant *
@@ -1799,7 +1836,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
 /// Creates a private, unnamed constant containing the address of another
 /// global variable. LLVM can replace relative references to this variable with
 /// relative references to the GOT entry for the variable in the object file.
-std::pair<llvm::Constant *, IRGenModule::DirectOrGOT>
+ConstantReference
 IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
                                                   Alignment alignment,
                                                   llvm::Type *defaultType) {
@@ -1843,12 +1880,12 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
     // aliasee to work around that.
     if (auto alias = dyn_cast<llvm::GlobalAlias>(entry))
       entry = alias->getAliasee();
-    return {entry, DirectOrGOT::Direct};
+    return {entry, ConstantReference::Direct};
   }
 
   auto &gotEntry = GlobalGOTEquivalents[entity];
   if (gotEntry) {
-    return {gotEntry, DirectOrGOT::GOT};
+    return {gotEntry, ConstantReference::Indirect};
   }
 
   // Look up the global variable.
@@ -1859,35 +1896,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   entity.mangle(name);
   auto gotEquivalent = createGOTEquivalent(*this, global, name);
   gotEntry = gotEquivalent;
-  return {gotEquivalent, DirectOrGOT::GOT};
-}
-
-/// If true, we lazily initialize metadata at runtime because the layout
-/// is only partially known. Otherwise, we can emit a direct reference a
-/// constant metadata symbol.
-bool
-IRGenModule::hasMetadataPattern(NominalTypeDecl *theDecl) {
-  assert(theDecl != nullptr);
-  // Protocols must be special-cased in a few places.
-  assert(!isa<ProtocolDecl>(theDecl));
-
-  // For classes, we already computed this when we did the layout.
-  // FIXME: Try not to call this for classes of other modules, by referencing
-  // the metadata accessor instead.
-  if (auto *theClass = dyn_cast<ClassDecl>(theDecl))
-    return irgen::getClassHasMetadataPattern(*this, theClass);
-
-  // Ok, we have a value type. If it is generic, it is always initialized
-  // at runtime.
-  if (theDecl->isGenericContext())
-    return true;
-
-  // If the type is not fixed-size, its size depends on resilient types,
-  // and the metadata is initialized at runtime.
-  if (!getTypeInfoForUnlowered(theDecl->getDeclaredType()).isFixedSize())
-    return true;
-
-  return false;
+  return {gotEquivalent, ConstantReference::Indirect};
 }
 
 namespace {
@@ -1905,16 +1914,16 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
   llvm::Type *defaultTy, *defaultPtrTy;
 
   auto nom = conformingType->getAnyNominal();
-  if (IGM.hasMetadataPattern(nom)) {
-    // Conformances for generics, concrete subclasses of generics, and
-    // resiliently-sized types are represented by referencing the
-    // nominal type descriptor.
+  auto clas = dyn_cast<ClassDecl>(nom);
+  if (nom->isGenericContext() ||
+      (clas && doesClassMetadataRequireDynamicInitialization(IGM, clas))) {
+    // Conformances for generics and concrete subclasses of generics
+    // are represented by referencing the nominal type descriptor.
     typeKind = TypeMetadataRecordKind::UniqueNominalTypeDescriptor;
     entity = LinkEntity::forNominalTypeDescriptor(nom);
     defaultTy = IGM.NominalTypeDescriptorTy;
     defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
-  } else if (auto ct = dyn_cast<ClassType>(conformingType)) {
-    auto clas = ct->getDecl();
+  } else if (clas) {
     if (clas->isForeign()) {
       typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
       entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
@@ -1963,17 +1972,16 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
 /// Form an LLVM constant for the relative distance between a reference
 /// (appearing at gep (0, indices) of `base`) and `target`.
 llvm::Constant *
-IRGenModule::emitRelativeReference(std::pair<llvm::Constant *,
-                                             IRGenModule::DirectOrGOT> target,
+IRGenModule::emitRelativeReference(ConstantReference target,
                                    llvm::Constant *base,
                                    ArrayRef<unsigned> baseIndices) {
   llvm::Constant *relativeAddr =
-    emitDirectRelativeReference(target.first, base, baseIndices);
+    emitDirectRelativeReference(target.getValue(), base, baseIndices);
 
-  // If the reference is to a GOT entry, flag it by setting the low bit.
+  // If the reference is indirect, flag it by setting the low bit.
   // (All of the base, direct target, and GOT entry need to be pointer-aligned
   // for this to be OK.)
-  if (target.second == IRGenModule::DirectOrGOT::GOT) {
+  if (target.isIndirect()) {
     relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
                              llvm::ConstantInt::get(RelativeAddressTy, 1));
   }
@@ -2068,10 +2076,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     // TODO: Produce a relative reference to a private generator function
     // if the witness table requires lazy initialization, instantiation, or
     // conditional conformance checking.
-    std::pair<llvm::Constant*, DirectOrGOT> witnessTableRef;
     auto witnessTableVar = getAddrOfWitnessTable(conformance);
-    witnessTableRef = std::make_pair(witnessTableVar,
-                                     DirectOrGOT::Direct);
+    auto witnessTableRef =
+      ConstantReference(witnessTableVar, ConstantReference::Direct);
 
     auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
       typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
@@ -2414,6 +2421,13 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
 ///     for a type metadata and it will have type TypeMetadataPtrTy.
 llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                                    bool isPattern) {
+  return getAddrOfTypeMetadata(concreteType, isPattern,
+                               SymbolReferenceKind::Absolute).getDirectValue();
+}
+
+ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
+                                                     bool isPattern,
+                                               SymbolReferenceKind refKind) {
   assert(isPattern || !isa<UnboundGenericType>(concreteType));
 
   llvm::Type *defaultVarTy;
@@ -2481,13 +2495,13 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                     0, 1, nullptr);
 
   auto addr = getAddrOfLLVMVariable(entity, alignment,
-                                    nullptr, defaultVarTy, DbgTy);
+                                    nullptr, defaultVarTy, DbgTy, refKind);
 
   // FIXME: MC breaks when emitting alias references on some platforms
   // (rdar://problem/22450593 ). Work around this by referring to the aliasee
   // instead.
-  if (auto alias = dyn_cast<llvm::GlobalAlias>(addr))
-    addr = alias->getAliasee();
+  if (auto alias = dyn_cast<llvm::GlobalAlias>(addr.getValue()))
+    addr = ConstantReference(alias->getAliasee(), addr.isIndirect());
 
   // Adjust if necessary.
   if (adjustmentIndex) {
@@ -2495,8 +2509,10 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, adjustmentIndex)
     };
-    addr = llvm::ConstantExpr::getInBoundsGetElementPtr(
-                                                 /*Ty=*/nullptr, addr, indices);
+    addr = ConstantReference(
+             llvm::ConstantExpr::getInBoundsGetElementPtr(
+                                    /*Ty=*/nullptr, addr.getValue(), indices),
+                             addr.isIndirect());
   }
   
   return addr;
