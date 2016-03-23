@@ -701,13 +701,22 @@ handleSemanticRequest(RequestDict Req,
       return Rec(createErrorRequestFailed("semantic editor is disabled"));
 
   if (ReqUID == RequestCursorInfo) {
-    int64_t Offset;
-    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
-      return Rec(createErrorRequestInvalid("missing 'key.offset'"));
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-    return Lang.getCursorInfo(
-        *SourceFile, Offset, Args,
-        [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
+
+    int64_t Offset;
+    if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
+      return Lang.getCursorInfo(
+          *SourceFile, Offset, Args,
+          [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
+    }
+    if (auto USR = Req.getString(KeyUSR)) {
+      return Lang.getCursorInfoFromUSR(
+          *SourceFile, *USR, Args,
+          [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
+    }
+
+    return Rec(createErrorRequestInvalid(
+        "either 'key.offset' or 'key.usr' is required"));
   }
 
   if (ReqUID == RequestRelatedIdents) {

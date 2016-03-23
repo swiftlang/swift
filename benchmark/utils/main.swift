@@ -63,6 +63,7 @@ import NSError
 import NSStringConversion
 import NopDeinit
 import ObjectAllocation
+import ObjectiveCBridging
 import OpenClose
 import Phonebook
 import PolymorphicCalls
@@ -147,6 +148,24 @@ precommitTests = [
   "NSStringConversion": run_NSStringConversion,
   "NopDeinit": run_NopDeinit,
   "ObjectAllocation": run_ObjectAllocation,
+  "ObjectiveCBridgeFromNSString": run_ObjectiveCBridgeFromNSString,
+  "ObjectiveCBridgeFromNSStringForced": run_ObjectiveCBridgeFromNSStringForced,
+  "ObjectiveCBridgeToNSString": run_ObjectiveCBridgeToNSString,
+  "ObjectiveCBridgeFromNSArrayAnyObject": run_ObjectiveCBridgeFromNSArrayAnyObject,
+  "ObjectiveCBridgeFromNSArrayAnyObjectForced": run_ObjectiveCBridgeFromNSArrayAnyObjectForced,
+  "ObjectiveCBridgeToNSArray": run_ObjectiveCBridgeToNSArray,
+  "ObjectiveCBridgeFromNSArrayAnyObjectToString": run_ObjectiveCBridgeFromNSArrayAnyObjectToString,
+  "ObjectiveCBridgeFromNSArrayAnyObjectToStringForced": run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced,
+  "ObjectiveCBridgeFromNSDictionaryAnyObject": run_ObjectiveCBridgeFromNSDictionaryAnyObject,
+  "ObjectiveCBridgeFromNSDictionaryAnyObjectForced": run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced,
+  "ObjectiveCBridgeFromNSDictionaryAnyObjectToString": run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString,
+  "ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced": run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced,
+  "ObjectiveCBridgeToNSDictionary": run_ObjectiveCBridgeToNSDictionary,
+  "ObjectiveCBridgeFromNSSetAnyObject": run_ObjectiveCBridgeFromNSSetAnyObject,
+  "ObjectiveCBridgeFromNSSetAnyObjectForced": run_ObjectiveCBridgeFromNSSetAnyObjectForced,
+  "ObjectiveCBridgeFromNSSetAnyObjectToString": run_ObjectiveCBridgeFromNSSetAnyObjectToString,
+  "ObjectiveCBridgeFromNSSetAnyObjectToStringForced": run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced,
+  "ObjectiveCBridgeToNSSet": run_ObjectiveCBridgeToNSSet,
   "OpenClose": run_OpenClose,
   "Phonebook": run_Phonebook,
   "PolymorphicCalls": run_PolymorphicCalls,

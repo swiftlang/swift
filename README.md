@@ -139,28 +139,20 @@ To find out more:
 Note: Arguments after "--" above are forwarded to `build-script-impl`, which is
 the ultimate shell script that invokes the actual build and test commands.
 
-A basic command to build Swift and run basic tests with Ninja:
+A basic command to build Swift with optimizations and run basic tests with
+Ninja:
 
-    utils/build-script -t
+    utils/build-script -r -t
 
 ## Developing Swift in Xcode
 
+`build-script` can also generate Xcode projects:
+
+    utils/build-script -x
+
 The Xcode IDE can be used to edit the Swift source code, but it is not currently
-fully supported as a build environment for SDKs other than OS X. If you'd like
-to build for other SDKs but still use Xcode, once you've built Swift using Ninja
-or one of the other supported CMake generators, you can set up an IDE-only Xcode
-environment using the build-script's `-X` flag:
-
-    utils/build-script -X --skip-build -- --reconfigure
-
-The `--skip-build` flag tells `build-script` to only generate the project,
-not build it in its entirety. A bare minimum of LLVM tools will build in order
-to configure the Xcode projects.
-
-The `--reconfigure` flag tells `build-script-impl` to run the CMake configuration
-step even if there is a cached configuration. As you develop in Xcode, you may
-need to rerun this from time to time to refresh your generated Xcode project,
-picking up new targets, file removals, or file additions.
+fully supported as a build environment for SDKs other than OS X. If you need to
+work with other SDKs, you'll need to create a second build using Ninja.
 
 ## Testing Swift
 

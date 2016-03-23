@@ -240,12 +240,6 @@ To create Xcode projects that can build Swift, use '-x':
 
   [~/src/s]$ ./swift/utils/build-script -x -R
 
-The Xcode IDE may have performance issues with this configuration. To create
-slimmer Xcode projects that can edit Swift compiler source, but cannot build,
-use '-X' instead:
-
-  [~/src/s]$ ./swift/utils/build-script -X -R
-
 Preset mode in build-script
 ---------------------------
 
@@ -508,12 +502,6 @@ build the Debug variant of the Swift standard library and SDK overlay""",
         help="use CMake's Xcode generator (default is Ninja)",
         action="store_const",
         const="Xcode",
-        dest="cmake_generator")
-    cmake_generator_group.add_argument(
-        "-X", "--xcode-ide-only",
-        help="use CMake's Xcode generator, with only IDE support (no build)",
-        action="store_const",
-        const="XcodeIDEOnly",
         dest="cmake_generator")
     cmake_generator_group.add_argument(
         "-m", "--make",
@@ -834,12 +822,6 @@ the number of parallel build jobs to use""",
     if args.export_compile_commands:
         build_script_impl_inferred_args += [
             "--export-compile-commands"
-        ]
-
-    if args.cmake_generator == "XcodeIDEOnly":
-        args.cmake_generator = "Xcode"
-        build_script_impl_inferred_args += [
-            "--xcode-ide-only"
         ]
 
     if not args.test:

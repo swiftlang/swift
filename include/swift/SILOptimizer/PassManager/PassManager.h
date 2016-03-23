@@ -125,6 +125,11 @@ public:
     CompletedPassesMap.clear();
   }
 
+  void notifyAnalysisOfFunction(SILFunction *F) {
+    for (auto AP : Analysis)
+      AP->notifyAnalysisOfFunction(F);
+  }
+
   /// \brief Broadcast the invalidation of the function to all analysis.
   void invalidateAnalysis(SILFunction *F,
                           SILAnalysis::InvalidationKind K) {

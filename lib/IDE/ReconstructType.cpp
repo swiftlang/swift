@@ -2375,6 +2375,23 @@ VisitNode(ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
   nodes.pop_back();
 }
 
+Decl *ide::getDeclFromUSR(ASTContext &context, StringRef USR,
+                          std::string &error) {
+  if (!USR.startswith("s:")) {
+    error = "not a Swift USR";
+    return nullptr;
+  }
+
+  std::string mangledName(USR);
+  // Convert to a symbol name by replacing the USR prefix.
+  // This relies on USR generation being very close to symbol mangling; if we
+  // need to support entities with customized USRs (e.g. extensions), we will
+  // need to do something smarter here.
+  mangledName.replace(0, 2, "_T");
+
+  return getDeclFromMangledSymbolName(context, mangledName, error);
+}
+
 Decl *ide::getDeclFromMangledSymbolName(ASTContext &context,
                                         StringRef mangledName,
                                         std::string &error) {

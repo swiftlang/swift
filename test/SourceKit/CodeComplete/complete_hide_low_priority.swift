@@ -26,9 +26,9 @@ func test(y: Int) {
 // NOHIDE: y
 // NOHIDE: z
 // NOHIDE: x
+// NOHIDE: import
 // NOHIDE: ModuleColor
 // NOHIDE: Int
-// NOHIDE: import
 
 func testType() {
   let x: #^TOP_LEVEL_TYPE_0^#

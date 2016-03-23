@@ -40,8 +40,8 @@ func test() {
 // CONTEXT: key.name: "foo(b:)"
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "test()"
-// CONTEXT: key.name: "AbsoluteValuable"
 // CONTEXT: key.name: "#column"
+// CONTEXT: key.name: "AbsoluteValuable"
 
 // RUN: %complete-test -tok=STMT_0 %s | FileCheck %s -check-prefix=STMT
 func test1() {
@@ -54,6 +54,29 @@ func test1() {
 // STMT: while
 // STMT: func
 // STMT: foo(a: Int)
+
+// RUN: %complete-test -tok=STMT_1 %s | FileCheck %s -check-prefix=STMT_1
+func test5() {
+  var retLocal: Int
+  #^STMT_1,r,ret,retur,return^#
+}
+// STMT_1-LABEL: Results for filterText: r [
+// STMT_1-NEXT:    retLocal
+// STMT_1-NEXT:    repeat
+// STMT_1-NEXT:    return
+// STMT_1-NEXT:    required
+// STMT_1: ]
+// STMT_1-LABEL: Results for filterText: ret [
+// STMT_1-NEXT:    retLocal
+// STMT_1-NEXT:    return
+// STMT_1-NEXT:    repeat
+// STMT_1: ]
+// STMT_1-LABEL: Results for filterText: retur [
+// STMT_1-NEXT:    return
+// STMT_1: ]
+// STMT_1-LABEL: Results for filterText: return [
+// STMT_1-NEXT:    return
+// STMT_1: ]
 
 // RUN: %complete-test -top=0 -tok=EXPR_0 %s | FileCheck %s -check-prefix=EXPR
 func test2() {

@@ -253,7 +253,7 @@ extension Collection {
   public var first: Iterator.Element? {
     // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
     // so instead of testing `isEmpty` and then returning the first element,
-    // we'll just rely on the fact that the generator always yields the
+    // we'll just rely on the fact that the iterator always yields the
     // first element first.
     var i = makeIterator()
     return i.next()

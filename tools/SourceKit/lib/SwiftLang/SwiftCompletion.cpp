@@ -782,6 +782,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyHideUnderscores("key.codecomplete.hideunderscores");
   static UIdent KeyHideLowPriority("key.codecomplete.hidelowpriority");
   static UIdent KeyHideByName("key.codecomplete.hidebyname");
+  static UIdent KeyIncludeExactMatch("key.codecomplete.includeexactmatch");
   static UIdent KeyAddInnerResults("key.codecomplete.addinnerresults");
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
@@ -802,6 +803,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   to.hideUnderscores = howMuchHiding;
   to.reallyHideAllUnderscores = howMuchHiding > 1;
   from.valueForOption(KeyHideLowPriority, to.hideLowPriority);
+  from.valueForOption(KeyIncludeExactMatch, to.includeExactMatch);
   from.valueForOption(KeyAddInnerResults, to.addInnerResults);
   from.valueForOption(KeyAddInnerOperators, to.addInnerOperators);
   from.valueForOption(KeyAddInitsToTopLevel, to.addInitsToTopLevel);

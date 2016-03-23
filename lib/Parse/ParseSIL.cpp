@@ -33,14 +33,19 @@ using namespace swift;
 namespace swift {
   class SILParserTUState {
   public:
-    SILParserTUState() {}
+    SILParserTUState(SILModule &M) : M(M) {}
     ~SILParserTUState();
+
+    SILModule &M;
     
     /// This is all of the forward referenced functions with
     /// the location for where the reference is.
     llvm::DenseMap<Identifier,
                    std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
+    /// A list of all functions forward-declared by a sil_scope.
+    std::vector<SILFunction *> PotentialZombieFns;
 
+    /// A map from textual .sil scope number to SILDebugScopes.
     llvm::DenseMap<unsigned, SILDebugScope *> ScopeSlots;
 
     /// Did we parse a sil_stage for this module?
@@ -51,7 +56,7 @@ namespace swift {
 }
 
 SILParserState::SILParserState(SILModule *M) : M(M) {
-  S = M ? new SILParserTUState() : nullptr;
+  S = M ? new SILParserTUState(*M) : nullptr;
 }
 
 SILParserState::~SILParserState() {
@@ -64,6 +69,13 @@ SILParserTUState::~SILParserTUState() {
       if (Entry.second.second.isValid())
         Diags->diagnose(Entry.second.second, diag::sil_use_of_undefined_value,
                         Entry.first.str());
+
+  // Turn any debug-info-only function declarations into zombies.
+  for (auto *Fn : PotentialZombieFns)
+    if (Fn->isExternalDeclaration()) {
+      Fn->setInlined();
+      M.eraseFunction(Fn);
+    }
 }
 
 
@@ -4645,12 +4657,14 @@ bool Parser::parseSILScope() {
         ScopeState.parseSILType(Ty, Ignored, true))
       return true;
 
+    // The function doesn't exist yet. Create a zombie forward declaration.
     auto FnTy = Ty.getAs<SILFunctionType>();
     if (!FnTy || !Ty.isObject()) {
       diagnose(FnLoc, diag::expected_sil_function_type);
       return true;
     }
     ParentFn = ScopeState.getGlobalNameForReference(FnName, FnTy, FnLoc, true);
+    ScopeState.TUState.PotentialZombieFns.push_back(ParentFn);
   }
 
   SILDebugScope *InlinedAt = nullptr;

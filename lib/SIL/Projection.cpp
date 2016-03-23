@@ -1168,8 +1168,18 @@ ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA, SILType BaseTy,
 }
 
 ProjectionTree::~ProjectionTree() {
-  for (auto *N : ProjectionTreeNodes)
-    N->~ProjectionTreeNode();
+  // Do nothing !. Eventually the all the projection tree nodes will be freed
+  // when the BPA allocator is free.
+}
+
+void
+ProjectionTree::initializeWithExistingTree(const ProjectionTree &PT) {
+  Kind = PT.Kind;
+  EpilogueReleases = PT.EpilogueReleases;
+  LiveLeafIndices = PT.LiveLeafIndices;
+  for (const auto &N : PT.ProjectionTreeNodes) {
+    ProjectionTreeNodes.push_back(new (Allocator) ProjectionTreeNode(*N));
+  }
 }
 
 SILValue

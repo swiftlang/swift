@@ -68,7 +68,7 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///     iterator.next() // nil
 ///
 /// - Note: Idiomatic usage is to call `enumerate` instead of
-///   constructing an `EnumerateGenerator` directly.
+///   constructing an `EnumerateIterator` directly.
 public struct EnumeratedIterator<
   Base : IteratorProtocol
 > : IteratorProtocol, Sequence {

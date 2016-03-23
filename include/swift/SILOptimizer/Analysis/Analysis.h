@@ -117,6 +117,8 @@ namespace swift {
     /// Invalidate all of the information for a specific function.
     virtual void invalidate(SILFunction *F, InvalidationKind K) {}
 
+    virtual void notifyAnalysisOfFunction(SILFunction *F) {}
+
     /// Verify the state of this analysis.
     virtual void verify() const {}
 
