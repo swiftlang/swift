@@ -2062,6 +2062,13 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
   switch (targetType->getKind()) {
   // Handle wrapping an Optional target.
   case MetadataKind::Optional: {
+    // If the source is an existential, attempt to cast it first without
+    // unwrapping the target. This handles an optional source wrapped within an
+    // existential that Optional conforms to (Any).
+    if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
+      return _dynamicCastFromExistential(dest, src, srcExistentialType,
+                                         targetType, flags);
+    }
     // Recursively cast into the layout compatible payload area.
     const Metadata *payloadType =
       cast<EnumMetadata>(targetType)->getGenericArgs()[0];
