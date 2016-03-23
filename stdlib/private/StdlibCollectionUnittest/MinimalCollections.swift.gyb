@@ -448,14 +448,6 @@ internal func _expectCompatibleIndices(
 }
 
 public struct MinimalIndex : Comparable {
-  public init(position: Int, startIndex: Int, endIndex: Int) {
-    self = MinimalIndex(
-      collectionState: nil,
-      position: position,
-      startIndex: startIndex,
-      endIndex: endIndex)
-  }
-
   internal init(
     collectionState: _CollectionState?,
     position: Int,
@@ -483,7 +475,7 @@ public func == (lhs: MinimalIndex, rhs: MinimalIndex) -> Bool {
 
 public func < (lhs: MinimalIndex, rhs: MinimalIndex) -> Bool {
   _expectCompatibleIndices(lhs, rhs)
-  return lhs.position == rhs.position
+  return lhs.position < rhs.position
 }
 
 //===----------------------------------------------------------------------===//
@@ -832,14 +824,19 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     return base.makeIterator()
   }
 
+  public let timesSuccessorCalled = ResettableValue(0)
   @warn_unused_result
   public func successor(of i: MinimalIndex) -> MinimalIndex {
+    timesSuccessorCalled.value += 1
     return base.successor(of: i)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
+  public let timesPredecessorCalled = ResettableValue(0)
+
   @warn_unused_result
   public func predecessor(of i: MinimalIndex) -> MinimalIndex {
+    timesPredecessorCalled.value += 1
     return base.predecessor(of: i)
   }
 %     end

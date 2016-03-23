@@ -48,6 +48,7 @@ extension RandomAccessCollection where SubSequence == RandomAccessSlice<Self> {
 extension RandomAccessCollection {
 
 // TODO: swift-3-indexing-model - implement optimized version of the following
+// (also un-xfail corresponding test in validation-test/stdlib/Index.swift.gyb)
   // advance(i: Index, by n: IndexDistance) -> Index
   // advance(i: Index, by n: IndexDistance, limit: Index) -> Index
   // distance(from start: Index, to end: Index) -> IndexDistance

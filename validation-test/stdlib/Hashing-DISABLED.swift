@@ -122,13 +122,8 @@ HashingTestSuite.test("_squeezeHashValue/UInt") {
   // Check that the function can return values that cover the whole range.
   func checkRange(r: Range<UInt>) {
     var results = [UInt : Void]()
-<<<<<<< HEAD:validation-test/stdlib/Hashing.swift
     let cardinality = r.upperBound - r.lowerBound
     for _ in 0..<(10*cardinality) {
-=======
-    let cardinality = r.endIndex - r.startIndex
-    for _ in 0..<(14 * cardinality) {
->>>>>>> origin/master:validation-test/stdlib/Hashing-DISABLED.swift
       let v = _squeezeHashValue(randInt(), r)
       expectTrue(r ~= v)
       if results[v] == nil {
