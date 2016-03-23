@@ -83,10 +83,7 @@ bool SILLinkerVisitor::processDeclRef(SILDeclRef Decl) {
     return false;
 
   // If F is a declaration, first deserialize it.
-  auto *NewFn =
-      isAvailableExternally(Decl.getLinkage(ForDefinition_t::NotForDefinition))
-          ? Loader->lookupSILFunction(Decl)
-          : nullptr;
+  auto *NewFn = Loader->lookupSILFunction(Decl);
   if (!NewFn || NewFn->isExternalDeclaration())
     return false;
 
