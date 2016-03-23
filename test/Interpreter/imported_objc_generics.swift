@@ -138,4 +138,14 @@ ImportedObjCGenerics.test("ClassWithMethodsUsingObjCGenerics") {
   expectTrue(y === wq)
 }
 
+ImportedObjCGenerics.test("InheritanceFromNongeneric") {
+  // Test NSObject methods inherited into Container<>
+  let gc = Container<NSString>(object: "")
+  expectTrue(gc.description.rangeOfString("Container") != nil)
+  expectTrue(gc.dynamicType.superclass() == NSObject.self)
+  expectTrue(Container<NSString>.superclass() == NSObject.self)
+  expectTrue(Container<NSObject>.superclass() == NSObject.self)
+  expectTrue(Container<NSObject>.self == Container<NSString>.self)
+}
+
 runAllTests()
