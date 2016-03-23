@@ -1,0 +1,106 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -caller-analysis-printer -o /dev/null | FileCheck --check-prefix=CHECK %s
+
+// CHECK: CallSite: call_top call_middle
+// CHECK: CallSite: call_middle call_bottom
+// CHECK: CallSite: self_recursive_func self_recursive_func
+// CHECK: CallSite: mutual_recursive_func2 mutual_recursive_func1
+// CHECK: CallSite: mutual_recursive_func1 mutual_recursive_func2
+// CHECK: CallSite: multi_calles multi_called
+// CHECK: CallSite: multi_calles multi_called
+// CHECK: CallSite: multi_calles multi_called
+// CHECK: CallSite: multi_caller1 multi_callers
+// CHECK: CallSite: multi_caller2 multi_callers
+
+sil_stage canonical
+
+import Builtin
+
+sil hidden @call_top : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @call_middle : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil hidden @call_middle : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @call_bottom : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil hidden  @call_bottom : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+sil hidden @self_recursive_func : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @self_recursive_func : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+   
+sil hidden @mutual_recursive_func1 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @mutual_recursive_func2 : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil hidden @mutual_recursive_func2 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @mutual_recursive_func1 : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil hidden @multi_called : $@convention(thin) () -> () {
+bb0:
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil hidden @multi_calles : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @multi_called : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = apply %0() : $@convention(thin) () -> ()
+  br bb3
+bb2:
+  %3 = apply %0() : $@convention(thin) () -> ()
+  br bb3
+bb3:  
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil hidden @multi_callers : $@convention(thin) () -> () {
+bb0:
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil hidden @multi_caller1 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @multi_callers : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil hidden @multi_caller2 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @multi_callers : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}

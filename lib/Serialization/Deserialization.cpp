@@ -544,7 +544,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, inheritedCount, defaultedCount;
+  unsigned valueCount, typeCount, inheritedCount;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -556,7 +556,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, valueCount,
                                               typeCount, inheritedCount,
-                                              defaultedCount, rawIDs);
+                                              rawIDs);
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
   ASTContext &ctx = getContext();
@@ -930,6 +930,43 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
     Decl *D = getDecl(rawID);
     assert(D && "unable to deserialize next member");
     Members.push_back(D);
+  }
+
+  return false;
+}
+
+bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
+  using namespace decls_block;
+
+  auto entry = DeclTypeCursor.advance();
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return true;
+
+  SmallVector<uint64_t, 16> witnessIDBuffer;
+
+  unsigned kind = DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer);
+  assert(kind == DEFAULT_WITNESS_TABLE);
+  (void)kind;
+
+  ArrayRef<uint64_t> rawWitnessIDs;
+  decls_block::DefaultWitnessTableLayout::readRecord(
+      witnessIDBuffer, rawWitnessIDs);
+
+  if (rawWitnessIDs.empty())
+    return false;
+
+  unsigned e = rawWitnessIDs.size();
+  assert(e % 2 == 0 && "malformed default witness table");
+
+  for (unsigned i = 0, e = rawWitnessIDs.size(); i < e; i += 2) {
+    ValueDecl *requirement = cast<ValueDecl>(getDecl(rawWitnessIDs[i]));
+    assert(requirement && "unable to deserialize next requirement");
+    ValueDecl *witness = cast<ValueDecl>(getDecl(rawWitnessIDs[i + 1]));
+    assert(witness && "unable to deserialize next witness");
+    assert(requirement->getDeclContext() == proto);
+
+    // FIXME: substitutions
+    proto->setDefaultWitness(requirement, ConcreteDeclRef(witness));
   }
 
   return false;
@@ -4047,13 +4084,19 @@ void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
   (void)Err;
 
   IterableDeclContext *IDC;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(D))
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
     IDC = nominal;
   else
     IDC = cast<ExtensionDecl>(D);
 
   for (auto member : members)
     IDC->addMember(member);
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(D)) {
+    bool Err = readDefaultWitnessTable(proto);
+    assert(!Err && "unable to read default witness table");
+    (void)Err;
+  }
 }
 
 void
@@ -4095,7 +4138,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, inheritedCount, defaultedCount;
+  unsigned valueCount, typeCount, inheritedCount;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -4106,7 +4149,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, valueCount,
                                               typeCount, inheritedCount,
-                                              defaultedCount, rawIDs);
+                                              rawIDs);
 
   // Skip trailing inherited conformances.
   while (inheritedCount--)
@@ -4138,13 +4181,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
-  SmallVector<ValueDecl *, 4> defaultedDefinitions;
-  while (defaultedCount--) {
-    auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
-    defaultedDefinitions.push_back(decl);
-  }
-  assert(rawIDIter <= rawIDs.end() && "read too much");
-
   // Set type witnesses.
   for (auto typeWitness : typeWitnesses) {
     conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
@@ -4154,11 +4190,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   // Set witnesses.
   for (auto witness : witnesses) {
     conformance->setWitness(witness.first, witness.second);
-  }
-
-  // Note any defaulted definitions.
-  for (auto defaulted : defaultedDefinitions) {
-    conformance->addDefaultDefinition(defaulted);
   }
 }
 

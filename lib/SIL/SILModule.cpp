@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-module"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
@@ -126,7 +127,8 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
 }
 
 SILWitnessTable *
-SILModule::lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily){
+SILModule::lookUpWitnessTable(ProtocolConformanceRef C,
+                              bool deserializeLazily) {
   // If we have an abstract conformance passed in (a legal value), just return
   // nullptr.
   if (!C.isConcrete())
@@ -160,29 +162,30 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
     return nullptr;
   }
 
-  SILWitnessTable *wT = found->second;
-  assert(wT != nullptr && "Should never map a conformance to a null witness"
+  SILWitnessTable *wtable = found->second;
+  assert(wtable != nullptr && "Should never map a conformance to a null witness"
                           " table.");
 
   // If we have a definition, return it.
-  if (wT->isDefinition())
-    return wT;
+  if (wtable->isDefinition())
+    return wtable;
 
   // Otherwise try to deserialize it. If we succeed return the deserialized
   // function.
   //
-  // *NOTE* In practice, wT will be deserializedTable, but I do not want to rely
+  // *NOTE* In practice, wtable will be deserializedTable, but I do not want to rely
   // on that behavior for now.
   if (deserializeLazily)
-    if (auto deserializedTable = getSILLoader()->lookupWitnessTable(wT))
-      return deserializedTable;
+    if (auto deserialized = getSILLoader()->lookupWitnessTable(wtable))
+      return deserialized;
 
   // If we fail, just return the declaration.
-  return wT;
+  return wtable;
 }
 
 SILDefaultWitnessTable *
-SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol) {
+SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
+                                     bool deserializeLazily) {
   // Note: we only ever look up default witness tables in the translation unit
   // that is currently being compiled, since they SILGen generates them when it
   // visits the protocol declaration, and IRGen emits them when emitting the
@@ -190,23 +193,28 @@ SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol) {
 
   auto found = DefaultWitnessTableMap.find(Protocol);
   if (found == DefaultWitnessTableMap.end()) {
-    assert(Protocol->hasFixedLayout() &&
-           "Resilient protocol must have a default witness table");
+    if (deserializeLazily) {
+      SILLinkage linkage =
+        getSILLinkage(getDeclLinkage(Protocol, /*internalAsVersioned=*/ false),
+                      ForDefinition);
+      SILDefaultWitnessTable *wtable =
+        SILDefaultWitnessTable::create(*this, linkage, Protocol);
+      wtable = getSILLoader()->lookupDefaultWitnessTable(wtable);
+      if (wtable)
+        DefaultWitnessTableMap[Protocol] = wtable;
+      return wtable;
+    }
+
     return nullptr;
   }
-
-  assert(!Protocol->hasFixedLayout() &&
-         "Fixed-layout protocol cannot have a default witness table");
 
   return found->second;
 }
 
 SILDefaultWitnessTable *
-SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol) {
-  assert(!Protocol->hasFixedLayout() &&
-         "Fixed-layout protocol cannot have a default witness table");
-
-  return SILDefaultWitnessTable::create(*this, Protocol);
+SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
+                                                SILLinkage Linkage) {
+  return SILDefaultWitnessTable::create(*this, Linkage, Protocol);
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
@@ -608,14 +616,12 @@ getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
   return Subs;
 }
 
-/// \brief Given a protocol \p Proto, a member method \p Member and a concrete
-/// class type \p ConcreteTy, search the witness tables and return the static
-/// function that matches the member with any specializations may be
-/// required. Notice that we do not scan the class hierarchy, just the concrete
-/// class type.
+/// \brief Given a conformance \p C and a protocol requirement \p Requirement,
+/// search the witness table for the conformance and return the witness thunk
+/// for the requirement, together with any substitutions for the conformance.
 std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
 SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
-                                        SILDeclRef Member) {
+                                        SILDeclRef Requirement) {
   // Look up the witness table associated with our protocol conformance from the
   // SILModule.
   auto Ret = lookUpWitnessTable(C);
@@ -623,7 +629,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   // If no witness table was found, bail.
   if (!Ret) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
-          C.dump(); Member.dump());
+          C.dump(); Requirement.dump());
     return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
   }
 
@@ -635,7 +641,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
 
     SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
     // Check if this is the member we were looking for.
-    if (MethodEntry.Requirement != Member)
+    if (MethodEntry.Requirement != Requirement)
       continue;
 
     return std::make_tuple(MethodEntry.Witness, Ret,
@@ -643,6 +649,46 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   }
 
   return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
+}
+
+/// \brief Given a protocol \p Protocol and a requirement \p Requirement,
+/// search the protocol's default witness table and return the default
+/// witness thunk for the requirement.
+std::pair<SILFunction *, SILDefaultWitnessTable *>
+SILModule::lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
+                                               SILDeclRef Requirement,
+                                               bool deserializeLazily) {
+  // Look up the default witness table associated with our protocol from the
+  // SILModule.
+  auto Ret = lookUpDefaultWitnessTable(Protocol, deserializeLazily);
+
+  // If no default witness table was found, bail.
+  //
+  // FIXME: Could be an assert if we fix non-single-frontend mode to link
+  // together serialized SIL emitted by each translation unit.
+  if (!Ret) {
+    DEBUG(llvm::dbgs() << "        Failed speculative lookup of default "
+          "witness for " << Protocol->getName() << " ";
+          Requirement.dump());
+    return std::make_pair(nullptr, nullptr);
+  }
+
+  // Okay, we found the correct default witness table. Now look for the method.
+  for (auto &Entry : Ret->getEntries()) {
+    // Ignore dummy entries semitted for non-method requirements, as well as
+    // requirements without default implementations.
+    if (!Entry.isValid())
+      continue;
+
+    // Check if this is the member we were looking for.
+    if (Entry.getRequirement() != Requirement)
+      continue;
+
+    return std::make_pair(Entry.getWitness(), Ret);
+  }
+
+  // This requirement doesn't have a default implementation.
+  return std::make_pair(nullptr, nullptr);
 }
 
 static ClassDecl *getClassDeclSuperClass(ClassDecl *Class) {

@@ -49,7 +49,6 @@ BRIDGING_KNOWN_TYPE(Darwin, DarwinBoolean)
 BRIDGING_KNOWN_TYPE(Swift, Bool)
 BRIDGING_KNOWN_TYPE(Swift, ErrorProtocol)
 
-BRIDGE_TYPE(Foundation, NSString, Swift, String, true)
 BRIDGE_TYPE(ObjectiveC, ObjCBool, Swift, Bool, false)
 BRIDGE_TYPE(Darwin, DarwinBoolean, Swift, Bool, false)
 

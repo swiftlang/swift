@@ -510,6 +510,12 @@ public:
                                   Type type,
                                   LazyResolver *resolver) const;
 
+  /// Determine whether the given Swift type is representable in a
+  /// given foreign language.
+  std::pair<ForeignRepresentableKind, ProtocolConformance *>
+  getForeignRepresentable(NominalTypeDecl *nominal, ForeignLanguage language,
+                          DeclContext *dc);
+
   /// Add a declaration to a list of declarations that need to be emitted
   /// as part of the current module or source file, but are otherwise not
   /// nested within it.

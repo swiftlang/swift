@@ -26,37 +26,80 @@ namespace swift {
 
 using ApplyList = llvm::SmallVector<FullApplySite, 4>;
 
-struct CallerAnalysisFunctionInfo {
+class CallerAnalysisFunctionInfo {
   /// A list of all the functions this function calls.
   llvm::SmallVector<SILFunction *, 4> Callees;
+  /// A list of all the functions that calls this function.
+  /// Keeping this list allows us to iterate over the CallSites
+  /// deterministically.
+  llvm::SmallVector<SILFunction *, 4> Callers;
   /// A map between all the callers and the callsites in them which
   /// calls this function.
-  llvm::DenseMap<SILFunction *, ApplyList> CallSites; 
+  llvm::SmallDenseMap<SILFunction *, ApplyList, 1> CallSites; 
+
+public:
+  /// Return a list of all the callsites for this function.
+  ApplyList getCallSites() {
+    ApplyList Sites;
+    for (auto &F : Callers) {
+      for (auto &S : CallSites[F])
+        Sites.push_back(S);
+    }
+    return Sites;
+  }
+
+  friend class CallerAnalysis;
 };
 
+/// CallerAnalysis relies on keeping the Caller/Callee relation up-to-date
+/// lazily. i.e. when a function is invalidated, instead of recomputing the
+/// function it calls right away, its kept in a recompute list and
+/// CallerAnalysis recomputes and empty the recompute list before any query.
+///
+/// We also considered the possibility of keeping a computed list, instead of
+/// recompute Every time we need to complete the computed list (i.e. we want
+/// to the computed list to contain every function in the module). We need to
+/// walk through every function in the module. This leads to O(n) And we need
+/// to run every function through the a sequence of function passes which might
+/// invalidate the functions and make the computed list incomplete. So
+/// O(n) * O(n) = O(n^2).
 class CallerAnalysis : public SILAnalysis {
+
   /// Current module we are analyzing.
   SILModule &Mod;
 
   /// A map between all the functions and their callsites in the module.
   llvm::DenseMap<SILFunction *, CallerAnalysisFunctionInfo> CallInfo;
 
+  /// A set of functions that needs to be recomputed. This is used to make sure
+  /// a function is not pushed to the RecomputeFunctionList more than once.
+  llvm::DenseSet<SILFunction *> RecomputeFunctionSet;
+
   /// A list of functions that needs to be recomputed.
-  llvm::DenseSet<SILFunction *> RecomputeFunctionList;
+  llvm::SmallVector<SILFunction *, 16> RecomputeFunctionList;
 
   /// Iterate over all the call sites in the function and update
-  /// FuncToCallsites.
+  /// CallInfo.
   void processFunctionCallSites(SILFunction *F); 
 
   /// This function is about to become "unknown" to us. Invalidate any 
   /// callsite information related to it.
   void invalidateExistingCalleeRelation(SILFunction *F); 
 
+  void processRecomputeFunctionList() {
+    for (auto &F : RecomputeFunctionList) {
+      processFunctionCallSites(F);
+    }
+    RecomputeFunctionList.clear(); 
+    RecomputeFunctionSet.clear();
+  }
+
 public:
   CallerAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Caller), Mod(*M) {
     // Make sure we compute everything first time called.
     for(auto &F : Mod) {
-      RecomputeFunctionList.insert(&F);
+      RecomputeFunctionSet.insert(&F);
+      RecomputeFunctionList.push_back(&F);
     }
   }
 
@@ -65,30 +108,66 @@ public:
   }
 
   virtual void notifyAnalysisOfFunction(SILFunction *F) {
-    RecomputeFunctionList.insert(F);
+    // This is not a new function.
+    if (RecomputeFunctionSet.find(F) != RecomputeFunctionSet.end())
+      return;
+    RecomputeFunctionSet.insert(F);
+    RecomputeFunctionList.push_back(F);
   }
 
   virtual void invalidate(SILFunction *F, InvalidationKind K) {
+    // Should we invalidate based on the invalidation kind.
+    bool shouldInvalidate = K & InvalidationKind::Calls;
+    if (!shouldInvalidate)
+      return;
+
     // This function has become "unknown" to us. Invalidate any callsite
     // information related to this function.
     invalidateExistingCalleeRelation(F);
+    if (RecomputeFunctionSet.find(F) != RecomputeFunctionSet.end())
+      return;
     // Make sure this function is recomputed next time.
-    RecomputeFunctionList.insert(F);
+    RecomputeFunctionSet.insert(F);
+    RecomputeFunctionList.push_back(F);
+  }
+
+  virtual void invalidateForDeadFunction(SILFunction *F, InvalidationKind K) {
+    invalidateExistingCalleeRelation(F);
+  }
+
+  virtual void invalidate(InvalidationKind K) {
+    // Should we invalidate based on the invalidation kind.
+    bool shouldInvalidate = K & InvalidationKind::Calls;
+    if (!shouldInvalidate)
+      return;
+
+    CallInfo.clear();
+    RecomputeFunctionList.clear();
+    RecomputeFunctionSet.clear();
+    for(auto &F : Mod) {
+      RecomputeFunctionSet.insert(&F);
+      RecomputeFunctionList.push_back(&F);
+    }
   }
 
   /// Return true if the function has a caller inside current module.
-  bool existCaller(SILFunction *F) {
+  bool hasCaller(SILFunction *F) {
     // Recompute every function in the invalidated function list and empty the
     // list.
-    for (auto &F : RecomputeFunctionList) {
-      processFunctionCallSites(F);
-    }
-    RecomputeFunctionList.clear(); 
-
+    processRecomputeFunctionList();
     auto Iter = CallInfo.FindAndConstruct(F);
     return !Iter.second.CallSites.empty();
   }
 
+
+  /// Return all the callsites to this function in the current module.
+  ApplyList getCallSites(SILFunction *F) {
+    // Recompute every function in the invalidated function list and empty the
+    // list.
+    processRecomputeFunctionList();
+    auto Iter = CallInfo.FindAndConstruct(F);
+    return Iter.second.getCallSites();
+  }
 };
 
 } // end namespace swift

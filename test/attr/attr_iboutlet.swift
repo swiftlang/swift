@@ -1,6 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 // REQUIRES: objc_interop
+import Foundation
 
 @IBOutlet // expected-error {{only instance properties can be declared @IBOutlet}} {{1-11=}}
 var iboutlet_global: Int
@@ -121,8 +122,8 @@ class NonObjC {}
   @IBOutlet var collection4b: ([CP1])? // expected-error{{@IBOutlet property cannot be an array of non-'@objc' protocol type}} {{3-13=}}
   @IBOutlet var collection4c: ([CP1])! // expected-error{{@IBOutlet property cannot be an array of non-'@objc' protocol type}} {{3-13=}}
 
-  @IBOutlet var collection5b: ([String])?  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
-  @IBOutlet var collection5c: ([String])!  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
+  @IBOutlet var collection5b: ([String])?
+  @IBOutlet var collection5c: ([String])!
 
   @IBOutlet var collection6a: [NonObjC] // expected-error{{@IBOutlet property cannot be an array of non-'@objc' class type}} {{3-13=}}
   @IBOutlet var collection6b: ([NonObjC])? // expected-error{{@IBOutlet property cannot be an array of non-'@objc' class type}} {{3-13=}}
@@ -166,7 +167,7 @@ class SwiftGizmo {
   @IBOutlet var b1 : [C]
   @IBOutlet var b2 : [C]!
   @IBOutlet var c : String!
-  @IBOutlet var d : [String]! // expected-error{{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
+  @IBOutlet var d : [String]!
   @IBOutlet var e : Proto!
 
   @IBOutlet var f : C?

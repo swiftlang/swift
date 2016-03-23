@@ -724,10 +724,8 @@ loadAllConformances(const T *container,
                         container->getASTContext().AllocateCopy(Conformances));
 }
 
-DeclRange NominalTypeDecl::getMembers(bool forceDelayedMembers) const {
+DeclRange NominalTypeDecl::getMembers() const {
   loadAllMembers();
-  if (forceDelayedMembers)
-    const_cast<NominalTypeDecl*>(this)->forceDelayedMemberDecls();
   return IterableDeclContext::getMembers();
 }
 
@@ -805,7 +803,7 @@ void ExtensionDecl::setGenericSignature(GenericSignature *sig) {
   GenericSig = sig;
 }
 
-DeclRange ExtensionDecl::getMembers(bool forceDelayedMembers) const {
+DeclRange ExtensionDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
 }
@@ -2716,6 +2714,26 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
                                          SourceLoc());
   result->setOuterParameters(outerGenericParams);
   return result;
+}
+
+/// Returns the default witness for a requirement, or nullptr if there is
+/// no default.
+ConcreteDeclRef ProtocolDecl::getDefaultWitness(ValueDecl *requirement) const {
+  loadAllMembers();
+
+  auto found = DefaultWitnesses.find(requirement);
+  if (found == DefaultWitnesses.end())
+    return nullptr;
+  return found->second;
+}
+
+/// Record the default witness for a requirement.
+void ProtocolDecl::setDefaultWitness(ValueDecl *requirement,
+                                     ConcreteDeclRef witness) {
+  assert(witness);
+  auto pair = DefaultWitnesses.insert(std::make_pair(requirement, witness));
+  assert(pair.second && "Already have a default witness!");
+  (void) pair;
 }
 
 /// \brief Return true if the 'getter' is mutating, i.e. that it requires an

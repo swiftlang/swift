@@ -1087,7 +1087,7 @@ class infer_instanceVar1 {
 // CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer10: UnsafeMutablePointer<PlainEnum>
 // CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer11: UnsafeMutablePointer<PlainProtocol>
 // CHECK-LABEL: @objc var var_UnsafeMutablePointer12: UnsafeMutablePointer<AnyObject>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer13: UnsafeMutablePointer<AnyObject.Type>
+// CHECK-LABEL: var var_UnsafeMutablePointer13: UnsafeMutablePointer<AnyObject.Type>
 // CHECK-LABEL: {{^}} @objc var var_UnsafeMutablePointer100: UnsafeMutablePointer<()>
 // CHECK-LABEL: {{^}} @objc var var_UnsafeMutablePointer101: UnsafeMutablePointer<Void>
 // CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer102: UnsafeMutablePointer<(Int, Int)>
@@ -2027,4 +2027,24 @@ class ConformsToProtocolThrowsObjCName1 : ProtocolThrowsObjCName {
 
 class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName { // expected-note{{class 'ConformsToProtocolThrowsObjCName2' declares conformance to protocol 'ProtocolThrowsObjCName' here}}
   @objc func doThing(x: Int) throws -> String { return "" } // expected-error{{Objective-C method 'doThing:error:' provided by method 'doThing' conflicts with optional requirement method 'doThing' in protocol 'ProtocolThrowsObjCName'}}
+}
+
+@objc class DictionaryTest {
+  // CHECK-LABEL: @objc func func_dictionary1a(x: Dictionary<ObjC_Class1, ObjC_Class1>)
+  func func_dictionary1a(x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
+
+  // CHECK-LABEL: @objc func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>)
+  @objc func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
+
+  func func_dictionary2a(x: Dictionary<String, Int>) { }
+  @objc func func_dictionary2b(x: Dictionary<String, Int>) { }
+}
+
+
+@objc class ObjC_Class1 : Hashable { 
+  var hashValue: Int { return 0 }
+}
+
+func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
+  return true
 }

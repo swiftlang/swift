@@ -66,12 +66,12 @@ func bridgeToAnyObject(s: BridgedStruct) -> AnyObject {
 }
 
 func bridgeFromObjC(c: BridgedClass) -> BridgedStruct {
-  return c // expected-error{{cannot convert return expression of type 'BridgedClass' to return type 'BridgedStruct'}}
+  return c // expected-error{{'BridgedClass' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}
   return c as BridgedStruct
 }
 
 func bridgeFromObjCDerived(s: BridgedClassSub) -> BridgedStruct {
-  return s // expected-error{{cannot convert return expression of type 'BridgedClassSub' to return type 'BridgedStruct'}}
+  return s // expected-error{{'BridgedClassSub' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}
   return s as BridgedStruct
 }
 
@@ -286,4 +286,9 @@ func force_cast_fixit(a : [NSString]) -> [NSString] {
 func rdar21244068(n: NSString!) -> String {
   return n  // expected-error {{'NSString!' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{11-11= as String}}
 }
+
+func forceBridgeDiag(obj: BridgedClass!) -> BridgedStruct {
+  return obj // expected-error{{'BridgedClass!' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}{{13-13= as BridgedStruct}}
+}
+
 

@@ -1419,13 +1419,9 @@ namespace {
     /// \param fromDC The DeclContext from which this associated type was
     /// computed, which may be different from the context associated with the
     /// protocol conformance.
-    ///
-    /// \param wasDeducedOrDefaulted Whether this witness was deduced or
-    /// defaulted (rather than being explicitly provided).
     void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
                            TypeDecl *typeDecl, DeclContext *fromDC,
-                           bool wasDeducedOrDefaulted,
-                           bool performRedeclarationCheck = true);
+                           bool performRedeclarationCheck);
 
     /// Resolve a (non-type) witness via name lookup.
     ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
@@ -1955,7 +1951,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
                                            TypeDecl *typeDecl,
                                            DeclContext *fromDC,
-                                           bool wasDeducedOrDefaulted,
                                            bool performRedeclarationCheck) {
   // If the declaration context from which the type witness was determined
   // differs from that of the conformance, adjust the type so that it is
@@ -2064,10 +2059,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     assocType,
     getArchetypeSubstitution(TC, DC, assocType->getArchetype(), type),
     typeDecl);
-
-  // Note whether this witness was deduced or defaulted.
-  if (wasDeducedOrDefaulted)
-    Conformance->addDefaultDefinition(assocType);
 }
 
 ResolveWitnessResult
@@ -2509,13 +2500,12 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
     recordTypeWitness(assocType, viable.front().second, viable.front().first,
-                      viable.front().first->getDeclContext(), false);
+                      viable.front().first->getDeclContext(), true);
     return ResolveWitnessResult::Success;
   }
 
   // Record an error.
-  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, DC, true,
-                    false);
+  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, DC, false);
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {

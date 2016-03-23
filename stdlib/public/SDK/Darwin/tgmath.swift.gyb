@@ -235,27 +235,15 @@ public func frexp(value: ${T}) -> (${T}, Int) {
 
 % end
 
-% # This would be AllFloatTypes not OverlayFloatTypes because of the Int return.
-% # ... except we need an _silgen_name to avoid an overload ambiguity.
-% for T, CT, f in OverlayFloatTypes():
+% # This is AllFloatTypes not OverlayFloatTypes because of the Int return.
+% for T, CT, f in AllFloatTypes():
 @_transparent
 @warn_unused_result
 public func ilogb(x: ${T}) -> Int {
-  return Int(ilogb${f}(${CT}(x)))
+  return Int(ilogb${f}(${CT}(x)) as CInt)
 }
 
 % end
-
-@warn_unused_result
-@_silgen_name("ilogb") 
-func _swift_Darwin_ilogb(value: CDouble) -> CInt
-
-@_transparent
-@warn_unused_result
-public func ilogb(x: Double) -> Int {
-  return Int(_swift_Darwin_ilogb(CDouble(x)))
-}
-
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
 % for T, CT, f in AllFloatTypes():

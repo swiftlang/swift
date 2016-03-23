@@ -1917,6 +1917,328 @@ bool TypeBase::isPotentiallyBridgedValueType() {
   return false;
 }
 
+/// Determine whether this is a representable Objective-C object type.
+static ForeignRepresentableKind getObjCObjectRepresentable(Type type) {
+  // @objc metatypes are representable when their instance type is.
+  if (auto metatype = type->getAs<AnyMetatypeType>()) {
+    // If the instance type is not representable, the metatype is not
+    // representable.
+    auto instanceType = metatype->getInstanceType();
+    if (getObjCObjectRepresentable(instanceType)
+          == ForeignRepresentableKind::None)
+      return ForeignRepresentableKind::None;
+
+    // Objective-C metatypes are trivially representable.
+    if (metatype->hasRepresentation() &&
+        metatype->getRepresentation() == MetatypeRepresentation::ObjC)
+      return ForeignRepresentableKind::Object;
+
+    // All other metatypes are bridged.
+    return ForeignRepresentableKind::Bridged;
+  }
+
+  // Look through DynamicSelfType.
+  if (auto dynSelf = type->getAs<DynamicSelfType>())
+    type = dynSelf->getSelfType();
+
+  // @objc classes.
+  if (auto classType = type->getAs<ClassType>()) {
+    auto classDecl = classType->getDecl();
+    auto &ctx = classDecl->getASTContext();
+    if (auto resolver = ctx.getLazyResolver())
+      resolver->resolveDeclSignature(classDecl);
+
+    if (classDecl->isObjC())
+      return ForeignRepresentableKind::Object;
+  }
+
+  // Objective-C existential types.
+  if (type->isObjCExistentialType())
+    return ForeignRepresentableKind::Object;
+
+  return ForeignRepresentableKind::None;
+}
+
+/// Determine the foreign representation of this type.
+///
+/// This function determines when and how a particular type is mapped
+/// into a foreign language. Any changes to the logic here also need
+/// to be reflected in PrintAsObjC, so that the Swift type will be
+/// properly printed for (Objective-)C and in SIL's bridging logic.
+static std::pair<ForeignRepresentableKind, ProtocolConformance *>
+getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
+  // Look through one level of optional type, but remember that we did.
+  bool wasOptional = false;
+  if (auto valueType = type->getAnyOptionalObjectType()) {
+    type = valueType;
+    wasOptional = true;
+  }
+
+  // Objective-C object types, including metatypes.
+  if (language == ForeignLanguage::ObjectiveC) {
+    auto representable = getObjCObjectRepresentable(type);
+    if (representable != ForeignRepresentableKind::None)
+      return { representable, nullptr };
+  }
+
+  // Local function that simply produces a failing result.
+  auto failure = []() -> std::pair<ForeignRepresentableKind,
+                                   ProtocolConformance *> {
+    return { ForeignRepresentableKind::None, nullptr };
+  };
+
+  // Function types.
+  if (auto functionType = type->getAs<FunctionType>()) {
+    // Cannot handle throwing functions.
+    if (functionType->getExtInfo().throws())
+      return failure();
+
+    // Whether we have found any types that are bridged.
+    bool anyBridged = false;
+    bool anyStaticBridged = false;
+
+    // Local function to combine the result of a recursive invocation.
+    //
+    // Returns true on failure.
+    auto recurse = [&](Type componentType) -> bool {
+      switch (componentType->getForeignRepresentableIn(language, dc).first) {
+      case ForeignRepresentableKind::None:
+        return true;
+
+      case ForeignRepresentableKind::Trivial:
+      case ForeignRepresentableKind::Object:
+        return false;
+
+      case ForeignRepresentableKind::Bridged:
+        anyBridged = true;
+        return false;
+
+      case ForeignRepresentableKind::StaticBridged:
+        anyStaticBridged = true;
+        return false;
+      }
+    };
+
+    // Check the representation of the function type.
+    bool isBlock = false;
+    switch (functionType->getRepresentation()) {
+    case AnyFunctionType::Representation::Thin:
+      return failure();
+
+    case AnyFunctionType::Representation::Swift:
+      anyStaticBridged = true;
+      break;
+
+    case AnyFunctionType::Representation::Block:
+      isBlock = true;
+      break;
+
+    case AnyFunctionType::Representation::CFunctionPointer:
+      break;
+    }
+
+    // Look at the result type.
+    Type resultType = functionType->getResult();
+    if (!resultType->isVoid() && recurse(resultType))
+      return failure();
+
+    // Look at the input types.
+    Type inputType = functionType->getInput();
+    if (auto inputTuple = inputType->getAs<TupleType>()) {
+      for (const auto &elt : inputTuple->getElements()) {
+        if (elt.isVararg())
+          return failure();
+        if (recurse(elt.getType()))
+          return failure();
+      }
+    } else if (recurse(inputType)) {
+      return failure();
+    }
+
+    // We have something representable; check how it is representable.
+    return { anyStaticBridged ? ForeignRepresentableKind::StaticBridged
+                 : anyBridged ? ForeignRepresentableKind::Bridged
+                 : isBlock    ? ForeignRepresentableKind::Object
+                 : ForeignRepresentableKind::Trivial,
+             nullptr };
+  }
+
+  auto nominal = type->getAnyNominal();
+  if (!nominal)
+    return failure();
+
+  ASTContext &ctx = nominal->getASTContext();
+
+  // If the type is @objc, it is trivially representable in Objective-C.
+  if (nominal->isObjC() && language == ForeignLanguage::ObjectiveC)
+    return { ForeignRepresentableKind::Trivial, nullptr };
+
+  // Unmanaged<T> can be trivially represented in Objective-C if T
+  // is trivially represented in Objective-C.
+  if (language == ForeignLanguage::ObjectiveC &&
+      nominal == ctx.getUnmanagedDecl()) {
+    auto boundGenericType = type->getAs<BoundGenericType>();
+
+    // Note: works around a broken Unmanaged<> definition.
+    if (!boundGenericType || boundGenericType->getGenericArgs().size() != 1)
+      return failure();
+    
+    auto typeArgument = boundGenericType->getGenericArgs()[0];
+    if (typeArgument->isTriviallyRepresentableIn(language, dc))
+      return { ForeignRepresentableKind::Trivial, nullptr };
+
+    return failure();
+  }
+
+  // If the type was imported from Clang, check whether it is
+  // representable in the requested language.
+  if (nominal->hasClangNode()) {
+    switch (language) {
+    case ForeignLanguage::C:
+      // Imported structs and enums are trivially representable in C.
+      // FIXME: This is not entirely true; we need to check that
+      // all of the exposed parts are representable in C.
+      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
+        return { ForeignRepresentableKind::Trivial, nullptr };
+
+      // Imported classes and protocols are not.
+      if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
+        return failure();
+
+      llvm_unreachable("Unhandled nominal type declaration");
+
+    case ForeignLanguage::ObjectiveC:
+      // Anything Clang imported is trivially representable in Objective-C.
+      return { ForeignRepresentableKind::Trivial, nullptr };
+    }
+  }
+
+  // Pointers may be representable in ObjC.
+  PointerTypeKind pointerKind;
+  if (auto pointerElt = type->getAnyPointerElementType(pointerKind)) {
+    // FIXME: Optionality should be embedded in the pointer types.
+    if (wasOptional)
+      return failure();
+
+    switch (pointerKind) {
+    case PTK_UnsafeMutablePointer:
+    case PTK_UnsafePointer:
+      // An UnsafeMutablePointer<T> or UnsafePointer<T> is
+      // representable if T is trivially representable or Void.
+      if (pointerElt->isVoid() ||
+          pointerElt->isTriviallyRepresentableIn(language, dc))
+        return { ForeignRepresentableKind::Trivial, nullptr };
+
+      return failure();
+
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      // An AutoreleasingUnsafeMutablePointer<T> is representable in
+      // Objective-C if T is a representable object type in
+      // Objective-C.
+
+      // Allow one level of optionality.
+      if (auto objectType = pointerElt->getAnyOptionalObjectType())
+        pointerElt = objectType;
+
+      if (language == ForeignLanguage::ObjectiveC &&
+          getObjCObjectRepresentable(pointerElt)
+            != ForeignRepresentableKind::None)
+        return { ForeignRepresentableKind::Trivial, nullptr };
+
+      return failure();
+    }
+  }
+
+  // Determine whether this nominal type is known to be representable
+  // in this foreign language.
+  auto result = ctx.getForeignRepresentable(nominal, language, dc);
+  if (result.first == ForeignRepresentableKind::None)
+    return result;
+
+  // The ability to bridge an optional is currently tied to the
+  // _ObjectiveCBridgeable protocol.
+  // FIXME: This will eventually be wrong, but it is convenient for now.
+  if (wasOptional &&
+      (!result.second ||
+       !result.second->getProtocol()->isSpecificProtocol(
+          KnownProtocolKind::ObjectiveCBridgeable)))
+    return failure();
+
+  // If our nominal type has type arguments, make sure they are
+  // representable as well. Because type arguments are not actually
+  // translated separately, whether they are trivially representable
+  // or bridged representable doesn't impact our final result.
+  if (auto boundGenericType = type->getAs<BoundGenericType>()) {
+    for (auto typeArg : boundGenericType->getGenericArgs()) {
+      // Type arguments cannot be optional.
+      if (typeArg->getAnyOptionalObjectType())
+        return failure();
+
+      // And must be representable either an object or bridged.
+      switch (typeArg->getForeignRepresentableIn(language, dc).first) {
+      case ForeignRepresentableKind::None:
+      case ForeignRepresentableKind::StaticBridged:
+        return failure();
+
+      case ForeignRepresentableKind::Trivial:
+        // FIXME: We allow trivially-representable cases that also
+        // conform to _ObjectiveCBridgeable. This may not be desirable
+        // and should be re-evaluated.
+        if (auto nominal = typeArg->getAnyNominal()) {
+          if (auto objcBridgeable
+                = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
+            SmallVector<ProtocolConformance *, 1> conformances;
+            if (nominal->lookupConformance(dc->getParentModule(),
+                                           objcBridgeable,
+                                           conformances))
+              break;
+          }
+        }
+        
+        return failure();
+        
+      case ForeignRepresentableKind::Object:
+      case ForeignRepresentableKind::Bridged:
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+std::pair<ForeignRepresentableKind, ProtocolConformance *>
+TypeBase::getForeignRepresentableIn(ForeignLanguage language, DeclContext *dc) {
+  return getForeignRepresentable(Type(this), language, dc);
+}
+
+bool TypeBase::isRepresentableIn(ForeignLanguage language, DeclContext *dc) {
+  switch (getForeignRepresentableIn(language, dc).first) {
+  case ForeignRepresentableKind::None:
+    return false;
+
+  case ForeignRepresentableKind::Trivial:
+  case ForeignRepresentableKind::Object:
+  case ForeignRepresentableKind::Bridged:
+  case ForeignRepresentableKind::StaticBridged:
+    return true;
+  }
+}
+
+bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
+                                          DeclContext *dc) {
+  switch (getForeignRepresentableIn(language, dc).first) {
+  case ForeignRepresentableKind::None:
+  case ForeignRepresentableKind::Bridged:
+  case ForeignRepresentableKind::StaticBridged:
+    return false;
+
+  case ForeignRepresentableKind::Trivial:
+  case ForeignRepresentableKind::Object:
+    return true;
+  }
+}
+
 /// Is t1 not just a subtype of t2, but one such that its values are
 /// trivially convertible to values of the other?
 static bool canOverride(CanType t1, CanType t2,

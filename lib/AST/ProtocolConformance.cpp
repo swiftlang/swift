@@ -151,7 +151,8 @@ ProtocolConformance::getInheritedConformances() const {
 
 /// Determine whether the witness for the given requirement
 /// is either the default definition or was otherwise deduced.
-bool ProtocolConformance::usesDefaultDefinition(ValueDecl *requirement) const {
+bool ProtocolConformance::
+usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
@@ -401,6 +402,11 @@ ProtocolConformance::getRootNormalConformance() const {
     }
   }
   return cast<NormalProtocolConformance>(C);
+}
+
+bool ProtocolConformance::isVisibleFrom(DeclContext *dc) const {
+  // FIXME: Implement me!
+  return true;
 }
 
 ProtocolConformance *ProtocolConformance::subst(Module *module,

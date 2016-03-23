@@ -209,7 +209,7 @@ public func _overflowChecked<T>(
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
 @_transparent
-public func _stdlibAssert(
+public func _debugPrecondition(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -223,7 +223,7 @@ public func _stdlibAssert(
 }
 
 @_transparent @noreturn
-public func _stdlibAssertionFailure(
+public func _debugPreconditionFailure(
   message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line) {
   if _isDebugAssertConfiguration() {

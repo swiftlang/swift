@@ -464,9 +464,18 @@ void swift::ide::printSubmoduleInterface(
           return false;
       }
     }
-
+    std::unique_ptr<SynthesizedExtensionAnalyzer> pAnalyzer;
+    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+      if (PrintSynthesizedExtensions) {
+        pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
+        AdjustedOptions.shouldCloseNominal = !pAnalyzer->hasMergeGroup(
+          SynthesizedExtensionAnalyzer::MergeGroupKind::Uncontraint);
+      }
+    }
     if (D->print(Printer, AdjustedOptions)) {
-      Printer << "\n";
+      if (AdjustedOptions.shouldCloseNominal)
+        Printer << "\n";
+      AdjustedOptions.shouldCloseNominal = true;
       if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
         std::queue<NominalTypeDecl *> SubDecls{{NTD}};
 
@@ -479,43 +488,83 @@ void swift::ide::printSubmoduleInterface(
             if (auto N = dyn_cast<NominalTypeDecl>(Sub))
               SubDecls.push(N);
 
-          // Print Ext and add sub-types of Ext.
-          for (auto Ext : NTD->getExtensions()) {
-            if (!shouldPrint(Ext, AdjustedOptions)) {
-              Printer.callAvoidPrintDeclPost(Ext);
-              continue;
+          if (!PrintSynthesizedExtensions) {
+            // Print Ext and add sub-types of Ext.
+            for (auto Ext : NTD->getExtensions()) {
+              if (!shouldPrint(Ext, AdjustedOptions)) {
+                Printer.callAvoidPrintDeclPost(Ext);
+                continue;
+              }
+              if (extensionHasClangNode(Ext))
+                continue; // will be printed in its source location, see above.
+              Printer << "\n";
+              Ext->print(Printer, AdjustedOptions);
+              Printer << "\n";
+              for (auto Sub : Ext->getMembers())
+                if (auto N = dyn_cast<NominalTypeDecl>(Sub))
+                  SubDecls.push(N);
             }
-            if (extensionHasClangNode(Ext))
-              continue; // will be printed in its source location, see above.
-            Printer << "\n";
-            Ext->print(Printer, AdjustedOptions);
-            Printer << "\n";
-            for (auto Sub : Ext->getMembers())
-              if (auto N = dyn_cast<NominalTypeDecl>(Sub))
-                SubDecls.push(N);
-          }
-          if (!PrintSynthesizedExtensions)
             continue;
+          }
 
-          // Print synthesized extensions.
-          SynthesizedExtensionAnalyzer Analyzer(NTD, AdjustedOptions);
-          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
-                                                                    &Analyzer);
-          Analyzer.forEachSynthesizedExtensionMergeGroup(
-            [&](ArrayRef<ExtensionDecl*> Decls){
+          bool IsTopLevelDecl = D == NTD;
+
+          // If printed Decl is the top-level, merge the contraint-free extensions
+          // into the main body.
+          if (IsTopLevelDecl) {
+          // Print the part that should be merged with the type decl.
+          pAnalyzer->forEachExtensionMergeGroup(
+            SynthesizedExtensionAnalyzer::MergeGroupKind::Uncontraint,
+            [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
               for (auto ET : Decls) {
-                AdjustedOptions.TransformContext->shouldOpenExtension =
-                  Decls.front() == ET;
-                AdjustedOptions.TransformContext->shouldCloseExtension =
-                  Decls.back() == ET;
-                if (AdjustedOptions.TransformContext->shouldOpenExtension)
+                AdjustedOptions.shouldOpenExtension = false;
+                AdjustedOptions.shouldCloseExtension =
+                  Decls.back().first == ET.first;
+                if (ET.second)
+                  AdjustedOptions.
+                    initArchetypeTransformerForSynthesizedExtensions(NTD,
+                                                               pAnalyzer.get());
+                ET.first->print(Printer, AdjustedOptions);
+                if (ET.second)
+                  AdjustedOptions.
+                    clearArchetypeTransformerForSynthesizedExtensions();
+                if (AdjustedOptions.shouldCloseExtension)
                   Printer << "\n";
-                ET->print(Printer, AdjustedOptions);
-                if (AdjustedOptions.TransformContext->shouldCloseExtension)
+              }
+          });
+          }
+
+          // If the printed Decl is not the top-level one, reset analyzer.
+          if (!IsTopLevelDecl)
+            pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
+
+          // Print the rest as synthesized extensions.
+          pAnalyzer->forEachExtensionMergeGroup(
+            // For top-level decls, only contraint extensions are to print;
+            // Since the rest are merged into the main body.
+            IsTopLevelDecl ? SynthesizedExtensionAnalyzer::MergeGroupKind::Contraint :
+            // For sub-decls, all extensions should be printed.
+                       SynthesizedExtensionAnalyzer::MergeGroupKind::All,
+            [&](ArrayRef<ExtensionAndIsSynthesized> Decls){
+              for (auto ET : Decls) {
+                AdjustedOptions.shouldOpenExtension =
+                  Decls.front().first == ET.first;
+                AdjustedOptions.shouldCloseExtension =
+                  Decls.back().first == ET.first;
+                if (AdjustedOptions.shouldOpenExtension)
+                  Printer << "\n";
+                if (ET.second)
+                  AdjustedOptions.
+                    initArchetypeTransformerForSynthesizedExtensions(NTD,
+                                                               pAnalyzer.get());
+                ET.first->print(Printer, AdjustedOptions);
+                if (ET.second)
+                  AdjustedOptions.
+                    clearArchetypeTransformerForSynthesizedExtensions();
+                if (AdjustedOptions.shouldCloseExtension)
                   Printer << "\n";
             }
           });
-          AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
         }
       }
       return true;

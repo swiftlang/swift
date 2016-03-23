@@ -487,11 +487,14 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_GLOBALVAR);
   BLOCK_RECORD(sil_block, SIL_INST_CAST);
   BLOCK_RECORD(sil_block, SIL_INIT_EXISTENTIAL);
-  BLOCK_RECORD(sil_block, SIL_WITNESSTABLE);
+  BLOCK_RECORD(sil_block, SIL_WITNESS_TABLE);
   BLOCK_RECORD(sil_block, SIL_WITNESS_METHOD_ENTRY);
   BLOCK_RECORD(sil_block, SIL_WITNESS_BASE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_PROTOCOL);
   BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_ENTRY);
+  BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE);
+  BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_ENTRY);
+  BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY);
   BLOCK_RECORD(sil_block, SIL_GENERIC_OUTER_PARAMS);
   BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
 
@@ -527,8 +530,10 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_VTABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_GLOBALVAR_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_GLOBALVAR_OFFSETS);
-  BLOCK_RECORD(sil_index_block, SIL_WITNESSTABLE_NAMES);
-  BLOCK_RECORD(sil_index_block, SIL_WITNESSTABLE_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_WITNESS_TABLE_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_WITNESS_TABLE_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_OFFSETS);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -1034,7 +1039,6 @@ void Serializer::writeNormalConformance(
   SmallVector<DeclID, 32> data;
   unsigned numValueWitnesses = 0;
   unsigned numTypeWitnesses = 0;
-  unsigned numDefaultedDefinitions = 0;
 
   // Collect the set of protocols inherited by this conformance.
   SmallVector<ProtocolDecl *, 8> inheritedProtos;
@@ -1067,20 +1071,6 @@ void Serializer::writeNormalConformance(
     return false;
   });
 
-  SmallVector<ValueDecl *, 4> defaultedDefinitions{
-    conformance->getDefaultedDefinitions().begin(),
-    conformance->getDefaultedDefinitions().end()
-  };
-  llvm::array_pod_sort(defaultedDefinitions.begin(), defaultedDefinitions.end(),
-                       [](ValueDecl * const *left, ValueDecl * const *right) {
-    return (*left)->getFullName().compare((*right)->getFullName());
-  });
-
-  for (auto defaulted : defaultedDefinitions) {
-    data.push_back(addDeclRef(defaulted));
-    ++numDefaultedDefinitions;
-  }
-
   unsigned numInheritedConformances = inheritedProtos.size();
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
@@ -1090,7 +1080,6 @@ void Serializer::writeNormalConformance(
                                               numValueWitnesses,
                                               numTypeWitnesses,
                                               numInheritedConformances,
-                                              numDefaultedDefinitions,
                                               data);
 
   // Write inherited conformances.
@@ -1283,6 +1272,31 @@ void Serializer::writeMembers(DeclRange members, bool isClass) {
     }
   }
   MembersLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
+}
+
+void Serializer::writeDefaultWitnessTable(const ProtocolDecl *proto,
+                                   const std::array<unsigned, 256> &abbrCodes) {
+  using namespace decls_block;
+
+  SmallVector<DeclID, 16> witnessIDs;
+
+  unsigned abbrCode = abbrCodes[DefaultWitnessTableLayout::Code];
+  for (auto member : proto->getMembers()) {
+    if (auto *value = dyn_cast<ValueDecl>(member)) {
+      ConcreteDeclRef witness = proto->getDefaultWitness(value);
+      if (!witness)
+        continue;
+
+      DeclID requirementID = addDeclRef(value);
+      DeclID witnessID = addDeclRef(witness.getDecl());
+      witnessIDs.push_back(requirementID);
+      witnessIDs.push_back(witnessID);
+
+      // FIXME: Substitutions
+    }
+  }
+  DefaultWitnessTableLayout::emitRecord(Out, ScratchRecord,
+                                        abbrCode, witnessIDs);
 }
 
 static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
@@ -2370,6 +2384,7 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(proto->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(proto->getGenericRequirements());
     writeMembers(proto->getMembers(), true);
+    writeDefaultWitnessTable(proto, DeclTypeAbbrCodes);
     break;
   }
 
@@ -3268,6 +3283,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<FuncLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
+  registerDeclTypeAbbr<DefaultWitnessTableLayout>();
   registerDeclTypeAbbr<PrefixOperatorLayout>();
   registerDeclTypeAbbr<PostfixOperatorLayout>();
   registerDeclTypeAbbr<InfixOperatorLayout>();

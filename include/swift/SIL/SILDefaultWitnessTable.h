@@ -74,6 +74,9 @@ private:
   /// The module which contains the SILDefaultWitnessTable.
   SILModule &Mod;
 
+  /// The linkage of the witness table.
+  SILLinkage Linkage;
+
   /// The protocol declaration to which this default witness table applies.
   const ProtocolDecl *Protocol;
 
@@ -90,23 +93,33 @@ private:
   bool IsDeclaration;
 
   /// Private constructor for making SILDefaultWitnessTable declarations.
-  SILDefaultWitnessTable(SILModule &M, const ProtocolDecl *Protocol);
+  SILDefaultWitnessTable(SILModule &M, SILLinkage Linkage,
+                         const ProtocolDecl *Protocol);
 
   /// Private constructor for making SILDefaultWitnessTable definitions.
-  SILDefaultWitnessTable(SILModule &M, const ProtocolDecl *Protocol,
+  SILDefaultWitnessTable(SILModule &M, SILLinkage Linkage,
+                         const ProtocolDecl *Protocol,
                          ArrayRef<Entry> entries);
 
   void addDefaultWitnessTable();
 
 public:
   /// Create a new SILDefaultWitnessTable declaration.
-  static SILDefaultWitnessTable *create(SILModule &M,
+  static SILDefaultWitnessTable *create(SILModule &M, SILLinkage Linkage,
                                         const ProtocolDecl *Protocol);
 
   /// Create a new SILDefaultWitnessTable definition with the given entries.
-  static SILDefaultWitnessTable *create(SILModule &M,
+  static SILDefaultWitnessTable *create(SILModule &M, SILLinkage Linkage,
                                         const ProtocolDecl *Protocol,
                                         ArrayRef<Entry> entries);
+
+  Identifier getIdentifier() const;
+
+  /// Get the linkage of the default witness table.
+  SILLinkage getLinkage() const { return Linkage; }
+
+  /// Set the linkage of the default witness table.
+  void setLinkage(SILLinkage l) { Linkage = l; }
 
   void convertToDefinition(ArrayRef<Entry> entries);
 

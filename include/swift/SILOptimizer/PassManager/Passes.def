@@ -53,6 +53,8 @@ PASS(COWArrayOpts, "cowarray-opt",
      "COW Array optimizations")
 PASS(CSE, "cse",
      "Common subexpression elimination")
+PASS(CallerAnalysisPrinter, "caller-analysis-printer",
+     "Print callsites of every function in the module")
 PASS(CapturePromotion, "capture-promotion",
      "Promote captures from by-reference to by-value")
 PASS(CapturePropagation, "capture-prop",

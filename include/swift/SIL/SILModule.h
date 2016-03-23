@@ -502,13 +502,21 @@ public:
   SILWitnessTable *
   lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
 
-  /// Attempt to lookup \p Member in the witness table for C.
+  /// Attempt to lookup \p Member in the witness table for \p C.
   std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
-  lookUpFunctionInWitnessTable(ProtocolConformanceRef C, SILDeclRef Member);
+  lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
+                               SILDeclRef Requirement);
 
   /// Look up the SILDefaultWitnessTable representing the default witnesses
   /// of a resilient protocol, if any.
-  SILDefaultWitnessTable *lookUpDefaultWitnessTable(const ProtocolDecl *Protocol);
+  SILDefaultWitnessTable *lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
+                                                    bool deserializeLazily=true);
+
+  /// Attempt to lookup \p Member in the default witness table for \p Protocol.
+  std::pair<SILFunction *, SILDefaultWitnessTable *>
+  lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
+                                      SILDeclRef Requirement,
+                                      bool deserializeLazily=true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
   SILVTable *lookUpVTable(const ClassDecl *C);
@@ -525,7 +533,8 @@ public:
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
   SILDefaultWitnessTable *
-  createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol);
+  createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
+                                       SILLinkage Linkage);
 
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }

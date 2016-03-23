@@ -94,7 +94,7 @@ public struct Range<
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Element) -> Element {
-    _stdlibAssert(position != endIndex, "Index out of range")
+    _debugPrecondition(position != endIndex, "Index out of range")
     return position
   }
 
