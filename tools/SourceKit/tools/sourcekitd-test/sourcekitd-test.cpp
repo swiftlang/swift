@@ -185,7 +185,7 @@ static int skt_main(int argc, const char **argv) {
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyUSR = sourcekitd_uid_get_from_cstr("key.usr");
-  KeyOriginalUSR = sourcekitd_uid_get_from_cstr("key.original-usr");
+  KeyOriginalUSR = sourcekitd_uid_get_from_cstr("key.original_usr");
   KeyTypename = sourcekitd_uid_get_from_cstr("key.typename");
   KeyOverrides = sourcekitd_uid_get_from_cstr("key.overrides");
   KeyRelatedDecls = sourcekitd_uid_get_from_cstr("key.related_decls");
