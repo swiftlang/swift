@@ -2,3 +2,11 @@ module OmitNeedlessWords {
   export *
   header "OmitNeedlessWords.h"
 }
+
+module ImportedProtocols {
+  export *
+  module SubModule {
+    requires objc
+    header "ImportedProtocols.h"
+  }
+}

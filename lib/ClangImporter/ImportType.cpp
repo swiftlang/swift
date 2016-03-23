@@ -686,12 +686,20 @@ namespace {
           // As a special case, turn 'NSObject <NSCopying>' into
           // 'id <NSObject, NSCopying>', which can be imported more usefully.
           Type nsObjectTy = Impl.getNSObjectType();
+          if (!nsObjectTy) {
+            // Input is malformed
+            return {};
+          }
           if (nsObjectTy && importedType->isEqual(nsObjectTy)) {
             SmallVector<clang::ObjCProtocolDecl *, 4> protocols{
               type->qual_begin(), type->qual_end()
             };
             auto *nsObjectProto =
                 Impl.getNSObjectProtocolType()->getAnyNominal();
+            if (!nsObjectProto) {
+              // Input is malformed
+              return {};
+            }
             auto *clangProto =
                 cast<clang::ObjCProtocolDecl>(nsObjectProto->getClangDecl());
             protocols.push_back(
@@ -2349,6 +2357,7 @@ Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
   // FIXME: Map source locations over.
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
+  lookupResult.setAllowHidden(true);
   if (!sema.LookupName(lookupResult, /*Scope=*/0)) {
     return nullptr;
   }
@@ -2400,6 +2409,7 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   // Perform name lookup into the global scope.
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupObjCProtocolName);
+  lookupResult.setAllowHidden(true);
   if (!sema.LookupName(lookupResult, /*Scope=*/0))
     return Type();
 
