@@ -783,7 +783,7 @@ public func indices<
 /// A generator that adapts a collection `C` and any sequence of
 /// its `Index` type to present the collection's elements in a
 /// permuted order.
-@available(*, deprecated, message="PermitationGenerator will be removed in Swift 3")
+@available(*, deprecated, message="PermutationGenerator will be removed in Swift 3")
 @swift3_migration(message="Removed in Swift 3")
 public struct PermutationGenerator<
   C: CollectionType, Indices: SequenceType
