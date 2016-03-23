@@ -210,9 +210,18 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
 
+option(SWIFT_STDLIB_SIL_SERIALIZE_ALL
+    "Build the standard libraries and overlays serializing all method bodies"
+    FALSE)
+
 if(SWIFT_SERIALIZE_STDLIB_UNITTEST AND SWIFT_STDLIB_ENABLE_RESILIENCE)
   message(WARNING "Ignoring SWIFT_SERIALIZE_STDLIB_UNITTEST because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
   set(SWIFT_SERIALIZE_STDLIB_UNITTEST FALSE)
+endif()
+
+if(SWIFT_STDLIB_SIL_SERIALIZE_ALL AND SWIFT_STDLIB_ENABLE_RESILIENCE)
+  message(WARNING "Ignoring SWIFT_STDLIB_SIL_SERIALIZE_ALL because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
+  set(SWIFT_STDLIB_SIL_SERIALIZE_ALL FALSE)
 endif()
 
 #
