@@ -134,6 +134,12 @@ private:
   // and handle exploded retain_value later.
   RetainList EpilogueRetainInsts;
 
+  /// Return true if all the successors of the EpilogueRetainInsts do not have
+  /// a retain. 
+  bool isTransistiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
+
+  /// Finds matching releases in the provided block \p BB.
+  RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V);
 public:
   /// Finds matching releases in the return block of the function \p F.
   ConsumedResultToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
@@ -165,11 +171,6 @@ public:
   unsigned size() const { return EpilogueRetainInsts.size(); }
 
   iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
-
-
-private:
-  /// Finds matching releases in the provided block \p BB.
-  RetainKindValue findMatchingRetainsInner(SILBasicBlock *BB, SILValue V);
 };
 
 /// A class that attempts to match owned arguments and corresponding epilogue
