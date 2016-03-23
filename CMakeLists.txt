@@ -212,7 +212,7 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
 
 option(SWIFT_STDLIB_SIL_SERIALIZE_ALL
     "Build the standard libraries and overlays serializing all method bodies"
-    FALSE)
+    TRUE)
 
 if(SWIFT_SERIALIZE_STDLIB_UNITTEST AND SWIFT_STDLIB_ENABLE_RESILIENCE)
   message(WARNING "Ignoring SWIFT_SERIALIZE_STDLIB_UNITTEST because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
