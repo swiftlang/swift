@@ -208,6 +208,24 @@ public:
 };
 
 struct SynthesizedExtensionAnalyzer::Implementation {
+  static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
+    DeclContext* DC = Target->getDeclContext();
+    Type BaseTy = Target->getDeclaredTypeInContext();
+    const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    if (!FD)
+      return true;
+    ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
+                                                    FD->getEffectiveFullName());
+    return !(Result && Result.Favored != D);
+  }
+
+  static bool isExtensionFavored(const NominalTypeDecl* Target,
+                                 const ExtensionDecl *ED) {
+    return std::find_if(ED->getMembers().begin(), ED->getMembers().end(),
+      [&](DeclIterator It) { return isMemberFavored(Target, *It);}) !=
+        ED->getMembers().end();
+  }
+
   struct SynthesizedExtensionInfo {
     ExtensionDecl *Ext = nullptr;
     std::vector<StringRef> KnownSatisfiedRequirements;
@@ -294,6 +312,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       Kind(MergeableWithType ? MergeGroupKind::MergeableWithTypeDef :
                                MergeGroupKind::UnmergeableWithTypeDef) {
       Members.push_back(Info);
+    }
+
+    void removeUnfavored(const NominalTypeDecl *Target) {
+      Members.erase(std::remove_if(Members.begin(), Members.end(),
+        [&](SynthesizedExtensionInfo *Info){
+          return !isExtensionFavored(Target, Info->Ext);}), Members.end());
     }
 
     void sortMembers() {
@@ -527,8 +551,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups);
     std::sort(AllGroups.begin(), AllGroups.end());
     for (auto &Group : AllGroups) {
+      Group.removeUnfavored(Target);
       Group.sortMembers();
     }
+    AllGroups.erase(std::remove_if(AllGroups.begin(), AllGroups.end(),
+      [](ExtensionMergeGroup &Group) { return Group.Members.empty(); }),
+      AllGroups.end());
     return InfoMap;
   }
 };
@@ -1485,7 +1513,23 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
+bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
+  if (!Options.TransformContext || !D->getDeclContext()->isExtensionContext() ||
+      !Options.TransformContext->isPrintingSynthesizedExtension())
+    return true;
+  NominalTypeDecl *Target = Options.TransformContext->getNominal();
+  Type BaseTy = Target->getDeclaredTypeInContext();
+  const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+  if (!FD)
+    return true;
+  ResolveMemberResult Result = resolveValueMember(*Target->getDeclContext(),
+                                                  BaseTy, FD->getEffectiveFullName());
+  return !(Result && Result.Favored != D);
+}
+
 bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
+  if (!shouldPrintAsFavorable(D, Options))
+    return false;
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
