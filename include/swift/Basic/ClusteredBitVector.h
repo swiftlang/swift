@@ -48,6 +48,7 @@
 #include <cassert>
 #include <climits>
 #include <cstdlib>
+#include <type_traits>
 
 namespace llvm {
   class APInt;
@@ -58,7 +59,8 @@ namespace swift {
 /// A vector of bits.  This data structure is optimized to store an
 /// empty vector of any size without doing any allocation.
 class ClusteredBitVector {
-  using ChunkType = uint64_t; // must be unsigned
+  using ChunkType = uint64_t;
+  static_assert(std::is_unsigned<ChunkType>::value, "ChunkType must be unsigned");
   enum {
     ChunkSizeInBits = sizeof(ChunkType) * CHAR_BIT
   };
