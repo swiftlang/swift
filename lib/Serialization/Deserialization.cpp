@@ -1096,13 +1096,9 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
     // HACK HACK HACK: Omit-needless-words hack to try to cope with
     // the "NS" prefix being added/removed. No "real" compiler mode
-    // has to go through this path: a Swift 2 compiler will have the
-    // prefix, while a Swift 3 compiler will not have the
-    // prefix. However, one can set OmitNeedlessWords in a Swift 2
-    // compiler to get API dumps and perform basic testing; this hack
-    // keeps that working.
+    // has to go through this path, but it's an option we toggle for
+    // testing.
     if (values.empty() && !retrying &&
-        getContext().LangOpts.OmitNeedlessWords &&
         getContext().LangOpts.StripNSPrefix &&
         (M->getName().str() == "ObjectiveC" ||
          M->getName().str() == "Foundation")) {
@@ -1110,7 +1106,6 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         if (name.str().size() > 2 && name.str() != "NSCocoaError") {
           auto known = getKnownFoundationEntity(name.str());
           if (!known || !nameConflictsWithStandardLibrary(*known)) {
-            // FIXME: lowercasing magic for non-types.
             name = getContext().getIdentifier(name.str().substr(2));
             retrying = true;
             goto retry;

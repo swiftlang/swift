@@ -1349,16 +1349,12 @@ namespace {
             // Record this as the alternate declaration.
             Impl.AlternateDecls[primary] = aliasRef;
 
-            // The "Ref" variants are deprecated and will be
-            // removed. Stage their removal via
-            // -enable-omit-needless-words.
+            // The "Ref" variants have been removed.
             auto attr = AvailableAttr::createUnconditional(
                           Impl.SwiftContext,
                           "",
                           primary->getName().str(),
-                          Impl.OmitNeedlessWords
-                            ? UnconditionalAvailabilityKind::UnavailableInSwift
-                            : UnconditionalAvailabilityKind::Deprecated);
+                          UnconditionalAvailabilityKind::UnavailableInSwift);
             aliasRef->getAttrs().add(attr);
           };
 

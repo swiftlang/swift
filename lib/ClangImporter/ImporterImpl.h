@@ -261,9 +261,6 @@ public:
   ASTContext &SwiftContext;
 
   const bool ImportForwardDeclarations;
-  const bool OmitNeedlessWords;
-  const bool InferDefaultArguments;
-  const bool UseSwiftLookupTables;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";

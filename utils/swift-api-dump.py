@@ -85,8 +85,6 @@ def create_parser():
     parser.add_argument('-i', '--swift-ide-test',
                         default=default_swift_ide_test,
                         help="The swift-ide-test executable.")
-    parser.add_argument('-3', '--swift-3', action='store_true',
-                        help="Use Swift 3 transformation")
     parser.add_argument('-o', '--output-dir', default=os.getcwd(),
                         help='Directory to which the output will be emitted.')
     parser.add_argument('-q', '--quiet', action='store_true',
@@ -289,9 +287,6 @@ def main():
 
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
-    if args.swift_3:
-        extra_args = extra_args + \
-            ['-enable-omit-needless-words', '-enable-infer-default-arguments']
 
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])

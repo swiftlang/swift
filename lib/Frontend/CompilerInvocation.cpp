@@ -762,7 +762,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.Playground |= Args.hasArg(OPT_playground);
   Opts.Swift3Migration |= Args.hasArg(OPT_swift3_migration);
   Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
-  Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
   Opts.StripNSPrefix |= Args.hasArg(OPT_enable_strip_ns_prefix);
   if (Args.hasArg(OPT_disable_infer_iuos)) {
     Opts.InferIUOs = false;
@@ -877,9 +876,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     });
   }
 
-  Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
-  Opts.InferDefaultArguments |= Args.hasArg(OPT_enable_infer_default_arguments);
-  Opts.UseSwiftLookupTables |= Args.hasArg(OPT_enable_swift_name_lookup_tables);
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   if (Args.hasArg(OPT_embed_bitcode))

@@ -2527,14 +2527,15 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
     RemoveFunc(DAK_AutoClosure);
 
 
-  if (Options.PrintDefaultParameterPlaceholder &&
-      param->isDefaultArgument()) {
-    Printer << " = ";
+  if (param->isDefaultArgument()) {
     auto defaultArgStr
       = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
     if (defaultArgStr.empty()) {
-      Printer << tok::kw_default;
+      if (Options.PrintDefaultParameterPlaceholder)
+        Printer << " = " << tok::kw_default;
     } else {
+      Printer << " = ";
+
       switch (param->getDefaultArgumentKind()) {
       case DefaultArgumentKind::File:
       case DefaultArgumentKind::Line:
@@ -2547,7 +2548,6 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
         Printer << defaultArgStr;
         break;
       }
-
     }
   }
 }

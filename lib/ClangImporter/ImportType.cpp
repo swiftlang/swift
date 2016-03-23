@@ -2157,9 +2157,8 @@ Type ClangImporter::Implementation::importMethodType(
     auto paramInfo = bodyVar;
     
     // Determine whether we have a default argument.
-    if (InferDefaultArguments &&
-        (kind == SpecialMethodKind::Regular ||
-         kind == SpecialMethodKind::Constructor)) {
+    if (kind == SpecialMethodKind::Regular ||
+        kind == SpecialMethodKind::Constructor) {
       bool isLastParameter = (paramIndex == params.size() - 1) ||
         (paramIndex == params.size() - 2 &&
          errorInfo && errorInfo->ParamIndex == params.size() - 1);

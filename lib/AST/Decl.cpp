@@ -3113,8 +3113,7 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
   // If the Swift name starts with the word "is", use that Swift name as the
   // getter name.
   auto var = cast<VarDecl>(this);
-  if (ctx.LangOpts.OmitNeedlessWords &&
-      camel_case::getFirstWord(var->getName().str()) == "is")
+  if (camel_case::getFirstWord(var->getName().str()) == "is")
     return ObjCSelector(ctx, 0, { var->getName() });
 
   // The getter selector is the property name itself.
@@ -3406,8 +3405,7 @@ Identifier VarDecl::getObjCPropertyName() const {
   // name.
   ASTContext &ctx = getASTContext();
   StringRef nameStr = getName().str();
-  if (ctx.LangOpts.OmitNeedlessWords &&
-      camel_case::getFirstWord(nameStr) == "is") {
+  if (camel_case::getFirstWord(nameStr) == "is") {
     SmallString<16> scratch;
     return ctx.getIdentifier(camel_case::toLowercaseWord(nameStr.substr(2),
                                                          scratch));

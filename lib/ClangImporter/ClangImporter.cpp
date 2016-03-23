@@ -1181,9 +1181,6 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
                                               const ClangImporterOptions &opts)
   : SwiftContext(ctx),
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
-    OmitNeedlessWords(opts.OmitNeedlessWords),
-    InferDefaultArguments(opts.InferDefaultArguments),
-    UseSwiftLookupTables(opts.UseSwiftLookupTables),
     BridgingHeaderLookupTable(nullptr)
 {
   // Add filters to determine if a Clang availability attribute
@@ -1257,7 +1254,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
 
   // Prepopulate the set of module prefixes.
   // FIXME: Hard-coded list should move into the module map language.
-  if (OmitNeedlessWords && ctx.LangOpts.StripNSPrefix) {
+  if (ctx.LangOpts.StripNSPrefix) {
     ModulePrefixes["Foundation"] = "NS";
     ModulePrefixes["ObjectiveC"] = "NS";
   }
@@ -2001,61 +1998,59 @@ auto ClangImporter::Implementation::importFullName(
     result.EffectiveContext = category->getClassInterface();
   }
 
-  // When omitting needless words, find the original method/property
-  // declaration.
-  if (OmitNeedlessWords) {
-    if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
-      // Inherit the name from the "originating" declarations, if
-      // there are any.
-      SmallVector<std::pair<const clang::ObjCMethodDecl *, ImportedName>, 4>
+  // Find the original method/property declaration and retrieve the
+  // name from thre.
+  if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
+    // Inherit the name from the "originating" declarations, if
+    // there are any.
+    SmallVector<std::pair<const clang::ObjCMethodDecl *, ImportedName>, 4>
+      overriddenNames;
+    SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+    method->getOverriddenMethods(overriddenMethods);
+    for (auto overridden : overriddenMethods) {
+      const auto overriddenName = importFullName(overridden, options,
+                                                 clangSemaOverride);
+      if (overriddenName.Imported)
+        overriddenNames.push_back({overridden, overriddenName});
+    }
+
+    // If we found any names of overridden methods, return those names.
+    if (!overriddenNames.empty()) {
+      if (overriddenNames.size() > 1)
+        mergeOverriddenNames(SwiftContext, method, overriddenNames);
+      overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
+      return overriddenNames[0].second;
+    }
+  } else if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+    // Inherit the name from the "originating" declarations, if
+    // there are any.
+    if (auto getter = property->getGetterMethodDecl()) {
+      SmallVector<std::pair<const clang::ObjCPropertyDecl *, ImportedName>, 4>
         overriddenNames;
       SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
-      method->getOverriddenMethods(overriddenMethods);
+      SmallPtrSet<const clang::ObjCPropertyDecl *, 4> knownProperties;
+      (void)knownProperties.insert(property);
+
+      getter->getOverriddenMethods(overriddenMethods);
       for (auto overridden : overriddenMethods) {
-        const auto overriddenName = importFullName(overridden, options,
+        if (!overridden->isPropertyAccessor()) continue;
+        auto overriddenProperty = overridden->findPropertyDecl(true);
+        if (!overriddenProperty) continue;
+        if (!knownProperties.insert(overriddenProperty).second) continue;
+
+        const auto overriddenName = importFullName(overriddenProperty,
+                                                   options,
                                                    clangSemaOverride);
         if (overriddenName.Imported)
-          overriddenNames.push_back({overridden, overriddenName});
+          overriddenNames.push_back({overriddenProperty, overriddenName});
       }
 
       // If we found any names of overridden methods, return those names.
       if (!overriddenNames.empty()) {
         if (overriddenNames.size() > 1)
-          mergeOverriddenNames(SwiftContext, method, overriddenNames);
+          mergeOverriddenNames(SwiftContext, property, overriddenNames);
         overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
         return overriddenNames[0].second;
-      }
-    } else if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
-      // Inherit the name from the "originating" declarations, if
-      // there are any.
-      if (auto getter = property->getGetterMethodDecl()) {
-        SmallVector<std::pair<const clang::ObjCPropertyDecl *, ImportedName>, 4>
-          overriddenNames;
-        SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
-        SmallPtrSet<const clang::ObjCPropertyDecl *, 4> knownProperties;
-        (void)knownProperties.insert(property);
-
-        getter->getOverriddenMethods(overriddenMethods);
-        for (auto overridden : overriddenMethods) {
-          if (!overridden->isPropertyAccessor()) continue;
-          auto overriddenProperty = overridden->findPropertyDecl(true);
-          if (!overriddenProperty) continue;
-          if (!knownProperties.insert(overriddenProperty).second) continue;
-
-          const auto overriddenName = importFullName(overriddenProperty,
-                                                     options,
-                                                     clangSemaOverride);
-          if (overriddenName.Imported)
-            overriddenNames.push_back({overriddenProperty, overriddenName});
-        }
-
-        // If we found any names of overridden methods, return those names.
-        if (!overriddenNames.empty()) {
-          if (overriddenNames.size() > 1)
-            mergeOverriddenNames(SwiftContext, property, overriddenNames);
-          overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
-          return overriddenNames[0].second;
-        }
       }
     }
   }
@@ -2158,13 +2153,11 @@ auto ClangImporter::Implementation::importFullName(
     // Map the identifier.
     baseName = D->getDeclName().getAsIdentifierInfo()->getName();
 
-    if (OmitNeedlessWords) {
-      // For Objective-C BOOL properties, use the name of the getter
-      // which, conventionally, has an "is" prefix.
-      if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
-        if (isBoolType(clangSema.Context, property->getType()))
-          baseName = property->getGetterName().getNameForSlot(0);
-      }
+    // For Objective-C BOOL properties, use the name of the getter
+    // which, conventionally, has an "is" prefix.
+    if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+      if (isBoolType(clangSema.Context, property->getType()))
+        baseName = property->getGetterName().getNameForSlot(0);
     }
 
     // For C functions, create empty argument names.
@@ -2220,13 +2213,6 @@ auto ClangImporter::Implementation::importFullName(
         argumentNames.push_back(StringRef());
       } else {
         StringRef argName = selector.getNameForSlot(index);
-
-        // Swift 2 lowercased all subsequent argument names.
-        // Swift 3 may handle this as part of omitting needless words, below,
-        // but don't preempt that here.
-        if (!OmitNeedlessWords)
-          argName = camel_case::toLowercaseWord(argName, stringScratch);
-
         argumentNames.push_back(argName);
       }
     }
@@ -2440,7 +2426,7 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
-  if (OmitNeedlessWords && !result.isSubscriptAccessor()) {
+  if (!result.isSubscriptAccessor()) {
     // Check whether the module in which the declaration resides has a
     // module prefix and will map into Swift as a type. If so, strip
     // that prefix off when present.
@@ -3935,8 +3921,6 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            Impl.OmitNeedlessWords,
-                            Impl.InferDefaultArguments,
                             Impl.SwiftContext.LangOpts.StripNSPrefix);
 }
 

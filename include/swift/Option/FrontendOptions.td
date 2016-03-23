@@ -224,21 +224,9 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def enable_omit_needless_words :
-  Flag<["-"], "enable-omit-needless-words">,
-  HelpText<"Omit needless words when importing Objective-C names">;
-
 def enable_strip_ns_prefix :
   Flag<["-"], "enable-strip-ns-prefix">,
   HelpText<"Strip 'NS' prefix from Foundation entities">;
-
-def enable_infer_default_arguments :
-  Flag<["-"], "enable-infer-default-arguments">,
-  HelpText<"Infer default arguments for imported parameters">;
-
-def enable_swift_name_lookup_tables :
-  Flag<["-"], "enable-swift-name-lookup-tables">,
-  HelpText<"Enable Swift name lookup tables in the Clang importer">;
 
 def swift3_migration :
   Flag<["-"], "swift3-migration">,
