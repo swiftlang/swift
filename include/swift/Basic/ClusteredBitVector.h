@@ -663,7 +663,7 @@ private:
   void appendReserved(size_t numBits,
                 llvm::function_ref<ChunkType(size_t numBitsWanted)> generator);
 
-  /// The slow cases of equality-checking.
+  /// The slow case of equality-checking.
   static bool equalsSlowCase(const ClusteredBitVector &lhs,
                              const ClusteredBitVector &rhs);
 };
