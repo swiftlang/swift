@@ -912,16 +912,23 @@ public:
 
     case SILLinkage::Shared:
     case SILLinkage::SharedExternal:
-        // This handles some kind of generated functions, like constructors
-        // of clang imported types.
-        // TODO: check why those functions are not fragile anyway and make
-        // a less conservative check here.
-        return true;
+      // This allows fragile functions to reference thunks, generated
+      // methods on Clang types, and optimizer specializations.
+      return true;
 
     case SILLinkage::Public:
     case SILLinkage::PublicExternal:
       return true;
     }
+  }
+
+  bool isValidLinkageForFragileRef(const SILFunction *RefF) {
+    if (RefF->isFragile() ||
+        RefF->isExternalDeclaration()) {
+      return true;
+    }
+
+    return isValidLinkageForFragileRef(RefF->getLinkage());
   }
 
   void checkFunctionRefInst(FunctionRefInst *FRI) {
@@ -931,9 +938,7 @@ public:
             "function_ref should have a context-free function result");
     if (F.isFragile()) {
       SILFunction *RefF = FRI->getReferencedFunction();
-      require(RefF->isFragile()
-                || isValidLinkageForFragileRef(RefF->getLinkage())
-                || RefF->isExternalDeclaration(),
+      require(isValidLinkageForFragileRef(RefF),
               "function_ref inside fragile function cannot "
               "reference a private or hidden symbol");
     }

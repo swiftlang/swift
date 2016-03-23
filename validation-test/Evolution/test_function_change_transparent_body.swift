@@ -28,12 +28,22 @@ ChangeTransparentBodyTest.test("ChangeTransparentBody") {
 
 }
 
+ChangeTransparentBodyTest.test("ChangeNonTransparentClosure") {
+
+  if getVersion() == 0 {
+    expectEqual(202, getFunction(2)(101))
+  } else {
+    expectEqual(101, getFunction(2)(101))
+  }
+
+}
+
 ChangeTransparentBodyTest.test("ChangeTransparentClosure") {
 
 #if BEFORE
-  expectEqual(202, getFunction(2)(101))
+  expectEqual(202, getTransparentFunction(2)(101))
 #else
-  expectEqual(101, getFunction(2)(101))
+  expectEqual(101, getTransparentFunction(2)(101))
 #endif
 
 }
