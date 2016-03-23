@@ -36,8 +36,24 @@ The LLVM lit-based testsuite
 Running the LLVM lit-based testsuite
 ------------------------------------
 
-You can run Swift tests using the ``build-script``, or, alternatively, using
-these targets in the build directory:
+It is recommended that you run the Swift test suites via ``utils/build-script``.
+For day-to-day work on the Swift compiler, using ``utils/build-script --test``
+should be sufficient.  The buildbot runs validation tests, so if those are
+accidentally broken, it should not go unnoticed.
+
+Before committing a large change to a compiler (especially a language change),
+or API changes to the standard library, it is recommended to run validation
+test suite, via ``utils/build-script --validation-test``.
+
+Although it is not recommended for day-to-day contributions, it is also
+technically possible to execute the tests directly via CMake. For example, if you have
+built Swift products at the directory ``build/Ninja-ReleaseAssert/swift-macosx-x86_64``,
+you may run the entire test suite directly using the following command::
+
+  cmake --build build/Ninja-ReleaseAssert/swift-macosx-x86_64 -- check-swift-macosx-x86_64
+
+Note that ``check-swift`` is suffixed with a target operating system and architecture.
+Besides ``check-swift``, other targets are also available. Here's the full list:
 
 * ``check-swift``
 
@@ -50,14 +66,6 @@ these targets in the build directory:
 * ``check-swift-all``
 
   Runs all tests.
-
-For day-to-day work on the Swift compiler, using ``check-swift`` should be
-sufficient.  The buildbot runs validation tests, so if those are accidentally
-broken, it should not go unnoticed.
-
-Before committing a large change to a compiler (especially a language change),
-or API changes to the standard library, it is recommended to run validation
-test suite.
 
 For every target above, there are variants for different optimizations:
 
