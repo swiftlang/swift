@@ -21,9 +21,19 @@ var ChangeTransparentBodyTest = TestSuite("ChangeTransparentBody")
 ChangeTransparentBodyTest.test("ChangeTransparentBody") {
 
 #if BEFORE
-  expectEqual(getBuildVersion(), 0)
+  expectEqual(0, getBuildVersion())
 #else
-  expectEqual(getBuildVersion(), 1)
+  expectEqual(1, getBuildVersion())
+#endif
+
+}
+
+ChangeTransparentBodyTest.test("ChangeTransparentClosure") {
+
+#if BEFORE
+  expectEqual(202, getFunction(2)(101))
+#else
+  expectEqual(101, getFunction(2)(101))
 #endif
 
 }
