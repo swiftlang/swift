@@ -168,11 +168,11 @@ class ClusteredBitVector {
   /// Return a pointer to the data storage of this bit vector.
   ChunkType *getChunksPtr() {
     assert(hasSufficientChunkStorage());
-    return (hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data);
+    return hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data;
   }
   const ChunkType *getChunksPtr() const {
     assert(hasSufficientChunkStorage());
-    return (hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data);
+    return hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data;
   }
 
   MutableArrayRef<ChunkType> getChunks() {
