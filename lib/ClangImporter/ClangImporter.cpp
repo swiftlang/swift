@@ -1952,6 +1952,26 @@ namespace {
   }
 }
 
+/// Determine whether the given Objective-C class, or any of its
+/// superclasses, either has or inherits a swift_bridge attribute.
+static bool hasOrInheritsSwiftBridgeAttr(
+    const clang::ObjCInterfaceDecl *objcClass) {
+  do {
+    // Look at the definition, if there is one.
+    if (auto def = objcClass->getDefinition())
+      objcClass = def;
+
+    // Check for the swift_bridge attribute.
+    if (objcClass->hasAttr<clang::SwiftBridgeAttr>())
+      return true;
+
+    // Follow the superclass chain.
+    objcClass = objcClass->getSuperClass();
+  } while (objcClass);
+
+  return false;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2431,7 +2451,9 @@ auto ClangImporter::Implementation::importFullName(
     // module prefix and will map into Swift as a type. If so, strip
     // that prefix off when present.
     if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
-        (isa<clang::TypeDecl>(D) || isa<clang::ObjCInterfaceDecl>(D) ||
+        (isa<clang::TypeDecl>(D) ||
+         (isa<clang::ObjCInterfaceDecl>(D) &&
+          !hasOrInheritsSwiftBridgeAttr(cast<clang::ObjCInterfaceDecl>(D))) ||
          isa<clang::ObjCProtocolDecl>(D))) {
       // Find the original declaration, from which we can determine
       // the owning module.

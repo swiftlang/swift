@@ -36,6 +36,9 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?)
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?, with: AnyObject?)
 
+// Note: don't prefix-strip swift_bridged classes or their subclasses.
+// CHECK-FOUNDATION: func mutableCopy() -> NSMutableArray
+
 // Note: id -> "Object".
 // CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
 
