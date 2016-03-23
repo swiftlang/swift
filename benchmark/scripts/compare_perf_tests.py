@@ -255,12 +255,12 @@ def main():
                 write_to_file(args.output, html_data)
             else:
                 print("Error: missing --output flag.")
-                exit(1)
+                sys.exit(1)
         elif args.format.lower() == "markdown" and args.output:
             write_to_file(args.output, markdown_data)
         elif args.format.lower() != "markdown":
             print("{0} is unknown format.".format(args.format))
-            exit(1)
+            sys.exit(1)
 
 
 def convert_to_html(ratio_list, old_results, new_results, delta_list,
@@ -342,15 +342,6 @@ def sort_ratio_list(ratio_list, changes_only=False):
 
     return (complete_perf_list, increased_perf_list,
             decreased_perf_list, sorted_normal_perf_list)
-
-
-def nthroot(y, n):
-    x, xp = 1, -1
-    while abs(x - xp) > 1:
-            xp, x = x, x - x/n + y/(n * x**(n-1))
-    while x**n > y:
-            x -= 1
-    return x
 
 
 def max_width(items, title, key_len=False):
