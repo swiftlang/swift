@@ -144,11 +144,7 @@ class ClusteredBitVector {
   /// is a relatively important operation because it's needed on every
   /// append.
   size_t getCapacityInBits() const {
-    if (hasOutOfLineData()) {
-      return getOutOfLineCapacityInBits();
-    } else {
-      return ChunkSizeInBits;
-    }
+    return hasOutOfLineData() ? getOutOfLineCapacityInBits() : ChunkSizeInBits;
   }
 
   /// Return the current capacity of this bit vector, in chunks.
