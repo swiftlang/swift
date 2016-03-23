@@ -713,6 +713,11 @@ public:
   bool isTriviallyRepresentableIn(ForeignLanguage language,
                                   DeclContext *dc);
 
+  /// \brief Given that this is a nominal type or bound generic nominal
+  /// type, return its parent type; this will be a null type if the type
+  /// is not a nested type.
+  Type getNominalParent();
+
   /// \brief If this is a GenericType, bound generic nominal type, or
   /// unbound generic nominal type, return the (possibly generic) nominal type
   /// declaration.
@@ -4335,6 +4340,14 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
   return getCanonicalType().getAnyNominal();
 }
 
+inline Type TypeBase::getNominalParent() {
+  if (auto classType = getAs<ClassType>()) {
+    return classType->getParent();
+  } else {
+    return castTo<BoundGenericClassType>()->getParent();
+  }
+}
+
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
@@ -4402,6 +4415,14 @@ inline CanType CanType::getLValueOrInOutObjectTypeImpl(CanType type) {
   if (auto refType = dyn_cast<LValueType>(type))
     return refType.getObjectType();
   return type;
+}
+
+inline CanType CanType::getNominalParent() const {
+  if (auto classType = dyn_cast<ClassType>(*this)) {
+    return classType.getParent();
+  } else {
+    return cast<BoundGenericClassType>(*this).getParent();
+  }
 }
 
 inline bool TypeBase::mayHaveSuperclass() {
