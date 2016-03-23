@@ -202,6 +202,9 @@ func canGenericCast<T, U>(a: T, _ ty : U.Type) -> Bool {
   return anyToAnyOrNil(a, ty) != nil
 }
 
+protocol TestExistential {}
+extension Int : TestExistential {}
+
 OptionalTests.test("Casting Optional") {
   let x = C()
   let sx: C? = x
@@ -254,6 +257,10 @@ OptionalTests.test("Casting Optional") {
   let oi: Int? = nil
   expectTrue(anyToAny(oi as Any, Optional<Int>.self) == nil)
   expectTrue(anyToAnyIs(oi as Any, Optional<Int>.self))
+  // For good measure test an existential that Optional does not conform to.
+  expectTrue(anyToAny(3 as TestExistential, Optional<Int>.self) == 3)
+  // And a type that is not convertible to its target.
+  anyToAny(nx as Any, Optional<Int>.self)
 
   // Double-wrapped optional
   expectTrue(anyToAnyIsOptional(oi as Any, Int.self))
@@ -276,6 +283,11 @@ OptionalTests.test("Casting Optional Traps") {
   let nx: C? = nil
   expectCrashLater()
   anyToAny(nx, Int.self)
+}
+OptionalTests.test("Casting Optional Any Traps") {
+  let nx: X? = X()
+  expectCrashLater()
+  _blackHole(anyToAny(nx as Any, Optional<Int>.self))
 }
 
 class TestNoString {}
