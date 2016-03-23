@@ -3,6 +3,7 @@
 // REQUIRES: objc_interop
 
 import Foundation
+import objc_generics
 
 func testNSArrayBridging(hive: Hive) {
   _ = hive.bees as [Bee]
