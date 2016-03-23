@@ -1513,7 +1513,7 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
-bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
+static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
   if (!Options.TransformContext || !D->getDeclContext()->isExtensionContext() ||
       !Options.TransformContext->isPrintingSynthesizedExtension())
     return true;
