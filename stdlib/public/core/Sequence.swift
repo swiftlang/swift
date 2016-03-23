@@ -381,7 +381,7 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i = ringBuffer.next(i) % maxLength
+        i = ringBuffer.successor(of: i) % maxLength
       }
     }
 
@@ -582,7 +582,7 @@ extension Sequence where
       } else {
         result.append(ringBuffer[i])
         ringBuffer[i] = element
-        i = ringBuffer.next(i) % n
+        i = ringBuffer.successor(of: i) % n
       }
     }
     return AnySequence(result)

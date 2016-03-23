@@ -180,12 +180,12 @@ public struct ClosedRangeOfStrideable<
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     return i._successor(upperBound: upperBound)
   }
 
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     return i._predecessor(upperBound: upperBound)
   }
 

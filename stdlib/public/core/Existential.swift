@@ -35,7 +35,7 @@ internal struct _CollectionOf<
     return AnyIterator {
       () -> Element? in
       if _fastPath(index != self.endIndex) {
-        self._nextInPlace(&index)
+        self.successor(updating: &index)
         return self._subscriptImpl(index)
       }
       return nil
@@ -46,7 +46,7 @@ internal struct _CollectionOf<
   internal let endIndex: IndexType
 
   @warn_unused_result
-  internal func next(i: IndexType) -> IndexType {
+  internal func successor(of i: IndexType) -> IndexType {
     return i.advanced(by: 1)
   }
 

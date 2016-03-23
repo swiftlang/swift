@@ -93,13 +93,13 @@ public struct ReversedCollection<
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
-    return ReversedIndex(_base.previous(i.base))
+  public func successor(of i: Index) -> Index {
+    return ReversedIndex(_base.predecessor(of: i.base))
   }
 
   @warn_unused_result
-  public func previous(i: Index) -> Index {
-    return ReversedIndex(_base.next(i.base))
+  public func predecessor(of i: Index) -> Index {
+    return ReversedIndex(_base.successor(of: i.base))
   }
 
   @warn_unused_result
@@ -123,7 +123,7 @@ public struct ReversedCollection<
 
   public typealias _Element = Base.Iterator.Element
   public subscript(position: Index) -> Base.Iterator.Element {
-    return _base[_base.previous(position.base)]
+    return _base[_base.predecessor(of: position.base)]
   }
 
   public subscript(bounds: Range<Index>) -> BidirectionalSlice<ReversedCollection> {
@@ -206,13 +206,13 @@ public struct ReversedRandomAccessCollection<
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
-    return ReversedRandomAccessIndex(_base.previous(i.base))
+  public func successor(of i: Index) -> Index {
+    return ReversedRandomAccessIndex(_base.predecessor(of: i.base))
   }
 
   @warn_unused_result
-  public func previous(i: Index) -> Index {
-    return ReversedRandomAccessIndex(_base.next(i.base))
+  public func predecessor(of i: Index) -> Index {
+    return ReversedRandomAccessIndex(_base.successor(of: i.base))
   }
 
   @warn_unused_result
@@ -239,7 +239,7 @@ public struct ReversedRandomAccessCollection<
   // FIXME(compiler limitation): this typealias should be inferred.
 
   public subscript(position: Index) -> Base.Iterator.Element {
-    return _base[_base.previous(position.base)]
+    return _base[_base.predecessor(of: position.base)]
   }
 
   // FIXME: swift-3-indexing-model: the rest of methods.

@@ -26,10 +26,10 @@ StringTraps.test("startIndex/predecessor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = s.next(i)
-  i = s.previous(i)
+  i = s.successor(of: i)
+  i = s.predecessor(of: i)
   expectCrashLater()
-  i = s.previous(i)
+  i = s.predecessor(of: i)
 }
 
 StringTraps.test("endIndex/successor")
@@ -39,11 +39,11 @@ StringTraps.test("endIndex/successor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = s.next(i)
-  i = s.next(i)
-  i = s.next(i)
+  i = s.successor(of: i)
+  i = s.successor(of: i)
+  i = s.successor(of: i)
   expectCrashLater()
-  i = s.next(i)
+  i = s.successor(of: i)
 }
 
 StringTraps.test("subscript(_:)/endIndex")
@@ -53,9 +53,9 @@ StringTraps.test("subscript(_:)/endIndex")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = s.next(i)
-  i = s.next(i)
-  i = s.next(i)
+  i = s.successor(of: i)
+  i = s.successor(of: i)
+  i = s.successor(of: i)
   expectCrashLater()
   s[i]
 }
@@ -67,11 +67,11 @@ StringTraps.test("UTF8ViewEndIndexSuccessor")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = s.utf8.next(i)
-  i = s.utf8.next(i)
-  i = s.utf8.next(i)
+  i = s.utf8.successor(of: i)
+  i = s.utf8.successor(of: i)
+  i = s.utf8.successor(of: i)
   expectCrashLater()
-  i = s.utf8.next(i)
+  i = s.utf8.successor(of: i)
 }
 
 StringTraps.test("UTF8ViewSubscript/endIndex")
@@ -81,9 +81,9 @@ StringTraps.test("UTF8ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = s.utf8.next(i)
-  i = s.utf8.next(i)
-  i = s.utf8.next(i)
+  i = s.utf8.successor(of: i)
+  i = s.utf8.successor(of: i)
+  i = s.utf8.successor(of: i)
   expectCrashLater()
   s.utf8[i]
 }
@@ -95,7 +95,7 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = s.utf16.previous(i)
+  i = s.utf16.predecessor(of: i)
   expectCrashLater()
   s.utf16[i]
 }
@@ -107,9 +107,9 @@ StringTraps.test("UTF16ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = s.utf16.next(i)
-  i = s.utf16.next(i)
-  i = s.utf16.next(i)
+  i = s.utf16.successor(of: i)
+  i = s.utf16.successor(of: i)
+  i = s.utf16.successor(of: i)
   expectCrashLater()
   s.utf16[i]
 }

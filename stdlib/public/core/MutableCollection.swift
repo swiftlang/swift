@@ -110,9 +110,9 @@ public protocol MutableIndexable : Indexable {
   ///
   /// - Precondition: `i` has a well-defined successor.
   @warn_unused_result
-  func next(i: Index) -> Index
+  func successor(of i: Index) -> Index
 
-  func _nextInPlace(i: inout Index)
+  func successor(updating i: inout Index)
 }
 
 // TODO: swift-3-indexing-model - review the following

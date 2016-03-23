@@ -100,18 +100,18 @@ public struct ${Self}<
   public var endIndex: Base.Index { return _base.endIndex }
 
   @warn_unused_result
-  public func next(i: Index) -> Index { return _base.next(i) }
+  public func successor(of i: Index) -> Index { return _base.successor(of: i) }
 
-  public func _nextInPlace(i: inout Index) {
-    _base._nextInPlace(&i)
+  public func successor(updating i: inout Index) {
+    _base.successor(updating: &i)
   }
 
 %   if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
-  public func previous(i: Index) -> Index { return _base.previous(i) }
+  public func predecessor(of i: Index) -> Index { return _base.predecessor(of: i) }
 
-  public func _previousInPlace(i: inout Index) {
-    _base._previousInPlace(&i)
+  public func predecessor(updating i: inout Index) {
+    _base.predecessor(updating: &i)
   }
 %   end
 

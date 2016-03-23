@@ -61,8 +61,8 @@ struct X : BidirectionalCollection {
     return msg.endIndex
   }
   subscript(i: Index) -> Element { return msg[i] }
-  func next(i: Index) -> Index { return msg.next(i) }
-  func previous(i: Index) -> Index { return msg.previous(i) }
+  func successor(of i: Index) -> Index { return msg.successor(of: i) }
+  func predecessor(of i: Index) -> Index { return msg.predecessor(of: i) }
 }
 
 var foobar = X("foobar")
@@ -163,14 +163,14 @@ func isPalindrome2<
   var b = seq.startIndex, e = seq.endIndex
 
   while (b != e) {
-    e = seq.previous(e)
+    e = seq.predecessor(of: e)
     if (b == e) {
       break
     }
     if seq[b] != seq[e] {
       return false
     }
-    b = seq.next(b)
+    b = seq.successor(of: b)
   }
   return true
 }
@@ -272,7 +272,7 @@ struct CollectionOnly<T: Collection> : Collection {
   subscript(position: T.Index) -> T.Iterator.Element {
     return base[position]
   }
-  func next(i: T.Index) -> T.Index { return base.next(i) }
+  func successor(of i: T.Index) -> T.Index { return base.successor(of: i) }
 }
 
 // CHECK: all done.

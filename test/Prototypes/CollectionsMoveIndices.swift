@@ -49,7 +49,7 @@
 // For the API this implies that indices can't be moved forward or
 // backward by themselves (`i.successor()` is not allowed).  Only the
 // corresponding collection instance can move indices (e.g.,
-// `c.next(i)`).  This API change reduces the requirements on the
+// `c.successor(of: i)`).  This API change reduces the requirements on the
 // amount of information indices need to store or reference.
 //
 // In this model indices can store the minimal amount of information
@@ -119,7 +119,7 @@
 // * Advancing an index forward or backward becomes harder -- the
 //   statement now includes two entities (collection and index):
 //
-//     j = c.next(i)    vs.    j = i.successor()
+//     j = c.successor(of: i)    vs.    j = i.successor()
 //
 //   In practice though, we found that when the code is doing such
 //   index manipulations, the collection is typically still around
@@ -157,7 +157,7 @@
 //
 //     // After:
 //     var i = c.index { $0 % 2 == 0 } // No change in algorithm API.
-//     i = c.next(i)                   // Advancing an index requires a collection instance.
+//     i = c.successor(of: i)                   // Advancing an index requires a collection instance.
 //     print(c[i])                     // No change in subscripting.
 //
 
@@ -442,9 +442,9 @@ public protocol MyIndexableType {
   var unownedHandle: UnownedHandle { get }
 
   @warn_unused_result
-  func next(i: Index) -> Index
+  func successor(of i: Index) -> Index
 
-  func _nextInPlace(i: inout Index)
+  func successor(updating i: inout Index)
 
   func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>)
 
@@ -456,8 +456,8 @@ public protocol MyIndexableType {
 }
 extension MyIndexableType {
   @inline(__always)
-  public func _nextInPlace(i: inout Index) {
-    i = next(i)
+  public func successor(updating i: inout Index) {
+    i = successor(of: i)
   }
 }
 
@@ -482,7 +482,7 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   var unownedHandle: UnownedHandle { get }
 
   @warn_unused_result
-  func next(i: Index) -> Index
+  func successor(of i: Index) -> Index
 
   @warn_unused_result
   func advance(i: Index, by: IndexDistance) -> Index
@@ -523,7 +523,7 @@ extension MyForwardCollectionType {
 
     var i = i
     for var offset: IndexDistance = 0; offset != n; offset = offset + 1 {
-      _nextInPlace(&i)
+      successor(updating: &i)
     }
     return i
   }
@@ -539,7 +539,7 @@ extension MyForwardCollectionType {
 
     var i = i
     for var offset: IndexDistance = 0; offset != n && i != limit; offset = offset + 1 {
-      _nextInPlace(&i)
+      successor(updating: &i)
     }
     return i
   }
@@ -560,7 +560,7 @@ extension MyForwardCollectionType {
     var count: IndexDistance = 0
     while start != end {
       count = count + 1
-      _nextInPlace(&start)
+      successor(updating: &start)
     }
     return count
   }
@@ -669,7 +669,7 @@ extension MyForwardCollectionType
   Index.Distance == IndexDistance {
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     return advance(i, by: 1)
   }
 
@@ -719,7 +719,7 @@ extension MyForwardCollectionType
       if self[i] == element {
         return i
       }
-      _nextInPlace(&i)
+      successor(updating: &i)
     }
     return nil
   }
@@ -731,22 +731,22 @@ extension MyForwardCollectionType
   public mutating func popFirst() -> Generator.Element? {
     guard !isEmpty else { return nil }
     let element = first!
-    self = self[MyRange(start: self.next(startIndex), end: endIndex)]
+    self = self[MyRange(start: self.successor(of: startIndex), end: endIndex)]
     return element
   }
 }
 
 public protocol MyBidirectionalCollectionType : MyForwardCollectionType {
   @warn_unused_result
-  func previous(i: Index) -> Index
+  func predecessor(of i: Index) -> Index
 
-  func _previousInPlace(i: inout Index)
+  func predecessor(updating i: inout Index)
 }
 
 extension MyBidirectionalCollectionType {
   @inline(__always)
-  public func _previousInPlace(i: inout Index) {
-    i = previous(i)
+  public func predecessor(updating i: inout Index) {
+    i = predecessor(of: i)
   }
 
   @warn_unused_result
@@ -756,7 +756,7 @@ extension MyBidirectionalCollectionType {
     }
     var i = i
     for var offset: IndexDistance = n; offset != 0; offset = offset + 1 {
-      _previousInPlace(&i)
+      predecessor(updating: &i)
     }
     return i
   }
@@ -769,7 +769,7 @@ extension MyBidirectionalCollectionType {
     var i = i
     for var offset: IndexDistance = n; offset != 0 && i != limit;
         offset = offset + 1 {
-      _previousInPlace(&i)
+      predecessor(updating: &i)
     }
     return i
   }
@@ -780,7 +780,7 @@ extension MyBidirectionalCollectionType
   Index.Distance == IndexDistance {
 
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     return advance(i, by: -1)
   }
 
@@ -870,8 +870,8 @@ public struct DefaultForwardIndexRange<Collection : MyIndexableType /* MyForward
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
-    return Collection(from: _unownedCollection).next(i)
+  public func successor(of i: Index) -> Index {
+    return Collection(from: _unownedCollection).successor(of: i)
   }
 }
 
@@ -898,7 +898,7 @@ public struct DefaultForwardIndexRangeGenerator<Collection : MyIndexableType /* 
       return nil
     }
     let result = _i
-    _i = _collection.next(_i)
+    _i = _collection.successor(of: _i)
     return result
   }
 }
@@ -937,14 +937,14 @@ public struct MyIterableRange<Index : MyStrideable> :
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     let result = i.advancedBy(1)
     _precondition(startIndex <= result, "can't advance past endIndex")
     return i.advancedBy(1)
   }
 
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     let result = i.advancedBy(-1)
     _precondition(result <= endIndex, "can't advance before startIndex")
     return result
@@ -1004,8 +1004,8 @@ public struct MySlice<Collection : MyIndexableType /* : MyForwardCollectionType 
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
-    return _base.next(i)
+  public func successor(of i: Index) -> Index {
+    return _base.successor(of: i)
   }
 
   public func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>) {
@@ -1094,8 +1094,8 @@ public struct MySliceIndexRange<Collection : MyIndexableType /* MyForwardCollect
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
-    return Collection(from: _unownedCollection).next(i)
+  public func successor(of i: Index) -> Index {
+    return Collection(from: _unownedCollection).successor(of: i)
   }
 
   public func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>) {
@@ -1148,7 +1148,7 @@ public struct DefaultGenerator<Collection : MyIndexableType>
       return nil
     }
     let result = _collection[_i]
-    _i = _collection.next(_i)
+    _i = _collection.successor(of: _i)
     return result
   }
 }
@@ -1240,13 +1240,13 @@ extension MyMutableCollectionType
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {
     if isEmpty { return }
-    if next(startIndex) == endIndex { return }
+    if successor(of: startIndex) == endIndex { return }
 
     while true {
       var swapped = false
       for i in OldSequence(indices) {
         if i == endIndex { break }
-        let ni = next(i)
+        let ni = successor(of: i)
         if ni == endIndex { break }
         if isOrderedBefore(self[ni], self[i]) {
           swap(&self[i], &self[ni])
@@ -1289,7 +1289,7 @@ extension MyRandomAccessCollectionType
       let midOffset = subrangeCount / 2
       let mid = advance(low, by: midOffset)
       if isOrderedBefore(self[mid], element) {
-        low = next(mid)
+        low = successor(of: mid)
         subrangeCount -= midOffset + 1
       } else {
         subrangeCount = midOffset
@@ -1374,7 +1374,7 @@ public struct MySimplestForwardCollection<Element> : MyForwardCollectionType {
   }
 
   @warn_unused_result
-  public func next(i: MySimplestForwardCollectionIndex) -> MySimplestForwardCollectionIndex {
+  public func successor(of i: MySimplestForwardCollectionIndex) -> MySimplestForwardCollectionIndex {
     return MySimplestForwardCollectionIndex(i._index + 1)
   }
 
@@ -1423,12 +1423,12 @@ public struct MySimplestBidirectionalCollection<Element> : MyBidirectionalCollec
   }
 
   @warn_unused_result
-  public func next(i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
+  public func successor(of i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
     return MySimplestBidirectionalCollectionIndex(i._index + 1)
   }
 
   @warn_unused_result
-  public func previous(i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
+  public func predecessor(of i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
     return MySimplestBidirectionalCollectionIndex(i._index - 1)
   }
 
@@ -1833,7 +1833,7 @@ extension MyBinaryTree : MyBidirectionalCollectionType {
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     _precondition(
       i._treeID == _treeID,
       "can't use index from another tree")
@@ -1871,7 +1871,7 @@ extension MyBinaryTree : MyBidirectionalCollectionType {
   }
 
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     _precondition(
       i._treeID == _treeID,
       "can't use index from another tree")
@@ -2083,26 +2083,26 @@ NewCollection.test("MyBinaryTree.insert(_:)") {
     var i = t.startIndex
     expectEqual(10, t[i])
 
-    i = t.next(i)
+    i = t.successor(of: i)
     expectEqual(20, t[i])
 
-    i = t.next(i)
+    i = t.successor(of: i)
     expectEqual(30, t[i])
 
-    i = t.next(i)
+    i = t.successor(of: i)
     expectEqual(t.endIndex, i)
   }
   do {
     var i = t.endIndex
-    i = t.previous(i)
+    i = t.predecessor(of: i)
     dump(i, name: "30")
     expectEqual(30, t[i])
 
-    i = t.previous(i)
+    i = t.predecessor(of: i)
     dump(i, name: "20")
     expectEqual(20, t[i])
 
-    i = t.previous(i)
+    i = t.predecessor(of: i)
     dump(i, name: "10")
     expectEqual(10, t[i])
     expectEqual(t.startIndex, i)

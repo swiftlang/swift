@@ -37,7 +37,7 @@ tests.test("IteratorSequence") {
   var rangeIndex = r.lowerBound
   for a in IteratorSequence(x) {
     expectEqual(rangeIndex, a)
-    rangeIndex = r.next(rangeIndex)
+    rangeIndex = r.successor(of: rangeIndex)
   }
   expectEqual(rangeIndex, r.upperBound)
 }

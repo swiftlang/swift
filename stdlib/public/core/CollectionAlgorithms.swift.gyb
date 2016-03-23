@@ -24,7 +24,7 @@ IElement = "Iterator.Element"
 
 extension BidirectionalCollection {
   public var last: Iterator.Element? {
-    return isEmpty ? nil : self[previous(endIndex)]
+    return isEmpty ? nil : self[predecessor(of: endIndex)]
   }
 }
 
@@ -48,7 +48,7 @@ extension Collection where ${IElement} : Equatable {
       if self[i] == element {
         return i
       }
-      self._nextInPlace(&i)
+      self.successor(updating: &i)
     }
     return nil
   }
@@ -68,7 +68,7 @@ extension Collection {
       if try predicate(self[i]) {
         return i
       }
-      self._nextInPlace(&i)
+      self.successor(updating: &i)
     }
     return nil
   }
@@ -304,7 +304,7 @@ extension ${Self} {
         Range(
           _uncheckedBounds: (
             lower: bounds.lowerBound,
-            upper: next(bounds.upperBound)))
+            upper: successor(of: bounds.upperBound)))
       ]
     }
 %   if 'Mutable' in Self:
@@ -313,7 +313,7 @@ extension ${Self} {
         Range(
           _uncheckedBounds: (
             lower: bounds.lowerBound,
-            upper: next(bounds.upperBound)))
+            upper: successor(of: bounds.upperBound)))
       ] = newValue
     }
 %   end

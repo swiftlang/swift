@@ -361,14 +361,14 @@ public struct ${Self}<
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     Log.next[selfType] += 1
-    return base.next(i)
+    return base.successor(of: i)
   }
 
-  public func _nextInPlace(i: inout Index) {
+  public func successor(updating i: inout Index) {
     Log._nextInPlace[selfType] += 1
-    base._nextInPlace(&i)
+    base.successor(updating: &i)
   }
 
   public typealias Indices = Base.Indices
@@ -544,14 +544,14 @@ public struct ${Self}<
 %     end
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     BidirectionalCollectionLog.previous[selfType] += 1
-    return base.previous(i)
+    return base.predecessor(of: i)
   }
 
-  public func _previousInPlace(i: inout Index) {
+  public func predecessor(updating i: inout Index) {
     BidirectionalCollectionLog._previousInPlace[selfType] += 1
-    base._previousInPlace(&i)
+    base.predecessor(updating: &i)
   }
 
   public var last: Iterator.Element? {

@@ -208,7 +208,7 @@ public struct LazyFilterCollection<
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
     return LazyFilterIndex(base: _nextFiltered(i.base))
   }
@@ -264,7 +264,7 @@ public struct LazyFilterCollection<
       if _predicate(_base[index]) {
         return false
       }
-      _base._nextInPlace(&index)
+      _base.successor(updating: &index)
     }
     return true
   }
@@ -283,7 +283,7 @@ public struct LazyFilterCollection<
       if _predicate(_base[index]) {
         return false
       }
-      _base._nextInPlace(&index)
+      _base.successor(updating: &index)
     }
     return true
   }

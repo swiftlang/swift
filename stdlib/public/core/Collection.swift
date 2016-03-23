@@ -110,9 +110,9 @@ public protocol IndexableBase {
   ///
   /// - Precondition: `i` has a well-defined successor.
   @warn_unused_result
-  func next(i: Index) -> Index
+  func successor(of i: Index) -> Index
 
-  func _nextInPlace(i: inout Index)
+  func successor(updating i: inout Index)
 }
 
 public protocol Indexable : IndexableBase {
@@ -120,7 +120,7 @@ public protocol Indexable : IndexableBase {
   /// `Index` values where one value is reachable from the other.
   ///
   /// Reachability is defined by the ability to produce one value from
-  /// the other via zero or more applications of `next(i)`.
+  /// the other via zero or more applications of `successor(of: i)`.
   associatedtype IndexDistance : SignedInteger = Int
 
   @warn_unused_result
@@ -154,7 +154,7 @@ public struct IndexingIterator<
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
-    _elements._nextInPlace(&_position)
+    _elements.successor(updating: &_position)
     return element
   }
 
@@ -181,7 +181,7 @@ public protocol Collection : Indexable, Sequence {
   /// `Index` values where one value is reachable from the other.
   ///
   /// Reachability is defined by the ability to produce one value from
-  /// the other via zero or more applications of `next(i)`.
+  /// the other via zero or more applications of `successor(of: i)`.
   associatedtype IndexDistance : SignedInteger = Int
 
   /// A type that provides the sequence's iteration interface and
@@ -337,9 +337,9 @@ public protocol Collection : Indexable, Sequence {
 /// Default implementation for forward collections.
 extension Indexable {
   @inline(__always)
-  public func _nextInPlace(i: inout Index) {
+  public func successor(updating i: inout Index) {
     // FIXME: swift-3-indexing-model: tests.
-    i = next(i)
+    i = successor(of: i)
   }
 
   public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
@@ -391,7 +391,7 @@ extension Indexable {
     var count: IndexDistance = 0
     while start != end {
       count = count + 1
-      _nextInPlace(&start)
+      successor(updating: &start)
     }
     return count
   }
@@ -405,7 +405,7 @@ extension Indexable {
 
     var i = i
     for _ in 0..<n {
-      _nextInPlace(&i)
+      successor(updating: &i)
     }
     return i
   }
@@ -423,7 +423,7 @@ extension Indexable {
       if (limit == i) {
         break;
       }
-      _nextInPlace(&i)
+      successor(updating: &i)
     }
     return i
   }
@@ -433,7 +433,7 @@ extension Indexable {
 /// of `Strideable` as their `Index`.
 extension Indexable where Index : Strideable {
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
@@ -505,7 +505,7 @@ extension Collection where SubSequence == Self {
   public mutating func popFirst() -> Iterator.Element? {
     guard !isEmpty else { return nil }
     let element = first!
-    self = self[next(startIndex)..<endIndex]
+    self = self[successor(of: startIndex)..<endIndex]
     return element
   }
 }
@@ -599,7 +599,7 @@ extension Collection {
 
     for _ in 0..<count {
       result.append(try transform(self[i]))
-      _nextInPlace(&i)
+      successor(updating: &i)
     }
 
     _expectEnd(i, self)
@@ -686,7 +686,7 @@ extension Collection {
   /// - Complexity: O(1)
   @warn_unused_result
   public func prefix(through position: Index) -> SubSequence {
-    return prefix(upTo: next(position))
+    return prefix(upTo: successor(of: position))
   }
 
 // TODO: swift-3-indexing-model - review the following
@@ -735,14 +735,14 @@ extension Collection {
     while subSequenceEnd != cachedEndIndex {
       if try isSeparator(self[subSequenceEnd]) {
         let didAppend = appendSubsequence(end: subSequenceEnd)
-        _nextInPlace(&subSequenceEnd)
+        successor(updating: &subSequenceEnd)
         subSequenceStart = subSequenceEnd
         if didAppend && result.count == maxSplits {
           break
         }
         continue
       }
-      _nextInPlace(&subSequenceEnd)
+      successor(updating: &subSequenceEnd)
     }
 
     if subSequenceStart != cachedEndIndex || !omittingEmptySubsequences {
@@ -793,7 +793,7 @@ extension Collection where SubSequence == Self {
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
-    self = self[next(startIndex)..<endIndex]
+    self = self[successor(of: startIndex)..<endIndex]
     return element
   }
 

@@ -120,14 +120,14 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func next(i: Index) -> Index {
+    public func successor(of i: Index) -> Index {
       // FIXME: swift-3-indexing-model: move `successor()` implementation here.
       return i.successor()
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func previous(i: Index) -> Index {
+    public func predecessor(of i: Index) -> Index {
       // FIXME: swift-3-indexing-model: move `predecessor()` implementation here.
       return i.predecessor()
     }
@@ -332,7 +332,7 @@ extension String.UnicodeScalarIndex {
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid.
       if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16.previous(utf16Index)]) {
+        && UTF16.isLeadSurrogate(utf16[utf16.predecessor(of: utf16Index)]) {
         return nil
       }
     }

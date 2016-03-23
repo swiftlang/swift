@@ -285,7 +285,7 @@ internal func _allIndices<C : Collection>(
   var i = bounds.lowerBound
   while i != bounds.upperBound {
     result.append(i)
-    i = c.next(i)
+    i = c.successor(of: i)
   }
   return result
 }
@@ -491,8 +491,8 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
 }
 
 // FIXME: swift-3-indexing-model - add tests for the follow?
-//          next(i: Index) -> Index
-//          _nextInPlace(i: inout Index)
+//          successor(of: i: Index) -> Index
+//          successor(updating: i: inout Index)
 //          advance(i: Index, by n: IndexDistance) -> Index
 //          advance(i: Index, by n: IndexDistance, limit: Index) -> Index
 //          distance(from start: Index, to end: Index) -> IndexDistance
@@ -723,7 +723,7 @@ self.test("\(testNamePrefix).removeFirst()/slice/semantics") {
     var slice = c[c.startIndex..<c.endIndex]
     let survivingIndices = _allIndices(
       into: slice,
-      in: slice.next(slice.startIndex)..<slice.endIndex)
+      in: slice.successor(of: slice.startIndex)..<slice.endIndex)
     let removedElement = slice.removeFirst()
     expectEqual(test.collection.first, extractValue(removedElement).value)
     expectEqualSequence(
@@ -819,7 +819,7 @@ self.test("\(testNamePrefix).popFirst()/slice/semantics") {
     var slice = c[c.startIndex..<c.endIndex]
     let survivingIndices = _allIndices(
       into: slice,
-      in: slice.next(slice.startIndex)..<slice.endIndex)
+      in: slice.successor(of: slice.startIndex)..<slice.endIndex)
     let removedElement = slice.popFirst()!
     expectEqual(test.collection.first, extractValue(removedElement).value)
     expectEqualSequence(
@@ -907,8 +907,8 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
     testNamePrefix += String(C.Type)
 
 // FIXME: swift-3-indexing-model - add tests for the follow?
-//          previous(i: Index) -> Index
-//          _previous(i: inout Index)
+//          predecessor(of i: Index) -> Index
+//          predecessor(updating: i: inout Index)
 
 // FIXME: swift-3-indexing-model - enhance the following for negative direction?
 //          advance(i: Index, by n: IndexDistance) -> Index

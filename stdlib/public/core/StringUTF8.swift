@@ -126,7 +126,7 @@ extension String {
       /// - Precondition: The next value is representable.
       @warn_unused_result
       public func successor() -> Index {
-        // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.next(Index)
+        // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.successor(of: Index)
         // FIXME: swift-3-indexing-model: remove the successor() function.
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
         let hiNibble = currentUnit >> 4
@@ -215,7 +215,7 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func next(i: Index) -> Index {
+    public func successor(of i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return i.successor()
     }
@@ -379,7 +379,7 @@ extension String.UTF8View.Index {
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid in UTF8.
       if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16.previous(utf16Index)]) {
+        && UTF16.isLeadSurrogate(utf16[utf16.predecessor(of: utf16Index)]) {
         return nil
       }
     }

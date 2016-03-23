@@ -267,7 +267,7 @@ extension RangeReplaceableCollection {
   public mutating func remove(at index: Index) -> Iterator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
     let result: Iterator.Element = self[index]
-    replaceSubrange(index..<next(index), with: EmptyCollection())
+    replaceSubrange(index..<successor(of: index), with: EmptyCollection())
     return result
   }
 
@@ -277,7 +277,7 @@ extension RangeReplaceableCollection {
     return Range(
       _uncheckedBounds: (
         lower: r.lowerBound,
-        upper: r.contains(r.upperBound) ? next(r.upperBound) : r.upperBound))
+        upper: r.contains(r.upperBound) ? successor(of: r.upperBound) : r.upperBound))
   }
   
   public mutating func removeSubrange<
@@ -323,7 +323,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
-    self = self[next(startIndex)..<endIndex]
+    self = self[successor(of: startIndex)..<endIndex]
     return element
   }
 
@@ -380,7 +380,7 @@ extension RangeReplaceableCollection
   @warn_unused_result
   public mutating func _customRemoveLast() -> Iterator.Element? {
     let element = last!
-    self = self[startIndex..<previous(endIndex)]
+    self = self[startIndex..<predecessor(of: endIndex)]
     return element
   }
 
@@ -401,7 +401,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
     if let result = _customRemoveLast() {
       return result
     }
-    return remove(at: previous(endIndex))
+    return remove(at: predecessor(of: endIndex))
   }
 
   /// Remove the last `n` elements.
@@ -437,7 +437,7 @@ extension RangeReplaceableCollection
     if let result = _customRemoveLast() {
       return result
     }
-    return remove(at: previous(endIndex))
+    return remove(at: predecessor(of: endIndex))
   }
 
   /// Remove the last `n` elements.

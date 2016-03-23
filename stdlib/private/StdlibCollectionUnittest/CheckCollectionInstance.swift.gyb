@@ -112,7 +112,7 @@ internal func _checkIncrementalAdvance<
       if jAtLimit {
         expectEqual(limit, j, ${trace})
       }
-      expectEqual(jAtLimit ? j : next(j), k, ${trace})
+      expectEqual(jAtLimit ? j : successor(of: j), k, ${trace})
       offset += sign
     }
   }
@@ -249,7 +249,7 @@ public func check${Traversal}Collection<
   // advances up to 5 positions without passing endIndex.  Picking a
   // small constant to avoid complexity explosion on large input
   // collections.
-  let next5 = { next(next(next(next(next($0))))) }
+  let next5 = { successor(of: next(successor(of: next(successor(of: $0))))) }
 
   let partWay0 = next5(collection.startIndex)
   let partWay1 = next5(partWay0)

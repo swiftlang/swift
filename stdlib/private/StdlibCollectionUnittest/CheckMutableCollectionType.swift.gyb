@@ -381,9 +381,9 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   // Check that the elements are sorted.
   if verifyOrder {
     for i in extractedResult.indices {
-      if i != extractedResult.previous(extractedResult.endIndex) {
+      if i != extractedResult.predecessor(of: extractedResult.endIndex) {
         let first = extractedResult[i].value
-        let second = extractedResult[extractedResult.next(i)].value
+        let second = extractedResult[extractedResult.successor(of: i)].value
         expectFalse(lessImpl(second, first))
       }
     }
@@ -686,9 +686,9 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
   // Check that the elements are sorted.
   if verifyOrder {
     for i in extractedResult.indices {
-      if i != extractedResult.previous(extractedResult.endIndex) {
+      if i != extractedResult.predecessor(of: extractedResult.endIndex) {
         let first = extractedResult[i].value
-        let second = extractedResult[extractedResult.next(i)].value
+        let second = extractedResult[extractedResult.successor(of: i)].value
         expectFalse(lessImpl(second, first))
       }
     }

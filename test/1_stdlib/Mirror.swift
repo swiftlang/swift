@@ -69,8 +69,8 @@ func find(substring: String, within domain: String) -> String.Index? {
       return sliceStart
     }
     if i == domainCount - substringCount { break }
-    sliceStart = domain.next(sliceStart)
-    sliceEnd = domain.next(sliceEnd)
+    sliceStart = domain.successor(of: sliceStart)
+    sliceEnd = domain.successor(of: sliceEnd)
     i += 1
   }
   return nil

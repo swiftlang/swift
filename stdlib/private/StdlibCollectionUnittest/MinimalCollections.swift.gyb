@@ -604,7 +604,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 
   @warn_unused_result
-  public func next(i: MinimalIndex) -> MinimalIndex {
+  public func successor(of i: MinimalIndex) -> MinimalIndex {
     expectLE(_elements.startIndex, i.position)
     expectGT(_elements.endIndex, i.position)
     return _index(forPosition: i.position + 1)
@@ -612,7 +612,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
-  public func previous(i: MinimalIndex) -> MinimalIndex {
+  public func predecessor(of i: MinimalIndex) -> MinimalIndex {
     expectLT(_elements.startIndex, i.position)
     expectGE(_elements.endIndex, i.position)
     return _index(forPosition: i.position - 1)
@@ -833,14 +833,14 @@ public struct ${Self}<Element> : ${SelfProtocols} {
   }
 
   @warn_unused_result
-  public func next(i: MinimalIndex) -> MinimalIndex {
-    return base.next(i)
+  public func successor(of i: MinimalIndex) -> MinimalIndex {
+    return base.successor(of: i)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
-  public func previous(i: MinimalIndex) -> MinimalIndex {
-    return base.previous(i)
+  public func predecessor(of i: MinimalIndex) -> MinimalIndex {
+    return base.predecessor(of: i)
   }
 %     end
 

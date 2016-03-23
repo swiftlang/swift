@@ -149,7 +149,7 @@ public struct RangeOfStrideable<
   
   // WORKAROUND - default should be picked up from Collection
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
@@ -158,7 +158,7 @@ public struct RangeOfStrideable<
 
   // WORKAROUND - default should be picked up from Collection
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
     //_failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 

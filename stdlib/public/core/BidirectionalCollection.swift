@@ -18,9 +18,9 @@ public protocol BidirectionalIndexable : Indexable {
   // library.
 
   @warn_unused_result
-  func previous(i: Index) -> Index
+  func predecessor(of i: Index) -> Index
 
-  func _previousInPlace(i: inout Index)
+  func predecessor(updating i: inout Index)
 }
 
 // TODO: swift-3-indexing-model - Add in BidirectionalCollection protocol documentation
@@ -31,14 +31,14 @@ public protocol BidirectionalCollection
   /// Returns the previous consecutive `Index` in a discrete sequence of
   /// `Index` values.
   ///
-  /// If `i` has a well-defined successor, `self.previous(self.next(i)) == i`.
-  /// If `i` has a well-defined predecessor, `self.next(self.previous(i)) == i`.
+  /// If `i` has a well-defined successor, `self.predecessor(of: self.successor(of: i)) == i`.
+  /// If `i` has a well-defined predecessor, `self.successor(of: self.predecessor(of: i)) == i`.
   ///
   /// - Precondition: `i` has a well-defined predecessor.
   @warn_unused_result
-  func previous(i: Index) -> Index
+  func predecessor(of i: Index) -> Index
 
-  func _previousInPlace(i: inout Index)
+  func predecessor(updating i: inout Index)
 
   associatedtype SubSequence : BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
@@ -58,8 +58,8 @@ public protocol BidirectionalCollection
 extension BidirectionalIndexable {
 
   @inline(__always)
-  public func _previousInPlace(i: inout Index) {
-    i = previous(i)
+  public func predecessor(updating i: inout Index) {
+    i = predecessor(of: i)
   }
 
   @warn_unused_result
@@ -71,7 +71,7 @@ extension BidirectionalIndexable {
     // FIXME: swift-3-indexing-model: There's a corner case here, -IntXX.min is
     // not representable.
     for _ in 0..<(-n) {
-      _previousInPlace(&i)
+      predecessor(updating: &i)
     }
     return i
   }
@@ -88,7 +88,7 @@ extension BidirectionalIndexable {
       if (limit == i) {
         break;
       }
-      _previousInPlace(&i)
+      predecessor(updating: &i)
     }
     return i
   }
@@ -101,13 +101,13 @@ extension BidirectionalIndexable {
     if start < end {
       while start != end {
         count += 1 as IndexDistance
-        _nextInPlace(&start)
+        successor(updating: &start)
       }
     }
     else if start > end {
       while start != end {
         count -= 1 as IndexDistance
-        _previousInPlace(&start)
+        predecessor(updating: &start)
       }
     }
 
@@ -119,7 +119,7 @@ extension BidirectionalIndexable {
 /// some model of `Strideable` as their `Index`.
 extension BidirectionalIndexable where Index : Strideable {
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
     //_failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
@@ -176,7 +176,7 @@ extension BidirectionalCollection where SubSequence == Self {
   public mutating func popLast() -> Iterator.Element? {
     guard !isEmpty else { return nil }
     let element = last!
-    self = self[startIndex..<previous(endIndex)]
+    self = self[startIndex..<predecessor(of: endIndex)]
     return element
   }
 
@@ -186,7 +186,7 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Precondition: `!self.isEmpty`
   public mutating func removeLast() -> Iterator.Element {
     let element = last!
-    self = self[startIndex..<previous(endIndex)]
+    self = self[startIndex..<predecessor(of: endIndex)]
     return element
   }
 

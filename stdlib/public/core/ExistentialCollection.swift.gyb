@@ -166,8 +166,8 @@ internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element> {
   var _indices: Indices
   */
   @warn_unused_result
-  internal func _next(i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func __nextInPlace(i: _AnyIndexBox) { _abstract() }
+  internal func _successor(of i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
+  internal func _successor(updating i: _AnyIndexBox) { _abstract() }
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
@@ -214,8 +214,8 @@ internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element> {
 internal class _AnyBidirectionalCollectionBox<Element>
   : _AnyCollectionBox<Element> {
 
-  internal func _previous(i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func __previousInPlace(i: _AnyIndexBox) { _abstract() }
+  internal func _predecessor(of i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
+  internal func _predecessor(updating i: _AnyIndexBox) { _abstract() }
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
@@ -312,13 +312,13 @@ internal final class _${Kind}Box<
   }
   
   @warn_unused_result
-  internal override func _next(position: _AnyIndexBox) -> _AnyIndexBox {
-    return _IndexBox(_base: _base.next(_unbox(position)))
+  internal override func _successor(of position: _AnyIndexBox) -> _AnyIndexBox {
+    return _IndexBox(_base: _base.successor(of: _unbox(position)))
   }
   
-  internal override func __nextInPlace(position: _AnyIndexBox) {
+  internal override func _successor(updating position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
-      return _base._nextInPlace(&p._base)
+      return _base.successor(updating: &p._base)
     }
     fatalError("Index type mismatch!")
   }
@@ -326,13 +326,13 @@ internal final class _${Kind}Box<
 %     if Kind in ['BidirectionalCollection', 'RandomAccessCollection']:
 
   @warn_unused_result
-  internal override func _previous(position: _AnyIndexBox) -> _AnyIndexBox {
-    return _IndexBox(_base: _base.previous(_unbox(position)))
+  internal override func _predecessor(of position: _AnyIndexBox) -> _AnyIndexBox {
+    return _IndexBox(_base: _base.predecessor(of: _unbox(position)))
   }
   
-  internal override func __previousInPlace(position: _AnyIndexBox) {
+  internal override func _predecessor(updating position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
-      return _base._previousInPlace(&p._base)
+      return _base.predecessor(updating: &p._base)
     }
     fatalError("Index type mismatch!")
   }
@@ -730,30 +730,30 @@ public struct ${Self}<Element>
   }
 
   @warn_unused_result
-  public func next(i: AnyIndex) -> AnyIndex {
-    return AnyIndex(_box: _box._next(i._box))
+  public func successor(of i: AnyIndex) -> AnyIndex {
+    return AnyIndex(_box: _box._successor(of: i._box))
   }
 
-  public func _nextInPlace(i: inout AnyIndex) {
+  public func successor(updating i: inout AnyIndex) {
     if _isUnique(&i._box) {
-      _box.__nextInPlace(i._box)
+      _box._successor(updating: i._box)
     }
     else {
-      i = next(i)
+      i = successor(of: i)
     }
   }
 
 %   if Traversal == 'Bidirectional' or Traversal == 'RandomAccess':
-  public func previous(i: AnyIndex) -> AnyIndex {
-    return AnyIndex(_box: _box._previous(i._box))
+  public func predecessor(of i: AnyIndex) -> AnyIndex {
+    return AnyIndex(_box: _box._predecessor(of: i._box))
   }
 
-  public func _previousInPlace(i: inout AnyIndex) {
+  public func predecessor(updating i: inout AnyIndex) {
     if _isUnique(&i._box) {
-      _box.__previousInPlace(i._box)
+      _box._predecessor(updating: i._box)
     }
     else {
-      i = previous(i)
+      i = predecessor(of: i)
     }
   }
 %   end

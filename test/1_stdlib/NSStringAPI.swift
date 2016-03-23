@@ -358,13 +358,13 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
 
   do {
     let s = "abcd"
-    let r = s.next(s.startIndex)..<s.endIndex
+    let r = s.successor(of: s.startIndex)..<s.endIndex
     expectEqual(NSComparisonResult.orderedSame,
         s.compare("bcd", range: r))
   }
   do {
     let s = "абвг"
-    let r = s.next(s.startIndex)..<s.endIndex
+    let r = s.successor(of: s.startIndex)..<s.endIndex
     expectEqual(NSComparisonResult.orderedSame,
         s.compare("бвг", range: r))
   }
@@ -1489,11 +1489,11 @@ NSStringAPIs.test("replacingCharacters(in:with:)") {
       in: s.startIndex..<s.advance(s.startIndex, by: 7), with: "\u{1F602}"))
 
   expectEqual("\u{1F601}", s.replacingCharacters(
-    in: s.next(s.startIndex)..<s.endIndex, with: ""))
+    in: s.successor(of: s.startIndex)..<s.endIndex, with: ""))
   expectEqual("\u{1F601}zzz", s.replacingCharacters(
-    in: s.next(s.startIndex)..<s.endIndex, with: "zzz"))
+    in: s.successor(of: s.startIndex)..<s.endIndex, with: "zzz"))
   expectEqual("\u{1F601}\u{1F602}", s.replacingCharacters(
-    in: s.next(s.startIndex)..<s.endIndex, with: "\u{1F602}"))
+    in: s.successor(of: s.startIndex)..<s.endIndex, with: "\u{1F602}"))
 
   expectEqual(
     "\u{1F601}aす\u{3099}せ\u{3099}そ\u{3099}",

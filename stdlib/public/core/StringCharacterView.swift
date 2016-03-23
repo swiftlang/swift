@@ -93,7 +93,7 @@ extension String.CharacterView : BidirectionalCollection {
     /// Returns the next consecutive value after `self`.
     ///
     /// - Precondition: The next value is representable.
-    // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.next(Index)
+    // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.successor(of: Index)
     internal func _successor() -> Index {
       _precondition(_base != _base._viewEndIndex, "cannot increment endIndex")
       return Index(_base: _endBase)
@@ -102,7 +102,7 @@ extension String.CharacterView : BidirectionalCollection {
     /// Returns the previous consecutive value before `self`.
     ///
     /// - Precondition: The previous value is representable.
-    // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.previous(Index)
+    // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.predecessor(of: Index)
     internal func _predecessor() -> Index {
       _precondition(_base != _base._viewStartIndex,
           "cannot decrement startIndex")
@@ -152,7 +152,7 @@ extension String.CharacterView : BidirectionalCollection {
 
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[start].value)
-      unicodeScalars._nextInPlace(&start)
+      unicodeScalars.successor(updating: &start)
 
       while start != end {
         // FIXME(performance): consider removing this "fast path".  A branch
@@ -167,7 +167,7 @@ extension String.CharacterView : BidirectionalCollection {
           break
         }
         gcb0 = gcb1
-        unicodeScalars._nextInPlace(&start)
+        unicodeScalars.successor(updating: &start)
       }
 
       return start._position - startIndexUTF16
@@ -193,14 +193,14 @@ extension String.CharacterView : BidirectionalCollection {
 
       var graphemeClusterStart = end
 
-      unicodeScalars._previousInPlace(&graphemeClusterStart)
+      unicodeScalars.predecessor(updating: &graphemeClusterStart)
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[graphemeClusterStart].value)
 
       var graphemeClusterStartUTF16 = graphemeClusterStart._position
 
       while graphemeClusterStart != start {
-        unicodeScalars._previousInPlace(&graphemeClusterStart)
+        unicodeScalars.predecessor(updating: &graphemeClusterStart)
         let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
             unicodeScalars[graphemeClusterStart].value)
         if segmenter.isBoundary(gcb1, gcb0) {
@@ -237,14 +237,14 @@ extension String.CharacterView : BidirectionalCollection {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
     return i._successor()
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     return i._predecessor()
   }
 

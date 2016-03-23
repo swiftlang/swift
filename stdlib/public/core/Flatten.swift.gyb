@@ -244,7 +244,7 @@ public struct ${Collection}<
       if !innerCollection.isEmpty {
         return ${Index}(outer, innerCollection.startIndex)
       }
-      _base._nextInPlace(&outer)
+      _base.successor(updating: &outer)
     }
 
     return endIndex
@@ -261,20 +261,20 @@ public struct ${Collection}<
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     let innerCollection = _base[i._outer]
-    let nextInner = innerCollection.next(i._inner!)
+    let nextInner = innerCollection.successor(of: i._inner!)
     if _fastPath(nextInner != innerCollection.endIndex) {
       return ${Index}(i._outer, nextInner)
     }
 
-    var nextOuter = _base.next(i._outer)
+    var nextOuter = _base.successor(of: i._outer)
     while nextOuter != _base.endIndex {
       let nextInnerCollection = _base[nextOuter]
       if !nextInnerCollection.isEmpty {
         return ${Index}(nextOuter, nextInnerCollection.startIndex)
       }
-      _base._nextInPlace(&nextOuter)
+      _base.successor(updating: &nextOuter)
     }
 
     return endIndex
@@ -283,21 +283,21 @@ public struct ${Collection}<
 % if traversal == 'Bidirectional':
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     var prevOuter = i._outer
     if prevOuter == _base.endIndex {
-      prevOuter = _base.previous(prevOuter)
+      prevOuter = _base.predecessor(of: prevOuter)
     }
     var prevInnerCollection = _base[prevOuter]
     var prevInner = i._inner ?? prevInnerCollection.endIndex
 
     while prevInner == prevInnerCollection.startIndex {
-      prevOuter = _base.previous(prevOuter)
+      prevOuter = _base.predecessor(of: prevOuter)
       prevInnerCollection = _base[prevOuter]
       prevInner = prevInnerCollection.endIndex
     }
 
-    return ${Index}(prevOuter, prevInnerCollection.previous(prevInner))
+    return ${Index}(prevOuter, prevInnerCollection.predecessor(of: prevInner))
   }
 % end
 

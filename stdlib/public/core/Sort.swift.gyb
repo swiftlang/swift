@@ -56,7 +56,7 @@ func _insertionSort<
 
     // One element is trivially already-sorted, thus pre-increment
     // Continue until the sorted elements cover the whole sequence
-    elements._nextInPlace(&sortedEnd)
+    elements.successor(updating: &sortedEnd)
     while sortedEnd != range.upperBound {
       // get the first unsorted element
       let x: C.Iterator.Element = elements[sortedEnd]
@@ -65,7 +65,7 @@ func _insertionSort<
       // moving elements forward to make room.
       var i = sortedEnd
       repeat {
-        let predecessor: C.Iterator.Element = elements[elements.previous(i)]
+        let predecessor: C.Iterator.Element = elements[elements.predecessor(of: i)]
 
         // if x doesn't belong before y, we've found its position
         if !${cmp("x", "predecessor", p)} {
@@ -74,14 +74,14 @@ func _insertionSort<
 
         // Move y forward
         elements[i] = predecessor
-        elements._previousInPlace(&i)
+        elements.predecessor(updating: &i)
       } while i != start
 
       if i != sortedEnd {
         // Plop x into position
         elements[i] = x
       }
-      elements._nextInPlace(&sortedEnd)
+      elements.successor(updating: &sortedEnd)
     }
   }
 }
@@ -111,19 +111,19 @@ func _partition<
 
 Loop: while true {
   FindLo: repeat {
-      elements._nextInPlace(&lo)
+      elements.successor(updating: &lo)
       while lo != hi {
         if !${cmp("elements[lo]", "pivot", p)} { break FindLo }
-        elements._nextInPlace(&lo)
+        elements.successor(updating: &lo)
       }
       break Loop
     } while false
 
   FindHi: repeat {
-      elements._previousInPlace(&hi)
+      elements.predecessor(updating: &hi)
       while hi != lo {
         if ${cmp("elements[hi]", "pivot", p)} { break FindHi }
-        elements._previousInPlace(&hi)
+        elements.predecessor(updating: &hi)
       }
       break Loop
     } while false
@@ -131,7 +131,7 @@ Loop: while true {
     swap(&elements[lo], &elements[hi])
   }
 
-  elements._previousInPlace(&lo)
+  elements.predecessor(updating: &lo)
   if lo != range.lowerBound {
     // swap the pivot into place
     swap(&elements[lo], &elements[range.lowerBound])
@@ -206,7 +206,7 @@ func _introSortImpl<
     depthLimit: depthLimit &- 1)
   _introSortImpl(
     &elements,
-    subRange: (elements.next(partIdx))..<range.upperBound,
+    subRange: (elements.successor(of: partIdx))..<range.upperBound,
     ${"isOrderedBefore: &isOrderedBefore, " if p else ""}
     depthLimit: depthLimit &- 1)
 }
@@ -234,7 +234,7 @@ func _siftDown<
   }
   // Check if right child is also within bounds before trying to examine it.
   if countToIndex + 2 < countFromIndex {
-    let right = elements.next(left)
+    let right = elements.successor(of: left)
     if ${cmp("elements[largest]", "elements[right]", p)} {
       largest = right
     }
@@ -269,7 +269,7 @@ func _heapify<
     root,
     by: elements.distance(from: range.lowerBound, to: range.upperBound) / 2)
   while node != root {
-    elements._previousInPlace(&node)
+    elements.predecessor(updating: &node)
     _siftDown(
       &elements,
       index: node,
@@ -291,7 +291,7 @@ func _heapSort<
     &elements,
     subRange: range
     ${", isOrderedBefore: &isOrderedBefore" if p else ""})
-  elements._previousInPlace(&hi)
+  elements.predecessor(updating: &hi)
   while hi != lo {
     swap(&elements[lo], &elements[hi])
     _siftDown(
@@ -299,7 +299,7 @@ func _heapSort<
       index: lo,
       subRange: lo..<hi
       ${", isOrderedBefore: &isOrderedBefore" if p else ""})
-    elements._previousInPlace(&hi)
+    elements.predecessor(updating: &hi)
   }
 }
 

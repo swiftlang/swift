@@ -553,11 +553,11 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func next(i: Index) -> Index { return characters.next(i) }
+  public func successor(of i: Index) -> Index { return characters.successor(of: i) }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func previous(i: Index) -> Index { return characters.previous(i) }
+  public func predecessor(of i: Index) -> Index { return characters.predecessor(of: i) }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result

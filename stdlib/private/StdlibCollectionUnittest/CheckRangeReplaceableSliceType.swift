@@ -75,7 +75,7 @@ extension TestSuite {
         var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let survivingIndices = _allIndices(
           into: c,
-          in: c.next(c.startIndex)..<c.endIndex)
+          in: c.successor(of: c.startIndex)..<c.endIndex)
         let removedElement = c.removeFirst()
         expectEqual(test.collection.first, extractValue(removedElement).value)
         expectEqualSequence(
@@ -221,7 +221,7 @@ extension TestSuite {
         var c = makeWrappedCollection(test.collection)
         let survivingIndices = _allIndices(
           into: c,
-          in: c.startIndex..<c.previous(c.endIndex))
+          in: c.startIndex..<c.predecessor(of: c.endIndex))
         let removedElement = c.removeLast()
         expectEqual(
           test.collection.last!.value,

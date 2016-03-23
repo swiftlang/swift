@@ -120,8 +120,8 @@ extension LazyCollection : Collection {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func next(i: Base.Index) -> Base.Index {
-    return _base.next(i)
+  public func successor(of i: Base.Index) -> Base.Index {
+    return _base.successor(of: i)
   }
 
   /// Access the element at `position`.

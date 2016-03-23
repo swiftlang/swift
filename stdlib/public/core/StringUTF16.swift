@@ -57,14 +57,14 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func next(i: Index) -> Index {
+    public func successor(of i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: _unsafePlus(i._offset, 1))
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func previous(i: Index) -> Index {
+    public func predecessor(of i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: _unsafeMinus(i._offset, 1))
     }
@@ -375,25 +375,25 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   }
 
   @warn_unused_result
-  public func next(i: Index) -> Index {
+  public func successor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
-    return _elements.next(i)
+    return _elements.successor(of: i)
   }
 
-  public func _nextInPlace(i: inout Index) {
+  public func successor(updating i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
-    _elements._nextInPlace(&i)
+    _elements.successor(updating: &i)
   }
 
   @warn_unused_result
-  public func previous(i: Index) -> Index {
+  public func predecessor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
-    return _elements.previous(i)
+    return _elements.predecessor(of: i)
   }
 
-  public func _previousInPlace(i: inout Index) {
+  public func predecessor(updating i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
-    _elements._previousInPlace(&i)
+    _elements.predecessor(updating: &i)
   }
 
   @warn_unused_result
