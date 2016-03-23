@@ -327,18 +327,6 @@ public:
   }
 
   /// Append the bits from the given vector to this one.
-  void append(ClusteredBitVector &&other) {
-    // If this vector is empty, just move the other.
-    if (empty()) {
-      *this = std::move(other);
-      return;
-    }
-
-    // Otherwise, use copy-append.
-    append(other);
-  }
-
-  /// Append the bits from the given vector to this one.
   void append(const ClusteredBitVector &other) {
     // Nothing to do if the other vector is empty.
     if (other.empty()) return;
@@ -358,6 +346,18 @@ public:
     } else {
       appendReserved(other.size(), other.getChunksPtr());
     }
+  }
+
+  /// Append the bits from the given vector to this one.
+  void append(ClusteredBitVector &&other) {
+    // If this vector is empty, just move the other.
+    if (empty()) {
+      *this = std::move(other);
+      return;
+    }
+
+    // Otherwise, use copy-append.
+    append(other);
   }
 
   /// Add the low N bits from the given value to the vector.
