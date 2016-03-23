@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "ForeignRepresentationInfo.h"
 #include "swift/Strings.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
@@ -29,6 +30,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/Attr.h"
@@ -333,65 +335,9 @@ struct ASTContext::Implementation {
   /// checking unintended Objective-C overrides.
   std::vector<AbstractFunctionDecl *> ObjCMethods;
 
-  /// An entry in the foreign-representable cache.
-  class ForeignRepresentableCacheEntry {
-    /// The low three bits store a ForeignRepresentableKind.
-    ///
-    /// When the ForeignRepresentableKind == None, the upper bits are
-    /// the generation count at which this negative result was last
-    /// checked. Otherwise, masking off the lower bits produces a
-    /// ProtocolConformance* that describes the conformance.
-    uintptr_t Storage;
-
-  public:
-    /// Retrieve a cache entry for a non-foreign-representable type.
-    static ForeignRepresentableCacheEntry forNone(unsigned generation) {
-      ForeignRepresentableCacheEntry result;
-      result.Storage = static_cast<uintptr_t>(generation) << 3;
-      result.Storage |= static_cast<uintptr_t>(ForeignRepresentableKind::None);
-      return result;
-    }
-
-    // Retrieve a cache entry for a trivially representable type.
-    static ForeignRepresentableCacheEntry forTrivial() {
-      ForeignRepresentableCacheEntry result;
-      result.Storage = reinterpret_cast<uintptr_t>(nullptr);
-      result.Storage |=
-          static_cast<uintptr_t>(ForeignRepresentableKind::Trivial);
-      return result;
-    }
-
-    // Retrieve a cache entry for a bridged representable type.
-    static ForeignRepresentableCacheEntry
-    forBridged(ProtocolConformance *conformance) {
-      ForeignRepresentableCacheEntry result;
-      result.Storage = reinterpret_cast<uintptr_t>(conformance);
-      result.Storage
-        |= static_cast<uintptr_t>(ForeignRepresentableKind::Bridged);
-      return result;
-    }
-
-    /// Retrieve the foreign representable kind.
-    ForeignRepresentableKind getKind() const {
-      return static_cast<ForeignRepresentableKind>(Storage & 0x07);
-    }
-
-    /// Retrieve the generation for a non-representable type.
-    unsigned getGeneration() const {
-      assert(getKind() == ForeignRepresentableKind::None);
-      return static_cast<unsigned>(Storage >> 3);
-    }
-
-    /// Retrieve the protocol conformance that makes it representable.
-    ProtocolConformance *getConformance() const {
-      assert(getKind() != ForeignRepresentableKind::None);
-      return reinterpret_cast<ProtocolConformance *>(Storage & ~0x07);
-    }
-  };
-
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
-  llvm::DenseMap<NominalTypeDecl *, ForeignRepresentableCacheEntry>
+  llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
     ForeignRepresentableCache;
 
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
@@ -3635,12 +3581,11 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
 
 /// Find the implementation of the named type in the given module.
 static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx, 
-                                                   StringRef name,
+                                                   Identifier name,
                                                    Module *module) {
   // Find all of the declarations with this name in the Swift module.
   SmallVector<ValueDecl *, 1> results;
-  auto identifier = ctx.getIdentifier(name);
-  module->lookupValue({ }, identifier, NLKind::UnqualifiedLookup, results);
+  module->lookupValue({ }, name, NLKind::UnqualifiedLookup, results);
   for (auto result : results) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(result))
       return nominal;
@@ -3656,61 +3601,52 @@ static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
   return nullptr;
 }
 
-std::pair<ForeignRepresentableKind, ProtocolConformance *>
-ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
-                                    ForeignLanguage language,
-                                    DeclContext *dc) {
-  using CacheEntry = Implementation::ForeignRepresentableCacheEntry;
-
+ForeignRepresentationInfo
+ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
+                                         ForeignLanguage language,
+                                         DeclContext *dc) {
   if (Impl.ForeignRepresentableCache.empty()) {
     // Local function to add a type with the given name and module as
     // trivially-representable.
-    auto addTrivial = [&](StringRef name, Module *module) {
+    auto addTrivial = [&](Identifier name, Module *module,
+                          bool allowOptional = false) {
       if (auto type = findUnderlyingTypeInModule(*this, name, module)) {
-        Impl.ForeignRepresentableCache.insert({type, CacheEntry::forTrivial()});
+        auto info = ForeignRepresentationInfo::forTrivial();
+        if (allowOptional)
+          info = ForeignRepresentationInfo::forTrivialWithOptional();
+        Impl.ForeignRepresentableCache.insert({type, info});
       }
     };
 
     // Pre-populate the foreign-representable cache with known types.
     if (auto stdlib = getStdlibModule()) {
-      addTrivial("OpaquePointer", stdlib);
+      addTrivial(getIdentifier("OpaquePointer"), stdlib);
 
       // Builtin types
+      // FIXME: Layering violation to use the ClangImporter's define.
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
-      addTrivial(#SWIFT_TYPE_NAME, stdlib);
+      addTrivial(getIdentifier(#SWIFT_TYPE_NAME), stdlib);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
-
-#define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,                     \
-                    NATIVE_MODULE, NATIVE_TYPE, OPTIONAL_IS_BRIDGED)  \
-      assert(StringRef(#NATIVE_MODULE) == "Swift");                   \
-      addTrivial(#NATIVE_TYPE, stdlib);
-#include "swift/SIL/BridgedTypes.def"
     }
 
-    if (auto darwin = getLoadedModule(getIdentifier("Darwin"))) {
+    if (auto darwin = getLoadedModule(Id_Darwin)) {
       // Note: DarwinBoolean is odd because it's bridged to Bool in APIs,
       // but can also be trivially bridged.
-      addTrivial("DarwinBoolean", darwin);
+      addTrivial(getIdentifier("DarwinBoolean"), darwin);
     }
 
-    if (auto objectiveC = getLoadedModule(getIdentifier("ObjectiveC"))) {
-      addTrivial("Selector", objectiveC);
+    if (auto objectiveC = getLoadedModule(Id_ObjectiveC)) {
+      addTrivial(Id_Selector, objectiveC);
 
       // Note: ObjCBool is odd because it's bridged to Bool in APIs,
       // but can also be trivially bridged.
-      addTrivial("ObjCBool", objectiveC);
+      addTrivial(getIdentifier("ObjCBool"), objectiveC);
 
-      addTrivial(getSwiftId(KnownFoundationEntity::NSZone).str(), objectiveC);
+      addTrivial(getSwiftId(KnownFoundationEntity::NSZone), objectiveC);
     }
 
     if (auto coreGraphics = getLoadedModule(getIdentifier("CoreGraphics"))) {
-      addTrivial("CGFloat", coreGraphics);
-    }
-
-    if (auto foundation = getLoadedModule(Id_Foundation)) {
-      // FIXME: Why do we care?
-      addTrivial(getSwiftId(KnownFoundationEntity::NSErrorPointer).str(),
-                 foundation);
+      addTrivial(Id_CGFloat, coreGraphics);
     }
 
     // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
@@ -3722,7 +3658,7 @@ ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
         char name[] = #BASENAME "0";                                    \
         for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) { \
           *(std::end(name) - 2) = '0' + i;                              \
-          addTrivial(name, simd);                                       \
+          addTrivial(getIdentifier(name), simd);                        \
         }                                                               \
       }
 #include "swift/ClangImporter/SIMDMappedTypes.def"      
@@ -3736,7 +3672,7 @@ ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
   if (known == Impl.ForeignRepresentableCache.end() ||
       (known->second.getKind() == ForeignRepresentableKind::None &&
        known->second.getGeneration() < CurrentGeneration)) {
-    Optional<CacheEntry> result;
+    Optional<ForeignRepresentationInfo> result;
 
     // Look for a conformance to _ObjectiveCBridgeable.
     //
@@ -3748,13 +3684,14 @@ ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
             = dc->getParentModule()->lookupConformance(
                 nominal->getDeclaredType(), objcBridgeable,
                 getLazyResolver())) {
-        result = CacheEntry::forBridged(conformance->getConcrete());
+        result =
+            ForeignRepresentationInfo::forBridged(conformance->getConcrete());
       }
     }
 
     // If we didn't find anything, mark the result as "None".
     if (!result)
-      result = CacheEntry::forNone(CurrentGeneration);
+      result = ForeignRepresentationInfo::forNone(CurrentGeneration);
     
     // Cache the result.
     known = Impl.ForeignRepresentableCache.insert({ nominal, *result }).first;
@@ -3763,14 +3700,14 @@ ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
   // Map a cache entry to a result for this specific 
   auto entry = known->second;
   if (entry.getKind() == ForeignRepresentableKind::None)
-    return { ForeignRepresentableKind::None, nullptr };
+    return entry;
 
   // Extract the protocol conformance.
   auto conformance = entry.getConformance();
 
   // If the conformance is not visible, fail.
   if (conformance && !conformance->isVisibleFrom(dc))
-    return { ForeignRepresentableKind::None, nullptr };
+    return ForeignRepresentationInfo::forNone();
 
   // Language-specific filtering.
   switch (language) {
@@ -3779,12 +3716,12 @@ ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
     if (conformance &&
         conformance->getProtocol()->isSpecificProtocol(
           KnownProtocolKind::ObjectiveCBridgeable))
-      return { ForeignRepresentableKind::None, nullptr };
+      return ForeignRepresentationInfo::forNone();
 
-    return { entry.getKind(), conformance };
+    SWIFT_FALLTHROUGH;
 
   case ForeignLanguage::ObjectiveC:
-    return { entry.getKind(), conformance };
+    return entry;
   }
 }
 
