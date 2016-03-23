@@ -96,15 +96,18 @@ iamStruct = Struct1.zero
 currentStruct1.x += 1.5
 
 // Protocols
-class Foo : IAMProto {}
+// class Foo : NSObject, IAMProto {}
+
 struct Bar : IAMProto {}
   // expected-error@-1{{non-class type 'Bar' cannot conform to class protocol 'IAMProto'}}
   // expected-error@-2{{non-class type 'Bar' cannot conform to class protocol 'ImportedProtocolBase'}}
+  // expected-error@-3{{non-class type 'Bar' cannot conform to class protocol 'NSObjectProtocol'}}
 
-let foo = Foo()
-foo.mutateSomeState()
-Foo.mutateSomeStaticState()
-  // expected-error@-1{{type 'Foo' has no member 'mutateSomeStaticState'}}
+
+// let foo = Foo()
+// foo.mutateSomeState()
+// Foo.mutateSomeStaticState()
+  // expected-not-error@-1{{type 'Foo' has no member 'mutateSomeStaticState'}}
 
 // TODO: error: "swift_name cannot be used to define static member on protocol"
 
