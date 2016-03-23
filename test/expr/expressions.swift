@@ -822,14 +822,20 @@ func swift22_deprecation_increment_decrement() {
 
   ++f     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= += 1}}
   f--     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{4-6= -= 1}}
-  _ = f-- // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+  _ = f-- // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{none}}
 
 
   ++si      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.successor()}}
   --si      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.predecessor()}}
   si++      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{5-7= = si.successor()}}
   si--      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{5-7= = si.predecessor()}}
-  _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+  _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{none}}
+
+
+  // <rdar://problem/24530312> Swift ++fix-it produces bad code in nested expressions
+  // This should not get a fixit hint.
+  var j = 2
+  i = ++j   // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{none}}
 }
 
 
