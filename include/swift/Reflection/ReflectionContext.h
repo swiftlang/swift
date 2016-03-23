@@ -564,6 +564,8 @@ public:
     for (auto Info : ReflectionInfos) {
       for (auto &FieldDescriptor : Info.fieldmd) {
         auto CandidateMangledName = FieldDescriptor.MangledTypeName.get();
+        if (!CandidateMangledName)
+          continue;
         if (MangledName.compare(CandidateMangledName) != 0)
           continue;
         for (auto &Field : FieldDescriptor) {
