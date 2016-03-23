@@ -323,26 +323,28 @@ Type TypeChecker::resolveTypeInContext(
     
     // If we found an alias type in an inherited protocol, resolve it based on our
     // own `Self`.
-    if (alias && alias->hasUnderlyingType() && alias->getUnderlyingType()->hasArchetype()) {
-      auto typeRepr = alias->getUnderlyingTypeLoc().getTypeRepr();
-      auto identRepr = typeRepr ? dyn_cast<IdentTypeRepr>(typeRepr) : nullptr;
+    if (alias && alias->hasInterfaceType()) {
+      auto metaType = alias->getInterfaceType()->getAs<MetatypeType>();
+      auto memberType = metaType ? metaType->getInstanceType()->getAs<DependentMemberType>() :
+                        nullptr;
 
-      if (parentDC->getAsProtocolOrProtocolExtensionContext() && identRepr) {
+      if (memberType && parentDC->getAsProtocolOrProtocolExtensionContext()) {
         auto protoSelf = parentDC->getProtocolSelf();
         auto selfTy = protoSelf->getDeclaredType()->castTo<GenericTypeParamType>();
         auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
-        
-        if (baseTy->isTypeParameter()) {
-          for (auto name : identRepr->getComponentRange()) {
-            if (name->getIdentifier() == protoSelf->getName())
-              continue;
-            baseTy = resolver->resolveDependentMemberType(baseTy, parentDC, identRepr->getSourceRange(), name);
-          }
-          return baseTy;
+
+        SmallVector<DependentMemberType *, 4> memberTypes;
+        do {
+          memberTypes.push_back(memberType);
+          memberType = memberType->getBase()->getAs<DependentMemberType>();
+        } while (memberType);
+
+        auto module = parentDC->getParentModule();
+        while (memberTypes.size()) {
+          baseTy = memberTypes.back()->substBaseType(module, baseTy, nullptr);
+          memberTypes.pop_back();
         }
-        return substMemberTypeWithBase(parentDC->getParentModule(), alias,
-                                       protoSelf->getArchetype(),
-                                       /*isTypeReference=*/true);
+        return baseTy;
       }
     }
 
