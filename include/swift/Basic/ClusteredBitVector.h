@@ -240,9 +240,9 @@ public:
   }
 
   ClusteredBitVector &operator=(const ClusteredBitVector &other) {
-    // Do something with our current out-of-line capacity.
+    // Do something with our current out-of-line storage.
     if (hasOutOfLineData()) {
-      // Copy into our current capacity if it's adequate.
+      // Copy into our current storage if its capacity is adequate.
       auto otherLengthInChunks = other.getLengthInChunks();
       if (otherLengthInChunks <= getOutOfLineCapacityInChunks()) {
         LengthInBits = other.LengthInBits;
@@ -256,7 +256,7 @@ public:
         return *this;
       }
 
-      // Otherwise, destroy our current capacity.
+      // Otherwise, destroy our current storage.
       destroy();
     }
 
@@ -271,7 +271,7 @@ public:
   }
 
   ClusteredBitVector &operator=(ClusteredBitVector &&other) {
-    // Just drop our current capacity.
+    // Just drop our current out-of-line storage.
     if (hasOutOfLineData()) {
       destroy();
     }
