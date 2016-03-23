@@ -66,7 +66,7 @@ func testPostfix1(x: S) {
 }
 // POSTFIX_1-NOT: ++
 
-func testPostfix2(var x: S) {
+func testPostfix2(x: inout S) {
   x#^POSTFIX_2^#
 }
 // POSTFIX_2: Begin completions
@@ -130,7 +130,7 @@ func testPostfix10<G: P where G.T : Fooable>(x: G) {
 }
 // POSTFIX_10: Decl[PostfixOperatorFunction]/CurrModule: ***[#G.T#]
 
-func testPostfixSpace(var x: S) {
+func testPostfixSpace(x: inout S) {
   x #^S_POSTFIX_SPACE^#
 }
 // S_POSTFIX_SPACE: Decl[PostfixOperatorFunction]/CurrModule/Erase[1]:  ++[#S#]
@@ -167,7 +167,7 @@ func testInfix1(x: S2) {
 // NEGATIVE_S2_INFIX-NOT: ~>
 // NEGATIVE_S2_INFIX-NOT: = {#
 
-func testInfix2(var x: S2) {
+func testInfix2(x: inout S2) {
   x#^INFIX_2^#
 }
 // S2_INFIX_LVALUE: Begin completions
@@ -296,7 +296,7 @@ func testSpace(x: S2) {
 // S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#S2#}[#S2#]
 // S2_INFIX_SPACE: End completions
 
-func testExtInfix1(var x: S2) {
+func testExtInfix1(x: inout S2) {
   x + S2() + x + S2() + x + S2() + x#^EXT_INFIX_1^#
 }
 

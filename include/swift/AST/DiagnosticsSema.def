@@ -778,6 +778,9 @@ ERROR(inout_cant_be_variadic,none,
       "inout arguments cannot be variadic", ())
 ERROR(inout_only_parameter,none,
       "'inout' is only valid in parameter lists", ())
+ERROR(var_parameter_not_allowed,none,
+      "parameters may not have the 'var' specifier", ())
+
 
 ERROR(mutating_invalid_global_scope,none,
       "'mutating' is only valid on methods", ())
