@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func foo() -> Int? { return .None }
+func foo() -> Int? { return .none }
 func nonOptional() -> Int { return 0 }
 func use(x: Int) {}
 func modify(x: inout Int) {}
@@ -44,7 +44,7 @@ if let x = foo() {
   use(y) // expected-error{{unresolved identifier 'y'}}
 }
 
-var opt: Int? = .None
+var opt: Int? = .none
 
 if let x = opt {}
 if var x = opt {}
@@ -93,7 +93,7 @@ func testIfCase(a : Int?) {
   if let p? = a {_ = p}  // expected-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
   
   
-  if let .Some(x) = a {_ = x}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
+  if let .some(x) = a {_ = x}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
 
   if case _ = a {}  // expected-warning {{'if' condition is always true}}
   while case _ = a {}  // expected-warning {{'while' condition is always true}}
@@ -103,7 +103,7 @@ func testIfCase(a : Int?) {
 // <rdar://problem/20883147> Type annotation for 'let' condition still expected to be optional
 func testTypeAnnotations() {
   if let x: Int = Optional(1) {_ = x}
-  if let x: Int = .Some(1) {_ = x}
+  if let x: Int = .some(1) {_ = x}
 
   if case _ : Int8 = 19 {}  // expected-warning {{'if' condition is always true}}
 }

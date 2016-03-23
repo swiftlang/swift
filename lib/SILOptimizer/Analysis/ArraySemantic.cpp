@@ -99,6 +99,13 @@ bool swift::ArraySemanticsCall::isValidSignature() {
     }
     return true;
   }
+  case ArrayCallKind::kWithUnsafeMutableBufferPointer: {
+    if (SemanticsCall->getOrigCalleeType()->getNumIndirectResults() != 1 ||
+        SemanticsCall->getNumArguments() != 3)
+      return false;
+    auto SelfConvention = FnTy->getSelfParameter().getConvention();
+    return SelfConvention == ParameterConvention::Indirect_Inout;
+  }
   }
 
   return true;
@@ -155,6 +162,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
             .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
+            .Case("array.withUnsafeMutableBufferPointer", ArrayCallKind::kWithUnsafeMutableBufferPointer)
             .Default(ArrayCallKind::kNone);
     if (Tmp != ArrayCallKind::kNone) {
       assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "

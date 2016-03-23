@@ -420,6 +420,21 @@ public:
                                                          SILValue src) {
     return createMarkUninitialized(Loc, src, MarkUninitializedInst::RootSelf);
   }
+  
+  MarkUninitializedBehaviorInst *
+  createMarkUninitializedBehavior(SILLocation Loc,
+                                  SILValue initStorageFunc,
+                                  ArrayRef<Substitution> initStorageSubs,
+                                  SILValue storage,
+                                  SILValue setterFunc,
+                                  ArrayRef<Substitution> setterSubs,
+                                  SILValue self,
+                                  SILType ty) {
+    return insert(MarkUninitializedBehaviorInst::create(F.getModule(),
+         getSILDebugLocation(Loc),
+         initStorageFunc, initStorageSubs, storage,
+         setterFunc, setterSubs, self, ty));
+  }
 
   MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation Loc,
                                                    ArrayRef<SILValue> vars) {
@@ -656,6 +671,12 @@ public:
   AutoreleaseValueInst *createAutoreleaseValue(SILLocation Loc,
                                                SILValue operand) {
     return insert(new (F.getModule()) AutoreleaseValueInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
+  SetDeallocatingInst *createSetDeallocating(SILLocation Loc,
+                                            SILValue operand) {
+    return insert(new (F.getModule()) SetDeallocatingInst(
         getSILDebugLocation(Loc), operand));
   }
 

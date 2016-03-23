@@ -62,6 +62,11 @@ extension String : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSString?
+  ) -> String {
+    return String()
+  }
 }
 
 extension Int : _ObjectiveCBridgeable {
@@ -86,6 +91,11 @@ extension Int : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSNumber?
+  ) -> Int {
+    return 0
+  }
 }
 
 extension Array : _ObjectiveCBridgeable {
@@ -104,10 +114,15 @@ extension Array : _ObjectiveCBridgeable {
     x: NSArray,
     result: inout Array?
   ) -> Bool {
-    return nil
+    return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSArray?
+  ) -> Array {
+    return Array()
   }
   public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(T.self)
+    return Swift._isBridgedToObjectiveC(Element.self)
   }
 }
 
@@ -129,8 +144,41 @@ extension Dictionary : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSDictionary?
+  ) -> Dictionary {
+    return Dictionary()
+  }
   public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(T.self)
+    return Swift._isBridgedToObjectiveC(Key.self) && Swift._isBridgedToObjectiveC(Value.self)
+  }
+}
+
+extension Set : _ObjectiveCBridgeable {
+  public static func _getObjectiveCType() -> Any.Type {
+    return NSSet.self
+  }
+  public func _bridgeToObjectiveC() -> NSSet {
+    return NSSet()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    x: NSSet,
+    result: inout Set?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSSet,
+    result: inout Set?
+  ) -> Bool {
+    return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSSet?
+  ) -> Set {
+    return Set()
+  }
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return Swift._isBridgedToObjectiveC(Element.self)
   }
 }
 
@@ -140,7 +188,7 @@ extension NSObject : Hashable {
 
 public func == (x: NSObject, y: NSObject) -> Bool { return true }
 
-extension NSError: ErrorType {
+extension NSError : ErrorProtocol {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }

@@ -3,5 +3,5 @@
 #^A^#{"
 protocol c{
 func a
-typealias b:c
-typealias e:c
+associatedtype b:c
+associatedtype e:c

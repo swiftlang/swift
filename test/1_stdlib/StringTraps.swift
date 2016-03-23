@@ -20,7 +20,7 @@ import ObjectiveC
 var StringTraps = TestSuite("StringTraps")
 
 StringTraps.test("startIndex/predecessor")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -33,7 +33,7 @@ StringTraps.test("startIndex/predecessor")
 }
 
 StringTraps.test("endIndex/successor")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -47,7 +47,7 @@ StringTraps.test("endIndex/successor")
 }
 
 StringTraps.test("subscript(_:)/endIndex")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -61,7 +61,7 @@ StringTraps.test("subscript(_:)/endIndex")
 }
 
 StringTraps.test("UTF8ViewEndIndexSuccessor")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -75,7 +75,7 @@ StringTraps.test("UTF8ViewEndIndexSuccessor")
 }
 
 StringTraps.test("UTF8ViewSubscript/endIndex")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -89,7 +89,7 @@ StringTraps.test("UTF8ViewSubscript/endIndex")
 }
 
 StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -101,7 +101,7 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
 }
 
 StringTraps.test("UTF16ViewSubscript/endIndex")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

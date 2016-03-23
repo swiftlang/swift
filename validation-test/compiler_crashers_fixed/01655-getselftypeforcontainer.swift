@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
  (""")
 enum b {
 func a()
@@ -21,7 +23,7 @@ typealias d, e? = A? = a<S {
 extension NSSet {
 enum A : a {
 convenience init()
-protocol d : BooleanType, let foo as a<T: C(x()
+protocol d : Boolean, let foo as a<T: C(x()
 extension NSSet {
 }
 }
@@ -79,11 +81,11 @@ f() -> Any, (B)
 t: T>) {
 }
 }
-init(range: CollectionType where A: B<T>(self)
+init(range: Collection where A: B<T>(self)
 return {
 }
 return "foobar"]([c()
-func i: start, ((object1, a: SequenceType> V, c(T, object2)
+func i: start, ((object1, a: Sequence> V, c(T, object2)
 enum b : ExtensibleCollectionType>("
 func b: Bool) -> d.dynamicType)
 protocol B : d) {

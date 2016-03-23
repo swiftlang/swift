@@ -3,7 +3,7 @@ func ifFalse() -> Int {
   if false { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
   } else {
-    return 1  
+    return 1
   }
 }
 
@@ -164,11 +164,11 @@ func testSwitchEnum(xi: Int) -> Int {
 }
 
 
-// Treat nil as .None and do not emit false 
+// Treat nil as .none and do not emit false 
 // non-exhaustive warning.
 func testSwitchEnumOptionalNil(x: Int?) -> Int {
   switch x { // no warning
-  case .Some(_):
+  case .some(_):
     return 1
   case nil:
     return -1
@@ -206,22 +206,22 @@ func testSwitchEnumBool(b: Bool, xi: Int) -> Int {
   return x
 }
 
-func testSwitchOptionalBool (b:Bool?, xi: Int) -> Int {
+func testSwitchOptionalBool(b: Bool?, xi: Int) -> Int {
   var x = xi
   switch b { // No warning
-  case .Some(true):
+  case .some(true):
     x += 1
-  case .Some(false):
+  case .some(false):
     x += 1
-  case .None:
+  case .none:
     x -= 1
   }
 
   switch b {
-  case .Some(true):
+  case .some(true):
     x += 1
-  case .None:
-    x -= 1 
+  case .none:
+    x -= 1
   } // expected-error{{switch must be exhaustive}}
 
   return xi
@@ -356,7 +356,7 @@ public func testFailingCast(s:String) -> Int {
    return s as! Int // expected-warning {{cast from 'String' to unrelated type 'Int' always fails}}
 }
 
-enum MyError : ErrorType { case A }
+enum MyError : ErrorProtocol { case A }
 
 @noreturn func raise() throws { throw MyError.A }
 

@@ -1107,7 +1107,7 @@ Are these conditions true?
 
 Recall that an addressor is invoked for an l-value of the form::
 
-  base.memory
+  base.pointee
 
 or::
 

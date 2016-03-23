@@ -383,7 +383,7 @@ enum PlaygroundRepresentation : UInt8 {
 
   static func fromByte(byte : UInt8) -> PlaygroundRepresentation {
     let repr = PlaygroundRepresentation(rawValue: byte)
-    if repr == .None { return .Unknown } else { return repr! }
+    if repr == .none { return .Unknown } else { return repr! }
   }
 }
 

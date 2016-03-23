@@ -46,6 +46,22 @@
 #endif
 #endif
 
+/// Does the current Swift platform have ISA pointers which should be opaque
+/// to anyone outside the Swift runtime?  Similarly to the ISA_MASKING case
+/// above, information other than the class pointer could be contained in the
+/// ISA.
+#ifndef SWIFT_HAS_OPAQUE_ISAS
+#if __ARM_ARCH_7K__ >= 2
+#define SWIFT_HAS_OPAQUE_ISAS 1
+#else
+#define SWIFT_HAS_OPAQUE_ISAS 0
+#endif
+#endif
+
+#if SWIFT_HAS_OPAQUE_ISAS && SWIFT_HAS_ISA_MASKING
+#error Masking ISAs are incompatible with opaque ISAs
+#endif
+
 // We try to avoid global constructors in the runtime as much as possible.
 // These macros delimit allowed global ctors.
 #if __clang__
@@ -94,7 +110,7 @@
 #define SWIFT_RT_USE_WRAPPERS_ALWAYS 1
 
 // If defined, it indicates that this calling convention is
-// supported by the currnet target.
+// supported by the current target.
 // TODO: Define it once the runtime calling convention support has
 // been integrated into clang and llvm.
 //#define RT_USE_RegisterPreservingCC
@@ -143,7 +159,7 @@
 #define SWIFT_RT_ENTRY_IMPL(Name) _##Name##_
 
 // Library internal way to invoke the implementation of a runtime entry.
-// E.g. a runtime function  may be called internally via its public API
+// E.g. a runtime function may be called internally via its public API
 // or via the function pointer.
 #define SWIFT_RT_ENTRY_CALL(Name) Name
 

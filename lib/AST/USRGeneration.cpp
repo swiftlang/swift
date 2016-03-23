@@ -68,7 +68,7 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
 
   // FIXME: mangling 'self' in destructors crashes in mangler.
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
-      return true;
+    return true;
 
   OS << getUSRSpacePrefix();
   Mangler Mangler;
@@ -112,5 +112,20 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
   Mangler.mangleAccessorEntity(AccKind, AddressorKind::NotAddressor, SD);
   Mangler.finalize(OS);
   return false;
+}
+
+bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
+  if (ED->getExtendedType().isNull())
+    return true;
+
+  // We make up a unique usr for each extension by combining a prefix
+  // and the USR of the first value member of the extension.
+  for (auto D : ED->getMembers()) {
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      OS << "ext:";
+      return printDeclUSR(VD, OS);
+    }
+  }
+  return true;
 }
 

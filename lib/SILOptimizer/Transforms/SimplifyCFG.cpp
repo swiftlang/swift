@@ -2309,8 +2309,8 @@ class ArgumentSplitter {
   /// The argument we are splitting.
   SILArgument *Arg;
 
-  /// The worklist of arguments that we still ned to visit. We simplify each
-  /// argument recursively one step at a time.
+  /// The worklist of arguments that we still need to visit. We
+  /// simplify each argument recursively one step at a time.
   std::vector<SILArgument *> &Worklist;
 
   /// The values incoming into Arg.
@@ -2411,10 +2411,9 @@ bool ArgumentSplitter::createNewArguments() {
 
   // We do not want to split arguments that have less than 2 non-trivial
   // projections.
-  if (std::count_if(Projections.begin(), Projections.end(),
-                    [&](const Projection &P) {
-                      return !P.getType(Ty, Mod).isTrivial(Mod);
-                    }) < 2)
+  if (count_if(Projections, [&](const Projection &P) {
+        return !P.getType(Ty, Mod).isTrivial(Mod);
+      }) < 2)
     return false;
 
   // We subtract one since this will be the number of the first new argument
@@ -2450,6 +2449,13 @@ bool ArgumentSplitter::createNewArguments() {
   }
 
   Arg->replaceAllUsesWith(Agg);
+
+  // Replace any references to Arg in IncomingValues with Agg. These
+  // references are used in generating new instructions that extract
+  // from the aggregate.
+  for (auto &P : IncomingValues)
+    if (P.second == Arg)
+      P.second = Agg;
 
   // Look at all users of agg and see if we can simplify any of them. This will
   // eliminate struct_extracts/tuple_extracts from the newly created aggregate
@@ -2745,8 +2751,8 @@ getSILValueFromCaseResult(SILBuilder &B, SILLocation Loc,
 /// a given enum is of a given tag.  If so, create a new select_enum instruction
 /// This is used to simplify arbitrary simple switch_enum diamonds into
 /// select_enums.
-bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
-                                    SILArgument *IntArg) {
+static bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
+                                           SILArgument *IntArg) {
 
   // Don't know which values should be passed if there is more
   // than one basic block argument.

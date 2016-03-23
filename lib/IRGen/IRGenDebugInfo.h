@@ -17,29 +17,15 @@
 #ifndef SWIFT_IRGEN_DEBUGINFO_H
 #define SWIFT_IRGEN_DEBUGINFO_H
 
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/IR/ValueHandle.h"
-#include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/DIBuilder.h"
-#include "llvm/Support/Allocator.h"
-
-#include "swift/AST/Module.h"
-#include "swift/SIL/SILLocation.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILDebugScope.h"
-
 #include "DebugTypeInfo.h"
 #include "IRBuilder.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "GenType.h"
+#include "swift/SIL/SILLocation.h"
+#include "llvm/IR/DIBuilder.h"
+#include "llvm/Support/Allocator.h"
 
 #include <set>
-
-namespace llvm {
-class DIBuilder;
-}
 
 namespace swift {
 
@@ -65,9 +51,9 @@ typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
 enum IndirectionKind : bool { DirectValue = false, IndirectValue = true };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
-/// IRGenDebugInfo - Helper object that keeps track of the current
-/// CompileUnit, File, LexicalScope, and translates SILLocations into
-/// <llvm::DebugLoc>s.
+/// Helper object that keeps track of the current CompileUnit, File,
+/// LexicalScope, and knows how to translate a \c SILLocation into an
+/// \c llvm::DebugLoc.
 class IRGenDebugInfo {
   friend class ArtificialLocation;
   const IRGenOptions &Opts;
@@ -83,7 +69,6 @@ class IRGenDebugInfo {
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
   TrackingDIRefMap DIRefMap;
-  llvm::SmallPtrSet<const llvm::DIType *, 16> IndirectEnumCases;
 
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;                    /// The current working directory.
@@ -140,12 +125,23 @@ public:
 
   /// Emit the final line 0 location for the unified trap block at the
   /// end of the function.
-  void setArtificialTrapLocation(IRBuilder &Builder, const SILDebugScope *Scope) {
+  void setArtificialTrapLocation(IRBuilder &Builder,
+                                 const SILDebugScope *Scope) {
     auto DL = llvm::DebugLoc::get(0, 0, getOrCreateScope(Scope));
     Builder.SetCurrentDebugLocation(DL);
   }
 
   /// Emit debug info for an import declaration.
+  ///
+  /// The DWARF output for import decls is similar to that of a using
+  /// directive in C++:
+  ///   import Foundation
+  ///   -->
+  ///   0: DW_TAG_imported_module
+  ///        DW_AT_import(*1)
+  ///   1: DW_TAG_module // instead of DW_TAG_namespace.
+  ///        DW_AT_name("Foundation")
+  ///
   void emitImport(ImportDecl *D);
 
   /// Emit debug info for the given function.
@@ -200,70 +196,121 @@ public:
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
 
-  /// Removes the function from the Functions map again.
-  void eraseFunction(llvm::Function *Fn);
-
 private:
   StringRef BumpAllocatedString(const char *Data, size_t Length);
   StringRef BumpAllocatedString(std::string S);
   StringRef BumpAllocatedString(StringRef S);
 
+  /// Construct a DIType from a DebugTypeInfo object.
+  ///
+  /// At this point we do not plan to emit full DWARF for all swift
+  /// types, the goal is to emit only the name and provenance of the
+  /// type, where possible. A can import the type definition directly
+  /// from the module/framework/source file the type is specified in.
+  /// For this reason we emit the fully qualified (=mangled) name for
+  /// each type whenever possible.
+  ///
+  /// The ultimate goal is to emit something like a
+  /// DW_TAG_APPLE_ast_ref_type (an external reference) instead of a
+  /// local reference to the type.
   llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
                            llvm::DIScope *Scope, llvm::DIFile *File);
+  /// Get the DIType corresponding to this DebugTypeInfo from the cache,
+  /// or build a fresh DIType otherwise.  There is the underlying
+  /// assumption that no two types that share the same canonical type
+  /// can have different storage size or alignment.
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy);
+  /// Translate a SILDebugScope into an llvm::DIDescriptor.
   llvm::DIScope *getOrCreateScope(const SILDebugScope *DS);
+  /// Build the context chain for a given DeclContext.
   llvm::DIScope *getOrCreateContext(DeclContext *DC);
+
+  /// Construct an LLVM inlined-at location from a SILDebugScope,
+  /// reversing the order in the process.
   llvm::MDNode *createInlinedAt(const SILDebugScope *CallSite);
 
+  /// Translate filenames into DIFiles.
   llvm::DIFile *getOrCreateFile(const char *Filename);
-  llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI);
+  /// Return a DIType for Ty reusing any DeclContext found in DbgTy.
+  llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy);
+
+  /// Attempt to figure out the unmangled name of a function.
   StringRef getName(const FuncDecl &FD);
+  /// Attempt to figure out the unmangled name of a function.
   StringRef getName(SILLocation L);
   StringRef getMangledName(TypeAliasDecl *Decl);
-  StringRef getMangledName(DebugTypeInfo DTI);
+  /// Return the mangled name of any nominal type, including the global
+  /// _Tt prefix, which marks the Swift namespace for types in DWARF.
+  StringRef getMangledName(DebugTypeInfo DbgTy);
+  /// Create the array of function parameters for a function type.
   llvm::DITypeRefArray createParameterTypes(CanSILFunctionType FnTy,
                                             DeclContext *DeclCtx);
+  /// Create the array of function parameters for FnTy. SIL Version.
   llvm::DITypeRefArray createParameterTypes(SILType SILTy,
                                             DeclContext *DeclCtx);
+  /// Create a single parameter type and push it.
   void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
                            SILType CanTy, DeclContext *DeclCtx);
+  /// Return an array with the DITypes for each of a tuple's elements.
   llvm::DINodeArray getTupleElements(TupleType *TupleTy, llvm::DIScope *Scope,
                                      llvm::DIFile *File, unsigned Flags,
                                      DeclContext *DeclContext,
                                      unsigned &SizeInBits);
   llvm::DIFile *getFile(llvm::DIScope *Scope);
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule M);
+  /// Return a cached module for an access path or create a new one.
   llvm::DIModule *getOrCreateModule(StringRef Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath);
   llvm::DIScope *getModule(StringRef MangledName);
+  /// Return an array with the DITypes for each of a struct's elements.
   llvm::DINodeArray getStructMembers(NominalTypeDecl *D, Type BaseTy,
                                      llvm::DIScope *Scope, llvm::DIFile *File,
                                      unsigned Flags, unsigned &SizeInBits);
+  /// Create a temporary forward declaration for a struct and add it to
+  /// the type cache so we can safely build recursive types.
   llvm::DICompositeType *
   createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
                    llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
                    unsigned SizeInBits, unsigned AlignInBits, unsigned Flags,
                    llvm::DIType *DerivedFrom, unsigned RuntimeLang,
                    StringRef UniqueID);
-  llvm::DIDerivedType *createMemberType(DebugTypeInfo DTI, StringRef Name,
+
+  /// Create a member of a struct, class, tuple, or enum.
+  llvm::DIDerivedType *createMemberType(DebugTypeInfo DbgTy, StringRef Name,
                                         unsigned &OffsetInBits,
                                         llvm::DIScope *Scope,
                                         llvm::DIFile *File, unsigned Flags);
+  /// Return an array with the DITypes for each of an enum's elements.
   llvm::DINodeArray getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
                                     llvm::DIScope *Scope, llvm::DIFile *File,
                                     unsigned Flags);
+  /// Create a temporary forward declaration for an enum and add it to
+  /// the type cache so we can safely build recursive types.
   llvm::DICompositeType *createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
                                         StringRef MangledName,
                                         llvm::DIScope *Scope,
                                         llvm::DIFile *File, unsigned Line,
                                         unsigned Flags);
+  /// Convenience function that creates a forward declaration for PointeeTy.
   llvm::DIType *createPointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
                                          llvm::DIFile *File, unsigned Line,
                                          unsigned Flags, StringRef MangledName);
+  /// Create a pointer-sized struct with a mangled name and a single
+  /// member of PointeeTy.
   llvm::DIType *createPointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
                                          llvm::DIType *PointeeTy,
                                          llvm::DIFile *File, unsigned Line,
                                          unsigned Flags, StringRef MangledName);
+  /// Create a 2*pointer-sized struct with a mangled name and a single
+  /// member of PointeeTy.
+  llvm::DIType *createDoublePointerSizedStruct(
+      llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
+      llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName);
+  /// Create an opaque struct with a mangled name.
+  llvm::DIType *createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
+                                   llvm::DIFile *File, unsigned Line,
+                                   unsigned SizeInBits, unsigned AlignInBits,
+                                   unsigned Flags, StringRef MangledName);
   uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy);
   TypeAliasDecl *getMetadataType();
 };

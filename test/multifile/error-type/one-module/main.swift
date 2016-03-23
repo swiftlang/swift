@@ -5,4 +5,4 @@
 
 // REQUIRES: executable_test
 
-extension NuclearMeltdown : ErrorType {}
+extension NuclearMeltdown : ErrorProtocol {}

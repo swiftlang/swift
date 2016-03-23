@@ -199,6 +199,10 @@ enum class TypeCheckExprFlags {
   /// If set, this expression is being re-type checked as part of diagnostics,
   /// and so we should not visit bodies of non-single expression closures.
   SkipMultiStmtClosures = 0x40,
+
+  /// Set if the client prefers fixits to be in the form of force unwrapping
+  /// or optional chaining to return an optional.
+  PreferForceUnwrapToOptional = 0x80,
 };
 
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
@@ -395,6 +399,7 @@ withoutContext(TypeResolutionOptions options) {
 /// the OBJC_ATTR_SELECT macro in DiagnosticsSema.def.
 enum class ObjCReason {
   DoNotDiagnose,
+  ExplicitlyCDecl,
   ExplicitlyDynamic,
   ExplicitlyObjC,
   ExplicitlyIBOutlet,
@@ -418,7 +423,12 @@ enum class ConformanceCheckFlags {
   /// Whether we will be using the conformance in the AST.
   ///
   /// This implies that the conformance will have to be complete.
-  Used = 0x02
+  Used = 0x02,
+  /// Whether to suppress dependency tracking entirely.
+  ///
+  /// FIXME: This deals with some oddities with the
+  /// _ObjectiveCBridgeable conformances.
+  SuppressDependencyTracking = 0x04,
 };
 
 /// Options that control protocol conformance checking.
@@ -895,6 +905,9 @@ public:
   AnyFunctionType::ExtInfo
   applyFunctionTypeAttributes(AbstractFunctionDecl *func, unsigned i);
 
+  /// Infer default value witnesses for all requirements in the given protocol.
+  void inferDefaultWitnesses(ProtocolDecl *proto);
+
   /// Determine whether the given (potentially constrained) protocol extension
   /// is usable for the given type.
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
@@ -946,7 +959,7 @@ public:
   /// \param nominal The generic type.
   ///
   /// \returns true if an error occurred, or false otherwise.
-  bool validateGenericTypeSignature(NominalTypeDecl *nominal);
+  bool validateGenericTypeSignature(GenericTypeDecl *nominal);
 
   /// Check the generic parameters in the given generic parameter list (and its
   /// parent generic parameter lists) according to the given resolver.
@@ -1461,6 +1474,9 @@ public:
                           ProtocolConformance **Conformance = nullptr,
                           SourceLoc ComplainLoc = SourceLoc());
 
+  /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+  void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
+
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
   ///
@@ -1542,7 +1558,7 @@ public:
                                    LookupTypeResult &lookup);
 
   /// Emit a diagnostic for references to declarations that have been
-  /// marked as unavailable, either through "unavailable" or "obsoleted=".
+  /// marked as unavailable, either through "unavailable" or "obsoleted:".
   bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                       SourceRange R,
                                       const DeclContext *DC);
@@ -1654,9 +1670,8 @@ public:
   /// the provided conformance. On return, requiredAvailability holds th
   /// availability levels required for conformance.
   bool
-  isAvailabilitySafeForConformance(ValueDecl *witness,
-                                   ValueDecl *requirement,
-                                   NormalProtocolConformance *conformance,
+  isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
+                                   ValueDecl *witness, DeclContext *dc,
                                    AvailabilityContext &requiredAvailability);
 
   /// Returns an over-approximation of the range of operating system versions

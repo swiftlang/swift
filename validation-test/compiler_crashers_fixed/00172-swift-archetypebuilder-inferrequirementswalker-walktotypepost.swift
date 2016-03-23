@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 protocol A {
     typealias B
     func b(B)
@@ -127,7 +129,7 @@ class C: B, A {
 func e<T where T: A, T: B>(t: T) {
     t.c()
 }
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 func f<e>() -> (e, e -> e) -> e {
     e b e.c = {}
     {
@@ -143,7 +145,7 @@ func f<e>() -> (e, e -> e) -> e {
         class func c
     }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
@@ -261,7 +263,7 @@ struct c<e> {
     let d: [(  h
 }
 func b(g: f) -> <e>(()-> e) -> i
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 func d() -> String {
@@ -295,7 +297,7 @@ class k<f>: NSObject {
 d
 protocol i : d { func d
 i
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
     l g: e
 }
 func h<e>() -> [l<e>] {
@@ -422,9 +424,9 @@ protocol d : b { func b
 func d(e:  = { (g: h, f: h -> h) -> h in
     return f(g)
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 class k {
     func l((Any, k))(m }
 }

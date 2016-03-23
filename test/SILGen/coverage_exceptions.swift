@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_catch %s | FileCheck %s
 
-enum SomeErr : ErrorType {
+enum SomeErr : ErrorProtocol {
   case Err1
   case Err2
 }

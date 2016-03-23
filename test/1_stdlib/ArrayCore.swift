@@ -21,7 +21,7 @@ import Swift
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-final class Tracked : ForwardIndexType, CustomStringConvertible {
+final class Tracked : ForwardIndex, CustomStringConvertible {
   required init(_ value: Int) {
     trackedCount += 1
     nextTrackedSerialNumber += 1
@@ -54,21 +54,17 @@ func == (x: Tracked, y: Tracked) -> Bool {
 
 //===--- struct MrMcRange -------------------------------------------------===//
 // A wrapper around Range<Tracked> that allows us to detect when it is
-// being treated as a CollectionType rather than merely a SequenceType, which
+// being treated as a Collection rather than merely a Sequence, which
 // helps us to prove that an optimization is being used.  In
 // particular, when constructing a _ContiguousArrayBuffer from a
-// CollectionType, the necessary storage should be pre-allocated.
-struct MrMcRange : CollectionType {
+// Collection, the necessary storage should be pre-allocated.
+struct MrMcRange : Collection {
   typealias Base = Range<Int>
 
   init(_ base: Base) {
     self.base = base
   }
 
-  func generate() -> IndexingGenerator<MrMcRange> {
-    return IndexingGenerator(self)
-  }
-  
   var startIndex: Int {
     print("using collection API")
     return base.startIndex
@@ -85,7 +81,7 @@ struct MrMcRange : CollectionType {
   var base: Base
 }
 
-func printSequence<T : SequenceType>(x: T) {
+func printSequence<T : Sequence>(x: T) {
   print("<", terminator: "")
   var prefix = ""
   for a in x {
@@ -104,7 +100,7 @@ print("testing...")
 func test() {
   //===--- Sequences can be converted -------------------------------------===//
 
-  let n0 = ((Tracked(10)..<Tracked(27)).generate())._copyToNativeArrayBuffer()
+  let n0 = ((Tracked(10)..<Tracked(27)).makeIterator())._copyToNativeArrayBuffer()
   // CHECK-NEXT: <10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26>
   printSequence(n0)
 

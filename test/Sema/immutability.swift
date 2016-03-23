@@ -304,6 +304,17 @@ func test_properties() {
  lvalue.weird_property = 1    // ok
 }
 
+protocol OpaqueBase {}
+extension OpaqueBase {
+  var x: Int { get { return 0 } set { } } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
+}
+
+protocol OpaqueRefinement : class, OpaqueBase {
+  var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'}}
+}
+
+class SetterMutatingConflict : OpaqueRefinement {} // expected-error {{type 'SetterMutatingConflict' does not conform to protocol 'OpaqueRefinement'}}
+
 struct DuplicateMutating {
   mutating mutating func f() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
 }

@@ -11,11 +11,12 @@
 # This file contains the worker processes that watch a file queue for files and
 # merge profile data in parallel.
 
-from multiprocessing import Process
-import pipes
-import os
-import subprocess
 import logging
+import os
+import pipes
+import subprocess
+
+from multiprocessing import Process
 
 
 class ProfdataMergerProcess(Process):

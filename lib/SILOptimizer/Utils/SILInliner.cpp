@@ -368,6 +368,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::StoreWeakInst:
     case ValueKind::StrongPinInst:
     case ValueKind::StrongReleaseInst:
+    case ValueKind::SetDeallocatingInst:
     case ValueKind::StrongRetainInst:
     case ValueKind::StrongRetainUnownedInst:
     case ValueKind::StrongUnpinInst:
@@ -403,6 +404,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
                        "function.");
     case ValueKind::MarkFunctionEscapeInst:
     case ValueKind::MarkUninitializedInst:
+    case ValueKind::MarkUninitializedBehaviorInst:
       llvm_unreachable("not valid in canonical sil");
   }
 }

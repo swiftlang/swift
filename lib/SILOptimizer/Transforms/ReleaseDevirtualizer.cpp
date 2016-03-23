@@ -32,7 +32,8 @@ namespace {
 /// with
 ///    %x = alloc_ref [stack] $X
 ///      ...
-///    %d = function_ref @deinit_of_X
+///    set_deallocating %x
+///    %d = function_ref @dealloc_of_X
 ///    %a = apply %d(%x)
 ///    dealloc_ref [stack] %x
 ///
@@ -61,9 +62,9 @@ private:
                                    ApplyInst *DeallocCall);
 
   /// Replace the release-instruction \p ReleaseInst with an explicit call to
-  /// the destructor of \p AllocType for \p object.
-  bool createDeinitCall(SILType AllocType, SILInstruction *ReleaseInst,
-                        SILValue object);
+  /// the deallocating destructor of \p AllocType for \p object.
+  bool createDeallocCall(SILType AllocType, SILInstruction *ReleaseInst,
+                         SILValue object);
 
   StringRef getName() override { return "Release Devirtualizer"; }
 
@@ -135,7 +136,7 @@ devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
     return false;
 
   SILType AllocType = ARI->getType();
-  return createDeinitCall(AllocType, ReleaseInst, ARI);
+  return createDeallocCall(AllocType, ReleaseInst, ARI);
 }
 
 bool ReleaseDevirtualizer::
@@ -180,46 +181,50 @@ devirtualizeReleaseOfBuffer(SILInstruction *ReleaseInst,
     return false;
 
   SILType SILClType = SILType::getPrimitiveObjectType(CanType(ClType));
-  return createDeinitCall(SILClType, ReleaseInst, AllocAI);
+  return createDeallocCall(SILClType, ReleaseInst, AllocAI);
 }
 
-bool ReleaseDevirtualizer::createDeinitCall(SILType AllocType,
+bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
                                             SILInstruction *ReleaseInst,
                                             SILValue object) {
-  DEBUG(llvm::dbgs() << "  create deinit call\n");
+  DEBUG(llvm::dbgs() << "  create dealloc call\n");
 
   ClassDecl *Cl = AllocType.getClassOrBoundGenericClass();
   assert(Cl && "no class type allocated with alloc_ref");
 
   // Find the destructor of the type.
   DestructorDecl *Destructor = Cl->getDestructor();
-  SILDeclRef DeinitRef(Destructor, SILDeclRef::Kind::Destroyer);
+  SILDeclRef DeallocRef(Destructor, SILDeclRef::Kind::Deallocator);
   SILModule &M = ReleaseInst->getFunction()->getModule();
-  SILFunction *Deinit = M.lookUpFunction(DeinitRef);
-  if (!Deinit)
+  SILFunction *Dealloc = M.lookUpFunction(DeallocRef);
+  if (!Dealloc)
     return false;
 
-  CanSILFunctionType DeinitType = Deinit->getLoweredFunctionType();
+  CanSILFunctionType DeallocType = Dealloc->getLoweredFunctionType();
   ArrayRef<Substitution> AllocSubsts = AllocType.gatherAllSubstitutions(M);
 
-  assert(!AllocSubsts.empty() == DeinitType->isPolymorphic() &&
-         "deinit of generic class is not polymorphic or vice versa");
+  assert(!AllocSubsts.empty() == DeallocType->isPolymorphic() &&
+         "dealloc of generic class is not polymorphic or vice versa");
 
-  if (DeinitType->isPolymorphic())
-    DeinitType = DeinitType->substGenericArgs(M, M.getSwiftModule(),
+  if (DeallocType->isPolymorphic())
+    DeallocType = DeallocType->substGenericArgs(M, M.getSwiftModule(),
                                               AllocSubsts);
 
-  SILType ReturnType = DeinitType->getSILResult();
-  SILType DeinitSILType = SILType::getPrimitiveObjectType(DeinitType);
+  SILType ReturnType = DeallocType->getSILResult();
+  SILType DeallocSILType = SILType::getPrimitiveObjectType(DeallocType);
 
   SILBuilder B(ReleaseInst);
   if (object->getType() != AllocType)
     object = B.createUncheckedRefCast(ReleaseInst->getLoc(), object, AllocType);
 
+  // Do what a release would do before calling the deallocator: set the object
+  // in deallocating state, which means set the RC_DEALLOCATING_FLAG flag.
+  B.createSetDeallocating(ReleaseInst->getLoc(), object);
+
   // Create the call to the destructor with the allocated object as self
   // argument.
-  auto *MI = B.createFunctionRef(ReleaseInst->getLoc(), Deinit);
-  B.createApply(ReleaseInst->getLoc(), MI, DeinitSILType, ReturnType,
+  auto *MI = B.createFunctionRef(ReleaseInst->getLoc(), Dealloc);
+  B.createApply(ReleaseInst->getLoc(), MI, DeallocSILType, ReturnType,
                 AllocSubsts, { object }, false);
 
   NumReleasesDevirtualized++;

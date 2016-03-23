@@ -169,10 +169,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     Buffer << "<serialized local context>";
     return;
 
-  case DeclContextKind::NominalTypeDecl: {
-    const NominalTypeDecl *Nominal = cast<NominalTypeDecl>(Context);
-    printFullContext(Nominal->getDeclContext(), Buffer);
-    Buffer << Nominal->getName() << ".";
+  case DeclContextKind::GenericTypeDecl: {
+    auto *generic = cast<GenericTypeDecl>(Context);
+    printFullContext(generic->getDeclContext(), Buffer);
+    Buffer << generic->getName() << ".";
     return;
   }
 
@@ -969,6 +969,17 @@ public:
     
     *this << getIDAndType(MU->getOperand());
   }
+  void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
+    *this << "mark_uninitialized_behavior "
+          << getID(MU->getInitStorageFunc());
+    printSubstitutions(MU->getInitStorageSubstitutions());
+    *this << '(' << getID(MU->getStorage()) << ") : "
+          << MU->getInitStorageFunc()->getType() << ", "
+          << getID(MU->getSetterFunc());
+    printSubstitutions(MU->getSetterSubstitutions());
+    *this << '(' << getID(MU->getSelf()) << ") : "
+          << MU->getSetterFunc()->getType();
+  }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     *this << "mark_function_escape ";
     interleave(MFE->getElements(),
@@ -1163,6 +1174,10 @@ public:
 
   void visitAutoreleaseValueInst(AutoreleaseValueInst *I) {
     *this << "autorelease_value " << getIDAndType(I->getOperand());
+  }
+
+  void visitSetDeallocatingInst(SetDeallocatingInst *I) {
+    *this << "set_deallocating " << getIDAndType(I->getOperand());
   }
 
   void visitStructInst(StructInst *SI) {
@@ -2104,10 +2119,14 @@ void SILWitnessTable::dump() const {
 void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   // sil_default_witness_table <Protocol> <MinSize>
   OS << "sil_default_witness_table"
-     << " " << getProtocol()->getName()
-     << " " << getMinimumWitnessTableSize() << " {\n";
+     << " " << getProtocol()->getName() << " {\n";
   
   for (auto &witness : getEntries()) {
+    if (!witness.isValid()) {
+      OS << "  no_default\n";
+      continue;
+    }
+
     // method #declref: @function
     OS << "  method ";
     witness.getRequirement().print(OS);

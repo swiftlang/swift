@@ -121,6 +121,30 @@ namespace {
     }
   };
 
+  class HeaderParsingASTConsumer : public clang::ASTConsumer {
+    SmallVector<clang::DeclGroupRef, 4> DeclGroups;
+  public:
+    void
+    HandleTopLevelDeclInObjCContainer(clang::DeclGroupRef decls) override {
+      DeclGroups.push_back(decls);
+    }
+
+    ArrayRef<clang::DeclGroupRef> getAdditionalParsedDecls() {
+      return DeclGroups;
+    }
+
+    void reset() {
+      DeclGroups.clear();
+    }
+  };
+
+  class ParsingAction : public clang::ASTFrontendAction {
+    std::unique_ptr<clang::ASTConsumer>
+    CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
+      return llvm::make_unique<HeaderParsingASTConsumer>();
+    }
+  };
+
   class StdStringMemBuffer : public llvm::MemoryBuffer {
     const std::string storage;
     const std::string name;
@@ -296,7 +320,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // Enable modules.
     "-fmodules",
 
-    // Enable implicit module maps
+    // Enable implicit module maps (this option is implied by "-fmodules").
     "-fimplicit-module-maps",
 
     // Don't emit LLVM IR.
@@ -359,6 +383,35 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       // Just use the most feature-rich C language mode.
       "-x", "c", "-std=gnu11",
     });
+
+    // The module map used for Glibc depends on the target we're compiling for,
+    // and is not included in the resource directory with the other implicit
+    // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
+    SmallString<128> GlibcModuleMapPath;
+    if (!importerOpts.OverrideResourceDir.empty()) {
+      GlibcModuleMapPath = importerOpts.OverrideResourceDir;
+    } else if (!searchPathOpts.RuntimeResourcePath.empty()) {
+      GlibcModuleMapPath = searchPathOpts.RuntimeResourcePath;
+    }
+
+    // Running without a resource directory is not a supported configuration.
+    assert(!GlibcModuleMapPath.empty());
+
+    llvm::sys::path::append(
+      GlibcModuleMapPath,
+      swift::getPlatformNameForTriple(triple), triple.getArchName(),
+      "glibc.modulemap");
+
+    // Only specify the module map if that file actually exists.
+    // It may not--for example in the case that
+    // `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
+    // a Swift compiler not built for Linux targets.
+    if (llvm::sys::fs::exists(GlibcModuleMapPath)) {
+      invocationArgStrs.push_back(
+        (Twine("-fmodule-map-file=") + GlibcModuleMapPath).str());
+    } else {
+      // FIXME: Emit a warning of some kind.
+    }
   }
 
   if (triple.isOSDarwin()) {
@@ -584,7 +637,7 @@ ClangImporter::create(ASTContext &ctx,
   instance.setInvocation(&*invocation);
 
   // Create the associated action.
-  importer->Impl.Action.reset(new clang::SyntaxOnlyAction);
+  importer->Impl.Action.reset(new ParsingAction);
   auto *action = importer->Impl.Action.get();
 
   // Execute the action. We effectively inline most of
@@ -645,6 +698,9 @@ ClangImporter::create(ASTContext &ctx,
   for (auto path : searchPathOpts.ImportSearchPaths)
     importer->addSearchPath(path, /*isFramework*/false);
 
+  // FIXME: These decls are not being parsed correctly since (a) some of the
+  // callbacks are still being added, and (b) the logic to parse them has
+  // changed.
   clang::Parser::DeclGroupPtrTy parsed;
   while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {
     for (auto *D : parsed.get()) {
@@ -815,28 +871,40 @@ bool ClangImporter::Implementation::importHeader(
                                                   /*LoadedID=*/0,
                                                   /*LoadedOffset=*/0,
                                                   includeLoc);
+  auto &consumer =
+      static_cast<HeaderParsingASTConsumer &>(Instance->getASTConsumer());
+  consumer.reset();
 
   pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
   // Force the import to occur.
   pp.LookAhead(0);
 
-  SmallVector<clang::NamedDecl *, 16> parsedNamedDecls;
+  SmallVector<clang::DeclGroupRef, 16> allParsedDecls;  
+  auto handleParsed = [&](clang::DeclGroupRef parsed) {
+    if (trackParsedSymbols) {
+      for (auto *D : parsed) {
+        addBridgeHeaderTopLevelDecls(D);
+      }
+    }
+
+    allParsedDecls.push_back(parsed);
+  };
+
   clang::Parser::DeclGroupPtrTy parsed;
   while (!Parser->ParseTopLevelDecl(parsed)) {
-    if (!parsed) continue;
-
-    for (auto *D : parsed.get()) {
-      if (trackParsedSymbols)
-        addBridgeHeaderTopLevelDecls(D);
-      if (auto named = dyn_cast<clang::NamedDecl>(D))
-        parsedNamedDecls.push_back(named);
-    }
+    if (parsed)
+      handleParsed(parsed.get());
+    for (auto additionalParsedGroup : consumer.getAdditionalParsedDecls())
+      handleParsed(additionalParsedGroup);
+    consumer.reset();
   }
 
   // We can't do this as we're parsing because we may want to resolve naming
   // conflicts between the things we've parsed.
-  for (auto *named : parsedNamedDecls)
-    addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable, named);
+  for (auto group : allParsedDecls)
+    for (auto *D : group)
+      if (auto named = dyn_cast<clang::NamedDecl>(D))
+        addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable, named);
 
   pp.EndSourceFile();
   bumpGeneration();

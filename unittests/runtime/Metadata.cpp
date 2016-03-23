@@ -376,14 +376,14 @@ ProtocolDescriptor ProtocolB{
     .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
 };
 
-ProtocolDescriptor ProtocolErrorType{
-  "_TMp8Metadata17ProtocolErrorType",
+ProtocolDescriptor ProtocolErrorProtocol{
+  "_TMp8Metadata21ProtocolErrorProtocol",
   nullptr,
   ProtocolDescriptorFlags()
     .withSwift(true)
     .withClassConstraint(ProtocolClassConstraint::Any)
     .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
-    .withSpecialProtocol(SpecialProtocol::ErrorType)
+    .withSpecialProtocol(SpecialProtocol::ErrorProtocol)
 };
 
 ProtocolDescriptor ProtocolClassConstrained{
@@ -518,22 +518,22 @@ TEST(MetadataTest, getExistentialMetadata) {
       return mixedWitnessTable;
     });
   
-  const ValueWitnessTable *ExpectedErrorTypeValueWitnesses;
+  const ValueWitnessTable *ExpectedErrorProtocolValueWitnesses;
 #if SWIFT_OBJC_INTEROP
-  ExpectedErrorTypeValueWitnesses = &_TWVBO;
+  ExpectedErrorProtocolValueWitnesses = &_TWVBO;
 #else
-  ExpectedErrorTypeValueWitnesses = &_TWVBo;
+  ExpectedErrorProtocolValueWitnesses = &_TWVBo;
 #endif
 
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
       auto special
-        = test_getExistentialMetadata({&ProtocolErrorType});
+        = test_getExistentialMetadata({&ProtocolErrorProtocol});
       EXPECT_EQ(MetadataKind::Existential, special->getKind());
       EXPECT_EQ(1U, special->Flags.getNumWitnessTables());
-      EXPECT_EQ(SpecialProtocol::ErrorType,
+      EXPECT_EQ(SpecialProtocol::ErrorProtocol,
                 special->Flags.getSpecialProtocol());
-      EXPECT_EQ(ExpectedErrorTypeValueWitnesses,
+      EXPECT_EQ(ExpectedErrorProtocolValueWitnesses,
                 special->getValueWitnesses());
       return special;
     });
@@ -541,13 +541,13 @@ TEST(MetadataTest, getExistentialMetadata) {
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
       auto special
-        = test_getExistentialMetadata({&ProtocolErrorType, &ProtocolA});
+        = test_getExistentialMetadata({&ProtocolErrorProtocol, &ProtocolA});
       EXPECT_EQ(MetadataKind::Existential, special->getKind());
       EXPECT_EQ(2U, special->Flags.getNumWitnessTables());
       // Compositions of special protocols aren't special.
       EXPECT_EQ(SpecialProtocol::None,
                 special->Flags.getSpecialProtocol());
-      EXPECT_NE(ExpectedErrorTypeValueWitnesses,
+      EXPECT_NE(ExpectedErrorProtocolValueWitnesses,
                 special->getValueWitnesses());
       return special;
     });

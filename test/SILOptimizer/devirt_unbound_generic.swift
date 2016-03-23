@@ -8,7 +8,7 @@
 // rdar://19912272
 
 protocol P {
-   typealias Node
+   associatedtype Node
 }
 
 class C<T:P> {

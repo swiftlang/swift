@@ -6,4 +6,4 @@ protocol P{
 class B<T
 {struct c{
 #^A^#
-protocol b{typealias e:B<T>
+protocol b{associatedtype e:B<T>

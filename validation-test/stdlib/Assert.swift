@@ -34,7 +34,7 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   case 3:
     _preconditionFailure("cannot happen")
   case 4:
-    _debugPreconditionFailure("cannot happen")
+    _stdlibAssertionFailure("cannot happen")
   case 5:
     _sanityCheckFailure("cannot happen")
 
@@ -46,7 +46,7 @@ func testTrapsAreNoreturn(i: Int) -> Int {
 var Assert = TestSuite("Assert")
 
 Assert.test("assert")
-  .xfail(.Custom(
+  .xfail(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "assertions are disabled in Release and Unchecked mode"))
   .crashOutputMatches("this should fail")
@@ -59,7 +59,7 @@ Assert.test("assert")
 }
 
 Assert.test("assert/StringInterpolation")
-  .xfail(.Custom(
+  .xfail(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "assertions are disabled in Release and Unchecked mode"))
   .crashOutputMatches("this should fail")
@@ -73,7 +73,7 @@ Assert.test("assert/StringInterpolation")
 }
 
 Assert.test("assertionFailure")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")
@@ -83,7 +83,7 @@ Assert.test("assertionFailure")
 }
 
 Assert.test("assertionFailure/StringInterpolation")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")
@@ -94,7 +94,7 @@ Assert.test("assertionFailure/StringInterpolation")
 }
 
 Assert.test("precondition")
-  .xfail(.Custom(
+  .xfail(.custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -106,7 +106,7 @@ Assert.test("precondition")
 }
 
 Assert.test("precondition/StringInterpolation")
-  .xfail(.Custom(
+  .xfail(.custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -119,7 +119,7 @@ Assert.test("precondition/StringInterpolation")
 }
 
 Assert.test("preconditionFailure")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -129,7 +129,7 @@ Assert.test("preconditionFailure")
 }
 
 Assert.test("preconditionFailure/StringInterpolation")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -155,7 +155,7 @@ Assert.test("fatalError/StringInterpolation")
 }
 
 Assert.test("_precondition")
-  .xfail(.Custom(
+  .xfail(.custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -167,7 +167,7 @@ Assert.test("_precondition")
 }
 
 Assert.test("_preconditionFailure")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -176,30 +176,30 @@ Assert.test("_preconditionFailure")
   _preconditionFailure("this should fail")
 }
 
-Assert.test("_debugPrecondition")
-  .xfail(.Custom(
+Assert.test("_stdlibAssert")
+  .xfail(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "debug preconditions are disabled in Release and Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   var x = 2
-  _debugPrecondition(x * 21 == 42, "should not fail")
+  _stdlibAssert(x * 21 == 42, "should not fail")
   expectCrashLater()
-  _debugPrecondition(x == 42, "this should fail")
+  _stdlibAssert(x == 42, "this should fail")
 }
 
-Assert.test("_debugPreconditionFailure")
-  .skip(.Custom(
+Assert.test("_stdlibAssertionFailure")
+  .skip(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")
   .code {
   expectCrashLater()
-  _debugPreconditionFailure("this should fail")
+  _stdlibAssertionFailure("this should fail")
 }
 
 Assert.test("_sanityCheck")
-  .xfail(.Custom(
+  .xfail(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .crashOutputMatches("this should fail")
@@ -211,7 +211,7 @@ Assert.test("_sanityCheck")
 }
 
 Assert.test("_sanityCheckFailure")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")

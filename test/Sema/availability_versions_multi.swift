@@ -5,13 +5,13 @@ func callToEnsureNotInScriptMode() { }
 // Add an expected error to express expectation that we're not in script mode
 callToEnsureNotInScriptMode() // expected-error {{expressions are not allowed at the top level}}
 
-@available(OSX, introduced=10.9)
+@available(OSX, introduced: 10.9)
 var globalAvailableOn10_9: Int = 9
 
-@available(OSX, introduced=10.51)
+@available(OSX, introduced: 10.51)
 var globalAvailableOn10_51: Int = 10
 
-@available(OSX, introduced=10.52)
+@available(OSX, introduced: 10.52)
 var globalAvailableOn10_52: Int = 11
 
 // Top level should reflect the minimum deployment target.
@@ -23,7 +23,7 @@ let ignored2: Int = globalAvailableOn10_51 // expected-error {{'globalAvailableO
 let ignored3: Int = globalAvailableOn10_52 // expected-error {{'globalAvailableOn10_52' is only available on OS X 10.52 or newer}}
     // expected-note@-1 {{add @available attribute to enclosing let}}
 
-@available(OSX, introduced=10.51)
+@available(OSX, introduced: 10.51)
 func useFromOtherOn10_51() {
   // This will trigger validation of OtherIntroduced10_51 in
   // in availability_multi_other.swift
@@ -45,7 +45,7 @@ func useFromOtherOn10_51() {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-@available(OSX, introduced=10.52)
+@available(OSX, introduced: 10.52)
 func useFromOtherOn10_52() {
   _ = OtherIntroduced10_52()
 

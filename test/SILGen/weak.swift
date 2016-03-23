@@ -28,7 +28,7 @@ func test0(c c: C) {
 //   Implicit conversion
 // CHECK-NEXT: [[TMP:%.*]] = load [[PBC]] : $*C
 // CHECK-NEXT: strong_retain [[TMP]] : $C
-// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.Some!enumelt.1, [[TMP]] : $C
+// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt.1, [[TMP]] : $C
 // CHECK-NEXT: store_weak [[OPTVAL]] to [initialization] [[PBX]] : $*@sil_weak Optional<C>
 // CHECK-NEXT: release_value [[OPTVAL]] : $Optional<C>
 
@@ -36,7 +36,7 @@ func test0(c c: C) {
 //   Implicit conversion
 // CHECK-NEXT: [[TMP:%.*]] = load [[PBC]] : $*C
 // CHECK-NEXT: strong_retain [[TMP]] : $C
-// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.Some!enumelt.1, [[TMP]] : $C
+// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt.1, [[TMP]] : $C
 
 //   Drill to a.x
 // CHECK-NEXT: [[A_X:%.*]] = struct_element_addr [[A]] : $*A, #A.x

@@ -17,20 +17,20 @@ import gizmo
 // NEGATIVE-NOT: sil shared [transparent] @_TFOSC16NSRuncingOptions15QuinceJuliennedFMS_S_
 // NEGATIVE-NOT: sil shared [transparent] @_TFOSC16NSRuncingOptions11QuinceDicedFMS_S_
 
-var runcing: NSRuncingOptions = .Mince
+var runcing: NSRuncingOptions = .mince
 
 var raw = runcing.rawValue
-var eq = runcing == .QuinceSliced
+var eq = runcing == .quinceSliced
 var hash = runcing.hashValue
 
 func testEm<E: Equatable>(x: E, _ y: E) {}
 func hashEm<H: Hashable>(x: H) {}
 func rawEm<R: RawRepresentable>(x: R) {}
 
-testEm(NSRuncingOptions.Mince, .QuinceSliced)
-hashEm(NSRuncingOptions.Mince)
-rawEm(NSRuncingOptions.Mince)
-rawEm(NSFungingMask.Asset)
+testEm(NSRuncingOptions.mince, .quinceSliced)
+hashEm(NSRuncingOptions.mince)
+rawEm(NSRuncingOptions.mince)
+rawEm(NSFungingMask.asset)
 
 protocol Bub {}
 
@@ -38,7 +38,7 @@ extension NSRuncingOptions: Bub {}
 
 // CHECK-32-DAG: integer_literal $Builtin.Int2048, -2147483648
 // CHECK-64-DAG: integer_literal $Builtin.Int2048, 2147483648
-_ = NSFungingMask.ToTheMax
+_ = NSFungingMask.toTheMax
 
 // CHECK-DAG: sil_witness_table shared NSRuncingOptions: RawRepresentable module gizmo
 // CHECK-DAG: sil_witness_table shared NSRuncingOptions: Equatable module gizmo

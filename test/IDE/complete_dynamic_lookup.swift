@@ -108,7 +108,6 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      .nested1_Property1[#Int?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .nested2_ObjcInstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      .nested2_Property[#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG-NOT:.objectAtIndexedSubscript
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .returnsObjcClass!({#(i): Int#})[#TopLevelObjcClass#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelClass_ObjcInstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      .topLevelClass_ObjcProperty1[#Int?#]{{; name=.+$}}
@@ -127,6 +126,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#Int32#}][#AnyObject!?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#AnyObject!#}][#AnyObject!?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT: End completions
+// GLOBAL_NEGATIVE-NOT:.objectAtIndexedSubscript
 
 // DL_INSTANCE_DOT: Begin completions
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: bar_ImportedObjcClass_InstanceFunc1!()[#Void#]{{; name=.+$}}
@@ -458,8 +458,8 @@ func testAnyObject11(dl: AnyObject) {
 }
 // FIXME: it would be nice if we produced a call pattern here.
 // DL_FUNC_NAME_1:     Begin completions
-// DL_FUNC_NAME_1-DAG: Decl[InstanceMethod]/CurrNominal:   .map({#(f):
-// DL_FUNC_NAME_1-DAG: Decl[InstanceMethod]/CurrNominal:   .flatMap({#(f):
+// DL_FUNC_NAME_1-DAG: Decl[InstanceVar]/CurrNominal:      .description[#String#]{{; name=.+$}}
+// DL_FUNC_NAME_1:     End completions
 
 func testAnyObject11_(dl: AnyObject) {
   dl.returnsObjcClass!(#^DL_FUNC_NAME_PAREN_1^#
@@ -473,8 +473,8 @@ func testAnyObject12(dl: AnyObject) {
 }
 // FIXME: it would be nice if we produced a call pattern here.
 // DL_FUNC_NAME_DOT_1:     Begin completions
-// DL_FUNC_NAME_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   map({#(f):
-// DL_FUNC_NAME_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   flatMap({#(f):
+// DL_FUNC_NAME_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      description[#String#]{{; name=.+$}}
+// DL_FUNC_NAME_DOT_1:     End completions
 
 func testAnyObject13(dl: AnyObject) {
   dl.returnsObjcClass!#^DL_FUNC_NAME_BANG_1^#

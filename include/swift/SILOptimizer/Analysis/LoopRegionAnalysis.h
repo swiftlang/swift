@@ -131,7 +131,9 @@
 namespace swift {
 
 /// A loop region is a data structure which represents one of a basic block,
-/// loop, or function. In the case of a loop, function, it contains an internal
+/// loop, or function.
+///
+/// In the case of a loop, function, it contains an internal
 /// data structure that represents the subregions of the loop/function. This
 /// data is tail allocated so that the basic block case is not penalized by
 /// storing this unnecessary information.
@@ -319,6 +321,66 @@ public:
   };
   using subregion_reverse_iterator = std::reverse_iterator<subregion_iterator>;
 
+  /// An iterator that knows how to iterate over the backedge indices of a
+  /// region.
+  class backedge_iterator
+      : public std::iterator<std::bidirectional_iterator_tag, unsigned> {
+    friend struct SubregionData;
+    using InnerIterTy = llvm::SmallVectorImpl<unsigned>::const_iterator;
+    llvm::Optional<InnerIterTy> InnerIter;
+
+    backedge_iterator(llvm::SmallVectorImpl<unsigned>::const_iterator iter)
+        : InnerIter(iter) {}
+
+  public:
+    using value_type = unsigned;
+    using reference = unsigned;
+    using pointer = void;
+    using iterator_category = std::bidirectional_iterator_tag;
+    using difference_type = int;
+
+    /// Construct a backedge_iterator suitable for use with a basic block. It
+    /// does not contain any data and can only be compared against another
+    /// invalid iterator (for which it will return true). Any other usage
+    /// results in an unreachable being hit.
+    backedge_iterator() : InnerIter() {}
+
+    bool hasValue() const { return InnerIter.hasValue(); }
+
+    /// Return the index of the current backedge index.
+    unsigned operator*() const { return **InnerIter; }
+
+    backedge_iterator &operator++() {
+      ++(*InnerIter);
+      return *this;
+    }
+    backedge_iterator operator++(int) {
+      backedge_iterator iter = *this;
+      ++iter;
+      return iter;
+    }
+    backedge_iterator &operator--() {
+      --(*InnerIter);
+      return *this;
+    }
+    backedge_iterator operator--(int) {
+      backedge_iterator iter = *this;
+      --iter;
+      return iter;
+    }
+    bool operator==(backedge_iterator rhs) const {
+      if (InnerIter.hasValue() != rhs.InnerIter.hasValue())
+        llvm_unreachable("Comparing uncomparable iterators");
+      // Now we know that the two either both have values or both do not have
+      // values.
+      if (!InnerIter.hasValue())
+        return true;
+      return *InnerIter == *rhs.InnerIter;
+    }
+    bool operator!=(backedge_iterator rhs) const { return !(*this == rhs); }
+  };
+  using backedge_reverse_iterator = std::reverse_iterator<backedge_iterator>;
+
 private:
   /// A pointer to one of a Loop, Basic Block, or Function represented by this
   /// region.
@@ -383,6 +445,13 @@ private:
     /// used as the RPO number for the whole region.
     unsigned RPONumOfHeaderBlock;
 
+    /// The RPO number of the back edge blocks of this loop. We use a
+    /// SmallVector of size 1 since after loop canonicalization we will always
+    /// have exactly one back edge block. But we want to be correct even in a
+    /// non-canonicalized case implying that we need to be able to support
+    /// multiple backedge blocks.
+    llvm::SmallVector<unsigned, 1> BackedgeRegions;
+
     /// A list of subregion IDs of this region sorted in RPO order.
     ///
     /// This takes advantage of the fact that the ID of a basic block is the
@@ -430,6 +499,29 @@ private:
       Subloops.push_back({Header->ID, L->ID});
     }
 
+    void addBackedgeSubregion(unsigned ID) {
+      if (count(BackedgeRegions, ID))
+        return;
+      BackedgeRegions.push_back(ID);
+    }
+
+    backedge_iterator backedge_begin() const {
+      return backedge_iterator(BackedgeRegions.begin());
+    }
+    backedge_iterator backedge_end() const {
+      return backedge_iterator(BackedgeRegions.end());
+    }
+    backedge_reverse_iterator backedge_rbegin() const {
+      return backedge_reverse_iterator(backedge_begin());
+    }
+    backedge_reverse_iterator backedge_rend() const {
+      return backedge_reverse_iterator(backedge_end());
+    }
+    bool backedge_empty() const { return BackedgeRegions.empty(); }
+    unsigned backedge_size() const { return BackedgeRegions.size(); }
+
+    ArrayRef<unsigned> getBackedgeRegions() const { return BackedgeRegions; }
+
     /// Once we finish processing a loop, we sort its subregions so that they
     /// are guaranteed to be in RPO order. This works because each BB's ID is
     /// its RPO number and we represent loops by the RPO number of their
@@ -441,7 +533,6 @@ private:
     /// going to sort just to be careful while bringing this up.
     void sortSubregions() { std::sort(Subregions.begin(), Subregions.end()); }
   };
-
 public:
   ~LoopRegion();
 
@@ -476,21 +567,34 @@ public:
     return getSubregionData().end();
   }
 
-  bool subregions_empty() const { return getSubregionData().empty(); }
-  unsigned subregions_size() const { return getSubregionData().size(); }
+  bool subregions_empty() const {
+    if (isBlock())
+      return true;
+    return getSubregionData().empty();
+  }
+
+  unsigned subregions_size() const {
+    if (isBlock())
+      return 0;
+    return getSubregionData().size();
+  }
+
   subregion_reverse_iterator subregion_rbegin() const {
     if (isBlock())
       return subregion_reverse_iterator();
     return getSubregionData().rbegin();
   }
+
   subregion_reverse_iterator subregion_rend() const {
     if (isBlock())
       return subregion_reverse_iterator();
     return getSubregionData().rend();
   }
+
   llvm::iterator_range<subregion_iterator> getSubregions() const {
     return {subregion_begin(), subregion_end()};
   }
+
   llvm::iterator_range<subregion_reverse_iterator>
   getReverseSubregions() const {
     return {subregion_rbegin(), subregion_rend()};
@@ -508,6 +612,50 @@ public:
   /// representing a block.
   ArrayRef<unsigned> getExitingSubregions() const {
     return getSubregionData().ExitingSubregions;
+  }
+
+  bool isBackedgeRegion(unsigned ID) const {
+    if (isBlock())
+      return false;
+    return count(getSubregionData().getBackedgeRegions(), ID);
+  }
+
+  ArrayRef<unsigned> getBackedgeRegions() const {
+    if (isBlock())
+      return ArrayRef<unsigned>();
+    return getSubregionData().getBackedgeRegions();
+  }
+
+  Optional<unsigned> getBackedgeRegion() const {
+    if (isBlock())
+      return None;
+    auto bedge_begin = getSubregionData().backedge_begin();
+    auto bedge_end = getSubregionData().backedge_end();
+    if (bedge_begin == bedge_end)
+      return None;
+    return *bedge_begin;
+  }
+
+  using backedge_iterator = backedge_iterator;
+  backedge_iterator backedge_begin() const {
+    if (isBlock())
+      return backedge_iterator();
+    return getSubregionData().backedge_begin();
+  }
+  backedge_iterator backedge_end() const {
+    if (isBlock())
+      return backedge_iterator();
+    return getSubregionData().backedge_end();
+  }
+  bool backedge_empty() const {
+    if (isBlock())
+      return true;
+    return getSubregionData().backedge_empty();
+  }
+  unsigned backedge_size() const {
+    if (isBlock())
+      return 0;
+    return getSubregionData().backedge_size();
   }
 
   using pred_const_iterator = decltype(Preds)::const_iterator;
@@ -570,7 +718,7 @@ public:
 
   /// Return the ID of the parent region of this BB. Asserts if this is a
   /// function region.
-  unsigned getParentID() const { return *ParentID; }
+  Optional<unsigned> getParentID() const { return ParentID; }
 
   unsigned getRPONumber() const {
     if (isBlock())
@@ -607,7 +755,7 @@ private:
 
   void addPred(LoopRegion *LNR) {
     assert(!isFunction() && "Functions cannot have predecessors");
-    if (std::count(pred_begin(), pred_end(), LNR->getID()))
+    if (count(getPreds(), LNR->getID()))
       return;
     Preds.push_back(LNR->ID);
   }
@@ -620,7 +768,7 @@ private:
   void replacePred(unsigned OldPredID, unsigned NewPredID) {
     // Check if we already have NewPred in our list. If so, we just delete
     // OldPredID.
-    if (std::count(Preds.begin(), Preds.end(), NewPredID)) {
+    if (count(Preds, NewPredID)) {
       // If this becomes a performance issue due to copying/moving/etc (which it
       // most likely will not), just use the marked dead model like successor
       // does.
@@ -781,8 +929,15 @@ public:
     return IDToRegionMap[RegionID];
   }
 
-  RegionTy *getRegionForNonLocalSuccessor(const LoopRegion *Child,
+  RegionTy *getRegionForNonLocalSuccessor(const RegionTy *Child,
                                           unsigned SuccID) const;
+
+  Optional<unsigned> getGrandparentID(const RegionTy *GrandChild) {
+    if (auto ParentID = GrandChild->getParentID()) {
+      return getRegion(*ParentID)->getParentID();
+    }
+    return None;
+  }
 
   /// Look up the region associated with this block and return it. Asserts if
   /// the block does not have a region associated with it.

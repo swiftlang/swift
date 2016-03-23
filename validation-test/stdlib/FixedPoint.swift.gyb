@@ -274,7 +274,7 @@ _UnimplementedError()
 // Misc tests that should be expanded to cover all types (FIXME)
 //===----------------------------------------------------------------------===//
 
-func testBitwiseOperationsImpl<T : UnsignedIntegerType>(_: T.Type) {
+func testBitwiseOperationsImpl<T : UnsignedInteger>(_: T.Type) {
   var x = numericCast(0b11_1010_00) as T
   var y = numericCast(0b10_1100_10) as T
 
@@ -346,11 +346,11 @@ BoolTestSuite.test("init()") {
   expectFalse(v)
 }
 
-struct Booleanish : BooleanType {
+struct Booleanish : Boolean {
   let boolValue: Bool
 }
 
-BoolTestSuite.test("init<T : BooleanType>(_:)") {
+BoolTestSuite.test("init<T : Boolean>(_:)") {
   do {
     let v = Bool(Booleanish(boolValue: false))
     expectFalse(v)
@@ -361,7 +361,7 @@ BoolTestSuite.test("init<T : BooleanType>(_:)") {
   }
 }
 
-BoolTestSuite.test("BooleanType") {
+BoolTestSuite.test("Boolean") {
   do {
     var v: Bool = false
     expectIsBooleanType(&v)

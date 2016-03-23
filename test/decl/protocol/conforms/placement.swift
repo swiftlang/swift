@@ -127,9 +127,9 @@ class SynthesizedSubClass3 : SynthesizedClass1, AnyObjectRefinement { }
 class SynthesizedSubClass4 : SynthesizedClass2 { }
 extension SynthesizedSubClass4 : AnyObjectRefinement { }
 
-enum SynthesizedEnum1 : Int, RawRepresentable { case None = 0 }
+enum SynthesizedEnum1 : Int, RawRepresentable { case none = 0 }
 
-enum SynthesizedEnum2 : Int { case None = 0 }
+enum SynthesizedEnum2 : Int { case none = 0 }
 extension SynthesizedEnum2 : RawRepresentable { }
 
 // ===========================================================================
@@ -182,7 +182,7 @@ class MFSynthesizedSubClass4 : MFSynthesizedClass2 { }
 
 extension MFSynthesizedEnum1 : RawRepresentable { }
 
-enum MFSynthesizedEnum2 : Int { case None = 0 }
+enum MFSynthesizedEnum2 : Int { case none = 0 }
 
 // ===========================================================================
 // Tests with conformances in imported modules

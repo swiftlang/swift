@@ -172,6 +172,7 @@ POUND_KEYWORD(elseif)
 POUND_KEYWORD(endif)
 POUND_KEYWORD(line)
 POUND_KEYWORD(setline)
+POUND_KEYWORD(sourceLocation)
 POUND_KEYWORD(available)
 POUND_KEYWORD(selector)
 

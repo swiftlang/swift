@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 import Foundation
 class m<j>: NSObject {
 var h: j
@@ -64,7 +66,7 @@ class m<j>k i<g : g, e : f k(f: l) {
 i(())
 class h {
 typealias g = g
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b:  [c<d>] {
 return []
 }
@@ -75,9 +77,9 @@ class b: a {
 class func c() { }
 }
 (b() as a).dynamicType.c()
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func a(x: Any, y: Any) -> (((Any, Any) -> Any) -> A  var d: b.Type
 func e() {
 d.e()
@@ -90,7 +92,7 @@ E == F>(f: B<T>)
 }
 struct  }
 }
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
 l g: e
 }
 func h<e>() -> [l<e>] {
@@ -136,7 +138,7 @@ j q
 j o
 }
 struct n<r : l>
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 }
 class p {
 u _ = q() {

@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
-struct S<A: CollectionType where A.Index == Int> : CollectionType {
-  typealias Element = A.Generator.Element
+struct S<A: Collection where A.Index == Int> : Collection {
+  typealias Element = A.Iterator.Element
   typealias Index = A.Index
   
   init(base: A, baseRange: Range<Index>) {
@@ -21,8 +21,8 @@ struct S<A: CollectionType where A.Index == Int> : CollectionType {
     return base[baseRange.startIndex + i]
   }
   
-  func generate() -> IndexingGenerator<S> {
-    return IndexingGenerator(self)
+  func makeIterator() -> IndexingIterator<S> {
+    return IndexingIterator(_elements: self)
   }
   
   var base: A

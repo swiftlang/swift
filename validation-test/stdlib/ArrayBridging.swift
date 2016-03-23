@@ -3,7 +3,7 @@
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
 // RUN: echo '#line 1 "%s"' > "%t/main.swift" && cat "%s" >> "%t/main.swift" && chmod -w "%t/main.swift"
-// RUN: %target-build-swift -Xfrontend -disable-access-control -I %S/Inputs/SlurpFastEnumeration/ %t/main.swift %S/Inputs/DictionaryKeyValueTypes.swift -Xlinker %t/SlurpFastEnumeration.o -o %t.out -O
+// RUN: %target-build-swift -Xfrontend -disable-access-control -I %S/Inputs/SlurpFastEnumeration/ %t/main.swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift -Xlinker %t/SlurpFastEnumeration.o -o %t.out -O
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 
@@ -22,7 +22,7 @@ import SwiftPrivatePthreadExtras
 import ObjectiveC
 #endif
 
-struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialDataType {
+struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
   class RaceData {
     var nsa: NSArray
     init(nsa: NSArray) {
@@ -46,8 +46,8 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialDataType {
     raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsa = raceData.nsa
-    let v: AnyObject = nsa.objectAtIndex(0)
-    return Observation(unsafeBitCast(v, UInt.self))
+    let v: AnyObject = nsa.object(at: 0)
+    return Observation(unsafeBitCast(v, to: UInt.self))
   }
 
   func evaluateObservations(
@@ -59,7 +59,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialDataType {
 }
 
 struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
-  RaceTestWithPerTrialDataType {
+  RaceTestWithPerTrialData {
   class RaceData {
     var nsa: NSArray
     init(nsa: NSArray) {
@@ -86,10 +86,10 @@ struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
     let objcValues = NSMutableArray()
     slurpFastEnumerationOfArrayFromObjCImpl(nsa, nsa, objcValues)
     return Observation(
-      unsafeBitCast(objcValues[0], UInt.self),
-      unsafeBitCast(objcValues[1], UInt.self),
-      unsafeBitCast(objcValues[2], UInt.self),
-      unsafeBitCast(objcValues[3], UInt.self))
+      unsafeBitCast(objcValues[0], to: UInt.self),
+      unsafeBitCast(objcValues[1], to: UInt.self),
+      unsafeBitCast(objcValues[2], to: UInt.self),
+      unsafeBitCast(objcValues[3], to: UInt.self))
   }
 
   func evaluateObservations(
@@ -116,10 +116,12 @@ ArrayTestSuite.test(
 
 ArrayTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
+  resetLeaksOfObjCDictionaryKeysValues()
 }
 
 ArrayTestSuite.tearDown {
   expectNoLeaksOfDictionaryKeysValues()
+  expectNoLeaksOfObjCDictionaryKeysValues()
 }
 
 runAllTests()

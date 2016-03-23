@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-enum Exception : ErrorType { case A }
+enum Exception : ErrorProtocol { case A }
 
 // Basic syntax ///////////////////////////////////////////////////////////////
 func bar() throws -> Int { return 0 }

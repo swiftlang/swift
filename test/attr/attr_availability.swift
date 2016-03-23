@@ -3,7 +3,7 @@
 @available(*, unavailable)
 func unavailable_func() {}
 
-@available(*, unavailable, message="message")
+@available(*, unavailable, message: "message")
 func unavailable_func_with_message() {}
 
 @available(tvOS, unavailable)
@@ -25,14 +25,14 @@ func unavailable_bad_platform() {}
 func availabilityUnknownPlatform() {}
 
 // <rdar://problem/17669805> Availability can't appear on a typealias
-@available(*, unavailable, message="oh no you dont")
+@available(*, unavailable, message: "oh no you don't")
 typealias int = Int // expected-note {{'int' has been explicitly marked unavailable here}}
 
-@available(*, unavailable, renamed="Float")
+@available(*, unavailable, renamed: "Float")
 typealias float = Float // expected-note {{'float' has been explicitly marked unavailable here}}
 
 struct MyCollection<Element> {
-  @available(*, unavailable, renamed="Element")
+  @available(*, unavailable, renamed: "Element")
   typealias T = Element // expected-note 2{{'T' has been explicitly marked unavailable here}}
 
   func foo(x: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{15-16=Element}}
@@ -42,11 +42,11 @@ extension MyCollection {
   func append(element: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{24-25=Element}}
 }
 
-var x : int // expected-error {{'int' is unavailable: oh no you dont}}
+var x : int // expected-error {{'int' is unavailable: oh no you don't}}
 var y : float // expected-error {{'float' has been renamed to 'Float'}}{{9-14=Float}}
 
 // Encoded message
-@available(*, unavailable, message="This message has a double quote \"")
+@available(*, unavailable, message: "This message has a double quote \"")
 func unavailableWithDoubleQuoteInMessage() {} // expected-note {{'unavailableWithDoubleQuoteInMessage()' has been explicitly marked unavailable here}}
 
 func useWithEscapedMessage() {
@@ -55,17 +55,17 @@ func useWithEscapedMessage() {
 
 
 // More complicated parsing.
-@available(OSX, message="x", unavailable)
+@available(OSX, message: "x", unavailable)
 let _: Int
 
-@available(OSX, introduced=1, deprecated=2.0, obsoleted=3.0.0)
+@available(OSX, introduced: 1, deprecated: 2.0, obsoleted: 3.0.0)
 let _: Int
 
-@available(OSX, introduced=1.0.0, deprecated=2.0, obsoleted=3, unavailable, renamed="x")
+@available(OSX, introduced: 1.0.0, deprecated: 2.0, obsoleted: 3, unavailable, renamed: "x")
 let _: Int
 
 // Meaningless but accepted.
-@available(OSX, message="x")
+@available(OSX, message: "x")
 let _: Int
 
 
@@ -76,57 +76,66 @@ let _: Int
 @available(OSX,) // expected-error{{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
 let _: Int
 
-@available(OSX, message) // expected-error{{expected '=' after 'message' in 'available' attribute}}
+@available(OSX, message) // expected-error{{expected ':' after 'message' in 'available' attribute}}
 let _: Int
 
-@available(OSX, message=) // expected-error{{expected string literal in 'available' attribute}} expected-error{{'=' must have consistent whitespace on both sides}}
+@available(OSX, message=) // expected-error{{expected string literal in 'available' attribute}} expected-error{{'=' must have consistent whitespace on both sides}} expected-warning {{'=' is deprecated}}
 let _: Int
 
-@available(OSX, message=x) // expected-error{{expected string literal in 'available' attribute}}
+@available(OSX, message: ) // expected-error{{expected string literal in 'available' attribute}}
+let _: Int
+
+@available(OSX, message: x) // expected-error{{expected string literal in 'available' attribute}}
 let _: Int
 
 @available(OSX, unavailable=) // expected-error{{expected ')' in 'available' attribute}} expected-error{{'=' must have consistent whitespace on both sides}} expected-error{{expected declaration}}
 let _: Int
 
-@available(OSX, introduced) // expected-error{{expected '=' after 'introduced' in 'available' attribute}}
+@available(OSX, unavailable:) // expected-error{{expected ')' in 'available' attribute}} expected-error{{expected declaration}}
 let _: Int
 
-@available(OSX, introduced=) // expected-error{{expected version number in 'available' attribute}} expected-error{{'=' must have consistent whitespace on both sides}}
+@available(OSX, introduced) // expected-error{{expected ':' after 'introduced' in 'available' attribute}}
 let _: Int
 
-@available(OSX, introduced=x) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced=) // expected-error{{expected version number in 'available' attribute}} expected-error{{'=' must have consistent whitespace on both sides}} expected-warning{{'=' is deprecated}}
 let _: Int
 
-@available(OSX, introduced=1.x) // expected-error{{expected ')' in 'available' attribute}} expected-error {{expected declaration}}
+@available(OSX, introduced: ) // expected-error{{expected version number in 'available' attribute}}
 let _: Int
 
-@available(OSX, introduced=1.0.x) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: x) // expected-error{{expected version number in 'available' attribute}}
 let _: Int
 
-@available(OSX, introduced=0x1) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: 1.x) // expected-error{{expected ')' in 'available' attribute}} expected-error {{expected declaration}}
 let _: Int
 
-@available(OSX, introduced=1.0e4) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: 1.0.x) // expected-error{{expected version number in 'available' attribute}}
 let _: Int
 
-@available(OSX, introduced=-1) // expected-error{{expected '=' after 'introduced' in 'available' attribute}} expected-error{{expected declaration}}
+@available(OSX, introduced: 0x1) // expected-error{{expected version number in 'available' attribute}}
 let _: Int
 
-@available(OSX, introduced=1.0.1e4) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: 1.0e4) // expected-error{{expected version number in 'available' attribute}}
 let _: Int
 
-@available(OSX, introduced=1.0.0x4) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: -1) // expected-error{{expected version number in 'available' attribute}} expected-error{{expected declaration}}
 let _: Int
 
-@available(*, deprecated, unavailable, message="message") // expected-error{{'available' attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
+@available(OSX, introduced: 1.0.1e4) // expected-error{{expected version number in 'available' attribute}}
+let _: Int
+
+@available(OSX, introduced: 1.0.0x4) // expected-error{{expected version number in 'available' attribute}}
+let _: Int
+
+@available(*, deprecated, unavailable, message: "message") // expected-error{{'available' attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
 struct BadUnconditionalAvailability { };
 
 // Encoding in messages
-@available(*, deprecated, message="Say \"Hi\"")
+@available(*, deprecated, message: "Say \"Hi\"")
 func deprecated_func_with_message() {}
 
 // 'PANDA FACE' (U+1F43C)
-@available(*, deprecated, message="Pandas \u{1F43C} are cute")
+@available(*, deprecated, message: "Pandas \u{1F43C} are cute")
 struct DeprecatedTypeWithMessage { }
 
 func use_deprecated_with_message() {
@@ -134,18 +143,18 @@ func use_deprecated_with_message() {
   var _: DeprecatedTypeWithMessage // expected-warning{{'DeprecatedTypeWithMessage' is deprecated: Pandas \u{1F43C} are cute}}
 }
 
-@available(*, deprecated, message="message")
+@available(*, deprecated, message: "message")
 func use_deprecated_func_with_message2() {
  deprecated_func_with_message() // no diagnostic
 }
 
-@available(*, deprecated, renamed="blarg")
+@available(*, deprecated, renamed: "blarg")
 func deprecated_func_with_renamed() {}
 
-@available(*, deprecated, message="blarg is your friend", renamed="blarg")
+@available(*, deprecated, message: "blarg is your friend", renamed: "blarg")
 func deprecated_func_with_message_renamed() {}
 
-@available(*, deprecated, renamed="wobble")
+@available(*, deprecated, renamed: "wobble")
 struct DeprecatedTypeWithRename { }
 
 func use_deprecated_with_renamed() {
@@ -191,16 +200,16 @@ func shortFormWithWildcardInMiddle() {}
 @available(iOS 8.0, OSX 10.10.3) // expected-error {{must handle potential future platforms with '*'}} {{32-32=, *}}
 func shortFormMissingWildcard() {}
 
-@availability(OSX, introduced=10.10) // expected-error {{@availability has been renamed to @available}} {{2-14=available}}
+@availability(OSX, introduced: 10.10) // expected-error {{@availability has been renamed to @available}} {{2-14=available}}
 func someFuncUsingOldAttribute() { }
 
 
 // <rdar://problem/23853709> Compiler crash on call to unavailable "print"
-func OutputStreamTest(message: String, to: inout OutputStreamType) {
-  print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'toStream' label for the target stream: 'print((...), toStream: &...)'}}
+func OutputStreamTest(message: String, to: inout OutputStream) {
+  print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'to' label for the target stream: 'print((...), to: &...)'}}
 }
 
 // expected-note@+1{{'T' has been explicitly marked unavailable here}}
-struct UnavailableGenericParam<@available(*, unavailable, message="nope") T> {
+struct UnavailableGenericParam<@available(*, unavailable, message: "nope") T> {
   func f(t: T) { } // expected-error{{'T' is unavailable: nope}}
 }

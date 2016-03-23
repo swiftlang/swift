@@ -2300,6 +2300,21 @@ zero, the object is destroyed and ``@weak`` references are cleared.  When both
 its strong and unowned reference counts reach zero, the object's memory is
 deallocated.
 
+set_deallocating
+````````````````
+::
+
+  set_deallocating %0 : $T
+  // $T must be a reference type.
+
+Explicitly sets the state of the object referenced by ``%0`` to deallocated.
+This is the same operation what's done by a strong_release immediately before
+it calls the deallocator of the object.
+
+It is expected that the strong reference count of the object is one.
+Furthermore, no other thread may increment the strong reference count during
+execution of this instruction.
+
 strong_retain_unowned
 `````````````````````
 ::
@@ -3370,7 +3385,7 @@ container may use one of several representations:
   * `init_existential_metatype`_
   * `open_existential_metatype`_
 
-- **Boxed existential containers**: The standard library ``ErrorType`` protocol
+- **Boxed existential containers**: The standard library ``ErrorProtocol`` protocol
   uses a size-optimized reference-counted container, which indirectly stores
   the conforming value. Boxed existential containers can be ``retain``-ed
   and ``release``-d. The following instructions manipulate boxed existential
@@ -3383,22 +3398,22 @@ container may use one of several representations:
 
 Some existential types may additionally support specialized representations
 when they contain certain known concrete types. For example, when Objective-C
-interop is available, the ``ErrorType`` protocol existential supports
+interop is available, the ``ErrorProtocol`` protocol existential supports
 a class existential container representation for ``NSError`` objects, so it
 can be initialized from one using ``init_existential_ref`` instead of the
 more expensive ``alloc_existential_box``::
 
   bb(%nserror: $NSError):
-    // The slow general way to form an ErrorType, allocating a box and
+    // The slow general way to form an ErrorProtocol, allocating a box and
     // storing to its value buffer:
-    %error1 = alloc_existential_box $ErrorType, $NSError
-    %addr = project_existential_box $NSError in %error1 : $ErrorType
+    %error1 = alloc_existential_box $ErrorProtocol, $NSError
+    %addr = project_existential_box $NSError in %error1 : $ErrorProtocol
     strong_retain %nserror: $NSError
     store %nserror to %addr : $NSError
 
     // The fast path supported for NSError:
     strong_retain %nserror: $NSError
-    %error2 = init_existential_ref %nserror: $NSError, $ErrorType
+    %error2 = init_existential_ref %nserror: $NSError, $ErrorProtocol
 
 init_existential_addr
 `````````````````````

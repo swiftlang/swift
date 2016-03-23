@@ -8,8 +8,15 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_5 | FileCheck %s -check-prefix=DEFAULT_ARGS_5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_6 | FileCheck %s -check-prefix=DEFAULT_ARGS_6
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_7 | FileCheck %s -check-prefix=DEFAULT_ARGS_7
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_8 | FileCheck %s -check-prefix=DEFAULT_ARGS_8
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_9 | FileCheck %s -check-prefix=DEFAULT_ARGS_9
+//
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_8 > %t
+// RUN: FileCheck %s -check-prefix=DEFAULT_ARGS_8 < %t
+// RUN: FileCheck %s -check-prefix=NEGATIVE_DEFAULT_ARGS_8 < %t
+//
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_9 > %t
+// RUN: FileCheck %s -check-prefix=DEFAULT_ARGS_9 < %t
+// RUN: FileCheck %s -check-prefix=NEGATIVE_DEFAULT_ARGS_9 < %t
+//
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_1 | FileCheck %s -check-prefix=DEFAULT_ARG_INIT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_2 | FileCheck %s -check-prefix=DEFAULT_ARG_INIT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_3 | FileCheck %s -check-prefix=DEFAULT_ARG_INIT
@@ -111,19 +118,19 @@ func testDefaultArgs8(x: C1) {
 // DEFAULT_ARGS_8: Begin completions
 // DEFAULT_ARGS_8-DAG: Decl[InstanceMethod]/CurrNominal:      methodWithDefaultArgs1()[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_8-DAG: Decl[InstanceMethod]/CurrNominal:      methodWithDefaultArgs1({#a: Int#})[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_8-DAG-NOT: methodWithDefaultArgsInSub1()
 // DEFAULT_ARGS_8-DAG: Decl[InstanceMethod]/CurrNominal:      methodWithDefaultArgsInSub1({#(a): Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_8: End completions
+// NEGATIVE_DEFAULT_ARGS_8-NOT: methodWithDefaultArgsInSub1()
 
 func testDefaultArgs9(x: C2) {
   x.#^DEFAULT_ARGS_9^#
 }
 // DEFAULT_ARGS_9: Begin completions
-// DEFAULT_ARGS_9-DAG-NOT: methodWithDefaultArgs1()
 // DEFAULT_ARGS_9-DAG: Decl[InstanceMethod]/CurrNominal:      methodWithDefaultArgs1({#a: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_9-DAG: Decl[InstanceMethod]/CurrNominal:      methodWithDefaultArgsInSub1()[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_9-DAG: Decl[InstanceMethod]/CurrNominal:      methodWithDefaultArgsInSub1({#(a): Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_9: End completions
+// NEGATIVE_DEFAULT_ARGS_9-NOT: methodWithDefaultArgs1()
 
 let globalVar = 1
 func testDefaultArgInit1(x = #^DEFAULT_ARG_INIT_1^#) { }

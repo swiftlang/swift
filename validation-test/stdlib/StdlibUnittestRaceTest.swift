@@ -14,7 +14,7 @@ import ObjectiveC
 
 _setTestSuiteFailedCallback() { print("abort()") }
 
-struct RaceTest1 : RaceTestWithPerTrialDataType {
+struct RaceTest1 : RaceTestWithPerTrialData {
   static var shouldPass: Bool = true
   static var iterationCountdown: _stdlib_AtomicInt = _stdlib_AtomicInt(8)
 
@@ -61,13 +61,13 @@ struct RaceTest1 : RaceTestWithPerTrialDataType {
     for observation in observations {
       switch observation {
       case Observation(0x1):
-        sink(.Pass)
+        sink(.pass)
       case Observation(0x2):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(observation)))
       case Observation(0xffff):
-        sink(.Failure)
+        sink(.failure)
       case Observation(0xfffe):
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       default:
         fatalError("should not happen")
       }

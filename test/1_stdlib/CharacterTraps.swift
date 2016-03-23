@@ -21,7 +21,7 @@ import ObjectiveC
 var CharacterTraps = TestSuite("CharacterTraps")
 
 CharacterTraps.test("CharacterFromEmptyString")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -31,7 +31,7 @@ CharacterTraps.test("CharacterFromEmptyString")
 }
 
 CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

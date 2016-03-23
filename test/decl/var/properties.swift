@@ -226,11 +226,11 @@ class C {
   }
 }
 
-protocol TrivialInitType {
+protocol TrivialInit {
   init()
 }
 
-class CT<T : TrivialInitType> {
+class CT<T : TrivialInit> {
   var prop1 = 42 {
     didSet { }
   }
@@ -558,7 +558,7 @@ struct MonoStruct {
     return 0
   }
 
-  static var zang = UnicodeScalar()
+  static var zang = UnicodeScalar("\0")
 
   static var zung: UInt16 {
     get {

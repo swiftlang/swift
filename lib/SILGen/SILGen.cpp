@@ -144,8 +144,8 @@ GET_BRIDGING_FN(Darwin, REQUIRED, Bool, REQUIRED, DarwinBoolean)
 GET_BRIDGING_FN(Darwin, REQUIRED, DarwinBoolean, REQUIRED, Bool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorType)
-GET_BRIDGING_FN(Foundation, REQUIRED, ErrorType, REQUIRED, NSError)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorProtocol)
+GET_BRIDGING_FN(Foundation, REQUIRED, ErrorProtocol, REQUIRED, NSError)
 GET_BRIDGING_FN(Foundation, REQUIRED, String, REQUIRED, NSString)
 GET_BRIDGING_FN(Foundation, OPTIONAL, NSString, REQUIRED, String)
 GET_BRIDGING_FN(Foundation, GENERIC, Array, REQUIRED, NSArray)
@@ -159,6 +159,121 @@ GET_BRIDGING_FN(Foundation, OPTIONAL, NSDictionary, GENERIC, Dictionary)
 #undef REQURIED
 #undef OPTIONAL
 #undef GENERIC
+
+ProtocolDecl *SILGenModule::getObjectiveCBridgeable(SILLocation loc) {
+  if (ObjectiveCBridgeable)
+    return *ObjectiveCBridgeable;
+
+  // Find the _ObjectiveCBridgeable protocol.
+  auto &ctx = getASTContext();
+  auto proto = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
+  if (!proto)
+    diagnose(loc, diag::bridging_objcbridgeable_missing);
+
+  ObjectiveCBridgeable = proto;
+  return proto;
+}
+
+FuncDecl *SILGenModule::getBridgeToObjectiveCRequirement(SILLocation loc) {
+  if (BridgeToObjectiveCRequirement)
+    return *BridgeToObjectiveCRequirement;
+
+  // Find the _ObjectiveCBridgeable protocol.
+  auto proto = getObjectiveCBridgeable(loc);
+  if (!proto) {
+    BridgeToObjectiveCRequirement = nullptr;
+    return nullptr;
+  }
+
+  // Look for _bridgeToObjectiveC().
+  auto &ctx = getASTContext();
+  FuncDecl *found = nullptr;
+  DeclName name(ctx, ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
+  for (auto member : proto->lookupDirect(name, true)) {
+    if (auto func = dyn_cast<FuncDecl>(member)) {
+      found = func;
+      break;
+    }
+  }
+
+  if (!found)
+    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+
+  BridgeToObjectiveCRequirement = found;
+  return found;
+}
+
+FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
+    SILLocation loc) {
+  if (UnconditionallyBridgeFromObjectiveCRequirement)
+    return *UnconditionallyBridgeFromObjectiveCRequirement;
+
+  // Find the _ObjectiveCBridgeable protocol.
+  auto proto = getObjectiveCBridgeable(loc);
+  if (!proto) {
+    UnconditionallyBridgeFromObjectiveCRequirement = nullptr;
+    return nullptr;
+  }
+
+  // Look for _bridgeToObjectiveC().
+  auto &ctx = getASTContext();
+  FuncDecl *found = nullptr;
+  DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
+                llvm::makeArrayRef(Identifier()));
+  for (auto member : proto->lookupDirect(name, true)) {
+    if (auto func = dyn_cast<FuncDecl>(member)) {
+      found = func;
+      break;
+    }
+  }
+
+  if (!found)
+    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+
+  UnconditionallyBridgeFromObjectiveCRequirement = found;
+  return found;
+}
+
+AssociatedTypeDecl *
+SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
+  if (BridgedObjectiveCType)
+    return *BridgedObjectiveCType;
+
+  // Find the _ObjectiveCBridgeable protocol.
+  auto proto = getObjectiveCBridgeable(loc);
+  if (!proto) {
+    BridgeToObjectiveCRequirement = nullptr;
+    return nullptr;
+  }
+
+  // Look for _bridgeToObjectiveC().
+  auto &ctx = getASTContext();
+  AssociatedTypeDecl *found = nullptr;
+  DeclName name(ctx.getIdentifier("_ObjectiveCType"));
+  for (auto member : proto->lookupDirect(name, true)) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      found = assocType;
+      break;
+    }
+  }
+
+  if (!found)
+    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+
+  BridgedObjectiveCType = found;
+  return found;
+}
+
+ProtocolConformance *
+SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
+  auto proto = getObjectiveCBridgeable(loc);
+  if (!proto) return nullptr;
+
+  // Find the conformance to _ObjectiveCBridgeable.
+  auto result = SwiftModule->lookupConformance(type, proto, nullptr);
+  if (result) return result->getConcrete();
+  return nullptr;
+}
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
@@ -434,6 +549,14 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
     if (!Captures.empty())
       TopLevelSGF->B.createMarkFunctionEscape(AFD, Captures);
+  }
+  
+  // If the declaration is exported as a C function, emit its native-to-foreign
+  // thunk too, if it wasn't already forced.
+  if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
+    auto thunk = SILDeclRef(AFD).asForeign();
+    if (!hasFunction(thunk))
+      emitNativeToForeignThunk(thunk);
   }
 }
 
@@ -977,8 +1100,8 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
   auto argv = new (gen.F.getModule()) SILArgument(
                                   entry, FnTy->getParameters()[1].getSILType());
 
-  // If the standard library provides a _didEnterMain intrinsic, call it first
-  // thing.
+  // If the standard library provides a _stdlib_didEnterMain intrinsic, call it
+  // first thing.
   if (auto didEnterMain = C.getDidEnterMain(nullptr)) {
     ManagedValue params[] = {
       ManagedValue::forUnmanaged(argc),

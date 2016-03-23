@@ -145,10 +145,8 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 
 /// Lookup table minor version number.
 ///
-/// When the format changes IN ANY WAY, this number should be
-/// incremented. When doing so, also update the comment so we'll get
-/// conflicts if two different changes to the format get merged.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 10; // globals-as-members
+/// When the format changes IN ANY WAY, this number should be incremented.
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 11; // globals-as-members
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.

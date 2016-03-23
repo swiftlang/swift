@@ -36,7 +36,7 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
     /*
     FIXME: this check is failing.
     This is a fundamental problem with lazy flatMap().
-    <rdar://problem/21989896> Investigate other CollectionType schemes: indices
+    <rdar://problem/21989896> Investigate other Collection schemes: indices
     are compositions of offsets
 
     expectEqual(

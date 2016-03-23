@@ -23,11 +23,11 @@
 // UNWRAPPED_INT: End completions
 
 func getOptional() -> Int? {
-  return .None
+  return .none
 }
 
 func getImplicitlyUnwrappedOptional() -> Int! {
-  return .None
+  return .none
 }
 
 if var unwrapped = getOptional() {

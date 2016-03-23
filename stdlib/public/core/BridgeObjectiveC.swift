@@ -73,6 +73,40 @@ public protocol _ObjectiveCBridgeable {
     source: _ObjectiveCType,
     result: inout Self?
   ) -> Bool
+
+  /// Bridge from an Objective-C object of the bridged class type to a
+  /// value of the Self type.
+  ///
+  /// This bridging operation is used for unconditional bridging when
+  /// interoperating with Objective-C code, either in the body of an
+  /// Objective-C thunk or when calling Objective-C code, and may
+  /// defer complete checking until later. For example, when bridging
+  /// from `NSArray` to `Array<Element>`, we can defer the checking
+  /// for the individual elements of the array.
+  ///
+  /// \param source The Objective-C object from which we are
+  /// bridging. This optional value will only be `nil` in cases where
+  /// an Objective-C method has returned a `nil` despite being marked
+  /// as `_Nonnull`/`nonnull`. In most such cases, bridging will
+  /// generally force the value immediately. However, this gives
+  /// bridging the flexibility to substitute a default value to cope
+  /// with historical decisions, e.g., an existing Objective-C method
+  /// that returns `nil` to for "empty result" rather than (say) an
+  /// empty array. In such cases, when `nil` does occur, the
+  /// implementation of `Swift.Array`'s conformance to
+  /// `_ObjectiveCBridgeable` will produce an empty array rather than
+  /// dynamically failing.
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self
+}
+
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
 }
 
 //===--- Bridging for metatypes -------------------------------------------===//
@@ -143,7 +177,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 @warn_unused_result
 public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return unsafeBitCast(x, AnyObject.self)
+    return unsafeBitCast(x, to: AnyObject.self)
   }
   return _bridgeNonVerbatimToObjectiveC(x)
 }
@@ -162,7 +196,7 @@ public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
 func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
 {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return unsafeBitCast(x, AnyObject.self)
+    return unsafeBitCast(x, to: AnyObject.self)
   }
   guard let bridged = _bridgeNonVerbatimToObjectiveC(x) else {
     _preconditionFailure(
@@ -326,11 +360,11 @@ internal var _nilNativeObject: AnyObject? {
 /// - `nil`, which gets passed as a null pointer,
 /// - an inout argument of the referenced type, which gets passed as a pointer
 ///   to a writeback temporary with autoreleasing ownership semantics,
-/// - an `UnsafeMutablePointer<Memory>`, which is passed as-is.
+/// - an `UnsafeMutablePointer<Pointee>`, which is passed as-is.
 ///
 /// Passing pointers to mutable arrays of ObjC class pointers is not
-/// directly supported. Unlike `UnsafeMutablePointer<Memory>`,
-/// `AutoreleasingUnsafeMutablePointer<Memory>` must reference storage that
+/// directly supported. Unlike `UnsafeMutablePointer<Pointee>`,
+/// `AutoreleasingUnsafeMutablePointer<Pointee>` must reference storage that
 /// does not own a reference count to the referenced
 /// value. UnsafeMutablePointer's operations, by contrast, assume that
 /// the referenced storage owns values loaded from or stored to it.
@@ -338,11 +372,8 @@ internal var _nilNativeObject: AnyObject? {
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
-  : Equatable, NilLiteralConvertible, _PointerType {
-
-  @available(*, unavailable, renamed="Memory")
-  public typealias T = Memory
+public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
+  : Equatable, NilLiteralConvertible, _Pointer {
 
   public let _rawValue: Builtin.RawPointer
 
@@ -354,17 +385,19 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
 
   @_transparent
   var _isNull : Bool {
-    return UnsafeMutablePointer<Memory>(self)._isNull
+    return UnsafeMutablePointer<Pointee>(self)._isNull
   }
 
-  /// Access the underlying raw memory, getting and
-  /// setting values.
-  public var memory: Memory {
+  /// Access the `Pointee` instance referenced by `self`.
+  ///
+  /// - Precondition: the pointee has been initialized with an instance of type
+  ///   `Pointee`.
+  public var pointee: Pointee {
     /// Retrieve the value the pointer points to.
     @_transparent get {
-      _debugPrecondition(!_isNull)
+      _stdlibAssert(!_isNull)
       // We can do a strong load normally.
-      return UnsafeMutablePointer<Memory>(self).memory
+      return UnsafeMutablePointer<Pointee>(self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -373,42 +406,36 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
     /// in ARC. This autoreleases the argument before trivially
     /// storing it to the referenced memory.
     @_transparent nonmutating set {
-      _debugPrecondition(!_isNull)
+      _stdlibAssert(!_isNull)
       // Autorelease the object reference.
       typealias OptionalAnyObject = AnyObject?
-      Builtin.retain(unsafeBitCast(newValue, OptionalAnyObject.self))
-      Builtin.autorelease(unsafeBitCast(newValue, OptionalAnyObject.self))
-      // Trivially assign it as a COpaquePointer; the pointer references an
+      Builtin.retain(unsafeBitCast(newValue, to: OptionalAnyObject.self))
+      Builtin.autorelease(unsafeBitCast(newValue, to: OptionalAnyObject.self))
+      // Trivially assign it as an OpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
-      let p = UnsafeMutablePointer<COpaquePointer>(
-        UnsafeMutablePointer<Memory>(self))
-        p.memory = unsafeBitCast(newValue, COpaquePointer.self)
+      let p = UnsafeMutablePointer<OpaquePointer>(
+        UnsafeMutablePointer<Pointee>(self))
+        p.pointee = unsafeBitCast(newValue, to: OpaquePointer.self)
     }
   }
 
   /// Access the `i`th element of the raw array pointed to by
   /// `self`.
   ///
-  /// - Requires: `self != nil`.
-  public subscript(i: Int) -> Memory {
+  /// - Precondition: `self != nil`.
+  public subscript(i: Int) -> Pointee {
     @_transparent
     get {
-      _debugPrecondition(!_isNull)
+      _stdlibAssert(!_isNull)
       // We can do a strong load normally.
-      return (UnsafePointer<Memory>(self) + i).memory
+      return (UnsafePointer<Pointee>(self) + i).pointee
     }
   }
 
   /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
-    _rawValue = _nilRawPointer
-  }
-
-  /// Initialize to a null pointer.
-  @_transparent public
-  init() {
+  @_transparent
+  public init(nilLiteral: ()) {
     self._rawValue = _nilRawPointer
   }
 
@@ -441,9 +468,9 @@ extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
 
 @_transparent
 @warn_unused_result
-public func == <Memory> (
-  lhs: AutoreleasingUnsafeMutablePointer<Memory>,
-  rhs: AutoreleasingUnsafeMutablePointer<Memory>
+public func == <Pointee> (
+  lhs: AutoreleasingUnsafeMutablePointer<Pointee>,
+  rhs: AutoreleasingUnsafeMutablePointer<Pointee>
 ) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
@@ -468,7 +495,7 @@ internal struct _CocoaFastEnumerationStackBuf {
   internal var _item15: Builtin.RawPointer
 
   @_transparent
-  internal var length: Int {
+  internal var count: Int {
     return 16
   }
 
@@ -490,8 +517,22 @@ internal struct _CocoaFastEnumerationStackBuf {
     _item14 = _item0
     _item15 = _item0
 
-    _sanityCheck(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * length)
+    _sanityCheck(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * count)
   }
 }
 
+extension AutoreleasingUnsafeMutablePointer {
+  @available(*, unavailable, renamed: "Pointee")
+  public typealias Memory = Pointee
+
+  @available(*, unavailable, renamed: "pointee")
+  public var memory: Pointee {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message: "Removed in Swift 3. Please use nil literal instead.")
+  public init() {
+    fatalError("unavailable function can't be called")
+  }
+}
 #endif

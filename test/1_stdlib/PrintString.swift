@@ -43,9 +43,7 @@ PrintTests.test("Printable") {
 }
 
 PrintTests.test("Printable") {
-  expectPrinted("nil", String!())
   expectPrinted("meow", String!("meow"))
-  expectPrinted("nil", String?())
   expectPrinted("Optional(\"meow\")", String?("meow"))
 }
 

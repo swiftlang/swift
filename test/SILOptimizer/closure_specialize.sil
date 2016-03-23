@@ -426,3 +426,42 @@ bb0(%0 : $Builtin.Int32, %1 : $@box Builtin.Int32):
   %7 = tuple ()
   return %7 : $()
 }
+
+// The specialized function should always be a thin function, regardless of the
+// representation of the original function.
+
+public protocol P {
+  static func foo(cl: () -> Int) -> Int
+}
+
+public struct S : P {
+  public static func foo(cl: () -> Int) -> Int
+  init()
+}
+
+// CHECK-LABEL: sil shared @_TTSf1cl8closure2Si_n___TTWV4test1SS_1PS_ZFS1_3foofFT_SiSi : $@convention(thin) (@thick S.Type, Int) -> Int
+sil @_TTWV4test1SS_1PS_ZFS1_3foofFT_SiSi : $@convention(witness_method) (@owned @callee_owned () -> Int, @thick S.Type) -> Int {
+bb0(%0 : $@callee_owned () -> Int, %1 : $@thick S.Type):
+  %3 = apply %0() : $@callee_owned () -> Int
+  return %3 : $Int
+}
+
+sil shared @closure2 : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  return %0 : $Int
+}
+
+sil @call_witness_method : $@convention(thin) (Int, S) -> Int {
+bb0(%0 : $Int, %1 : $S):
+  %3 = function_ref @closure2 : $@convention(thin) (Int) -> Int
+  %4 = partial_apply %3(%0) : $@convention(thin) (Int) -> Int
+  %5 = metatype $@thick S.Type
+  %6 = function_ref @_TTWV4test1SS_1PS_ZFS1_3foofFT_SiSi : $@convention(witness_method) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
+  %7 = apply %6(%4, %5) : $@convention(witness_method) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
+  return %7 : $Int
+}
+
+sil_witness_table S: P module test {
+  method #P.foo!1: @_TTWV4test1SS_1PS_ZFS1_3foofFT_SiSi
+}
+

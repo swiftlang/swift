@@ -358,12 +358,13 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   for (auto proto : assocType->getConformingProtocols(resolver)) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
                                                         resolver);
-    assert((conforms.getInt() == ConformanceKind::Conforms ||
+    assert((conforms ||
             specializedType->is<TypeVariableType>() ||
             specializedType->isTypeParameter() ||
             specializedType->is<ErrorType>()) &&
            "Improperly checked substitution");
-    conformances.push_back(ProtocolConformanceRef(proto, conforms.getPointer()));
+    conformances.push_back(conforms ? *conforms 
+                                    : ProtocolConformanceRef(proto));
   }
 
   // Form the substitution.
@@ -521,7 +522,7 @@ found_inherited:
                                  subMap, conformanceMap);
   }
   assert((getType()->isEqual(foundInherited->getType()) ||
-          foundInherited->getType()->isSuperclassOf(getType(), nullptr))
+          foundInherited->getType()->isExactSuperclassOf(getType(), nullptr))
          && "inherited conformance does not match type");
   return foundInherited;
 }

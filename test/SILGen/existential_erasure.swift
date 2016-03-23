@@ -54,7 +54,7 @@ func openExistentialToP1(p: P) throws {
 // CHECK:   destroy_addr %0
 // CHECK:   return
 //
-// CHECK: bb2([[FAILURE:%.*]] : $ErrorType):
+// CHECK: bb2([[FAILURE:%.*]] : $ErrorProtocol):
 // CHECK:   deinit_existential_addr [[RESULT]]
 // CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   destroy_addr %0
@@ -77,7 +77,7 @@ func openExistentialToP2(p: P) throws {
 // CHECK:  destroy_addr %0
 // CHECK:  return
 //
-// CHECK: bb2([[FAILURE:%.*]]: $ErrorType):
+// CHECK: bb2([[FAILURE:%.*]]: $ErrorProtocol):
 // CHECK:  deinit_existential_addr [[RESULT]]
 // CHECK:  dealloc_stack [[RESULT]]
 // CHECK:  destroy_addr %0
@@ -88,30 +88,30 @@ func openExistentialToP2(p: P) throws {
 
 // Same as above but for boxed existentials
 
-extension ErrorType {
+extension ErrorProtocol {
   func returnOrThrowSelf() throws -> Self {
     throw self
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF19existential_erasure12errorHandlerFzPs9ErrorType_PS0__
-func errorHandler(e: ErrorType) throws -> ErrorType {
-// CHECK: bb0(%0 : $ErrorType):
-// CHECK:  debug_value %0 : $ErrorType
-// CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $ErrorType to $*[[OPEN_TYPE:@opened\(.*\) ErrorType]]
-// CHECK:  [[RESULT:%.*]] = alloc_existential_box $ErrorType, $[[OPEN_TYPE]]
-// CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $ErrorType
-// CHECK:  [[FUNC:%.*]] = function_ref @_TFE19existential_erasurePs9ErrorType17returnOrThrowSelf
+// CHECK-LABEL: sil hidden @_TF19existential_erasure12errorHandlerFzPs13ErrorProtocol_PS0__
+func errorHandler(e: ErrorProtocol) throws -> ErrorProtocol {
+// CHECK: bb0(%0 : $ErrorProtocol):
+// CHECK:  debug_value %0 : $ErrorProtocol
+// CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $ErrorProtocol to $*[[OPEN_TYPE:@opened\(.*\) ErrorProtocol]]
+// CHECK:  [[RESULT:%.*]] = alloc_existential_box $ErrorProtocol, $[[OPEN_TYPE]]
+// CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $ErrorProtocol
+// CHECK:  [[FUNC:%.*]] = function_ref @_TFE19existential_erasurePs13ErrorProtocol17returnOrThrowSelf
 // CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[ADDR]], [[OPEN]])
 //
 // CHECK: bb1
-// CHECK:  strong_release %0 : $ErrorType
-// CHECK:  return [[RESULT]] : $ErrorType
+// CHECK:  strong_release %0 : $ErrorProtocol
+// CHECK:  return [[RESULT]] : $ErrorProtocol
 //
-// CHECK: bb2([[FAILURE:%.*]] : $ErrorType):
+// CHECK: bb2([[FAILURE:%.*]] : $ErrorProtocol):
 // CHECK:  dealloc_existential_box [[RESULT]]
-// CHECK:  strong_release %0 : $ErrorType
-// CHECK:  throw [[FAILURE]] : $ErrorType
+// CHECK:  strong_release %0 : $ErrorProtocol
+// CHECK:  throw [[FAILURE]] : $ErrorProtocol
 //
   return try e.returnOrThrowSelf()
 }

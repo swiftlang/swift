@@ -2048,12 +2048,12 @@ getExistentialValueWitnesses(ExistentialTypeState &E,
                              SpecialProtocol special) {
   // Use special representation for special protocols.
   switch (special) {
-  case SpecialProtocol::ErrorType:
+  case SpecialProtocol::ErrorProtocol:
 #if SWIFT_OBJC_INTEROP
-    // ErrorType always has a single-ObjC-refcounted representation.
+    // ErrorProtocol always has a single-ObjC-refcounted representation.
     return &_TWVBO;
 #else
-    // Without ObjC interop, ErrorType is native-refcounted.
+    // Without ObjC interop, ErrorProtocol is native-refcounted.
     return &_TWVBo;
 #endif
       
@@ -2071,12 +2071,12 @@ getExistentialValueWitnesses(ExistentialTypeState &E,
   }
 }
 
-ExistentialTypeRepresentation
+template<> ExistentialTypeRepresentation
 ExistentialTypeMetadata::getRepresentation() const {
   // Some existentials use special containers.
   switch (Flags.getSpecialProtocol()) {
-  case SpecialProtocol::ErrorType:
-    return ExistentialTypeRepresentation::ErrorType;
+  case SpecialProtocol::ErrorProtocol:
+    return ExistentialTypeRepresentation::ErrorProtocol;
   case SpecialProtocol::AnyObject:
   case SpecialProtocol::None:
     break;
@@ -2088,7 +2088,7 @@ ExistentialTypeMetadata::getRepresentation() const {
   return ExistentialTypeRepresentation::Opaque;
 }
 
-bool
+template<> bool
 ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   switch (getRepresentation()) {
   // Owning a reference to a class existential is equivalent to owning a
@@ -2100,7 +2100,7 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
     return true;
     
   // References to boxed existential containers may be shared.
-  case ExistentialTypeRepresentation::ErrorType: {
+  case ExistentialTypeRepresentation::ErrorProtocol: {
     // We can only take the value if the box is a bridged NSError, in which case
     // owning a reference to the box is owning a reference to the NSError.
     // TODO: Or if the box is uniquely referenced. We don't have intimate
@@ -2112,7 +2112,7 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   }
 }
 
-void
+template<> void
 ExistentialTypeMetadata::deinitExistentialContainer(OpaqueValue *container)
 const {
   switch (getRepresentation()) {
@@ -2128,14 +2128,14 @@ const {
     break;
   }
   
-  case ExistentialTypeRepresentation::ErrorType:
+  case ExistentialTypeRepresentation::ErrorProtocol:
     // TODO: If we were able to claim the value from a uniquely-owned
     // existential box, we would want to deallocError here.
     break;
   }
 }
 
-const OpaqueValue *
+template<> const OpaqueValue *
 ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   switch (getRepresentation()) {
   case ExistentialTypeRepresentation::Class: {
@@ -2149,7 +2149,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
     return opaqueContainer->Type->vw_projectBuffer(
                          const_cast<ValueBuffer*>(&opaqueContainer->Buffer));
   }
-  case ExistentialTypeRepresentation::ErrorType: {
+  case ExistentialTypeRepresentation::ErrorProtocol: {
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(container);
     // If the error is a bridged NSError, then the "box" is in fact itself
@@ -2161,7 +2161,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   }
 }
 
-const Metadata *
+template<> const Metadata *
 ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   switch (getRepresentation()) {
   case ExistentialTypeRepresentation::Class: {
@@ -2175,7 +2175,7 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
     return opaqueContainer->Type;
   }
-  case ExistentialTypeRepresentation::ErrorType: {
+  case ExistentialTypeRepresentation::ErrorProtocol: {
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getType();
@@ -2183,7 +2183,7 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   }
 }
 
-const WitnessTable *
+template<> const WitnessTable *
 ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
                                          unsigned i) const {
   assert(i < Flags.getNumWitnessTables());
@@ -2205,10 +2205,10 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
     witnessTables = opaqueContainer->getWitnessTables();
     break;
   }
-  case ExistentialTypeRepresentation::ErrorType: {
+  case ExistentialTypeRepresentation::ErrorProtocol: {
     // Only one witness table we should be able to return, which is the
-    // ErrorType.
-    assert(i == 0 && "only one witness table in an ErrorType box");
+    // ErrorProtocol.
+    assert(i == 0 && "only one witness table in an ErrorProtocol box");
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getErrorConformance();
@@ -2388,37 +2388,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
 
 /*** Other metadata routines ***********************************************/
 
-const NominalTypeDescriptor *
-Metadata::getNominalTypeDescriptor() const {
-  switch (getKind()) {
-  case MetadataKind::Class: {
-    const ClassMetadata *cls = static_cast<const ClassMetadata *>(this);
-    if (!cls->isTypeMetadata())
-      return nullptr;
-    if (cls->isArtificialSubclass())
-      return nullptr;
-    return cls->getDescription();
-  }
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-    return static_cast<const StructMetadata *>(this)->Description;
-  case MetadataKind::ForeignClass:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype:
-  case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
-    return nullptr;
-  }
-}
-
-const GenericMetadata *
+template<> const GenericMetadata *
 Metadata::getGenericPattern() const {
   auto ntd = getNominalTypeDescriptor();
   if (!ntd)
@@ -2426,7 +2396,7 @@ Metadata::getGenericPattern() const {
   return ntd->getGenericMetadataPattern();
 }
 
-const ClassMetadata *
+template<> const ClassMetadata *
 Metadata::getClassObject() const {
   switch (getKind()) {
   case MetadataKind::Class: {

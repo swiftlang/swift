@@ -464,9 +464,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     ProtocolDecl *anyObjectProtocol =
       getASTContext().getProtocol(KnownProtocolKind::AnyObject);
     auto mainClassAnyObjectConformance = ProtocolConformanceRef(
-      SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
-                                                nullptr)
-        .getPointer());
+      *SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
+                                                nullptr));
     CanType anyObjectTy = anyObjectProtocol
       ->getDeclaredTypeInContext()
       ->getCanonicalType();

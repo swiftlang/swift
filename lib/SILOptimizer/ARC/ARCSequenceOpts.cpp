@@ -241,6 +241,7 @@ bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
     Evaluator.clearLoopState(Region);
     Context.DecToIncStateMap.clear();
     Context.IncToDecStateMap.clear();
+    Evaluator.clearSetFactory();
 
     // This ensures we only ever recompute post dominating releases on the first
     // iteration.

@@ -7,6 +7,7 @@ set(UTILS_SOURCES
   Utils/Generics.cpp
   Utils/Local.cpp
   Utils/LoopUtils.cpp
+  Utils/LSBase.cpp
   Utils/SILInliner.cpp
   Utils/SILSSAUpdater.cpp
   PARENT_SCOPE)

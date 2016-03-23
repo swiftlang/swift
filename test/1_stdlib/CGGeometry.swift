@@ -235,7 +235,7 @@ assert(!rect.contains(bigRect))
 
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
-var (slice, remainder) = rect.divide(5, fromEdge:CGRectEdge.MinXEdge)
+var (slice, remainder) = rect.divide(5, fromEdge:CGRectEdge.minXEdge)
 print_(slice, "slice")
 print_(remainder, "remainder")
 // CHECK-NEXT: slice 11.25 22.25 5.0 44.25

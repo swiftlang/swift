@@ -313,6 +313,35 @@ func testGenericMethodCallACHandled<P: MyProto>(s: P) throws {
   try P.static_callAC(raise())
 }
 
+/** Optional closure parameters */
+
+func testForceUnwrappedOptionalFunctionParameter(f: (() throws -> Void)?) rethrows {
+  try f!()
+}
+
+func testBindOptionalFunctionParameter(f: (() throws -> Void)?) rethrows {
+  try f?()
+}
+
+func testImplicitlyUnwrappedFunctionParameter(f: (() throws -> Void)!) rethrows {
+  if f != nil {
+    try f()
+  }
+}
+
+func throwingFunc() throws {}
+
+func nonThrowingFunc() {}
+
+try testBindOptionalFunctionParameter(throwingFunc)
+testBindOptionalFunctionParameter(nonThrowingFunc)
+testBindOptionalFunctionParameter(nil)
+
+try testImplicitlyUnwrappedFunctionParameter(throwingFunc)
+testImplicitlyUnwrappedFunctionParameter(nonThrowingFunc)
+testImplicitlyUnwrappedFunctionParameter(nil)
+
+
 /** Miscellaneous bugs **/
 
 // rdar://problem/21967164 - Non-throwing closures are incorrectly marked as throwing in rethrow contexts
@@ -323,7 +352,7 @@ func rt2(predicate: () throws -> ()) rethrows { }
 rt2 { }
 
 
-enum SomeError : ErrorType {
+enum SomeError : ErrorProtocol {
   case Badness
 }
 

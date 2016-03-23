@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 func c<g>() -> (g, g -> g) -> g {
    d b d.f = {
 }
@@ -312,7 +314,7 @@ k()
 h
 protocol k : h { func h
 k
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }
@@ -509,7 +511,7 @@ struct l<l : d> : d {
 protocol f {
 }
 protocol d : f {
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: dlass func s {}
 s p {
     func m() -> String
@@ -734,9 +736,9 @@ func e<l {
 class l: j{  k() -> ())
 }
 ({})
-func j<o : BooleanType>(l: o) {
+func j<o : Boolean>(l: o) {
 }
-j(j q BooleanType)
+j(j q Boolean)
 func p(l: Any, g: Any) -> (((Any, Any) -> Any) -> Any) {
     return {
         (p: (Any, Any) -> Any) -> Any in

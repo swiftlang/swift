@@ -573,3 +573,17 @@ bb0(%0 : $Int):
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 2
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
 // CHECK-NEXT: %T.Y.P2 = load i8**, i8*** [[T1]], align 8
+
+struct ComplexBoundedType<T: P2> {}
+
+// SR-901: Ensure that a partial_apply which captures bound generic type
+// metadata doesn't crash when restoring the generic context.
+
+sil hidden_external @generic_function : $@convention(thin) <T> () -> ()
+sil @partial_apply_with_generic_type : $@convention(thin) <U: P2> () -> () {
+bb0:
+  %fn = function_ref @generic_function : $@convention(thin) <T> () -> ()
+  %pa = partial_apply %fn <ComplexBoundedType<U>>() : $@convention(thin) <T> () -> ()
+  %result = tuple ()
+  return %result : $()
+}

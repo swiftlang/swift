@@ -15,13 +15,13 @@ func sum(x:Int, y:Int) -> Int {
 }
 
 @inline(never)
-func benchCaptureProp<S : SequenceType
+func benchCaptureProp<S : Sequence
 >(
-  s:S, _ f:(S.Generator.Element, S.Generator.Element)->S.Generator.Element) -> S.Generator.Element {
+  s:S, _ f:(S.Iterator.Element, S.Iterator.Element)->S.Iterator.Element) -> S.Iterator.Element {
 
-  var g = s.generate()
-  let initial = g.next()!
-  return GeneratorSequence(g).reduce(initial, combine: f)
+  var it = s.makeIterator()
+  let initial = it.next()!
+  return IteratorSequence(it).reduce(initial, combine: f)
 }
 
 public func run_CaptureProp(N: Int) {

@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 }
 }
 func b<T -> T ->()
@@ -55,7 +57,7 @@ extension NSSet {
 let x in a = c
 }
 private let x }
-class func a(s: CollectionType where f<f = F>) -> : d : A".startIndex)
+class func a(s: Collection where f<f = F>) -> : d : A".startIndex)
 }
 let c: e: c(x):
 func c(()
@@ -114,7 +116,7 @@ class A : NSManagedObject {
 e = b(object1: Int {
 let t.C()))
 return ")
-func g: (self[T where f(i: (c, object2: SequenceType, i: l) {
+func g: (self[T where f(i: (c, object2: Sequence, i: l) {
 var b(n: c) {
 class a()
 override func e: Any, AnyObject)
@@ -134,7 +136,7 @@ func d()) -> V, k : A<d {
 b
 super.Type) {
 }
-class b(.f : SequenceType where Optional<Q<T! {
+class b(.f : Sequence where Optional<Q<T! {
 typealias B
 })")(t: 1
 ")

@@ -16,7 +16,7 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-var SliceTests = TestSuite("CollectionType")
+var SliceTests = TestSuite("Collection")
 
 //===----------------------------------------------------------------------===//
 // Slice<Base>
@@ -30,21 +30,21 @@ SliceTests.test("Slice/AssociatedTypes") {
     expectSliceType(${traversal}Slice.self)
     expectCollectionAssociatedTypes(
       collectionType: ${traversal}Slice.self,
-      generatorType: IndexingGenerator<${traversal}Slice>.self,
+      iteratorType: IndexingIterator<${traversal}Slice>.self,
       subSequenceType: ${traversal}Slice.self,
       indexType: Minimal${traversal}Index.self)
   }
 %end
 
-  func checkStaticTypealiases<Base : CollectionType>(_: Base) {
+  func checkStaticTypealiases<Base : Collection>(_: Base) {
     expectEqualType(Base.Index.self, Slice<Base>.Index.self)
   }
 }
 
-SliceTests.test("Slice/init(base:bounds:)") {
+SliceTests.test("Slice/init(_base:bounds:)") {
   for test in subscriptRangeTests {
     let base = MinimalForwardCollection(elements: test.collection)
-    var result = Slice(base: base, bounds: test.boundsIn(base))
+    var result = Slice(_base: base, bounds: test.boundsIn(base))
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &result)
@@ -61,7 +61,7 @@ SliceTests.test("Slice.{startIndex,endIndex}") {
   for test in subscriptRangeTests {
     let base = MinimalForwardCollection(elements: test.collection)
     let bounds = test.boundsIn(base)
-    var slice = Slice(base: base, bounds: bounds)
+    var slice = Slice(_base: base, bounds: bounds)
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &slice)
@@ -77,7 +77,7 @@ SliceTests.test("Slice.subscript(_: Index)") {
     Base.Index.trapOnRangeCheckFailure.value = false
     let base = Base(elements: test.collection)
     let bounds = test.boundsIn(base)
-    var slice = Slice(base: base, bounds: bounds)
+    var slice = Slice(_base: base, bounds: bounds)
     expectType(Slice<Base>.self, &slice)
 
     for i in bounds {
@@ -86,7 +86,7 @@ SliceTests.test("Slice.subscript(_: Index)") {
       expectEqual(base[i].value, element.value)
     }
 
-    for (i, index) in base.indices.enumerate() {
+    for (i, index) in base.indices.enumerated() {
       if test.bounds.contains(i) {
         expectEqual(base[index].value, slice[index].value)
       } else {
@@ -105,7 +105,7 @@ SliceTests.test("Slice.subscript(_: Range<Index>)") {
     typealias Base = MinimalForwardCollection<OpaqueValue<Int>>
     Base.Index.trapOnRangeCheckFailure.value = false
     let base = Base(elements: test.collection)
-    var slice = Slice(base: base, bounds: base.indices)
+    var slice = Slice(_base: base, bounds: base.indices)
     expectType(Slice<Base>.self, &slice)
 
     var result = slice[test.boundsIn(slice)]
@@ -144,14 +144,14 @@ SliceTests.test("MutableSlice/AssociatedTypes") {
     expectMutableSliceType(${traversal}MutableSlice.self)
     expectCollectionAssociatedTypes(
       collectionType: ${traversal}MutableSlice.self,
-      generatorType: IndexingGenerator<${traversal}MutableSlice>.self,
+      iteratorType: IndexingIterator<${traversal}MutableSlice>.self,
       subSequenceType: ${traversal}MutableSlice.self,
       indexType: Minimal${traversal}Index.self)
   }
 %end
 
   func checkStaticTypealiases<
-    Base : MutableCollectionType
+    Base : MutableCollection
   >(_: Base) {
     expectEqualType(Base.Index.self, MutableSlice<Base>.Index.self)
   }
@@ -166,23 +166,23 @@ and MutableCollection
 extension MutableSlice {
   func _checkBaseSubSequenceElementIsElement() {
       Element.self,
-      Generator.Element.self)
+      Iterator.Element.self)
     expectEqualType(
       Element.self,
-      Generator.Element.self,
-      Base.Generator.Element.self)
+      Iterator.Element.self,
+      Base.Iterator.Element.self)
     expectEqualType(
       Element.self,
-      Generator.Element.self,
-      Base.SubSequence.Generator.Element.self)
+      Iterator.Element.self,
+      Base.SubSequence.Iterator.Element.self)
   }
 }
 */
 
-SliceTests.test("MutableSlice/init(base:bounds:)") {
+SliceTests.test("MutableSlice/init(_base:bounds:)") {
   for test in subscriptRangeTests {
     let c = MinimalForwardMutableCollection(elements: test.collection)
-    var result = MutableSlice(base: c, bounds: test.boundsIn(c))
+    var result = MutableSlice(_base: c, bounds: test.boundsIn(c))
     expectType(
       MutableSlice<MinimalForwardMutableCollection<OpaqueValue<Int>>>.self,
       &result)
@@ -199,7 +199,7 @@ SliceTests.test("MutableSlice.{startIndex,endIndex}") {
   for test in subscriptRangeTests {
     let c = MinimalForwardMutableCollection(elements: test.collection)
     let bounds = test.boundsIn(c)
-    var slice = MutableSlice(base: c, bounds: bounds)
+    var slice = MutableSlice(_base: c, bounds: bounds)
     expectType(
       MutableSlice<MinimalForwardMutableCollection<OpaqueValue<Int>>>.self,
       &slice)
@@ -215,7 +215,7 @@ SliceTests.test("MutableSlice.subscript(_: Index)/{get,set}") {
     Base.Index.trapOnRangeCheckFailure.value = false
     let base = Base(elements: test.collection)
     let bounds = test.boundsIn(base)
-    var slice = MutableSlice(base: base, bounds: bounds)
+    var slice = MutableSlice(_base: base, bounds: bounds)
     expectType(MutableSlice<Base>.self, &slice)
 
     for i in bounds {
@@ -235,7 +235,7 @@ SliceTests.test("MutableSlice.subscript(_: Index)/{get,set}") {
     }
 
     var sliceForSetter = slice
-    for (i, index) in base.indices.enumerate() {
+    for (i, index) in base.indices.enumerated() {
       if test.bounds.contains(i) {
         // Test getter.
         expectEqual(base[index].value, slice[index].value)

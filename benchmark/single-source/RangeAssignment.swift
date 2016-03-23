@@ -15,7 +15,7 @@ import TestsUtils
 @inline(never)
 public func run_RangeAssignment(scale: Int) {
   let range = 100..<200
-  var vector = [Double](count: 5000, repeatedValue: 0.0 )
+  var vector = [Double](repeating: 0.0 , count: 5000)
   let alfa = 1.0
   let N = 500*scale
   for _ in 1...N {

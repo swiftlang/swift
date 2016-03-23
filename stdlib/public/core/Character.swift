@@ -23,13 +23,13 @@ public struct Character :
   // representations.  In the small representation, the unused bytes
   // are filled with 0xFF.
   //
-  // If the grapheme cluster can be represented as Small, it
+  // If the grapheme cluster can be represented as `.small`, it
   // should be represented as such.
   internal enum Representation {
     // A _StringBuffer whose first grapheme cluster is self.
     // NOTE: may be more than 1 Character long.
-    case Large(_StringBuffer._Storage)
-    case Small(Builtin.Int63)
+    case large(_StringBuffer._Storage)
+    case small(Builtin.Int63)
   }
 
   /// Construct a `Character` containing just the given `scalar`.
@@ -42,9 +42,9 @@ public struct Character :
       shift += 8
     }
 
-    UTF8.encode(scalar, output: output)
+    UTF8.encode(scalar, sendingOutputTo: output)
     asInt |= (~0) << shift
-    _representation = .Small(Builtin.trunc_Int64_Int63(asInt._value))
+    _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
   }
 
   @effects(readonly)
@@ -62,12 +62,13 @@ public struct Character :
   @effects(readonly)
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
-    isASCII: Builtin.Int1) {
+    utf8CodeUnitCount: Builtin.Word,
+    isASCII: Builtin.Int1
+  ) {
     self = Character(
       String(
         _builtinExtendedGraphemeClusterLiteral: start,
-        byteSize: byteSize,
+        utf8CodeUnitCount: utf8CodeUnitCount,
         isASCII: isASCII))
   }
 
@@ -78,7 +79,7 @@ public struct Character :
 
   /// Create an instance from a single-character `String`.
   ///
-  /// - Requires: `s` contains exactly one extended grapheme cluster.
+  /// - Precondition: `s` contains exactly one extended grapheme cluster.
   public init(_ s: String) {
     // The small representation can accept up to 8 code units as long
     // as the last one is a continuation.  Since the high bit of the
@@ -95,23 +96,23 @@ public struct Character :
       s.startIndex.successor() == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    let (count, initialUTF8) = s._core._encodeSomeUTF8(0)
+    let (count, initialUTF8) = s._core._encodeSomeUTF8(from: 0)
     // Notice that the result of sizeof() is a small non-zero number and can't
     // overflow when multiplied by 8.
     let bits = sizeofValue(initialUTF8) &* 8 &- 1
     if _fastPath(
       count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
-      _representation = .Small(Builtin.trunc_Int64_Int63(initialUTF8._value))
+      _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {
       if let native = s._core.nativeBuffer
               where native.start == UnsafeMutablePointer(s._core._baseAddress) {
-        _representation = .Large(native._storage)
+        _representation = .large(native._storage)
         return
       }
       var nativeString = ""
-      nativeString.appendContentsOf(s)
-      _representation = .Large(nativeString._core.nativeBuffer!._storage)
+      nativeString.append(s)
+      _representation = .large(nativeString._core.nativeBuffer!._storage)
     }
   }
 
@@ -134,11 +135,11 @@ public struct Character :
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
 
-  internal struct _SmallUTF8 : CollectionType {
+  internal struct _SmallUTF8 : Collection {
     init(_ u8: UInt64) {
-      let count = Character._smallSize(u8)
-      _sanityCheck(count <= 8, "Character with more than 8 UTF-8 code units")
-      self.count = UInt16(count)
+      let utf8Count = Character._smallSize(u8)
+      _sanityCheck(utf8Count <= 8, "Character with more than 8 UTF-8 code units")
+      self.count = UInt16(utf8Count)
       self.data = u8
     }
 
@@ -160,7 +161,7 @@ public struct Character :
 
     /// Access the code unit at `position`.
     ///
-    /// - Requires: `position` is a valid position in `self` and
+    /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     subscript(position: Int) -> UTF8.CodeUnit {
       _sanityCheck(position >= 0)
@@ -171,7 +172,7 @@ public struct Character :
         truncatingBitPattern: data >> (UInt64(position) &* 8))
     }
 
-    internal struct Generator : GeneratorType {
+    internal struct Iterator : IteratorProtocol {
       init(_ data: UInt64) {
         self._data = data
       }
@@ -188,19 +189,20 @@ public struct Character :
       internal var _data: UInt64
     }
 
-    internal func generate() -> Generator {
-      return Generator(data)
+    internal func makeIterator() -> Iterator {
+      return Iterator(data)
     }
 
     var count: UInt16
     var data: UInt64
   }
 
-  struct _SmallUTF16 : CollectionType {
+  struct _SmallUTF16 : Collection {
     init(_ u8: UInt64) {
-      let count = UTF16.measure(
-        UTF8.self, input: _SmallUTF8(u8).generate(),
-        repairIllFormedSequences: true)!.0
+      let count = UTF16.transcodedLength(
+        of: _SmallUTF8(u8).makeIterator(),
+        decodedAs: UTF8.self,
+        repairingIllFormedSequences: true)!.0
       _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
       self.count = UInt16(count)
       var u16: UInt64 = 0
@@ -209,8 +211,10 @@ public struct Character :
         u16 = u16 | UInt64($0)
       }
       transcode(
-        UTF8.self, UTF16.self, _SmallUTF8(u8).generate(), output,
-        stopOnError: false)
+        _SmallUTF8(u8).makeIterator(),
+        from: UTF8.self, to: UTF16.self,
+        stoppingOnError: false,
+        sendingOutputTo: output)
       self.data = u16
     }
 
@@ -232,7 +236,7 @@ public struct Character :
 
     /// Access the code unit at `position`.
     ///
-    /// - Requires: `position` is a valid position in `self` and
+    /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     subscript(position: Int) -> UTF16.CodeUnit {
       _sanityCheck(position >= 0)
@@ -279,19 +283,19 @@ extension String {
   /// Construct an instance containing just the given `Character`.
   public init(_ c: Character) {
     switch c._representation {
-    case let .Small(_63bits):
+    case let .small(_63bits):
       let value = Character._smallValue(_63bits)
       let smallUTF8 = Character._SmallUTF8(value)
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: smallUTF8)
-    case let .Large(value):
+    case let .large(value):
       let buf = String(_StringCore(_StringBuffer(value)))
       self = buf[buf.startIndex..<buf.startIndex.successor()]
     }
   }
 }
 
-/// .Small characters are stored in an Int63 with their UTF-8 representation,
+/// `.small` characters are stored in an Int63 with their UTF-8 representation,
 /// with any unused bytes set to 0xFF. ASCII characters will have all bytes set
 /// to 0xFF except for the lowest byte, which will store the ASCII value. Since
 /// 0x7FFFFFFFFFFFFF80 or greater is an invalid UTF-8 sequence, we know if a
@@ -307,7 +311,7 @@ internal var _minASCIICharReprBuiltin: Builtin.Int63 {
 @warn_unused_result
 public func ==(lhs: Character, rhs: Character) -> Bool {
   switch (lhs._representation, rhs._representation) {
-  case let (.Small(lbits), .Small(rbits)) where
+  case let (.small(lbits), .small(rbits)) where
     Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
     && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
     return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
@@ -321,7 +325,7 @@ public func ==(lhs: Character, rhs: Character) -> Bool {
 @warn_unused_result
 public func <(lhs: Character, rhs: Character) -> Bool {
   switch (lhs._representation, rhs._representation) {
-  case let (.Small(lbits), .Small(rbits)) where
+  case let (.small(lbits), .small(rbits)) where
     // Note: This is consistent with Foundation but unicode incorrect.
     // See String._compareASCII.
     Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))

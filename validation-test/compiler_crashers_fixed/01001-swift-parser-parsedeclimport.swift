@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 {
 return x in c {
 () { c<T.a<T : T : b
@@ -27,7 +29,7 @@ public var f = d>(n: T> {
 }
 S() -> () -> {
 protocol C = {
-class func c<S : SequenceType, k : T : A<Y> (true }
+class func c<S : Sequence, k : T : A<Y> (true }
 }
 self.h : C {
 import Foundation
@@ -39,6 +41,6 @@ import Foundation
 protocol A {
 let c: d {
 }
-func f(f, let foo as BooleanType))-> U -> {
+func f(f, let foo as Boolean))-> U -> {
 print("[1
 typealias A : A {

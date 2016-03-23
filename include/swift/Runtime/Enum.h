@@ -23,8 +23,14 @@ namespace swift {
   
 struct OpaqueValue;
 struct ValueWitnessTable;
-struct Metadata;
-struct EnumMetadata;
+  
+struct InProcess;
+
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
+
+template <typename Runtime> struct TargetEnumMetadata;
+using EnumMetadata = TargetEnumMetadata<InProcess>;
 struct TypeLayout;
 
 /// \brief Initialize the value witness table for a generic, single-payload

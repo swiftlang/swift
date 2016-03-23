@@ -11,9 +11,10 @@ class B {
 
 // CHECK-LABEL: sil @devirtualize_object
 // CHECK: [[A:%[0-9]+]] = alloc_ref
+// CHECK-NEXT: set_deallocating [[A]] 
 // CHECK-NOT: strong_release
-// CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test1Bd
-// CHECK: apply [[D]]([[A]])
+// CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test1BD
+// CHECK-NEXT: apply [[D]]([[A]])
 // CHECK-NEXT: dealloc_ref [stack] [[A]]
 // CHECK: return
 sil @devirtualize_object : $@convention(thin) () -> () {
@@ -75,9 +76,10 @@ bb0(%0 : $B):
 
 // CHECK-LABEL: sil @dont_crash_with_missing_release
 // CHECK: [[A:%[0-9]+]] = alloc_ref
+// CHECK-NEXT: set_deallocating [[A]] 
 // CHECK-NOT: strong_release
-// CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test1Bd
-// CHECK: apply [[D]]([[A]])
+// CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test1BD
+// CHECK-NEXT: apply [[D]]([[A]])
 // CHECK-NEXT: dealloc_ref [stack] [[A]]
 // CHECK: return
 sil @dont_crash_with_missing_release : $@convention(thin) () -> () {
@@ -104,7 +106,8 @@ struct WrongStorage {
 // CHECK-NOT: strong_release
 // CHECK: unchecked_ref_cast
 // CHECK: [[C:%[0-9]+]] = unchecked_ref_cast [[B]]
-// CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test14MyArrayStoraged
+// CHECK: set_deallocating [[C]]
+// CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test14MyArrayStorageD
 // CHECK: apply [[D]]<Int64>([[C]])
 // CHECK: [[X:%[0-9]+]] = function_ref @swift_bufferDeallocateFromStack
 // CHECK: apply [[X]]([[B]])

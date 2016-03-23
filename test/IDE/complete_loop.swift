@@ -1,5 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_1 | FileCheck %s -check-prefix=LOOP_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_2 | FileCheck %s -check-prefix=LOOP_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_2 > %t.loop2.txt
+// RUN: FileCheck %s -check-prefix=LOOP_2 < %t.loop2.txt
+// RUN: FileCheck %s -check-prefix=LOOP_2_NEGATIVE < %t.loop2.txt
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_3 | FileCheck %s -check-prefix=LOOP_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_4 | FileCheck %s -check-prefix=LOOP_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_5 | FileCheck %s -check-prefix=LOOP_5
@@ -33,6 +35,8 @@ class C {
 // LOOP_2-DAG: Decl[LocalVar]/Local:               G[#Gen#]{{; name=.+$}}
 // LOOP_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
 // LOOP_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f2({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
+
+// LOOP_2_NEGATIVE-NOT: TypeRelation[{{.*}}]: SequenceType[#SequenceType#];
 
 	func f3(G : Gen) {
 		for i in G.#^LOOP_3^#

@@ -200,7 +200,7 @@ func conformanceViaRequires<T
 
 protocol GeneratesAnElement {
   associatedtype Element : EqualComparable
-  func generate() -> Element
+  func makeIterator() -> Element
 }
 
 protocol AcceptsAnElement {
@@ -209,8 +209,8 @@ protocol AcceptsAnElement {
 }
 
 func impliedSameType<T : GeneratesAnElement where T : AcceptsAnElement>(t: T) {
-  t.accept(t.generate())
-  let e = t.generate(), e2 = t.generate()
+  t.accept(t.makeIterator())
+  let e = t.makeIterator(), e2 = t.makeIterator()
   if e.isEqual(e2) || e.isLess(e2) {
     return
   }
@@ -248,8 +248,8 @@ func recursiveSameType
         where T.MetaAssoc1 == V.Assoc1, V.Assoc1 == U.MetaAssoc2>
        (t: T, u: U)
 {
-  t.get().accept(t.get().generate())
-  let e = t.get().generate(), e2 = t.get().generate()
+  t.get().accept(t.get().makeIterator())
+  let e = t.get().makeIterator(), e2 = t.get().makeIterator()
   if e.isEqual(e2) || e.isLess(e2) {
     return
   }

@@ -24,8 +24,8 @@ __typeof(BOOL (^)(BOOL)) testObjCBoolFnToBlock(BOOL (*)(BOOL));
 __typeof(Boolean (^)(Boolean)) testDarwinBooleanFnToBlock(Boolean (*)(Boolean));
 
 @interface Test : NSObject
-@property bool propCBool;
-@property BOOL propObjCBool;
+@property bool propCBool __attribute__((swift_name("propCBool")));
+@property BOOL propObjCBool __attribute__((swift_name("propObjCBool")));
 @property Boolean propDarwinBoolean;
 
 - (bool)testCBool:(bool)b;

@@ -18,6 +18,7 @@ func test1(var x: MyInt) {
 // CHECK: !=
 // CHECK: +
 // CHECK: ++
+// CHECK: =
 
 func test2(var x: MyInt) {
   #^INT_OPERATORS_INNER,x^#
@@ -26,6 +27,7 @@ func test2(var x: MyInt) {
 // INNER: x+
 // INNER: x++
 // INNER: xxxx
+// INNER: x=
 // INNER: x.bigPowers
 
 // RAW: {

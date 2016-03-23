@@ -2036,6 +2036,44 @@ TypeConverter::getProtocolDispatchStrategy(ProtocolDecl *P) {
   return ProtocolDispatchStrategy::Swift;
 }
 
+CanSILFunctionType TypeConverter::
+getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
+                                 CanGenericSignature genericSig,
+                                 Type selfType) {
+  auto &ctx = M.getASTContext();
+
+  // Get lowered formal types for callback parameters.
+  auto selfMetatypeType = MetatypeType::get(selfType,
+                                            MetatypeRepresentation::Thick);
+
+  {
+    GenericContextScope scope(*this, genericSig);
+
+    // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
+    // selfMetatypeType.
+    if (auto metatype = selfType->getAs<MetatypeType>()) {
+      if (!metatype->hasRepresentation())
+        selfType = getLoweredType(metatype).getSwiftRValueType();
+    }
+  }
+
+  // Create the SILFunctionType for the callback.
+  SILParameterInfo params[] = {
+    { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
+    { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
+    { selfType->getCanonicalType(), ParameterConvention::Indirect_Inout },
+    { selfMetatypeType->getCanonicalType(), ParameterConvention::Direct_Unowned },
+  };
+  ArrayRef<SILResultInfo> results = {};
+  auto extInfo = 
+    SILFunctionType::ExtInfo()
+      .withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  return SILFunctionType::get(genericSig, extInfo,
+                   /*callee*/ ParameterConvention::Direct_Unowned,
+                              params, results, None, ctx);
+}
+
 /// If a capture references a local function, return a reference to that
 /// function.
 static Optional<AnyFunctionRef>

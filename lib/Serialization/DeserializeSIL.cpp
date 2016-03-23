@@ -1171,6 +1171,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(RetainValue)
   UNARY_INSTRUCTION(ReleaseValue)
   UNARY_INSTRUCTION(AutoreleaseValue)
+  UNARY_INSTRUCTION(SetDeallocating)
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
@@ -1725,6 +1726,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createUnreachable(Loc);
     break;
   }
+  case ValueKind::MarkUninitializedBehaviorInst:
+    llvm_unreachable("todo");
   }
   if (ResultVal->hasValue()) {
     LastValueID = LastValueID + 1;

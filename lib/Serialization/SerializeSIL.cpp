@@ -876,6 +876,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::RetainValueInst:
   case ValueKind::ReleaseValueInst:
   case ValueKind::AutoreleaseValueInst:
+  case ValueKind::SetDeallocatingInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocRefInst:
   case ValueKind::DeinitExistentialAddrInst:
@@ -1440,7 +1441,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              S.addTypeRef(IBSHI->getType().getSwiftRValueType()),
              (unsigned)IBSHI->getType().getCategory(),
              ListOfValues);
+    break;
   }
+  case ValueKind::MarkUninitializedBehaviorInst:
+    llvm_unreachable("todo");
   }
   // Non-void values get registered in the value table.
   if (SI.hasValue()) {

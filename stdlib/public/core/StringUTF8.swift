@@ -20,7 +20,7 @@
 extension _StringCore {
   /// An integral type that holds a sequence of UTF-8 code units, starting in
   /// its low byte.
-  public typealias UTF8Chunk = UInt64
+  internal typealias _UTF8Chunk = UInt64
 
   /// Encode text starting at `i` as UTF-8.  Returns a pair whose first
   /// element is the index of the text following whatever got encoded,
@@ -28,15 +28,15 @@ extension _StringCore {
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
   @warn_unused_result
-  func _encodeSomeUTF8(i: Int) -> (Int, UTF8Chunk) {
+  func _encodeSomeUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(i <= count)
 
     if _fastPath(elementWidth == 1) {
       // How many UTF-16 code units might we use before we've filled up
-      // our UTF8Chunk with UTF-8 code units?
-      let utf16Count = min(sizeof(UTF8Chunk.self), count - i)
+      // our _UTF8Chunk with UTF-8 code units?
+      let utf16Count = Swift.min(sizeof(_UTF8Chunk.self), count - i)
 
-      var result: UTF8Chunk = ~0 // Start with all bits set
+      var result: _UTF8Chunk = ~0 // Start with all bits set
 
       _memcpy(
         dest: UnsafeMutablePointer(Builtin.addressof(&result)),
@@ -45,10 +45,10 @@ extension _StringCore {
 
       return (i + utf16Count, result)
     } else if _fastPath(!_baseAddress._isNull) {
-      return _encodeSomeContiguousUTF16AsUTF8(i)
+      return _encodeSomeContiguousUTF16AsUTF8(from: i)
     } else {
 #if _runtime(_ObjC)
-      return _encodeSomeNonContiguousUTF16AsUTF8(i)
+      return _encodeSomeNonContiguousUTF16AsUTF8(from: i)
 #else
       _sanityCheckFailure("_encodeSomeUTF8: Unexpected cocoa string")
 #endif
@@ -58,7 +58,7 @@ extension _StringCore {
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is contiguous UTF-16.
   @warn_unused_result
-  func _encodeSomeContiguousUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
+  func _encodeSomeContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(!_baseAddress._isNull)
 
@@ -70,7 +70,7 @@ extension _StringCore {
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is non-contiguous UTF-16.
   @warn_unused_result
-  func _encodeSomeNonContiguousUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
+  func _encodeSomeNonContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(_baseAddress._isNull)
 
@@ -86,7 +86,7 @@ extension _StringCore {
 
 extension String {
   /// A collection of UTF-8 code units that encodes a `String` value.
-  public struct UTF8View : CollectionType, CustomStringConvertible, CustomDebugStringConvertible {
+  public struct UTF8View : Collection, CustomStringConvertible, CustomDebugStringConvertible {
     internal let _core: _StringCore
     internal let _startIndex: Index
     internal let _endIndex: Index
@@ -95,7 +95,7 @@ extension String {
       self._core = _core
       self._endIndex = Index(_core, _core.endIndex, Index._emptyBuffer)
       if _fastPath(_core.count != 0) {
-        let (_, buffer) = _core._encodeSomeUTF8(0)
+        let (_, buffer) = _core._encodeSomeUTF8(from: 0)
         self._startIndex = Index(_core, 0, buffer)
       } else {
         self._startIndex = self._endIndex
@@ -109,8 +109,8 @@ extension String {
     }
 
     /// A position in a `String.UTF8View`.
-    public struct Index : ForwardIndexType {
-      internal typealias Buffer = _StringCore.UTF8Chunk
+    public struct Index : ForwardIndex {
+      internal typealias Buffer = _StringCore._UTF8Chunk
 
       init(_ _core: _StringCore, _ _coreIndex: Int,
            _ _buffer: Buffer) {
@@ -123,7 +123,7 @@ extension String {
 
       /// Returns the next consecutive value after `self`.
       ///
-      /// - Requires: The next value is representable.
+      /// - Precondition: The next value is representable.
       @warn_unused_result
       public func successor() -> Index {
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
@@ -136,7 +136,7 @@ extension String {
            0b10___01___01___01___00___00___00___00___01___01___01___01___01___01___01___01)
         let increment = (u16Increments >> numericCast(hiNibble << 1)) & 0x3
         let nextCoreIndex = _coreIndex &+ increment
-        let nextBuffer = Index._nextBuffer(_buffer)
+        let nextBuffer = Index._nextBuffer(after: _buffer)
 
         // if the nextBuffer is non-empty, we have all we need
         if _fastPath(nextBuffer != Index._emptyBuffer) {
@@ -144,7 +144,7 @@ extension String {
         }
         // If the underlying UTF16 isn't exhausted, fill a new buffer
         else if _fastPath(nextCoreIndex < _core.endIndex) {
-          let (_, freshBuffer) = _core._encodeSomeUTF8(nextCoreIndex)
+          let (_, freshBuffer) = _core._encodeSomeUTF8(from: nextCoreIndex)
           return Index(_core, nextCoreIndex, freshBuffer)
         }
         else {
@@ -180,7 +180,7 @@ extension String {
 
       /// Consume a byte of the given buffer: shift out the low byte
       /// and put FF in the high byte
-      internal static func _nextBuffer(thisBuffer: Buffer) -> Buffer {
+      internal static func _nextBuffer(after thisBuffer: Buffer) -> Buffer {
         return (thisBuffer >> 8) | _bufferHiByte
       }
 
@@ -211,7 +211,7 @@ extension String {
 
     /// Access the element at `position`.
     ///
-    /// - Requires: `position` is a valid position in `self` and
+    /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     public subscript(position: Index) -> UTF8.CodeUnit {
       let result: UTF8.CodeUnit = numericCast(position._buffer & 0xFF)
@@ -219,13 +219,12 @@ extension String {
       return result
     }
 
-    /// Access the elements delimited by the given half-open range of
-    /// indices.
+    /// Access the contiguous subrange of elements enclosed by `bounds`.
     ///
     /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.
-    public subscript(subRange: Range<Index>) -> UTF8View {
-      return UTF8View(_core, subRange.startIndex, subRange.endIndex)
+    public subscript(bounds: Range<Index>) -> UTF8View {
+      return UTF8View(_core, bounds.startIndex, bounds.endIndex)
     }
 
     public var description: String {
@@ -239,7 +238,12 @@ extension String {
 
   /// A UTF-8 encoding of `self`.
   public var utf8: UTF8View {
-    return UTF8View(self._core)
+    get {
+      return UTF8View(self._core)
+    }
+    set {
+      self = String(newValue)
+    }
   }
 
   public var _contiguousUTF8: UnsafeMutablePointer<UTF8.CodeUnit> {
@@ -265,8 +269,8 @@ extension String {
   public init?(_ utf8: UTF8View) {
     let wholeString = String(utf8._core)
 
-    if let start = utf8.startIndex.samePositionIn(wholeString),
-       let end = utf8.endIndex.samePositionIn(wholeString) {
+    if let start = utf8.startIndex.samePosition(in: wholeString),
+       let end = utf8.endIndex.samePosition(in: wholeString) {
       self = wholeString[start..<end]
       return
     }
@@ -308,8 +312,8 @@ public func == (
 
     // Move the buffers along.
     buffer = (
-      String.UTF8Index._nextBuffer(buffer.0),
-      String.UTF8Index._nextBuffer(buffer.1))
+      String.UTF8Index._nextBuffer(after: buffer.0),
+      String.UTF8Index._nextBuffer(after: buffer.1))
   }
   while true
 }
@@ -317,14 +321,14 @@ public func == (
 // Index conversions
 extension String.UTF8View.Index {
   internal init(_ core: _StringCore, _utf16Offset: Int) {
-      let (_, buffer) = core._encodeSomeUTF8(_utf16Offset)
+      let (_, buffer) = core._encodeSomeUTF8(from: _utf16Offset)
       self.init(core, _utf16Offset, buffer)
   }
 
   /// Construct the position in `utf8` that corresponds exactly to
   /// `utf16Index`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `utf8Index` is an element of
+  /// - Precondition: `utf8Index` is an element of
   ///   `String(utf16)!.utf8.indices`.
   public init?(_ utf16Index: String.UTF16Index, within utf8: String.UTF8View) {
     let utf16 = String.UTF16View(utf8._core)
@@ -351,7 +355,7 @@ extension String.UTF8View.Index {
   /// Construct the position in `utf8` that corresponds exactly to
   /// `unicodeScalarIndex`.
   ///
-  /// - Requires: `unicodeScalarIndex` is an element of
+  /// - Precondition: `unicodeScalarIndex` is an element of
   ///   `String(utf8)!.unicodeScalars.indices`.
   public init(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
@@ -363,7 +367,7 @@ extension String.UTF8View.Index {
   /// Construct the position in `utf8` that corresponds exactly to
   /// `characterIndex`.
   ///
-  /// - Requires: `characterIndex` is an element of
+  /// - Precondition: `characterIndex` is an element of
   ///   `String(utf8)!.indices`.
   public init(_ characterIndex: String.Index, within utf8: String.UTF8View) {
     self.init(utf8._core, _utf16Offset: characterIndex._base._position)
@@ -372,10 +376,10 @@ extension String.UTF8View.Index {
   /// Returns the position in `utf16` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of `String(utf16)!.utf8.indices`.
+  /// - Precondition: `self` is an element of `String(utf16)!.utf8.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf16: String.UTF16View
+  public func samePosition(
+    in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {
     return String.UTF16View.Index(self, within: utf16)
   }
@@ -383,11 +387,11 @@ extension String.UTF8View.Index {
   /// Returns the position in `unicodeScalars` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of
+  /// - Precondition: `self` is an element of
   ///   `String(unicodeScalars).utf8.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    unicodeScalars: String.UnicodeScalarView
+  public func samePosition(
+    in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
     return String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
@@ -395,10 +399,10 @@ extension String.UTF8View.Index {
   /// Returns the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of `characters.utf8.indices`.
+  /// - Precondition: `self` is an element of `characters.utf8.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    characters: String
+  public func samePosition(
+    in characters: String
   ) -> String.Index? {
     return String.Index(self, within: characters)
   }
@@ -407,14 +411,13 @@ extension String.UTF8View.Index {
 // Reflection
 extension String.UTF8View : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  @warn_unused_result
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: self)
   }
 }
 
 extension String.UTF8View : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .Text(description)
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(description)
   }
 }

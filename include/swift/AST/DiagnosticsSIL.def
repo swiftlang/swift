@@ -54,14 +54,20 @@ ERROR(bridging_function_not_correct_type,none,
       "definition of implicit conversion function '%0.%1' is not of the correct"
       " type",
       (StringRef, StringRef))
+ERROR(bridging_objcbridgeable_missing,none,
+      "cannot find definition of '_ObjectiveCBridgeable' protocol", ())
+ERROR(bridging_objcbridgeable_broken,none,
+      "broken definition of '_ObjectiveCBridgeable' protocol: missing %0",
+      (DeclName))
+
 ERROR(invalid_sil_builtin,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
       (StringRef))
 ERROR(could_not_find_bridge_type,none,
       "could not find Objective-C bridge type for type %0; "
       "did you forget to import Foundation?", (Type))
-ERROR(could_not_find_pointer_memory_property,none,
-      "could not find 'memory' property of pointer type %0", (Type))
+ERROR(could_not_find_pointer_pointee_property,none,
+      "could not find 'pointee' property of pointer type %0", (Type))
 
 ERROR(writeback_overlap_property,none,
       "inout writeback to computed property %0 occurs in multiple arguments to"

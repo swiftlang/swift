@@ -103,3 +103,114 @@ public func run_SetIntersect(N: Int) {
   }
   sink(&and)
 }
+
+class Box<T : Hashable where T : Equatable> : Hashable {
+  var value: T
+
+  init(_ v: T) {
+    value = v
+  }
+
+  var hashValue : Int {
+    return value.hashValue
+  }
+}
+
+extension Box : Equatable {
+}
+
+func ==<T: Equatable>(lhs: Box<T>,  rhs: Box<T>) -> Bool {
+  return lhs.value == rhs.value
+}
+
+@inline(never)
+public func run_SetIsSubsetOf_OfObjects(N: Int) {
+  let size = 200
+
+  SRand()
+
+  var set = Set<Box<Int>>(minimumCapacity: size)
+  var otherSet = Set<Box<Int>>(minimumCapacity: size)
+
+  for _ in 0 ..< size {
+    set.insert(Box(Int(truncatingBitPattern: Random())))
+    otherSet.insert(Box(Int(truncatingBitPattern: Random())))
+  }
+
+  var isSubset = false;
+  for _ in 0 ..< N * 5000 {
+    isSubset = set.isSubsetOf(otherSet)
+    if isSubset {
+      break
+    }
+  }
+
+  CheckResults(!isSubset, "Incorrect results in SetIsSubsetOf")
+}
+
+@inline(never)
+func sink(s: inout Set<Box<Int>>) {
+}
+
+@inline(never)
+public func run_SetExclusiveOr_OfObjects(N: Int) {
+  let size = 400
+
+  SRand()
+
+  var set = Set<Box<Int>>(minimumCapacity: size)
+  var otherSet = Set<Box<Int>>(minimumCapacity: size)
+
+  for _ in 0 ..< size {
+    set.insert(Box(Int(truncatingBitPattern: Random())))
+    otherSet.insert(Box(Int(truncatingBitPattern: Random())))
+  }
+
+  var xor = Set<Box<Int>>()
+  for _ in 0 ..< N * 100 {
+    xor = set.exclusiveOr(otherSet)
+  }
+  sink(&xor)
+}
+
+@inline(never)
+public func run_SetUnion_OfObjects(N: Int) {
+  let size = 400
+
+  SRand()
+
+  var set = Set<Box<Int>>(minimumCapacity: size)
+  var otherSet = Set<Box<Int>>(minimumCapacity: size)
+
+  for _ in 0 ..< size {
+    set.insert(Box(Int(truncatingBitPattern: Random())))
+    otherSet.insert(Box(Int(truncatingBitPattern: Random())))
+  }
+
+  var or = Set<Box<Int>>()
+  for _ in 0 ..< N * 100 {
+    or = set.union(otherSet)
+  }
+  sink(&or)
+}
+
+@inline(never)
+public func run_SetIntersect_OfObjects(N: Int) {
+  let size = 400
+
+  SRand()
+
+  var set = Set<Box<Int>>(minimumCapacity: size)
+  var otherSet = Set<Box<Int>>(minimumCapacity: size)
+
+  for _ in 0 ..< size {
+    set.insert(Box(Int(truncatingBitPattern: Random())))
+    otherSet.insert(Box(Int(truncatingBitPattern: Random())))
+  }
+
+  var and = Set<Box<Int>>()
+  for _ in 0 ..< N * 100 {
+    and = set.intersect(otherSet)
+  }
+  sink(&and)
+}

@@ -37,6 +37,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_1 | FileCheck %s -check-prefix=BOUND_GENERIC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_2 | FileCheck %s -check-prefix=BOUND_GENERIC_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_1 | FileCheck %s -check-prefix=EMPTY_OVERLOAD
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_2 | FileCheck %s -check-prefix=EMPTY_OVERLOAD
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -208,20 +211,24 @@ class C3 {
 // OVERLOAD2-NEXT: End completions
 
 // OVERLOAD3: Begin completions
+// OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal:      C1I[#C1#]; name=C1I
+// OVERLOAD3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C2I[#C2#]; name=C2I
 // OVERLOAD3-DAG: Decl[Class]/CurrModule/TypeRelation[Identical]: C2[#C2#]
-// OVERLOAD3-DAG-NOT: Decl[Class]{{.*}} C1
-// OVERLOAD3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
-// OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal:      C1I[#C1#]; name=C1I
 // OVERLOAD3: End completions
+
+// FIXME: This should be a negative test case
+// NEGATIVE_OVERLOAD_3-NOT: Decl[Class]{{.*}} C1
 
 // OVERLOAD4: Begin completions
 // OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
+// OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
 // OVERLOAD4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // OVERLOAD4-DAG: Decl[Class]/CurrModule/TypeRelation[Identical]: C1[#C1#]
-// OVERLOAD4-DAG-NOT: Decl[Class]{{.*}} C2
-// OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
 // OVERLOAD4: End completions
+
+// FIXME: This should be a negative test case
+// NEGATIVE_OVERLOAD4-NOT: Decl[Class]{{.*}} C2
 
 class C4 {
   func f1(G : Gen) {
@@ -311,7 +318,7 @@ class C4 {
 
 // MEMBER7: Begin completions
 // MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: removeAll()[#Void#]; name=removeAll()
-// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: removeAll({#keepCapacity: Bool#})[#Void#]; name=removeAll(keepCapacity: Bool)
+// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: removeAll({#keepingCapacity: Bool#})[#Void#]; name=removeAll(keepingCapacity: Bool)
 // MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: count[#Int#]; name=count
 // MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: capacity[#Int#]; name=capacity
 
@@ -360,3 +367,18 @@ struct TestBoundGeneric1 {
 // BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      x[#[Int]#];
 // BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      y[#[Int]#];
 }
+
+func emptyOverload() {}
+func emptyOverload(foo foo: Int) {}
+emptyOverload(foo: #^EMPTY_OVERLOAD_1^#)
+struct EmptyOverload {
+  init() {}
+  init(frame: Int) {}
+}
+_ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
+// FIXME: we should have a TypeRelation[Identical] here for Ints. For now just
+// check it's not empty.
+// EMPTY_OVERLOAD: Begin completions
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local: i2[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local: i1[#Int#];
+// EMPTY_OVERLOAD: End completions

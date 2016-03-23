@@ -276,7 +276,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
       if lhs.isZero && rhs.isZero {
         // Special case: 0.0 and -0.0 compare equal.
         checkFloatingPointComparison_${FloatSelf}(
-          ExpectedComparisonResult.EQ, lhs, rhs)
+          ExpectedComparisonResult.eq, lhs, rhs)
       } else if lhs.isNaN || rhs.isNaN {
         // Special case: NaN is unordered wrt other values.
         // - equality comparison with NaN returns false,
@@ -292,10 +292,10 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
         // The sane case.
         checkFloatingPointComparison_${FloatSelf}(
           lhsIdx < rhsIdx ?
-            ExpectedComparisonResult.LT :
+            ExpectedComparisonResult.lt :
             (lhsIdx == rhsIdx ?
-              ExpectedComparisonResult.EQ :
-              ExpectedComparisonResult.GT),
+              ExpectedComparisonResult.eq :
+              ExpectedComparisonResult.gt),
           lhs, rhs)
       }
     }
@@ -321,7 +321,7 @@ FloatingPoint.test("${Self}/Strideable") {
 % end
 
 // FIXME: implement Float80 tests after Float80 is implemented.
-// <rdar://problem/20005438> Float80 does not conform to FloatingPointType
+// <rdar://problem/20005438> Float80 does not conform to FloatingPoint
 
 FloatingPoint.test("Float32/Literals") {
   do {
@@ -651,16 +651,16 @@ var FloatingPointClassification = TestSuite("NumericParsing")
 
 FloatingPointClassification.test("FloatingPointClassification/Equatable") {
   let values: [FloatingPointClassification] = [
-    .SignalingNaN,
-    .QuietNaN,
-    .NegativeInfinity,
-    .NegativeNormal,
-    .NegativeSubnormal,
-    .NegativeZero,
-    .PositiveZero,
-    .PositiveSubnormal,
-    .PositiveNormal,
-    .PositiveInfinity
+    .signalingNaN,
+    .quietNaN,
+    .negativeInfinity,
+    .negativeNormal,
+    .negativeSubnormal,
+    .negativeZero,
+    .positiveZero,
+    .positiveSubnormal,
+    .positiveNormal,
+    .positiveInfinity
   ]
   // Values should be equal iff indices equal
   checkEquatable(values, oracle: { $0 == $1 }) 

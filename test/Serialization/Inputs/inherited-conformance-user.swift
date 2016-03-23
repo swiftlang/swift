@@ -1,7 +1,7 @@
 import Base
 
-// Instantiate Counter<Int>, relying on Counter's adoption of ForwardIndexType.
-public struct OneToAThousand : CollectionType {
+// Instantiate Counter<Int>, relying on Counter's adoption of ForwardIndex.
+public struct OneToAThousand : Collection {
   public typealias Element = Int
   public typealias Index = Counter<Int>
 
@@ -15,10 +15,6 @@ public struct OneToAThousand : CollectionType {
 
   public subscript(i: Index) -> Element {
     return i.value
-  }
-
-  public func generate() -> IndexingGenerator<OneToAThousand> {
-    return IndexingGenerator(self)
   }
 
   public init() {}

@@ -48,8 +48,9 @@ UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
 
   var trie = _UnicodeGraphemeClusterBreakPropertyTrie()
 
-  var expected = [_GraphemeClusterBreakPropertyValue](count: 0x110000,
-      repeatedValue: _GraphemeClusterBreakPropertyValue.Other)
+  var expected = [_GraphemeClusterBreakPropertyValue](
+    repeating: _GraphemeClusterBreakPropertyValue.Other,
+    count: 0x110000)
   for (startCodePoint, endCodePoint, value) in graphemeBreakPropertyTable {
     for cp in startCodePoint...endCodePoint {
       expected[cp] = value
@@ -92,15 +93,21 @@ class NonContiguousNSString : NSString {
 
   convenience init(_ scalars: [UInt32]) {
     var encoded: [UInt16] = []
-    var g = scalars.generate()
+    var iter = scalars.makeIterator()
     let output: (UInt16) -> Void = { encoded.append($0) }
-    let hadError =
-      transcode(UTF32.self, UTF16.self, g, output, stopOnError: true)
+    let hadError = transcode(
+      iter,
+      from: UTF32.self,
+      to: UTF16.self,
+      stoppingOnError: true,
+      sendingOutputTo: output)
     expectFalse(hadError)
     self.init(encoded)
   }
 
-  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+  @objc(copyWithZone:)
+  override func copy(with zone: NSZone) -> AnyObject {
+
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -110,7 +117,7 @@ class NonContiguousNSString : NSString {
     return _value.count
   }
 
-  @objc override func characterAtIndex(index: Int) -> unichar {
+  @objc override func character(at index: Int) -> unichar {
     return _value[index]
   }
 

@@ -16,17 +16,18 @@
 # dump the API for all frameworks across OS X, iOS, watchOS, and tvOS,
 # with the Swift 3 rules, use:
 #
-#  /path/to/bin/dir/swift-api-dump.py -3 -o output-dir -s macosx iphoneos watchos appletvos
+#  /path/to/bin/dir/swift-api-dump.py -3 -o output-dir -s macosx iphoneos \
+#      watchos appletvos
 #
 
 from __future__ import print_function
 
 import argparse
+import multiprocessing
 import os
 import re
-import sys
 import subprocess
-import multiprocessing
+import sys
 
 DEFAULT_TARGET_BASED_ON_SDK = {
     'macosx': 'x86_64-apple-macosx10.11',
@@ -65,6 +66,7 @@ SKIPPED_FRAMEWORKS = {
     'vecLib',
 }
 
+
 def create_parser():
     script_path = os.path.dirname(sys.argv[0])
     script_path = os.path.abspath(script_path)
@@ -75,36 +77,54 @@ def create_parser():
         prog='swift-api-dump.py',
         usage='%(prog)s -s iphoneos')
     parser.add_argument('-m', '--module', help='The module name.')
-    parser.add_argument('-j', '--jobs', type=int, help='The number of parallel jobs to execute')
-    parser.add_argument('-s', '--sdk', nargs='+', required=True, help="The SDKs to use.")
+    parser.add_argument('-j', '--jobs', type=int,
+                        help='The number of parallel jobs to execute')
+    parser.add_argument('-s', '--sdk', nargs='+',
+                        required=True, help="The SDKs to use.")
     parser.add_argument('-t', '--target', help="The target triple to use.")
-    parser.add_argument('-i', '--swift-ide-test', default=default_swift_ide_test, help="The swift-ide-test executable.")
-    parser.add_argument('-3', '--swift-3', action='store_true', help="Use Swift 3 transformation")
-    parser.add_argument('-o', '--output-dir', default=os.getcwd(), help='Directory to which the output will be emitted.')
-    parser.add_argument('-q', '--quiet', action='store_true', help='Suppress printing of status messages.')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Print extra information.')
-    parser.add_argument('--enable-infer-import-as-member', action='store_true', help='Infer when a global could be imported as a member.')
-    parser.add_argument('-F', '--framework-dir', action='append', help='Add additional framework directories')
-    parser.add_argument('-I', '--include-dir', action='append', help='Add additional include directories')
+    parser.add_argument('-i', '--swift-ide-test',
+                        default=default_swift_ide_test,
+                        help="The swift-ide-test executable.")
+    parser.add_argument('-3', '--swift-3', action='store_true',
+                        help="Use Swift 3 transformation")
+    parser.add_argument('-o', '--output-dir', default=os.getcwd(),
+                        help='Directory to which the output will be emitted.')
+    parser.add_argument('-q', '--quiet', action='store_true',
+                        help='Suppress printing of status messages.')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='Print extra information.')
+    parser.add_argument('-F', '--framework-dir', action='append',
+                        help='Add additional framework directories')
+    parser.add_argument('-I', '--include-dir', action='append',
+                        help='Add additional include directories')
+    parser.add_argument('--enable-infer-import-as-member', action='store_true', 
+                        help='Infer when a global could be imported as a member.')
     return parser
+
 
 def output_command_result_to_file(command_args, filename):
     with open(filename, 'w') as output_file:
         subprocess.call(command_args, stdout=output_file)
 
+
 def run_command(args):
-    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
     exitcode = proc.returncode
     return (exitcode, out, err)
 
 # Collect the set of submodules for the given module.
+
+
 def collect_submodules(common_args, module):
     # Execute swift-ide-test to print the interface.
     my_args = ['-module-print-submodules', '-module-to-print=%s' % (module)]
     (exitcode, out, err) = run_command(common_args + my_args)
     if exitcode != 0:
-        print('error: submodule collection failed for module %s with error %d' % (module, exitcode))
+        print(
+            'error: submodule collection failed for module %s with error %d' %
+            (module, exitcode))
         return ()
 
     # Find all of the submodule imports.
@@ -118,6 +138,8 @@ def collect_submodules(common_args, module):
     return sorted(list(submodules))
 
 # Print out the command we're about to execute
+
+
 def print_command(cmd, outfile=""):
     str = " ".join(cmd)
     if outfile != "":
@@ -125,7 +147,10 @@ def print_command(cmd, outfile=""):
     print(str)
 
 # Dump the API for the given module.
-def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet, verbose)):
+
+
+def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet,
+                     verbose)):
     # Collect the submodules
     submodules = collect_submodules(cmd, module)
 
@@ -151,13 +176,15 @@ def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet, verbose)):
 
         full_submodule = '%s.%s' % (module, submodule)
         submodule_cmd = cmd + extra_dump_args
-        submodule_cmd = submodule_cmd + ['-module-to-print=%s' % (full_submodule)]
+        submodule_cmd = submodule_cmd + \
+            ['-module-to-print=%s' % (full_submodule)]
         if verbose:
             print_command(submodule_cmd, output_file)
 
         output_command_result_to_file(submodule_cmd, output_file)
 
     return
+
 
 def pretty_sdk_name(sdk):
     if sdk.find("macosx") == 0:
@@ -171,20 +198,25 @@ def pretty_sdk_name(sdk):
     return 'unknownOS'
 
 # Collect the set of frameworks we should dump
+
+
 def collect_frameworks(sdk):
-    (exitcode, sdk_path, err) = run_command(["xcrun", "--show-sdk-path", "-sdk", sdk])
+    (exitcode, sdk_path, err) = run_command(
+        ["xcrun", "--show-sdk-path", "-sdk", sdk])
     if exitcode != 0:
         print('error: framework collection failed with error %d' % (exitcode))
         return ()
     sdk_path = sdk_path.rstrip()
 
-    (exitcode, sdk_version, err) = run_command(["xcrun", "--show-sdk-version", "-sdk", sdk])
+    (exitcode, sdk_version, err) = run_command(
+        ["xcrun", "--show-sdk-version", "-sdk", sdk])
     if exitcode != 0:
         print('error: framework collection failed with error %d' % (exitcode))
         return ()
     sdk_version = sdk_version.rstrip()
 
-    print('Collecting frameworks from %s %s at %s' % (pretty_sdk_name(sdk), sdk_version, sdk_path))
+    print('Collecting frameworks from %s %s at %s' %
+          (pretty_sdk_name(sdk), sdk_version, sdk_path))
 
     # Collect all of the framework names
     frameworks_dir = '%s/System/Library/Frameworks' % sdk_path
@@ -199,7 +231,10 @@ def collect_frameworks(sdk):
 
     return (sorted(list(frameworks)), sdk_path)
 
-def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target, source_filename, output_dir, quiet, verbose):
+
+def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module,
+                                target, source_filename, output_dir, quiet,
+                                verbose):
 
     # Determine the SDK root and collect the set of frameworks.
     (frameworks, sdk_root) = collect_frameworks(sdk)
@@ -218,19 +253,33 @@ def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target,
     results = []
     cmd = cmd_common + ['-sdk', sdk_root, '-target', sdk_target]
     if module:
-        results.append((cmd, cmd_extra_args, sdk_output_dir, module, quiet, verbose))
+        results.append(
+            (cmd, cmd_extra_args, sdk_output_dir, module, quiet, verbose))
     else:
         for framework in frameworks:
-            results.append((cmd, cmd_extra_args, sdk_output_dir, framework, quiet, verbose))
+            results.append(
+                (cmd, cmd_extra_args, sdk_output_dir, framework, quiet,
+                 verbose))
 
     return results
+
 
 def main():
     source_filename = 'swift-api-dump.swift'
     parser = create_parser()
     args = parser.parse_args()
 
-    cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments', '-always-argument-labels', '-skip-overrides']
+    cmd_common = [
+        args.swift_ide_test,
+        '-print-module',
+        '-source-filename',
+        source_filename,
+        '-module-print-skip-overlay',
+        '-skip-unavailable',
+        '-skip-print-doc-comments',
+        '-always-argument-labels',
+        '-skip-overrides'
+    ]
 
     # Add -F / -I arguments.
     if args.framework_dir:
@@ -243,7 +292,8 @@ def main():
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
     if args.swift_3:
-        extra_args = extra_args + ['-enable-omit-needless-words', '-enable-infer-default-arguments']
+        extra_args = extra_args + \
+            ['-enable-omit-needless-words', '-enable-infer-default-arguments']
     if args.enable_infer_import_as_member:
         extra_args = extra_args + ['-enable-infer-import-as-member']
 
@@ -253,7 +303,10 @@ def main():
     # Construct the set of API dumps we should perform.
     jobs = []
     for sdk in args.sdk:
-        jobs = jobs + create_dump_module_api_args(cmd_common, extra_args, sdk, args.module, args.target, source_filename, args.output_dir, args.quiet, args.verbose)
+        jobs = jobs + create_dump_module_api_args(
+            cmd_common, extra_args, sdk, args.module,
+            args.target, source_filename, args.output_dir,
+            args.quiet, args.verbose)
 
     # Execute the API dumps
     pool = multiprocessing.Pool(processes=args.jobs)

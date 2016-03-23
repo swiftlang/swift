@@ -21,6 +21,7 @@
 namespace swift {
   class Decl;
   class DeclContext;
+  class DynamicSelfType;
   class ModuleEntity;
   class TypeDecl;
   class Type;
@@ -35,23 +36,47 @@ namespace swift {
 enum class PrintNameContext {
   /// Normal context
   Normal,
+  /// Keyword context, where no keywords are escaped.
+  Keyword,
   /// Generic parameter context, where 'Self' is not escaped.
   GenericParameter,
+  /// Class method return type, where 'Self' is not escaped.
+  ClassDynamicSelf,
   /// Function parameter context, where keywords other than let/var/inout are
   /// not escaped.
   FunctionParameterExternal,
   FunctionParameterLocal,
+  /// Tuple element context, similar to \c FunctionParameterExternal.
+  TupleElement,
+  /// Attributes, which are escaped as 'Normal', but differentiated for
+  /// the purposes of printName* callbacks.
+  Attribute,
+};
+
+/// Describes the kind of structured entity being printed.
+///
+/// This includes printables with sub-structure that cannot be completely
+/// handled by the printDeclPre/printDeclPost callbacks.
+/// E.g.
+/// \code
+///   func foo(<FunctionParameter>x: Int = 2</FunctionParameter>, ...)
+/// \endcode
+enum class PrintStructureKind {
+  GenericParameter,
+  GenericRequirement,
+  FunctionParameter,
+  FunctionType,
+  FunctionReturnType,
+  BuiltinAttribute,
+  TupleElement,
+  NumberLiteral,
+  StringLiteral,
 };
 
 /// An abstract class used to print an AST.
 class ASTPrinter {
   unsigned CurrentIndentation = 0;
   unsigned PendingNewlines = 0;
-  /// The queue of pending printDeclPre callbacks that will be run when we print
-  /// a non-whitespace character.
-  SmallVector<const Decl *, 4> PendingDeclPreCallbacks;
-  const Decl *PendingDeclLocCallback = nullptr;
-  Optional<PrintNameContext> PendingNamePreCallback;
   const NominalTypeDecl *SynthesizeTarget = nullptr;
 
   void printTextImpl(StringRef Text);
@@ -93,7 +118,11 @@ public:
 
   /// Called when printing the referenced name of a type declaration, possibly
   /// from deep inside another type.
-  virtual void printTypeRef(const TypeDecl *TD, Identifier Name);
+  ///
+  /// \param T the original \c Type being referenced. May be null.
+  /// \param RefTo the \c TypeDecl this is considered a reference to.
+  /// \param Name the name to be printed.
+  virtual void printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name);
 
   /// Called when printing the referenced name of a module.
   virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
@@ -106,12 +135,23 @@ public:
   virtual void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                              const NominalTypeDecl *NTD) {}
 
+  /// Called before printing a structured entity.
+  ///
+  /// Callers should use callPrintStructurePre().
+  virtual void printStructurePre(PrintStructureKind Kind,
+                                 const Decl *D = nullptr) {}
+  /// Called after printing a structured entity.
+  virtual void printStructurePost(PrintStructureKind Kind,
+                                  const Decl *D = nullptr) {}
+
   /// Called before printing a name in the given context.
   virtual void printNamePre(PrintNameContext Context) {}
   /// Called after printing a name in the given context.
   virtual void printNamePost(PrintNameContext Context) {}
 
   // Helper functions.
+
+  void printTypeRef(DynamicSelfType *T, Identifier Name);
 
   void printSeparator(bool &first, StringRef separator) {
     if (first) {
@@ -131,6 +171,20 @@ public:
 
   ASTPrinter &operator<<(DeclName name);
 
+  void printKeyword(StringRef Name) {
+    callPrintNamePre(PrintNameContext::Keyword);
+    *this << Name;
+    printNamePost(PrintNameContext::Keyword);
+  }
+
+  void printAttrName(StringRef Name, bool needAt = false) {
+    callPrintNamePre(PrintNameContext::Attribute);
+    if (needAt)
+      *this << "@";
+    *this << Name;
+    printNamePost(PrintNameContext::Attribute);
+  }
+
   void printName(Identifier Name,
                  PrintNameContext Context = PrintNameContext::Normal);
 
@@ -149,51 +203,52 @@ public:
     PendingNewlines++;
   }
 
+  void forceNewlines() {
+    if (PendingNewlines > 0) {
+      llvm::SmallString<16> Str;
+      for (unsigned i = 0; i != PendingNewlines; ++i)
+        Str += '\n';
+      PendingNewlines = 0;
+      printText(Str);
+      printIndent();
+    }
+  }
+
   virtual void printIndent();
 
   // MARK: Callback interface wrappers that perform ASTPrinter bookkeeping.
 
-  /// Schedule a \c printDeclPre callback to be called as soon as a
-  /// non-whitespace character is printed.
-  void callPrintDeclPre(const Decl *D) {
-    PendingDeclPreCallbacks.emplace_back(D);
-  }
+   /// Make a callback to printDeclPre(), performing any necessary bookeeping.
+  void callPrintDeclPre(const Decl *D);
 
   /// Make a callback to printDeclPost(), performing any necessary bookeeping.
   void callPrintDeclPost(const Decl *D) {
-    if (!PendingDeclPreCallbacks.empty() &&
-        PendingDeclPreCallbacks.back() == D) {
-      // Nothing printed for D; skip both pre and post callbacks.
-      // Ideally we wouldn't get as far as setting up the callback if we aren't
-      // going to print anything, but currently that would mean walking the
-      // children of top-level code decls to determine.
-      PendingDeclPreCallbacks.pop_back();
-      return;
-    }
     printDeclPost(D);
   }
 
   /// Make a callback to avoidPrintDeclPost(), performing any necessary
   /// bookkeeping.
   void callAvoidPrintDeclPost(const Decl *D) {
-    assert((PendingDeclPreCallbacks.empty() ||
-            PendingDeclPreCallbacks.back() != D) &&
-           "printDeclPre should not be called on avoided decl");
     avoidPrintDeclPost(D);
   }
 
-  /// Schedule a \c printDeclLoc callback to be called as soon as a
-  /// non-whitespace character is printed.
+   /// Make a callback to printDeclLoc(), performing any necessary bookeeping.
   void callPrintDeclLoc(const Decl *D) {
-    assert(!PendingDeclLocCallback && "unexpected nested callPrintDeclLoc");
-    PendingDeclLocCallback = D;
+    forceNewlines();
+    printDeclLoc(D);
   }
 
-  /// Schedule a \c printNamePre callback to be called as soon as a
-  /// non-whitespace character is printed.
+   /// Make a callback to printNamePre(), performing any necessary bookeeping.
   void callPrintNamePre(PrintNameContext Context) {
-    assert(!PendingNamePreCallback && "unexpected nested callPrintNamePre");
-    PendingNamePreCallback = Context;
+    forceNewlines();
+    printNamePre(Context);
+  }
+
+  /// Make a callback to printStructurePre(), performing any necessary
+  /// bookkeeping.
+  void callPrintStructurePre(PrintStructureKind Kind, const Decl *D = nullptr) {
+    forceNewlines();
+    printStructurePre(Kind, D);
   }
 
   /// To sanitize a malformed utf8 string to a well-formed one.

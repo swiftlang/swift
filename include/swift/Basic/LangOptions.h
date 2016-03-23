@@ -151,7 +151,7 @@ namespace swift {
     /// places elsewhere in the compiler that specifically reference
     /// Objective-C entities whose names are affected by
     /// omit-needless-words.
-    bool OmitNeedlessWords = false;
+    bool OmitNeedlessWords = true;
 
     /// Whether to use the import as member inference system
     ///

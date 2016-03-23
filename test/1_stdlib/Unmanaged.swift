@@ -25,11 +25,11 @@ extension Unmanaged where Instance : TestProtocol1 {
 var UnmanagedTests = TestSuite("Unmanaged")
 
 UnmanagedTests.test("fromOpaque()/trap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isDebugAssertConfiguration() },
-    reason: "fromOpaque() does a _debugPrecondition() for null pointers"))
+    reason: "init(bitPattern:) does a _stdlibAssert() for null pointers"))
   .code {
-  let null = getPointer(COpaquePointer())
+  let null: OpaquePointer = getPointer(nil)
   expectCrashLater()
   let unmanaged = Unmanaged<AnyObject>.fromOpaque(null)
   _blackHole(unmanaged)
@@ -43,7 +43,7 @@ UnmanagedTests.test("unsafeBitCast(Unmanaged, Int)") {
     0,
     unsafeBitCast(
       Unmanaged.passUnretained(ref) as Unmanaged<AnyObject>,
-      Int.self))
+      to: Int.self))
   _fixLifetime(ref)
 }
 

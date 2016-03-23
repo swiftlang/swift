@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 }
 }
 }
@@ -52,7 +54,7 @@ func b> {
 return $0
 }
 let h, g : NSObject {
-(a: CollectionType where l.c<T : C<T> T : d where B = c<h == {
+(a: Collection where l.c<T : C<T> T : d where B = c<h == {
 protocol A = b> d<c) {
 typealias A {
 case A<h : a {
@@ -73,7 +75,7 @@ var a)
 func b(Any)(A: Bool) + seq: T>("foobar")
 func f<U, c(#object1, y)
 }
-return b> ((t: SequenceType> T where S<d
+return b> ((t: Sequence> T where S<d
 protocol a {
 }
 }
@@ -84,7 +86,7 @@ let h == [$0
 }
 func f: (bytes: T, let d.C() -> String) {
 struct c(g> Void>(()
-typealias B<l : BooleanType>(_ = Swift.<b
+typealias B<l : Boolean>(_ = Swift.<b
 var b) {
 }
 for (2, length: b {

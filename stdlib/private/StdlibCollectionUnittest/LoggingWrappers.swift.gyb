@@ -12,13 +12,13 @@
 
 import StdlibUnittest
 
-public protocol WrapperType {
+public protocol Wrapper {
   associatedtype Base
   init(_: Base)
   var base: Base {get set}
 }
 
-public protocol LoggingType : WrapperType {
+public protocol LoggingType : Wrapper {
   associatedtype Log : AnyObject
 }
 
@@ -32,19 +32,19 @@ extension LoggingType {
   }
 }
 
-public class GeneratorLog {
-  public static func dispatchTester<G: GeneratorType>(
-    g: G
-  ) -> LoggingGenerator<LoggingGenerator<G>> {
-    return LoggingGenerator(LoggingGenerator(g))
+public class IteratorLog {
+  public static func dispatchTester<I : IteratorProtocol>(
+    iterator: I
+  ) -> LoggingIterator<LoggingIterator<I>> {
+    return LoggingIterator(LoggingIterator(iterator))
   }
   public static var next = TypeIndexed(0)
 }
 
-public struct LoggingGenerator<Base: GeneratorType>
-  : GeneratorType, LoggingType {
+public struct LoggingIterator<Base : IteratorProtocol>
+  : IteratorProtocol, LoggingType {
 
-  public typealias Log = GeneratorLog
+  public typealias Log = IteratorLog
   
   public init(_ base: Base) {
     self.base = base
@@ -59,7 +59,7 @@ public struct LoggingGenerator<Base: GeneratorType>
 }
 
 /// Data container to keep track of how many times each `Base` type calls methods
-/// of RangeReplaceableCollectionType.
+/// of RangeReplaceableCollection.
 ///
 /// Each static variable is a mapping of Type -> Number of calls.
 public class RangeReplaceableCollectionLog {
@@ -69,17 +69,17 @@ public class RangeReplaceableCollectionLog {
   public static var appendContentsOf = TypeIndexed(0)
   public static var insert = TypeIndexed(0)
   public static var removeAll = TypeIndexed(0)
-  public static var removeAtIndex = TypeIndexed(0)
+  public static var removeAt = TypeIndexed(0)
   public static var _customRemoveLast = TypeIndexed(0)
   public static var _customRemoveLastN = TypeIndexed(0)
-  public static var removeRange = TypeIndexed(0)
+  public static var removeSubrange = TypeIndexed(0)
   public static var removeFirst = TypeIndexed(0)
   public static var removeFirstN = TypeIndexed(0)
-  public static var replaceRange = TypeIndexed(0)
+  public static var replaceSubrange = TypeIndexed(0)
   public static var reserveCapacity = TypeIndexed(0)
   public static var insertContentsOf = TypeIndexed(0)
 
-  public static func dispatchTester<C: RangeReplaceableCollectionType>(
+  public static func dispatchTester<C: RangeReplaceableCollection>(
     rrc: C
   ) -> LoggingRangeReplaceableCollection<LoggingRangeReplaceableCollection<C>> {
     return LoggingRangeReplaceableCollection(
@@ -88,11 +88,11 @@ public class RangeReplaceableCollectionLog {
   }
 }
 
-/// Interposes between RangeReplaceableCollectionType method calls to
+/// Interposes between RangeReplaceableCollection method calls to
 /// increment each method's counter.
 public struct LoggingRangeReplaceableCollection<
-  Base: RangeReplaceableCollectionType
-> : RangeReplaceableCollectionType, LoggingType {
+  Base: RangeReplaceableCollection
+> : RangeReplaceableCollection, LoggingType {
 
   public typealias Index = Base.Index
   public typealias Log = RangeReplaceableCollectionLog
@@ -105,7 +105,7 @@ public struct LoggingRangeReplaceableCollection<
   }
 
   public init<
-    S : SequenceType where S.Generator.Element == Generator.Element
+    S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S) {
     self.base = Base(elements)
     Log.initWithSequence[selfType] += 1
@@ -119,7 +119,7 @@ public struct LoggingRangeReplaceableCollection<
     return base.count
   }
 
-  public var first: Base.Generator.Element? {
+  public var first: Base.Iterator.Element? {
     return base.first
   }
 
@@ -135,44 +135,44 @@ public struct LoggingRangeReplaceableCollection<
     return base.endIndex
   }
 
-  public subscript(position: Base.Index) -> Base.Generator.Element {
+  public subscript(position: Base.Index) -> Base.Iterator.Element {
     return base[position]
   }
 
-  public mutating func replaceRange<
-    C : CollectionType where C.Generator.Element == Base.Generator.Element
+  public mutating func replaceSubrange<
+    C : Collection where C.Iterator.Element == Base.Iterator.Element
   >(
-    subRange: Range<Base.Index>, with newElements: C
+    bounds: Range<Base.Index>, with newElements: C
   ) {
-    Log.replaceRange[selfType] += 1
-    base.replaceRange(subRange, with: newElements)
+    Log.replaceSubrange[selfType] += 1
+    base.replaceSubrange(bounds, with: newElements)
   }
 
-  public mutating func append(newElement: Base.Generator.Element) {
+  public mutating func append(newElement: Base.Iterator.Element) {
     Log.append[selfType] += 1
     base.append(newElement)
   }
 
-  public mutating func appendContentsOf<
-    S : SequenceType where S.Generator.Element == Base.Generator.Element
-  >(newElements: S) {
+  public mutating func append<
+    S : Sequence where S.Iterator.Element == Base.Iterator.Element
+  >(contentsOf newElements: S) {
     Log.appendContentsOf[selfType] += 1
-    base.appendContentsOf(newElements)
+    base.append(contentsOf: newElements)
   }
 
   public mutating func insert(
-    newElement: Base.Generator.Element, atIndex i: Base.Index
+    newElement: Base.Iterator.Element, at i: Base.Index
   ) {
     Log.insert[selfType] += 1
-    base.insert(newElement, atIndex: i)
+    base.insert(newElement, at: i)
   }
 
-  public mutating func removeAtIndex(index: Base.Index) -> Base.Generator.Element {
-    Log.removeAtIndex[selfType] += 1
-    return base.removeAtIndex(index)
+  public mutating func remove(at index: Base.Index) -> Base.Iterator.Element {
+    Log.removeAt[selfType] += 1
+    return base.remove(at: index)
   }
 
-  public mutating func _customRemoveLast() -> Base.Generator.Element? {
+  public mutating func _customRemoveLast() -> Base.Iterator.Element? {
     Log._customRemoveLast[selfType] += 1
     return base._customRemoveLast()
   }
@@ -182,7 +182,7 @@ public struct LoggingRangeReplaceableCollection<
     return base._customRemoveLast(n)
   }
 
-  public mutating func removeFirst() -> Base.Generator.Element {
+  public mutating func removeFirst() -> Base.Iterator.Element {
     Log.removeFirst[selfType] += 1
     return base.removeFirst()
   }
@@ -192,14 +192,14 @@ public struct LoggingRangeReplaceableCollection<
     base.removeFirst(n)
   }
 
-  public mutating func removeRange(subRange: Range<Base.Index>) {
-    Log.removeRange[selfType] += 1
-    base.removeRange(subRange)
+  public mutating func removeSubrange(bounds: Range<Base.Index>) {
+    Log.removeSubrange[selfType] += 1
+    base.removeSubrange(bounds)
   }
 
-  public mutating func removeAll(keepCapacity keepCapacity: Bool) {
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     Log.removeAll[selfType] += 1
-    base.removeAll(keepCapacity: keepCapacity)
+    base.removeAll(keepingCapacity: keepCapacity)
   }
 
   public mutating func reserveCapacity(n: Base.Index.Distance) {
@@ -207,29 +207,29 @@ public struct LoggingRangeReplaceableCollection<
     base.reserveCapacity(n)
   }
 
-  public mutating func insertContentsOf<
-    C : CollectionType where C.Generator.Element == Base.Generator.Element
-  >(newElements: C, at i: Base.Index) {
+  public mutating func insert<
+    C : Collection where C.Iterator.Element == Base.Iterator.Element
+  >(contentsOf newElements: C, at i: Base.Index) {
     Log.insertContentsOf[selfType] += 1
-    base.insertContentsOf(newElements, at: i)
+    base.insert(contentsOf: newElements, at: i)
   }
 
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) throws -> T
+    @noescape transform: (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     return try base.map(transform)
   }
 
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) throws -> Bool
-  ) rethrows -> [Base.Generator.Element] {
+    @noescape includeElement: (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> [Base.Iterator.Element] {
     return try base.filter(includeElement)
   }
 
-  public func generate() -> Base.Generator {
-    return base.generate()
+  public func makeIterator() -> Base.Iterator {
+    return base.makeIterator()
   }
 }
 
@@ -239,7 +239,7 @@ public class ForwardIndexLog {
   public static var advancedByWithLimit = TypeIndexed(0)
   public static var distanceTo = TypeIndexed(0)
 
-  public class func dispatchTester<I : ForwardIndexType>(
+  public class func dispatchTester<I : ForwardIndex>(
     i: I
   ) -> LoggingForwardIndex<LoggingForwardIndex<I>> {
     return LoggingForwardIndex(LoggingForwardIndex(i))
@@ -249,7 +249,7 @@ public class ForwardIndexLog {
 public class BidirectionalIndexLog : ForwardIndexLog {
   public static var predecessor = TypeIndexed(0)
 
-  public class func dispatchTester<I : BidirectionalIndexType>(
+  public class func dispatchTester<I : BidirectionalIndex>(
     i: I
   ) -> LoggingBidirectionalIndex<LoggingBidirectionalIndex<I>> {
     return LoggingBidirectionalIndex(LoggingBidirectionalIndex(i))
@@ -257,7 +257,7 @@ public class BidirectionalIndexLog : ForwardIndexLog {
 }
 
 public class RandomAccessIndexLog : BidirectionalIndexLog {
-  public class func dispatchTester<I : RandomAccessIndexType>(
+  public class func dispatchTester<I : RandomAccessIndex>(
     i: I
   ) -> LoggingRandomAccessIndex<LoggingRandomAccessIndex<I>> {
     return LoggingRandomAccessIndex(LoggingRandomAccessIndex(i))
@@ -265,14 +265,14 @@ public class RandomAccessIndexLog : BidirectionalIndexLog {
 }
 
 public class SequenceLog {
-  public static func dispatchTester<S: SequenceType>(
+  public static func dispatchTester<S: Sequence>(
     s: S
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(LoggingSequence(s))
   }
   public static var forEach = TypeIndexed(0)
-  public static var generate = TypeIndexed(0)
-  public static var underestimateCount = TypeIndexed(0)
+  public static var makeIterator = TypeIndexed(0)
+  public static var underestimatedCount = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
@@ -283,11 +283,11 @@ public class SequenceLog {
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _preprocessingPass = TypeIndexed(0)
   public static var _copyToNativeArrayBuffer = TypeIndexed(0)
-  public static var _initializeTo = TypeIndexed(0)
+  public static var _copyContents = TypeIndexed(0)
 }
 
 public class CollectionLog : SequenceLog {
-  public class func dispatchTester<C : CollectionType>(
+  public class func dispatchTester<C : Collection>(
     c: C
   ) -> LoggingCollection<LoggingCollection<C>> {
     return LoggingCollection(LoggingCollection(c))
@@ -306,7 +306,7 @@ public class CollectionLog : SequenceLog {
 }
 
 public class MutableCollectionLog : CollectionLog {
-  public class func dispatchTester<C : MutableCollectionType>(
+  public class func dispatchTester<C : MutableCollection>(
     c: C
   ) -> LoggingMutableCollection<LoggingMutableCollection<C>> {
     return LoggingMutableCollection(LoggingMutableCollection(c))
@@ -320,8 +320,8 @@ public class MutableCollectionLog : CollectionLog {
 
 % for Kind in ['ForwardIndex', 'BidirectionalIndex', 'RandomAccessIndex']:
 public struct Logging${Kind}<
-  Base: ${Kind}Type
-> : ${Kind}Type, LoggingType {
+  Base: ${Kind}
+> : ${Kind}, LoggingType {
 
   public typealias Log = ${Kind}Log
   public typealias Distance = Base.Distance
@@ -344,20 +344,20 @@ public struct Logging${Kind}<
   }
 %   end
 
-  public func distanceTo(end: Logging${Kind}<Base>) -> Base.Distance {
+  public func distance(to end: Logging${Kind}<Base>) -> Base.Distance {
     Log.distanceTo[selfType] += 1
-    return base.distanceTo(end.base)
+    return base.distance(to: end.base)
   }
 
-  public func advancedBy(n: Base.Distance) -> Logging${Kind}<Base> {
+  public func advanced(by n: Base.Distance) -> Logging${Kind}<Base> {
     Log.advancedBy[selfType] += 1
-    return Logging${Kind}(base.advancedBy(n))
+    return Logging${Kind}(base.advanced(by: n))
   }
 
-  public func advancedBy(n: Base.Distance, limit: Logging${Kind}<Base>)
+  public func advanced(by n: Base.Distance, limit: Logging${Kind}<Base>)
     -> Logging${Kind} {
     Log.advancedByWithLimit[selfType] += 1
-    return Logging${Kind}(base.advancedBy(n, limit: limit.base))
+    return Logging${Kind}(base.advanced(by: n, limit: limit.base))
   }
 }
 
@@ -367,8 +367,8 @@ public func ==<Base>(lhs: Logging${Kind}<Base>, rhs: Logging${Kind}<Base>)
 }
 % end
 
-% for Kind in 'Sequence', 'Collection', 'MutableCollection':
-public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
+% for Kind in ['Sequence', 'Collection', 'MutableCollection']:
+public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
 
   public typealias Log = ${Kind}Log
 
@@ -387,7 +387,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     return base.endIndex
   }
 
-  public subscript(position: Base.Index) -> Base.Generator.Element {
+  public subscript(position: Base.Index) -> Base.Iterator.Element {
     get {
       Log.subscriptIndex[selfType] += 1
       return base[position]
@@ -424,13 +424,13 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   }
 
   public func _customIndexOfEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Base.Index?? {
     Log._customIndexOfEquatableElement[selfType] += 1
     return base._customIndexOfEquatableElement(element)
   }
 
-  public var first: Base.Generator.Element? {
+  public var first: Base.Iterator.Element? {
     Log.first[selfType] += 1
     return base.first
   }
@@ -438,7 +438,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
 
 %   if Kind == 'MutableCollection':
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (UnsafeMutablePointer<Generator.Element>, Int) throws -> R
+    @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
@@ -449,18 +449,18 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   }
 %   end
 
-  public func generate() -> LoggingGenerator<Base.Generator> {
-    Log.generate[selfType] += 1
-    return LoggingGenerator(base.generate())
+  public func makeIterator() -> LoggingIterator<Base.Iterator> {
+    Log.makeIterator[selfType] += 1
+    return LoggingIterator(base.makeIterator())
   }
 
-  public func underestimateCount() -> Int {
-    Log.underestimateCount[selfType] += 1
-    return base.underestimateCount()
+  public var underestimatedCount: Int {
+    Log.underestimatedCount[selfType] += 1
+    return base.underestimatedCount
   }
 
   public func forEach(
-    @noescape body: (Base.Generator.Element) throws -> Void
+    @noescape body: (Base.Iterator.Element) throws -> Void
   ) rethrows {
     Log.forEach[selfType] += 1
     try base.forEach(body)
@@ -468,7 +468,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
 
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) throws -> T
+    @noescape transform: (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     Log.map[selfType] += 1
     return try base.map(transform)
@@ -476,8 +476,8 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
 
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) throws -> Bool
-  ) rethrows -> [Base.Generator.Element] {
+    @noescape includeElement: (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> [Base.Iterator.Element] {
     Log.filter[selfType] += 1
     return try base.filter(includeElement)
   }
@@ -503,42 +503,44 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   }
 
   public func split(
-    maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false,
-    @noescape isSeparator: (Base.Generator.Element) throws -> Bool
+    maxSplits maxSplits: Int = Int.max,
+    omittingEmptySubsequences: Bool = true,
+    @noescape isSeparator: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.SubSequence] {
     Log.split[selfType] += 1
-    return try base.split(maxSplit, allowEmptySlices: allowEmptySlices,
-        isSeparator: isSeparator)
+    return try base.split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
+      isSeparator: isSeparator)
   }
 
 %   if Kind == 'Collection' or Kind == 'MutableCollection':
 
-  public func prefixUpTo(end: Index) -> Base.SubSequence {
+  public func prefix(upTo end: Index) -> Base.SubSequence {
     Log.prefixUpTo[selfType] += 1
-    return base.prefixUpTo(end)
+    return base.prefix(upTo: end)
   }
 
-  public func suffixFrom(start: Index) -> Base.SubSequence {
+  public func suffix(from start: Index) -> Base.SubSequence {
     Log.suffixFrom[selfType] += 1
-    return base.suffixFrom(start)
+    return base.suffix(from: start)
   }
 
-  public func prefixThrough(position: Index) -> Base.SubSequence {
+  public func prefix(through position: Index) -> Base.SubSequence {
     Log.prefixThrough[selfType] += 1
-    return base.prefixThrough(position)
+    return base.prefix(through: position)
   }
 
 %   end
 
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? {
     Log._customContainsEquatableElement[selfType] += 1
     return base._customContainsEquatableElement(element)
   }
 
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
@@ -551,16 +553,17 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     Log._copyToNativeArrayBuffer[selfType] += 1
     return base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
-    Log._initializeTo[selfType] += 1
-    return base._initializeTo(ptr)
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    Log._copyContents[selfType] += 1
+    return base._copyContents(initializing: ptr)
   }
   
   public var base: Base
@@ -568,9 +571,9 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
 % end
 
 public func expectCustomizable<
-  T : WrapperType where
+  T : Wrapper where
   T : LoggingType,
-  T.Base : WrapperType, T.Base : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
@@ -586,9 +589,9 @@ public func expectCustomizable<
 }
 
 public func expectNotCustomizable<
-  T : WrapperType where
+  T : Wrapper where
   T : LoggingType,
-  T.Base : WrapperType, T.Base : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//

@@ -361,6 +361,10 @@ public:
     return getOptions(getKind());
   }
 
+  /// Prints this attribute (if applicable), returning `true` if anything was
+  /// printed.
+  bool printImpl(ASTPrinter &Printer, const PrintOptions &Options) const;
+
 public:
   DeclAttrKind getKind() const {
     return static_cast<DeclAttrKind>(DeclAttrBits.Kind);
@@ -509,6 +513,24 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SILGenName;
+  }
+};
+
+/// Defines the @_cdecl attribute.
+class CDeclAttr : public DeclAttribute {
+public:
+  CDeclAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+    : DeclAttribute(DAK_CDecl, AtLoc, Range, Implicit),
+      Name(Name) {}
+
+  CDeclAttr(StringRef Name, bool Implicit)
+    : CDeclAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+
+  /// The symbol name.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_CDecl;
   }
 };
 
@@ -1048,10 +1070,10 @@ public:
 ///
 /// \code
 /// struct X {
-///   @warn_unused_result(message="this string affects your health")
+///   @warn_unused_result(message: "this string affects your health")
 ///   func methodA() -> String { ... }
 ///
-///   @warn_unused_result(mutable_variant="jumpInPlace")
+///   @warn_unused_result(mutable_variant: "jumpInPlace")
 ///   func jump() -> X { ... }
 ///
 ///   mutating func jumpInPlace() { ... }

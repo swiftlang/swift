@@ -263,6 +263,9 @@ static void getResultStructure(
         C.is(ChunkKind::CallParameterBegin))
       break;
 
+    if (C.is(ChunkKind::Equal))
+      isOperator = true;
+
     if (C.hasText())
       textSize += C.getText().size();
   }

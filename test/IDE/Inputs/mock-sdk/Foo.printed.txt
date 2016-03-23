@@ -41,19 +41,19 @@ enum FooComparisonResult : Int {
   var rawValue: Int { get }
   
   // This is ascending
-  case OrderedAscending
-  case OrderedSame // But this is the same.
-  case OrderedDescending
+  case orderedAscending
+  case orderedSame // But this is the same.
+  case orderedDescending
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
-struct FooRuncingOptions : OptionSetType {
+struct FooRuncingOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
   
   // This is mince.
-  static var EnableMince: FooRuncingOptions { get }
-  static var EnableQuince: FooRuncingOptions { get } /* But this is quince */
+  static var enableMince: FooRuncingOptions { get }
+  static var enableQuince: FooRuncingOptions { get } /* But this is quince */
 }
 
 struct FooStruct1 {
@@ -137,7 +137,7 @@ func fooFuncWithComment5()
 /// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
 func redeclaredInMultipleModulesFunc1(a: Int32) -> Int32
 
-@available(*, unavailable, message="Variadic function is unavailable")
+@available(*, unavailable, message: "Variadic function is unavailable")
 func fooFuncUsingVararg(a: Int32, _ varargs: Any...) -> Int32 // This comment should not show without decl.
 
 /// Aaa.  FooProtocolBase.  Bbb.
@@ -179,7 +179,7 @@ class FooClassBase {
   
   class func fooBaseClassFunc0()
   /*not inherited*/ init!(_ x: Int32)
-  @available(*, unavailable, message="use object construction 'FooClassBase(_:)'")
+  @available(*, unavailable, message: "use object construction 'FooClassBase(_:)'")
   class func fooClassBase(x: Int32) -> FooClassBase!
 }
 
@@ -276,32 +276,32 @@ class FooClassPropertyOwnership : FooClassBase {
 
 class FooUnavailableMembers : FooClassBase {
   convenience init!(int i: Int32)
-  @available(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")
-  class func unavailableMembersWithInt(i: Int32) -> Self!
+  @available(*, unavailable, message: "use object construction 'FooUnavailableMembers(int:)'")
+  class func withInt(i: Int32) -> Self!
   
-  @available(*, unavailable, message="x")
+  @available(*, unavailable, message: "x")
   func unavailable() // This comment should not show without decl. rdar://20092567
-  @available(*, unavailable, message="Not available in Swift")
+  @available(*, unavailable, message: "Not available in Swift")
   func swiftUnavailable()
-  @available(*, deprecated, message="x")
+  @available(*, deprecated, message: "x")
   func deprecated()
   
   @available(OSX 10.1, *)
   func availabilityIntroduced()
-  @available(OSX, unavailable, deprecated=10.1, message="APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
+  @available(OSX, unavailable, deprecated: 10.1, message: "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
   func availabilityDeprecated()
-  @available(OSX, obsoleted=10.1)
+  @available(OSX, obsoleted: 10.1)
   func availabilityObsoleted()
   @available(OSX, unavailable)
   func availabilityUnavailable()
   
-  @available(OSX, introduced=10.1, message="x")
+  @available(OSX, introduced: 10.1, message: "x")
   func availabilityIntroducedMsg()
-  @available(OSX, unavailable, deprecated=10.1, message="x")
+  @available(OSX, unavailable, deprecated: 10.1, message: "x")
   func availabilityDeprecatedMsg()
-  @available(OSX, obsoleted=10.1, message="x")
+  @available(OSX, obsoleted: 10.1, message: "x")
   func availabilityObsoletedMsg()
-  @available(OSX, unavailable, message="x")
+  @available(OSX, unavailable, message: "x")
   func availabilityUnavailableMsg()
   init!()
   convenience init!(float f: Float)
@@ -309,9 +309,9 @@ class FooUnavailableMembers : FooClassBase {
 
 class FooCFType {
 }
-@available(*, deprecated, renamed="FooCFType")
+@available(*, unavailable, renamed: "FooCFType", message: "Not available in Swift")
 typealias FooCFTypeRef = FooCFType
-@available(*, unavailable, message="Core Foundation objects are automatically memory managed")
+@available(*, unavailable, message: "Core Foundation objects are automatically memory managed")
 func FooCFTypeRelease(_: FooCFType!)
 
 class FooRepeatedMembers : FooClassBase {
@@ -335,9 +335,9 @@ enum SCNFilterMode : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
   
-  case None
-  case Nearest
-  case Linear
+  case none
+  case nearest
+  case linear
   @available(*, unavailable)
   case SCNNoFiltering // This comment should not show without decl.
 }

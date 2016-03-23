@@ -19,8 +19,7 @@
 // RUN: %target-run %t/ArrayBridge > %t.txt
 // RUN: FileCheck %s < %t.txt
 // REQUIRES: executable_test
-
-// XFAIL: linux
+// REQUIRES: objc_interop
 
 import Foundation
 import ArrayBridgeObjC
@@ -206,7 +205,7 @@ func testBridgedVerbatim() {
 
   // CHECK-NEXT: Base#1(100)
   let basesConvertedToNSArray = bases as NSArray
-  print(basesConvertedToNSArray.objectAtIndex(0) as! Base)
+  print(basesConvertedToNSArray.object(at: 0) as! Base)
 
   // Create an ordinary NSArray, not a native one
   let nsArrayOfBase: NSArray = NSArray(object: Base(42))
@@ -216,7 +215,7 @@ func testBridgedVerbatim() {
 
   // Capture the representation of the first element
   // CHECK-NEXT: [[base42:Base.*42]]
-  print(nsArrayOfBase.objectAtIndex(0) as! Base)
+  print(nsArrayOfBase.object(at: 0) as! Base)
 
   // ...with the same elements
   // CHECK-NEXT: [[base42]]
@@ -346,7 +345,7 @@ func testExplicitlyBridged() {
   let roundTripBridgedSwifts
     = Swift._forceBridgeFromObjectiveC(bridgedSwiftsAsNSArray, 
                                        [BridgedSwift].self)
-  // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
+  // CHECK-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
   // CHECK-NEXT: [BridgedSwift#[[id10:[0-9]+]](42), BridgedSwift#[[id11:[0-9]+]](17)]
   print("roundTripBridgedSwifts = \(roundTripBridgedSwifts))")
 
@@ -356,8 +355,8 @@ func testExplicitlyBridged() {
   // ...and bridge *that* back
   let bridgedBackSwifts
     = Swift._forceBridgeFromObjectiveC(cocoaBridgedSwifts, [BridgedSwift].self)
-  // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
-  // CHECK-NEXT-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
+  // CHECK-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
+  // CHECK-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
   // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]
   print("bridgedBackSwifts      = \(bridgedBackSwifts)")
   
@@ -552,14 +551,14 @@ struct X {}
 /*
 let x: NSArray = arrayAsID(bases)!
 
-print(x.objectAtIndex(0) as Base)
+print(x.objectAt(0) as Base)
 */
 
 func testMutableArray() {
   let m = NSMutableArray(array: ["fu", "bar", "buzz"])
   let a = m as NSArray as! [NSString]
   print(a) // CHECK-NEXT: [fu, bar, buzz]
-  m.addObject("goop")
+  m.add("goop")
   print(a) // CHECK-NEXT: [fu, bar, buzz]
 }
 testMutableArray()

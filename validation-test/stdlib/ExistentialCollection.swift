@@ -26,7 +26,7 @@ import ObjectiveC
 // Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
 
-extension AnyGenerator where Element : TestProtocol1 {
+extension AnyIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -58,36 +58,36 @@ extension AnyRandomAccessCollection where Element : TestProtocol1 {
 
 var tests = TestSuite("ExistentialCollection")
 
-tests.test("AnyGenerator") {
-  func countStrings() -> AnyGenerator<String> {
+tests.test("AnyIterator") {
+  func digits() -> AnyIterator<String> {
     let lazyStrings = (0..<5).lazy.map { String($0) }
     
     // This is a really complicated type of no interest to our
     // clients.
-    let g: LazyMapGenerator<
-      RangeGenerator<Int>, String> = lazyStrings.generate()
-    return AnyGenerator(g)
+    let iterator: LazyMapIterator<RangeIterator<Int>, String> =
+      lazyStrings.makeIterator()
+    return AnyIterator(iterator)
   }
-  expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))
+  expectEqual(["0", "1", "2", "3", "4"], Array(digits()))
 
   var x = 7
-  let g = AnyGenerator<Int> {
+  let iterator = AnyIterator<Int> {
     if x >= 15 { return nil }
     x += 1
     return x-1
   }
-  expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(g))
+  expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(iterator))
 }
 
 let initialCallCounts = [
   "successor": 0, "predecessor": 0,
   "_successorInPlace": 0, "_predecessorInPlace": 0,
-  "advancedBy": 0, "distanceTo": 0
+  "advanced(by:)": 0, "distance(to:)": 0
 ]
 
 var callCounts = initialCallCounts
   
-struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
+struct InstrumentedIndex<I : RandomAccessIndex> : RandomAccessIndex {
   typealias Distance = I.Distance
 
   var base: I
@@ -120,18 +120,18 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
     base._predecessorInPlace()
   }
   
-  func advancedBy(distance: Distance) -> InstrumentedIndex {
-    callCounts["advancedBy"]! += 1
-    return InstrumentedIndex(base.advancedBy(distance))
+  func advanced(by distance: Distance) -> InstrumentedIndex {
+    callCounts["advanced(by:)"]! += 1
+    return InstrumentedIndex(base.advanced(by: distance))
   }
   
-  func distanceTo(other: InstrumentedIndex) -> Distance {
-    callCounts["distanceTo"]! += 1
-    return base.distanceTo(other.base)
+  func distance(to other: InstrumentedIndex) -> Distance {
+    callCounts["distance(to:)"]! += 1
+    return base.distance(to: other.base)
   }
 }
 
-tests.test("AnySequence.init(SequenceType)") {
+tests.test("AnySequence.init(Sequence)") {
   if true {
     let base = MinimalSequence<OpaqueValue<Int>>(elements: [])
     var s = AnySequence(base)
@@ -151,7 +151,7 @@ tests.test("AnySequence.init(SequenceType)") {
 tests.test("AnySequence.init(() -> Generator)") {
   if true {
     var s = AnySequence {
-      return MinimalGenerator<OpaqueValue<Int>>([])
+      return MinimalIterator<OpaqueValue<Int>>([])
     }
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
@@ -160,7 +160,7 @@ tests.test("AnySequence.init(() -> Generator)") {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
     let data = intData.map(OpaqueValue.init)
     var s = AnySequence {
-      return MinimalGenerator(data)
+      return MinimalIterator(data)
     }
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence(data, s, resiliencyChecks: .none) { $0.value == $1.value }
@@ -206,7 +206,7 @@ tests.test("ForwardCollection") {
   let a1 = ContiguousArray(fc0)
   expectEqual(a0, a1)
   for e in a0 {
-    let i = fc0.indexOf(e)
+    let i = fc0.index(of: e)
     expectNotEmpty(i)
     expectEqual(e, fc0[i!])
   }
@@ -218,23 +218,23 @@ tests.test("ForwardCollection") {
 
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(a0.lazy.reverse())
+  let fc0 = AnyForwardCollection(a0.lazy.reversed())
   
   let bc0_ = AnyBidirectionalCollection(fc0)         // upgrade!
   expectNotEmpty(bc0_)
   let bc0 = bc0_!
   expectTrue(fc0 === bc0)
 
-  let fc1 = AnyForwardCollection(a0.lazy.reverse()) // new collection
+  let fc1 = AnyForwardCollection(a0.lazy.reversed()) // new collection
   expectFalse(fc1 === fc0)
 
   let fc2 = AnyForwardCollection(bc0)                // downgrade
   expectTrue(fc2 === bc0)
   
-  let a1 = ContiguousArray(bc0.lazy.reverse())
+  let a1 = ContiguousArray(bc0.lazy.reversed())
   expectEqual(a0, a1)
   for e in a0 {
-    let i = bc0.indexOf(e)
+    let i = bc0.index(of: e)
     expectNotEmpty(i)
     expectEqual(e, bc0[i!])
   }
@@ -254,7 +254,7 @@ tests.test("BidirectionalCollection") {
 
 tests.test("RandomAccessCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(a0.lazy.reverse())
+  let fc0 = AnyForwardCollection(a0.lazy.reversed())
   let rc0_ = AnyRandomAccessCollection(fc0)         // upgrade!
   expectNotEmpty(rc0_)
   let rc0 = rc0_!
@@ -266,10 +266,10 @@ tests.test("RandomAccessCollection") {
   let fc1 = AnyBidirectionalCollection(rc0)         // downgrade
   expectTrue(fc1 === rc0)
   
-  let a1 = ContiguousArray(rc0.lazy.reverse())
+  let a1 = ContiguousArray(rc0.lazy.reversed())
   expectEqual(a0, a1)
   for e in a0 {
-    let i = rc0.indexOf(e)
+    let i = rc0.index(of: e)
     expectNotEmpty(i)
     expectEqual(e, rc0[i!])
   }

@@ -258,8 +258,9 @@ public:
   ///
   /// \param base - always an address, but possibly an r-value
   virtual void writeback(SILGenFunction &gen, SILLocation loc,
-                         ManagedValue base, ManagedValue temporary,
-                         ArrayRef<SILValue> otherInfo, bool isFinal);
+                         ManagedValue base,
+                         MaterializedLValue materialized,
+                         bool isFinal);
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {
@@ -340,10 +341,6 @@ public:
   static LValue forAddress(ManagedValue address,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
-
-  /// Form a class-reference l-value.  Only suitable as the base of
-  /// very specific member components.
-  static LValue forClassReference(ManagedValue reference);
 
   bool isValid() const { return !Path.empty(); }
 

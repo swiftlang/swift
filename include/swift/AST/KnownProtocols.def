@@ -48,16 +48,16 @@
 #define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(name) \
     BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(name, "_" #name)
 
-PROTOCOL(SequenceType)
-PROTOCOL(GeneratorType)
-PROTOCOL(BooleanType)
+PROTOCOL(Sequence)
+PROTOCOL(IteratorProtocol)
+PROTOCOL(Boolean)
 PROTOCOL(AnyObject)
 PROTOCOL(RawRepresentable)
 PROTOCOL(Equatable)
 PROTOCOL(Hashable)
 PROTOCOL(Comparable)
-PROTOCOL(ErrorType)
-PROTOCOL(OptionSetType)
+PROTOCOL(ErrorProtocol)
+PROTOCOL(OptionSet)
 PROTOCOL_(BridgedNSError)
 
 PROTOCOL_(ObjectiveCBridgeable)

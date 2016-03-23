@@ -51,8 +51,8 @@ variadic2(1, 2, 3, x: 5.0)
 // SIL:   {{%.+}} = apply [[SLICE]]({{%.+}}) : $@convention(thin) (@owned Array<Int>) -> ()
 slice(x: [2, 4, 5])
 
-optional(x: .Some(23))
-optional(x: .None)
+optional(x: .some(23))
+optional(x: .none)
 
 
 // SIL:   [[MAKE_PAIR:%.+]] = function_ref @_TF8def_func8makePair{{.*}} : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> (@out τ_0_0, @out τ_0_1)
@@ -112,8 +112,8 @@ do {
   try throws1()
   try throws2(1)
 } catch _ {}
-// SIL: sil @_TF8def_func7throws1FzT_T_ : $@convention(thin) () -> @error ErrorType
-// SIL: sil @_TF8def_func7throws2{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorType)
+// SIL: sil @_TF8def_func7throws1FzT_T_ : $@convention(thin) () -> @error ErrorProtocol
+// SIL: sil @_TF8def_func7throws2{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorProtocol)
 
 // LLVM: }
 
