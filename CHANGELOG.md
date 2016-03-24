@@ -64,6 +64,13 @@ Swift 3.0
         }
     }
     ```
+* Throwing closure arguments of a rethrowing function may now be optional. For example:
+
+    ```swift
+    func executeClosureIfNotNil(closure: (() throws -> Void)?) rethrows {
+        try closure?()
+    }
+    ```
 
 Swift 2.2
 ---------
