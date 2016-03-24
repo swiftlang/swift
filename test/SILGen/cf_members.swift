@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s | FileCheck %s
 
+// REQUIRES: objc_interop
+
 import ImportAsMember
 
 func makeMetatype() -> Struct1.Type { return Struct1.self }

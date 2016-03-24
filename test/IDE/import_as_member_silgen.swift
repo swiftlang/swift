@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -I %S/Inputs/custom-modules %s 2>&1 | FileCheck --check-prefix=SIL %s
+// REQUIRES: objc_interop
 import ImportAsMember
 import ImportAsMember.Proto
 

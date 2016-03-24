@@ -65,6 +65,8 @@
 // RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
 // RUN: %target-swift-frontend %s -parse -I %S/Inputs/custom-modules -verify
 
+// REQUIRES: objc_interop
+
 import ImportAsMember
 import ImportAsMember.B
 import ImportAsMember.ProtoErr
