@@ -364,28 +364,10 @@ bool SILDeclRef::isFragile() const {
   if (auto closure = getAbstractClosureExpr())
     dc = closure->getLocalContext();
   else
-    dc = getDecl()->getDeclContext();
+    dc = getDecl()->getInnermostDeclContext();
 
-  while (!dc->isModuleScopeContext()) {
-    // Local definitions in transparent contexts are fragile because
-    // external references to them can be exposed by mandatory inlining.
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc))
-      if (fn->isTransparent() &&
-          fn->getEffectiveAccess() == Accessibility::Public)
-        return true;
-    // Check that this local context is not itself in a local transparent
-    // context.
-    dc = dc->getParent();
-  }
-
-  // Externally-visible transparent functions are fragile.
-  if (hasDecl())
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(getDecl()))
-      if (fn->isTransparent() &&
-          fn->getEffectiveAccess() == Accessibility::Public)
-        return true;
-
-  return false;
+  // This is stupid
+  return (dc->getResilienceExpansion() == ResilienceExpansion::Minimal);
 }
 
 /// \brief True if the function has noinline attribute.

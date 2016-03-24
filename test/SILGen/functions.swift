@@ -371,6 +371,10 @@ func noinline_callee() {}
 @inline(__always)
 func always_inline_callee() {}
 
+// CHECK-LABEL: sil [fragile] [always_inline] @_TF9functions27public_always_inline_calleeFT_T_ : $@convention(thin) () -> ()
+@inline(__always)
+public func public_always_inline_callee() {}
+
 protocol AlwaysInline {
   func alwaysInlined()
 }
