@@ -141,3 +141,8 @@ module MacrosRedefA {
 module MacrosRedefB {
   header "MacrosRedefB.h"
 }
+
+module floats {
+  header "floats.h"
+}
+
