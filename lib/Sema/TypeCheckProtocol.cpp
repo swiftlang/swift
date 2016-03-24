@@ -3597,6 +3597,9 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   if (auto *FD = dyn_cast<FuncDecl>(requirement))
     if (FD->isAccessor())
       return;
+  // If this is a typealias, it does not need a witness check.
+  if (isa<TypeAliasDecl>(requirement))
+    return;
 
   // Resolve all associated types before trying to resolve this witness.
   resolveTypeWitnesses();

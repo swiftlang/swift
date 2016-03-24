@@ -135,11 +135,61 @@ protocol CB {
   func setIt(element: E)
 }
 
-func go1<T : CB, U : Col where U.Elem == T.E>(col: U, builder: T) {
+func go1<T : CB, U : Col where U.Elem == T.E>(col: U, builder: T) { // OK
   builder.setIt(col.elem)
 }
 func go2<T : CB, U : Col where U.Elem == T.C.Elem>(col: U, builder: T) { // OK
   builder.setIt(col.elem)
+}
+
+// Test for same type requirement with typealias == concrete
+func go3<T : CB where T.E == Int>(builder: T) {
+  builder.setIt(1)
+}
+
+// Test for conformance to protocol with associatedtype and another with typealias with same name.
+protocol MyIterator {
+  associatedtype Elem
+  
+  func next() -> Elem?
+}
+
+protocol MySeq {
+  associatedtype I : MyIterator
+  typealias Elem = Self.I.Elem
+  
+  func makeIterator() -> I
+  func getIndex(i: Int) -> Elem
+  func first() -> Elem
+}
+
+extension MySeq where Self : MyIterator {
+  func makeIterator() -> Self {
+    return self
+  }
+}
+
+func plusOne<S: MySeq where S.Elem == Int>(s: S, i: Int) -> Int {
+  return s.getIndex(i) + 1
+}
+
+struct OneIntSeq: MySeq, MyIterator {
+  let e : Float
+  
+  func next() -> Float? {
+    return e
+  }
+  
+  func getIndex(i: Int) -> Float {
+    return e
+  }
+}
+
+// test for conformance correctness using typealias in extension
+extension MySeq {
+  func first() -> Elem {
+    return getIndex(0)
+  }
 }
 
 // Specific diagnosis for trying to use complex typealiases in generic constraints
@@ -162,3 +212,13 @@ protocol P3 {
   
   associatedtype V : P2 = // expected-error {{expected type in associatedtype declaration}}
 }
+
+// Test for not crashing on self and recursive aliases
+protocol P4 {
+  typealias X = Self
+  typealias Y = Self.Y // expected-error {{type alias 'Y' circularly references itself}}
+  
+  func getSelf() -> X
+}
+
+

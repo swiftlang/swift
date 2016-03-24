@@ -245,6 +245,7 @@ Type TypeChecker::resolveTypeInContext(
   bool nonTypeOwner = !ownerDC->isTypeContext();
   auto ownerNominal = ownerDC->getAsNominalTypeOrNominalTypeExtensionContext();
   auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
+  auto alias = dyn_cast<TypeAliasDecl>(typeDecl);
   DeclContext *typeParent = nullptr;
   assert((ownerNominal || nonTypeOwner) &&
          "Owner must be a nominal type or a non type context");
@@ -317,6 +318,33 @@ Type TypeChecker::resolveTypeInContext(
             }
           }
         }
+      }
+    }
+    
+    // If we found an alias type in an inherited protocol, resolve it based on our
+    // own `Self`.
+    if (alias && alias->hasInterfaceType()) {
+      auto metaType = alias->getInterfaceType()->getAs<MetatypeType>();
+      auto memberType = metaType ? metaType->getInstanceType()->getAs<DependentMemberType>() :
+                        nullptr;
+
+      if (memberType && parentDC->getAsProtocolOrProtocolExtensionContext()) {
+        auto protoSelf = parentDC->getProtocolSelf();
+        auto selfTy = protoSelf->getDeclaredType()->castTo<GenericTypeParamType>();
+        auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
+
+        SmallVector<DependentMemberType *, 4> memberTypes;
+        do {
+          memberTypes.push_back(memberType);
+          memberType = memberType->getBase()->getAs<DependentMemberType>();
+        } while (memberType);
+
+        auto module = parentDC->getParentModule();
+        while (memberTypes.size()) {
+          baseTy = memberTypes.back()->substBaseType(module, baseTy, nullptr);
+          memberTypes.pop_back();
+        }
+        return baseTy;
       }
     }
 
