@@ -101,3 +101,10 @@ protocol CP2 : class { }
 
   init() { }
 }
+
+
+import ObjectiveC
+class Y: NSObject {
+    @IBAction private func foo(sender: AnyObject?) {}
+}
+let yFoo = #selector(Y.foo)
