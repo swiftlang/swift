@@ -79,9 +79,9 @@ public struct ${Self}<
     return _elements.successor(of: i)
   }
 
-  public func successor(updating i: inout Index) {
+  public func formSuccessor(i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
-    _elements.successor(updating: &i)
+    _elements.formSuccessor(&i)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
@@ -91,9 +91,9 @@ public struct ${Self}<
     return _elements.predecessor(of: i)
   }
 
-  public func predecessor(updating i: inout Index) {
+  public func formPredecessor(i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
-    _elements.predecessor(updating: &i)
+    _elements.formPredecessor(&i)
   }
 %     end
 

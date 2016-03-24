@@ -244,7 +244,7 @@ public struct ${Collection}<
       if !innerCollection.isEmpty {
         return ${Index}(outer, innerCollection.startIndex)
       }
-      _base.successor(updating: &outer)
+      _base.formSuccessor(&outer)
     }
 
     return endIndex
@@ -274,7 +274,7 @@ public struct ${Collection}<
       if !nextInnerCollection.isEmpty {
         return ${Index}(nextOuter, nextInnerCollection.startIndex)
       }
-      _base.successor(updating: &nextOuter)
+      _base.formSuccessor(&nextOuter)
     }
 
     return endIndex

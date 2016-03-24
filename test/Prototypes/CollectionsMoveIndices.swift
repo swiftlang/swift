@@ -444,7 +444,7 @@ public protocol MyIndexableType {
   @warn_unused_result
   func successor(of i: Index) -> Index
 
-  func successor(updating i: inout Index)
+  func formSuccessor(i: inout Index)
 
   func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>)
 
@@ -456,7 +456,7 @@ public protocol MyIndexableType {
 }
 extension MyIndexableType {
   @inline(__always)
-  public func successor(updating i: inout Index) {
+  public func formSuccessor(i: inout Index) {
     i = successor(of: i)
   }
 }
@@ -523,7 +523,7 @@ extension MyForwardCollectionType {
 
     var i = i
     for var offset: IndexDistance = 0; offset != n; offset = offset + 1 {
-      successor(updating: &i)
+      formSuccessor(&i)
     }
     return i
   }
@@ -539,7 +539,7 @@ extension MyForwardCollectionType {
 
     var i = i
     for var offset: IndexDistance = 0; offset != n && i != limit; offset = offset + 1 {
-      successor(updating: &i)
+      formSuccessor(&i)
     }
     return i
   }
@@ -560,7 +560,7 @@ extension MyForwardCollectionType {
     var count: IndexDistance = 0
     while start != end {
       count = count + 1
-      successor(updating: &start)
+      formSuccessor(&start)
     }
     return count
   }
@@ -719,7 +719,7 @@ extension MyForwardCollectionType
       if self[i] == element {
         return i
       }
-      successor(updating: &i)
+      formSuccessor(&i)
     }
     return nil
   }
@@ -740,12 +740,12 @@ public protocol MyBidirectionalCollectionType : MyForwardCollectionType {
   @warn_unused_result
   func predecessor(of i: Index) -> Index
 
-  func predecessor(updating i: inout Index)
+  func formPredecessor(i: inout Index)
 }
 
 extension MyBidirectionalCollectionType {
   @inline(__always)
-  public func predecessor(updating i: inout Index) {
+  public func formPredecessor(i: inout Index) {
     i = predecessor(of: i)
   }
 
@@ -756,7 +756,7 @@ extension MyBidirectionalCollectionType {
     }
     var i = i
     for var offset: IndexDistance = n; offset != 0; offset = offset + 1 {
-      predecessor(updating: &i)
+      formPredecessor(&i)
     }
     return i
   }
@@ -769,7 +769,7 @@ extension MyBidirectionalCollectionType {
     var i = i
     for var offset: IndexDistance = n; offset != 0 && i != limit;
         offset = offset + 1 {
-      predecessor(updating: &i)
+      formPredecessor(&i)
     }
     return i
   }

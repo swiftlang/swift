@@ -48,7 +48,7 @@ extension Collection where ${IElement} : Equatable {
       if self[i] == element {
         return i
       }
-      self.successor(updating: &i)
+      self.formSuccessor(&i)
     }
     return nil
   }
@@ -68,7 +68,7 @@ extension Collection {
       if try predicate(self[i]) {
         return i
       }
-      self.successor(updating: &i)
+      self.formSuccessor(&i)
     }
     return nil
   }

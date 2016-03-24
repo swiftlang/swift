@@ -152,7 +152,7 @@ extension String.CharacterView : BidirectionalCollection {
 
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[start].value)
-      unicodeScalars.successor(updating: &start)
+      unicodeScalars.formSuccessor(&start)
 
       while start != end {
         // FIXME(performance): consider removing this "fast path".  A branch
@@ -167,7 +167,7 @@ extension String.CharacterView : BidirectionalCollection {
           break
         }
         gcb0 = gcb1
-        unicodeScalars.successor(updating: &start)
+        unicodeScalars.formSuccessor(&start)
       }
 
       return start._position - startIndexUTF16
@@ -193,14 +193,14 @@ extension String.CharacterView : BidirectionalCollection {
 
       var graphemeClusterStart = end
 
-      unicodeScalars.predecessor(updating: &graphemeClusterStart)
+      unicodeScalars.formPredecessor(&graphemeClusterStart)
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[graphemeClusterStart].value)
 
       var graphemeClusterStartUTF16 = graphemeClusterStart._position
 
       while graphemeClusterStart != start {
-        unicodeScalars.predecessor(updating: &graphemeClusterStart)
+        unicodeScalars.formPredecessor(&graphemeClusterStart)
         let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
             unicodeScalars[graphemeClusterStart].value)
         if segmenter.isBoundary(gcb1, gcb0) {

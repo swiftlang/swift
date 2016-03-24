@@ -366,9 +366,9 @@ public struct ${Self}<
     return base.successor(of: i)
   }
 
-  public func successor(updating i: inout Index) {
+  public func formSuccessor(i: inout Index) {
     Log._nextInPlace[selfType] += 1
-    base.successor(updating: &i)
+    base.formSuccessor(&i)
   }
 
   public typealias Indices = Base.Indices
@@ -549,9 +549,9 @@ public struct ${Self}<
     return base.predecessor(of: i)
   }
 
-  public func predecessor(updating i: inout Index) {
+  public func formPredecessor(i: inout Index) {
     BidirectionalCollectionLog._previousInPlace[selfType] += 1
-    base.predecessor(updating: &i)
+    base.formPredecessor(&i)
   }
 
   public var last: Iterator.Element? {

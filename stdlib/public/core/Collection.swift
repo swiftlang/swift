@@ -112,7 +112,7 @@ public protocol IndexableBase {
   @warn_unused_result
   func successor(of i: Index) -> Index
 
-  func successor(updating i: inout Index)
+  func formSuccessor(i: inout Index)
 }
 
 public protocol Indexable : IndexableBase {
@@ -154,7 +154,7 @@ public struct IndexingIterator<
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
-    _elements.successor(updating: &_position)
+    _elements.formSuccessor(&_position)
     return element
   }
 
@@ -337,7 +337,7 @@ public protocol Collection : Indexable, Sequence {
 /// Default implementation for forward collections.
 extension Indexable {
   @inline(__always)
-  public func successor(updating i: inout Index) {
+  public func formSuccessor(i: inout Index) {
     // FIXME: swift-3-indexing-model: tests.
     i = successor(of: i)
   }
@@ -391,7 +391,7 @@ extension Indexable {
     var count: IndexDistance = 0
     while start != end {
       count = count + 1
-      successor(updating: &start)
+      formSuccessor(&start)
     }
     return count
   }
@@ -405,7 +405,7 @@ extension Indexable {
 
     var i = i
     for _ in 0..<n {
-      successor(updating: &i)
+      formSuccessor(&i)
     }
     return i
   }
@@ -423,7 +423,7 @@ extension Indexable {
       if (limit == i) {
         break;
       }
-      successor(updating: &i)
+      formSuccessor(&i)
     }
     return i
   }
@@ -599,7 +599,7 @@ extension Collection {
 
     for _ in 0..<count {
       result.append(try transform(self[i]))
-      successor(updating: &i)
+      formSuccessor(&i)
     }
 
     _expectEnd(i, self)
@@ -735,14 +735,14 @@ extension Collection {
     while subSequenceEnd != cachedEndIndex {
       if try isSeparator(self[subSequenceEnd]) {
         let didAppend = appendSubsequence(end: subSequenceEnd)
-        successor(updating: &subSequenceEnd)
+        formSuccessor(&subSequenceEnd)
         subSequenceStart = subSequenceEnd
         if didAppend && result.count == maxSplits {
           break
         }
         continue
       }
-      successor(updating: &subSequenceEnd)
+      formSuccessor(&subSequenceEnd)
     }
 
     if subSequenceStart != cachedEndIndex || !omittingEmptySubsequences {

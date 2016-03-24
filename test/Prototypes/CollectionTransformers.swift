@@ -951,7 +951,7 @@ final internal class _CollectionTransformerStepCollectionSource<
     while i != range.upperBound {
       let e = c[i]
       collector.append(e)
-      c.successor(updating: &i)
+      c.formSuccessor(&i)
     }
   }
 }

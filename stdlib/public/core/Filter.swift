@@ -264,7 +264,7 @@ public struct LazyFilterCollection<
       if _predicate(_base[index]) {
         return false
       }
-      _base.successor(updating: &index)
+      _base.formSuccessor(&index)
     }
     return true
   }
@@ -283,7 +283,7 @@ public struct LazyFilterCollection<
       if _predicate(_base[index]) {
         return false
       }
-      _base.successor(updating: &index)
+      _base.formSuccessor(&index)
     }
     return true
   }

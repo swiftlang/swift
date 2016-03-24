@@ -212,7 +212,7 @@ internal protocol _HashStorage {
   @warn_unused_result
   func successor(of i: Index) -> Index
 
-  func successor(updating i: inout Index)
+  func formSuccessor(i: inout Index)
 
   @warn_unused_result
   func index(forKey key: Key) -> Index?
@@ -1262,7 +1262,7 @@ public func == <Key : Equatable, Value : Equatable>(
       // TODO: swift-3-indexing-model: change 'if' into 'guard'.
       if let rhsValue = optRhsValue {
         if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
-          lhsNative.successor(updating: &index)
+          lhsNative.formSuccessor(&index)
           continue
         }
       }
@@ -2184,7 +2184,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return i.successor()
   }
 
-  internal func successor(updating i: inout Index) {
+  internal func formSuccessor(i: inout Index) {
     // FIXME: swift-3-indexing-model: optimize if possible.
     i = i.successor()
   }
@@ -2443,7 +2443,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
       return nil
     }
     let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
-    nativeStorageOwner.nativeStorage.successor(updating: &nextIndex)
+    nativeStorageOwner.nativeStorage.formSuccessor(&nextIndex)
     return bridgedKey
   }
 
@@ -2468,7 +2468,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
     let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
-    nativeStorageOwner.nativeStorage.successor(updating: &nextIndex)
+    nativeStorageOwner.nativeStorage.formSuccessor(&nextIndex)
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = bridgedKey
@@ -2823,7 +2823,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
       let bridgedKey: AnyObject = _getBridgedKey(currIndex)
       unmanagedObjects[i] = bridgedKey
       stored += 1
-      nativeStorage.successor(updating: &currIndex)
+      nativeStorage.formSuccessor(&currIndex)
     }
     theState.extra.0 = CUnsignedLong(currIndex.offset)
     state.pointee = theState
@@ -2856,7 +2856,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
     return i.successor()
   }
 
-  internal func successor(updating i: inout Index) {
+  internal func formSuccessor(i: inout Index) {
     // FIXME: swift-3-indexing-model: optimize if possible.
     i = i.successor()
   }
@@ -3171,7 +3171,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
-  func successor(updating i: inout Index) {
+  func formSuccessor(i: inout Index) {
     // FIXME: swift-3-indexing-model: optimize if possible.
     i = successor(of: i)
   }

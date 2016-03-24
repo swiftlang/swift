@@ -492,7 +492,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
 
 // FIXME: swift-3-indexing-model - add tests for the follow?
 //          successor(of: i: Index) -> Index
-//          successor(updating: i: inout Index)
+//          formSuccessor(i: inout Index)
 //          advance(i: Index, by n: IndexDistance) -> Index
 //          advance(i: Index, by n: IndexDistance, limit: Index) -> Index
 //          distance(from start: Index, to end: Index) -> IndexDistance
@@ -908,7 +908,7 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
 
 // FIXME: swift-3-indexing-model - add tests for the follow?
 //          predecessor(of i: Index) -> Index
-//          predecessor(updating: i: inout Index)
+//          formPredecessor(i: inout Index)
 
 // FIXME: swift-3-indexing-model - enhance the following for negative direction?
 //          advance(i: Index, by n: IndexDistance) -> Index

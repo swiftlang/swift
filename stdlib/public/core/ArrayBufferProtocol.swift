@@ -166,12 +166,12 @@ extension _ArrayBufferProtocol where Index == Int {
       var i = newValues.startIndex
       for j in RangeOfStrideable(subRange) {
         elements[j] = newValues[i]
-        newValues.successor(updating: &i)
+        newValues.formSuccessor(&i)
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
         (elements + j).initialize(with: newValues[i])
-        newValues.successor(updating: &i)
+        newValues.formSuccessor(&i)
       }
       _expectEnd(i, newValues)
     }
@@ -181,8 +181,8 @@ extension _ArrayBufferProtocol where Index == Int {
       var j = newValues.startIndex
       for _ in 0..<newCount {
         elements[i] = newValues[j]
-        successor(updating: &i)
-        newValues.successor(updating: &j)
+        formSuccessor(&i)
+        newValues.formSuccessor(&j)
       }
       _expectEnd(j, newValues)
 

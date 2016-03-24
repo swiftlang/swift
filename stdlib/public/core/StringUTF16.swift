@@ -380,9 +380,9 @@ extension String.UTF16View.Indices : BidirectionalCollection {
     return _elements.successor(of: i)
   }
 
-  public func successor(updating i: inout Index) {
+  public func formSuccessor(i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
-    _elements.successor(updating: &i)
+    _elements.formSuccessor(&i)
   }
 
   @warn_unused_result
@@ -391,9 +391,9 @@ extension String.UTF16View.Indices : BidirectionalCollection {
     return _elements.predecessor(of: i)
   }
 
-  public func predecessor(updating i: inout Index) {
+  public func formPredecessor(i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
-    _elements.predecessor(updating: &i)
+    _elements.formPredecessor(&i)
   }
 
   @warn_unused_result

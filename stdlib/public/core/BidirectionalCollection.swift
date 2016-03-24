@@ -20,7 +20,7 @@ public protocol BidirectionalIndexable : Indexable {
   @warn_unused_result
   func predecessor(of i: Index) -> Index
 
-  func predecessor(updating i: inout Index)
+  func formPredecessor(i: inout Index)
 }
 
 // TODO: swift-3-indexing-model - Add in BidirectionalCollection protocol documentation
@@ -38,7 +38,7 @@ public protocol BidirectionalCollection
   @warn_unused_result
   func predecessor(of i: Index) -> Index
 
-  func predecessor(updating i: inout Index)
+  func formPredecessor(i: inout Index)
 
   associatedtype SubSequence : BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
@@ -58,7 +58,7 @@ public protocol BidirectionalCollection
 extension BidirectionalIndexable {
 
   @inline(__always)
-  public func predecessor(updating i: inout Index) {
+  public func formPredecessor(i: inout Index) {
     i = predecessor(of: i)
   }
 
@@ -71,7 +71,7 @@ extension BidirectionalIndexable {
     // FIXME: swift-3-indexing-model: There's a corner case here, -IntXX.min is
     // not representable.
     for _ in 0..<(-n) {
-      predecessor(updating: &i)
+      formPredecessor(&i)
     }
     return i
   }
@@ -88,7 +88,7 @@ extension BidirectionalIndexable {
       if (limit == i) {
         break;
       }
-      predecessor(updating: &i)
+      formPredecessor(&i)
     }
     return i
   }
@@ -101,13 +101,13 @@ extension BidirectionalIndexable {
     if start < end {
       while start != end {
         count += 1 as IndexDistance
-        successor(updating: &start)
+        formSuccessor(&start)
       }
     }
     else if start > end {
       while start != end {
         count -= 1 as IndexDistance
-        predecessor(updating: &start)
+        formPredecessor(&start)
       }
     }
 

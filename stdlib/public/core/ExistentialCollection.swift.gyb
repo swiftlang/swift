@@ -167,7 +167,7 @@ internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element> {
   */
   @warn_unused_result
   internal func _successor(of i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func _successor(updating i: _AnyIndexBox) { _abstract() }
+  internal func _formSuccessor(i: _AnyIndexBox) { _abstract() }
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
@@ -215,7 +215,7 @@ internal class _AnyBidirectionalCollectionBox<Element>
   : _AnyCollectionBox<Element> {
 
   internal func _predecessor(of i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func _predecessor(updating i: _AnyIndexBox) { _abstract() }
+  internal func _formPredecessor(i: _AnyIndexBox) { _abstract() }
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
@@ -316,9 +316,9 @@ internal final class _${Kind}Box<
     return _IndexBox(_base: _base.successor(of: _unbox(position)))
   }
   
-  internal override func _successor(updating position: _AnyIndexBox) {
+  internal override func _formSuccessor(position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
-      return _base.successor(updating: &p._base)
+      return _base.formSuccessor(&p._base)
     }
     fatalError("Index type mismatch!")
   }
@@ -330,9 +330,9 @@ internal final class _${Kind}Box<
     return _IndexBox(_base: _base.predecessor(of: _unbox(position)))
   }
   
-  internal override func _predecessor(updating position: _AnyIndexBox) {
+  internal override func _formPredecessor(position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
-      return _base.predecessor(updating: &p._base)
+      return _base.formPredecessor(&p._base)
     }
     fatalError("Index type mismatch!")
   }
@@ -734,9 +734,9 @@ public struct ${Self}<Element>
     return AnyIndex(_box: _box._successor(of: i._box))
   }
 
-  public func successor(updating i: inout AnyIndex) {
+  public func formSuccessor(i: inout AnyIndex) {
     if _isUnique(&i._box) {
-      _box._successor(updating: i._box)
+      _box._formSuccessor(i._box)
     }
     else {
       i = successor(of: i)
@@ -748,9 +748,9 @@ public struct ${Self}<Element>
     return AnyIndex(_box: _box._predecessor(of: i._box))
   }
 
-  public func predecessor(updating i: inout AnyIndex) {
+  public func formPredecessor(i: inout AnyIndex) {
     if _isUnique(&i._box) {
-      _box._predecessor(updating: i._box)
+      _box._formPredecessor(i._box)
     }
     else {
       i = predecessor(of: i)

@@ -112,7 +112,7 @@ public protocol MutableIndexable : Indexable {
   @warn_unused_result
   func successor(of i: Index) -> Index
 
-  func successor(updating i: inout Index)
+  func formSuccessor(i: inout Index)
 }
 
 // TODO: swift-3-indexing-model - review the following

@@ -35,7 +35,7 @@ internal struct _CollectionOf<
     return AnyIterator {
       () -> Element? in
       if _fastPath(index != self.endIndex) {
-        self.successor(updating: &index)
+        self.formSuccessor(&index)
         return self._subscriptImpl(index)
       }
       return nil
