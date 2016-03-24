@@ -332,7 +332,7 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
-/// \brief Transform the node structure in a string.
+/// \brief Transform the node structure to a string.
 ///
 /// Typical usage:
 /// \code
