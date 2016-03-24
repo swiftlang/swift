@@ -95,7 +95,7 @@ private:
 
     // Add a reference to the parent class, if applicable.
     if (theClass->getDeclContext()->isTypeContext()) {
-      asImpl().addParentMetadataRef(theClass, type);
+      asImpl().addParentMetadataRef(theClass);
     }
 
     // Add space for the generic parameters, if applicable.
@@ -232,7 +232,7 @@ public:
   void addIVarDestroyer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addDestructorFunction() { addPointer(); }
-  void addParentMetadataRef(ClassDecl *forClass, Type classType) {addPointer();}
+  void addParentMetadataRef(ClassDecl *forClass) { addPointer(); }
   void addSuperClass() { addPointer(); }
   void addClassFlags() { addInt32(); }
   void addInstanceAddressPoint() { addInt32(); }

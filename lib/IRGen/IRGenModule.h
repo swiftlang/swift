@@ -31,7 +31,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/IR/CallingConv.h"
-#include "llvm/IR/Constant.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/Target/TargetMachine.h"
@@ -304,29 +303,6 @@ private:
   std::atomic<int> QueueIndex;
   
   friend class CurrentIGMPtr;
-};
-
-class ConstantReference {
-public:
-  enum Directness : bool { Direct, Indirect };
-private:
-  llvm::PointerIntPair<llvm::Constant *, 1, Directness> ValueAndIsIndirect;
-public:
-  ConstantReference() {}
-  ConstantReference(llvm::Constant *value, Directness isIndirect)
-    : ValueAndIsIndirect(value, isIndirect) {}
-
-  Directness isIndirect() const { return ValueAndIsIndirect.getInt(); }
-  llvm::Constant *getValue() const { return ValueAndIsIndirect.getPointer(); }
-
-  llvm::Constant *getDirectValue() const {
-    assert(!isIndirect());
-    return getValue();
-  }
-
-  explicit operator bool() const {
-    return ValueAndIsIndirect.getPointer() != nullptr;
-  }
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -821,8 +797,6 @@ public:
                                   llvm::StringRef section = {});
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType, bool isPattern);
-  ConstantReference getAddrOfTypeMetadata(CanType concreteType, bool isPattern,
-                                          SymbolReferenceKind kind);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Function *getAddrOfGenericTypeMetadataAccessFunction(
@@ -881,16 +855,22 @@ public:
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
  
+  bool hasMetadataPattern(NominalTypeDecl *theDecl);
+ 
   // Get the ArchetypeBuilder for the currently active generic context. Crashes
   // if there is no generic context.
   ArchetypeBuilder &getContextArchetypes();
 
-  ConstantReference
+  enum class DirectOrGOT {
+    Direct, GOT,
+  };
+
+  std::pair<llvm::Constant *, DirectOrGOT>
   getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
                                        llvm::Type *defaultType);
 
   llvm::Constant *
-  emitRelativeReference(ConstantReference target,
+  emitRelativeReference(std::pair<llvm::Constant *, DirectOrGOT> target,
                         llvm::Constant *base,
                         ArrayRef<unsigned> baseIndices);
 
@@ -914,12 +894,6 @@ private:
                                         ForDefinition_t forDefinition,
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType);
-  ConstantReference getAddrOfLLVMVariable(LinkEntity entity,
-                                        Alignment alignment,
-                                        llvm::Type *definitionType,
-                                        llvm::Type *defaultType,
-                                        DebugTypeInfo debugType,
-                                        SymbolReferenceKind refKind);
 
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(CanType type);

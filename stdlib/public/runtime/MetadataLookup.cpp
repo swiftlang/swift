@@ -220,10 +220,11 @@ swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
   if (ntd == nullptr || ntd->Name.get() != typeName)
     return nullptr;
 
-  // Call the accessor if there is one.
-  if (metadata == nullptr && !ntd->GenericParams.isGeneric()) {
-    if (auto accessFn = ntd->getAccessFunction())
-      accessFn();
+  // Instantiate resilient types.
+  if (metadata == nullptr &&
+      ntd->getGenericMetadataPattern() &&
+      !ntd->GenericParams.isGeneric()) {
+    return swift_getResilientMetadata(ntd->getGenericMetadataPattern());
   }
 
   return metadata;

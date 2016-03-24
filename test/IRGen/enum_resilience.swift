@@ -229,12 +229,15 @@ public func getResilientEnumType() -> Any.Type {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK: cacheIsNull:
-// CHECK-NEXT: call void @swift_once(i64* @_TMaO15enum_resilience24EnumWithResilientPayload.once_token, i8* bitcast (void (i8*)* @initialize_metadata_EnumWithResilientPayload to i8*))
-// CHECK-NEXT: [[METADATA2:%.*]] = load %swift.type*, %swift.type** @_TMLO15enum_resilience24EnumWithResilientPayload
+// CHECK-NEXT: [[METADATA2:%.*]] = call %swift.type* @swift_getResilientMetadata
+// CHECK-NEXT: store %swift.type* [[METADATA2]], %swift.type** @_TMLO15enum_resilience24EnumWithResilientPayload
 // CHECK-NEXT: br label %cont
 
 // CHECK: cont:
 // CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[METADATA]], %entry ], [ [[METADATA2]], %cacheIsNull ]
 // CHECK-NEXT: ret %swift.type* [[RESULT]]
 
-// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_EnumWithResilientPayload(i8*)
+
+// FIXME: this is bogus
+
+// CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_EnumWithResilientPayload(%swift.type_pattern*, i8**)

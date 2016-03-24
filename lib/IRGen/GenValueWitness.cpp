@@ -1361,6 +1361,10 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   assert(!isa<BoundGenericType>(abstractType) &&
          "emitting VWT for generic instance");
 
+  // We shouldn't emit global value witness tables for non-fixed-layout types.
+  assert(!hasDependentValueWitnessTable(IGM, abstractType) &&
+         "emitting global VWT for dynamic-layout type");
+
   SmallVector<llvm::Constant*, MaxNumValueWitnesses> witnesses;
   addValueWitnessesForAbstractType(IGM, abstractType, witnesses);
 

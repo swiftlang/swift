@@ -243,9 +243,26 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
     pattern->AddressPoint;
   auto patternMetadata = reinterpret_cast<const ValueMetadata*>(patternBytes);
   metadata->Description = patternMetadata->Description.get();
-  metadata->Parent = patternMetadata->Parent;
+  metadata->Parent = patternMetadata->Parent.get();
   
   return metadata;
+}
+
+/// Entrypoint for non-generic types with resilient layout.
+const Metadata *
+swift::swift_getResilientMetadata(GenericMetadata *pattern) {
+  assert(pattern->NumKeyArguments == 0);
+
+  auto entry = getCache(pattern).findOrAdd(nullptr, 0,
+    [&]() -> GenericCacheEntry* {
+      // Create new metadata to cache.
+      auto metadata = pattern->CreateFunction(pattern, nullptr);
+      auto entry = GenericCacheEntry::getFromMetadata(pattern, metadata);
+      entry->Value = metadata;
+      return entry;
+    });
+
+  return entry->Value;
 }
 
 /// The primary entrypoint.
@@ -1456,13 +1473,8 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 }
 #endif
 
-/// Initialize the invariant superclass components of a class metadata,
-/// such as the generic type arguments, field offsets, and so on.
-///
-/// This may also relocate the metadata object if it wasn't allocated
-/// with enough space.
-static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
-                                                  bool copyFieldOffsetVectors) {
+static void _swift_initializeSuperclass(ClassMetadata *theClass,
+                                        bool copyFieldOffsetVectors) {
 #if SWIFT_OBJC_INTEROP
   // If the class is generic, we need to give it a name for Objective-C.
   if (theClass->getDescription()->GenericParams.isGeneric())
@@ -1471,43 +1483,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
 
   const ClassMetadata *theSuperclass = theClass->SuperClass;
   if (theSuperclass == nullptr)
-    return theClass;
-
-  // Relocate the metadata if necessary.
-  //
-  // For now, we assume that relocation is only required when the parent
-  // class has prefix matter we didn't know about.  This isn't consistent
-  // with general class resilience, however.
-  if (theSuperclass->isTypeMetadata()) {
-    auto superAP = theSuperclass->getClassAddressPoint();
-    auto oldClassAP = theClass->getClassAddressPoint();
-    if (superAP > oldClassAP) {
-      size_t extraPrefixSize = superAP - oldClassAP;
-      size_t oldClassSize = theClass->getClassSize();
-
-      // Allocate a new metadata object.
-      auto rawNewClass = (char*) malloc(extraPrefixSize + oldClassSize);
-      auto rawOldClass = (const char*) theClass;
-      auto rawSuperclass = (const char*) theSuperclass;
-
-      // Copy the extra prefix from the superclass.
-      memcpy((void**) (rawNewClass),
-             (void* const *) (rawSuperclass - superAP),
-             extraPrefixSize);
-      // Copy the rest of the data from the derived class.
-      memcpy((void**) (rawNewClass + extraPrefixSize),
-             (void* const *) (rawOldClass - oldClassAP),
-             oldClassSize);
-
-      // Update the class extents on the new metadata object.
-      theClass = reinterpret_cast<ClassMetadata*>(rawNewClass + oldClassAP);
-      theClass->setClassAddressPoint(superAP);
-      theClass->setClassSize(extraPrefixSize + oldClassSize);
-
-      // The previous metadata should be global data, so we have no real
-      // choice but to drop it on the floor.
-    }
-  }
+    return;
 
   // If any ancestor classes have generic parameters or field offset
   // vectors, inherit them.
@@ -1552,24 +1528,15 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
     = (const ClassMetadata *)object_getClass((id)theSuperclass);
   theMetaclass->SuperClass = theSuperMetaclass;
 #endif
-
-  return theClass;
-}
-
-static MetadataAllocator &getResilientMetadataAllocator() {
-  // This should be constant-initialized, but this is safe.
-  static MetadataAllocator allocator;
-  return allocator;
 }
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
-ClassMetadata *
-swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                                 size_t numFields,
-                                           const ClassFieldLayout *fieldLayouts,
-                                                 size_t *fieldOffsets) {
-  self = _swift_initializeSuperclass(self, /*copyFieldOffsetVectors=*/true);
+void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
+                                          size_t numFields,
+                                          const ClassFieldLayout *fieldLayouts,
+                                          size_t *fieldOffsets) {
+  _swift_initializeSuperclass(self, /*copyFieldOffsetVectors=*/true);
 
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
@@ -1658,10 +1625,9 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   // even if Swift doesn't, because of SwiftObject.)
   rodata->InstanceStart = size;
 
-  auto genericPattern = self->getDescription()->getGenericMetadataPattern();
-  auto &allocator =
-    genericPattern ? unsafeGetInitializedCache(genericPattern).getAllocator()
-                   : getResilientMetadataAllocator();
+  auto &allocator = unsafeGetInitializedCache(
+                           self->getDescription()->getGenericMetadataPattern())
+    .getAllocator();
 
   // Always clone the ivar descriptors.
   if (numFields) {
@@ -1737,8 +1703,6 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
     }
   }
 #endif
-
-  return self;
 }
 
 /// \brief Fetch the type metadata associated with the formal dynamic
@@ -2495,6 +2459,19 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
   }
 }
 #endif
+
+SWIFT_RUNTIME_EXPORT
+extern "C"
+void swift_initializeSuperclass(ClassMetadata *theClass,
+                                bool copyFieldOffsetVectors) {
+  // Copy generic parameters and field offset vectors from the superclass.
+  _swift_initializeSuperclass(theClass, copyFieldOffsetVectors);
+
+#if SWIFT_OBJC_INTEROP
+  // Register the class pair with the ObjC runtime.
+  swift_instantiateObjCClass(theClass);
+#endif
+}
 
 /*** Protocol witness tables *************************************************/
 

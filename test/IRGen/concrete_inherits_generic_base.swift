@@ -23,8 +23,8 @@ class Base<T> {
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     call void @swift_once(i64* @_TMaC3foo12SuperDerived.once_token, i8* bitcast (void (i8*)* @initialize_metadata_SuperDerived to i8*))
-// CHECK-NEXT:     [[METADATA:%.*]] = load %swift.type*, %swift.type** @_TMLC3foo12SuperDerived
+// CHECK-NEXT:     [[METADATA:%.*]] = call %swift.type* @swift_getResilientMetadata(
+// CHECK-NEXT:     store %swift.type* [[METADATA]], %swift.type** @_TMLC3foo12SuperDerived
 // CHECK-NEXT:     br label %cont
 // CHECK:       cont:
 // CHECK-NEXT:     [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
@@ -39,8 +39,8 @@ class SuperDerived: Derived {
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     call void @swift_once(i64* @_TMaC3foo7Derived.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Derived to i8*))
-// CHECK-NEXT:     [[METADATA:%.*]] = load %swift.type*, %swift.type** @_TMLC3foo7Derived
+// CHECK-NEXT:     [[METADATA:%.*]] = call %swift.type* @swift_getResilientMetadata(
+// CHECK-NEXT:     store %swift.type* [[METADATA]], %swift.type** @_TMLC3foo7Derived
 // CHECK-NEXT:     br label %cont
 // CHECK:       cont:
 // CHECK-NEXT:     [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
@@ -69,9 +69,9 @@ presentBase(Derived(x: "two"))
 presentBase(Base(x: "two"))
 presentBase(Base(x: 2))
 
-// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_SuperDerived(i8*)
+// CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_SuperDerived(%swift.type_pattern*, i8**)
 // CHECK:         [[TMP:%.*]] = call %swift.type* @_TMaC3foo7Derived()
-// CHECK-NEXT:    store %swift.type* [[TMP]], %swift.type** getelementptr inbounds ({{.*}} @_TMfC3foo12SuperDerived{{.*}}, i32 1), align
-// CHECK:         [[METADATA:%.*]] = call %swift.type* @swift_initClassMetadata_UniversalStrategy(
-// CHECK:         store atomic %swift.type* [[METADATA]], %swift.type** @_TMLC3foo12SuperDerived release,
-// CHECK:         ret void
+// CHECK-NEXT:    [[SUPER:%.*]] = bitcast %swift.type* [[TMP:%.*]] to %objc_class*
+// CHECK-NEXT:    [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
+// CHECK:         call void @swift_initializeSuperclass(%swift.type* [[METADATA]], i1 false)
+// CHECK-NEXT:    ret %swift.type* [[METADATA]]
