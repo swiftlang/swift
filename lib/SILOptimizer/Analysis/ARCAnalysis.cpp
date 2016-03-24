@@ -621,9 +621,10 @@ findMatchingRetainsInner(SILBasicBlock *BB, SILValue V) {
   return std::make_pair(FindRetainKind::None, nullptr);
 } 
 
-ConsumedArgToEpilogueReleaseMatcher::ConsumedArgToEpilogueReleaseMatcher(
-    RCIdentityFunctionInfo *RCFI, SILFunction *F, ExitKind Kind)
-    : F(F), RCFI(RCFI), Kind(Kind) {
+ConsumedArgToEpilogueReleaseMatcher::
+ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCFI,
+                                    SILFunction *F, ExitKind Kind)
+   : F(F), RCFI(RCFI), Kind(Kind) {
   recompute();
 }
 
@@ -674,26 +675,57 @@ isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
 
 bool
 ConsumedArgToEpilogueReleaseMatcher::
-releaseAllNonTrivials(ReleaseList Insts, SILValue Base) {
+releaseArgument(ReleaseList Insts, SILValue Arg) {
   // Reason about whether all parts are released.
   SILModule *Mod = &(*Insts.begin())->getModule();
 
   // These are the list of SILValues that are actually released.
   ProjectionPathSet Paths;
   for (auto &I : Insts) {
-    auto PP = ProjectionPath::getProjectionPath(Base, I->getOperand(0));
+    auto PP = ProjectionPath::getProjectionPath(Arg, I->getOperand(0));
     if (!PP)
       return false;
     Paths.insert(PP.getValue());
   } 
 
   // Is there an uncovered non-trivial type.
-  return !ProjectionPath::hasUncoveredNonTrivials(Base->getType(), Mod, Paths);
+  return !ProjectionPath::hasUncoveredNonTrivials(Arg->getType(), Mod, Paths);
 }
 
 void
 ConsumedArgToEpilogueReleaseMatcher::
-findMatchingReleases(SILBasicBlock *BB) {
+processMatchingReleases() {
+  llvm::DenseSet<SILArgument *> ArgToRemove;
+  // If we can not find a releases for all parts with reference semantics
+  // that means we did not find all release for the base.
+  for (auto Arg : ArgInstMap) {
+    // If an argument has a single release and it is rc-identical to the
+    // SILArgument. Then we do not need to use projection to check for whether
+    // all non-trivial fields are covered.
+    if (Arg.second.size() == 1) {
+      SILInstruction *I = *Arg.second.begin();
+      SILValue RV = I->getOperand(0);
+      if (Arg.first == RCFI->getRCIdentityRoot(RV))
+        continue;
+    }
+
+    // OK. we have multiple epilogue releases for this argument, check whether
+    // it has covered all fields with reference semantic in the argument.
+    if (releaseArgument(Arg.second, Arg.first))
+      continue;
+
+    ArgToRemove.insert(Arg.first);
+  }
+
+  // Clear any releases found for this argument.
+  for (auto &X : ArgToRemove) { 
+    ArgInstMap.erase(ArgInstMap.find(X));
+  }
+}
+
+void
+ConsumedArgToEpilogueReleaseMatcher::
+collectMatchingReleases(SILBasicBlock *BB) {
   // Iterate over the instructions post-order and find final releases
   // associated with each arguments.
   //
@@ -734,7 +766,7 @@ findMatchingReleases(SILBasicBlock *BB) {
     auto *Arg = dyn_cast<SILArgument>(Op);
     // If this is not a SILArgument, maybe it is a part of a SILArgument.
     // This is possible after we expand release instructions in SILLowerAgg pass.
-    if (!Arg) { 
+    if (!Arg) {
       Arg = dyn_cast<SILArgument>(stripValueProjections(OrigOp));
     }
 
@@ -769,29 +801,16 @@ findMatchingReleases(SILBasicBlock *BB) {
     // Record it. 
     Iter->second.push_back(Target);
   }
+}
 
-  // If we can not find a releases for all parts with reference semantics
-  // that means we did not find all releases for the base.
-  llvm::DenseSet<SILArgument *> ArgToRemove;
-  for (auto &Arg : ArgInstMap) {
-    // If an argument has a single release and it is rc-identical to the
-    // SILArgument. Then we do not need to use projection to check for whether
-    // all non-trivial fields are covered. This is a short-cut to avoid
-    // projection for cost as well as accuracy. Projection currently does not
-    // support single incoming argument as rc-identity does whereas rc-identity
-    // does.
-    if (Arg.second.size() == 1) {
-      SILInstruction *I = *Arg.second.begin();
-      SILValue RV = I->getOperand(0);
-      if (Arg.first == RCFI->getRCIdentityRoot(RV))
-        continue;
-    }
-    if (!releaseAllNonTrivials(Arg.second, Arg.first))
-      ArgToRemove.insert(Arg.first);
-  }
-
-  for (auto &X : ArgToRemove) 
-    ArgInstMap.erase(ArgInstMap.find(X));
+void
+ConsumedArgToEpilogueReleaseMatcher::
+findMatchingReleases(SILBasicBlock *BB) {
+  // Walk the given basic block to find all the epilogue releases.
+  collectMatchingReleases(BB);
+  // We've exited the epilogue sequence, try to find out which parameter we
+  // have all the epilogue releases for and which one we did not.
+  processMatchingReleases();
 }
 
 //===----------------------------------------------------------------------===//
