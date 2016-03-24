@@ -371,7 +371,6 @@ struct NodeFactory {
 class DemanglerPrinter {
 public:
   DemanglerPrinter(std::string &out) : Stream(out) {}
-  DemanglerPrinter(std::string &&out) : Stream(out) {}
 
   DemanglerPrinter &operator<<(llvm::StringRef Value) & {
     Stream.append(Value.data(), Value.size());
