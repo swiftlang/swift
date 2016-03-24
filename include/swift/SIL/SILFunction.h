@@ -325,6 +325,10 @@ public:
   /// Set the function's linkage attribute.
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
+  /// Returns true if this function can be referenced from a fragile function
+  /// body.
+  bool hasValidLinkageForFragileRef() const;
+
   /// Get's the effective linkage which is used to derive the llvm linkage.
   /// Usually this is the same as getLinkage(), except in one case: if this
   /// function is a method in a class which has higher visibility than the

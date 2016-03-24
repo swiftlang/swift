@@ -1481,28 +1481,6 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   return (NewI) ? NewI : AI;
 }
 
-bool swift::isValidLinkageForFragileRef(SILLinkage linkage) {
-  switch (linkage) {
-  case SILLinkage::Private:
-  case SILLinkage::PrivateExternal:
-  case SILLinkage::Hidden:
-  case SILLinkage::HiddenExternal:
-    return false;
-
-  case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
-      // This handles some kind of generated functions, like constructors
-      // of clang imported types.
-      // TODO: check why those functions are not fragile anyway and make
-      // a less conservative check here.
-      return true;
-
-  case SILLinkage::Public:
-  case SILLinkage::PublicExternal:
-    return true;
-  }
-}
-
 /// Create a call of _bridgeToObjectiveC which converts an _ObjectiveCBridgeable
 /// instance into a bridged ObjC type.
 SILInstruction *
@@ -1568,9 +1546,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
          "Implementation of _bridgeToObjectiveC could not be found");
 
   if (Inst->getFunction()->isFragile() &&
-      !(BridgedFunc->isFragile() ||
-        isValidLinkageForFragileRef(BridgedFunc->getLinkage()) ||
-        BridgedFunc->isExternalDeclaration()))
+      !BridgedFunc->hasValidLinkageForFragileRef())
     return nullptr;
 
   auto ParamTypes = BridgedFunc->getLoweredFunctionType()->getParameters();

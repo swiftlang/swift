@@ -271,6 +271,8 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
   // have enough information at the time we emit the function to
   // know if it should be marked fragile or not.
   if (F->getLinkage() == SILLinkage::Shared && !DeclOnly) {
+    assert(F->isThunk() && "Reference to non-thunk, non-fragile shared "
+           "function from a fragile function");
     FuncsToEmit[F] = false;
     Worklist.push_back(F);
     return;

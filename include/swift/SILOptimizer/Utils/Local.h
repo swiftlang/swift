@@ -174,10 +174,6 @@ bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
 
 void recalcDomTreeForCCBOpt(DominanceInfo *DT, SILFunction &F);
 
-/// Checks if a symbol with a given linkage can be referenced from fragile
-/// functions.
-bool isValidLinkageForFragileRef(SILLinkage linkage);
-
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
 struct InstModCallbacks {
