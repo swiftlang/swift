@@ -44,7 +44,7 @@ public:
   bool isInvalid() const { return !Value.isValid(); }
   
   bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
-  bool operator!=(const SourceLoc &RHS) const { return RHS.Value != Value; }
+  bool operator!=(const SourceLoc &RHS) const { return !operator==(RHS); }
   
   /// Return a source location advanced a specified number of bytes.
   SourceLoc getAdvancedLoc(int ByteOffset) const {
