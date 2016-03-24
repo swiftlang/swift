@@ -18,7 +18,7 @@
 
 // FIXME: Make this work with Linux
 
-import Foundation
+import MachO
 import Darwin
 
 let RequestInstanceAddress = "i"
@@ -120,7 +120,7 @@ internal func getSectionInfo(name: String,
 internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let header = unsafeBitCast(_dyld_get_image_header(i),
-    to: UnsafePointer<mach_header_64>.self)
+    to: UnsafePointer<MachHeader>.self)
 
   let imageName = _dyld_get_image_name(i)
   if let fieldmd = getSectionInfo("__swift3_fieldmd", header),
