@@ -1773,8 +1773,6 @@ namespace {
     }
     
     Type visitArrayExpr(ArrayExpr *expr) {
-      ASTContext &C = CS.getASTContext();
-      
       // An array expression can be of a type T that conforms to the
       // ArrayLiteralConvertible protocol.
       auto &tc = CS.getTypeChecker();
@@ -1785,10 +1783,14 @@ namespace {
         return Type();
       }
 
-      // FIXME: Protect against broken standard library.
-      auto elementAssocTy = cast<AssociatedTypeDecl>(
-                              arrayProto->lookupDirect(
-                                C.getIdentifier("Element")).front());
+      // Assume that ArrayLiteralConvertible contains a single associated type.
+      AssociatedTypeDecl *elementAssocTy = nullptr;
+      for (auto decl : arrayProto->getMembers()) {
+        if ((elementAssocTy = dyn_cast<AssociatedTypeDecl>(decl)))
+          break;
+      }
+      if (!elementAssocTy)
+        return Type();
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
