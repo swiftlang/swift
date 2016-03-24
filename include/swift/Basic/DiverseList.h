@@ -193,7 +193,7 @@ public:
       return *this;
     }
     iterator operator++(int _) {
-      iterator copy = *this;
+      auto copy = *this;
       operator++();
       return copy;
     }
@@ -236,7 +236,7 @@ public:
       return *this;
     }
     const_iterator operator++(int _) {
-      const_iterator copy = *this;
+      auto copy = *this;
       operator++();
       return copy;
     }
