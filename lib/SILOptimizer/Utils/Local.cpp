@@ -77,17 +77,31 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
 
 /// \brief Return true if this is a release instruction and the released value
 /// is a part of a guaranteed parameter.
-bool swift::isGuaranteedParamRelease(SILInstruction *I) {
-  if (!isa<StrongReleaseInst>(I) || !isa<ReleaseValueInst>(I))
+bool swift::isIntermediateRelease(SILInstruction *I,
+                                  ConsumedArgToEpilogueReleaseMatcher &ERM) {
+  // Check whether this is a release instruction.
+  if (!isa<StrongReleaseInst>(I) && !isa<ReleaseValueInst>(I))
     return false;
+
   // OK. we have a release instruction.
   // Check whether this is a release on part of a guaranteed function argument.
   SILValue Op = stripValueProjections(I->getOperand(0));
   SILArgument *Arg = dyn_cast<SILArgument>(Op);
-  if (!Arg || !Arg->isFunctionArg() ||
-      !Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed))
+  if (!Arg || !Arg->isFunctionArg())
     return false;
-  return true;
+  
+  // This is a release on a guaranteed parameter. Its not the final release.
+  if (Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed))
+    return true;
+
+  // This is a release on a owned parameter and its not the epilogue relase.
+  // Its not the final release.
+  SILInstruction *Rel = ERM.getSingleReleaseForArgument(Arg);
+  if (Rel && Rel != I)
+    return true;
+
+  // Failed to prove anything.
+  return false;
 }
 
 namespace {
