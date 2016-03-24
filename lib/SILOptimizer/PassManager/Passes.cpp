@@ -347,7 +347,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addDeadStoreElimination();
 
   // We've done a lot of optimizations on this function, attempt to FSO.
-  PM.addFunctionSignatureOptCloner();
+  PM.addFunctionSignatureOpts();
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();

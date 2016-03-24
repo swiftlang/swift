@@ -1,4 +1,4 @@
-//===--- FunctionSignatureOptCloner.cpp - Optimizes function signatures ---===//
+//===--- FunctionSignatureOpts.cpp - Optimizes function signatures -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-function-signature-opt-cloner"
+#define DEBUG_TYPE "sil-function-signature-opt"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
@@ -535,7 +535,7 @@ createOptimizedFunction(RCIdentityFunctionInfo *RCIA,
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 namespace {
-class FunctionSignatureOptCloner : public SILFunctionTransform {
+class FunctionSignatureOpts : public SILFunctionTransform {
 public:
   void run() override {
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
@@ -579,12 +579,12 @@ public:
   }
 
   StringRef getName() override {
-    return "Function Signature Optimization Cloner";
+    return "Function Signature Optimization";
   }
 };
 
 } // end anonymous namespace
 
-SILTransform *swift::createFunctionSignatureOptCloner() {
-  return new FunctionSignatureOptCloner();
+SILTransform *swift::createFunctionSignatureOpts() {
+  return new FunctionSignatureOpts();
 }
