@@ -141,8 +141,8 @@ struct ASTContext::Implementation {
   NominalTypeDecl *UnsafePointerDecl = nullptr;
   VarDecl *UnsafePointerMemoryDecl = nullptr;
   
-  /// The declaration of Swift.COpaquePointer.
-  NominalTypeDecl *COpaquePointerDecl = nullptr;
+  /// The declaration of Swift.OpaquePointer.
+  NominalTypeDecl *OpaquePointerDecl = nullptr;
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
@@ -760,12 +760,12 @@ NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
   return Impl.UnsafeMutablePointerDecl;
 }
 
-NominalTypeDecl *ASTContext::getCOpaquePointerDecl() const {
-  if (!Impl.COpaquePointerDecl)
-    Impl.COpaquePointerDecl
-    = findStdlibType(*this, "COpaquePointer", 0);
+NominalTypeDecl *ASTContext::getOpaquePointerDecl() const {
+  if (!Impl.OpaquePointerDecl)
+    Impl.OpaquePointerDecl
+    = findStdlibType(*this, "OpaquePointer", 0);
   
-  return Impl.COpaquePointerDecl;
+  return Impl.OpaquePointerDecl;
 }
 
 NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {

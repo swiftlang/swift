@@ -388,7 +388,7 @@ enum class ConventionsKind : uint8_t {
                         clangTy->getPointeeType().getTypePtr(), CanType(eltTy));
         
         if (substTy->getAnyNominal() ==
-              M.getASTContext().getCOpaquePointerDecl())
+              M.getASTContext().getOpaquePointerDecl())
           // TODO: We could conceivably have an indirect opaque ** imported
           // as COpaquePointer. That shouldn't ever happen today, though,
           // since we only ever indirect the 'self' parameter of functions
