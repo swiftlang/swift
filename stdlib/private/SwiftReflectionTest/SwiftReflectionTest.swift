@@ -1,4 +1,4 @@
-//===--- ReflectionPipe.swift ---------------------------------*- swift -*-===//
+//===--- SwiftReflectionTest.swift ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -47,7 +47,7 @@ internal struct Section {
 
 /// Holds the addresses and sizes of sections related to reflection
 internal struct ReflectionInfo : Sequence {
-  /// The name of the laoded image
+  /// The name of the loaded image
   internal let imageName: String
 
   /// The Field Metadata section

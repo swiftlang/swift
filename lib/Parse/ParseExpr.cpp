@@ -760,7 +760,7 @@ static bool isValidTrailingClosure(bool isExprBasic, Expr *baseExpr, Parser &P){
 
   // If this is a normal expression (not an expr-basic) then trailing closures
   // are allowed, so this is obviously one.
-  // TODO: We could handle try to diambiguate cases like:
+  // TODO: We could handle try to disambiguate cases like:
   //   let x = foo
   //   {...}()
   // by looking ahead for the ()'s, but this has been replaced by do{}, so this

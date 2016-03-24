@@ -370,7 +370,7 @@ SILValue EagerDispatch::emitArgumentCast(SILArgument *OrigArg, unsigned Idx) {
 }
 
 /// Converts each generic function argument into a SILValue that can be passed
-/// to the specialized call by emiting a cast followed by a load.
+/// to the specialized call by emitting a cast followed by a load.
 ///
 /// Populates the CallArgs with the converted arguments.
 ///

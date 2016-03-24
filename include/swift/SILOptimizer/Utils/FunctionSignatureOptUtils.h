@@ -17,7 +17,6 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"

@@ -54,7 +54,7 @@ class LetPropertiesOpt {
   llvm::SmallPtrSet<NominalTypeDecl *, 16> SkipTypeProcessing;
   // Properties in this set cannot be removed.
   llvm::SmallPtrSet<VarDecl *, 16> CannotRemove;
-  // Set of let propeties in a given nominal type.
+  // Set of let properties in a given nominal type.
   llvm::MapVector<NominalTypeDecl *, Properties> NominalTypeLetProperties;
   // Set of properties whose initializer functions were processed already.
   llvm::SmallPtrSet<VarDecl *, 16> ProcessedPropertyInitializers;
@@ -508,7 +508,7 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
     }
 
     if (LetProps.empty()) {
-      // No interesting let propeties in this struct.
+      // No interesting let properties in this struct.
       SkipTypeProcessing.insert(structDecl);
       return;
     }
@@ -521,7 +521,7 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
   auto &Props = NominalTypeLetProperties[structDecl];
 
   DEBUG(llvm::dbgs()
-            << "Found a struct instruction intializing some let properties: ";
+            << "Found a struct instruction initializing some let properties: ";
         SI->dumpInContext());
   // Figure out the initializing sequence for each
   // of the properties.
@@ -533,7 +533,7 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
                        << "' :" << PropValue << "\n");
     if (!analyzeInitValue(SI, Prop)) {
       SkipProcessing.insert(Prop);
-      DEBUG(llvm::dbgs() << "The value of a let propertiy '"
+      DEBUG(llvm::dbgs() << "The value of a let property '"
                          << structDecl->getName() << "::" << Prop->getName()
                          << "' is not statically known\n");
     }
@@ -548,7 +548,7 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
     return;
 
   DEBUG(llvm::dbgs()
-            << "Collecting propery access for property '"
+            << "Collecting property access for property '"
             << dyn_cast<NominalTypeDecl>(Property->getDeclContext())->getName()
             << "::" << Property->getName() << "':\n";
         llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());

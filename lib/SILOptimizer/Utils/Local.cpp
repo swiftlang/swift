@@ -94,7 +94,7 @@ bool swift::isIntermediateRelease(SILInstruction *I,
   if (Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed))
     return true;
 
-  // This is a release on a owned parameter and its not the epilogue relase.
+  // This is a release on an owned parameter and its not the epilogue release.
   // Its not the final release.
   SILInstruction *Rel = ERM.getSingleReleaseForArgument(Arg);
   if (Rel && Rel != I)

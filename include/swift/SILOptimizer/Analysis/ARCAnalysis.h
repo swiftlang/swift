@@ -136,7 +136,7 @@ private:
 
   /// Return true if all the successors of the EpilogueRetainInsts do not have
   /// a retain. 
-  bool isTransistiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
+  bool isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
 
   /// Finds matching releases in the provided block \p BB.
   RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V);
