@@ -510,9 +510,31 @@ bool SILFunction::hasName(const char *Name) const {
   return getName() == Name;
 }
 
-  /// Helper method which returns true if the linkage of the SILFunction
-  /// indicates that the objects definition might be required outside the
-  /// current SILModule.
+/// Returns true if this function can be referenced from a fragile function
+/// body.
+bool SILFunction::hasValidLinkageForFragileRef() const {
+  // Fragile functions can reference other fragile functions.
+  if (isFragile())
+    return true;
+
+  // Fragile functions can reference 'static inline' functions imported
+  // from C.
+  if (hasForeignBody())
+    return true;
+
+  // Fragile functions can reference non-fragile shared functions only
+  // if they are thunks.
+  SILLinkage linkage = getLinkage();
+  if (hasSharedVisibility(linkage))
+    return isThunk();
+
+  // Otherwise, only public functions can be referenced.
+  return hasPublicVisibility(linkage);
+}
+
+/// Helper method which returns true if the linkage of the SILFunction
+/// indicates that the objects definition might be required outside the
+/// current SILModule.
 bool
 SILFunction::isPossiblyUsedExternally() const {
   return swift::isPossiblyUsedExternally(getLinkage(),

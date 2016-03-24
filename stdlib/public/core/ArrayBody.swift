@@ -19,7 +19,8 @@ import SwiftShims
 
 internal struct _ArrayBody {
   var _storage: _SwiftArrayBodyStorage
-  
+
+  @_versioned
   init(count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
     _sanityCheck(count >= 0)
     _sanityCheck(capacity >= 0)

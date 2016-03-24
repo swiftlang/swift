@@ -39,7 +39,7 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), nullptr,
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
-      Orig->isFragile(), Orig->isThunk(), Orig->getClassVisibility(),
+      Orig->isFragile(), IsThunk, Orig->getClassVisibility(),
       Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
       Orig->getDebugScope(), Orig->getDeclContext());
   NewF->setDeclCtx(Orig->getDeclContext());

@@ -565,7 +565,7 @@ PromotedParamCloner::initCloned(SILFunction *Orig,
   auto *Fn = M.getOrCreateFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getContextGenericParams(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
-      Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
+      IsThunk, Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
