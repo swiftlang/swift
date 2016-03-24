@@ -511,6 +511,11 @@ SerializedASTFile::collectAllGroups(std::vector<StringRef> &Names) const {
   File.collectAllGroups(Names);
 };
 
+Optional<StringRef>
+SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
+  return File.getGroupNameByUSR(USR);
+}
+
 void
 SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   File.getTopLevelDecls(results);

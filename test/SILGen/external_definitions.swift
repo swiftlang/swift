@@ -32,7 +32,7 @@ hasNoPrototype()
 // CHECK-LABEL: sil  shared @_TFCSo8NSObjectC{{.*}} : $@convention(thin) (@thick NSObject.Type) -> @owned NSObject
 
 // -- Native Swift thunk for NSAnse
-// CHECK: sil shared @_TTOFSC6NSAnseFGSQCSo7Ansible_GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Ansible>) -> @owned ImplicitlyUnwrappedOptional<Ansible> {
+// CHECK: sil shared [thunk] @_TTOFSC6NSAnseFGSQCSo7Ansible_GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Ansible>) -> @owned ImplicitlyUnwrappedOptional<Ansible> {
 // CHECK: bb0(%0 : $ImplicitlyUnwrappedOptional<Ansible>):
 // CHECK:   %1 = function_ref @NSAnse : $@convention(c) (ImplicitlyUnwrappedOptional<Ansible>) -> @autoreleased ImplicitlyUnwrappedOptional<Ansible>
 // CHECK:   %2 = apply %1(%0) : $@convention(c) (ImplicitlyUnwrappedOptional<Ansible>) -> @autoreleased ImplicitlyUnwrappedOptional<Ansible>

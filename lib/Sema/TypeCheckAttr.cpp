@@ -79,6 +79,7 @@ public:
   IGNORED_ATTR(Testable)
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
+  IGNORED_ATTR(Versioned)
   IGNORED_ATTR(WarnUnusedResult)
   IGNORED_ATTR(ShowInInterface)
 #undef IGNORED_ATTR
@@ -652,6 +653,9 @@ public:
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
+
+    // FIXME: We actually do have things to enforce for versioned API.
+    IGNORED_ATTR(Versioned)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

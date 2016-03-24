@@ -2,6 +2,9 @@
 Swift 3.0
 -------
 
+* [SE-0043](https://github.com/apple/swift-evolution/blob/master/proposals/0043-declare-variables-in-case-labels-with-multiple-patterns.md)
+  landed, adding the ability to declare variables in multiple patterns in cases.
+
 * Renamification landed, so the Clang importer imports ObjC symbols
   substantially differently.  *Someone should expand on this point.*
 
@@ -59,6 +62,13 @@ Swift 3.0
         } catch is SomeError {
             throw OtherError()
         }
+    }
+    ```
+* Throwing closure arguments of a rethrowing function may now be optional. For example:
+
+    ```swift
+    func executeClosureIfNotNil(closure: (() throws -> Void)?) rethrows {
+        try closure?()
     }
     ```
 

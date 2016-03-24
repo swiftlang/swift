@@ -328,16 +328,16 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     return fn;
   }
 
-  IsTransparent_t IsTrans = constant.isTransparent()?
-                              IsTransparent : IsNotTransparent;
-  IsFragile_t IsFrag = IsNotFragile;
-  if (IsTrans == IsTransparent && (linkage == SILLinkage::Public
-                                   || linkage == SILLinkage::PublicExternal)) {
-    IsFrag = IsFragile;
-  }
+  IsTransparent_t IsTrans = constant.isTransparent()
+                            ? IsTransparent
+                            : IsNotTransparent;
+  IsFragile_t IsFrag = constant.isFragile()
+                       ? IsFragile
+                       : IsNotFragile;
 
-  EffectsKind EK = constant.hasEffectsAttribute() ?
-  constant.getEffectsAttribute() : EffectsKind::Unspecified;
+  EffectsKind EK = constant.hasEffectsAttribute()
+                   ? constant.getEffectsAttribute()
+                   : EffectsKind::Unspecified;
 
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())

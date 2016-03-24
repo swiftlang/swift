@@ -78,3 +78,6 @@ def simplified_demangling : Flag<["-"], "simplified-demangling">,
 
 def synthesized_extension : Flag<["-"], "synthesized-extension">,
   HelpText<"Print synthesized extensions when generating interface">;
+
+def interested_usr : Separate<["-"], "interested-usr">,
+  HelpText<"Interested USR to calculate the containing group">;

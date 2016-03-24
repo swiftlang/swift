@@ -47,6 +47,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
     // an ObjC method. This would change if we introduced a native
     // runtime-hookable mechanism.
     SILGenFunction SGF(*this, *F);
+    F->setThunk(IsThunk);
     SGF.emitForeignToNativeThunk(constant);
   }
 

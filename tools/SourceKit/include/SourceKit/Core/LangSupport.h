@@ -426,7 +426,8 @@ public:
                                    StringRef ModuleName,
                                    Optional<StringRef> Group,
                                    ArrayRef<const char *> Args,
-                                   bool SynthesizedExtensions) = 0;
+                                   bool SynthesizedExtensions,
+                                   Optional<StringRef> InterestedUSR) = 0;
 
   virtual void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                          StringRef Name,

@@ -252,6 +252,13 @@ SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
 DECL_ATTR(_cdecl, CDecl,
           OnFunc | LongAttribute | UserInaccessible, 63)
 
+// A testing attribute for Library Evolution ("resilience").
+// FIXME: Replace with improved @available attribute.
+SIMPLE_DECL_ATTR(_versioned, Versioned,
+                 OnFunc | OnVar | OnSubscript | OnConstructor |
+                 OnStruct | OnEnum | OnClass | OnProtocol |
+                 LongAttribute | UserInaccessible,
+                 64)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

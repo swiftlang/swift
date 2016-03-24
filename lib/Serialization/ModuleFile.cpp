@@ -1646,6 +1646,14 @@ ModuleFile::getCommentForDeclByUSR(StringRef USR) const {
   return *I;
 }
 
+Optional<StringRef>
+ModuleFile::getGroupNameByUSR(StringRef USR) const {
+  if (auto Comment = getCommentForDeclByUSR(USR)) {
+    return getGroupNameById(Comment.getValue().Group);
+  }
+  return None;
+}
+
 Identifier ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {
   Identifier discriminator = PrivateDiscriminatorsByValue.lookup(D);
   assert(!discriminator.empty() && "no discriminator found for decl");

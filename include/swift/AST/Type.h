@@ -275,6 +275,7 @@ public:
   StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
   EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
   NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
+  CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 

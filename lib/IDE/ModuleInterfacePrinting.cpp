@@ -206,6 +206,16 @@ static ClangNode extensionGetClangNode(ExtensionDecl *ext) {
   return members.front()->getClangNode();
 }
 
+Optional<StringRef>
+swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
+  for (auto File : M->getFiles()) {
+    if (auto Name = File->getGroupNameByUSR(USR)) {
+      return Name;
+    }
+  }
+  return None;
+}
+
 void swift::ide::printSubmoduleInterface(
        Module *M,
        ArrayRef<StringRef> FullModuleName,

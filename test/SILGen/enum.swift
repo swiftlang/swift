@@ -42,7 +42,7 @@ func Optionable_cases(x: Int) {
   _ = Optionable.mere(x)
 }
 
-// CHECK-LABEL: sil shared [transparent] @_TFOs10Optionable4mereFMS_FSiS_
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TFOs10Optionable4mereFMS_FSiS_
 // CHECK:        [[FN:%.*]] = function_ref @_TFOs10Optionable4merefMS_FSiS_
 // CHECK-NEXT:   [[METHOD:%.*]] = partial_apply [[FN]](%0)
 // CHECK-NEXT:   return [[METHOD]]
@@ -102,7 +102,7 @@ func AddressOnly_cases(s: S) {
   // CHECK:       return
 }
 
-// CHECK-LABEL: sil shared [transparent] @_TFOs11AddressOnly4mereFMS_FPs1P_S_
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TFOs11AddressOnly4mereFMS_FPs1P_S_
 // CHECK:       [[FN:%.*]] = function_ref @_TFOs11AddressOnly4merefMS_FPs1P_S_
 // CHECK-NEXT:  [[METHOD:%.*]] = partial_apply [[FN]](%0)
 // CHECK-NEXT:  return [[METHOD]] : $@callee_owned (@in P) -> @out AddressOnly
@@ -169,7 +169,7 @@ struct String { var ptr: Builtin.NativeObject }
 
 enum Foo { case A(P, String) }
 
-// CHECK-LABEL: sil shared [transparent] @_TFOs3Foo1AFMS_FTPs1P_SS_S_
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TFOs3Foo1AFMS_FTPs1P_SS_S_
 // CHECK:         [[FN:%.*]] = function_ref @_TFOs3Foo1AfMS_FTPs1P_SS_S_
 // CHECK-NEXT:    [[METHOD:%.*]] = partial_apply [[FN]](%0)
 // CHECK-NEXT:    return [[METHOD]]

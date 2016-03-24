@@ -191,7 +191,8 @@ editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
                     Optional<StringRef> Group, ArrayRef<const char *> Args,
-                    bool SynthesizedExtensions);
+                    bool SynthesizedExtensions,
+                    Optional<StringRef> InterestedUSR);
 
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
@@ -474,8 +475,9 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     int64_t SynthesizedExtension = false;
     Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
                  /*isOptional=*/true);
+    Optional<StringRef> InterestedUSR = Req.getString(KeyInterestedUSR);
     return Rec(editorOpenInterface(*Name, *ModuleName, GroupName, Args,
-                                   SynthesizedExtension));
+                                   SynthesizedExtension, InterestedUSR));
   }
 
   if (ReqUID == RequestEditorOpenHeaderInterface) {
@@ -1785,14 +1787,15 @@ editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
                     Optional<StringRef> Group, ArrayRef<const char *> Args,
-                    bool SynthesizedExtensions) {
+                    bool SynthesizedExtensions,
+                    Optional<StringRef> InterestedUSR) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
                          /*EnableStructure=*/true,
                          /*EnableDiagnostics=*/false,
                          /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenInterface(EditC, Name, ModuleName, Group, Args,
-                           SynthesizedExtensions);
+                           SynthesizedExtensions, InterestedUSR);
   return EditC.createResponse();
 }
 
