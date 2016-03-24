@@ -109,7 +109,7 @@ func foo(a: A3) -> Int {
 // Check that call to A3.f() can be devirtualized.
 //
 // CHECK-NORMAL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
-// CHECK-TESTABLE: sil{{( hidden)?}} [thunk] [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
+// CHECK-TESTABLE: sil{{( hidden)?}} [thunk] [always_inline] @_TF19devirt_default_case3fooFCS_2A3Si
 // CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2B31f
 // CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2A31f
 // CHECK-NORMAL-NOT: class_method

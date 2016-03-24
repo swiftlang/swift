@@ -322,6 +322,9 @@ private:
   /// Type Expansion Analysis.
   TypeExpansionAnalysis *TE;
 
+  /// The epilogue release matcher we are using.
+  ConsumedArgToEpilogueReleaseMatcher& ERM;
+
   /// Allocator.
   llvm::BumpPtrAllocator BPA;
 
@@ -428,8 +431,9 @@ private:
 public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
-             AliasAnalysis *AA, EscapeAnalysis *EA, TypeExpansionAnalysis *TE)
-      : Mod(M), F(F), PM(PM), AA(AA), EA(EA), TE(TE) {}
+             AliasAnalysis *AA, EscapeAnalysis *EA, TypeExpansionAnalysis *TE,
+             ConsumedArgToEpilogueReleaseMatcher &ERM)
+      : Mod(M), F(F), PM(PM), AA(AA), EA(EA), TE(TE), ERM(ERM) {}
 
   /// Entry point for dead store elimination.
   bool run();
@@ -445,6 +449,8 @@ public:
 
   /// Returns the location vault of the current function.
   std::vector<LSLocation> &getLocationVault() { return LocationVault; }
+
+  ConsumedArgToEpilogueReleaseMatcher &getERM() const { return ERM; };
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
@@ -1049,7 +1055,7 @@ void DSEContext::processUnknownReadInstForDSE(SILInstruction *I) {
 void DSEContext::processUnknownReadInst(SILInstruction *I, DSEKind Kind) {
   // If this is a release on a guaranteed parameter, it can not call deinit,
   // which might read or write memory.
-  if (isGuaranteedParamRelease(I))
+  if (isIntermediateRelease(I, ERM))
     return;
 
   // Are we building genset and killset.
@@ -1231,13 +1237,17 @@ public:
 
   /// The entry point to the transformation.
   void run() override {
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
-    auto *EA = PM->getAnalysis<EscapeAnalysis>();
-    auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     SILFunction *F = getFunction();
     DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
 
-    DSEContext DSE(F, &F->getModule(), PM, AA, EA, TE);
+    auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *EA = PM->getAnalysis<EscapeAnalysis>();
+    auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
+    auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
+
+    ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F);
+
+    DSEContext DSE(F, &F->getModule(), PM, AA, EA, TE, ERM);
     if (DSE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
