@@ -3267,17 +3267,18 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
     ConstraintKind::ValueMember, Name, BaseTy, nullptr, false);
   if (LookupResult.ViableCandidates.empty())
     return Result;
-  if (OverloadChoice *Choice = LookupResult.getFavoredChoice()) {
-    Result.Favored = Choice->getDecl();
-  }
+  ConstraintLocator *Locator = CS.getConstraintLocator(nullptr);
+  TypeVariableType *TV = CS.createTypeVariable(Locator, TVO_CanBindToLValue);
+  CS.addOverloadSet(TV, LookupResult.ViableCandidates, Locator);
+  Optional<Solution> OpSolution = CS.solveSingle();
+  if (!OpSolution.hasValue())
+    return Result;
+  SelectedOverload Selected =  OpSolution.getValue().overloadChoices[Locator];
+  Result.Favored = Selected.choice.getDecl();
   for (OverloadChoice& Choice : LookupResult.ViableCandidates) {
     ValueDecl *VD = Choice.getDecl();
     if (VD != Result.Favored)
       Result.OtherViables.push_back(VD);
-  }
-  if (!Result.Favored) {
-    Result.Favored = Result.OtherViables.front();
-    Result.OtherViables.erase(Result.OtherViables.begin());
   }
   return Result;
 }

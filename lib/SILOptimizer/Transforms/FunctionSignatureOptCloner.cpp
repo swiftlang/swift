@@ -14,7 +14,6 @@
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
-#include "swift/SILOptimizer/Analysis/FunctionSignatureAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -540,11 +539,12 @@ class FunctionSignatureOptCloner : public SILFunctionTransform {
 public:
   void run() override {
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
-    auto *FSA = getAnalysis<FunctionSignatureAnalysis>();
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *CA = PM->getAnalysis<CallerAnalysis>();
 
     SILFunction *F = getFunction();
+    llvm::BumpPtrAllocator Allocator;
+    FunctionSignatureInfo FSI(F, Allocator, AA, RCIA->get(F));
     DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
 
     // Don't optimize callees that should not be optimized.
@@ -563,7 +563,7 @@ public:
 
     // Try to create an optimized function based on the signature analysis.
     SILFunction *NewF = 
-                 createOptimizedFunction(RCIA->get(F), FSA->get(F), AA, F);
+                 createOptimizedFunction(RCIA->get(F), &FSI, AA, F);
   
     if (NewF) { 
       // The thunk now carries the information on how the signature is

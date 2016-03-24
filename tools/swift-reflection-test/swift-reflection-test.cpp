@@ -189,7 +189,7 @@ static int doDumpReflectionSections(std::string BinaryFilename,
     reinterpret_cast<const void *>(TypeRefSectionContents.end())
   };
 
-  MemoryReader Reader;
+  InProcessMemoryReader Reader;
   ReflectionContext<External<RuntimeTarget<8>>> RC(Reader);
   RC.addReflectionInfo({
     BinaryFilename,
@@ -203,196 +203,264 @@ static int doDumpReflectionSections(std::string BinaryFilename,
   return EXIT_SUCCESS;
 }
 
-#define READ_END 0
-#define WRITE_END 1
-
-#define PARENT_END 1
-#define CHILD_END 0
-
-static int to_child[2];
-static int from_child[2];
-
-#define PARENT_WRITE_FD (to_child[WRITE_END])
-#define CHILD_READ_FD (to_child[READ_END])
-#define PARENT_READ_FD (from_child[READ_END])
-#define CHILD_WRITE_FD (from_child[WRITE_END])
-
-static uint8_t pipeGetPointerSize() {
-  // FIXME: Return based on -arch argument to the test tool
-  return 8;
-}
-
-static uint8_t pipeGetSizeSize() {
-  // FIXME: Return based on -arch argument to the test tool
-  return 8;
-}
-
-static bool pipeReadBytes(addr_t Address, uint8_t *Dest, uint64_t Size) {
-  write(PARENT_WRITE_FD, REQUEST_READ_BYTES, 2);
-  write(PARENT_WRITE_FD, &Address, sizeof(Address));
-  write(PARENT_WRITE_FD, &Size, sizeof(Size));
-  auto bytesRead = read(PARENT_READ_FD, Dest, Size);
-  return bytesRead == (int64_t)Size;
-}
-
-static bool pipeReadInteger(addr_t Address, uint64_t *Value, uint8_t Size) {
-  return pipeReadBytes(Address, (uint8_t*)Value, Size);
-}
-
-template <typename StoredPointer>
-static uint64_t pipeGetStringLength(addr_t Address) {
-  write(PARENT_WRITE_FD, REQUEST_STRING_LENGTH, 2);
-  StoredPointer Length;
-  write(PARENT_WRITE_FD, &Address, sizeof(Address));
-  read(PARENT_READ_FD, &Length, sizeof(Length));
-  return static_cast<uint64_t>(Length);
-}
-
-template <typename StoredPointer>
-static addr_t pipeGetSymbolAddress(const char *Name, uint64_t NameLength) {
-  StoredPointer Address = 0;
-  write(PARENT_WRITE_FD, REQUEST_SYMBOL_ADDRESS, 2);
-  write(PARENT_WRITE_FD, Name, NameLength);
-  write(PARENT_WRITE_FD, "\n", 1);
-  read(PARENT_READ_FD, &Address, sizeof(Address));
-  return static_cast<addr_t>(Address);
-}
-
 namespace {
+template <typename Runtime>
 struct Section {
-  addr_t StartAddress;
-  addr_t Size;
-
-  addr_t getEndAddress() const {
+  using StoredPointer = typename Runtime::StoredPointer;
+  StoredPointer StartAddress;
+  StoredPointer Size;
+  StoredPointer getEndAddress() const {
     return StartAddress + Size;
   }
 };
 
+template <typename Runtime>
 struct RemoteReflectionInfo {
-  const std::string ImageName;
-  const Section fieldmd;
-  const Section assocty;
-  const Section reflstr;
-  const Section typeref;
-  const addr_t StartAddress;
-  const size_t TotalSize;
+  using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSize = typename Runtime::StoredSize;
 
-  RemoteReflectionInfo(std::string ImageName, Section fieldmd, Section assocty,
-                       Section reflstr, Section typeref)
-    : fieldmd(fieldmd), assocty(assocty), reflstr(reflstr), typeref(typeref),
+  const std::string ImageName;
+  const Section<Runtime> fieldmd;
+  const Section<Runtime> assocty;
+  const llvm::Optional<Section<Runtime>> reflstr;
+  const Section<Runtime> typeref;
+  const StoredPointer StartAddress;
+  const StoredSize TotalSize;
+
+  RemoteReflectionInfo(std::string ImageName,
+                       Section<Runtime> fieldmd,
+                       Section<Runtime> assocty,
+                       llvm::Optional<Section<Runtime>> reflstr,
+                       Section<Runtime> typeref)
+    : ImageName(ImageName),
+      fieldmd(fieldmd),
+      assocty(assocty),
+      reflstr(reflstr),
+      typeref(typeref),
       StartAddress(std::min({
-        fieldmd.StartAddress, typeref.StartAddress,
-        reflstr.StartAddress, assocty.StartAddress})),
-      TotalSize(std::max({fieldmd.getEndAddress(), assocty.getEndAddress(),
-                         reflstr.getEndAddress(), typeref.getEndAddress()}) - StartAddress) {}
+        fieldmd.StartAddress,
+        typeref.StartAddress,
+        reflstr.hasValue()
+          ? reflstr.getValue().StartAddress
+          : fieldmd.StartAddress,
+        assocty.StartAddress})),
+      TotalSize(std::max({
+        fieldmd.getEndAddress(),
+        assocty.getEndAddress(),
+        reflstr.hasValue()
+          ? reflstr.getValue().getEndAddress()
+          : fieldmd.getEndAddress(),
+        typeref.getEndAddress()
+      }) - StartAddress) {}
 };
 }
 
-std::vector<ReflectionInfo> receiveReflectionInfo(MemoryReader &Reader) {
-  write(PARENT_WRITE_FD, REQUEST_REFLECTION_INFO, 2);
-  uint64_t NumReflectionInfos = 0;
-  read(PARENT_READ_FD, &NumReflectionInfos, sizeof(NumReflectionInfos));
+template <typename Runtime>
+class PipeMemoryReader : public MemoryReader {
+  using StoredPointer = typename Runtime::StoredPointer;
 
-  std::vector<RemoteReflectionInfo> RemoteInfos;
-  for (uint64_t i = 0; i < NumReflectionInfos; ++i) {
-    uint64_t ImageNameLength;
-    read(PARENT_READ_FD, &ImageNameLength, sizeof(ImageNameLength));
-    char c;
-    std::string ImageName;
-    for (uint64_t i = 0; i < ImageNameLength; ++i) {
-      read(PARENT_READ_FD, &c, 1);
-      ImageName.push_back(c);
+  static constexpr size_t ReadEnd = 0;
+  static constexpr size_t WriteEnd = 1;
+
+  int to_child[2];
+  int from_child[2];
+
+public:
+
+  int getParentReadFD() const {
+    return from_child[ReadEnd];
+  }
+
+  int getChildWriteFD() const {
+    return from_child[WriteEnd];
+  }
+
+  int getParentWriteFD() const {
+    return to_child[WriteEnd];
+  }
+
+  int getChildReadFD() const {
+    return to_child[ReadEnd];
+  }
+
+
+  PipeMemoryReader() {
+    if (pipe(to_child))
+      errorAndExit("Couldn't create pipes to child process");
+    if (pipe(from_child))
+      errorAndExit("Couldn't create pipes from child process");
+  }
+
+  uint8_t getPointerSize() override {
+    // FIXME: Return based on -arch argument to the test tool
+    return 8;
+  }
+
+  uint8_t getSizeSize() override {
+    // FIXME: Return based on -arch argument to the test tool
+    return 8;
+  }
+
+  template <typename T>
+  void collectBytesFromPipe(T *Value, size_t Size) {
+    auto Dest = reinterpret_cast<uint8_t *>(&Value);
+    while (Size) {
+      auto bytesRead = read(getParentReadFD(), Value, Size);
+      if (bytesRead <= 0)
+        errorAndExit("collectBytesFromPipe");
+      Size -= bytesRead;
+      Dest += bytesRead;
+    }
+  }
+
+  bool readBytes(addr_t Address, uint8_t *Dest, uint64_t Size) override {
+
+    StoredPointer TargetAddress = (StoredPointer)Address;
+    write(getParentWriteFD(), REQUEST_READ_BYTES, 2);
+    write(getParentWriteFD(), &TargetAddress, sizeof(TargetAddress));
+    write(getParentWriteFD(), &Size, sizeof(Size));
+    collectBytesFromPipe(Dest, Size);
+    return true;
+  }
+
+  uint64_t getParentWriteFD(StoredPointer Address) {
+    write(getParentWriteFD(), REQUEST_STRING_LENGTH, 2);
+    StoredPointer Length;
+    write(getParentWriteFD(), &Address, sizeof(Address));
+    collectBytesFromPipe(&Length, sizeof(Length));
+    return static_cast<uint64_t>(Length);
+  }
+
+  addr_t getSymbolAddress(const std::string &SymbolName) override {
+    StoredPointer Address = 0;
+    write(getParentWriteFD(), REQUEST_SYMBOL_ADDRESS, 2);
+    write(getParentWriteFD(), SymbolName.c_str(), SymbolName.size());
+    write(getParentWriteFD(), "\n", 1);
+    collectBytesFromPipe(&Address, sizeof(Address));
+    return static_cast<StoredPointer>(Address);
+  }
+
+  StoredPointer receiveInstanceAddress() {
+    write(getParentWriteFD(), REQUEST_INSTANCE_ADDRESS, 2);
+    StoredPointer InstanceAddress = 0;
+    collectBytesFromPipe(&InstanceAddress, sizeof(InstanceAddress));
+    return InstanceAddress;
+  }
+
+  void sendExitMessage() {
+    write(getParentWriteFD(), REQUEST_EXIT, 2);
+  }
+
+  uint8_t receivePointerSize() {
+    write(getParentWriteFD(), REQUEST_POINTER_SIZE, 2);
+    uint8_t PointerSize = 0;
+    collectBytesFromPipe(&PointerSize, sizeof(PointerSize));
+    return PointerSize;
+  }
+
+  std::vector<ReflectionInfo> receiveReflectionInfo() {
+    write(getParentWriteFD(), REQUEST_REFLECTION_INFO, 2);
+    uint64_t NumReflectionInfos = 0;
+    collectBytesFromPipe(&NumReflectionInfos, sizeof(NumReflectionInfos));
+
+    std::vector<RemoteReflectionInfo<Runtime>> RemoteInfos;
+    for (uint64_t i = 0; i < NumReflectionInfos; ++i) {
+      uint64_t ImageNameLength;
+      collectBytesFromPipe(&ImageNameLength, sizeof(ImageNameLength));
+      char c;
+      std::string ImageName;
+      for (uint64_t i = 0; i < ImageNameLength; ++i) {
+        collectBytesFromPipe(&c, 1);
+        ImageName.push_back(c);
+      }
+
+      StoredPointer fieldmd_start;
+      StoredPointer fieldmd_size;
+      StoredPointer typeref_start;
+      StoredPointer typeref_size;
+      StoredPointer reflstr_start;
+      StoredPointer reflstr_size;
+      StoredPointer assocty_start;
+      StoredPointer assocty_size;
+
+      collectBytesFromPipe(&fieldmd_start, sizeof(fieldmd_start));
+      collectBytesFromPipe(&fieldmd_size, sizeof(fieldmd_size));
+      collectBytesFromPipe(&typeref_start, sizeof(typeref_start));
+      collectBytesFromPipe(&typeref_size, sizeof(typeref_size));
+      collectBytesFromPipe(&reflstr_start, sizeof(reflstr_start));
+      collectBytesFromPipe(&reflstr_size, sizeof(reflstr_size));
+      collectBytesFromPipe(&assocty_start, sizeof(assocty_start));
+      collectBytesFromPipe(&assocty_size, sizeof(assocty_size));
+
+      RemoteInfos.push_back({
+        ImageName,
+        {fieldmd_start, fieldmd_size},
+        {typeref_start, typeref_size},
+        reflstr_size > 0
+          ? llvm::Optional<Section<Runtime>>({reflstr_start, reflstr_size})
+          : llvm::None,
+        {assocty_start, assocty_size},
+      });
     }
 
-    addr_t fieldmd_start;
-    addr_t fieldmd_size;
-    addr_t typeref_start;
-    addr_t typeref_size;
-    addr_t reflstr_start;
-    addr_t reflstr_size;
-    addr_t assocty_start;
-    addr_t assocty_size;
+    std::vector<ReflectionInfo> Infos;
+    for (auto &RemoteInfo : RemoteInfos) {
 
-    read(PARENT_READ_FD, &fieldmd_start, sizeof(fieldmd_start));
-    read(PARENT_READ_FD, &fieldmd_size, sizeof(fieldmd_size));
-    read(PARENT_READ_FD, &typeref_start, sizeof(typeref_start));
-    read(PARENT_READ_FD, &typeref_size, sizeof(typeref_size));
-    read(PARENT_READ_FD, &reflstr_start, sizeof(reflstr_start));
-    read(PARENT_READ_FD, &reflstr_size, sizeof(reflstr_size));
-    read(PARENT_READ_FD, &assocty_start, sizeof(assocty_start));
-    read(PARENT_READ_FD, &assocty_size, sizeof(assocty_size));
+      auto buffer = (uint8_t *)malloc(RemoteInfo.TotalSize);
 
-    RemoteInfos.push_back({
-      ImageName,
-      {fieldmd_start, fieldmd_size},
-      {typeref_start, typeref_size},
-      {reflstr_start, reflstr_size},
-      {assocty_start, assocty_size},
-    });
+      if (!readBytes(RemoteInfo.StartAddress, buffer, RemoteInfo.TotalSize))
+        errorAndExit("Couldn't read reflection information");
+
+      auto fieldmd_base
+        = buffer + RemoteInfo.fieldmd.StartAddress - RemoteInfo.StartAddress;
+      auto typeref_base
+        = buffer + RemoteInfo.typeref.StartAddress - RemoteInfo.StartAddress;
+      auto reflstr_base
+        = RemoteInfo.reflstr.hasValue()
+          ? buffer + RemoteInfo.reflstr.getValue().StartAddress
+             - RemoteInfo.StartAddress
+          : 0;
+      auto assocty_base
+        = buffer + RemoteInfo.assocty.StartAddress - RemoteInfo.StartAddress;
+      ReflectionInfo Info {
+        RemoteInfo.ImageName,
+        {fieldmd_base, fieldmd_base + RemoteInfo.fieldmd.Size},
+        {typeref_base, typeref_base + RemoteInfo.typeref.Size},
+        {reflstr_base, reflstr_base + (RemoteInfo.reflstr.hasValue()
+          ? RemoteInfo.reflstr.getValue().Size
+          : 0)},
+        {assocty_base, assocty_base + RemoteInfo.assocty.Size},
+      };
+      Infos.push_back(Info);
+    }
+    return Infos;
   }
 
-  std::vector<ReflectionInfo> Infos;
-  for (auto &RemoteInfo : RemoteInfos) {
-
-    auto buffer = (uint8_t *)malloc(RemoteInfo.TotalSize);
-
-    Reader.readBytes(RemoteInfo.StartAddress, buffer, RemoteInfo.TotalSize);
-
-    auto fieldmd_base = buffer + RemoteInfo.fieldmd.StartAddress - RemoteInfo.StartAddress;
-    auto typeref_base = buffer + RemoteInfo.typeref.StartAddress - RemoteInfo.StartAddress;
-    auto reflstr_base = buffer + RemoteInfo.reflstr.StartAddress - RemoteInfo.StartAddress;
-    auto assocty_base = buffer + RemoteInfo.assocty.StartAddress - RemoteInfo.StartAddress;
-    ReflectionInfo Info {
-      RemoteInfo.ImageName,
-      {fieldmd_base, fieldmd_base + RemoteInfo.fieldmd.Size},
-      {typeref_base, typeref_base + RemoteInfo.typeref.Size},
-      {reflstr_base, reflstr_base + RemoteInfo.reflstr.Size},
-      {assocty_base, assocty_base + RemoteInfo.assocty.Size},
-    };
-    Infos.push_back(Info);
+  uint64_t getStringLength(StoredPointer Address) {
+    write(getParentWriteFD(), REQUEST_STRING_LENGTH, 2);
+    StoredPointer Length;
+    write(getParentWriteFD(), &Address, sizeof(Address));
+    collectBytesFromPipe(&Length, sizeof(Length));
+    return static_cast<uint64_t>(Length);
   }
 
-  return Infos;
-}
+  std::string readString(addr_t Address) override {
+    auto NameSize = getStringLength(Address);
+    if (!NameSize)
+      return "";
 
-template <typename StoredPointer>
-static std::unique_ptr<MemoryReaderImpl> getPipeMemoryReaderImpl() {
-  auto Impl = std::unique_ptr<MemoryReaderImpl>(new MemoryReaderImpl());
-  Impl->getPointerSize = pipeGetPointerSize;
-  Impl->getSizeSize = pipeGetSizeSize;
-  Impl->readBytes = pipeReadBytes;
-  Impl->readInteger = pipeReadInteger;
-  Impl->getStringLength = pipeGetStringLength<StoredPointer>;
-  Impl->getSymbolAddress = pipeGetSymbolAddress<StoredPointer>;
-  return Impl;
-}
-
-addr_t receiveInstanceAddress() {
-  write(PARENT_WRITE_FD, REQUEST_INSTANCE_ADDRESS, 2);
-  addr_t InstanceAddress = 0;
-  read(PARENT_READ_FD, &InstanceAddress, sizeof(InstanceAddress));
-  return InstanceAddress;
-}
-
-uint8_t receivePointerSize() {
-  write(PARENT_WRITE_FD, REQUEST_POINTER_SIZE, 2);
-  uint8_t PointerSize;
-  read(PARENT_READ_FD, &PointerSize, sizeof(PointerSize));
-  return PointerSize;
-}
-
-void sendExitMessage() {
-  write(PARENT_WRITE_FD, REQUEST_EXIT, 2);
-}
+    auto NameBuffer = std::unique_ptr<uint8_t>(new uint8_t[NameSize + 1]);
+    if (!readBytes(Address, NameBuffer.get(), NameSize + 1))
+      return "";
+    return std::string(reinterpret_cast<const char *>(NameBuffer.get()));
+  }
+};
 
 template <typename Runtime>
 static int doDumpHeapInstance(std::string BinaryFilename) {
   using StoredPointer = typename Runtime::StoredPointer;
 
-  if (pipe(to_child))
-    errorAndExit("Couldn't create pipes to child process");
-  if (pipe(from_child))
-    errorAndExit("Couldn't create pipes from child process");
+  PipeMemoryReader<Runtime> Pipe;
 
   pid_t pid = fork();
   switch (pid) {
@@ -400,34 +468,33 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
       errorAndExit("Couldn't fork child process");
       exit(EXIT_FAILURE);
     case 0: { // Child:
-      close(PARENT_WRITE_FD);
-      close(PARENT_READ_FD);
-      dup2(CHILD_READ_FD, STDIN_FILENO);
-      dup2(CHILD_WRITE_FD, STDOUT_FILENO);
+      close(Pipe.getParentWriteFD());
+      close(Pipe.getParentReadFD());
+      dup2(Pipe.getChildReadFD(), STDIN_FILENO);
+      dup2(Pipe.getChildWriteFD(), STDOUT_FILENO);
       execv(BinaryFilename.c_str(), NULL);
       exit(EXIT_SUCCESS);
     }
     default: { // Parent
-      close(CHILD_READ_FD);
-      close(CHILD_WRITE_FD);
+      close(Pipe.getChildReadFD());
+      close(Pipe.getChildWriteFD());
 
-      MemoryReader Reader(getPipeMemoryReaderImpl<StoredPointer>());
-      ReflectionContext<External<Runtime>> RC(Reader);
+      ReflectionContext<External<Runtime>> RC(Pipe);
 
-      uint8_t PointerSize = receivePointerSize();
+      uint8_t PointerSize = Pipe.receivePointerSize();
       if (PointerSize != Runtime::PointerSize)
         errorAndExit("Child process had unexpected architecture");
 
-      addr_t instance = receiveInstanceAddress();
+      StoredPointer instance = Pipe.receiveInstanceAddress();
       assert(instance);
       std::cerr << "Parent: instance pointer in child address space: 0x";
       std::cerr << std::hex << instance << std::endl;
 
-      addr_t isa;
-      if (!Reader.readInteger(instance, &isa))
+      StoredPointer isa;
+      if (!Pipe.readInteger(instance, &isa))
         errorAndExit("Couldn't get heap object's metadata address");
 
-      for (auto &Info : receiveReflectionInfo(Reader))
+      for (auto &Info : Pipe.receiveReflectionInfo())
         RC.addReflectionInfo(Info);
 
       std::cerr << "Parent: metadata pointer in child address space: 0x";
@@ -447,7 +514,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
     }
   }
 
-  sendExitMessage();
+  Pipe.sendExitMessage();
 
   return EXIT_SUCCESS;
 }
