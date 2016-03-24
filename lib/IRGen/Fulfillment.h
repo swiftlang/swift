@@ -140,7 +140,8 @@ public:
   }
 
 private:
-  bool searchParentTypeMetadata(IRGenModule &IGM, CanType parent,
+  bool searchParentTypeMetadata(IRGenModule &IGM, NominalTypeDecl *typeDecl,
+                                CanType parent,
                                 unsigned source, MetadataPath &&path,
                                 const InterestingKeysCallback &keys);
 
