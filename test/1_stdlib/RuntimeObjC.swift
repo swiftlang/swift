@@ -543,22 +543,12 @@ RuntimeFoundationWrappers.test(
   expectEqual(0, nsStringCanaryCount)
 }
 
-RuntimeFoundationWrappers.test("_stdlib_NSStringNFDHashValue/NoLeak") {
+RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringNFDHashValue(a)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringASCIIHashValue/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringASCIIHashValue(a)
+    _stdlib_NSStringHashValue(a, true)
   }
   expectEqual(0, nsStringCanaryCount)
 }
