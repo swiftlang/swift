@@ -353,7 +353,7 @@ createEmptyFunctionWithOptimizedSig(const std::string &NewFName) {
   // Create the new function.
   auto *NewF = M.getOrCreateFunction(
       F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
+      F->isTransparent(), F->isFragile(), IsThunk, F->getClassVisibility(),
       F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
       F->getDeclContext());
 
