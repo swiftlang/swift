@@ -255,7 +255,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid
   ///   for the duration of the call to `body`.
   public func withUnsafeMutablePointerToValue<R>(
-    body: (UnsafeMutablePointer<Value>) -> R
+    body: @noescape (UnsafeMutablePointer<Value>) -> R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
