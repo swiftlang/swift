@@ -3717,7 +3717,7 @@ ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
     // FIXME: Layering violation to use the ClangImporter's define.
     const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
     if (auto simd = getLoadedModule(Id_simd)) {
-#define MAP_SIMD_TYPE(BASENAME, __)                                     \
+#define MAP_SIMD_TYPE(BASENAME, _, __)                                  \
       {                                                                 \
         char name[] = #BASENAME "0";                                    \
         for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) { \

@@ -213,9 +213,9 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
 #undef CHECK_NAMED_TYPE
 
   // Map vector types to the corresponding C vectors.
-#define MAP_SIMD_TYPE(TYPE_NAME, CLANG_KIND)                           \
+#define MAP_SIMD_TYPE(TYPE_NAME, _, BUILTIN_KIND)                      \
   if (name.startswith(#TYPE_NAME)) {                                   \
-    return getClangVectorType(ctx, clang::BuiltinType::CLANG_KIND,     \
+    return getClangVectorType(ctx, clang::BuiltinType::BUILTIN_KIND,   \
                               clang::VectorType::GenericVector,        \
                               name.drop_front(sizeof(#TYPE_NAME)-1));  \
   }

@@ -424,7 +424,7 @@ namespace {
         if (auto builtinTy
               = dyn_cast<clang::BuiltinType>(type->getElementType())){
           switch (builtinTy->getKind()) {
-#define MAP_SIMD_TYPE(TYPE_NAME, BUILTIN_KIND)   \
+#define MAP_SIMD_TYPE(TYPE_NAME, __, BUILTIN_KIND)   \
           case clang::BuiltinType::BUILTIN_KIND: \
             names << #TYPE_NAME;                 \
             break;
