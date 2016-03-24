@@ -126,7 +126,7 @@ protected:
 };
 
 /// An "abstract" base class for DiverseList<T> which does not
-/// explicitly the preferred inline capacity.  Most of the
+/// explicitly set the preferred inline capacity.  Most of the
 /// implementation is in this class.
 template <class T> class DiverseListImpl : private DiverseListBase {
   DiverseListImpl(const DiverseListImpl<T> &other) = delete;
