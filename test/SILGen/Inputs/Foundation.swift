@@ -45,9 +45,6 @@ extension String : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSString.self
-  }
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
@@ -74,9 +71,6 @@ extension Int : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
@@ -99,9 +93,6 @@ extension Int : _ObjectiveCBridgeable {
 }
 
 extension Array : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSArray.self
-  }
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
@@ -127,9 +118,6 @@ extension Array : _ObjectiveCBridgeable {
 }
 
 extension Dictionary : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSDictionary.self
-  }
   public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
@@ -155,9 +143,6 @@ extension Dictionary : _ObjectiveCBridgeable {
 }
 
 extension Set : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSSet.self
-  }
   public func _bridgeToObjectiveC() -> NSSet {
     return NSSet()
   }

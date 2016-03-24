@@ -1291,6 +1291,42 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                                      rParenLoc, false));
     break;
     }
+  case DAK_Specialize: {
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    SourceLoc lParenLoc = consumeToken();
+
+    SmallVector<TypeLoc, 8> TypeList;
+    do {
+      // Parse the concrete nominal type.
+      ParserResult<TypeRepr> Ty = parseTypeIdentifier();
+      if (Ty.isNull()) {
+        skipUntil(tok::r_paren);
+        return false;
+      }  
+
+      // Record the type.
+      TypeList.push_back(Ty.get());
+  
+      // Check for a ',', which indicates that there are more protocols coming.
+    } while (consumeIf(tok::comma));
+
+    // Parse the closing ')'.
+    SourceLoc rParenLoc;
+    if (!consumeIf(tok::r_paren, rParenLoc)) {
+      diagnose(lParenLoc, diag::attr_expected_rparen, AttrName,
+               /*DeclModifier=*/false);
+      return false;
+    }
+    Attributes.add(
+      SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
+                             TypeList));
+    break;
+    }
   }
 
   if (DuplicateAttribute) {
@@ -5525,25 +5561,37 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
   SourceLoc AssociativityLoc, AssociativityValueLoc,
     PrecedenceLoc, PrecedenceValueLoc,
     AssignmentLoc;
-  
+
+  auto ErrReturnFunc = [&] () {
+    skipUntilDeclRBrace();
+    assert(Tok.getKind() == tok::r_brace);
+    SourceLoc RBraceLoc = Tok.getLoc();
+    auto Res = new (Context)
+    InfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc, LBraceLoc,
+                      AssociativityLoc.isInvalid(), AssociativityLoc,
+                      AssociativityValueLoc, PrecedenceLoc.isInvalid(),
+                      PrecedenceLoc, PrecedenceValueLoc,
+                      AssignmentLoc.isInvalid(), AssignmentLoc,
+                      RBraceLoc,
+                      InfixData(precedence, associativity, assignment));
+    Res->getAttrs() = Attributes;
+    return makeParserErrorResult(Res);
+  };
   while (!Tok.is(tok::r_brace)) {
     if (!Tok.is(tok::identifier)) {
       diagnose(Tok, diag::expected_operator_attribute);
-      skipUntilDeclRBrace();
-      return nullptr;
+      return ErrReturnFunc();
     }
     
     if (Tok.getText().equals("associativity")) {
       if (AssociativityLoc.isValid()) {
         diagnose(Tok, diag::operator_associativity_redeclared);
-        skipUntilDeclRBrace();
-        return nullptr;
+        return ErrReturnFunc();
       }
       AssociativityLoc = consumeToken();
       if (!Tok.is(tok::identifier)) {
         diagnose(Tok, diag::expected_infix_operator_associativity);
-        skipUntilDeclRBrace();
-        return nullptr;
+        return ErrReturnFunc();
       }
       auto parsedAssociativity
         = llvm::StringSwitch<Optional<Associativity>>(Tok.getText())
@@ -5553,8 +5601,7 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
           .Default(None);
       if (!parsedAssociativity) {
         diagnose(Tok, diag::unknown_infix_operator_associativity, Tok.getText());
-        skipUntilDeclRBrace();
-        return nullptr;
+        return ErrReturnFunc();
       }
       associativity = *parsedAssociativity;
 
@@ -5565,14 +5612,12 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
     if (Tok.getText().equals("precedence")) {
       if (PrecedenceLoc.isValid()) {
         diagnose(Tok, diag::operator_precedence_redeclared);
-        skipUntilDeclRBrace();
-        return nullptr;
+        return ErrReturnFunc();
       }
       PrecedenceLoc = consumeToken();
       if (!Tok.is(tok::integer_literal)) {
         diagnose(Tok, diag::expected_infix_operator_precedence);
-        skipUntilDeclRBrace();
-        return nullptr;
+        return ErrReturnFunc();
       }
       if (Tok.getText().getAsInteger(0, precedence)) {
         diagnose(Tok, diag::invalid_infix_operator_precedence);
@@ -5586,8 +5631,7 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
     if (Tok.getText().equals("assignment")) {
       if (AssignmentLoc.isValid()) {
         diagnose(Tok, diag::operator_assignment_redeclared);
-        skipUntilDeclRBrace();
-        return nullptr;
+        return ErrReturnFunc();
       }
       AssignmentLoc = consumeToken();
       assignment = true;
@@ -5595,8 +5639,7 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
     }
     
     diagnose(Tok, diag::unknown_infix_operator_attribute, Tok.getText());
-    skipUntilDeclRBrace();
-    return nullptr;
+    return ErrReturnFunc();
   }
   
   SourceLoc RBraceLoc = Tok.getLoc();

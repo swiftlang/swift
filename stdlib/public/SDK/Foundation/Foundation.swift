@@ -75,16 +75,6 @@ func _convertStringToNSString(string: String) -> NSString {
   return string._bridgeToObjectiveC()
 }
 
-@warn_unused_result
-@_semantics("convertFromObjectiveC")
-public // COMPILER_INTRINSIC
-func _convertNSStringToString(nsstring: NSString?) -> String {
-  if nsstring == nil { return "" }
-  var result: String?
-  String._forceBridgeFromObjectiveC(nsstring!, result: &result)
-  return result!
-}
-
 extension NSString : StringLiteralConvertible {
   /// Create an instance initialized to `value`.
   public required convenience init(unicodeScalarLiteral value: StaticString) {
@@ -134,10 +124,6 @@ extension String {
 extension String : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
-  }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSString.self
   }
 
   @_semantics("convertToObjectiveC")
@@ -190,10 +176,6 @@ extension Int : _ObjectiveCBridgeable {
     self = number.integerValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(integer: self)
@@ -228,10 +210,6 @@ extension UInt : _ObjectiveCBridgeable {
 
   public init(_ number: NSNumber) {
     self = number.unsignedIntegerValue
-  }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
   }
 
   @_semantics("convertToObjectiveC")
@@ -270,10 +248,6 @@ extension Float : _ObjectiveCBridgeable {
     self = number.floatValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(float: self)
@@ -308,10 +282,6 @@ extension Double : _ObjectiveCBridgeable {
 
   public init(_ number: NSNumber) {
     self = number.doubleValue
-  }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
   }
 
   @_semantics("convertToObjectiveC")
@@ -350,10 +320,6 @@ extension Bool: _ObjectiveCBridgeable {
     self = number.boolValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(bool: self)
@@ -389,10 +355,6 @@ extension CGFloat : _ObjectiveCBridgeable {
 
   public init(_ number: NSNumber) {
     self.native = CGFloat.NativeType(number)
-  }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
   }
 
   @_semantics("convertToObjectiveC")
@@ -461,33 +423,6 @@ extension NSArray : ArrayLiteralConvertible {
   }
 }
 
-/// The entry point for converting `NSArray` to `Array` in bridge
-/// thunks.  Used, for example, to expose :
-///
-///     func f([NSView]) {}
-///
-/// to Objective-C code as a method that accepts an `NSArray`.  This operation
-/// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
-@warn_unused_result
-@_semantics("convertFromObjectiveC")
-public func _convertNSArrayToArray<T>(source: NSArray?) -> [T] {
-  if _slowPath(source == nil) { return [] }
-  var result: [T]?
-  Array._forceBridgeFromObjectiveC(source!, result: &result)
-  return result!
-}
-
-/// The entry point for converting `Array` to `NSArray` in bridge
-/// thunks.  Used, for example, to expose :
-///
-///     func f() -> [NSView] { return [] }
-///
-/// to Objective-C code as a method that returns an `NSArray`.
-@warn_unused_result
-public func _convertArrayToNSArray<T>(array: [T]) -> NSArray {
-  return array._bridgeToObjectiveC()
-}
-
 extension Array : _ObjectiveCBridgeable {
 
   /// Private initializer used for bridging.
@@ -514,10 +449,6 @@ extension Array : _ObjectiveCBridgeable {
 
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Element.self)
-  }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSArray.self
   }
 
   @_semantics("convertToObjectiveC")
@@ -626,60 +557,8 @@ extension Dictionary {
   }
 }
 
-/// The entry point for bridging `NSDictionary` to `Dictionary` in bridge
-/// thunks.  Used, for example, to expose:
-///
-///     func f([String : String]) {}
-///
-/// to Objective-C code as a method that accepts an `NSDictionary`.
-///
-/// This is a forced downcast.  This operation should have O(1) complexity
-/// when `Key` and `Value` are bridged verbatim.
-///
-/// The cast can fail if bridging fails.  The actual checks and bridging can be
-/// deferred.
-@warn_unused_result
-@_semantics("convertFromObjectiveC")
-public func _convertNSDictionaryToDictionary<
-  Key : Hashable, Value
->(d: NSDictionary?) -> [Key : Value] {
-  // Note: there should be *a good justification* for doing something else
-  // than just dispatching to `_forceBridgeFromObjectiveC`.
-  if _slowPath(d == nil) { return [:] }
-  var result: [Key : Value]?
-  Dictionary._forceBridgeFromObjectiveC(d!, result: &result)
-  return result!
-}
-
-// FIXME: right now the following is O(n), not O(1).
-
-/// The entry point for bridging `Dictionary` to `NSDictionary` in bridge
-/// thunks.  Used, for example, to expose:
-///
-///     func f() -> [String : String] {}
-///
-/// to Objective-C code as a method that returns an `NSDictionary`.
-///
-/// This is a forced downcast.  This operation should have O(1) complexity.
-///
-/// The cast can fail if bridging fails.  The actual checks and bridging can be
-/// deferred.
-@warn_unused_result
-public func _convertDictionaryToNSDictionary<Key, Value>(
-  d: [Key : Value]
-) -> NSDictionary {
-
-  // Note: there should be *a good justification* for doing something else
-  // than just dispatching to `_bridgeToObjectiveC`.
-  return d._bridgeToObjectiveC()
-}
-
 // Dictionary<Key, Value> is conditionally bridged to NSDictionary
 extension Dictionary : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSDictionary.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
     return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSDictionary.self)
@@ -925,51 +804,8 @@ extension NSIndexSet : Sequence {
   }
 }
 
-// FIXME: right now the following is O(n), not O(1).
-
-/// The entry point for bridging `Set` to `NSSet` in bridge
-/// thunks.  Used, for example, to expose:
-///
-///     func f() -> Set<String> {}
-///
-/// to Objective-C code as a method that returns an `NSSet`.
-///
-/// This is a forced downcast.  This operation should have O(1) complexity.
-///
-/// The cast can fail if bridging fails.  The actual checks and bridging can be
-/// deferred.
-@warn_unused_result
-public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
-  return s._bridgeToObjectiveC()
-}
-
-/// The entry point for bridging `NSSet` to `Set` in bridge
-/// thunks.  Used, for example, to expose:
-///
-///     func f(Set<String>) {}
-///
-/// to Objective-C code as a method that accepts an `NSSet`.
-///
-/// This is a forced downcast.  This operation should have O(1) complexity
-/// when `T` is bridged verbatim.
-///
-/// The cast can fail if bridging fails.  The actual checks and bridging can be
-/// deferred.
-@warn_unused_result
-@_semantics("convertFromObjectiveC")
-public func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
-  if _slowPath(s == nil) { return [] }
-  var result: Set<T>?
-  Set._forceBridgeFromObjectiveC(s!, result: &result)
-  return result!
-}
-
 // Set<Element> is conditionally bridged to NSSet
 extension Set : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSSet.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSSet {
     return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSSet.self)

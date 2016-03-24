@@ -107,6 +107,10 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     if (!handleImports(Import))
       return false;
 
+  } else if (auto OpD = dyn_cast<OperatorDecl>(D)) {
+    Loc = OpD->getLoc();
+    if (Loc.isValid())
+      NameLen = OpD->getName().getLength();
   } else {
     return true;
   }

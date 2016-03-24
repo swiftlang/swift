@@ -40,7 +40,7 @@ public func || <T : Boolean, U : Boolean>(
 
 // FIXME: We can't make the above @_transparent due to
 // rdar://problem/19418937, so here are some @_transparent overloads
-// for Bool.  We've done the same for ObjCBool
+// for Bool.  We've done the same for ObjCBool.
 @_transparent
 @warn_unused_result
 public func && <T : Boolean>(

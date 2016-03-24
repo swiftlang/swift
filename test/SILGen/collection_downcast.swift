@@ -15,10 +15,6 @@ struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
   
   var hashValue: Int { return 0 }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedObjC.self
-  }
-  
   func _bridgeToObjectiveC() -> BridgedObjC {
     return BridgedObjC()
   }

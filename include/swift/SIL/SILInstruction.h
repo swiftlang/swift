@@ -132,6 +132,11 @@ public:
   const SILDebugScope *getDebugScope() const;
   SILDebugLocation getDebugLocation() const { return Location; }
 
+  /// Sets the debug location.
+  /// Note: Usually it should not be needed to use this function as the location
+  /// is already set in when creating an instruction.
+  void setDebugLocation(SILDebugLocation Loc) { Location = Loc; }
+
   /// removeFromParent - This method unlinks 'self' from the containing basic
   /// block, but does not delete it.
   ///

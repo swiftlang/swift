@@ -505,6 +505,11 @@ public:
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
   
+  /// Determine whether the given nominal type is one of the standard
+  /// library types that is known a priori to be bridged to a
+  /// Foundation.
+  bool isStandardLibraryTypeBridgedInFoundation(NominalTypeDecl *nominal) const;
+
   /// Get the Objective-C type that a Swift type bridges to, if any.
   Optional<Type> getBridgedToObjC(const DeclContext *dc,
                                   Type type,

@@ -28,14 +28,6 @@ public protocol _ObjectiveCBridgeable {
   @warn_unused_result
   static func _isBridgedToObjectiveC() -> Bool
 
-  // _getObjectiveCType is a workaround: right now protocol witness
-  // tables don't include associated types, so we cannot find
-  // '_ObjectiveCType.self' from them.
-
-  /// Must return `_ObjectiveCType.self`.
-  @warn_unused_result
-  static func _getObjectiveCType() -> Any.Type
-
   /// Convert `self` to Objective-C.
   @warn_unused_result
   func _bridgeToObjectiveC() -> _ObjectiveCType
@@ -127,10 +119,6 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
     return true
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return AnyObject.self
-  }
-
   public func _bridgeToObjectiveC() -> AnyObject {
     return value
   }
@@ -218,7 +206,7 @@ func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 ///   - if the dynamic type of `x` is `T` or a subclass of it, it is bridged
 ///     verbatim, the function returns `x`;
 /// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`:
-///   + if the dynamic type of `x` is not `T._getObjectiveCType()`
+///   + if the dynamic type of `x` is not `T._ObjectiveCType`
 ///     or a subclass of it, trap;
 ///   + otherwise, returns the result of `T._forceBridgeFromObjectiveC(x)`;
 /// - otherwise, trap.
@@ -252,7 +240,7 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(x: T.
 /// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`:
 ///   + if `T._isBridgedToObjectiveC()` returns `false`, then the result is
 ///     empty;
-///   + otherwise, if the dynamic type of `x` is not `T._getObjectiveCType()`
+///   + otherwise, if the dynamic type of `x` is not `T._ObjectiveCType`
 ///     or a subclass of it, the result is empty;
 ///   + otherwise, returns the result of
 ///     `T._conditionallyBridgeFromObjectiveC(x)`;

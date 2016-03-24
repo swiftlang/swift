@@ -1182,10 +1182,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
                                               const ClangImporterOptions &opts)
   : SwiftContext(ctx),
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
-    OmitNeedlessWords(opts.OmitNeedlessWords),
     InferImportAsMember(opts.InferImportAsMember),
-    InferDefaultArguments(opts.InferDefaultArguments),
-    UseSwiftLookupTables(opts.UseSwiftLookupTables),
     BridgingHeaderLookupTable(nullptr)
 {
   // Add filters to determine if a Clang availability attribute
@@ -1259,7 +1256,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
 
   // Prepopulate the set of module prefixes.
   // FIXME: Hard-coded list should move into the module map language.
-  if (OmitNeedlessWords && ctx.LangOpts.StripNSPrefix) {
+  if (ctx.LangOpts.StripNSPrefix) {
     ModulePrefixes["Foundation"] = "NS";
     ModulePrefixes["ObjectiveC"] = "NS";
   }
@@ -1875,35 +1872,8 @@ Identifier ClangImporter::Implementation::importMacroName(
   if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
     return Identifier();
 
-  // If we aren't omitting needless words, no transformation is applied to the
-  // name.
+  // No transformation is applied to the name.
   StringRef name = clangIdentifier->getName();
-  if (!OmitNeedlessWords) return SwiftContext.getIdentifier(name);
-
-  // Determine which module defines this macro.
-  StringRef moduleName;
-  if (auto moduleID = macro->getOwningModuleID()) {
-    if (auto module = clangCtx.getExternalSource()->getModule(moduleID))
-      moduleName = module->getTopLevelModuleName();
-  }
-
-  if (moduleName.empty())
-    moduleName = clangCtx.getLangOpts().CurrentModule;
-
-  // Check whether we have a prefix to strip.
-  unsigned prefixLen = stripModulePrefixLength(ModulePrefixes, moduleName,
-                                               name);
-  if (prefixLen == 0) return SwiftContext.getIdentifier(name);
-
-  // Strip the prefix.
-  name = name.substr(prefixLen);
-
-  // If we should lowercase, do so.
-  StringScratchSpace scratch;
-  if (shouldLowercaseValueName(name))
-    name = camel_case::toLowercaseInitialisms(name, scratch);
-
-  // We're done.
   return SwiftContext.getIdentifier(name);
 }
 
@@ -1984,6 +1954,26 @@ namespace {
   }
 }
 
+/// Determine whether the given Objective-C class, or any of its
+/// superclasses, either has or inherits a swift_bridge attribute.
+static bool hasOrInheritsSwiftBridgeAttr(
+    const clang::ObjCInterfaceDecl *objcClass) {
+  do {
+    // Look at the definition, if there is one.
+    if (auto def = objcClass->getDefinition())
+      objcClass = def;
+
+    // Check for the swift_bridge attribute.
+    if (objcClass->hasAttr<clang::SwiftBridgeAttr>())
+      return true;
+
+    // Follow the superclass chain.
+    objcClass = objcClass->getSuperClass();
+  } while (objcClass);
+
+  return false;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2030,61 +2020,59 @@ auto ClangImporter::Implementation::importFullName(
     result.EffectiveContext = category->getClassInterface();
   }
 
-  // When omitting needless words, find the original method/property
-  // declaration.
-  if (OmitNeedlessWords) {
-    if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
-      // Inherit the name from the "originating" declarations, if
-      // there are any.
-      SmallVector<std::pair<const clang::ObjCMethodDecl *, ImportedName>, 4>
+  // Find the original method/property declaration and retrieve the
+  // name from thre.
+  if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
+    // Inherit the name from the "originating" declarations, if
+    // there are any.
+    SmallVector<std::pair<const clang::ObjCMethodDecl *, ImportedName>, 4>
+      overriddenNames;
+    SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+    method->getOverriddenMethods(overriddenMethods);
+    for (auto overridden : overriddenMethods) {
+      const auto overriddenName = importFullName(overridden, options,
+                                                 clangSemaOverride);
+      if (overriddenName.Imported)
+        overriddenNames.push_back({overridden, overriddenName});
+    }
+
+    // If we found any names of overridden methods, return those names.
+    if (!overriddenNames.empty()) {
+      if (overriddenNames.size() > 1)
+        mergeOverriddenNames(SwiftContext, method, overriddenNames);
+      overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
+      return overriddenNames[0].second;
+    }
+  } else if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+    // Inherit the name from the "originating" declarations, if
+    // there are any.
+    if (auto getter = property->getGetterMethodDecl()) {
+      SmallVector<std::pair<const clang::ObjCPropertyDecl *, ImportedName>, 4>
         overriddenNames;
       SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
-      method->getOverriddenMethods(overriddenMethods);
+      SmallPtrSet<const clang::ObjCPropertyDecl *, 4> knownProperties;
+      (void)knownProperties.insert(property);
+
+      getter->getOverriddenMethods(overriddenMethods);
       for (auto overridden : overriddenMethods) {
-        const auto overriddenName = importFullName(overridden, options,
+        if (!overridden->isPropertyAccessor()) continue;
+        auto overriddenProperty = overridden->findPropertyDecl(true);
+        if (!overriddenProperty) continue;
+        if (!knownProperties.insert(overriddenProperty).second) continue;
+
+        const auto overriddenName = importFullName(overriddenProperty,
+                                                   options,
                                                    clangSemaOverride);
         if (overriddenName.Imported)
-          overriddenNames.push_back({overridden, overriddenName});
+          overriddenNames.push_back({overriddenProperty, overriddenName});
       }
 
       // If we found any names of overridden methods, return those names.
       if (!overriddenNames.empty()) {
         if (overriddenNames.size() > 1)
-          mergeOverriddenNames(SwiftContext, method, overriddenNames);
+          mergeOverriddenNames(SwiftContext, property, overriddenNames);
         overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
         return overriddenNames[0].second;
-      }
-    } else if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
-      // Inherit the name from the "originating" declarations, if
-      // there are any.
-      if (auto getter = property->getGetterMethodDecl()) {
-        SmallVector<std::pair<const clang::ObjCPropertyDecl *, ImportedName>, 4>
-          overriddenNames;
-        SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
-        SmallPtrSet<const clang::ObjCPropertyDecl *, 4> knownProperties;
-        (void)knownProperties.insert(property);
-
-        getter->getOverriddenMethods(overriddenMethods);
-        for (auto overridden : overriddenMethods) {
-          if (!overridden->isPropertyAccessor()) continue;
-          auto overriddenProperty = overridden->findPropertyDecl(true);
-          if (!overriddenProperty) continue;
-          if (!knownProperties.insert(overriddenProperty).second) continue;
-
-          const auto overriddenName = importFullName(overriddenProperty,
-                                                     options,
-                                                     clangSemaOverride);
-          if (overriddenName.Imported)
-            overriddenNames.push_back({overriddenProperty, overriddenName});
-        }
-
-        // If we found any names of overridden methods, return those names.
-        if (!overriddenNames.empty()) {
-          if (overriddenNames.size() > 1)
-            mergeOverriddenNames(SwiftContext, property, overriddenNames);
-          overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
-          return overriddenNames[0].second;
-        }
       }
     }
   }
@@ -2214,13 +2202,11 @@ auto ClangImporter::Implementation::importFullName(
     // Map the identifier.
     baseName = D->getDeclName().getAsIdentifierInfo()->getName();
 
-    if (OmitNeedlessWords) {
-      // For Objective-C BOOL properties, use the name of the getter
-      // which, conventionally, has an "is" prefix.
-      if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
-        if (isBoolType(clangSema.Context, property->getType()))
-          baseName = property->getGetterName().getNameForSlot(0);
-      }
+    // For Objective-C BOOL properties, use the name of the getter
+    // which, conventionally, has an "is" prefix.
+    if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+      if (isBoolType(clangSema.Context, property->getType()))
+        baseName = property->getGetterName().getNameForSlot(0);
     }
 
     // For C functions, create empty argument names.
@@ -2276,13 +2262,6 @@ auto ClangImporter::Implementation::importFullName(
         argumentNames.push_back(StringRef());
       } else {
         StringRef argName = selector.getNameForSlot(index);
-
-        // Swift 2 lowercased all subsequent argument names.
-        // Swift 3 may handle this as part of omitting needless words, below,
-        // but don't preempt that here.
-        if (!OmitNeedlessWords)
-          argName = camel_case::toLowercaseWord(argName, stringScratch);
-
         argumentNames.push_back(argName);
       }
     }
@@ -2496,11 +2475,15 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
-  if (OmitNeedlessWords && !result.isSubscriptAccessor()) {
+  if (!result.isSubscriptAccessor()) {
     // Check whether the module in which the declaration resides has a
-    // module prefix. If so, strip that prefix off when present.
+    // module prefix and will map into Swift as a type. If so, strip
+    // that prefix off when present.
     if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
-        D->getDeclName().getNameKind() == clang::DeclarationName::Identifier) {
+        (isa<clang::TypeDecl>(D) ||
+         (isa<clang::ObjCInterfaceDecl>(D) &&
+          !hasOrInheritsSwiftBridgeAttr(cast<clang::ObjCInterfaceDecl>(D))) ||
+         isa<clang::ObjCProtocolDecl>(D))) {
       // Find the original declaration, from which we can determine
       // the owning module.
       const clang::Decl *owningD = D->getCanonicalDecl();
@@ -4022,9 +4005,8 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            Impl.OmitNeedlessWords,
                             Impl.InferImportAsMember,
-                            Impl.InferDefaultArguments);
+                            Impl.SwiftContext.LangOpts.StripNSPrefix);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>

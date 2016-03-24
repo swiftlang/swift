@@ -224,7 +224,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 class MD5Stream : public llvm::raw_ostream {
 private:
 
-  uint64_t Pos;
+  uint64_t Pos = 0;
   llvm::MD5 Hash;
 
   void write_impl(const char *Ptr, size_t Size) override {

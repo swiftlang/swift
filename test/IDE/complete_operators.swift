@@ -55,6 +55,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_4 | FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_1| FileCheck %s -check-prefix=ASSIGN_TUPLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_2| FileCheck %s -check-prefix=ASSIGN_TUPLE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_3| FileCheck %s -check-prefix=ASSIGN_TUPLE_1
 
 struct S {}
 postfix operator ++ {}
@@ -343,7 +344,14 @@ func testExtInfix4(x: S4) {
 func testAssignTuple1() {
   ()#^ASSIGN_TUPLE_1^#
 }
-// ASSIGN_TUPLE_1: Pattern/None:                        = {#()#}[#Void#];
+func testAssignTuple3() {
+  func void() {}
+  void()#^ASSIGN_TUPLE_3^#
+}
+// FIXME: technically this is sometimes legal, but we would need to
+// differentiate between casese like () = and print() =. Since it's not very
+// useful anyway, just omit the completion.
+// ASSIGN_TUPLE_1-NOT: Pattern/None:  = {
 
 func testAssignTuple2() {
   var x: S2

@@ -40,4 +40,4 @@ namespace swift {
   static const char MANGLING_MODULE_C[] = "__C";
 } // end namespace swift
 
-#endif
+#endif // SWIFT_STRINGS_H

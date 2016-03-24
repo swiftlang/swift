@@ -67,13 +67,6 @@ SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)
     : RawText(RawText), Kind(static_cast<unsigned>(getCommentKind(RawText))),
       StartColumn(StartColumn), StartLine(0), EndLine(0) {}
 
-static bool canHaveComment(const Decl *D) {
-  return !D->hasClangNode() &&
-         (isa<ValueDecl>(D) || isa<ExtensionDecl>(D)) &&
-         !isa<ParamDecl>(D) &&
-         (!isa<AbstractTypeParamDecl>(D) || isa<AssociatedTypeDecl>(D));
-}
-
 static void addCommentToList(SmallVectorImpl<SingleRawComment> &Comments,
                              const SingleRawComment &SRC) {
   // TODO: consider producing warnings when we decide not to merge comments.
@@ -131,7 +124,7 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
 }
 
 RawComment Decl::getRawComment() const {
-  if (!canHaveComment(this))
+  if (!this->canHaveComment())
     return RawComment();
 
   // Check the cache in ASTContext.
@@ -195,7 +188,7 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
                                      const Decl *D) {
   PrettyStackTraceDecl StackTrace("extracting brief comment for", D);
 
-  if (!canHaveComment(D))
+  if (!D->canHaveComment())
     return StringRef();
 
   llvm::markup::MarkupContext MC;
@@ -217,7 +210,7 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
 }
 
 StringRef Decl::getBriefComment() const {
-  if (!canHaveComment(this))
+  if (!this->canHaveComment())
     return StringRef();
 
   auto &Context = getASTContext();

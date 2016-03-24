@@ -17,9 +17,6 @@ struct AnArray<T> : _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  static func _getObjectiveCType() -> Any.Type {
-    return AnNSArray.self
-  }
   func _bridgeToObjectiveC() -> AnNSArray {
     return AnNSArray()
   }

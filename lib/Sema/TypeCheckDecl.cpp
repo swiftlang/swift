@@ -2174,21 +2174,6 @@ static void checkBridgedFunctions(TypeChecker &TC) {
   if (Module *module = TC.Context.getLoadedModule(TC.Context.Id_Foundation)) {
     checkObjCBridgingFunctions(TC, module,
                                TC.Context.getSwiftName(
-                                 KnownFoundationEntity::NSArray),
-                               "_convertNSArrayToArray",
-                               "_convertArrayToNSArray");
-    checkObjCBridgingFunctions(TC, module,
-                               TC.Context.getSwiftName(
-                                 KnownFoundationEntity::NSDictionary),
-                               "_convertNSDictionaryToDictionary",
-                               "_convertDictionaryToNSDictionary");
-    checkObjCBridgingFunctions(TC, module,
-                               TC.Context.getSwiftName(
-                                 KnownFoundationEntity::NSSet),
-                               "_convertNSSetToSet",
-                               "_convertSetToNSSet");
-    checkObjCBridgingFunctions(TC, module,
-                               TC.Context.getSwiftName(
                                  KnownFoundationEntity::NSError),
                                "_convertNSErrorToErrorProtocol",
                                "_convertErrorProtocolToNSError");
@@ -5103,6 +5088,7 @@ public:
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
+    UNINTERESTING_ATTR(Specialize)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(AutoClosure)

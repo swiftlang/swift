@@ -10,19 +10,19 @@
 // XFAIL: linux
 
 /// first_decl_class_1 Aaa.
-class first_decl_class_1 {
+public class first_decl_class_1 {
 
   /// decl_func_1 Aaa.
-  func decl_func_1() {}
+  public func decl_func_1() {}
 
   /**
    * decl_func_3 Aaa.
    */
-  func decl_func_2() {}
+  public func decl_func_2() {}
 
   /// decl_func_3 Aaa.
   /** Bbb. */
-  func decl_func_3() {}
+  public func decl_func_3() {}
 }
 
 // CHECK: Class/first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.\n]

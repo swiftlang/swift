@@ -8,7 +8,6 @@ import Swift
 struct Butt: _ObjectiveCBridgeable {
   typealias _ObjectiveCType = NSCloud
   static func _isBridgedToObjectiveC() -> Bool
-  static func _getObjectiveCType() -> Any.Type
   func _bridgeToObjectiveC() -> NSCloud
   static func _forceBridgeFromObjectiveC(source: NSCloud,
                                          inout result: Butt?)

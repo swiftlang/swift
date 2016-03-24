@@ -51,8 +51,7 @@ struct MyArray<Element> {}
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error{{no '<' candidates produce the expected contextual result type 'MyArray<Int>'}}
-      // expected-note @-1 {{produces result of type 'Bool'}}
+        a = MyArray<Int // expected-error{{'<' produces 'Bool', not the expected contextual result type 'MyArray<Int>'}}
     }
 }
 
@@ -74,8 +73,7 @@ func bad_return2() -> (Int, Int) {
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
 func bad_return3(lhs:Int, rhs:Int) {
-  return lhs != 0  // expected-error {{no '!=' candidates produce the expected contextual result type '()'}}
-  // expected-note @-1 {{produces result of type 'Bool'}}
+  return lhs != 0  // expected-error {{'!=' produces 'Bool', not the expected contextual result type '()'}}
 }
 
 class MyBadReturnClass {

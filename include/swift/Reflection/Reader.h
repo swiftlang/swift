@@ -42,12 +42,20 @@ public:
   : Begin(reinterpret_cast<const void * const>(Begin)),
   End(reinterpret_cast<const void * const>(End)) {}
 
+  void *startAddress() {
+    return const_cast<void *>(Begin);
+  }
+
   const_iterator begin() const {
     return const_iterator(Begin, End);
   }
 
   const_iterator end() const {
     return const_iterator(End, End);
+  }
+
+  size_t size() const {
+    return (char *)End - (char *)Begin;
   }
 };
 
@@ -81,6 +89,11 @@ public:
       return true;
     }
     return false;
+  }
+
+  addr_t getSymbolAddress(std::string Name) {
+    auto Address = Impl->getSymbolAddress(Name.c_str(), Name.size());
+    return static_cast<addr_t>(Address);
   }
 
   size_t getStringLength(addr_t Address) {

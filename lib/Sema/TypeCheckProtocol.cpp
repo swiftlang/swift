@@ -3774,6 +3774,26 @@ void ConformanceChecker::checkConformance() {
   }
 
   emitDelayedDiags();
+
+  // Except in specific whitelisted cases for Foundation/Swift
+  // standard library compatibility, an _ObjectiveCBridgeable
+  // conformance must appear in the same module as the definition of
+  // the conforming type.
+  //
+  // Note that we check the module name to smooth over the difference
+  // between an imported Objective-C module and its overlay.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
+    if (auto nominal = Adoptee->getAnyNominal()) {
+      if (!TC.Context.isStandardLibraryTypeBridgedInFoundation(nominal)) {
+        auto nominalModule = nominal->getParentModule();
+        auto conformanceModule = DC->getParentModule();
+        if (nominalModule->getName() != conformanceModule->getName()) {
+          TC.diagnose(Loc, diag::nonlocal_bridged_to_objc, nominal->getName(),
+                      Proto->getName(), nominalModule->getName());
+        }
+      }
+    }
+  }
 }
 
 static void diagnoseConformanceFailure(TypeChecker &TC, Type T,

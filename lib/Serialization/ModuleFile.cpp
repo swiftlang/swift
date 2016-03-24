@@ -1621,7 +1621,16 @@ void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {
   if (!GroupNamesMap)
     return;
   for (auto It = GroupNamesMap->begin(); It != GroupNamesMap->end(); ++ It) {
-    Names.push_back(It->getSecond());
+    StringRef FullGroupName = It->getSecond();
+    if (FullGroupName.empty())
+      continue;
+    auto Sep = FullGroupName.find_last_of(Separator);
+    assert(Sep != StringRef::npos);
+    auto Group = FullGroupName.substr(0, Sep);
+    auto Found = std::find(Names.begin(), Names.end(), Group);
+    if (Found != Names.end())
+      continue;
+    Names.push_back(Group);
   }
 }
 

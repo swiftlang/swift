@@ -3735,7 +3735,7 @@ unchecked_addr_cast
 
 Converts an address to a different address type. Using the resulting
 address is undefined unless ``B`` is layout compatible with ``A``. The
-layout of ``A`` may be smaller than that of ``B`` as long as the lower
+layout of ``B`` may be smaller than that of ``A`` as long as the lower
 order bytes have identical layout.
 
 unchecked_trivial_bit_cast

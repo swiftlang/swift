@@ -31,7 +31,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
-  add_subdirectory(Glibc)
+  add_subdirectory(Platform)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")

@@ -3249,3 +3249,33 @@ bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
 bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
   return canSatisfy(T1, T2, DC, ConstraintKind::Equal, false, false);
 }
+
+ResolveMemberResult
+swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
+  ResolveMemberResult Result;
+  std::unique_ptr<TypeChecker> CreatedTC;
+  // If the current ast context has no type checker, create one for it.
+  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
+  if (!TC) {
+    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
+    TC = CreatedTC.get();
+  }
+  ConstraintSystem CS(*TC, &DC, None);
+  MemberLookupResult LookupResult = CS.performMemberLookup(
+    ConstraintKind::ValueMember, Name, BaseTy, nullptr, false);
+  if (LookupResult.ViableCandidates.empty())
+    return Result;
+  if (OverloadChoice *Choice = LookupResult.getFavoredChoice()) {
+    Result.Favored = Choice->getDecl();
+  }
+  for (OverloadChoice& Choice : LookupResult.ViableCandidates) {
+    ValueDecl *VD = Choice.getDecl();
+    if (VD != Result.Favored)
+      Result.OtherViables.push_back(VD);
+  }
+  if (!Result.Favored) {
+    Result.Favored = Result.OtherViables.front();
+    Result.OtherViables.erase(Result.OtherViables.begin());
+  }
+  return Result;
+}

@@ -52,7 +52,7 @@ OptionalTests.test("nil comparison") {
   x = .some(1)
   expectTrue(x != nil)
 
-  if true {
+  do {
     var y1: Int? = .none
     expectTrue(y1 == nil)
 
@@ -202,6 +202,9 @@ func canGenericCast<T, U>(a: T, _ ty : U.Type) -> Bool {
   return anyToAnyOrNil(a, ty) != nil
 }
 
+protocol TestExistential {}
+extension Int : TestExistential {}
+
 OptionalTests.test("Casting Optional") {
   let x = C()
   let sx: C? = x
@@ -235,12 +238,25 @@ OptionalTests.test("Casting Optional") {
     _ = anyToAny(Optional(t), CustomDebugStringConvertible.self)
   }
   expectTrue(deinitRan)
+
+  // Test for SR-912: Runtime exception casting an Any nil to an Optional.
+  let oi: Int? = nil
+  expectTrue(anyToAny(oi as Any, Optional<Int>.self) == nil)
+  // For good measure test an existential that Optional does not conform to.
+  expectTrue(anyToAny(3 as TestExistential, Optional<Int>.self) == 3)
+  // And a type that is not convertible to its target.
+  anyToAny(nx as Any, Optional<Int>.self)
 }
 
 OptionalTests.test("Casting Optional Traps") {
   let nx: C? = nil
   expectCrashLater()
   _blackHole(anyToAny(nx, Int.self))
+}
+OptionalTests.test("Casting Optional Any Traps") {
+  let nx: X? = X()
+  expectCrashLater()
+  _blackHole(anyToAny(nx as Any, Optional<Int>.self))
 }
 
 class TestNoString {}

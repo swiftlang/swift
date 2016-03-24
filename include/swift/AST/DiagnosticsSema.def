@@ -392,6 +392,8 @@ WARNING(selector_literal_deprecated_suggest,none,
         "use '#selector' instead", ())
 WARNING(selector_construction_suggest,none,
         "use '#selector' instead of explicitly constructing a 'Selector'", ())
+NOTE(selector_construction_suppress_warning,none,
+     "wrap the selector name in parentheses to suppress this warning", ())
 
 ERROR(cannot_return_value_from_void_func,none,
       "unexpected non-void return value in void function", ())
@@ -1976,6 +1978,8 @@ ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(generic_type_declared_here,none,
      "generic type %0 declared here", (Identifier))
+ERROR(cannot_partially_specialize_generic_function,none,
+     "cannot partially specialize a generic function", ())
 
 // Ambiguities
 ERROR(ambiguous_decl_ref,none,
@@ -2175,6 +2179,15 @@ ERROR(unnecessary_cast_over_optionset,none,
 
 ERROR(type_mismatch_multiple_pattern_list,none,
       "pattern variable bound to type %0, expected type %1", (Type, Type))
+
+WARNING(where_on_one_item, none,
+        "'where' only applies to the second pattern match in this case", ())
+
+NOTE(add_where_newline, none,
+     "disambiguate by adding a line break between them if this is desired", ())
+
+NOTE(duplicate_where, none,
+     "duplicate the 'where' on both patterns to check both patterns",())
 
 //------------------------------------------------------------------------------
 // Type Check Patterns
@@ -2586,6 +2599,10 @@ ERROR(objc_override_method_selector_mismatch,none,
 ERROR(objc_override_property_name_mismatch,none,
       "Objective-C property has a different name from the "
       "property it overrides (%0 vs. %1)", (Identifier, Identifier))
+
+ERROR(nonlocal_bridged_to_objc,none,
+      "conformance of %0 to %1 can only be written in module %2",
+      (Identifier, Identifier, Identifier))
 
 ERROR(broken_bridged_to_objc_protocol,none,
       "_BridgedToObjectiveC protocol is broken", ())

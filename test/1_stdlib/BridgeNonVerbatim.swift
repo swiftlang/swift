@@ -73,10 +73,6 @@ struct X : _ObjectiveCBridgeable {
     self.value = value
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return Tracked.self
-  }
-
   func _bridgeToObjectiveC() -> Tracked {
     return Tracked(value)
   }

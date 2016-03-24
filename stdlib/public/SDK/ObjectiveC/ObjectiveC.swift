@@ -196,10 +196,10 @@ typealias Zone = NSZone
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-@_silgen_name("objc_autoreleasePoolPush")
+@_silgen_name("_swift_objc_autoreleasePoolPush")
 func __pushAutoreleasePool() -> OpaquePointer
 
-@_silgen_name("objc_autoreleasePoolPop")
+@_silgen_name("_swift_objc_autoreleasePoolPop")
 func __popAutoreleasePool(pool: OpaquePointer)
 
 public func autoreleasepool(@noescape code: () -> Void) {

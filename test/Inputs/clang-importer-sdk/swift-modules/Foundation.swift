@@ -50,9 +50,6 @@ extension String : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSString.self
-  }
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
@@ -75,9 +72,6 @@ extension Int : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
@@ -104,9 +98,6 @@ extension Array : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSArray.self
-  }
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
@@ -133,9 +124,6 @@ extension Dictionary : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSDictionary.self
-  }
   public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
@@ -162,9 +150,6 @@ extension Set : _ObjectiveCBridgeable {
     return true
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSSet.self
-  }
   public func _bridgeToObjectiveC() -> NSSet {
     return NSSet()
   }
@@ -191,9 +176,6 @@ extension CGFloat : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
@@ -220,10 +202,6 @@ extension NSRange : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSValue.self
-  }
-
   public func _bridgeToObjectiveC() -> NSValue {
     return NSValue()
   }

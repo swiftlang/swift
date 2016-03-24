@@ -877,6 +877,8 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
     Elem.set(KeyLine, Info.Line);
     Elem.set(KeyColumn, Info.Column);
   }
+  if (!Info.Group.empty())
+    Elem.set(KeyGroupName, Info.Group);
 
   if (Info.EntityType == EntityInfo::FuncDecl) {
     const FuncDeclEntityInfo &FDInfo =
@@ -1097,6 +1099,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyKeyword, Info.Argument);
   if (!Info.USR.empty())
     Elem.set(KeyUSR, Info.USR);
+  if (!Info.OriginalUSR.empty())
+    Elem.set(KeyOriginalUSR, Info.OriginalUSR);
   if (Info.Length > 0) {
     Elem.set(KeyOffset, Info.Offset);
     Elem.set(KeyLength, Info.Length);
@@ -1297,6 +1301,13 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     for (auto USR : Info.OverrideUSRs) {
       auto Override = Overrides.appendDictionary();
       Override.set(KeyUSR, USR);
+    }
+  }
+  if (!Info.ModuleGroupArray.empty()) {
+    auto Groups = Elem.setArray(KeyModuleGroups);
+    for (auto Name : Info.ModuleGroupArray) {
+      auto Entry = Groups.appendDictionary();
+      Entry.set(KeyGroupName, Name);
     }
   }
   if (!Info.AnnotatedRelatedDeclarations.empty()) {

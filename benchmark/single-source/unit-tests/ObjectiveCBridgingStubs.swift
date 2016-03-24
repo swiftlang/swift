@@ -1,4 +1,4 @@
-//===---------- ObjectiveCBridgingStubs.swift -----------------------------===//
+//===--- ObjectiveCBridgingStubs.swift ------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -26,8 +26,10 @@ func testObjectiveCBridgeStubFromNSString() {
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromNSString(N: Int) {
-  for _ in 0 ..< N {
-    testObjectiveCBridgeStubFromNSString()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      testObjectiveCBridgeStubFromNSString()
+    }
   }
 }
 
@@ -43,8 +45,10 @@ func testObjectiveCBridgeStubToNSString() {
 
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSString(N: Int) {
-  for _ in 0 ..< N {
-    testObjectiveCBridgeStubToNSString()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      testObjectiveCBridgeStubToNSString()
+    }
   }
 }
 @inline(never)
@@ -61,8 +65,10 @@ func testObjectiveCBridgeStubFromArrayOfNSString() {
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromArrayOfNSString(N: Int) {
-  for _ in 0 ..< N {
-    testObjectiveCBridgeStubFromArrayOfNSString()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      testObjectiveCBridgeStubFromArrayOfNSString()
+    }
   }
 }
 @inline(never)
@@ -78,7 +84,9 @@ func testObjectiveCBridgeStubToArrayOfNSString() {
 
 @inline(never)
 public func run_ObjectiveCBridgeStubToArrayOfNSString(N: Int) {
-  for _ in 0 ..< N {
-    testObjectiveCBridgeStubToArrayOfNSString()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      testObjectiveCBridgeStubToArrayOfNSString()
+    }
   }
 }

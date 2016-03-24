@@ -40,24 +40,25 @@ public:
   GenericCloner(SILFunction *F,
                 const ReabstractionInfo &ReInfo,
                 TypeSubstitutionMap &ContextSubs,
+                ArrayRef<Substitution> ParamSubs,
                 StringRef NewName,
-                ArrayRef<Substitution> ApplySubs,
                 CloneCollector::CallbackType Callback)
   : TypeSubstCloner(*initCloned(F, ReInfo, NewName), *F, ContextSubs,
-                    ApplySubs), ReInfo(ReInfo), Callback(Callback) {
+                    ParamSubs), ReInfo(ReInfo), Callback(Callback) {
     assert(F->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
   }
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs. Parameters are re-abstracted (changed from indirect to
   /// direct) according to \p ReInfo.
-  static SILFunction *cloneFunction(SILFunction *F,
-                                    const ReabstractionInfo &ReInfo,
-                                    TypeSubstitutionMap &ContextSubs,
-                                    StringRef NewName, ApplySite Caller,
-                            CloneCollector::CallbackType Callback =nullptr) {
+  static SILFunction *
+  cloneFunction(SILFunction *F,
+                const ReabstractionInfo &ReInfo,
+                TypeSubstitutionMap &ContextSubs,
+                ArrayRef<Substitution> ParamSubs,
+                StringRef NewName,
+                CloneCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.
-    GenericCloner SC(F, ReInfo, ContextSubs, NewName,
-                     Caller.getSubstitutions(), Callback);
+    GenericCloner SC(F, ReInfo, ContextSubs, ParamSubs, NewName, Callback);
     SC.populateCloned();
     SC.cleanUp(SC.getCloned());
     return SC.getCloned();

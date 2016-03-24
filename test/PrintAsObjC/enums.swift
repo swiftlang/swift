@@ -78,7 +78,7 @@ import Foundation
 // CHECK-NEXT: };
 
 /// Foo: A feer, a female feer.
-@objc enum FooComments: Int {
+@objc public enum FooComments: Int {
   /// Zim: A zeer, a female zeer.
   case Zim
   case Zang, Zung

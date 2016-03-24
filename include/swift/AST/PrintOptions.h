@@ -72,8 +72,8 @@ public:
 
   enum class MergeGroupKind : char {
     All,
-    Contraint,
-    Uncontraint,
+    MergeableWithTypeDef,
+    UnmergeableWithTypeDef,
   };
 
   void forEachExtensionMergeGroup(MergeGroupKind Kind,
@@ -81,6 +81,17 @@ public:
   bool isInSynthesizedExtension(const ValueDecl *VD);
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
   bool hasMergeGroup(MergeGroupKind Kind);
+};
+
+struct BracketOptions {
+  bool shouldOpenExtension = true;
+  bool shouldCloseExtension = true;
+  bool shouldCloseNominal = true;
+  void reset() {
+    shouldOpenExtension = true;
+    shouldCloseExtension = true;
+    shouldCloseNominal = true;
+  }
 };
 
 /// Options for printing AST nodes.
@@ -243,6 +254,10 @@ struct PrintOptions {
     BothAlways,
   };
 
+  /// Whether to print the doc-comment from the conformance if a member decl
+  /// has no associated doc-comment by itself.
+  bool ElevateDocCommentFromConformance = false;
+
   /// Whether to print the content of an extension decl inside the type decl where it
   /// extends from.
   std::function<bool(const ExtensionDecl *)> printExtensionContentAsMembers =
@@ -275,11 +290,7 @@ struct PrintOptions {
   /// \brief The information for converting archetypes to specialized types.
   std::shared_ptr<ArchetypeTransformContext> TransformContext;
 
-  bool shouldOpenExtension = true;
-
-  bool shouldCloseExtension = true;
-
-  bool shouldCloseNominal = true;
+  BracketOptions BracketOptions;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
@@ -322,6 +333,7 @@ struct PrintOptions {
     result.SkipDeinit = true;
     result.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
     result.EmptyLineBetweenMembers = true;
+    result.ElevateDocCommentFromConformance = true;
     return result;
   }
 
@@ -404,6 +416,7 @@ struct PrintOptions {
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.ExcludeAttrList.push_back(DAK_Swift3Migration);
+    PO.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
     PO.SkipPrivateStdlibDecls = true;
     PO.ExplodeEnumCaseDecls = true;
     return PO;

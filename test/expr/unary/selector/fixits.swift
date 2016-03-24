@@ -24,11 +24,10 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -parse %t.sources/fixits.swift 2> %t.result
 
 // RUN: FileCheck %s < %t.result
-// RUN: grep -c "warning:" %t.result | grep 4
+// RUN: grep -c "warning:" %t.result | grep 3
 
 // CHECK: warning: no method declared with Objective-C selector 'unknownMethodWithValue:label:'
 // CHECK: warning: string literal is not a valid Objective-C selector
-// CHECK: warning: no method declared with Objective-C selector 'unknownMethodWithValue:label:'
 // CHECK: warning: string literal is not a valid Objective-C selector
 
 import Foundation
@@ -98,6 +97,8 @@ func testDeprecatedStringLiteralSelector() {
 func testSelectorConstruction() {
   _ = Selector("methodWithValue:label:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-41=#selector(Foo.method(_:label:))}}
   _ = Selector("unknownMethodWithValue:label:") // expected-warning{{no method declared with Objective-C selector 'unknownMethodWithValue:label:'}}
+  // expected-note@-1{{wrap the selector name in parentheses to suppress this warning}}{{16-16=(}}{{47-47=)}}
+  _ = Selector(("unknownMethodWithValue:label:"))
   _ = Selector("badSelector:label") // expected-warning{{string literal is not a valid Objective-C selector}}
   _ = Selector("method2WithValue:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-36=#selector(Foo.method2(_:))}}
   _ = Selector("method3") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-26=#selector(Foo.method3)}}

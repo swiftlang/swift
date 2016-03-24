@@ -3,6 +3,14 @@ module OmitNeedlessWords {
   header "OmitNeedlessWords.h"
 }
 
+module ImportedProtocols {
+  export *
+  module SubModule {
+    requires objc
+    header "ImportedProtocols.h"
+  }
+}
+
 module ImportAsMember {
   export *
 

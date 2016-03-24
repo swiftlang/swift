@@ -497,6 +497,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY);
   BLOCK_RECORD(sil_block, SIL_GENERIC_OUTER_PARAMS);
   BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
+  BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
@@ -1799,6 +1800,15 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                                blob);
     return;
   }
+  case DAK_Specialize: {
+    auto abbrCode = DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
+    SmallVector<TypeID, 8> typeIDs;
+    for (auto tl : cast<SpecializeAttr>(DA)->getTypeLocs())
+      typeIDs.push_back(addTypeRef(tl.getType()));
+
+    SpecializeDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode, typeIDs);
+    return;
+  }
   }
 }
 
@@ -2995,7 +3005,7 @@ void Serializer::writeType(Type ty) {
             fnTy->isNoReturn(),
             fnTy->throws(),
             genericParams);
-    
+
     // Write requirements.
     writeRequirements(fnTy->getRequirements());
     break;
@@ -3764,10 +3774,28 @@ static void writeDeclCommentTable(
       if (!VD)
         return true;
 
-      // Skip the decl if it does not have a comment.
       RawComment Raw = VD->getRawComment();
-      if (Raw.Comments.empty() && !GroupContext.isEnable())
-        return true;
+      // When building the stdlib we intend to
+      // serialize unusual comments.  This situation is represented by
+      // GroupContext.isEnable().  In that case, we perform fewer serialization checks.
+      if (!GroupContext.isEnable()) {
+        // Skip the decl if it cannot have a comment.
+        if (!VD->canHaveComment()) {
+          return true;
+        }
+
+        // Skip the decl if it does not have a comment.
+        if (Raw.Comments.empty())
+          return true;
+
+        // Skip the decl if it's not visible to clients.
+        // The use of getEffectiveAccess is unusual here;
+        // we want to take the testability state into account
+        // and emit documentation if and only if they are visible to clients
+        // (which means public ordinarily, but public+internal when testing enabled).
+        if (VD->getEffectiveAccess() != Accessibility::Public)
+          return true;
+      }
 
       // Compute USR.
       {

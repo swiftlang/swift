@@ -17,7 +17,7 @@ from swift_build_support import xcrun
 class FindTestCase(unittest.TestCase):
     def setUp(self):
         if platform.system() != 'Darwin':
-            self.skipTest('XCRun tests should only be run on OS X')
+            self.skipTest('xcrun tests should only be run on OS X')
 
     def test_when_tool_not_found_returns_none(self):
         self.assertIsNone(xcrun.find(

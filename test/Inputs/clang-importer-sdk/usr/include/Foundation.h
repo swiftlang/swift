@@ -89,6 +89,8 @@ __attribute__((availability(ios,introduced=8.0)))
 
 @class NSString, NSArray, NSDictionary, NSSet, NSEnumerator;
 
+@class NSMutableArray<ObjectType>;
+
 /// Aaa.  NSArray.  Bbb.
 @interface NSArray<ObjectType> : NSObject
 - (nonnull ObjectType)objectAtIndexedSubscript:(NSUInteger)idx;
@@ -97,6 +99,7 @@ __attribute__((availability(ios,introduced=8.0)))
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject withObject:(nullable ObjectType)anotherObject;
+- (nonnull NSMutableArray<ObjectType> *)mutableCopy;
 @end
 
 @interface NSArray (AddingObject)

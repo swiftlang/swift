@@ -443,12 +443,35 @@ var _allTestSuites: [TestSuite] = []
 var _testSuiteNameToIndex: [String : Int] = [:]
 
 let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
+let _crashedPrefix = "CRASHED:"
 
 @_silgen_name("swift_stdlib_installTrapInterceptor")
 func _stdlib_installTrapInterceptor()
 
+#if _runtime(_ObjC)
+@objc protocol _StdlibUnittestNSException {
+  optional var name: AnyObject { get }
+}
+#endif
+
 func _childProcess() {
   _stdlib_installTrapInterceptor()
+
+#if _runtime(_ObjC)
+  objc_setUncaughtExceptionHandler {
+    var stderr = _Stderr()
+    let maybeNSException = unsafeBitCast($0, to:_StdlibUnittestNSException.self)
+    if let name = maybeNSException.name {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception " +
+        "\(name): \($0)",
+        to: &stderr)
+    } else {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception: \($0)",
+        to: &stderr)      
+    }
+  }
+#endif
+
   while let line = _stdlib_getline() {
     let parts = line._split(separator: ";")
     let testSuiteName = parts[0]
@@ -579,7 +602,7 @@ struct _ParentProcess {
           if stdoutSeenCrashDelimiter {
             capturedCrashStdout.append(line)
           }
-          print("out>>> \(line)")
+          print("stdout>>> \(line)")
         }
         continue
       }
@@ -604,8 +627,11 @@ struct _ParentProcess {
           }
           if stderrSeenCrashDelimiter {
             capturedCrashStderr.append(line)
+            if findSubstring(line, _crashedPrefix) != nil {
+              line = "OK: saw expected \"\(line.lowercased())\""
+            }
           }
-          print("err>>> \(line)")
+          print("stderr>>> \(line)")
         }
         continue
       }

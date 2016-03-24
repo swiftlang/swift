@@ -1234,6 +1234,7 @@ public:
 
   bool isSystemModule() const;
   bool isBuiltinModule() const;
+  const ModuleDecl *getAsSwiftModule() const;
 
   explicit operator bool() const { return !Mod.isNull(); }
 };

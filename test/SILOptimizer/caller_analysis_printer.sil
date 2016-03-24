@@ -1,19 +1,26 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -caller-analysis-printer -o /dev/null | FileCheck --check-prefix=CHECK %s
 
-// CHECK: CallSite: call_top call_middle
-// CHECK: CallSite: call_middle call_bottom
-// CHECK: CallSite: self_recursive_func self_recursive_func
-// CHECK: CallSite: mutual_recursive_func2 mutual_recursive_func1
-// CHECK: CallSite: mutual_recursive_func1 mutual_recursive_func2
-// CHECK: CallSite: multi_calles multi_called
-// CHECK: CallSite: multi_calles multi_called
-// CHECK: CallSite: multi_calles multi_called
-// CHECK: CallSite: multi_caller1 multi_callers
-// CHECK: CallSite: multi_caller2 multi_callers
+// CHECK: Function dead_func has caller: false
+// CHECK: Function call_top has caller: false
+// CHECK: Function call_middle has caller: true
+// CHECK: Function call_bottom has caller: true
+// CHECK: Function self_recursive_func has caller: true
+// CHECK: Function mutual_recursive_func1 has caller: true
+// CHECK: Function mutual_recursive_func2 has caller: true
+// CHECK: Function multi_called has caller: true
+// CHECK: Function multi_calles has caller: false
+// CHECK: Function multi_callers has caller: true
+// CHECK: Function multi_caller1 has caller: false
+// CHECK: Function multi_caller2 has caller: false
 
 sil_stage canonical
 
 import Builtin
+
+sil hidden @dead_func : $@convention(thin) () -> () {
+  %2 = tuple ()
+  return %2 : $()
+}
 
 sil hidden @call_top : $@convention(thin) () -> () {
 bb0:

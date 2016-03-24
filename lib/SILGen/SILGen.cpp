@@ -146,17 +146,9 @@ GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
 GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorProtocol)
 GET_BRIDGING_FN(Foundation, REQUIRED, ErrorProtocol, REQUIRED, NSError)
-GET_BRIDGING_FN(Foundation, REQUIRED, String, REQUIRED, NSString)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSString, REQUIRED, String)
-GET_BRIDGING_FN(Foundation, GENERIC, Array, REQUIRED, NSArray)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSArray, GENERIC, Array)
-GET_BRIDGING_FN(Foundation, GENERIC, Set, REQUIRED, NSSet)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSSet, GENERIC, Set)
-GET_BRIDGING_FN(Foundation, GENERIC, Dictionary, REQUIRED, NSDictionary)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSDictionary, GENERIC, Dictionary)
 
 #undef GET_BRIDGING_FN
-#undef REQURIED
+#undef REQUIRED
 #undef OPTIONAL
 #undef GENERIC
 

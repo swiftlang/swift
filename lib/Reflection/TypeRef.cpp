@@ -15,8 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Demangle.h"
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 using namespace reflection;
@@ -69,18 +71,37 @@ public:
   }
 
   void visitNominalTypeRef(const NominalTypeRef *N) {
-    printHeader("nominal");
+    if (N->isStruct())
+      printHeader("struct");
+    else if (N->isEnum())
+      printHeader("enum");
+    else if (N->isClass())
+      printHeader("class");
+    else
+      printHeader("nominal");
     auto demangled = Demangle::demangleTypeAsString(N->getMangledName());
     printField("", demangled);
+    if (auto parent = N->getParent())
+      printRec(parent.get());
     OS << ')';
   }
 
   void visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    printHeader("bound-generic");
+    if (BG->isStruct())
+      printHeader("bound-generic struct");
+    else if (BG->isEnum())
+      printHeader("bound-generic enum");
+    else if (BG->isClass())
+      printHeader("bound-generic class");
+    else
+      printHeader("bound-generic");
+
     auto demangled = Demangle::demangleTypeAsString(BG->getMangledName());
     printField("", demangled);
     for (auto param : BG->getGenericParams())
-      printRec(param.second.get());
+      printRec(param.get());
+    if (auto parent = BG->getParent())
+      printRec(parent.get());
     OS << ')';
   }
 
@@ -127,13 +148,14 @@ public:
 
   void visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
     printHeader("generic-type-parameter");
-    printField("index", GTP->getIndex());
     printField("depth", GTP->getDepth());
+    printField("index", GTP->getIndex());
     OS << ')';
   }
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     printHeader("dependent-member");
+    printRec(DM->getProtocol());
     printRec(DM->getBase().get());
     printField("member", DM->getMember());
     OS << ')';
@@ -172,7 +194,7 @@ struct TypeRefIsConcrete
   bool visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
     TypeRefVector GenericParams;
     for (auto Param : BG->getGenericParams())
-      if (!visit(Param.second.get()))
+      if (!visit(Param.get()))
         return false;
     return true;
   }
@@ -274,18 +296,7 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
         if (auto ParamTypeRef = fromDemangleNode(genericArg))
           Args.push_back(ParamTypeRef);
 
-      GenericArgumentMap ArgMap;
-      unsigned Index = 0;
-      for (auto Arg : Args) {
-        if (auto GTP = dyn_cast<GenericTypeParameterTypeRef>(Arg.get())) {
-          ArgMap.insert({{GTP->getIndex(), GTP->getDepth()}, Arg});
-        } else {
-          ArgMap.insert({{Index, 0}, Arg});
-        }
-        ++Index;
-      }
-
-      return BoundGenericTypeRef::create(mangledName, ArgMap);
+      return BoundGenericTypeRef::create(mangledName, Args);
     }
     case NodeKind::Class:
     case NodeKind::Enum:
@@ -327,7 +338,7 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
       auto index = Node->getChild(1)->getIndex();
-      return GenericTypeParameterTypeRef::create(index, depth);
+      return GenericTypeParameterTypeRef::create(depth, index);
     }
     case NodeKind::FunctionType: {
       TypeRefVector arguments;
@@ -357,8 +368,12 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     case NodeKind::DependentMemberType: {
       auto base = fromDemangleNode(Node->getChild(0));
       auto member = Node->getChild(1)->getText();
-      return DependentMemberTypeRef::create(member, base);
+      auto protocol = fromDemangleNode(Node->getChild(1));
+      cast<ProtocolTypeRef>(protocol.get());
+      return DependentMemberTypeRef::create(member, base, protocol);
     }
+    case NodeKind::DependentAssociatedTypeRef:
+      return fromDemangleNode(Node->getChild(0));
     default:
       return nullptr;
   }
@@ -366,4 +381,115 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
 
 bool TypeRef::isConcrete() const {
   return TypeRefIsConcrete().visit(this);
+}
+
+static unsigned _getDepth(TypeRef *TR) {
+  switch (TR->getKind()) {
+  case TypeRefKind::Nominal: {
+    auto Nom = cast<NominalTypeRef>(TR);
+    return Nom->getDepth();
+    break;
+  }
+  case TypeRefKind::BoundGeneric: {
+    auto BG = cast<BoundGenericTypeRef>(TR);
+    return BG->getDepth();
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected type ref kind asked for parent type");
+  }
+}
+
+unsigned NominalTypeRef::getDepth() const {
+  if (auto P = Parent.get())
+    return 1 + _getDepth(P);
+
+  return 0;
+}
+
+unsigned BoundGenericTypeRef::getDepth() const {
+  if (auto P = Parent.get())
+    return 1 + _getDepth(P);
+
+  return 0;
+}
+
+GenericArgumentMap TypeRef::getSubstMap() const {
+  GenericArgumentMap Substitutions;
+  switch (getKind()) {
+    case TypeRefKind::Nominal: {
+      auto Nom = cast<NominalTypeRef>(this);
+      if (auto Parent = Nom->getParent())
+        return Parent->getSubstMap();
+      return GenericArgumentMap();
+    }
+    case TypeRefKind::BoundGeneric: {
+      auto BG = cast<BoundGenericTypeRef>(this);
+      auto Depth = BG->getDepth();
+      unsigned Index = 0;
+      for (auto Param : BG->getGenericParams())
+        Substitutions.insert({{Depth, Index++}, Param});
+      if (auto Parent = BG->getParent()) {
+        auto ParentSubs = Parent->getSubstMap();
+        Substitutions.insert(ParentSubs.begin(), ParentSubs.end());
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  return Substitutions;
+}
+
+namespace {
+bool isStruct(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+    case Demangle::Node::Kind::Type:
+      return isStruct(Node->getChild(0));
+    case Demangle::Node::Kind::Structure:
+    case Demangle::Node::Kind::BoundGenericStructure:
+      return true;
+    default:
+      return false;
+  }
+}
+bool isEnum(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+    case Demangle::Node::Kind::Type:
+      return isEnum(Node->getChild(0));
+    case Demangle::Node::Kind::Enum:
+    case Demangle::Node::Kind::BoundGenericEnum:
+      return true;
+    default:
+      return false;
+  }
+}
+bool isClass(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+    case Demangle::Node::Kind::Type:
+      return isClass(Node->getChild(0));
+    case Demangle::Node::Kind::Class:
+    case Demangle::Node::Kind::BoundGenericClass:
+      return true;
+    default:
+      return false;
+  }
+}
+}
+
+bool NominalTypeTrait::isStruct() const {
+  auto Demangled = Demangle::demangleTypeAsNode(MangledName);
+  return ::isStruct(Demangled);
+}
+
+
+bool NominalTypeTrait::isEnum() const {
+  auto Demangled = Demangle::demangleTypeAsNode(MangledName);
+  return ::isEnum(Demangled);
+}
+
+
+bool NominalTypeTrait::isClass() const {
+  auto Demangled = Demangle::demangleTypeAsNode(MangledName);
+  return ::isClass(Demangled);
 }

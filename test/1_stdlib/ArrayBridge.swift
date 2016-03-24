@@ -97,10 +97,6 @@ var bridgeFromOperationCount = 0
 var bridgeToOperationCount = 0
 
 struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedObjC.self
-  }
-  
   func _bridgeToObjectiveC() -> BridgedObjC {
     bridgeToOperationCount += 1
     return BridgedObjC(trak.value)
@@ -385,7 +381,7 @@ func testExplicitlyBridged() {
   print(bridgedSwiftsAsAnyObjects[1])
 
   // Downcasts of non-verbatim bridged value types to objects.
-  if true {
+  do {
     let downcasted = bridgedSwifts as [BridgedObjC]
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     print(downcasted[0])
@@ -393,7 +389,7 @@ func testExplicitlyBridged() {
     print(downcasted[1])
   }
 
-  if true {
+  do {
     let downcasted = bridgedSwifts as [Base]
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     print(downcasted[0])
@@ -401,7 +397,7 @@ func testExplicitlyBridged() {
     print(downcasted[1])
   }
 
-  if true {
+  do {
     let downcasted = bridgedSwifts as [AnyObject]
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     print(downcasted[0])
