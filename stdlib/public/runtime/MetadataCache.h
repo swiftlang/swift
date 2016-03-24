@@ -26,6 +26,31 @@
 
 namespace swift {
 
+/// A bump pointer for metadata allocations. Since metadata is (currently)
+/// never released, it does not support deallocation. This allocator by itself
+/// is not thread-safe; in concurrent uses, allocations must be guarded by
+/// a lock, such as the per-metadata-cache lock used to guard metadata
+/// instantiations. All allocations are pointer-aligned.
+class MetadataAllocator {
+  /// Address of the next available space. The allocator grabs a page at a time,
+  /// so the need for a new page can be determined by page alignment.
+  ///
+  /// Initializing to -1 instead of nullptr ensures that the first allocation
+  /// triggers a page allocation since it will always span a "page" boundary.
+  char *next = (char*)(~(uintptr_t)0U);
+  
+public:
+  constexpr MetadataAllocator() = default;
+
+  // Don't copy or move, please.
+  MetadataAllocator(const MetadataAllocator &) = delete;
+  MetadataAllocator(MetadataAllocator &&) = delete;
+  MetadataAllocator &operator=(const MetadataAllocator &) = delete;
+  MetadataAllocator &operator=(MetadataAllocator &&) = delete;
+  
+  void *alloc(size_t size);
+};
+
 // A wrapper around a pointer to a metadata cache entry that provides
 // DenseMap semantics that compare values in the key vector for the metadata
 // instance.
