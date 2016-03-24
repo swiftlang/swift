@@ -185,7 +185,7 @@ public extension P5 where T1 : Comparable{
   public func foo3() {}
 }
 
-public extension P5  where T1 : Comparable {
+public extension P5 where T1 : Comparable {
 
   /// This is picked
   public func foo4() {}

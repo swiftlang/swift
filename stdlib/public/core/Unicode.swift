@@ -193,7 +193,7 @@ public struct UTF8 : UnicodeCodec {
   ///     well-formed; otherwise the *maximal subpart of the ill-formed
   ///     sequence* (Unicode 8.0.0, Ch 3.9, D93b), i.e. the number of leading
   ///     code units that were valid or 1 in case none were valid.  Unicode
-  ///     recommends to skip these bytes bytes and replace them by a single
+  ///     recommends to skip these bytes and replace them by a single
   ///     replacement character (U+FFFD).
   ///
   /// - Requires: There is at least one used byte in `buffer`, and the unused

@@ -468,7 +468,7 @@ void ConsumedResultToEpilogueRetainMatcher::recompute() {
 
 bool
 ConsumedResultToEpilogueRetainMatcher::
-isTransistiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs) {
+isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs) {
   // For every block with retain, we need to check the transitive
   // closure of its successors are retain-free.
   for (auto &I : EpilogueRetainInsts) {
@@ -631,7 +631,7 @@ findMatchingRetains(SILBasicBlock *BB) {
   }
 
   // Lastly, check whether all the successor blocks are retain-free.
-  if (!isTransistiveSuccessorsRetainFree(RetainFrees))
+  if (!isTransitiveSuccessorsRetainFree(RetainFrees))
     EpilogueRetainInsts.clear();
 
   // At this point, we've either failed to find any epilogue retains or

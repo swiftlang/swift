@@ -349,7 +349,7 @@ func testAssignTuple3() {
   void()#^ASSIGN_TUPLE_3^#
 }
 // FIXME: technically this is sometimes legal, but we would need to
-// differentiate between casese like () = and print() =. Since it's not very
+// differentiate between cases like () = and print() =. Since it's not very
 // useful anyway, just omit the completion.
 // ASSIGN_TUPLE_1-NOT: Pattern/None:  = {
 

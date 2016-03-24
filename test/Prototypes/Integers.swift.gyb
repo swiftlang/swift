@@ -162,7 +162,7 @@ extension Arithmetic {
 }
 
 /// SignedArithmetic protocol will only be conformed to by signed numbers,
-/// otherwise it would be posible to negate an unsigned value.
+/// otherwise it would be possible to negate an unsigned value.
 ///
 /// The only method of this protocol has the default implementation in an
 /// extension, that uses a parameterless initializer and subtraction.
@@ -206,7 +206,7 @@ public typealias UWord = UInt${word_bits}
 %               'IntegerLiteralConvertible, CustomStringConvertible'
 
 /// Integer protocol is a base for all the integer types that are available in
-/// the standard library, and besides should be suffecient to implement
+/// the standard library, and besides should be sufficient to implement
 /// arbitrary precision integer types.
 ///
 /// `isEqual(to:)` and `isLess(than:)` methods are the ones responsible for
@@ -930,7 +930,7 @@ public struct DoubleWidth<
     self._storage = (high: _value.0, low: _value.1)
   }
 
-  // aithmetic
+  // arithmetic
   //
   public init() {
     self.init((High(), Low()))
