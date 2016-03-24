@@ -126,7 +126,7 @@ enum class ValueWitnessKind {
   StoreExtraInhabitant,
   GetExtraInhabitantIndex,
   GetEnumTag,
-  DestructiveProjectEnumData
+  DestructiveProjectEnumData,
 };
 
 enum class Directness {
@@ -319,7 +319,7 @@ enum class OperatorKind {
   NotOperator,
   Prefix,
   Postfix,
-  Infix
+  Infix,
 };
 
 /// \brief Mangle an identifier using Swift's mangling rules.
