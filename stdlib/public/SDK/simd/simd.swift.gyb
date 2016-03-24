@@ -16,24 +16,25 @@ import Swift
 import Darwin
 @_exported import simd
 
-% component = ['x','y','z','w']
-% scalar_types = ['Float','Double','Int32']
-% ctype = { 'Float':'float', 'Double':'double', 'Int32':'int' }
-% llvm_type = { 'Float':'FPIEEE32', 'Double':'FPIEEE64', 'Int32':'Int32' }
-% floating_types = ['Float','Double']
-% cardinal = { 2:'two', 3:'three', 4:'four'}
-% hash_scales = ['1', '3', '5', '11']
-% one_minus_ulp = { 'Float':'0x1.fffffep-1', 'Double':'0x1.fffffffffffffp-1' }
+%{
+component = ['x','y','z','w']
+scalar_types = ['Float','Double','Int32','UInt32']
+ctype = { 'Float':'float', 'Double':'double', 'Int32':'int', 'UInt32':'uint'}
+llvm_type = { 'Float':'FPIEEE32', 'Double':'FPIEEE64', 'Int32':'Int32', 'UInt32':'Int32' }
+floating_types = ['Float','Double']
+cardinal = { 2:'two', 3:'three', 4:'four'}
+one_minus_ulp = { 'Float':'0x1.fffffep-1', 'Double':'0x1.fffffffffffffp-1' }
+}%
 
 % for type in scalar_types:
 %   for size in [2, 3, 4]:
-//    Workaround <rdar://problem/18900352>
 %     vectype = ctype[type] + str(size)
 %     llvm_vectype = "Vec" + str(size) + "x" + llvm_type[type]
 %     vecsize = (8 if type == 'Double' else 4) * (2 if size == 2 else 4)
 %     extractelement = "extractelement_" + llvm_vectype + "_Int32"
 %     insertelement = "insertelement_" + llvm_vectype + "_" + llvm_type[type] + "_Int32"
 %     is_floating = type in floating_types
+%     is_signed = type[0] != 'U'
 %     wrap = "" if is_floating else "&"
 
 
@@ -204,8 +205,10 @@ public func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(_bits:
 %if is_floating:
     Builtin.fdiv_${llvm_vectype}(
-%else:
+%elif is_signed:
     Builtin.sdiv_${llvm_vectype}(
+%else:
+    Builtin.udiv_${llvm_vectype}(
 %end
       lhs._vector, rhs._vector))
 }
@@ -258,6 +261,7 @@ public func *=(lhs: inout ${vectype}, rhs: ${type}) -> Void {
 }
 % end
 
+% if is_signed:
 /// Elementwise absolute value of a vector.  The result is a vector of the same
 /// length with all elements positive.
 @inline(__always)
@@ -267,6 +271,7 @@ public func abs(x: ${vectype}) -> ${vectype} {
                     'abs(x.' + c + ')', \
                     component[:size]))})
 }
+%end
 
 /// Elementwise minimum of two vectors.  Each component of the result is the
 /// smaller of the corresponding component of the inputs.
