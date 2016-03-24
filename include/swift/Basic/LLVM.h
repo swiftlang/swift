@@ -46,7 +46,7 @@ namespace llvm {
   class raw_ostream;
   class APInt;
   class APFloat;
-} // end namespace llvm;
+} // end namespace llvm
 
 
 namespace swift {
