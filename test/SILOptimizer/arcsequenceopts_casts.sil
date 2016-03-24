@@ -4,8 +4,8 @@
 import Builtin
 
 public enum Optional<T> {
-  case None
-  case Some(T)
+  case none
+  case some(T)
 }
 
 class C {

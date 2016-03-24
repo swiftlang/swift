@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ===--- generate_harness.py ----------------------------------------------===//
+# ===--- generate_harness.py ---------------------------------------------===//
 #
 #  This source file is part of the Swift.org open source project
 #
@@ -10,14 +10,15 @@
 #  See http://swift.org/LICENSE.txt for license information
 #  See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
-# ===----------------------------------------------------------------------===//
+# ===---------------------------------------------------------------------===//
 
 # Generate CMakeLists.txt and utils/main.swift from templates.
 
-import jinja2
-import os
 import glob
+import os
 import re
+
+import jinja2
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 perf_dir = os.path.realpath(os.path.join(script_dir, '../..'))
@@ -40,14 +41,15 @@ if __name__ == '__main__':
              for x in glob.glob(os.path.join(single_source_dir, '*.swift'))]
 
     # CMakeList multi-source
-    class multi_source_bench(object):
+    class MultiSourceBench(object):
+
         def __init__(self, path):
             self.name = os.path.basename(path)
             self.files = [x for x in os.listdir(path)
                           if x.endswith('.swift')]
     if os.path.isdir(multi_source_dir):
         multisource_benches = [
-            multi_source_bench(os.path.join(multi_source_dir, x))
+            MultiSourceBench(os.path.join(multi_source_dir, x))
             for x in os.listdir(multi_source_dir)
             if os.path.isdir(os.path.join(multi_source_dir, x))
         ]
@@ -81,7 +83,7 @@ if __name__ == '__main__':
     for template_file in template_map:
         template_path = os.path.join(script_dir, template_file)
         template = template_env.get_template(template_path)
-        print template_map[template_file]
+        print(template_map[template_file])
         open(template_map[template_file], 'w').write(
             template.render(tests=tests,
                             multisource_benches=multisource_benches,

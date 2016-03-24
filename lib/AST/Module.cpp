@@ -76,10 +76,10 @@ void BuiltinUnit::LookupCache::lookupValue(
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
-      TypeAliasDecl *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name,
-                                                   SourceLoc(),
-                                                   TypeLoc::withoutLoc(Ty),
-                                                   const_cast<BuiltinUnit*>(&M));
+      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
+                                          TypeLoc::withoutLoc(Ty),
+                                          /*genericparams*/nullptr,
+                                          const_cast<BuiltinUnit*>(&M));
       TAD->computeType();
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;
@@ -474,8 +474,10 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
     break;
   }
 
-  case DeclContextKind::NominalTypeDecl: {
-    auto nominal = cast<NominalTypeDecl>(container);
+  case DeclContextKind::GenericTypeDecl: {
+    auto nominal = dyn_cast<NominalTypeDecl>(container);
+    if (!nominal) break;
+    
     auto lookupResults = nominal->lookupDirect(name);
 
     // Filter out declarations from other modules.
@@ -737,24 +739,17 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
 
     SmallVector<ProtocolConformanceRef, 4> conformances;
     for (auto proto : archetype->getConformsTo()) {
-      // If the type is a type variable or is dependent, just fill in null
+      // If the type is a type variable or is dependent, just fill in empty
       // conformances.
       if (type->is<TypeVariableType>() || type->isTypeParameter()) {
         conformances.push_back(ProtocolConformanceRef(proto));
 
       // Otherwise, find the conformances.
       } else {
-        auto conforms = module->lookupConformance(type, proto, resolver);
-        switch (conforms.getInt()) {
-        case ConformanceKind::Conforms:
-          conformances.push_back(
-                         ProtocolConformanceRef(proto, conforms.getPointer()));
-          break;
-        case ConformanceKind::UncheckedConforms:
-        case ConformanceKind::DoesNotConform:
+        if (auto conforms = module->lookupConformance(type, proto, resolver))
+          conformances.push_back(*conforms);
+        else
           conformances.push_back(ProtocolConformanceRef(proto));
-          break;
-        }
       }
     }
 
@@ -777,9 +772,9 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
   return permanentSubs;
 }
 
-LookupConformanceResult Module::lookupConformance(Type type,
-                                                  ProtocolDecl *protocol,
-                                                  LazyResolver *resolver) {
+Optional<ProtocolConformanceRef>
+Module::lookupConformance(Type type, ProtocolDecl *protocol,
+                          LazyResolver *resolver) {
   ASTContext &ctx = getASTContext();
 
   // An archetype conforms to a protocol if the protocol is listed in the
@@ -787,18 +782,18 @@ LookupConformanceResult Module::lookupConformance(Type type,
   if (auto archetype = type->getAs<ArchetypeType>()) {
     if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       if (archetype->requiresClass())
-        return { nullptr, ConformanceKind::Conforms };
-      return { nullptr, ConformanceKind::DoesNotConform };
+        return ProtocolConformanceRef(protocol);
+
+      return None;
     }
 
     for (auto ap : archetype->getConformsTo()) {
       if (ap == protocol || ap->inheritsFrom(protocol))
-        return { nullptr, ConformanceKind::Conforms };
+        return ProtocolConformanceRef(protocol);
     }
 
-    if (!archetype->getSuperclass()) {
-      return { nullptr, ConformanceKind::DoesNotConform };
-    }
+    if (!archetype->getSuperclass())
+      return None;
   }
 
   // An existential conforms to a protocol if the protocol is listed in the
@@ -814,48 +809,46 @@ LookupConformanceResult Module::lookupConformance(Type type,
     for (auto proto : protocols) {
       if (!proto->isObjC() &&
           !proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-        return { nullptr, ConformanceKind::DoesNotConform };
+        return None;
     }
 
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
     if (!protocol->existentialConformsToSelf() ||
         !protocol->existentialTypeSupported(resolver))
-      return { nullptr, ConformanceKind::DoesNotConform };
+      return None;
 
     // Special-case AnyObject, which may not be in the list of conformances.
     if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      return { nullptr, type->isClassExistentialType()
-                          ? ConformanceKind::Conforms
-                          : ConformanceKind::DoesNotConform };
+      if (type->isClassExistentialType())
+        return ProtocolConformanceRef(protocol);
+
+      return None;
     }
 
     // Look for this protocol within the existential's list of conformances.
     for (auto proto : protocols) {
-      if (proto == protocol || proto->inheritsFrom(protocol)) {
-        return { nullptr, ConformanceKind::Conforms };
-      }
+      if (proto == protocol || proto->inheritsFrom(protocol))
+        return ProtocolConformanceRef(protocol);
     }
 
     // We didn't find our protocol in the existential's list; it doesn't
     // conform.
-    return { nullptr, ConformanceKind::DoesNotConform };
+    return None;
   }
 
   // Check for protocol conformance of archetype via superclass requirement.
   if (auto archetype = type->getAs<ArchetypeType>()) {
     if (auto super = archetype->getSuperclass()) {
-      auto inheritedConformance = lookupConformance(super, protocol, resolver);
-      switch (inheritedConformance.getInt()) {
-      case ConformanceKind::DoesNotConform:
-        return { nullptr, ConformanceKind::DoesNotConform };
-      case ConformanceKind::UncheckedConforms:
-        return inheritedConformance;
-      case ConformanceKind::Conforms:
-        auto result =
-          ctx.getInheritedConformance(type, inheritedConformance.getPointer());
-        return { result, ConformanceKind::Conforms };
+      if (auto inheritedConformance = lookupConformance(super, protocol,
+                                                        resolver)) {
+        return ProtocolConformanceRef(
+                 ctx.getInheritedConformance(
+                   type,
+                   inheritedConformance->getConcrete()));
       }
+
+      return None;
     }
   }
 
@@ -863,27 +856,21 @@ LookupConformanceResult Module::lookupConformance(Type type,
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have.
   if (type->is<UnresolvedType>()) {
-    return {
-      ctx.getConformance(type, protocol, protocol->getLoc(), this,
-                         ProtocolConformanceState::Complete),
-      ConformanceKind::Conforms
-    };
+    return ProtocolConformanceRef(
+             ctx.getConformance(type, protocol, protocol->getLoc(), this,
+                                ProtocolConformanceState::Complete));
   }
   
   
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
-  // FIXME: We may have implicit conformances for some cases. Handle those
-  // here.
-  if (!nominal) {
-    return { nullptr, ConformanceKind::DoesNotConform };
-  }
+  if (!nominal) return None;
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(this, protocol, conformances))
-    return { nullptr, ConformanceKind::DoesNotConform };
+    return None;
 
   // FIXME: Ambiguity resolution.
   auto conformance = conformances.front();
@@ -906,22 +893,13 @@ LookupConformanceResult Module::lookupConformance(Type type,
     // Compute the conformance for the inherited type.
     auto inheritedConformance = lookupConformance(superclassTy, protocol,
                                                   resolver);
-    switch (inheritedConformance.getInt()) {
-    case ConformanceKind::DoesNotConform:
-      llvm_unreachable("We already found the inherited conformance");
-
-    case ConformanceKind::UncheckedConforms:
-      return inheritedConformance;
-
-    case ConformanceKind::Conforms:
-      // Create inherited conformance below.
-      break;
-    }
+    assert(inheritedConformance &&
+           "We already found the inherited conformance");
 
     // Create the inherited conformance entry.
     conformance
-      = ctx.getInheritedConformance(type, inheritedConformance.getPointer());
-    return { conformance, ConformanceKind::Conforms };
+      = ctx.getInheritedConformance(type, inheritedConformance->getConcrete());
+    return ProtocolConformanceRef(conformance);
   }
 
   // If the type is specialized, find the conformance for the generic type.
@@ -942,18 +920,18 @@ LookupConformanceResult Module::lookupConformance(Type type,
       
       for (auto sub : substitutions) {
         if (sub.getReplacement()->is<ErrorType>())
-          return { nullptr, ConformanceKind::DoesNotConform };
+          return None;
       }
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance,
                                                   substitutions);
-      return { result, ConformanceKind::Conforms };
+      return ProtocolConformanceRef(result);
     }
   }
 
   // Record and return the simple conformance.
-  return { conformance, ConformanceKind::Conforms };
+  return ProtocolConformanceRef(conformance);
 }
 
 namespace {
@@ -1581,11 +1559,12 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 
   StringRef name = getFilename();
   if (name.empty()) {
-    assert(1 == std::count_if(getParentModule()->getFiles().begin(),
-                              getParentModule()->getFiles().end(),
-                              [](const FileUnit *FU) -> bool {
-      return isa<SourceFile>(FU) && cast<SourceFile>(FU)->getFilename().empty();
-    }) && "can't promise uniqueness if multiple source files are nameless");
+    assert(1 == count_if(getParentModule()->getFiles(),
+                         [](const FileUnit *FU) -> bool {
+                           return isa<SourceFile>(FU) &&
+                                  cast<SourceFile>(FU)->getFilename().empty();
+                         }) &&
+           "can't promise uniqueness if multiple source files are nameless");
 
     // We still need a discriminator, so keep going.
   }
@@ -1669,4 +1648,11 @@ bool ModuleEntity::isBuiltinModule() const {
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
     return SwiftMod->isBuiltinModule();
   return false;
+}
+
+const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod;
+  return nullptr;
 }

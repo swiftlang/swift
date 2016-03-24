@@ -30,9 +30,9 @@ func testOverrideProperty(obj: Sub) {
 
 testOverrideProperty(Sub())
 
-// CHECK-LABEL: sil shared @_TFC15objc_extensions3Sub3fooFT_T_
+// CHECK-LABEL: sil shared [thunk] @_TFC15objc_extensions3Sub3fooFT_T_
 // CHECK:         function_ref @_TTDFC15objc_extensions3Sub3foofT_T_
-// CHECK:       sil shared [transparent] @_TTDFC15objc_extensions3Sub3foofT_T_
+// CHECK:       sil shared [transparent] [thunk] @_TTDFC15objc_extensions3Sub3foofT_T_
 // CHECK:         class_method [volatile] %0 : $Sub, #Sub.foo!1.foreign
 func testCurry(x: Sub) {
   _ = x.foo

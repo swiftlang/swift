@@ -37,7 +37,15 @@ namespace swift {
   /// \brief Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
-  bool isConvertibleTo(Type T1, Type T2, DeclContext *DC);
+  bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
+
+  bool isEqual(Type T1, Type T2, DeclContext &DC);
+
+  bool canPossiblyEqual(Type T1, Type T2, DeclContext &DC);
+
+  bool canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC);
+
+  Type lookUpTypeInContext(DeclContext *DC, StringRef Name);
 
   /// \brief Given an unresolved member E and its parent P, this function tries
   /// to infer the type of E.
@@ -50,6 +58,14 @@ namespace swift {
   /// \returns Resolved type on success, nullptr on error.
   Type checkMemberType(DeclContext &DC, Type BaseTy, ArrayRef<Identifier> Names);
 
+  struct ResolveMemberResult {
+    ValueDecl *Favored = nullptr;
+    std::vector<ValueDecl*> OtherViables;
+    operator bool() const { return Favored; }
+  };
+
+  ResolveMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
+                                         DeclName Name);
 
   /// \brief Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the

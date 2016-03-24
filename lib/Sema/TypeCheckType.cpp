@@ -103,7 +103,7 @@ Type TypeChecker::getUInt8Type(DeclContext *dc) {
 /// We call this the "exception type" to try to avoid confusion with
 /// the AST's ErrorType node.
 Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
-  if (NominalTypeDecl *decl = Context.getExceptionTypeDecl())
+  if (NominalTypeDecl *decl = Context.getErrorProtocolDecl())
     return decl->getDeclaredType();
 
   // Not really sugar, but the actual diagnostic text is fine.
@@ -186,10 +186,6 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
   // Force any delayed members added to the nominal type declaration.
-  if (nominalDecl->hasDelayedMemberDecls()) {
-    nominalDecl->forceDelayed();
-  }
-  
   if (nominalDecl->hasDelayedMembers()) {
     this->handleExternalDecl(nominalDecl);
     nominalDecl->setHasDelayedMembers(false);
@@ -249,6 +245,7 @@ Type TypeChecker::resolveTypeInContext(
   bool nonTypeOwner = !ownerDC->isTypeContext();
   auto ownerNominal = ownerDC->getAsNominalTypeOrNominalTypeExtensionContext();
   auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
+  auto alias = dyn_cast<TypeAliasDecl>(typeDecl);
   DeclContext *typeParent = nullptr;
   assert((ownerNominal || nonTypeOwner) &&
          "Owner must be a nominal type or a non type context");
@@ -323,6 +320,33 @@ Type TypeChecker::resolveTypeInContext(
         }
       }
     }
+    
+    // If we found an alias type in an inherited protocol, resolve it based on our
+    // own `Self`.
+    if (alias && alias->hasInterfaceType()) {
+      auto metaType = alias->getInterfaceType()->getAs<MetatypeType>();
+      auto memberType = metaType ? metaType->getInstanceType()->getAs<DependentMemberType>() :
+                        nullptr;
+
+      if (memberType && parentDC->getAsProtocolOrProtocolExtensionContext()) {
+        auto protoSelf = parentDC->getProtocolSelf();
+        auto selfTy = protoSelf->getDeclaredType()->castTo<GenericTypeParamType>();
+        auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
+
+        SmallVector<DependentMemberType *, 4> memberTypes;
+        do {
+          memberTypes.push_back(memberType);
+          memberType = memberType->getBase()->getAs<DependentMemberType>();
+        } while (memberType);
+
+        auto module = parentDC->getParentModule();
+        while (memberTypes.size()) {
+          baseTy = memberTypes.back()->substBaseType(module, baseTy, nullptr);
+          memberTypes.pop_back();
+        }
+        return baseTy;
+      }
+    }
 
     // Search the type of this context and its supertypes.
     llvm::SmallPtrSet<const NominalTypeDecl *, 8> visited;
@@ -395,6 +419,7 @@ Type TypeChecker::applyGenericArguments(Type type, SourceLoc loc,
     if (!type->is<ErrorType>())
       diagnose(loc, diag::not_a_generic_type, type)
           .fixItRemove(generic->getAngleBrackets());
+    generic->setInvalid();
     return type;
   }
 
@@ -450,13 +475,28 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     genericArgTypes.push_back(genericArg.getType());
   }
+  
+  // If we're completing a generic TypeAlias, then we map the types provided
+  // onto the underlying type.
+  if (auto *TAD = dyn_cast<TypeAliasDecl>(unbound->getDecl())) {
+    assert(TAD->getGenericParams()->getAllArchetypes().size()
+             == genericArgs.size() &&
+           "argument arity mismatch");
 
-  // Form the bound generic type
-  BoundGenericType *BGT = BoundGenericType::get(unbound->getDecl(),
-                                                unbound->getParent(),
-                                                genericArgTypes);
+    SmallVector<Substitution, 4> subs;
+    subs.reserve(genericArgs.size());
+    for (auto t : genericArgs)
+      subs.push_back(Substitution(t.getType(), {}));
+  
+    auto subst = TAD->getGenericParams()->getSubstitutionMap(subs);
+    return TAD->getUnderlyingType().subst(TAD->getParentModule(), subst, None);
+  }
+  
+  // Form the bound generic type.
+  auto *BGT = BoundGenericType::get(cast<NominalTypeDecl>(unbound->getDecl()),
+                                    unbound->getParent(), genericArgTypes);
   // Check protocol conformance.
-  if (!BGT->hasTypeParameter()) {
+  if (!BGT->hasTypeParameter() && !BGT->hasTypeVariable()) {
     SourceLoc noteLoc = unbound->getDecl()->getLoc();
     if (noteLoc.isInvalid())
       noteLoc = loc;
@@ -718,8 +758,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // parameters (only), then move up to the enclosing context.
   if (options.contains(TR_GenericSignature)) {
     GenericParamList *genericParams;
-    if (auto *nominal = dyn_cast<NominalTypeDecl>(DC)) {
-      genericParams = nominal->getGenericParams();
+    if (auto *generic = dyn_cast<GenericTypeDecl>(DC)) {
+      genericParams = generic->getGenericParams();
     } else if (auto *ext = dyn_cast<ExtensionDecl>(DC)) {
       genericParams = ext->getGenericParams();
     } else {
@@ -969,16 +1009,6 @@ static Type resolveNestedIdentTypeComponent(
                                                            parentRange,
                                                            comp);
     assert(memberType && "Received null dependent member type");
-
-    if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {
-      // FIXME: Highlight generic arguments and introduce a Fix-It to
-      // remove them.
-      if (diagnoseErrors)
-        TC.diagnose(comp->getIdLoc(), diag::not_a_generic_type, memberType);
-
-      // Drop the arguments.
-    }
-
     // If we know what type declaration we're referencing, store it.
     if (auto typeDecl = memberType->getDirectlyReferencedTypeDecl()) {
       comp->setValue(typeDecl);
@@ -1834,7 +1864,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   switch (auto rep = extInfo.getRepresentation()) {
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
-    if (!TC.isRepresentableInObjC(DC, fnTy)) {
+    if (!fnTy->isRepresentableIn(ForeignLanguage::ObjectiveC, DC)) {
       StringRef strName =
         rep == AnyFunctionType::Representation::Block ? "block" : "c";
       auto extInfo2 =
@@ -1868,7 +1898,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
     for (auto elt : tuple->getElements()) {
       if (auto named = dyn_cast<NamedTypeRepr>(elt)) {
-        TC.diagnose(named->getNameLoc(), diag::sil_function_label);
+        TC.diagnose(named->getNameLoc(), diag::sil_function_input_label);
         elt = named->getTypeRepr();
       }
 
@@ -1889,22 +1919,13 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       hasError = true;
   }
 
-  SILResultInfo result;
+  SmallVector<SILResultInfo, 4> results;
   Optional<SILResultInfo> errorResult;
   {
-    // For now, resolveSILResults only returns a single ordinary result.
     // FIXME: Deal with unsatisfied dependencies.
-    SmallVector<SILResultInfo, 1> ordinaryResults;
     if (resolveSILResults(repr->getResultTypeRepr(), options,
-                          ordinaryResults, errorResult)) {
+                          results, errorResult)) {
       hasError = true;
-    } else {
-      if (ordinaryResults.empty()) {
-        result = SILResultInfo(TupleType::getEmpty(TC.Context),
-                               ResultConvention::Unowned);
-      } else {
-        result = ordinaryResults.front();
-      }
     }
   }
 
@@ -1917,7 +1938,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   // FIXME: Remap the parsed context types to interface types.
   CanGenericSignature genericSig;
   SmallVector<SILParameterInfo, 4> interfaceParams;
-  SILResultInfo interfaceResult;
+  SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
   if (auto *genericParams = repr->getGenericParams()) {
     genericSig = repr->getGenericSignature()->getCanonicalSignature();
@@ -1927,9 +1948,12 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
           M, genericParams, param.getType())->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
-    auto transResultType = ArchetypeBuilder::mapTypeOutOfContext(
-        M, genericParams, result.getType())->getCanonicalType();
-    interfaceResult = result.getWithType(transResultType);
+    for (auto &result : results) {
+      auto transResultType =
+        ArchetypeBuilder::mapTypeOutOfContext(
+          M, genericParams, result.getType())->getCanonicalType();
+      interfaceResults.push_back(result.getWithType(transResultType));
+    }
 
     if (errorResult) {
       auto transErrorResultType = ArchetypeBuilder::mapTypeOutOfContext(
@@ -1939,12 +1963,12 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   } else {
     interfaceParams = params;
-    interfaceResult = result;
+    interfaceResults = results;
     interfaceErrorResult = errorResult;
   }
   return SILFunctionType::get(genericSig, extInfo,
                               callee,
-                              interfaceParams, interfaceResult,
+                              interfaceParams, interfaceResults,
                               interfaceErrorResult,
                               Context);
 }
@@ -1973,7 +1997,6 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_in_guaranteed,
              ParameterConvention::Indirect_In_Guaranteed);
     checkFor(TypeAttrKind::TAK_in, ParameterConvention::Indirect_In);
-    checkFor(TypeAttrKind::TAK_out, ParameterConvention::Indirect_Out);
     checkFor(TypeAttrKind::TAK_inout, ParameterConvention::Indirect_Inout);
     checkFor(TypeAttrKind::TAK_inout_aliasable,
              ParameterConvention::Indirect_InoutAliasable);
@@ -2026,6 +2049,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
       attrs.clearAttribute(tak);
       convention = attrConv;
     };
+    checkFor(TypeAttrKind::TAK_out, ResultConvention::Indirect);
     checkFor(TypeAttrKind::TAK_owned, ResultConvention::Owned);
     checkFor(TypeAttrKind::TAK_unowned_inner_pointer,
              ResultConvention::UnownedInnerPointer);
@@ -2043,14 +2067,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
   assert(!isErrorResult || convention == ResultConvention::Owned);
   SILResultInfo resolvedResult(type->getCanonicalType(), convention);
 
-  // TODO: we want to generalize this to allow multiple normal results.
-  // But for now, just allow one.
   if (!isErrorResult) {
-    if (!ordinaryResults.empty()) {
-      TC.diagnose(repr->getStartLoc(), diag::sil_function_multiple_results);
-      return true;
-    }
-
     ordinaryResults.push_back(resolvedResult);
     return false;
   }
@@ -2070,39 +2087,23 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
   return false;
 }
 
-static bool hasElementWithSILResultAttribute(TupleTypeRepr *tuple) {
-  for (auto elt : tuple->getElements()) {
-    if (auto attrRepr = dyn_cast<AttributedTypeRepr>(elt)) {
-      const TypeAttributes &attrs = attrRepr->getAttrs();
-      if (attrs.has(TypeAttrKind::TAK_owned) ||
-          attrs.has(TypeAttrKind::TAK_unowned_inner_pointer) ||
-          attrs.has(TypeAttrKind::TAK_autoreleased) ||
-          attrs.has(TypeAttrKind::TAK_error)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 bool TypeResolver::resolveSILResults(TypeRepr *repr,
                                      TypeResolutionOptions options,
                                 SmallVectorImpl<SILResultInfo> &ordinaryResults,
                                 Optional<SILResultInfo> &errorResult) {
-
-  // When we generalize SIL to handle multiple normal results, we
-  // should always split up a tuple (a single level deep only).  Until
-  // then, we need to recognize when the tuple elements don't use any
-  // SIL result attributes and keep it as a single result.
   if (auto tuple = dyn_cast<TupleTypeRepr>(repr)) {
-    if (hasElementWithSILResultAttribute(tuple)) {
-      bool hadError = false;
-      for (auto elt : tuple->getElements()) {
-        if (resolveSingleSILResult(elt, options, ordinaryResults, errorResult))
-          hadError = true;
+    bool hadError = false;
+    for (auto elt : tuple->getElements()) {
+      if (auto named = dyn_cast<NamedTypeRepr>(elt)) {
+        TC.diagnose(named->getNameLoc(), diag::sil_function_output_label);
+        // Recover by just ignoring the label.
+        elt = named->getTypeRepr();
       }
-      return hadError;
+
+      if (resolveSingleSILResult(elt, options, ordinaryResults, errorResult))
+        hadError = true;
     }
+    return hadError;
   }
 
   return resolveSingleSILResult(repr, options, ordinaryResults, errorResult);
@@ -2375,31 +2376,6 @@ Type TypeChecker::resolveMemberType(DeclContext *dc, Type type,
   return memberTypes.back().second;
 }
 
-/// Look up and validate a type declared in the standard library.
-static CanType lookupUniqueTypeInLibrary(TypeChecker &TC,
-                                         Module *stdlib,
-                                         Identifier name) {
-  SmallVector<ValueDecl *, 4> results;
-  stdlib->lookupValue({}, name, NLKind::UnqualifiedLookup, results);
-
-  TypeDecl *type = nullptr;
-  for (auto result: results) {
-    if (auto foundType = dyn_cast<TypeDecl>(result)) {
-      // Fail if we find two types with this name.
-      if (type) return CanType();
-      type = foundType;
-    }
-  }
-
-  // Fail if we didn't find a type.
-  if (!type) return CanType();
-
-  TC.validateDecl(type);
-  if (type->isInvalid()) return CanType();
-
-  return type->getDeclaredType()->getCanonicalType();
-}
-
 static void lookupAndAddLibraryTypes(TypeChecker &TC,
                                      Module *Stdlib,
                                      ArrayRef<Identifier> TypeNames,
@@ -2485,7 +2461,9 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
       return false;
     }
     
-    if (TC.isRepresentableInObjC(AFD, param->getType()))
+    if (param->getType()->isRepresentableIn(
+          ForeignLanguage::ObjectiveC,
+          const_cast<AbstractFunctionDecl *>(AFD)))
       continue;
     
     // Permit '()' when this method overrides a method with a
@@ -2656,9 +2634,10 @@ bool TypeChecker::isRepresentableInObjC(
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (FD->isAccessor()) {
       // Accessors can only be @objc if the storage declaration is.
+      // Global computed properties may however @_cdecl their accessors.
       auto storage = FD->getAccessorStorageDecl();
       validateDecl(storage);
-      if (!storage->isObjC()) {
+      if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl) {
         if (Diagnose) {
           auto error = FD->isGetter()
                     ? (isa<VarDecl>(storage) 
@@ -2713,7 +2692,8 @@ bool TypeChecker::isRepresentableInObjC(
     isSpecialInit = init->isObjCZeroParameterWithLongSelector();
 
   if (!isSpecialInit &&
-      !isParamListRepresentableInObjC(*this, AFD, AFD->getParameterList(1),
+      !isParamListRepresentableInObjC(*this, AFD,
+                                      AFD->getParameterLists().back(),
                                       Reason)) {
     if (!Diagnose) {
       // Return as soon as possible if we are not producing diagnostics.
@@ -2723,7 +2703,9 @@ bool TypeChecker::isRepresentableInObjC(
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
     Type ResultType = FD->getResultType();
-    if (!ResultType->isVoid() && !isRepresentableInObjC(FD, ResultType)) {
+    if (!ResultType->isVoid() &&
+        !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
+                                       const_cast<FuncDecl *>(FD))) {
       if (Diagnose) {
         diagnose(AFD->getLoc(), diag::objc_invalid_on_func_result_type,
                  getObjCDiagnosticAttrKind(Reason));
@@ -2849,7 +2831,7 @@ bool TypeChecker::isRepresentableInObjC(
     // If the selector did not provide an index for the error, find
     // the last parameter that is not a trailing closure.
     if (!foundErrorParameterIndex) {
-      auto *paramList = AFD->getParameterList(1);
+      auto *paramList = AFD->getParameterLists().back();
       errorParameterIndex = paramList->size();
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.
@@ -2935,7 +2917,8 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     // Because of this, look through @weak and @unowned.
     T = RST->getReferentType();
   }
-  bool Result = isRepresentableInObjC(VD->getDeclContext(), T);
+  bool Result = T->isRepresentableIn(ForeignLanguage::ObjectiveC,
+                                     VD->getDeclContext());
   bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
 
   if (Result && checkObjCInExtensionContext(*this, VD, Diagnose))
@@ -2977,9 +2960,12 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   if (IndicesType->is<ErrorType>())
     return false;
 
-  bool IndicesResult = isRepresentableInObjC(SD->getDeclContext(), IndicesType);
-  bool ElementResult = isRepresentableInObjC(SD->getDeclContext(),
-                                             SD->getElementType());
+  bool IndicesResult =
+    IndicesType->isRepresentableIn(ForeignLanguage::ObjectiveC,
+                                   SD->getDeclContext());
+  bool ElementResult =
+    SD->getElementType()->isRepresentableIn(ForeignLanguage::ObjectiveC,
+                                            SD->getDeclContext());
   bool Result = IndicesResult && ElementResult;
 
   if (Result && checkObjCInExtensionContext(*this, SD, Diagnose))
@@ -3013,240 +2999,6 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   describeObjCReason(*this, SD, Reason);
 
   return Result;
-}
-
-/// True if T is representable as a non-nullable ObjC pointer type.
-static bool isAnyObjCRepresentableObjectType(Type T) {
-  // Look through a single level of metatype.
-  if (auto MTT = T->getAs<AnyMetatypeType>())
-    T = MTT->getInstanceType();
-
-  if (auto dynSelf = T->getAs<DynamicSelfType>())
-    T = dynSelf->getSelfType();
-
-  if (auto *CT = T->getAs<ClassType>())
-    return CT->getDecl()->isObjC();
-  return T->isObjCExistentialType();
-}
-
-/// True if T is representable as an ObjC pointer type, nullable or otherwise.
-static bool isNullableObjCRepresentableObjectType(Type T) {
-  // Look through a single layer of optional type.
-  if (auto valueType = T->getAnyOptionalObjectType()) {
-    T = valueType;
-  }
-  return isAnyObjCRepresentableObjectType(T);
-}
-
-bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
-                                                 Type T) {
-  // If you change this function, you must add or modify a test in PrintAsObjC.
-
-  // Look through one level of optional type, but remember that we did.
-  bool wasOptional = false;
-  if (auto valueType = T->getAnyOptionalObjectType()) {
-    T = valueType;
-    wasOptional = true;
-  }
-
-  // T can be represented in Objective-C if T is an @objc class or protocol.
-  if (isAnyObjCRepresentableObjectType(T))
-    return true;
-
-  auto NTD = T->getAnyNominal();
-
-  // Unmanaged<T> can be represented in Objective-C if T is an @objc class
-  // or protocol.
-  if (NTD == Context.getUnmanagedDecl()) {
-    auto BGT = T->getAs<BoundGenericType>();
-    if (!BGT)
-      return false;
-    assert(BGT->getGenericArgs().size() == 1);
-    return isAnyObjCRepresentableObjectType(BGT->getGenericArgs().front());
-  }
-
-  // TODO: maybe Optional<UnsafeMutablePointer<T>> should be okay?
-  if (wasOptional)
-    return false;
-
-  if (NTD) {
-    // If the type was imported from Clang, it is representable in Objective-C.
-    if (NTD->hasClangNode())
-      return true;
-    
-    // If the type is @objc, it is representable in Objective-C.
-    if (NTD->isObjC())
-      return true;
-
-    // Pointers may be representable in ObjC.
-    PointerTypeKind PTK;
-    if (auto pointerElt = T->getAnyPointerElementType(PTK)) {
-      switch (PTK) {
-      case PTK_UnsafeMutablePointer:
-      case PTK_UnsafePointer: {
-        // An UnsafeMutablePointer<T> or UnsafePointer<T> is
-        // representable in Objective-C if T is a trivially
-        // representable type or Void.
-        return pointerElt->isEqual(Context.TheEmptyTupleType)
-          || isTriviallyRepresentableInObjC(DC, pointerElt);
-      }
-      case PTK_AutoreleasingUnsafeMutablePointer: {
-        // An AutoreleasingUnsafeMutablePointer<T> is representable in ObjC if T
-        // is a (potentially optional) ObjC pointer type.
-        return isNullableObjCRepresentableObjectType(pointerElt);
-      }
-      }
-    }
-
-  }
-
-  // If it's a mapped type, it's representable.
-  fillObjCRepresentableTypeCache(DC);
-  if (ObjCMappedTypes.count(T->getCanonicalType()))
-    return true;
-
-  return false;
-}
-
-static bool
-isObjCRepresentableCollection(TypeChecker &TC, const DeclContext *DC, Type T);
-
-static bool
-isElementRepresentableInObjC(TypeChecker &TC, const DeclContext *DC, Type T) {
-  // If you change this function, you must add or modify a test in PrintAsObjC.
-
-  // ImplicitlyUnwrappedOptional is marked bridgeable to Objective-C, but
-  // it's not something you can put in API signatures.
-  if (T->getAnyOptionalObjectType())
-    return false;
-
-  if (isAnyObjCRepresentableObjectType(T))
-    return true;
-
-  if (isObjCRepresentableCollection(TC, DC, T))
-    return true;
-
-  if (auto fnTy = T->getAs<AnyFunctionType>())
-    return fnTy->getRepresentation() == FunctionTypeRepresentation::Block;
-
-  if (!T->getAs<BoundGenericType>()) {
-    // Don't check this path for collections and other things that are only
-    // conditionally bridged to Objective-C.
-    ProtocolDecl *bridgingProto =
-        TC.getProtocol({}, KnownProtocolKind::ObjectiveCBridgeable);
-    if (bridgingProto &&
-        TC.conformsToProtocol(T, bridgingProto, const_cast<DeclContext *>(DC),
-                              ConformanceCheckOptions())) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-static bool
-isObjCRepresentableCollection(TypeChecker &TC, const DeclContext *DC, Type T) {
-  // If you change this function, you must add or modify a test in PrintAsObjC.
-
-  auto boundGeneric = T->getAs<BoundGenericType>();
-  if (!boundGeneric)
-    return false;
-
-  // Array<T> is representable when T is bridged to Objective-C.
-  if (auto arrayDecl = TC.Context.getArrayDecl()) {
-    if (boundGeneric->getDecl() == arrayDecl) {
-      auto elementType = boundGeneric->getGenericArgs()[0];
-      return isElementRepresentableInObjC(TC, DC, elementType);
-    }
-  }
-
-  // Dictionary<K, V> is representable when K and V are bridged to Objective-C.
-  if (auto dictDecl = TC.Context.getDictionaryDecl()) {
-    if (boundGeneric->getDecl() == dictDecl) {
-      // The key type must be bridged to Objective-C.
-      auto keyType = boundGeneric->getGenericArgs()[0];
-      if (!isElementRepresentableInObjC(TC, DC, keyType))
-        return false;
-
-      // The value type must be bridged to Objective-C.
-      auto valueType = boundGeneric->getGenericArgs()[1];
-      if (!isElementRepresentableInObjC(TC, DC, valueType))
-        return false;
-
-      return true;
-    }
-  }
-
-  // Set<T> is representable when T is bridged to Objective-C.
-  if (auto setDecl = TC.Context.getSetDecl()) {
-    if (boundGeneric->getDecl() == setDecl) {
-      auto elementType = boundGeneric->getGenericArgs()[0];
-      return isElementRepresentableInObjC(TC, DC, elementType);
-    }
-  }
-
-  return false;
-}
-
-bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
-  // If you change this function, you must add or modify a test in PrintAsObjC.
-
-  if (isTriviallyRepresentableInObjC(DC, T))
-    return true;
-
-  // Look through one level of optional type, but remember that we did.
-  bool wasOptional = false;
-  if (auto valueType = T->getAnyOptionalObjectType()) {
-    T = valueType;
-    wasOptional = true;
-  }
-
-  if (auto FT = T->getAs<FunctionType>()) {
-    switch (FT->getRepresentation()) {
-    case AnyFunctionType::Representation::Thin:
-      return false;
-    case AnyFunctionType::Representation::Swift:
-    case AnyFunctionType::Representation::Block:
-    case AnyFunctionType::Representation::CFunctionPointer:
-      break;
-    }
-    
-    Type Input = FT->getInput();
-    if (auto InputTuple = Input->getAs<TupleType>()) {
-      for (auto &Elt : InputTuple->getElements()) {
-        if (Elt.isVararg())
-          return false;
-        if (!isRepresentableInObjC(DC, Elt.getType()))
-          return false;
-      }
-    } else if (!isRepresentableInObjC(DC, Input)) {
-      return false;
-    }
-
-    Type Result = FT->getResult();
-    if (!Result->isVoid() && !isRepresentableInObjC(DC, Result))
-      return false;
-
-    if (FT->getExtInfo().throws())
-      return false;
-
-    return true;
-  }
-
-  if (isObjCRepresentableCollection(*this, DC, T))
-    return true;
-
-  // Check to see if this is a bridged type.  Note that some bridged
-  // types are representable, but their optional type is not.
-  fillObjCRepresentableTypeCache(DC);
-  auto iter = ObjCRepresentableTypes.find(T->getCanonicalType());
-  if (iter != ObjCRepresentableTypes.end()) {
-    if (wasOptional && !iter->second)
-      return false;
-    return true;
-  }
-
-  return false;
 }
 
 void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
@@ -3323,101 +3075,17 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 }
 
-static void
-lookupAndAddRepresentableType(TypeChecker &TC,
-                              Module *stdlib,
-                              Identifier nativeName,
-                              bool isOptionalRepresentable,
-                              llvm::DenseMap<CanType, bool> &types) {
-  auto nativeType = lookupUniqueTypeInLibrary(TC, stdlib, nativeName);
-  if (!nativeType) return;
-
-  types.insert({nativeType, isOptionalRepresentable});
-}
-
 void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
-  if (!ObjCMappedTypes.empty())
+  if (!CIntegerTypes.empty())
     return;
 
   SmallVector<Identifier, 32> StdlibTypeNames;
-
-  StdlibTypeNames.push_back(Context.getIdentifier("COpaquePointer"));
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
-  StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-
   Module *Stdlib = getStdlibModule(DC);
-  lookupAndAddLibraryTypes(*this, Stdlib, StdlibTypeNames, ObjCMappedTypes);
-
-  StdlibTypeNames.clear();
 #define MAP_BUILTIN_TYPE(_, __)
 #define MAP_BUILTIN_INTEGER_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
   StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
   lookupAndAddLibraryTypes(*this, Stdlib, StdlibTypeNames, CIntegerTypes);
-
-#define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,                          \
-                    NATIVE_MODULE, NATIVE_TYPE, OPTIONAL_IS_BRIDGED)       \
-  if (Context.getIdentifier(#NATIVE_MODULE) == Context.StdlibModuleName) { \
-    lookupAndAddRepresentableType(*this, Stdlib,                           \
-                                  Context.getIdentifier(#NATIVE_TYPE),     \
-                                  OPTIONAL_IS_BRIDGED,                     \
-                                  ObjCRepresentableTypes);                 \
-  }
-#include "swift/SIL/BridgedTypes.def"
-
-  Identifier ID_Darwin = Context.Id_Darwin;
-  if (auto DarwinModule = Context.getLoadedModule(ID_Darwin)) {
-    StdlibTypeNames.clear();
-    StdlibTypeNames.push_back(Context.getIdentifier("DarwinBoolean"));
-    lookupAndAddLibraryTypes(*this, DarwinModule, StdlibTypeNames,
-                             ObjCMappedTypes);
-  }
-
-  Identifier ID_ObjectiveC = Context.Id_ObjectiveC;
-  if (auto ObjCModule = Context.getLoadedModule(ID_ObjectiveC)) {
-    StdlibTypeNames.clear();
-    StdlibTypeNames.push_back(Context.getIdentifier("Selector"));
-    StdlibTypeNames.push_back(Context.getIdentifier("ObjCBool"));
-    StdlibTypeNames.push_back(
-      Context.getSwiftId(KnownFoundationEntity::NSZone));
-    lookupAndAddLibraryTypes(*this, ObjCModule, StdlibTypeNames,
-                             ObjCMappedTypes);
-  }
-
-  Identifier ID_CoreGraphics = Context.getIdentifier("CoreGraphics");
-  if (auto CoreGraphicsModule = Context.getLoadedModule(ID_CoreGraphics)) {
-    StdlibTypeNames.clear();
-    StdlibTypeNames.push_back(Context.getIdentifier("CGFloat"));
-    lookupAndAddLibraryTypes(*this, CoreGraphicsModule, StdlibTypeNames,
-                             ObjCMappedTypes);
-  }
-
-  Identifier ID_Foundation = Context.Id_Foundation;
-  if (auto FoundationModule = Context.getLoadedModule(ID_Foundation)) {
-    StdlibTypeNames.clear();
-    StdlibTypeNames.push_back(
-      Context.getSwiftId(KnownFoundationEntity::NSErrorPointer));
-    lookupAndAddLibraryTypes(*this, FoundationModule, StdlibTypeNames,
-                             ObjCMappedTypes);
-  }
-  
-  // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
-  Identifier ID_SIMD = Context.Id_simd;
-  if (auto SIMDModule = Context.getLoadedModule(ID_SIMD)) {
-    StdlibTypeNames.clear();
-#define MAP_SIMD_TYPE(BASENAME, __)                                      \
-    {                                                                    \
-      char name[] = #BASENAME "0";                                       \
-      for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) { \
-        *(std::end(name) - 2) = '0' + i;                                 \
-        StdlibTypeNames.push_back(Context.getIdentifier(name));          \
-      }                                                                  \
-    }
-#include "swift/ClangImporter/SIMDMappedTypes.def"
-    lookupAndAddLibraryTypes(*this, SIMDModule, StdlibTypeNames,
-                             ObjCMappedTypes);
-  }
 }
 
 namespace {

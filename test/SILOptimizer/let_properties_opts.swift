@@ -86,6 +86,43 @@ public struct Boo {
   public init(i:Int64) {}
 }
 
+public class Foo2 {
+  internal let x: Int32
+  @inline(never)
+  init(count: Int32) {
+    if count < 2 {
+      x = 5
+    } else {
+      x = 10
+    }
+  }
+}
+
+public class C {}
+
+struct Boo3 {
+  //public 
+  let Prop0: Int32
+  let Prop1: Int32
+  private let Prop2: Int32
+  internal let Prop3: Int32
+
+  @inline(__always)
+  init(_ f1: C, _ f2: C) {
+    self.Prop0 = 0
+    self.Prop1 = 1
+    self.Prop2 = 2
+    self.Prop3 = 3
+  }
+
+  init(_ v: C) {
+    self.Prop0 = 10
+    self.Prop1 = 11
+    self.Prop2 = 12
+    self.Prop3 = 13
+  }
+}
+
 // Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
@@ -108,7 +145,7 @@ public func testClassLet1(f: Foo1) -> Int32 {
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop3
 // CHECK: return
-public func testClassLet1(inout f: Foo1) -> Int32 {
+public func testClassLet1(f: inout Foo1) -> Int32 {
   return f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -130,7 +167,7 @@ public func testClassLet(f: Foo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testClassLet(inout f: Foo) -> Int32 {
+public func testClassLet(f: inout Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -158,7 +195,7 @@ public func testStructLet(b: Boo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testStructLet(inout b: Boo) -> Int32 {
+public func testStructLet(b: inout Boo) -> Int32 {
   return b.Prop1 + b.Prop1 + b.Prop2 + b.Prop3
 }
 
@@ -169,4 +206,48 @@ public func testStructLet(inout b: Boo) -> Int32 {
 // CHECK-NEXT: return
 public func testStructPublicLet(b: Boo) -> Int32 {
   return b.Prop0
+}
+
+// Check that f.x is not constant folded, because the initializer of Foo2 has multiple
+// assignments to the property x with different values.
+// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet2FCS_4Foo2Vs5Int32 : $@convention(thin) (@owned Foo2) -> Int32
+// bb0
+// CHECK: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
+// CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
+// CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
+// CHECK: return
+public func testClassLet2(f: Foo2) -> Int32 {
+  return f.x + f.x
+}
+
+// Check that the sum of properties is not folded into a constant.
+// CHECK-WMO-LABEL: sil hidden [noinline] @_TF19let_properties_opts27testStructWithMultipleInitsFTVS_4Boo3S0__Vs5Int32 : $@convention(thin) (Boo3, Boo3) -> Int32
+// CHECK-WMO: bb0
+// No constant folding should have been performed.
+// CHECK-WMO-NOT: integer_literal $Builtin.Int32, 92
+// CHECK-WMO: struct_extract
+// CHECK-WMO: }
+@inline(never)
+func testStructWithMultipleInits( _ boos1: Boo3, _ boos2: Boo3) -> Int32 {
+  let count1 =  boos1.Prop0 + boos1.Prop1 + boos1.Prop2 + boos1.Prop3
+  let count2 =  boos2.Prop0 + boos2.Prop1 + boos2.Prop2 + boos2.Prop3
+  return count1 + count2
+}
+
+public func testStructWithMultipleInitsAndInlinedInitializer() {
+  let things = [C()]
+  // This line results in inlinig of the initializer Boo3(C, C) and later
+  // removal of this initializer by the dead function elimination pass.
+  // As a result, only one initializer, Boo3(C) is seen by the Let Properties Propagation
+  // pass. This pass may think that there is only one intializer and take the
+  // values of let properties assigned there as constants and try to propagate
+  // those values into uses. But this is wrong! The pass should be clever enough
+  // to detect all stores to the let properties, including those outside of
+  // initializers, e.g. inside inlined initializers. And if it detects all such
+  // stores it should understand that values of let properties in Boo3 are not
+  // statically known constant initializers with the same value and thus
+  // cannot be propagated.
+  let boos1 = things.map { Boo3($0, C()) }
+  let boos2 = things.map(Boo3.init)
+  print(testStructWithMultipleInits(boos1[0], boos2[0]))
 }

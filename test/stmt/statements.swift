@@ -54,7 +54,7 @@ func funcdecl5(a: Int, y: Int) {
   }
 
   // FIXME: This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+  if x {}   // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 
   if true {
     if (B) {
@@ -94,7 +94,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'BooleanType'}}
+  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'Boolean'}}
 }
 
 // test "builder" API style
@@ -281,6 +281,15 @@ func brokenSwitch(x: Int) -> Int {
   }
 }
 
+func switchWithVarsNotMatchingTypes(x: Int, y: Int, z: String) -> Int {
+  switch (x,y,z) {
+  case (let a, 0, _), (0, let a, _): // OK
+    return a
+  case (let a, _, _), (_, _, let a): // expected-error {{pattern variable bound to type 'String', expected type 'Int'}}
+    return a
+  }
+}
+
 func breakContinue(x : Int) -> Int {
 
 Outer:
@@ -319,7 +328,7 @@ Loop:  // expected-note {{previously declared here}}
   
   // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
   switch x {
-  case .Some(42): break
+  case .some(42): break
   case nil: break
   
   }
@@ -374,7 +383,7 @@ func test_require(x : Int, y : Int??, cond : Bool) {
   markUsed(a)
   guard let b = y where cond else {}
   guard case let c = x where cond else {}
-  guard case let Optional.Some(d) = y else {}
+  guard case let Optional.some(d) = y else {}
   guard x != 4, case _ = x else { }
 
 
@@ -419,7 +428,7 @@ func r18776073(a : Int?) {
 
 // <rdar://problem/22491782> unhelpful error message from "throw nil"
 func testThrowNil() throws {
-  throw nil  // expected-error {{cannot infer concrete ErrorType for thrown 'nil' value}}
+  throw nil  // expected-error {{cannot infer concrete ErrorProtocol for thrown 'nil' value}}
 }
 
 
@@ -462,14 +471,45 @@ func f21080671() {
 // <rdar://problem/24467411> QoI: Using "&& #available" should fixit to comma
 // https://twitter.com/radexp/status/694561060230184960
 func f(x : Int, y : Int) {
-  if x == y && #available(iOS 9, *) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
-  if #available(iOS 9, *) && x == y {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{27-29=,}}
+  if x == y && #available(iOS 52, *) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
+  if #available(iOS 52, *) && x == y {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{28-30=,}}
 
   // https://twitter.com/radexp/status/694790631881883648
   if x == y && let _ = Optional(y) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
 }
 
 
+
+// <rdar://problem/25178926> QoI: Warn about cases where switch statement "ignores" where clause
+enum Type {
+  case Foo
+  case Bar
+}
+func r25178926(a : Type) {
+  switch a {
+  case .Foo, .Bar where 1 != 100:
+    // expected-warning @-1 {{'where' only applies to the second pattern match in this case}}
+    // expected-note @-2 {{disambiguate by adding a line break between them if this is desired}} {{14-14=\n       }}
+    // expected-note @-3 {{duplicate the 'where' on both patterns to check both patterns}} {{12-12= where 1 != 100}}
+    break
+  }
+
+  switch a {
+  case .Foo: break
+  case .Bar where 1 != 100: break
+  }
+
+  switch a {
+  case .Foo,  // no warn
+       .Bar where 1 != 100:
+    break
+  }
+
+  switch a {
+  case .Foo where 1 != 100, .Bar where 1 != 100:
+    break
+  }
+}
 
 
 

@@ -502,9 +502,7 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
       // Create the edge in this graph. Note: this may trigger merging of
       // content nodes.
       if (DestReachable) {
-        Changed |= defer(DestFrom, DestReachable);
-        // In case DestFrom is merged during adding the defer-edge.
-        DestFrom = DestFrom->getMergeTarget();
+        DestFrom = defer(DestFrom, DestReachable, Changed);
       }
 
       for (auto *Deferred : SourceReachable->defersTo) {
@@ -1080,7 +1078,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
       for (SILValue Src : Incoming) {
         CGNode *SrcArg = ConGraph->getNode(Src, this);
         if (SrcArg) {
-          ConGraph->defer(ArgNode, SrcArg);
+          ArgNode = ConGraph->defer(ArgNode, SrcArg);
         } else {
           ConGraph->setEscapesGlobal(ArgNode);
           break;
@@ -1123,20 +1121,25 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         }
         return;
       case ArrayCallKind::kGetElement:
-        // This is like a load from a ref_element_addr.
-        if (FAS.getArgument(0)->getType().isAddress()) {
-          if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf(), this)) {
-            if (CGNode *DestNode = ConGraph->getNode(FAS.getArgument(0), this)) {
-              // One content node for going from the array buffer pointer to
-              // the element address (like ref_element_addr).
-              CGNode *RefElement = ConGraph->getContentNode(AddrNode);
-              // Another content node to actually load the element.
-              CGNode *ArrayContent = ConGraph->getContentNode(RefElement);
-              // The content of the destination address.
-              CGNode *DestContent = ConGraph->getContentNode(DestNode);
-              ConGraph->defer(DestContent, ArrayContent);
-              return;
-            }
+        if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf(), this)) {
+          CGNode *DestNode = nullptr;
+          // This is like a load from a ref_element_addr.
+          if (ASC.hasGetElementDirectResult()) {
+            DestNode = ConGraph->getNode(FAS.getInstruction(), this);
+          } else {
+            CGNode *DestAddrNode = ConGraph->getNode(FAS.getArgument(0), this);
+            assert(DestAddrNode && "indirect result must have node");
+            // The content of the destination address.
+            DestNode = ConGraph->getContentNode(DestAddrNode);
+          }
+          if (DestNode) {
+            // One content node for going from the array buffer pointer to
+            // the element address (like ref_element_addr).
+            CGNode *RefElement = ConGraph->getContentNode(AddrNode);
+            // Another content node to actually load the element.
+            CGNode *ArrayContent = ConGraph->getContentNode(RefElement);
+            ConGraph->defer(DestNode, ArrayContent);
+            return;
           }
         }
         break;
@@ -1147,8 +1150,57 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
                           ConGraph->getContentNode(SelfNode));
         }
         return;
+      case ArrayCallKind::kWithUnsafeMutableBufferPointer:
+        // Model this like an escape of the elements of the array and a capture
+        // of anything captured by the closure.
+        // Self is passed inout.
+        if (CGNode *AddrArrayStruct = ConGraph->getNode(ASC.getSelf(), this)) {
+          CGNode *ArrayStructValueNode =
+              ConGraph->getContentNode(AddrArrayStruct);
+          // One content node for going from the array buffer pointer to
+          // the element address (like ref_element_addr).
+          CGNode *RefElement = ConGraph->getContentNode(ArrayStructValueNode);
+          // Another content node to actually load the element.
+          CGNode *ArrayContent = ConGraph->getContentNode(RefElement);
+          ConGraph->setEscapesGlobal(ArrayContent);
+          // The first non indirect result is the closure.
+          auto Args = FAS.getArgumentsWithoutIndirectResults();
+          setEscapesGlobal(ConGraph, Args[0]);
+          return;
+        }
+        break;
       default:
         break;
+    }
+
+    if (FAS.getReferencedFunction() &&
+        FAS.getReferencedFunction()->hasSemanticsAttr(
+            "self_no_escaping_closure") &&
+        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 3) ||
+         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 2)) &&
+        FAS.hasSelfArgument()) {
+      // The programmer has guaranteed that the closure will not capture the
+      // self pointer passed to it or anything that is transitively reachable
+      // from the pointer.
+      auto Args = FAS.getArgumentsWithoutIndirectResults();
+      // The first not indirect result argument is the closure.
+      setEscapesGlobal(ConGraph, Args[0]);
+      return;
+    }
+
+    if (FAS.getReferencedFunction() &&
+        FAS.getReferencedFunction()->hasSemanticsAttr(
+            "pair_no_escaping_closure") &&
+        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 4) ||
+         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 3)) &&
+        FAS.hasSelfArgument()) {
+      // The programmer has guaranteed that the closure will not capture the
+      // self pointer passed to it or anything that is transitively reachable
+      // from the pointer.
+      auto Args = FAS.getArgumentsWithoutIndirectResults();
+      // The second not indirect result argument is the closure.
+      setEscapesGlobal(ConGraph, Args[1]);
+      return;
     }
 
     if (RecursionDepth < MaxRecursionDepth) {
@@ -1168,7 +1220,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       }
     }
 
-    if (auto *Fn = FAS.getCalleeFunction()) {
+    if (auto *Fn = FAS.getReferencedFunction()) {
       if (Fn->getName() == "swift_bufferAllocate")
         // The call is a buffer allocation, e.g. for Array.
         return;
@@ -1245,6 +1297,35 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         ConGraph->setNode(I, PointsTo);
       }
       return;
+    case ValueKind::CopyAddrInst: {
+      // Be conservative if the dest may be the final release.
+      if (!cast<CopyAddrInst>(I)->isInitializationOfDest()) {
+        setAllEscaping(I, ConGraph);
+        break;
+      }
+
+      // A copy_addr is like a 'store (load src) to dest'.
+      CGNode *SrcAddrNode = ConGraph->getNode(I->getOperand(CopyAddrInst::Src),
+                                              this);
+      if (!SrcAddrNode) {
+        setAllEscaping(I, ConGraph);
+        break;
+      }
+
+      CGNode *LoadedValue = ConGraph->getContentNode(SrcAddrNode);
+      CGNode *DestAddrNode = ConGraph->getNode(
+        I->getOperand(CopyAddrInst::Dest), this);
+      if (DestAddrNode) {
+        // Create a defer-edge from the loaded to the stored value.
+        CGNode *PointsTo = ConGraph->getContentNode(DestAddrNode);
+        ConGraph->defer(PointsTo, LoadedValue);
+      } else {
+        // A store to an address we don't handle -> be conservative.
+        ConGraph->setEscapesGlobal(LoadedValue);
+      }
+      return;
+    }
+    break;
     case ValueKind::StoreInst:
     case ValueKind::StoreWeakInst:
       if (CGNode *ValueNode = ConGraph->getNode(I->getOperand(StoreInst::Src),
@@ -1269,7 +1350,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       assert(ResultNode && "thick functions must have a CG node");
       for (const Operand &Op : I->getAllOperands()) {
         if (CGNode *ArgNode = ConGraph->getNode(Op.get(), this)) {
-          ConGraph->defer(ResultNode, ArgNode);
+          ResultNode = ConGraph->defer(ResultNode, ArgNode);
         }
       }
       return;
@@ -1296,7 +1377,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
             ResultNode = FieldNode;
             assert(isPointer(I));
           } else {
-            ConGraph->defer(ResultNode, FieldNode);
+            ResultNode = ConGraph->defer(ResultNode, FieldNode);
           }
         }
       }
@@ -1332,8 +1413,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::ReturnInst:
       if (CGNode *ValueNd = ConGraph->getNode(cast<ReturnInst>(I)->getOperand(),
                                               this)) {
-        ConGraph->defer(ConGraph->getReturnNode(),
-                                 ValueNd);
+        ConGraph->defer(ConGraph->getReturnNode(), ValueNd);
       }
       return;
     default:
@@ -1353,7 +1433,7 @@ analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
       auto *ArgNode = ConGraph->getNode(CaseVal, this);
       assert(ArgNode &&
              "there should be an argument node if there is a result node");
-      ConGraph->defer(ResultNode, ArgNode);
+      ResultNode = ConGraph->defer(ResultNode, ArgNode);
     }
     // ... also including the default value.
     auto *DefaultNode = ConGraph->getNode(SI->getDefaultResult(), this);

@@ -1,2 +1,2 @@
-// RUN: not --crash %target-sil-opt %s
+// RUN: not %target-sil-opt %s
 sil@s:$()->(@owned T c:t

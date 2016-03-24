@@ -22,6 +22,17 @@ namespace llvm {
 }
 
 namespace swift {
+
+  enum class DarwinPlatformKind : unsigned {
+    MacOS,
+    IPhoneOS,
+    IPhoneOSSimulator,
+    TvOS,
+    TvOSSimulator,
+    WatchOS,
+    WatchOSSimulator
+  };
+
   /// Returns true if the given triple represents iOS running in a simulator.
   bool tripleIsiOSSimulator(const llvm::Triple &triple);
 
@@ -43,6 +54,9 @@ namespace swift {
   /// If the triple does not correspond to a known platform, the empty string is
   /// returned.
   StringRef getPlatformNameForTriple(const llvm::Triple &triple);
+
+  /// Returns the platform Kind for Darwin triples.
+  DarwinPlatformKind getDarwinPlatformKind(const llvm::Triple &triple);
 }
 
 #endif // SWIFT_BASIC_PLATFORM_H

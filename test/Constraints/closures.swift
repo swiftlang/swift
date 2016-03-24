@@ -94,7 +94,7 @@ func r22162441(lines: [String]) {
 func testMap() {
   let a = 42
   [1,a].map { $0 + 1.0 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Memory>), (Int, UnsafePointer<Memory>)}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
@@ -140,7 +140,7 @@ func r15998821() {
   func take_closure(x : (inout Int) -> ()) { }
 
   func test1() {
-    take_closure { (inout a : Int) in
+    take_closure { (a : inout Int) in
       a = 42
     }
   }
@@ -173,4 +173,10 @@ func typeCheckMultiStmtClosureCrash() {
     _ = $0
     return 1
   }
+}
+
+// SR-832 - both these should be ok
+func someFunc(foo: (String -> String)?, bar: String -> String) {
+    let _: String -> String = foo != nil ? foo! : bar
+    let _: String -> String = foo ?? bar
 }

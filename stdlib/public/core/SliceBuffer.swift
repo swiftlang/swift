@@ -12,7 +12,7 @@
 
 /// Buffer type for `ArraySlice<Element>`.
 public // @testable
-struct _SliceBuffer<Element> : _ArrayBufferType {
+struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
@@ -73,11 +73,11 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
   /// Replace the given subRange with the first newCount elements of
   /// the given collection.
   ///
-  /// - Requires: This buffer is backed by a uniquely-referenced
+  /// - Precondition: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
   public mutating func replace<
-    C : CollectionType where C.Generator.Element == Element
+    C : Collection where C.Iterator.Element == Element
   >(
     subRange subRange: Range<Int>,
     with insertCount: Int,
@@ -130,9 +130,9 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
   //===--- Non-essential bits ---------------------------------------------===//
 
   @warn_unused_result
-  public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
-    -> NativeBuffer?
-  {
+  public mutating func requestUniqueMutableBackingBuffer(
+    minimumCapacity minimumCapacity: Int
+  ) -> NativeBuffer? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer && isUniquelyReferenced()) {
       if capacity >= minimumCapacity {
@@ -181,16 +181,16 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     return nil
   }
 
-  public
-  func _uninitializedCopy(
-    subRange: Range<Int>, target: UnsafeMutablePointer<Element>
+  public func _copyContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _invariantCheck()
-    _sanityCheck(subRange.startIndex >= startIndex)
-    _sanityCheck(subRange.endIndex >= subRange.startIndex)
-    _sanityCheck(subRange.endIndex <= endIndex)
-    let c = subRange.count
-    target.initializeFrom(subscriptBaseAddress + subRange.startIndex, count: c)
+    _sanityCheck(bounds.startIndex >= startIndex)
+    _sanityCheck(bounds.endIndex >= bounds.startIndex)
+    _sanityCheck(bounds.endIndex <= endIndex)
+    let c = bounds.count
+    target.initializeFrom(subscriptBaseAddress + bounds.startIndex, count: c)
     return target + c
   }
 
@@ -253,7 +253,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Int) -> Element {
     get {
@@ -266,15 +266,15 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     }
   }
 
-  public subscript(subRange: Range<Int>) -> _SliceBuffer {
+  public subscript(bounds: Range<Int>) -> _SliceBuffer {
     get {
-      _sanityCheck(subRange.startIndex >= startIndex)
-      _sanityCheck(subRange.endIndex >= subRange.startIndex)
-      _sanityCheck(subRange.endIndex <= endIndex)
+      _sanityCheck(bounds.startIndex >= startIndex)
+      _sanityCheck(bounds.endIndex >= bounds.startIndex)
+      _sanityCheck(bounds.endIndex <= endIndex)
       return _SliceBuffer(
         owner: owner,
         subscriptBaseAddress: subscriptBaseAddress,
-        indices: subRange,
+        indices: bounds,
         hasNativeBuffer: _hasNativeBuffer)
     }
     set {
@@ -282,7 +282,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     }
   }
 
-  //===--- CollectionType conformance -------------------------------------===//
+  //===--- Collection conformance -------------------------------------===//
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -338,7 +338,7 @@ extension _SliceBuffer {
     }
 
     let result = _ContiguousArrayBuffer<Element>(
-      count: count,
+      uninitializedCount: count,
       minimumCapacity: 0)
     result.firstElementAddress.initializeFrom(firstElementAddress, count: count)
     return result

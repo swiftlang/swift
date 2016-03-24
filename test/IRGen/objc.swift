@@ -39,7 +39,7 @@ struct id {
 class MyBlammo : Blammo {
   func foo() {}
 // CHECK:  define hidden void @_TFC4objc8MyBlammo3foofT_T_([[MYBLAMMO]]*) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
+// CHECK:    call {{.*}} @rt_swift_release
 // CHECK:    ret void
 }
 
@@ -83,7 +83,7 @@ func test0(arg: id) -> id {
 
 func test1(cell: Blammo) {}
 // CHECK:  define hidden void @_TF4objc5test1{{.*}}([[BLAMMO]]*) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
+// CHECK:    call {{.*}} @rt_swift_release
 // CHECK:    ret void
 
 
@@ -114,7 +114,7 @@ func test9(g: Gizmo) {
 }
 
 func test10(g: Gizmo, r: Rect) {
-  Gizmo.runWithRect(r, andGizmo:g);
+  Gizmo.run(with: r, andGizmo:g);
 }
 
 // Force the emission of the Rect metadata.
@@ -139,5 +139,5 @@ class WeakObjC {
 // CHECK:  i32 1, !"Objective-C Image Info Version", i32 0}
 // CHECK:  i32 1, !"Objective-C Image Info Section", !"__DATA, __objc_imageinfo, regular, no_dead_strip"}
 //   512 == (2 << 8).  2 is the Swift ABI version.
-// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 768}
-// CHECK:  i32 1, !"Swift Version", i32 3}
+// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 1024}
+// CHECK:  i32 1, !"Swift Version", i32 4}

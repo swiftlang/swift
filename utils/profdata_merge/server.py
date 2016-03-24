@@ -12,8 +12,8 @@
 # the merge worker processes.
 
 import SocketServer
-import thread
 import logging
+import thread
 
 from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
 
@@ -27,7 +27,8 @@ class ProfdataTCPHandler(SocketServer.StreamRequestHandler):
     def handle(self):
         """Receive a newline-separated list of filenames from a TCP connection
         and add them to the shared merge queue, where the workers will
-        execute llvm-profdata merge commands."""
+        execute llvm-profdata merge commands.
+        """
         data = self.rfile.read()
         self.report("received data (length %d): %s" % (len(data), repr(data)))
 

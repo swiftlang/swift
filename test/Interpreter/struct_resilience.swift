@@ -81,7 +81,7 @@ ResilientStructTestSuite.test("DynamicLayoutMetatype") {
   do {
     var output = ""
     let expected = "- main.MyResilientLayoutRuntimeTest #0\n"
-    dump(getMetadata(), &output)
+    dump(getMetadata(), to: &output)
     expectEqual(output, expected)
   }
   do {

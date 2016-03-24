@@ -1,6 +1,6 @@
 Name:            Dispatch
 Functions:
 - Name: dispatch_release
-  Availability: none
+  Availability: nonswift
 - Name: dispatch_retain
-  Availability: none
+  Availability: nonswift

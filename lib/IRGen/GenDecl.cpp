@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsIRGen.h"
@@ -808,7 +807,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
   // Emit static initializers.
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
-    IGM->emitSILStaticInitializer();
+    IGM->emitSILStaticInitializers();
   }
 
   // Emit witness tables.
@@ -942,7 +941,7 @@ void IRGenModule::emitVTableStubs() {
                                     "_swift_dead_method_stub");
       stub->setAttributes(constructInitialAttributes());
       Module.getFunctionList().push_back(stub);
-      stub->setCallingConv(RuntimeCC);
+      stub->setCallingConv(DefaultCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
       auto *errorFunc = getDeletedMethodErrorFn();
       llvm::CallInst::Create(errorFunc, ArrayRef<llvm::Value *>(), "", entry);
@@ -1055,9 +1054,8 @@ static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
 
 static SILLinkage getConformanceLinkage(IRGenModule &IGM,
                                         const ProtocolConformance *conf) {
-  auto wt = IGM.SILMod->lookUpWitnessTable(conf);
-  if (wt.first) {
-    return wt.first->getLinkage();
+  if (auto wt = IGM.SILMod->lookUpWitnessTable(conf)) {
+    return wt->getLinkage();
   } else {
     return SILLinkage::PublicExternal;
   }
@@ -1173,9 +1171,8 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
       return getSILGlobalVariable()->isFragile();
       
     case Kind::DirectProtocolWitnessTable: {
-      auto wt = IGM.SILMod->lookUpWitnessTable(getProtocolConformance());
-      if (wt.first) {
-        return wt.first->isFragile();
+      if (auto wt = IGM.SILMod->lookUpWitnessTable(getProtocolConformance())) {
+        return wt->isFragile();
       } else {
         return false;
       }
@@ -1379,7 +1376,7 @@ bool LinkInfo::isUsed(llvm::GlobalValue::LinkageTypes Linkage,
 llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
                                                llvm::Type *storageType,
                                                Alignment alignment,
-                                               DebugTypeInfo DebugType,
+                                               DebugTypeInfo DbgTy,
                                                Optional<SILLocation> DebugLoc,
                                                StringRef DebugName) {
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(getName());
@@ -1409,11 +1406,10 @@ llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
     IGM.addUsedGlobal(var);
   }
 
-  if (IGM.DebugInfo && ForDefinition)
-    IGM.DebugInfo->
-      emitGlobalVariableDeclaration(var,
-                                    DebugName.empty() ? getName() : DebugName,
-                                    getName(), DebugType, DebugLoc);
+  if (IGM.DebugInfo && !DbgTy.isNull() && ForDefinition)
+    IGM.DebugInfo->emitGlobalVariableDeclaration(
+        var, DebugName.empty() ? getName() : DebugName, getName(), DbgTy,
+        DebugLoc);
 
   return var;
 }
@@ -1723,7 +1719,7 @@ llvm::Constant *
 IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
                                    llvm::Type *definitionType,
                                    llvm::Type *defaultType,
-                                   DebugTypeInfo debugType) {
+                                   DebugTypeInfo DbgTy) {
   // This function assumes that 'globals' only contains GlobalValue
   // values for the entities that it will look up.
 
@@ -1765,7 +1761,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
   if (!definitionType) definitionType = defaultType;
 
   // Create the variable.
-  auto var = link.createVariable(*this, definitionType, alignment, debugType);
+  auto var = link.createVariable(*this, definitionType, alignment, DbgTy);
 
   // If we have an existing entry, destroy it, replacing it with the
   // new variable.
@@ -2029,6 +2025,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   case llvm::Triple::ELF:
     sectionName = ".swift2_protocol_conformances";
     break;
+  case llvm::Triple::COFF:
+    sectionName = ".sw2prtc";
+    break;
   default:
     llvm_unreachable("Don't know how to emit protocol conformances for "
                      "the selected object format.");
@@ -2109,6 +2108,9 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     break;
   case llvm::Triple::ELF:
     sectionName = ".swift2_type_metadata";
+    break;
+  case llvm::Triple::COFF:
+    sectionName = ".sw2tymd";
     break;
   default:
     llvm_unreachable("Don't know how to emit type metadata table for "
@@ -2227,7 +2229,7 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2251,7 +2253,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2565,7 +2567,7 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
       cast<llvm::PointerType>(getValueWitnessTy(index))
         ->getElementType());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2576,11 +2578,8 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
 llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
                                                   llvm::Type *definitionType) {
   LinkEntity entity = LinkEntity::forValueWitnessTable(concreteType);
-  DebugTypeInfo DbgTy(concreteType, WitnessTablePtrTy,
-                      getPointerSize(), getPointerAlignment(),
-                      nullptr);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), definitionType,
-                               WitnessTableTy, DbgTy);
+                               WitnessTableTy, DebugTypeInfo());
 }
 
 static Address getAddrOfSimpleVariable(IRGenModule &IGM,
@@ -2898,7 +2897,7 @@ IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                           Int8PtrPtrTy },
                                         /*varargs*/ false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2944,7 +2943,7 @@ IRGenModule::getAddrOfWitnessTableAccessFunction(
   }
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2966,7 +2965,7 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
     = llvm::FunctionType::get(WitnessTablePtrTy, false);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -3015,7 +3014,7 @@ IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
 
   auto fnType = getAssociatedTypeMetadataAccessFunctionTy();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -3039,7 +3038,7 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
 
   auto fnType = getAssociatedTypeWitnessTableAccessFunctionTy();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -3053,7 +3052,7 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
   def->setLinkage(llvm::Function::LinkOnceODRLinkage);
   def->setVisibility(llvm::Function::HiddenVisibility);
   def->setDoesNotThrow();
-  def->setCallingConv(IGM.RuntimeCC);
+  def->setCallingConv(IGM.DefaultCC);
   return def;
 }
 

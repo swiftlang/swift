@@ -96,7 +96,7 @@ IntervalTestSuite.test("PatternMatching") {
 IntervalTestSuite.test("Overlaps") {
   
   func expectOverlaps<
-    I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
+    I0: Interval, I1: Interval where I0.Bound == I1.Bound
   >(expectation: Bool, _ lhs: I0, _ rhs: I1) {
     if expectation {
       expectTrue(lhs.overlaps(rhs))
@@ -131,6 +131,11 @@ IntervalTestSuite.test("Overlaps") {
   expectOverlaps(true, 0..<20, 5...10)
   expectOverlaps(true, 0...20, 5..<10)
   expectOverlaps(true, 0...20, 5...10)
+
+  // 0-0, 0-5
+  expectOverlaps(false, 0..<0, 0..<5)
+  expectOverlaps(false, 0..<0, 0...5)
+  
 }
 
 IntervalTestSuite.test("Emptiness") {
@@ -185,11 +190,11 @@ IntervalTestSuite.test("CustomStringConvertible/CustomDebugStringConvertible") {
 }
 
 IntervalTestSuite.test("rdar12016900") {
-  if true {
+  do {
     let wc = 0
     expectFalse((0x00D800 ..< 0x00E000).contains(wc))
   }
-  if true {
+  do {
     let wc = 0x00D800
     expectTrue((0x00D800 ..< 0x00E000).contains(wc))
   }

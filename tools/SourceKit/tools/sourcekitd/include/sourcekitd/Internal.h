@@ -39,6 +39,10 @@ namespace sourcekitd {
 using llvm::Optional;
 using llvm::None;
 
+// The IPC protocol version. This can be queried via a request.
+static const unsigned ProtocolMajorVersion = 1;
+static const unsigned ProtocolMinorVersion = 0;
+
 enum class CustomBufferKind {
   TokenAnnotationsArray,
   DocSupportAnnotationArray,
@@ -154,6 +158,8 @@ sourcekitd_uid_t SKDUIDFromUIdent(SourceKit::UIdent UID);
 SourceKit::UIdent UIdentFromSKDUID(sourcekitd_uid_t uid);
 
 std::string getRuntimeLibPath();
+
+void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
 
 static inline sourcekitd_variant_t makeNullVariant() {
   return {{ 0, 0, 0 }};

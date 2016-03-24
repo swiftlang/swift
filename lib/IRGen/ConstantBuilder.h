@@ -222,6 +222,8 @@ protected:
 
 public:
   llvm::Constant *getInit() const {
+    if (Fields.empty())
+      return nullptr;
     return llvm::ConstantStruct::getAnon(Fields, /*packed*/ true);
   }
 

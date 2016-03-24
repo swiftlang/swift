@@ -16,10 +16,11 @@
 # This file invokes the runner after parsing arguments.
 
 from __future__ import print_function
-import sys
+
 import argparse
-import tempfile
 import logging
+import sys
+import tempfile
 
 import runner
 

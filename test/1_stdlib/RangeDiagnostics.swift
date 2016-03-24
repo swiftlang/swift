@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-parse-verify-swift
 
-func assertCollection<C: CollectionType>(_: C) {}
+func assertCollection<C: Collection>(_: C) {}
 assertCollection(0..<10)
 
 // The point of this test is to check that we don't allow indexing

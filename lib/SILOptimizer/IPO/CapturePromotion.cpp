@@ -412,7 +412,7 @@ ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
                          OrigFTI->getExtInfo(),
                          OrigFTI->getCalleeConvention(),
                          ClonedInterfaceArgTys,
-                         OrigFTI->getResult(),
+                         OrigFTI->getAllResults(),
                          OrigFTI->getOptionalErrorResult(),
                          M.getASTContext());
 
@@ -680,8 +680,10 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   // An apply is ok if the argument is used as an inout parameter or an
   // indirect return, but counts as a possible mutation in both cases.
   if (auto *AI = dyn_cast<ApplyInst>(U)) {
-    if (AI->getSubstCalleeType()
-          ->getParameters()[O->getOperandNumber()-1].isIndirect()) {
+    auto argIndex = O->getOperandNumber()-1;
+    auto convention =
+      AI->getSubstCalleeType()->getSILArgumentConvention(argIndex);
+    if (isIndirectConvention(convention)) {
       Mutations.push_back(AI);
       return true;
     }
@@ -700,10 +702,11 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
 }
 
 static bool signatureHasDependentTypes(SILFunctionType &CalleeTy) {
-  if (CalleeTy.getSemanticResultSILType().hasTypeParameter())
-    return true;
+  for (auto Result : CalleeTy.getAllResults())
+    if (Result.getType()->hasTypeParameter())
+      return true;
 
-  for (auto ParamTy : CalleeTy.getParameterSILTypesWithoutIndirectResult())
+  for (auto ParamTy : CalleeTy.getParameterSILTypes())
     if (ParamTy.hasTypeParameter())
       return true;
 
@@ -744,9 +747,9 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // Calculate the index into the closure's argument list of the captured
       // box pointer (the captured address is always the immediately following
       // index so is not stored separately);
-      unsigned Index = OpNo - 1 + closureType->getParameters().size();
+      unsigned Index = OpNo - 1 + closureType->getNumSILArguments();
 
-      auto *Fn = PAI->getCalleeFunction();
+      auto *Fn = PAI->getReferencedFunction();
       if (!Fn || !Fn->isDefinition())
         return false;
 
@@ -844,7 +847,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   auto genericSig = F->getLoweredFunctionType()->getGenericSignature();
   auto *genericParams = F->getContextGenericParams();
 
-  if (ApplySubs.size()) {
+  if (!ApplySubs.empty()) {
     InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
     ContextSubs = genericParams->getSubstitutionMap(ApplySubs);
   } else {

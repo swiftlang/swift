@@ -21,20 +21,17 @@ struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return ObjC.self
-  }
   func _bridgeToObjectiveC() -> ObjC {
     return ObjC()
   }
   static func _forceBridgeFromObjectiveC(
     x: ObjC,
-    inout result: BridgedToObjC?
+    result: inout BridgedToObjC?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: ObjC,
-    inout result: BridgedToObjC?
+    result: inout BridgedToObjC?
   ) -> Bool {
     return true
   }

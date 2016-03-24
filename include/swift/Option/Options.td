@@ -254,6 +254,10 @@ def no_link_objc_runtime : Flag<["-"], "no-link-objc-runtime">,
   Flags<[HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't link in additions to the Objective-C runtime">;
 
+def use_ld : Joined<["-"], "use-ld=">,
+  Flags<[DoesNotAffectIncrementalBuild]>,
+  HelpText<"Specifies the linker to be used">;
+
 def Xlinker : Separate<["-"], "Xlinker">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies an option which should be passed to the linker">;
@@ -447,5 +451,9 @@ def embed_bitcode_marker : Flag<["-"], "embed-bitcode-marker">,
 def enable_testing : Flag<["-"], "enable-testing">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allows this module's internal API to be accessed for testing">;
+
+def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
+  Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
+  HelpText<"Turn on runtime checks for erroneous behavior.">;
 
 include "FrontendOptions.td"

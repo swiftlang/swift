@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceManager.h"
@@ -126,7 +127,7 @@ static void findNominals(llvm::MapVector<const NominalTypeDecl *, bool> &found,
     if (!nominal)
       continue;
     found[nominal] |= true;
-    findNominals(found, nominal->getMembers(/*forceDelayed=*/false));
+    findNominals(found, nominal->getMembers());
   }
 }
 
@@ -800,7 +801,8 @@ static bool performCompile(CompilerInstance &Instance,
   // These may change across compiler versions.
   {
     SharedTimer timer("SIL optimization");
-    if (IRGenOpts.Optimize) {
+    if (Invocation.getSILOptions().Optimization >
+        SILOptions::SILOptMode::None) {
       StringRef CustomPipelinePath =
         Invocation.getSILOptions().ExternalPassPipelineFilename;
       if (!CustomPipelinePath.empty()) {
@@ -857,6 +859,7 @@ static bool performCompile(CompilerInstance &Instance,
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
+      serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
       serializationOpts.SerializeAllSIL = opts.SILSerializeAll;
       if (opts.SerializeBridgingHeader)
         serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
@@ -1018,6 +1021,12 @@ int frontend_main(ArrayRef<const char *>Args,
   if (Invocation.parseArgs(Args, Instance.getDiags(), workingDirectory)) {
     return 1;
   }
+
+  // Setting DWARF Version depend on platform
+  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  IRGenOpts.DWARFVersion = swift::GenericDWARFVersion;
+  if (Invocation.getLangOptions().Target.isWindowsCygwinEnvironment())
+    IRGenOpts.DWARFVersion = swift::CygwinDWARFVersion;
 
   if (Invocation.getFrontendOptions().PrintHelp ||
       Invocation.getFrontendOptions().PrintHelpHidden) {

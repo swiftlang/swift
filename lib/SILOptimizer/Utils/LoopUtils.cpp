@@ -34,8 +34,8 @@ static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
   }
 
   // Create the branch to the header.
-  SILBuilder(Preheader)
-      .createBranch(SILFileLocation(SourceLoc()), Header, Args);
+  SILBuilder(Preheader).createBranch(RegularLocation(SourceLoc()), Header,
+                                     Args);
 
   return Preheader;
 }
@@ -96,8 +96,8 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
 
   // For simplicity, assume a single preheader
   SILBasicBlock *Preheader = L->getLoopPreheader();
-  if (!Preheader)
-    return nullptr;
+  assert(Preheader && "A preheader should have been created before calling"
+         "this function");
 
   SILBasicBlock *Header = L->getHeader();
   SILFunction *F = Header->getParent();

@@ -215,7 +215,7 @@ implementing it in the future:
   a major compatibility break.
 
 - With some admitted awkwardness, external exceptions can be reflected
-  into an ``ErrorType`` - like model automatically by the catch
+  into an ``ErrorProtocol`` - like model automatically by the catch
   mechanism.
 
 - In the meanwhile, developers who must handle an Objective-C
@@ -1523,12 +1523,12 @@ allowed in a blocking context.
 Error type
 ~~~~~~~~~~
 
-The Swift standard library will provide ``ErrorType``, a protocol with
+The Swift standard library will provide ``ErrorProtocol``, a protocol with
 a very small interface (which is not described in this proposal).  The
 standard pattern should be to define the conformance of an ``enum`` to
 the type::
 
-  enum HomeworkError : ErrorType {
+  enum HomeworkError : ErrorProtocol {
     case Overworked
     case Impossible
     case EatenByCat(Cat)
@@ -1545,13 +1545,13 @@ techniques for that will work fine in the future.
 Note that this corresponds very cleanly to the ``NSError`` model of an
 error domain, an error code, and optional user data.  We expect to
 import system error domains as enums that follow this approach and
-implement ``ErrorType``.  ``NSError`` and ``CFError`` themselves will also
-conform to ``ErrorType``.
+implement ``ErrorProtocol``.  ``NSError`` and ``CFError`` themselves will also
+conform to ``ErrorProtocol``.
 
 The physical representation (still being nailed down) will make it
-efficient to embed an ``NSError`` as an ``ErrorType`` and vice-versa.  It
+efficient to embed an ``NSError`` as an ``ErrorProtocol`` and vice-versa.  It
 should be possible to turn an arbitrary Swift ``enum`` that conforms to
-``ErrorType`` into an ``NSError`` by using the qualified type name as the
+``ErrorProtocol`` into an ``NSError`` by using the qualified type name as the
 domain key, the enumerator as the error code, and turning the payload
 into user data.
 
@@ -1808,9 +1808,9 @@ Let's wade into the details.
 Error types
 ~~~~~~~~~~~
 
-``NSError`` and ``CFError`` should implement the ``ErrorType`` protocol.  It
+``NSError`` and ``CFError`` should implement the ``ErrorProtocol`` protocol.  It
 should be possible to turn an arbitrary Swift ``enum`` that conforms to
-``ErrorType`` into an ``NSError`` by using the qualified type name as the
+``ErrorProtocol`` into an ``NSError`` by using the qualified type name as the
 domain key, the enumerator as the error code, and turning the payload
 into user data.
 
@@ -2030,7 +2030,7 @@ other words, we should not use table-based unwinding.
 
 Error propagation for universal errors should be handled by
 table-based unwinding.  ``catch`` handlers can catch both, mapping
-unwind exceptions to ``ErrorType`` values as necessary.  With a
+unwind exceptions to ``ErrorProtocol`` values as necessary.  With a
 carefully-designed interpretation function aimed to solve the specific
 needs of Swift, we can avoid most of the code-size impact by shifting
 it to the unwind tables, which needn't ever be loaded in the common

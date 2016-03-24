@@ -249,7 +249,7 @@ public:
 namespace {
 struct ClosureInfo {
   SILInstruction *Closure;
-  ValueLifetime Lifetime;
+  ValueLifetimeAnalysis::Frontier LifetimeFrontier;
   llvm::SmallVector<CallSiteDescriptor, 8> CallSites;
 
   ClosureInfo(SILInstruction *Closure): Closure(Closure) {}
@@ -404,15 +404,14 @@ std::string CallSiteDescriptor::createName() const {
 }
 
 void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
-  assert(!CInfo->Lifetime.getLastUsers().empty() &&
+  assert(!CInfo->LifetimeFrontier.empty() &&
          "Need a post-dominating release(s)");
 
   // Extend the lifetime of a captured argument to cover the callee.
   SILBuilderWithScope Builder(getClosure());
   Builder.createRetainValue(getClosure()->getLoc(), Arg);
-  for (auto *I : CInfo->Lifetime.getLastUsers()) {
-    auto It = SILBasicBlock::iterator(*I);
-    Builder.setInsertionPoint(++It);
+  for (auto *I : CInfo->LifetimeFrontier) {
+    Builder.setInsertionPoint(I);
     Builder.createReleaseValue(getClosure()->getLoc(), Arg);
   }
 }
@@ -471,7 +470,7 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
   //
   // TODO: We can probably handle other partial applies here.
   auto *FRI = dyn_cast<FunctionRefInst>(Callee);
-  if (!FRI || FRI->getFunctionType()->hasIndirectResult())
+  if (!FRI || FRI->getFunctionType()->hasIndirectResults())
     return false;
 
   // Otherwise, we do support specializing this closure.
@@ -502,7 +501,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
   // First add to NewParameterInfoList all of the SILParameterInfo in the
   // original function except for the closure.
   CanSILFunctionType ClosureUserFunTy = ClosureUser->getLoweredFunctionType();
-  unsigned Index = 0;
+  unsigned Index = ClosureUserFunTy->getNumIndirectResults();
   for (auto &param : ClosureUserFunTy->getParameters()) {
     if (Index != CallSiteDesc.getClosureIndex())
       NewParameterInfoList.push_back(param);
@@ -537,10 +536,16 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
     NewParameterInfoList.push_back(NewPInfo);
   }
 
+  // The specialized function is always a thin function. This is important
+  // because we may add additional parameters after the Self parameter of
+  // witness methods. In this case the new function is not a method anymore.
+  auto ExtInfo = ClosureUserFunTy->getExtInfo();
+  ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+
   auto ClonedTy = SILFunctionType::get(
-      ClosureUserFunTy->getGenericSignature(), ClosureUserFunTy->getExtInfo(),
+      ClosureUserFunTy->getGenericSignature(), ExtInfo,
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
-      ClosureUserFunTy->getResult(),
+      ClosureUserFunTy->getAllResults(),
       ClosureUserFunTy->getOptionalErrorResult(),
       M.getASTContext());
 
@@ -739,7 +744,7 @@ void ClosureSpecializer::gatherCallSites(
 
         // If AI does not have a function_ref definition as its callee, we can
         // not do anything here... so continue...
-        SILFunction *ApplyCallee = AI.getCalleeFunction();
+        SILFunction *ApplyCallee = AI.getReferencedFunction();
         if (!ApplyCallee || ApplyCallee->isExternalDeclaration())
           continue;
 
@@ -776,8 +781,13 @@ void ClosureSpecializer::gatherCallSites(
           continue;
         }
 
+        auto NumIndirectResults =
+          AI.getSubstCalleeType()->getNumIndirectResults();
+        assert(ClosureIndex.getValue() >= NumIndirectResults);
+        auto ClosureParamIndex = ClosureIndex.getValue() - NumIndirectResults;
+
         auto ParamInfo = AI.getSubstCalleeType()->getParameters();
-        SILParameterInfo ClosureParamInfo = ParamInfo[ClosureIndex.getValue()];
+        SILParameterInfo ClosureParamInfo = ParamInfo[ClosureParamIndex];
 
         // Get all non-failure exit BBs in the Apply Callee if our partial apply
         // is guaranteed. If we do not understand one of the exit BBs, bail.
@@ -795,7 +805,8 @@ void ClosureSpecializer::gatherCallSites(
         if (!CInfo) {
           CInfo = new ClosureInfo(&II);
           ValueLifetimeAnalysis VLA(CInfo->Closure);
-          CInfo->Lifetime = VLA.computeFromDirectUses();
+          VLA.computeFrontier(CInfo->LifetimeFrontier,
+                              ValueLifetimeAnalysis::AllowToModifyCFG);
         }
 
         // Now we know that CSDesc is profitable to specialize. Add it to our

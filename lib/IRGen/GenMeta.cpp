@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements IR generation for metadata constructs like
-//  metatypes and modules.  These is presently always trivial, but in
-//  the future we will likely have some sort of physical
-//  representation for at least some metatypes.
+//  This file implements IR generation for type metadata constructs.
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,6 +25,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/Runtime/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -43,6 +41,7 @@
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
 #include "GenPoly.h"
+#include "GenValueWitness.h"
 #include "GenArchetype.h"
 #include "GenStruct.h"
 #include "HeapTypeInfo.h"
@@ -104,7 +103,6 @@ llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
                                      classPtr);
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();
-  call->setCallingConv(IGF.IGM.RuntimeCC);
   return call;
 }
 
@@ -130,45 +128,53 @@ namespace {
     SmallVector<llvm::Value *, 8> Values;
     SmallVector<llvm::Type *, 8> Types;
 
-    void collectTypes(IRGenModule &IGM, const NominalTypeDecl *nominal) {
-      auto generics = nominal->getGenericParamsOfContext();
-      collectTypes(IGM, generics->getForwardingSubstitutions(IGM.Context));
+    static unsigned getNumGenericArguments(IRGenModule &IGM,
+                                           NominalTypeDecl *nominal) {
+      GenericTypeRequirements requirements(IGM, nominal);
+      return unsigned(requirements.hasParentType())
+               + requirements.getNumTypeRequirements();
     }
 
-    void collectTypes(IRGenModule &IGM, ArrayRef<Substitution> subs) {
-      // Add all the argument archetypes.
-      Types.append(subs.size(), IGM.TypeMetadataPtrTy);
+    void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
+      GenericTypeRequirements requirements(IGM, nominal);
+      collectTypes(IGM, requirements);
+    }
 
-      // Add protocol witness tables for all those archetypes.
-      for (auto sub : subs) {
-        auto conformances = sub.getConformances();
+    void collectTypes(IRGenModule &IGM,
+                      const GenericTypeRequirements &requirements) {
+      if (requirements.hasParentType()) {
+        Types.push_back(IGM.TypeMetadataPtrTy);
+      }
 
-        for (auto &conformance : conformances) {
-          auto *proto = conformance.getRequirement();
-          if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-            continue;
-
+      for (auto &requirement : requirements.getRequirements()) {
+        if (requirement.Protocol) {
           Types.push_back(IGM.WitnessTablePtrTy);
+        } else {
+          Types.push_back(IGM.TypeMetadataPtrTy);
         }
       }
     }
 
-    void collect(IRGenFunction &IGF, BoundGenericType *type) {
-      auto subs = type->getSubstitutions(/*FIXME:*/nullptr, nullptr);
+    void collect(IRGenFunction &IGF, CanBoundGenericType type) {
+      GenericTypeRequirements requirements(IGF.IGM, type->getDecl());
 
-      // Add all the argument archetypes.
-      for (auto &sub : subs) {
-        CanType subbed = sub.getReplacement()->getCanonicalType();
-        Values.push_back(IGF.emitTypeMetadataRef(subbed));
+      if (requirements.hasParentType()) {
+        Values.push_back(IGF.emitTypeMetadataRef(type.getParent()));
       }
 
-      // Add protocol witness tables for all those archetypes.
-      for (auto i : indices(subs)) {
-        llvm::Value *metadata = Values[i];
-        emitWitnessTableRefs(IGF, subs[i], &metadata, Values);
-      }
+      auto subs =
+        type->getSubstitutions(IGF.IGM.getSwiftModule(), nullptr);
+      requirements.enumerateFulfillments(IGF.IGM, subs,
+                                [&](unsigned reqtIndex, CanType type,
+                                    Optional<ProtocolConformanceRef> conf) {
+        if (conf) {
+          Values.push_back(emitWitnessTableRef(IGF, type, *conf));
+        } else {
+          Values.push_back(IGF.emitTypeMetadataRef(type));
+        }
+      });
 
-      collectTypes(IGF.IGM, subs);
+      collectTypes(IGF.IGM, type->getDecl());
       assert(Types.size() == Values.size());
     }
   };
@@ -177,38 +183,27 @@ namespace {
 /// Given an array of polymorphic arguments as might be set up by
 /// GenericArguments, bind the polymorphic parameters.
 static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
-                                               const GenericParamList &generics,
+                                               NominalTypeDecl *typeDecl,
                                                Address array) {
-  unsigned nextIndex = 0;
-  auto claimNext = [&](llvm::PointerType *desiredType) {
-    Address addr = array;
-    if (unsigned index = nextIndex++) {
-      addr = IGF.Builder.CreateConstArrayGEP(array, index,
-                                             index * IGF.IGM.getPointerSize());
-    }
-    llvm::Value *value = IGF.Builder.CreateLoad(addr);
-    return IGF.Builder.CreateBitCast(value, desiredType);
+  GenericTypeRequirements requirements(IGF.IGM, typeDecl);
+
+  array = IGF.Builder.CreateElementBitCast(array, IGF.IGM.TypeMetadataPtrTy);
+
+  auto getInContext = [&](CanType type) -> CanType {
+    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type, nullptr)
+             ->getCanonicalType();
   };
 
-  // Bind all the argument archetypes.
-  for (auto archetype : generics.getAllArchetypes()) {
-    llvm::Value *metadata = claimNext(IGF.IGM.TypeMetadataPtrTy);
-    metadata->setName(archetype->getFullName());
-    IGF.setUnscopedLocalTypeData(CanType(archetype),
-                                 LocalTypeDataKind::forTypeMetadata(),
-                                 metadata);
+  // If we have a parent type, it's the first parameter.
+  if (requirements.hasParentType()) {
+    auto parentType = getInContext(requirements.getParentType());
+    llvm::Value *parentMetadata = IGF.Builder.CreateLoad(array);
+    array = IGF.Builder.CreateConstArrayGEP(array, 1, IGF.IGM.getPointerSize());
+    IGF.bindLocalTypeDataFromTypeMetadata(parentType, IsExact, parentMetadata);
   }
 
-  // Bind all the argument witness tables.
-  for (auto archetype : generics.getAllArchetypes()) {
-    for (auto protocol : archetype->getConformsTo()) {
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-        continue;
-      llvm::Value *wtable = claimNext(IGF.IGM.WitnessTablePtrTy);
-      auto key = LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol);
-      IGF.setUnscopedLocalTypeData(CanType(archetype), key, wtable);
-    }
-  }
+  // Okay, bind everything else from the context.
+  requirements.bindFromBuffer(IGF, array, getInContext);
 }
 
 /// Attempts to return a constant heap metadata reference for a
@@ -575,7 +570,6 @@ namespace {
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata2Fn(),
                                            args);
         call->setDoesNotThrow();
-        call->setCallingConv(IGF.IGM.RuntimeCC);
         return setLocal(CanType(type), call);
       }
 
@@ -594,7 +588,6 @@ namespace {
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata3Fn(),
                                            args);
         call->setDoesNotThrow();
-        call->setCallingConv(IGF.IGM.RuntimeCC);
         return setLocal(CanType(type), call);
       }
       default:
@@ -633,7 +626,6 @@ namespace {
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadataFn(),
                                            args);
         call->setDoesNotThrow();
-        call->setCallingConv(IGF.IGM.RuntimeCC);
 
         IGF.Builder.CreateLifetimeEnd(buffer,
                                     IGF.IGM.getPointerSize() * elements.size());
@@ -727,7 +719,6 @@ namespace {
                                             IGF.IGM.getGetFunctionMetadata1Fn(),
                                             {flags, arg0, resultMetadata});
           call->setDoesNotThrow();
-          call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(CanType(type), call);
         }
 
@@ -738,7 +729,6 @@ namespace {
                                             IGF.IGM.getGetFunctionMetadata2Fn(),
                                             {flags, arg0, arg1, resultMetadata});
           call->setDoesNotThrow();
-          call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(CanType(type), call);
         }
 
@@ -751,7 +741,6 @@ namespace {
                                             {flags, arg0, arg1, arg2,
                                              resultMetadata});
           call->setDoesNotThrow();
-          call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(CanType(type), call);
         }
 
@@ -788,7 +777,6 @@ namespace {
           auto call = IGF.Builder.CreateCall(IGF.IGM.getGetFunctionMetadataFn(),
                                              pointerToFirstArg.getAddress());
           call->setDoesNotThrow();
-          call->setCallingConv(IGF.IGM.RuntimeCC);
           
           IGF.Builder.CreateLifetimeEnd(buffer,
                                    IGF.IGM.getPointerSize() * arguments.size());
@@ -815,7 +803,6 @@ namespace {
                   : IGF.IGM.getGetExistentialMetatypeMetadataFn();
       auto call = IGF.Builder.CreateCall(fn, instMetadata);
       call->setDoesNotThrow();
-      call->setCallingConv(IGF.IGM.RuntimeCC);
 
       return setLocal(type, call);
     }
@@ -858,7 +845,6 @@ namespace {
                                          {IGF.IGM.getSize(Size(protocols.size())),
                                           descriptorArray.getAddress()});
       call->setDoesNotThrow();
-      call->setCallingConv(IGF.IGM.RuntimeCC);
       IGF.Builder.CreateLifetimeEnd(descriptorArray,
                                    IGF.IGM.getPointerSize() * protocols.size());
       return setLocal(type, call);
@@ -882,7 +868,7 @@ namespace {
     }
 
     llvm::Value *visitArchetypeType(CanArchetypeType type) {
-      return IGF.getLocalTypeData(type, LocalTypeDataKind::forTypeMetadata());
+      return emitArchetypeTypeMetadataRef(IGF, type);
     }
 
     llvm::Value *visitGenericTypeParamType(CanGenericTypeParamType type) {
@@ -1027,7 +1013,7 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
 
 static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
                                                       NominalTypeDecl *nominal,
-                                                      GenericArguments genericArgs) {
+                                                      GenericArguments &genericArgs) {
   CanType declaredType = nominal->getDeclaredType()->getCanonicalType();
   llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(declaredType, true);
 
@@ -1223,7 +1209,7 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
   llvm::Constant *accessor =
     getTypeMetadataAccessFunction(IGF.IGM, type, shouldDefine);
   llvm::CallInst *call = IGF.Builder.CreateCall(accessor, {});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotAccessMemory();
   call->setDoesNotThrow();
   
@@ -1324,7 +1310,6 @@ namespace {
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata2Fn(),
                                            args);
         call->setDoesNotThrow();
-        call->setCallingConv(IGF.IGM.RuntimeCC);
         return setLocal(CanType(type), call);
       }
 
@@ -1344,7 +1329,6 @@ namespace {
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata3Fn(),
                                            args);
         call->setDoesNotThrow();
-        call->setCallingConv(IGF.IGM.RuntimeCC);
         return setLocal(CanType(type), call);
       }
       default:
@@ -1384,7 +1368,6 @@ namespace {
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadataFn(),
                                            args);
         call->setDoesNotThrow();
-        call->setCallingConv(IGF.IGM.RuntimeCC);
 
         IGF.Builder.CreateLifetimeEnd(buffer,
                                     IGF.IGM.getPointerSize() * elements.size());
@@ -1787,37 +1770,6 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
   return result;
 }
 
-namespace {
-  /// A CRTP type visitor for deciding whether the metatype for a type
-  /// has trivial representation.
-  struct HasTrivialMetatype : CanTypeVisitor<HasTrivialMetatype, bool> {
-    /// Class metatypes have non-trivial representation due to the
-    /// possibility of subclassing.
-    bool visitClassType(CanClassType type) {
-      return false;
-    }
-    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return false;
-    }
-
-    /// Archetype metatypes have non-trivial representation in case
-    /// they instantiate to a class metatype.
-    bool visitArchetypeType(CanArchetypeType type) {
-      return false;
-    }
-    
-    /// All levels of class metatypes support subtyping.
-    bool visitMetatypeType(CanMetatypeType type) {
-      return visit(type.getInstanceType());
-    }
-
-    /// Everything else is trivial.
-    bool visitType(CanType type) {
-      return false;
-    }
-  };
-}
-
 /// Emit a metatype value for a known type.
 void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                             Explosion &explosion) {
@@ -1897,46 +1849,32 @@ namespace {
     
     void addGenericParams() {
       NominalTypeDecl *ntd = asImpl().getTarget();
-      if (!ntd->getGenericParams()) {
-        // If there are no generic parameters, there is no generic parameter
-        // vector.
-        addConstantInt32(0);
-        addConstantInt32(0);
-        addConstantInt32(0);
 
-        return;
-      }
-      
       // uint32_t GenericParameterVectorOffset;
       addConstantInt32InWords(asImpl().getGenericParamsOffset());
 
       // The archetype order here needs to be consistent with
       // MetadataLayout::addGenericFields.
       
-      // Note that we intentionally don't forward the generic arguments.
+      GenericTypeRequirements requirements(IGM, ntd);
       
-      // Add all the primary archetypes.
-      // TODO: only the *primary* archetypes.
-      // TODO: not archetypes from outer contexts.
-      auto allArchetypes = ntd->getGenericParams()->getAllArchetypes();
-      
-      // uint32_t NumGenericParameters;
-      addConstantInt32(allArchetypes.size());
+      // uint32_t NumGenericRequirements;
+      addConstantInt32(requirements.getStorageSizeInWords());
 
       // uint32_t NumPrimaryGenericParameters;
-      addConstantInt32(ntd->getGenericParams()->getPrimaryArchetypes().size());
-      
-      // GenericParameter Parameters[NumGenericParameters];
-      // struct GenericParameter {
-      for (auto archetype : allArchetypes) {
-        //   uint32_t NumWitnessTables;
-        // Count the protocol conformances that require witness tables.
-        unsigned count = std::count_if(
-                archetype->getConformsTo().begin(),
-                archetype->getConformsTo().end(),
-                Lowering::TypeConverter::protocolRequiresWitnessTable);
-        addConstantInt32(count);
-      }
+      addConstantInt32(requirements.getNumTypeRequirements());
+
+      // GenericParameterDescriptorFlags Flags;
+      GenericParameterDescriptorFlags flags;
+      if (ntd->getDeclContext()->isTypeContext())
+        flags = flags.withHasParent(true);
+      if (requirements.hasParentType())
+        flags = flags.withHasGenericParent(true);
+      addConstantInt32(flags.getIntValue());
+
+      // TODO: provide reflective descriptions of the type and
+      // conformance requirements stored here.
+
       // };
     }
     
@@ -2238,9 +2176,8 @@ namespace {
         
         void noteAddressPoint() { AddressPoint = NextOffset; }
         void noteStartOfFieldOffsets() { FieldVectorOffset = NextOffset; }
-        void addGenericFields(const GenericParamList &g) {
+        void noteStartOfGenericRequirements() {
           GenericParamsOffset = NextOffset;
-          StructMetadataScanner::addGenericFields(g);
         }
       };
       
@@ -2322,11 +2259,10 @@ namespace {
             FieldVectorOffset = NextOffset;
           }
         }
-        void addGenericFields(const GenericParamList &g, ClassDecl *c) {
+        void noteStartOfGenericRequirements(ClassDecl *c) {
           if (c == Target) {
             GenericParamsOffset = NextOffset;
           }
-          ClassMetadataScanner::addGenericFields(g, c);
         }
       };
       
@@ -2406,9 +2342,8 @@ namespace {
           PayloadSizeOffset = NextOffset;
           EnumMetadataScanner::addPayloadSize();
         }
-        void addGenericFields(const GenericParamList &g) {
+        void noteStartOfGenericRequirements() {
           GenericParamsOffset = NextOffset;
-          EnumMetadataScanner::addGenericFields(g);
         }
       };
       
@@ -2623,8 +2558,8 @@ namespace {
     unsigned NumGenericWitnesses = 0;
 
     struct FillOp {
-      CanArchetypeType Archetype;
-      ProtocolDecl *Protocol;
+      CanType Type;
+      Optional<ProtocolConformanceRef> Conformance;
       Size ToOffset;
     };
 
@@ -2680,10 +2615,10 @@ namespace {
       llvm::Value *args = params.claimNext();
 
       // Bind the generic arguments.
-      auto generics = super::Target->getGenericParamsOfContext();
-      Address argsArray(args, IGM.getPointerAlignment());
-      if (generics)
-        emitPolymorphicParametersFromArray(IGF, *generics, argsArray);
+      if (super::Target->isGenericContext()) {
+        Address argsArray(args, IGM.getPointerAlignment());
+        emitPolymorphicParametersFromArray(IGF, super::Target, argsArray);
+      }
 
       // Allocate the metadata.
       llvm::Value *metadataValue =
@@ -2696,12 +2631,10 @@ namespace {
       
       for (auto &fillOp : FillOps) {
         llvm::Value *value;
-        if (fillOp.Protocol) {
-          value = emitArchetypeWitnessTableRef(IGF, fillOp.Archetype,
-                                               fillOp.Protocol);
+        if (fillOp.Conformance) {
+          value = emitWitnessTableRef(IGF, fillOp.Type, *fillOp.Conformance);
         } else {
-          value = IGF.getLocalTypeData(fillOp.Archetype,
-                                       LocalTypeDataKind::forTypeMetadata());
+          value = IGF.emitTypeMetadataRef(fillOp.Type);
         }
         value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
         auto dest = createPointerSizedGEP(IGF, metadataWords,
@@ -2783,8 +2716,10 @@ namespace {
       //   uint16_t NumArguments;
       // TODO: ultimately, this should be the number of actual template
       // arguments, not the number of witness tables required.
+      unsigned numGenericArguments =
+        GenericArguments::getNumGenericArguments(IGM, super::Target);
       headerFields[Field++]
-        = llvm::ConstantInt::get(IGM.Int16Ty, NumGenericWitnesses);
+        = llvm::ConstantInt::get(IGM.Int16Ty, numGenericArguments);
 
       //   uint16_t AddressPoint;
       assert(!AddressPoint.isInvalid() && "address point not noted!");
@@ -2810,18 +2745,18 @@ namespace {
     }
 
     template <class... T>
-    void addGenericArgument(ArchetypeType *type, T &&...args) {
+    void addGenericArgument(CanType type, T &&...args) {
       NumGenericWitnesses++;
-      FillOps.push_back({ CanArchetypeType(type), nullptr, getNextOffset() });
+      FillOps.push_back({ type, None, getNextOffset() });
       super::addGenericArgument(type, std::forward<T>(args)...);
     }
 
     template <class... T>
-    void addGenericWitnessTable(ArchetypeType *type, ProtocolDecl *protocol,
+    void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf,
                                 T &&...args) {
       NumGenericWitnesses++;
-      FillOps.push_back({ CanArchetypeType(type), protocol, getNextOffset() });
-      super::addGenericWitnessTable(type, protocol, std::forward<T>(args)...);
+      FillOps.push_back({ type, conf, getNextOffset() });
+      super::addGenericWitnessTable(type, conf, std::forward<T>(args)...);
     }
     
     void addFieldTypeVectorReferenceSlot() {
@@ -3161,12 +3096,12 @@ namespace {
       }
     }
 
-    void addGenericArgument(ArchetypeType *archetype, ClassDecl *forClass) {
+    void addGenericArgument(CanType argTy, ClassDecl *forClass) {
       addWord(llvm::Constant::getNullValue(IGM.TypeMetadataPtrTy));
     }
 
-    void addGenericWitnessTable(ArchetypeType *archetype,
-                                ProtocolDecl *protocol, ClassDecl *forClass) {
+    void addGenericWitnessTable(CanType argTy, ProtocolConformanceRef conf,
+                                ClassDecl *forClass) {
       addWord(llvm::Constant::getNullValue(IGM.WitnessTablePtrTy));
     }
   };
@@ -3356,7 +3291,7 @@ namespace {
     // fill ops for generic arguments unless they belong directly to the target
     // class and not its ancestors.
 
-    void addGenericArgument(ArchetypeType *type, ClassDecl *forClass) {
+    void addGenericArgument(CanType type, ClassDecl *forClass) {
       if (forClass == Target) {
         // Introduce the fill op.
         GenericMetadataBuilderBase::addGenericArgument(type, forClass);
@@ -3368,18 +3303,16 @@ namespace {
       }
     }
     
-    void addGenericWitnessTable(ArchetypeType *type, ProtocolDecl *protocol,
+    void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf,
                                 ClassDecl *forClass) {
       if (forClass == Target) {
         // Introduce the fill op.
-        GenericMetadataBuilderBase::addGenericWitnessTable(type, protocol,
-                                                           forClass);
+        GenericMetadataBuilderBase::addGenericWitnessTable(type, conf,forClass);
       } else {
         // Lay out the field, but don't provide the fill op, which we'll get
         // from the superclass.
         HasDependentMetadata = true;
-        ClassMetadataBuilderBase::addGenericWitnessTable(type, protocol,
-                                                         forClass);
+        ClassMetadataBuilderBase::addGenericWitnessTable(type, conf, forClass);
       }
     }
 
@@ -3825,36 +3758,54 @@ llvm::Value *irgen::emitParentMetadataRef(IRGenFunction &IGF,
 }
 
 namespace {
-  /// A class for finding a type argument in a type metadata object.
-  BEGIN_GENERIC_METADATA_SEARCHER_1(FindTypeArgumentIndex,
-                                    ArchetypeType *, TargetArchetype)
+  /// A class for finding the start of the generic requirements section
+  /// in a type metadata object.
+  BEGIN_GENERIC_METADATA_SEARCHER_0(FindTypeGenericRequirements)
     template <class... T>
-    void addGenericArgument(ArchetypeType *argument, T &&...args) {
-      if (argument == TargetArchetype)
-        this->setTargetOffset();
-      super::addGenericArgument(argument, std::forward<T>(args)...);
+    void noteStartOfGenericRequirements() {
+      this->setTargetOffset();
     }
-  END_GENERIC_METADATA_SEARCHER(ArgumentIndex)
+
+    template <class... T>
+    void noteStartOfGenericRequirements(ClassDecl *forClass) {
+      if (forClass == Target)
+        this->setTargetOffset();
+    }
+  END_GENERIC_METADATA_SEARCHER(GenericRequirements)
 }
 
-int32_t irgen::getIndexOfGenericArgument(IRGenModule &IGM,
-                                         NominalTypeDecl *decl,
-                                         ArchetypeType *archetype) {
+static int getIndexOfGenericRequirement(IRGenModule &IGM,
+                                        NominalTypeDecl *decl,
+                                        unsigned reqtIndex) {
   switch (decl->getKind()) {
-    case DeclKind::Class:
-      return FindClassArgumentIndex(IGM, cast<ClassDecl>(decl), archetype)
-        .getTargetIndex();
-    case DeclKind::Struct:
-      return FindStructArgumentIndex(IGM, cast<StructDecl>(decl), archetype)
-        .getTargetIndex();
-    case DeclKind::Enum:
-      return FindEnumArgumentIndex(IGM, cast<EnumDecl>(decl), archetype)
-        .getTargetIndex();
-    case DeclKind::Protocol:
-      llvm_unreachable("protocols are never generic!");
-    default:
-      llvm_unreachable("not a nominal type");
+#define NOMINAL_TYPE_DECL(id, parent)
+#define DECL(id, parent) \
+  case DeclKind::id:
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("not a nominal type");
+
+  case DeclKind::Protocol:
+    llvm_unreachable("protocols are never generic!");
+
+  case DeclKind::Class: {
+    int index = FindClassGenericRequirements(IGM, cast<ClassDecl>(decl))
+                  .getTargetIndex() + (int) reqtIndex;
+    return index;
   }
+
+  case DeclKind::Enum: {
+    int index = FindEnumGenericRequirements(IGM, cast<EnumDecl>(decl))
+                  .getTargetIndex() + (int) reqtIndex;
+    return index;
+  }
+        
+  case DeclKind::Struct: {
+    int index = FindStructGenericRequirements(IGM, cast<StructDecl>(decl))
+                  .getTargetIndex() + (int) reqtIndex;
+    return index;
+  }
+  }
+  llvm_unreachable("bad decl kind!");
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -3862,48 +3813,12 @@ int32_t irgen::getIndexOfGenericArgument(IRGenModule &IGM,
 /// have generic arguments.
 llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
                                             NominalTypeDecl *decl,
-                                            unsigned argumentIndex,
+                                      const GenericTypeRequirements &reqts,
+                                            unsigned reqtIndex,
                                             llvm::Value *metadata) {
-  assert(decl->getGenericParams() != nullptr);
-  auto targetArchetype =
-    decl->getGenericParams()->getAllArchetypes()[argumentIndex];
-
-  switch (decl->getKind()) {
-#define NOMINAL_TYPE_DECL(id, parent)
-#define DECL(id, parent) \
-  case DeclKind::id:
-#include "swift/AST/DeclNodes.def"
-    llvm_unreachable("not a nominal type");
-
-  case DeclKind::Protocol:
-    llvm_unreachable("protocols are never generic!");
-
-  case DeclKind::Struct:
-  case DeclKind::Enum:
-  case DeclKind::Class: {
-    int index = getIndexOfGenericArgument(IGF.IGM, decl, targetArchetype);
-    return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
-  }
-  }
-  llvm_unreachable("bad decl kind!");
-}
-
-namespace {
-  /// A class for finding a protocol witness table for a type argument
-  /// in a value type metadata object.
-  BEGIN_GENERIC_METADATA_SEARCHER_2(FindTypeWitnessTableIndex,
-                                    ArchetypeType *, TargetArchetype,
-                                    ProtocolDecl *, TargetProtocol)
-    template <class... T>
-    void addGenericWitnessTable(ArchetypeType *argument,
-                                ProtocolDecl *protocol,
-                                T &&...args) {
-      if (argument == TargetArchetype && protocol == TargetProtocol)
-        this->setTargetOffset();
-      super::addGenericWitnessTable(argument, protocol,
-                                    std::forward<T>(args)...);
-    }
-  END_GENERIC_METADATA_SEARCHER(WitnessTableIndex)
+  assert(reqts.getRequirements()[reqtIndex].Protocol == nullptr);
+  int index = getIndexOfGenericRequirement(IGF.IGM, decl, reqtIndex);
+  return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -3911,48 +3826,12 @@ namespace {
 /// argument metadata.  The type must have generic arguments.
 llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
                                                 NominalTypeDecl *decl,
-                                                unsigned argumentIndex,
-                                                ProtocolDecl *targetProtocol,
+                                          const GenericTypeRequirements &reqts,
+                                                unsigned reqtIndex,
                                                 llvm::Value *metadata) {
-  assert(decl->getGenericParams() != nullptr);
-  auto targetArchetype =
-    decl->getGenericParams()->getAllArchetypes()[argumentIndex];
-
-  switch (decl->getKind()) {
-#define NOMINAL_TYPE_DECL(id, parent)
-#define DECL(id, parent) \
-  case DeclKind::id:
-#include "swift/AST/DeclNodes.def"
-    llvm_unreachable("not a nominal type");
-
-  case DeclKind::Protocol:
-    llvm_unreachable("protocols are never generic!");
-
-  case DeclKind::Class: {
-    int index =
-      FindClassWitnessTableIndex(IGF.IGM, cast<ClassDecl>(decl),
-                                 targetArchetype, targetProtocol)
-        .getTargetIndex();
-    return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
-  }
-
-  case DeclKind::Enum: {
-    int index =
-      FindEnumWitnessTableIndex(IGF.IGM, cast<EnumDecl>(decl),
-                                 targetArchetype, targetProtocol)
-        .getTargetIndex();
-    return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
-  }
-      
-  case DeclKind::Struct: {
-    int index =
-      FindStructWitnessTableIndex(IGF.IGM, cast<StructDecl>(decl),
-                                  targetArchetype, targetProtocol)
-        .getTargetIndex();
-    return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
-  }
-  }
-  llvm_unreachable("bad decl kind!");
+  assert(reqts.getRequirements()[reqtIndex].Protocol != nullptr);
+  int index = getIndexOfGenericRequirement(IGF.IGM, decl, reqtIndex);
+  return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
 }
 
 irgen::Size irgen::getClassFieldOffset(IRGenModule &IGM,
@@ -4067,6 +3946,8 @@ static llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
     metadata = IGF.Builder.CreateAnd(metadata, mask);
     metadata = IGF.Builder.CreateIntToPtr(metadata, IGF.IGM.TypeMetadataPtrTy);
     return metadata;
+  } else if (IGF.IGM.TargetInfo.hasOpaqueISAs()) {
+    return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
   } else {
     object = IGF.Builder.CreateBitCast(object,
                                   IGF.IGM.TypeMetadataPtrTy->getPointerTo());
@@ -4170,7 +4051,6 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
   auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
                                          object,
                                          object->getName() + ".Type");
-  metadata->setCallingConv(IGF.IGM.RuntimeCC);
   metadata->setDoesNotThrow();
   metadata->setDoesNotAccessMemory();
   return metadata;
@@ -4271,17 +4151,6 @@ namespace {
       super::addMethod(fn);
     }
   END_METADATA_SEARCHER()
-}
-
-/// Provide the abstract parameters for virtual calls to the given method.
-AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
-                                               FuncDecl *method) {
-  // TODO: maybe use better versions in the v-table sometimes?
-  ResilienceExpansion bestExplosion = ResilienceExpansion::Minimal;
-  unsigned naturalUncurry = method->getNaturalArgumentCount() - 1;
-
-  return AbstractCallee(SILFunctionTypeRepresentation::Method, bestExplosion,
-                        naturalUncurry, naturalUncurry, ExtraData::None);
 }
 
 /// Load the correct virtual function for the given class method.
@@ -4404,11 +4273,11 @@ namespace {
         addConstantWord(0);
     }
 
-    void addGenericArgument(ArchetypeType *type) {
+    void addGenericArgument(CanType type) {
       addWord(llvm::Constant::getNullValue(IGM.TypeMetadataPtrTy));
     }
 
-    void addGenericWitnessTable(ArchetypeType *type, ProtocolDecl *protocol) {
+    void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
       addWord(llvm::Constant::getNullValue(IGM.WitnessTablePtrTy));
     }
 
@@ -4568,11 +4437,11 @@ public:
     addFarRelativeAddressOrNull(nullptr);
   }
   
-  void addGenericArgument(ArchetypeType *type) {
+  void addGenericArgument(CanType type) {
     addWord(llvm::Constant::getNullValue(IGM.TypeMetadataPtrTy));
   }
   
-  void addGenericWitnessTable(ArchetypeType *type, ProtocolDecl *protocol) {
+  void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
     addWord(llvm::Constant::getNullValue(IGM.WitnessTablePtrTy));
   }
 };
@@ -4954,13 +4823,13 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   switch (*known) {
   case KnownProtocolKind::AnyObject:
     return SpecialProtocol::AnyObject;
-  case KnownProtocolKind::ErrorType:
-    return SpecialProtocol::ErrorType;
+  case KnownProtocolKind::ErrorProtocol:
+    return SpecialProtocol::ErrorProtocol;
     
   // The other known protocols aren't special at runtime.
-  case KnownProtocolKind::SequenceType:
-  case KnownProtocolKind::GeneratorType:
-  case KnownProtocolKind::BooleanType:
+  case KnownProtocolKind::Sequence:
+  case KnownProtocolKind::IteratorProtocol:
+  case KnownProtocolKind::Boolean:
   case KnownProtocolKind::RawRepresentable:
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:
@@ -4987,14 +4856,14 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::BuiltinStringLiteralConvertible:
   case KnownProtocolKind::BuiltinUTF16StringLiteralConvertible:
   case KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible:
-  case KnownProtocolKind::OptionSetType:
+  case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
     return SpecialProtocol::None;
   }
 }
 
 namespace {
-  const unsigned NumProtocolDescriptorFields = 12;
+  const unsigned NumProtocolDescriptorFields = 13;
 
   class ProtocolDescriptorBuilder : public ConstantBuilder<> {
     ProtocolDecl *Protocol;
@@ -5108,12 +4977,18 @@ namespace {
         addConstantInt16(DefaultWitnesses->getMinimumWitnessTableSize());
         addConstantInt16(DefaultWitnesses->getDefaultWitnessTableSize());
 
-        for (auto entry : DefaultWitnesses->getEntries()) {
+        // Unused padding
+        addConstantInt32(0);
+
+        for (auto entry : DefaultWitnesses->getResilientDefaultEntries()) {
           addWord(IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition));
         }
       } else {
         addConstantInt16(0);
         addConstantInt16(0);
+
+        // Unused padding
+        addConstantInt32(0);
       }
     }
 
@@ -5145,7 +5020,9 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
     return;
   }
 
-  auto *defaultWitnesses = SILMod->lookUpDefaultWitnessTable(protocol);
+  SILDefaultWitnessTable *defaultWitnesses = nullptr;
+  if (!protocol->hasFixedLayout())
+    defaultWitnesses = SILMod->lookUpDefaultWitnessTable(protocol);
   ProtocolDescriptorBuilder builder(*this, protocol, defaultWitnesses);
   builder.layout();
 

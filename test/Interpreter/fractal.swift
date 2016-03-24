@@ -1,5 +1,5 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: ulimit -c unlimited && %target-jit-run %s -I %S -enable-source-import | FileCheck %s
+// RUN: %target-jit-run %s -I %S -enable-source-import | FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: swift_interpreter

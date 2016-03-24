@@ -2,6 +2,7 @@ add_swift_executable(swift-reflection-test
   swift-reflection-test.cpp
   LINK_LIBRARIES
     swiftBasic
+    swiftReflection
 
   COMPONENT_DEPENDS object support
 )

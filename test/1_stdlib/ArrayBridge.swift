@@ -19,8 +19,7 @@
 // RUN: %target-run %t/ArrayBridge > %t.txt
 // RUN: FileCheck %s < %t.txt
 // REQUIRES: executable_test
-
-// XFAIL: linux
+// REQUIRES: objc_interop
 
 import Foundation
 import ArrayBridgeObjC
@@ -98,10 +97,6 @@ var bridgeFromOperationCount = 0
 var bridgeToOperationCount = 0
 
 struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedObjC.self
-  }
-  
   func _bridgeToObjectiveC() -> BridgedObjC {
     bridgeToOperationCount += 1
     return BridgedObjC(trak.value)
@@ -113,7 +108,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: BridgedObjC,
-    inout result: BridgedSwift?
+    result: inout BridgedSwift?
   ) {
     assert(x.value >= 0, "not bridged")
     bridgeFromOperationCount += 1
@@ -122,7 +117,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _conditionallyBridgeFromObjectiveC(
     x: BridgedObjC,
-    inout result: BridgedSwift?
+    result: inout BridgedSwift?
   ) -> Bool {
     if x.value >= 0 {
       result = BridgedSwift(x.value)
@@ -206,7 +201,7 @@ func testBridgedVerbatim() {
 
   // CHECK-NEXT: Base#1(100)
   let basesConvertedToNSArray = bases as NSArray
-  print(basesConvertedToNSArray.objectAtIndex(0) as! Base)
+  print(basesConvertedToNSArray.object(at: 0) as! Base)
 
   // Create an ordinary NSArray, not a native one
   let nsArrayOfBase: NSArray = NSArray(object: Base(42))
@@ -216,7 +211,7 @@ func testBridgedVerbatim() {
 
   // Capture the representation of the first element
   // CHECK-NEXT: [[base42:Base.*42]]
-  print(nsArrayOfBase.objectAtIndex(0) as! Base)
+  print(nsArrayOfBase.object(at: 0) as! Base)
 
   // ...with the same elements
   // CHECK-NEXT: [[base42]]
@@ -346,7 +341,7 @@ func testExplicitlyBridged() {
   let roundTripBridgedSwifts
     = Swift._forceBridgeFromObjectiveC(bridgedSwiftsAsNSArray, 
                                        [BridgedSwift].self)
-  // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
+  // CHECK-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
   // CHECK-NEXT: [BridgedSwift#[[id10:[0-9]+]](42), BridgedSwift#[[id11:[0-9]+]](17)]
   print("roundTripBridgedSwifts = \(roundTripBridgedSwifts))")
 
@@ -356,8 +351,8 @@ func testExplicitlyBridged() {
   // ...and bridge *that* back
   let bridgedBackSwifts
     = Swift._forceBridgeFromObjectiveC(cocoaBridgedSwifts, [BridgedSwift].self)
-  // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
-  // CHECK-NEXT-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
+  // CHECK-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
+  // CHECK-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
   // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]
   print("bridgedBackSwifts      = \(bridgedBackSwifts)")
   
@@ -386,7 +381,7 @@ func testExplicitlyBridged() {
   print(bridgedSwiftsAsAnyObjects[1])
 
   // Downcasts of non-verbatim bridged value types to objects.
-  if true {
+  do {
     let downcasted = bridgedSwifts as [BridgedObjC]
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     print(downcasted[0])
@@ -394,7 +389,7 @@ func testExplicitlyBridged() {
     print(downcasted[1])
   }
 
-  if true {
+  do {
     let downcasted = bridgedSwifts as [Base]
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     print(downcasted[0])
@@ -402,7 +397,7 @@ func testExplicitlyBridged() {
     print(downcasted[1])
   }
 
-  if true {
+  do {
     let downcasted = bridgedSwifts as [AnyObject]
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     print(downcasted[0])
@@ -552,14 +547,14 @@ struct X {}
 /*
 let x: NSArray = arrayAsID(bases)!
 
-print(x.objectAtIndex(0) as Base)
+print(x.objectAt(0) as Base)
 */
 
 func testMutableArray() {
   let m = NSMutableArray(array: ["fu", "bar", "buzz"])
   let a = m as NSArray as! [NSString]
   print(a) // CHECK-NEXT: [fu, bar, buzz]
-  m.addObject("goop")
+  m.add("goop")
   print(a) // CHECK-NEXT: [fu, bar, buzz]
 }
 testMutableArray()

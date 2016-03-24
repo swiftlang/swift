@@ -15,7 +15,7 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
     var result = s.lazy.flatMap {
       (element: OpaqueValue<Int>) -> ${Minimal}<OpaqueValue<Int32>> in
       _blackHole(closureLifetimeTracker)
-      ++timesClosureWasCalled
+      timesClosureWasCalled += 1
       return ${Minimal}<OpaqueValue<Int32>>(
         elements: test.transform(element.value).map { OpaqueValue(Int32($0)) })
     }
@@ -36,7 +36,7 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
     /*
     FIXME: this check is failing.
     This is a fundamental problem with lazy flatMap().
-    <rdar://problem/21989896> Investigate other CollectionType schemes: indices
+    <rdar://problem/21989896> Investigate other Collection schemes: indices
     are compositions of offsets
 
     expectEqual(

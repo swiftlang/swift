@@ -269,7 +269,7 @@ public protocol Comparable : Equatable {
 /// -  `x & Self.allZeros == .allZeros`
 /// -  `x & ~Self.allZeros == x`
 /// -  `~x == x ^ ~Self.allZeros`
-public protocol BitwiseOperationsType {
+public protocol BitwiseOperations {
   /// Returns the intersection of bits set in `lhs` and `rhs`.
   ///
   /// - Complexity: O(1).
@@ -302,18 +302,15 @@ public protocol BitwiseOperationsType {
   static var allZeros: Self { get }
 }
 
-@warn_unused_result
-public func |= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
+public func |= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs | rhs
 }
 
-@warn_unused_result
-public func &= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
+public func &= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs & rhs
 }
 
-@warn_unused_result
-public func ^= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
+public func ^= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs ^ rhs
 }
 
@@ -329,10 +326,6 @@ public protocol Hashable : Equatable {
   ///   hash value across program runs.
   var hashValue: Int { get }
 }
-
-public protocol _SinkType {}
-@available(*, unavailable, message="SinkType has been removed. Use (T) -> () closures directly instead.")
-public typealias SinkType = _SinkType
 
 //===----------------------------------------------------------------------===//
 // Standard pattern matching forms
@@ -451,3 +444,7 @@ infix operator  |= { associativity right precedence 90 assignment }
 // example of how this operator is used, and how its use can be hidden
 // from users.
 infix operator ~> { associativity left precedence 255 }
+
+@available(*, unavailable, renamed: "BitwiseOperations")
+public typealias BitwiseOperationsType = BitwiseOperations
+

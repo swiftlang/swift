@@ -20,7 +20,7 @@ class RefArray<T> {
   var array : [T]
 
   init(_ i:T, count:Int = 100_000) {
-    array = [T](count: count, repeatedValue: i)
+    array = [T](repeating: i, count: count)
   }
 }
 

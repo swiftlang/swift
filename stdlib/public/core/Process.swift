@@ -10,6 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
+internal class _Box<T> {
+  var value = [String]()
+  init(_ value : [String]) { self.value = value }
+}
+
 /// Command-line arguments for the current process.
 public enum Process {
   /// Return an array of string containing the list of command-line arguments
@@ -17,8 +24,10 @@ public enum Process {
   internal static func _computeArguments() -> [String] {
     var result: [String] = []
     for i in 0..<Int(argc) {
+      let arg = unsafeArgv[i]
       result.append(
-       String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? "")
+       arg == nil ? "" : String(cString: arg)
+      )
     }
     return result 
   }
@@ -27,13 +36,6 @@ public enum Process {
   internal static var _unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
     = nil
-
-  internal enum _ProcessArgumentsState {
-    case NotYetComputed
-    case ComputedArguments([String])
-  }
-
-  internal static var _arguments: [String]? = nil 
 
   /// Access to the raw argc value from C.
   public static var argc: CInt {
@@ -54,22 +56,29 @@ public enum Process {
   /// around by the optimizer which will break the data dependence on argc
   /// and argv.
   public static var arguments: [String] {
-    if _arguments == nil { 
-      _arguments = _computeArguments()
+    let argumentsPtr = UnsafeMutablePointer<AnyObject?>(
+      Builtin.addressof(&_swift_stdlib_ProcessArguments))
+
+    // Check whether argument has been initialized.
+    if let arguments = _stdlib_atomicLoadARCRef(object: argumentsPtr) {
+      return (arguments as! _Box<[String]>).value
     }
-    return _arguments!
+
+    let arguments = _Box<[String]>(_computeArguments())
+    _stdlib_atomicInitializeARCRef(object: argumentsPtr, desired: arguments)
+
+    return arguments.value
   } 
 }
 
 /// Intrinsic entry point invoked on entry to a standalone program's "main".
 @_transparent
 public // COMPILER_INTRINSIC
-func _didEnterMain(
-  argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+func _stdlib_didEnterMain(
+  argc argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
 ) {
   // Initialize the Process.argc and Process.unsafeArgv variables with the
   // values that were passed in to main.
   Process._argc = CInt(argc)
   Process._unsafeArgv = UnsafeMutablePointer(argv)
 }
-

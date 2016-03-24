@@ -3,7 +3,7 @@
 import CoreGraphics
 
 public protocol OtherPoint {
-  typealias FloatType
+  associatedtype FloatType
 
   var x: FloatType { get set }
   var y: FloatType { get set }

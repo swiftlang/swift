@@ -141,6 +141,8 @@ SILArgument *SILBasicBlock::insertBBArg(bbarg_iterator Iter, SILType Ty,
 }
 
 void SILBasicBlock::eraseBBArg(int Index) {
+  assert(getBBArg(Index)->use_empty() &&
+         "Erasing block argument that has uses!");
   // Notify the delete handlers that this BB argument is going away.
   getModule().notifyDeleteHandlers(getBBArg(Index));
   BBArgList.erase(BBArgList.begin() + Index);
@@ -194,6 +196,21 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
     for (auto &II : *First)
       II.setDebugScope(B,
                        ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
+  }
+}
+
+/// ScopeCloner expects NewFn to be a clone of the original
+/// function, with all debug scopes and locations still pointing to
+/// the original function.
+ScopeCloner::ScopeCloner(SILFunction &NewFn) : NewFn(NewFn) {
+  // Some clients of SILCloner copy over the original function's
+  // debug scope. Create a new one here.
+  // FIXME: Audit all call sites and make them create the function
+  // debug scope.
+  auto *SILFn = NewFn.getDebugScope()->Parent.get<SILFunction *>();
+  if (SILFn != &NewFn) {
+    SILFn->setInlined();
+    NewFn.setDebugScope(getOrCreateClonedScope(NewFn.getDebugScope()));
   }
 }
 

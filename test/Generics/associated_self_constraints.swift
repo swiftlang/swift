@@ -56,7 +56,7 @@ class Subject<T>: Observer, Observable {
 
 struct X<T> {
 
-  mutating func replace<C: CollectionType where C.Generator.Element == T>(a: C) {
+  mutating func replace<C : Collection where C.Iterator.Element == T>(a: C) {
     for i in a.startIndex..<a.endIndex {
       _ = a[i] as T
     }

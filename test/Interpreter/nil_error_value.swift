@@ -18,6 +18,6 @@ import Foundation
 do {
   try NilError.throwIt()
 } catch {
-  // CHECK: error was: Foundation._GenericObjCError.NilError
+  // CHECK: error was: Foundation._GenericObjCError.nilError
   print("error was: \(String(reflecting: error))")
 }

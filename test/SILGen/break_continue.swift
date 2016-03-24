@@ -1,14 +1,15 @@
 // RUN: %target-swift-frontend -module-name Swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
-enum Optional<T> {
-  case Some(T), None
+enum Optional<Wrapped> {
+  case none
+  case some(Wrapped)
 }
 
-protocol BooleanType {
+protocol Boolean {
   var boolValue: Bool { get }
 }
 
-struct Bool : BooleanType {
+struct Bool : Boolean {
   var value: Builtin.Int1
   func _getBuiltinLogicValue() -> Builtin.Int1 { return value }
   var boolValue: Bool { return self }

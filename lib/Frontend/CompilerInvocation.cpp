@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
+#include "swift/Option/SanitizerOptions.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
@@ -47,7 +48,27 @@ static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
-  llvm::sys::path::append(LibPath, Triple.getArchName());
+  // The linux provided triple for ARM contains a trailing 'l'
+  // denoting little-endian.  This is not used in the path for
+  // libraries.  LLVM matches these SubArchTypes to the generic
+  // ARMSubArch_v7 (for example) type.  If that is the case,
+  // use the base of the architecture type in the library path.
+  if (Triple.isOSLinux()) {
+    switch(Triple.getSubArch()) {
+    default:
+      llvm::sys::path::append(LibPath, Triple.getArchName());
+      break;
+    case llvm::Triple::SubArchType::ARMSubArch_v7:
+      llvm::sys::path::append(LibPath, "armv7");
+      break;
+    case llvm::Triple::SubArchType::ARMSubArch_v6:
+      llvm::sys::path::append(LibPath, "armv6");
+      break;
+    }
+  } else {
+    llvm::sys::path::append(LibPath, Triple.getArchName());
+  }
+
   SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
 }
 
@@ -142,6 +163,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
     Opts.DumpAPIPath = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_group_info_path)) {
+    Opts.GroupInfoPath = A->getValue();
   }
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
@@ -706,6 +731,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPatterns |=
     Args.hasArg(OPT_enable_experimental_patterns);
 
+  Opts.EnableExperimentalPropertyBehaviors |=
+    Args.hasArg(OPT_enable_experimental_property_behaviors);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   
@@ -734,8 +762,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.Playground |= Args.hasArg(OPT_playground);
   Opts.Swift3Migration |= Args.hasArg(OPT_swift3_migration);
   Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
-  Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
-  Opts.StripNSPrefix = Args.hasArg(OPT_enable_strip_ns_prefix);
+  Opts.StripNSPrefix |= Args.hasArg(OPT_enable_strip_ns_prefix);
+  if (Args.hasArg(OPT_disable_infer_iuos)) {
+    Opts.InferIUOs = false;
+  }
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 
@@ -812,7 +842,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (UnsupportedOS) {
-    auto TargetArgOS = TargetComponents.size() > 2 ? TargetComponents.back() : "";
+    auto TargetArgOS = TargetComponents.size() > 2 ? TargetComponents[2] : "";
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
   }
 
@@ -846,9 +876,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     });
   }
 
-  Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
-  Opts.InferDefaultArguments |= Args.hasArg(OPT_enable_infer_default_arguments);
-  Opts.UseSwiftLookupTables |= Args.hasArg(OPT_enable_swift_name_lookup_tables);
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   if (Args.hasArg(OPT_embed_bitcode))
@@ -1043,6 +1070,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
 
+  if (Args.hasArg(OPT_debug_on_sil)) {
+    // Derive the name of the SIL file for debugging from
+    // the regular outputfile.
+    StringRef BaseName = FEOpts.getSingleOutputFilename();
+    // If there are no or multiple outputfiles, derive the name
+    // from the module name.
+    if (BaseName.empty())
+      BaseName = FEOpts.ModuleName;
+    Opts.SILOutputFileNameForDebugging = BaseName.str();
+  }
   return false;
 }
 
@@ -1079,11 +1116,15 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
+                           const SILOptions &SILOpts,
                            StringRef SDKPath,
-                           StringRef ResourceDir) {
+                           StringRef ResourceDir,
+                           const llvm::Triple &Triple) {
   using namespace options;
 
-  if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
+  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
+      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+  } else if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
     if (A->getOption().matches(OPT_g))
       Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
@@ -1149,7 +1190,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
-  if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {
+  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
+    Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
+  } else if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {
     unsigned Index = FrontendOpts.PrimaryInput->Index;
     Opts.MainInputFilename = FrontendOpts.InputFilenames[Index];
   } else if (FrontendOpts.InputFilenames.size() == 1) {
@@ -1174,6 +1217,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
+
+  // This is set to true by default.
+  Opts.UseIncrementalLLVMCodeGen &=
+    !Args.hasArg(OPT_disable_incremental_llvm_codegeneration);
 
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.EmbedMode = IRGenEmbedMode::EmbedBitcode;
@@ -1202,6 +1249,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         Opts.CmdArgs.push_back('\0');
       }
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
+    Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
   }
 
   if (Args.hasArg(OPT_enable_reflection_metadata)) {
@@ -1273,8 +1324,9 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts,
-                     getSDKPath(), SearchPathOpts.RuntimeResourcePath)) {
+  if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts, SILOpts,
+                     getSDKPath(), SearchPathOpts.RuntimeResourcePath,
+                     LangOpts.Target)) {
     return true;
   }
 

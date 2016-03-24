@@ -32,6 +32,7 @@
 #include "swift/Driver/OutputFileMap.h"
 #include "swift/Driver/ToolChain.h"
 #include "swift/Option/Options.h"
+#include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
 #include "llvm/ADT/DenseSet.h"
@@ -1099,6 +1100,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       }
     }
   }
+
+  OI.SelectedSanitizer = SanitizerKind::None;
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
+    OI.SelectedSanitizer = parseSanitizerArgValues(A, TC.getTriple(), Diags);
 }
 
 void Driver::buildActions(const ToolChain &TC,
@@ -2009,24 +2014,7 @@ void Driver::printHelp(bool ShowHidden) const {
 }
 
 static llvm::Triple computeTargetTriple(StringRef DefaultTargetTriple) {
-  llvm::Triple triple = llvm::Triple(DefaultTargetTriple);
-
-  // armv6l and armv7l (which come from linux) are mapped to armv6 and 
-  // armv7 (respectively) within llvm.  When a Triple is created by llvm,
-  // the string is preserved, which keeps the 'l'.  This extra character
-  // causes problems later down the line.
-  // By explicitly setting the architecture to the subtype that it aliases to,
-  // we remove that extra character while not introducing other side effects.
-  if (triple.getOS() == llvm::Triple::Linux) {
-    if (triple.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7) {
-      triple.setArchName("armv7");
-    }
-    if (triple.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v6) {
-      triple.setArchName("armv6");
-    }
-  }
-
-  return triple;
+  return llvm::Triple(DefaultTargetTriple); 
 }
 
 const ToolChain *Driver::getToolChain(const ArgList &Args) const {
@@ -2045,6 +2033,9 @@ const ToolChain *Driver::getToolChain(const ArgList &Args) const {
     case llvm::Triple::Linux:
     case llvm::Triple::FreeBSD:
       TC = new toolchains::GenericUnix(*this, Target);
+      break;
+    case llvm::Triple::Win32:
+      TC = new toolchains::Windows(*this, Target);
       break;
     default:
       TC = nullptr;

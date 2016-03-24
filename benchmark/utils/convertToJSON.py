@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ===--- convertToJSON.py -------------------------------------------------===//
+# ===--- convertToJSON.py ------------------------------------------------===//
 #
 #  This source file is part of the Swift.org open source project
 #
@@ -10,7 +10,7 @@
 #  See http://swift.org/LICENSE.txt for license information
 #  See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
-# ===----------------------------------------------------------------------===//
+# ===---------------------------------------------------------------------===//
 
 # This script converts results from pre-commit benchmark tests to JSON.
 # Usage: PrecommitBench_O | convertToJSON.py
@@ -57,9 +57,10 @@
 #     ]
 # }
 
-import sys
 import json
 import re
+import sys
+
 # Parse lines like this
 # #,TEST,SAMPLES,MIN(ms),MAX(ms),MEAN(ms),SD(ms),MEDIAN(ms)
 SCORERE = re.compile(r"(\d+),[ \t]*(\w+),[ \t]*([\d.]+),[ \t]*([\d.]+)")

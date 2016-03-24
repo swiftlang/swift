@@ -91,8 +91,7 @@ func testChainedAliases(fridge: CCRefrigerator) {
   _ = fridge as CCRefrigerator
 
   _ = fridge as CCFridge
-  _ = fridge as CCFridgeRef // expected-warning{{'CCFridgeRef' is deprecated: renamed to 'CCFridge'}}
-  // expected-note@-1{{use 'CCFridge' instead}}{{17-28=CCFridge}}
+  _ = fridge as CCFridgeRef // expected-error{{'CCFridgeRef' is unavailable in Swift}}
 }
 
 func testBannedImported(object: CCOpaqueTypeRef) {
@@ -136,12 +135,11 @@ func nameCollisions() {
   otherAlias = cfAlias // expected-error {{cannot assign value of type 'MyProblematicAliasRef?' to type 'MyProblematicAlias?'}}
   cfAlias = otherAlias // expected-error {{cannot assign value of type 'MyProblematicAlias?' to type 'MyProblematicAliasRef?'}}
 
-  func isOptionalFloat(inout _: Optional<Float>) {}
+  func isOptionalFloat(_: inout Optional<Float>) {}
   isOptionalFloat(&otherAlias) // okay
 
   var np: NotAProblem?
-  var np2: NotAProblemRef? // expected-warning{{'NotAProblemRef' is deprecated: renamed to 'NotAProblem'}}
-  // expected-note@-1{{use 'NotAProblem' instead}}{{12-26=NotAProblem}}
+  var np2: NotAProblemRef? // expected-error{{'NotAProblemRef' is unavailable in Swift}}
 
   np = np2
   np2 = np

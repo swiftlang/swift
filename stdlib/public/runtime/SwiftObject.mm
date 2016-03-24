@@ -258,7 +258,7 @@ static NSString *_getClassDescription(Class cls) {
   return _objc_rootAutorelease(self);
 }
 - (NSUInteger)retainCount {
-  return reinterpret_cast<HeapObject *>(self)->refCount.getCount();
+  return swift::swift_retainCount(reinterpret_cast<HeapObject *>(self));
 }
 - (BOOL)_isDeallocating {
   return swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
@@ -472,10 +472,21 @@ static uintptr_t const objectPointerIsObjCBit = 0x00000002U;
 
 static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
   assert(!isObjCTaggedPointerOrNull(object));
+#if SWIFT_HAS_OPAQUE_ISAS
+  // Fast path for opaque ISAs.  We don't want to call _swift_getClassOfAllocated
+  // as that will call object_getClass.  Instead we can look at the bits in the
+  // ISA and tell if its a non-pointer opaque ISA which means it is definitely
+  // an ObjC object and doesn't use native swift reference counting.
+  if (_swift_isNonPointerIsaObjCClass(object))
+    return false;
+  return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocatedFromPointer(object));
+#endif
   return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
 }
 
-void swift::swift_unknownRetain_n(void *object, int n) {
+SWIFT_RUNTIME_EXPORT
+void swift::swift_unknownRetain_n(void *object, int n)
+    SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
   if (usesNativeSwiftReferenceCounting_allocated(object)) {
     swift_retain_n(static_cast<HeapObject *>(object), n);
@@ -485,7 +496,9 @@ void swift::swift_unknownRetain_n(void *object, int n) {
     objc_retain(static_cast<id>(object));
 }
 
-void swift::swift_unknownRelease_n(void *object, int n) {
+SWIFT_RUNTIME_EXPORT
+void swift::swift_unknownRelease_n(void *object, int n)
+    SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
   if (usesNativeSwiftReferenceCounting_allocated(object))
     return swift_release_n(static_cast<HeapObject *>(object), n);
@@ -493,7 +506,9 @@ void swift::swift_unknownRelease_n(void *object, int n) {
     objc_release(static_cast<id>(object));
 }
 
-void swift::swift_unknownRetain(void *object) {
+SWIFT_RUNTIME_EXPORT
+void swift::swift_unknownRetain(void *object)
+    SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
   if (usesNativeSwiftReferenceCounting_allocated(object)) {
     swift_retain(static_cast<HeapObject *>(object));
@@ -502,17 +517,19 @@ void swift::swift_unknownRetain(void *object) {
   objc_retain(static_cast<id>(object));
 }
 
-void swift::swift_unknownRelease(void *object) {
+SWIFT_RUNTIME_EXPORT
+void swift::swift_unknownRelease(void *object)
+    SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
   if (usesNativeSwiftReferenceCounting_allocated(object))
-    return swift_release(static_cast<HeapObject *>(object));
+    return SWIFT_RT_ENTRY_CALL(swift_release)(static_cast<HeapObject *>(object));
   return objc_release(static_cast<id>(object));
 }
 
 /// Return true iff the given BridgeObject is not known to use native
 /// reference-counting.
 ///
-/// Requires: object does not encode a tagged pointer
+/// Precondition: object does not encode a tagged pointer
 static bool isNonNative_unTagged_bridgeObject(void *object) {
   static_assert((heap_object_abi::SwiftSpareBitsMask & objectPointerIsObjCBit) ==
                 objectPointerIsObjCBit,
@@ -524,12 +541,14 @@ static bool isNonNative_unTagged_bridgeObject(void *object) {
 // Mask out the spare bits in a bridgeObject, returning the object it
 // encodes.
 ///
-/// Requires: object does not encode a tagged pointer
+/// Precondition: object does not encode a tagged pointer
 static void* toPlainObject_unTagged_bridgeObject(void *object) {
   return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
 }
 
-void *swift::swift_bridgeObjectRetain(void *object) {
+SWIFT_RUNTIME_EXPORT
+void *swift::swift_bridgeObjectRetain(void *object)
+    SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
   if (isObjCTaggedPointer(object))
     return object;
@@ -549,7 +568,9 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 #endif
 }
 
-void swift::swift_bridgeObjectRelease(void *object) {
+SWIFT_RUNTIME_EXPORT
+void swift::swift_bridgeObjectRelease(void *object)
+    SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
   if (isObjCTaggedPointer(object))
     return;
@@ -566,7 +587,9 @@ void swift::swift_bridgeObjectRelease(void *object) {
 #endif
 }
 
-void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
+SWIFT_RUNTIME_EXPORT
+void *swift::swift_bridgeObjectRetain_n(void *object, int n)
+    SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
   if (isObjCTaggedPointer(object))
     return object;
@@ -589,7 +612,9 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
 #endif
 }
 
-void swift::swift_bridgeObjectRelease_n(void *object, int n) {
+SWIFT_RUNTIME_EXPORT
+void swift::swift_bridgeObjectRelease_n(void *object, int n)
+    SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
   if (isObjCTaggedPointer(object))
     return;
@@ -1170,8 +1195,9 @@ void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
   (void)registered;
 }
 
-SWIFT_RUNTIME_EXPORT
-extern "C" Class swift_getInitializedObjCClass(Class c) {
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C" Class swift_getInitializedObjCClass(Class c)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
   // Used when we have class metadata and we want to ensure a class has been
   // initialized by the Objective C runtime. We need to do this because the
   // class "c" might be valid metadata, but it hasn't been initialized yet.
@@ -1227,9 +1253,10 @@ static bool usesNativeSwiftReferenceCounting_nonNull(
 }
 #endif 
 
+SWIFT_RT_ENTRY_VISIBILITY
 bool swift::swift_isUniquelyReferenced_nonNull_native(
   const HeapObject* object
-) {
+) SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(object != nullptr);
   assert(!object->refCount.isDeallocating());
   return object->refCount.isUniquelyReferenced();
@@ -1237,7 +1264,7 @@ bool swift::swift_isUniquelyReferenced_nonNull_native(
 
 bool swift::swift_isUniquelyReferenced_native(const HeapObject* object) {
   return object != nullptr
-    && swift::swift_isUniquelyReferenced_nonNull_native(object);
+    && swift::SWIFT_RT_ENTRY_CALL(swift_isUniquelyReferenced_nonNull_native)(object);
 }
 
 bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
@@ -1246,7 +1273,7 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
 #if SWIFT_OBJC_INTEROP
     usesNativeSwiftReferenceCounting_nonNull(object) &&
 #endif 
-    swift_isUniquelyReferenced_nonNull_native((HeapObject*)object);
+    SWIFT_RT_ENTRY_CALL(swift_isUniquelyReferenced_nonNull_native)((HeapObject*)object);
 }
 
 // Given an object reference, return true iff it is non-nil and refers
@@ -1275,10 +1302,12 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   // object is going to be a negligible cost for a possible big win.
 #if SWIFT_OBJC_INTEROP
   return !isNonNative_unTagged_bridgeObject(bridgeObject)
-    ? swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object)
-    : swift_isUniquelyReferencedNonObjC_nonNull(object);
+             ? SWIFT_RT_ENTRY_CALL(swift_isUniquelyReferenced_nonNull_native)(
+                   (const HeapObject *)object)
+             : swift_isUniquelyReferencedNonObjC_nonNull(object);
 #else
-  return swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object);
+  return SWIFT_RT_ENTRY_CALL(swift_isUniquelyReferenced_nonNull_native)(
+      (const HeapObject *)object);
 #endif
 }
 
@@ -1323,9 +1352,10 @@ bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
 // Given a non-@objc object reference, return true iff the
 // object is non-nil and either has a strong reference count of 1
 // or is pinned.
+SWIFT_RT_ENTRY_VISIBILITY
 bool swift::swift_isUniquelyReferencedOrPinned_native(
-  const HeapObject* object
-) {
+  const HeapObject* object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
   return object != nullptr
     && swift_isUniquelyReferencedOrPinned_nonNull_native(object);
 }
@@ -1333,8 +1363,10 @@ bool swift::swift_isUniquelyReferencedOrPinned_native(
 /// Given a non-nil native swift object reference, return true if
 /// either the object has a strong reference count of 1 or its
 /// pinned flag is set.
+SWIFT_RT_ENTRY_VISIBILITY
 bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
-                                                    const HeapObject* object) {
+                                                    const HeapObject* object)
+  SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(object != nullptr);
   assert(!object->refCount.isDeallocating());
   return object->refCount.isUniquelyReferencedOrPinned();

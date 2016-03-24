@@ -288,12 +288,12 @@ string.concat(lhs: String, rhs: String) -> String
   This operation can be optimized away in case of both operands
   being string literals. In this case, it can be replaced by
   a string literal representing a concatenation of both operands.
-
-string.makeUTF8(start: RawPointer, byteSize: Word, isASCII: Int1) -> String
-
+  
+string.makeUTF8(start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1) -> String
+  
   Converts a built-in UTF8-encoded string literal into a string.
 
-string.makeUTF16(start: RawPointer, numberOfCodeUnits: Word) -> String
+string.makeUTF16(start: RawPointer, utf16CodeUnitCount: Word) -> String
 
   Converts a built-in UTF16-encoded string literal into a string.
 

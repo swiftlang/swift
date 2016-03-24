@@ -183,16 +183,9 @@ public:
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
   SILType getFunctionInterfaceResultType() const {
-    return castTo<SILFunctionType>()->getSemanticResultSILType();
+    return castTo<SILFunctionType>()->getSILResult();
   }
 
-  /// Returns true if this function type has an indirect argument.
-  ///
-  /// The SILType must refer to a function type.
-  bool isFunctionTypeWithIndirectResult() const {
-    return castTo<SILFunctionType>()->hasIndirectResult();
-  }
-  
   /// Returns the AbstractCC of a function type.
   /// The SILType must refer to a function type.
   SILFunctionTypeRepresentation getFunctionRepresentation() const {
@@ -425,10 +418,19 @@ public:
     return SILType::getPrimitiveObjectType(superclass->getCanonicalType());
   }
 
-  /// Return true if Ty is a subtype of this SILType, or null otherwise.
-  bool isSuperclassOf(SILType Ty) const {
-    return getSwiftRValueType()->isSuperclassOf(Ty.getSwiftRValueType(),
-                                                nullptr);
+  /// Return true if Ty is a subtype of this exact SILType, or false otherwise.
+  bool isExactSuperclassOf(SILType Ty) const {
+    return getSwiftRValueType()->isExactSuperclassOf(Ty.getSwiftRValueType(),
+                                                     nullptr);
+  }
+
+  /// Return true if Ty is a subtype of this SILType, or if this SILType
+  /// contains archetypes that can be found to form a supertype of Ty, or false
+  /// otherwise.
+  bool isBindableToSuperclassOf(SILType Ty) const {
+    return getSwiftRValueType()->isBindableToSuperclassOf(
+                                                        Ty.getSwiftRValueType(),
+                                                        nullptr);
   }
 
   /// Transform the function type SILType by replacing all of its interface
@@ -569,19 +571,22 @@ SILFunctionType::getParameterSILType(const SILParameterInfo &param) {
   return param.getSILType();
 }
 
-inline SILType SILFunctionType::getSILResult() const {
-  return getResult().getSILType();
-}
-
 inline SILType SILResultInfo::getSILType() const {
-  return SILType::getPrimitiveObjectType(getType());
+  if (isIndirect()) {
+    return SILType::getPrimitiveAddressType(getType());
+  } else {
+    return SILType::getPrimitiveObjectType(getType());    
+  }
 }
 
-inline SILType SILFunctionType::getSemanticResultSILType() const {
-  return (hasIndirectResult() ? getIndirectResult().getSILType()
-                              : getResult().getSILType());
-}  
-  
+inline SILType SILFunctionType::getSILArgumentType(unsigned index) const {
+  if (index < getNumIndirectResults()) {
+    return getIndirectResults()[index].getSILType();
+  } else {
+    return getParameters()[index - getNumIndirectResults()].getSILType();
+  }
+}
+
 inline SILType SILBlockStorageType::getCaptureAddressType() const {
   return SILType::getPrimitiveAddressType(getCaptureType());
 }

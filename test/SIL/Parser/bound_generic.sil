@@ -29,9 +29,9 @@ bb1:
   br bb3
 
 bb3:
-  %27 = function_ref @_TFs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
-  // CHECK: apply %{{[0-9]+}}<()>(%{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
-  %28 = apply %27<()>(%3) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
+  %27 = function_ref @_TFs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  // CHECK: apply %{{[0-9]+}}<()>(%{{[0-9]+}}) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  %28 = apply %27<()>(%3) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
   br bb4
 
 bb4:
@@ -43,4 +43,4 @@ bb4:
 }
 
 sil [transparent] @_TFs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
-sil [transparent] @_TFs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
+sil [transparent] @_TFs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>

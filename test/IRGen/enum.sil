@@ -1216,7 +1216,7 @@ enum DynamicSinglePayload<T> {
 
 // CHECK: define{{( protected)?}} void @dynamic_single_payload_switch(%O4enum20DynamicSinglePayload* noalias nocapture, %swift.type* %T) {{.*}} {
 // CHECK:   [[OPAQUE_ENUM:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
-// CHECK:   [[CASE_INDEX:%.*]] = call i32 @swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE_ENUM]], %swift.type* %T, i32 3)
+// CHECK:   [[CASE_INDEX:%.*]] = call i32 @rt_swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE_ENUM]], %swift.type* %T, i32 3)
 // CHECK:   switch i32 [[CASE_INDEX]], label {{%.*}} [
 // CHECK:     i32 -1, label {{%.*}}
 // CHECK:     i32 2, label {{%.*}}
@@ -1241,8 +1241,8 @@ end:
 
 // CHECK: define{{( protected)?}} void @dynamic_single_payload_inject_x(%O4enum20DynamicSinglePayload* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T) {{.*}} {
 // CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
-// CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
-sil @dynamic_single_payload_inject_x : $<T> (@out DynamicSinglePayload<T>, @in T) -> () {
+// CHECK:   call void @rt_swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
+sil @dynamic_single_payload_inject_x : $<T> (@in T) -> @out DynamicSinglePayload<T> {
 entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
   inject_enum_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.x!enumelt.1
   %v = tuple ()
@@ -1251,8 +1251,8 @@ entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
 
 // CHECK: define{{( protected)?}} void @dynamic_single_payload_inject_y(%O4enum20DynamicSinglePayload* noalias nocapture sret, %swift.type* %T) {{.*}} {
 // CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
-// CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
-sil @dynamic_single_payload_inject_y : $<T> (@out DynamicSinglePayload<T>) -> () {
+// CHECK:   call void @rt_swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
+sil @dynamic_single_payload_inject_y : $<T> () -> @out DynamicSinglePayload<T> {
 entry(%r : $*DynamicSinglePayload<T>):
   inject_enum_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.y!enumelt
   %v = tuple ()
@@ -2423,13 +2423,13 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 // CHECK-32-LABEL: define{{( protected)?}} i1 @optional_optional_class_protocol(i32, i32)
 // CHECK-32:         icmp eq i32 %0, 1
 enum Optionable<T> {
-  case Some(T), None
+  case some(T), none
 }
 sil @optional_optional_class_protocol : $@convention(thin) Optionable<Optionable<PC>> -> Builtin.Int1 {
 entry(%o : $Optionable<Optionable<PC>>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
-  %r = select_enum %o : $Optionable<Optionable<PC>>, case #Optionable.Some!enumelt.1: %t, case #Optionable.None!enumelt: %f : $Builtin.Int1
+  %r = select_enum %o : $Optionable<Optionable<PC>>, case #Optionable.some!enumelt.1: %t, case #Optionable.none!enumelt: %f : $Builtin.Int1
   return %r : $Builtin.Int1
 }
 
@@ -2446,8 +2446,8 @@ struct ContainsUnownedObjC {
 // CHECK-native-32:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned : $@convention(thin) () -> (Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>) {
 entry:
-  %a = enum $Optionable<ContainsUnowned>, #Optionable.None!enumelt
-  %b = enum $Optionable<Optionable<ContainsUnowned>>, #Optionable.None!enumelt
+  %a = enum $Optionable<ContainsUnowned>, #Optionable.none!enumelt
+  %b = enum $Optionable<Optionable<ContainsUnowned>>, #Optionable.none!enumelt
   %t = tuple (%a : $Optionable<ContainsUnowned>, %b : $Optionable<Optionable<ContainsUnowned>>)
   return %t : $(Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>)
 }
@@ -2458,8 +2458,8 @@ entry:
 // CHECK-native-32:    ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned_objc : $@convention(thin) () -> (Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>) {
 entry:
-  %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.None!enumelt
-  %b = enum $Optionable<Optionable<ContainsUnownedObjC>>, #Optionable.None!enumelt
+  %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.none!enumelt
+  %b = enum $Optionable<Optionable<ContainsUnownedObjC>>, #Optionable.none!enumelt
   %t = tuple (%a : $Optionable<ContainsUnownedObjC>, %b : $Optionable<Optionable<ContainsUnownedObjC>>)
   return %t : $(Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>)
 }
@@ -2468,22 +2468,22 @@ entry:
 sil @empty_payload_enum_in_enum : $@convention(thin) (Int32) -> Optional<(Optional<()>, Int32)> {
 entry(%x : $Int32):
   %a = tuple ()
-  %b = enum $Optional<()>, #Optional.Some!enumelt.1, %a : $()
+  %b = enum $Optional<()>, #Optional.some!enumelt.1, %a : $()
   %c = tuple (%b : $Optional<()>, %x : $Int32)
   // CHECK-64: [[INT_ZEXT:%.*]] = zext i32 %0 to i64
   // CHECK-64: [[INT_SHL:%.*]] = shl i64 [[INT_ZEXT]], 32
   // CHECK-64: [[COMBINE:%.*]] = or i64 0, [[INT_SHL]]
-  %d = enum $Optional<(Optional<()>, Int32)>, #Optional.Some!enumelt.1, %c : $(Optional<()>, Int32)
+  %d = enum $Optional<(Optional<()>, Int32)>, #Optional.some!enumelt.1, %c : $(Optional<()>, Int32)
   // CHECK-64: [[BIT:%.*]] = trunc i64 [[COMBINE]] to i1
   // CHECK-64: [[INT_SHR:%.*]] = lshr i64 [[COMBINE]], 32
   // CHECK-64: [[INT:%.*]] = trunc i64 [[INT_SHR]] to i32
-  %e = unchecked_enum_data %d : $Optional<(Optional<()>, Int32)>, #Optional.Some!enumelt.1
+  %e = unchecked_enum_data %d : $Optional<(Optional<()>, Int32)>, #Optional.some!enumelt.1
   return %d : $Optional<(Optional<()>, Int32)>
 }
 
 sil @optional_float80 : $@convention(thin) Float80 -> () {
 entry(%x : $Float80):
-  %y = enum $Optional<Float80>, #Optional.Some!enumelt.1, %x : $Float80
+  %y = enum $Optional<Float80>, #Optional.some!enumelt.1, %x : $Float80
   return undef : $()
 }
 
@@ -2501,14 +2501,14 @@ entry(%x : $*StructWithWeakVar?):
   // CHECK-64:      icmp eq [[WORD]] {{%.*}}, 0
   // CHECK-64-NEXT: icmp eq [[WORD]] {{%.*}}, 1
   switch_enum_addr %x : $*StructWithWeakVar?,
-    case #Optional.Some!enumelt.1: a,
-    case #Optional.None!enumelt:   b
+    case #Optional.some!enumelt.1: a,
+    case #Optional.none!enumelt:   b
 a:
   br x
 b:
   // CHECK-64:      store [[WORD]] 0
   // CHECK-64:      store [[WORD]] 1
-  inject_enum_addr %x : $*StructWithWeakVar?, #Optional.None!enumelt
+  inject_enum_addr %x : $*StructWithWeakVar?, #Optional.none!enumelt
   br x
 
 x:
@@ -2566,8 +2566,8 @@ bb4:
 // -- Fill function for dynamic singleton. The value witness table flags just
 //    get copied over from the element.
 // CHECK: define{{( protected)?}} private %swift.type* @create_generic_metadata_DynamicSingleton(%swift.type_pattern*, i8**) {{.*}} {
-// CHECK:   [[T0:%.*]] = load i8*, i8** %1
-// CHECK:   [[T:%.*]] = bitcast i8* [[T0]] to %swift.type*
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   [[T:%T]] = load %swift.type*, %swift.type** [[T0]],
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*

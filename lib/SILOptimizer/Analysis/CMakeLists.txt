@@ -4,12 +4,14 @@ set(ANALYSIS_SOURCES
   Analysis/Analysis.cpp
   Analysis/ArraySemantic.cpp
   Analysis/BasicCalleeAnalysis.cpp
+  Analysis/CallerAnalysis.cpp
   Analysis/CFG.cpp
   Analysis/ClassHierarchyAnalysis.cpp
   Analysis/ColdBlockInfo.cpp
   Analysis/DestructorAnalysis.cpp
   Analysis/EscapeAnalysis.cpp
   Analysis/FunctionOrder.cpp
+  Analysis/FunctionSignatureAnalysis.cpp
   Analysis/IVAnalysis.cpp
   Analysis/LoopAnalysis.cpp
   Analysis/LoopRegionAnalysis.cpp

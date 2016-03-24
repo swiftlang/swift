@@ -22,6 +22,8 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Range.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/AttrKind.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
@@ -37,55 +39,7 @@ class ASTContext;
 struct PrintOptions;
 class Decl;
 class ClassDecl;
-
-/// The associativity of a binary operator.
-enum class Associativity {
-  /// Non-associative operators cannot be written next to other
-  /// operators with the same precedence.  Relational operators are
-  /// typically non-associative.
-  None,
-
-  /// Left-associative operators associate to the left if written next
-  /// to other left-associative operators of the same precedence.
-  Left,
-
-  /// Right-associative operators associate to the right if written
-  /// next to other right-associative operators of the same precedence.
-  Right
-};
-
-/// The kind of unary operator, if any.
-enum class UnaryOperatorKind : uint8_t {
-  None,
-  Prefix,
-  Postfix
-};
-
-/// Access control levels.
-// These are used in diagnostics, so please do not reorder existing values.
-enum class Accessibility : uint8_t {
-  /// Private access is limited to the current file.
-  Private = 0,
-  /// Internal access is limited to the current module.
-  Internal,
-  /// Public access is not limited.
-  Public
-};
-
-enum class InlineKind : uint8_t {
-  Never = 0,
-  Always = 1
-};
-
-/// This enum represents the possible values of the @effects attribute.
-/// These values are ordered from the strongest guarantee to the weakest,
-/// so please do not reorder existing values.
-enum class EffectsKind : uint8_t {
-  ReadNone,
-  ReadOnly,
-  ReadWrite,
-  Unspecified
-};
+struct TypeLoc;
 
 class InfixData {
   unsigned Precedence : 8;
@@ -148,20 +102,6 @@ namespace IntrinsicPrecedences {
     MaxPrecedence = 255
   };
 }
-
-  
-enum DeclAttrKind : unsigned {
-#define DECL_ATTR(_, NAME, ...) DAK_##NAME,
-#include "swift/AST/Attr.def"
-  DAK_Count
-};
-
-// Define enumerators for each type attribute, e.g. TAK_weak.
-enum TypeAttrKind {
-#define TYPE_ATTR(X) TAK_##X,
-#include "swift/AST/Attr.def"
-  TAK_Count
-};
 
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {
@@ -423,6 +363,10 @@ public:
     return getOptions(getKind());
   }
 
+  /// Prints this attribute (if applicable), returning `true` if anything was
+  /// printed.
+  bool printImpl(ASTPrinter &Printer, const PrintOptions &Options) const;
+
 public:
   DeclAttrKind getKind() const {
     return static_cast<DeclAttrKind>(DeclAttrBits.Kind);
@@ -571,6 +515,24 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SILGenName;
+  }
+};
+
+/// Defines the @_cdecl attribute.
+class CDeclAttr : public DeclAttribute {
+public:
+  CDeclAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+    : DeclAttribute(DAK_CDecl, AtLoc, Range, Implicit),
+      Name(Name) {}
+
+  CDeclAttr(StringRef Name, bool Implicit)
+    : CDeclAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+
+  /// The symbol name.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_CDecl;
   }
 };
 
@@ -1110,10 +1072,10 @@ public:
 ///
 /// \code
 /// struct X {
-///   @warn_unused_result(message="this string affects your health")
+///   @warn_unused_result(message: "this string affects your health")
 ///   func methodA() -> String { ... }
 ///
-///   @warn_unused_result(mutable_variant="jumpInPlace")
+///   @warn_unused_result(mutable_variant: "jumpInPlace")
 ///   func jump() -> X { ... }
 ///
 ///   mutating func jumpInPlace() { ... }
@@ -1173,6 +1135,36 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Swift3Migration;
+  }
+};
+
+/// The @_specialize attribute, which forces specialization on the specified
+/// type list.
+class SpecializeAttr : public DeclAttribute {
+  unsigned numTypes;
+  ConcreteDeclRef specializedDecl;
+
+  TypeLoc *getTypeLocData() {
+    return reinterpret_cast<TypeLoc *>(this + 1);
+  }
+
+  SpecializeAttr(SourceLoc atLoc, SourceRange Range,
+                 ArrayRef<TypeLoc> typeLocs);
+
+public:
+  static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
+                                SourceRange Range, ArrayRef<TypeLoc> typeLocs);
+
+  ArrayRef<TypeLoc> getTypeLocs() const;
+
+  MutableArrayRef<TypeLoc> getTypeLocs();
+
+  ConcreteDeclRef getConcreteDecl() const { return specializedDecl; }
+
+  void setConcreteDecl(ConcreteDeclRef ref) { specializedDecl = ref; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Specialize;
   }
 };
 

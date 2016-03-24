@@ -435,6 +435,15 @@ private:
   /// after reading. Nothing should ever follow a MEMBERS record.
   bool readMembers(SmallVectorImpl<Decl *> &Members);
 
+  /// Populates the protocol's default witness table.
+  ///
+  /// Returns true if there is an error.
+  ///
+  /// Note: this destroys the cursor's position in the stream. Furthermore,
+  /// because it reads from the cursor, it is not possible to reset the cursor
+  /// after reading. Nothing should ever follow a DEFAULT_WITNESS_TABLE record.
+  bool readDefaultWitnessTable(ProtocolDecl *proto);
+
   /// Resolves a cross-reference, starting from the given module.
   ///
   /// Note: this destroys the cursor's position in the stream. Furthermore,
@@ -618,10 +627,14 @@ public:
                                        uint64_t contextData) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
+  Optional<StringRef> getSourceFileNameById(unsigned Id) const;
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
+  Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
+  Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
   void collectAllGroups(std::vector<StringRef> &Names) const;
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
   Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
+  Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
 

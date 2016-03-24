@@ -12,7 +12,7 @@ struct Y {
   func f1() -> Float { return 0.0 }
 }
 
-func testParenOverloads(inout x: Int, y: Y) {
+func testParenOverloads(x: inout Int, y: Y) {
   x = f0(x)
   x = (f0)(x)
   x = ((f0))(x)

@@ -41,7 +41,7 @@ function(get_test_dependencies SDK result_var_name)
 
   set(deps_binaries
       swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract
-      lldb-moduleimport-test)
+      lldb-moduleimport-test swift-reflection-test)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries llc)
   endif()
@@ -57,6 +57,7 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "TVOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "WATCHOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "LINUX") OR
+     ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD"))
     # No extra dependencies.
   else()

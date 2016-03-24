@@ -18,6 +18,7 @@
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/ClangImporter/ClangModule.h" // FIXME: SDK overlay semantics
 
@@ -47,6 +48,7 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
+  IGNORED_ATTR(CDecl)
   IGNORED_ATTR(SILGenName)
   IGNORED_ATTR(Available)
   IGNORED_ATTR(Convenience)
@@ -70,13 +72,16 @@ public:
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(Semantics)
+  IGNORED_ATTR(Specialize)
   IGNORED_ATTR(Swift3Migration)
   IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
+  IGNORED_ATTR(Versioned)
   IGNORED_ATTR(WarnUnusedResult)
+  IGNORED_ATTR(ShowInInterface)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -647,9 +652,15 @@ public:
     IGNORED_ATTR(Swift3Migration)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
+    IGNORED_ATTR(ShowInInterface)
+
+    // FIXME: We actually do have things to enforce for versioned API.
+    IGNORED_ATTR(Versioned)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
+  
+  void visitCDeclAttr(CDeclAttr *attr);
 
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
@@ -680,6 +691,7 @@ public:
   void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
 
   void visitWarnUnusedResultAttr(WarnUnusedResultAttr *attr);
+  void visitSpecializeAttr(SpecializeAttr *attr);
 };
 } // end anonymous namespace
 
@@ -755,7 +767,8 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
       if (auto nominal = ty->getAnyNominal())
         if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
           if (nominal->classifyAsOptionalType() == OTK_None)
-            if (TC.isTriviallyRepresentableInObjC(cast<FuncDecl>(D), ty))
+            if (ty->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC,
+                                               cast<FuncDecl>(D)))
               break;  // Looks ok.
     }
     if (checkObjectOrOptionalObjectType(TC, D, paramList->get(0)))
@@ -849,6 +862,18 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     TC.diagnose(EnclosingDecl->getLoc(),
                 diag::availability_decl_more_than_enclosing_enclosing_here);
   }
+}
+
+void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
+  // Only top-level func decls are currently supported.
+  if (D->getDeclContext()->isTypeContext())
+    TC.diagnose(attr->getLocation(),
+                diag::cdecl_not_at_top_level);
+  
+  // The name must not be empty.
+  if (attr->Name.empty())
+    TC.diagnose(attr->getLocation(),
+                diag::cdecl_empty_name);
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
@@ -1220,7 +1245,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   auto fn = cast<AbstractFunctionDecl>(D);
   for (auto paramList : fn->getParameterLists()) {
     for (auto param : *paramList)
-      if (hasThrowingFunctionParameter(param->getType()->getCanonicalType()))
+      if (hasThrowingFunctionParameter(param->getType()->lookThroughAllAnyOptionalTypes()->getCanonicalType()))
         return;
   }
 
@@ -1352,6 +1377,136 @@ void AttributeChecker::visitWarnUnusedResultAttr(WarnUnusedResultAttr *attr) {
       return;      
     }
   }
+}
+
+/// Check that the @_specialize type list has the correct number of entries.
+/// Resolve each type in the list to a concrete type.
+/// Create a Substitution list mapping each nested archetype to a concrete
+/// type, and resolve conformances for each generic parameter requirement.
+/// Store the Substitution list in a ConcreteDeclRef attached to the attribute.
+void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
+  DeclContext *DC = D->getDeclContext();
+  auto *FD = cast<AbstractFunctionDecl>(D);
+  auto *genericSig = FD->getGenericSignature();
+
+  unsigned numTypes = genericSig->getGenericParams().size();
+  if (numTypes != attr->getTypeLocs().size()) {
+    TC.diagnose(attr->getLocation(), diag::type_parameter_count_mismatch,
+                FD->getName(), numTypes, attr->getTypeLocs().size(),
+                numTypes > attr->getTypeLocs().size());
+    return;
+  }
+  // Initialize each TypeLoc in this attribute with a concrete type,
+  // and populate a substitution map from GenericTypeParamType to concrete Type.
+  TypeSubstitutionMap subMap;
+  for (unsigned paramIdx = 0; paramIdx < numTypes; ++paramIdx) {
+
+    auto *genericTypeParamTy = genericSig->getGenericParams()[paramIdx];
+    auto &tl = attr->getTypeLocs()[paramIdx];
+
+    auto ty = TC.resolveType(tl.getTypeRepr(), DC, None);
+    if (ty && !ty->is<ErrorType>()) {
+      if (ty->getCanonicalType()->hasArchetype()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::cannot_partially_specialize_generic_function);
+        return;
+      }
+      tl.setType(ty, /*validated=*/true);
+      subMap[genericTypeParamTy->getCanonicalType().getPointer()] = ty;
+    }
+  }
+  // Build a list of Substitutions.
+  //
+  // This walks the generic signature's requirements, similar to
+  // Solution::computeSubstitutions but with several differences:
+  // - It does not operate within the type constraint system.
+  // - This is the first point at which diagnostics must be emitted for
+  //   bad conformances. Self and super requirements must also be
+  //   checked and diagnosed.
+  // - This does not make use of Archetypes since it is directly substituting
+  //   in place of GenericTypeParams.
+  SmallVector<Substitution, 4> substitutions;
+  auto currentModule = FD->getParentModule();
+  Type currentFromTy;
+  Type currentReplacement;
+  SmallVector<ProtocolConformanceRef, 4> currentConformances;
+  for (const auto &req : genericSig->getRequirements()) {
+
+    switch (req.getKind()) {
+    case RequirementKind::WitnessMarker:
+      // Flush the current conformances.
+      if (currentFromTy) {
+        substitutions.push_back({
+          currentReplacement,
+          DC->getASTContext().AllocateCopy(currentConformances)
+        });
+        currentConformances.clear();
+      }
+      // Each witness marker starts a new substitution.
+      currentFromTy = req.getFirstType();
+      currentReplacement = currentFromTy.subst(currentModule, subMap, None);
+      break;
+
+    case RequirementKind::Conformance: {
+      assert(currentFromTy->getCanonicalType()
+             == req.getFirstType()->getCanonicalType() && "bad WitnessMarker");
+      // Get the conformance and record it.
+      auto protoType = req.getSecondType()->castTo<ProtocolType>();
+      ProtocolConformance *conformance = nullptr;
+      bool conforms =
+        TC.conformsToProtocol(currentReplacement,
+                              protoType->getDecl(),
+                              DC,
+                              (ConformanceCheckFlags::InExpression|
+                               ConformanceCheckFlags::Used),
+                              &conformance);
+      if (!conforms || !conformance) {
+        TC.diagnose(attr->getLocation(),
+                    diag::cannot_convert_argument_value_protocol,
+                    currentReplacement, protoType);
+        // leaks prior conformances
+        return;
+      }
+      currentConformances.push_back(
+        ProtocolConformanceRef(protoType->getDecl(), conformance));
+      break;
+    }
+    case RequirementKind::Superclass: {
+      // Superclass requirements aren't recorded in substitutions.
+      auto firstTy = req.getFirstType().subst(currentModule, subMap, None);
+      auto superTy = req.getSecondType().subst(currentModule, subMap, None);
+      if (!TC.isSubtypeOf(firstTy, superTy, DC)) {
+        TC.diagnose(attr->getLocation(), diag::type_does_not_inherit,
+                    FD->getType(), firstTy, superTy);
+      }
+      break;
+    }
+    case RequirementKind::SameType: {
+      // Same-type requirements are type checked but not recorded in
+      // substitutions.
+      auto firstTy = req.getFirstType().subst(currentModule, subMap, None);
+      auto sameTy = req.getSecondType().subst(currentModule, subMap, None);
+      if (!firstTy->isEqual(sameTy)) {
+        TC.diagnose(attr->getLocation(), diag::types_not_equal, FD->getType(),
+                    firstTy, sameTy);
+
+        return;
+      }
+      break;
+    }
+    }
+  }
+  // Flush the final conformances.
+  if (currentFromTy) {
+    substitutions.push_back({
+      currentReplacement,
+      DC->getASTContext().AllocateCopy(currentConformances),
+    });
+    currentConformances.clear();
+  }
+  // Package the Substitution list in the SpecializeAttr's ConcreteDeclRef.
+  attr->setConcreteDecl(
+    ConcreteDeclRef(DC->getASTContext(), FD, substitutions));
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

@@ -87,20 +87,20 @@
 // FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  case Mince{{$}}
-// FOUNDATION-NEXT: {{^}}  case Quince{{$}}
+// FOUNDATION-NEXT: {{^}}  case mince{{$}}
+// FOUNDATION-NEXT: {{^}}  case quince{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSetType {{{$}}
+// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
-// FOUNDATION-NEXT: {{^}}  static var EnableMince: NSRuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  static var EnableQuince: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var enableMince: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var enableQuince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
-// FOUNDATION-NEXT: @available(*, unavailable, message="Zone-based memory management is unavailable")
+// FOUNDATION-NEXT: @available(*, unavailable, message: "Zone-based memory management is unavailable")
 // FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, _ name: String)
 
 // CTYPESBITS-NOT: FooStruct1
@@ -113,8 +113,8 @@
 // CHECK-NULLABILITY: class SomeClass {
 // CHECK-NULLABILITY:   class func methodA(obj: SomeClass?) -> AnyObject{{$}}
 // CHECK-NULLABILITY:   func methodA(obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   class func methodB(block: ((Int32, Int32) -> Int32)?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodB(block: ((Int32, Int32) -> Int32)?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   class func methodB(block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   func methodB(block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
 // CHECK-NULLABILITY:   func methodC() -> AnyObject?
 // CHECK-NULLABILITY:   var property: AnyObject?
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}

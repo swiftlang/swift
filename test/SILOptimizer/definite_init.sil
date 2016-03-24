@@ -70,7 +70,7 @@ struct AddressOnlyStruct {
 }
 
 /// returns_generic_struct - This returns a struct by reference.
-sil @returns_generic_struct : $@convention(thin) (@out AddressOnlyStruct) -> ()
+sil @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
 
 // There should be no error in this function.
 // CHECK-LABEL: sil @call_struct_return_function
@@ -80,8 +80,8 @@ bb0:
   %0a = project_box %0 : $@box AddressOnlyStruct
   %1 = mark_uninitialized [var] %0a : $*AddressOnlyStruct
 
-  %2 = function_ref @returns_generic_struct : $@convention(thin) (@out AddressOnlyStruct) -> ()
-  %3 = apply %2(%1) : $@convention(thin) (@out AddressOnlyStruct) -> ()
+  %2 = function_ref @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
+  %3 = apply %2(%1) : $@convention(thin) () -> @out AddressOnlyStruct
   %4 = struct_element_addr %1 : $*AddressOnlyStruct, #AddressOnlyStruct.b
   %5 = load %4 : $*Int
   strong_release %0 : $@box AddressOnlyStruct
@@ -125,7 +125,7 @@ bb0(%0 : $Int):
 
 
 // CHECK-LABEL: sil @copy_addr1
-sil @copy_addr1 : $@convention(thin) <T> (@out T, @in T) -> () {
+sil @copy_addr1 : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $T
   %3a = project_box %3 : $@box T
@@ -138,7 +138,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // CHECK-LABEL: sil @copy_addr2
-sil @copy_addr2 : $@convention(thin) <T> (@out T, @in T) -> () {
+sil @copy_addr2 : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $T
   %3a = project_box %3 : $@box T
@@ -234,7 +234,7 @@ bb0:
 
 
 // CHECK-LABEL: sil @assign_test_addressonly
-sil @assign_test_addressonly : $@convention(thin) <T> (@out T, @in T) -> () {
+sil @assign_test_addressonly : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %b = alloc_box $T
   %ba = project_box %b : $@box T
@@ -271,7 +271,7 @@ bb0:
   %c = mark_uninitialized [var] %ba : $*@sil_weak Optional<SomeClass> // expected-note {{variable defined here}}
 
   // Invalid load to keep the alloc_box around so we can check init semantics.
-  load %c : $*@sil_weak Optional<SomeClass>    // expected-error {{used before being initialized}}
+  load_weak %c : $*@sil_weak Optional<SomeClass>    // expected-error {{used before being initialized}}
 
   %f = function_ref @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 
@@ -708,21 +708,21 @@ struct MyStruct2 {
     init()
 }
 
-sil @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
+sil @selfinit_delegate : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2
 
   // <rdar://problem/18089574> Protocol member in struct + delegating init miscompilation
   // CHECK-LABEL: @self_init_copyaddr
-  sil @self_init_copyaddr : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> () {
+  sil @self_init_copyaddr : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2 {
     bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
       // CHECK: [[SELF:%[0-9]+]] = alloc_stack $MyStruct2
       %2 = alloc_stack $MyStruct2, var, name "sf"
        %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct2
        %6 = metatype $@thin MyStruct2.Type
-       %7 = function_ref @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
+       %7 = function_ref @selfinit_delegate : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2
        %8 = alloc_stack $MyStruct2
 
        // Make sure this copy_addr ends up being an initialization.
-       apply %7(%8, %6) : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
+       apply %7(%8, %6) : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2
   copy_addr [take] %8 to %3 : $*MyStruct2
   dealloc_stack %8 : $*MyStruct2
 

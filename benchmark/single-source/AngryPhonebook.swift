@@ -36,7 +36,7 @@ public func run_AngryPhonebook(N: Int) {
   for _ in 1...N {
     for firstname in words {
       for lastname in words {
-        (firstname.uppercaseString, lastname.lowercaseString)
+        (firstname.uppercased, lastname.lowercased)
       }
     }
   }

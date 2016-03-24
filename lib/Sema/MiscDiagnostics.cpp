@@ -23,6 +23,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -424,8 +425,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// The DRE argument is a reference to a noescape parameter.  Verify that
     /// its uses are ok.
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
-      // This only cares about declarations marked noescape.
-      if (!DRE->getDecl()->getAttrs().hasAttribute<NoEscapeAttr>())
+      // This only cares about declarations of noescape function type.
+      auto AFT = DRE->getDecl()->getType()->getAs<AnyFunctionType>();
+      if (!AFT || !AFT->isNoEscape())
         return;
 
       // Only diagnose this once.  If we check and accept this use higher up in
@@ -440,7 +442,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
-                  DRE->getDecl()->getName());
+                  DRE->getDecl()->getName(), isa<ParamDecl>(DRE->getDecl()));
       if (DRE->getDecl()->getAttrs().hasAttribute<AutoClosureAttr>() &&
           DRE->getDecl()->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
@@ -812,7 +814,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 //===----------------------------------------------------------------------===//
 
 /// Emit a diagnostic for references to declarations that have been
-/// marked as unavailable, either through "unavailable" or "obsoleted=".
+/// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  SourceRange R,
                                                  const DeclContext *DC) {
@@ -914,14 +916,12 @@ class AvailabilityWalker : public ASTWalker {
 
   TypeChecker &TC;
   DeclContext *DC;
-  const MemberAccessContext AccessContext;
+  MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
 
 public:
   AvailabilityWalker(
-      TypeChecker &TC, DeclContext *DC,
-      MemberAccessContext AccessContext = MemberAccessContext::Getter)
-      : TC(TC), DC(DC), AccessContext(AccessContext) {}
+      TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
 
   virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
@@ -975,7 +975,7 @@ private:
                                  const AvailableAttr *Attr);
 
   /// Walk an assignment expression, checking for availability.
-  void walkAssignExpr(AssignExpr *E) const {
+  void walkAssignExpr(AssignExpr *E) {
     // We take over recursive walking of assignment expressions in order to
     // walk the destination and source expressions in different member
     // access contexts.
@@ -989,20 +989,20 @@ private:
     // encountered walking (pre-order) is the Dest is the destination of the
     // write. For the moment this is fine -- but future syntax might violate
     // this assumption.
-    walkInContext(Dest, MemberAccessContext::Setter);
+    walkInContext(E, Dest, MemberAccessContext::Setter);
 
     // Check RHS in getter context
     Expr *Source = E->getSrc();
     if (!Source) {
       return;
     }
-    walkInContext(Source, MemberAccessContext::Getter);
+    walkInContext(E, Source, MemberAccessContext::Getter);
   }
   
   /// Walk a member reference expression, checking for availability.
   void walkMemberRef(MemberRefExpr *E) {
     // Walk the base in a getter context.
-    walkInContext(E->getBase(), MemberAccessContext::Getter);
+    walkInContext(E, E->getBase(), MemberAccessContext::Getter);
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
@@ -1020,12 +1020,15 @@ private:
   
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
-    walkInContext(E->getSubExpr(), MemberAccessContext::InOut);
+    walkInContext(E, E->getSubExpr(), MemberAccessContext::InOut);
   }
 
   /// Walk the given expression in the member access context.
-  void walkInContext(Expr *E, MemberAccessContext AccessContext) const {
-    E->walk(AvailabilityWalker(TC, DC, AccessContext));
+  void walkInContext(Expr *baseExpr, Expr *E,
+                     MemberAccessContext AccessContext) {
+    llvm::SaveAndRestore<MemberAccessContext>
+      C(this->AccessContext, AccessContext);
+    E->walk(*this);
   }
 
   /// Emit diagnostics, if necessary, for accesses to storage where
@@ -1277,6 +1280,10 @@ public:
   bool shouldTrackVarDecl(VarDecl *VD) {
     // If the variable is implicit, ignore it.
     if (VD->isImplicit() || VD->getLoc().isInvalid())
+      return false;
+    
+    // If the variable is computed, ignore it.
+    if (!VD->hasStorage())
       return false;
     
     // If the variable was invalid, ignore it and notice that the code is
@@ -1820,7 +1827,8 @@ static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, con
 }
 
 static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
-  // If we're missing semi-colons we'll already be erroring out, and this may not even have been intended as C-style.
+  // If we're missing semi-colons we'll already be erroring out, and this may
+  // not even have been intended as C-style.
   if (FS->getFirstSemicolonLoc().isInvalid() || FS->getSecondSemicolonLoc().isInvalid())
     return;
     
@@ -1830,7 +1838,8 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
 
   // Verify that there is only one loop variable, and it is declared here.
   auto initializers = FS->getInitializerVarDecls();
-  PatternBindingDecl *loopVarDecl = initializers.size() == 2 ? dyn_cast<PatternBindingDecl>(initializers[0]) : nullptr;
+  PatternBindingDecl *loopVarDecl = initializers.size() == 2 ?
+    dyn_cast<PatternBindingDecl>(initializers[0]) : nullptr;
   if (!loopVarDecl || loopVarDecl->getNumPatternEntries() != 1)
     return;
 
@@ -1838,7 +1847,7 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   Expr *startValue = loopVarDecl->getInit(0);
   Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar);
   bool strideByOne = unaryIncrementForConvertingCStyleForLoop(FS, loopVar) ||
-                     plusEqualOneIncrementForConvertingCStyleForLoop(TC, FS, loopVar);
+               plusEqualOneIncrementForConvertingCStyleForLoop(TC, FS, loopVar);
 
   if (!loopVar || !startValue || !endValue || !strideByOne)
     return;
@@ -1854,15 +1863,77 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
     return;
   }
     
-  SourceLoc loopPatternEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, loopVarDecl->getPattern(0)->getEndLoc());
-  SourceLoc endOfIncrementLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FS->getIncrement().getPtrOrNull()->getEndLoc());
+  SourceLoc loopPatternEnd =
+    Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                               loopVarDecl->getPattern(0)->getEndLoc());
+  SourceLoc endOfIncrementLoc =
+    Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                               FS->getIncrement().getPtrOrNull()->getEndLoc());
     
   diagnostic
    .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
-   .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(), " ..< ")
+   .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
+                      " ..< ")
    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
 }
+
+
+// Perform MiscDiagnostics on Switch Statements.
+static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
+  // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
+  // clause only applies to the second case, and this is surprising.
+  for (auto cs : stmt->getCases()) {
+    // The case statement can have multiple case items, each can have a where.
+    // If we find a "where", and there is a preceding item without a where, and
+    // if they are on the same source line, then warn.
+    auto items = cs->getCaseLabelItems();
+    
+    // Don't do any work for the vastly most common case.
+    if (items.size() == 1) continue;
+    
+    // Ignore the first item, since it can't have preceding ones.
+    for (unsigned i = 1, e = items.size(); i != e; ++i) {
+      // Must have a where clause.
+      auto where = items[i].getGuardExpr();
+      if (!where)
+        continue;
+      
+      // Preceding item must not.
+      if (items[i-1].getGuardExpr())
+        continue;
+      
+      // Must be on the same source line.
+      auto prevLoc = items[i-1].getStartLoc();
+      auto thisLoc = items[i].getStartLoc();
+      if (prevLoc.isInvalid() || thisLoc.isInvalid())
+        continue;
+      
+      auto &SM = TC.Context.SourceMgr;
+      auto prevLineCol = SM.getLineAndColumn(prevLoc);
+      if (SM.getLineNumber(thisLoc) != prevLineCol.first)
+        continue;
+      
+      TC.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
+        .highlight(items[i].getPattern()->getSourceRange())
+        .highlight(where->getSourceRange());
+      
+      // Whitespace it out to the same column as the previous item.
+      std::string whitespace(prevLineCol.second-1, ' ');
+      TC.diagnose(thisLoc, diag::add_where_newline)
+        .fixItInsert(thisLoc, "\n"+whitespace);
+
+      auto whereRange = SourceRange(items[i].getWhereLoc(),
+                                    where->getEndLoc());
+      auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
+      auto whereText = SM.extractText(charRange);
+      TC.diagnose(prevLoc, diag::duplicate_where)
+        .fixItInsertAfter(items[i-1].getEndLoc(), " " + whereText.str())
+        .highlight(items[i-1].getSourceRange());
+    }
+  }
+}
+
 
 static Optional<ObjCSelector>
 parseObjCSelector(ASTContext &ctx, StringRef string) {
@@ -1987,12 +2058,31 @@ public:
     else if (!argNames[0].empty())
       return { true, expr };
 
+    // Track whether we had parentheses around the string literal.
+    bool hadParens = false;
+    auto lookThroughParens = [&](Expr *arg, bool outermost) -> Expr * {
+      if (auto parenExpr = dyn_cast<ParenExpr>(arg)) {
+        if (!outermost) {
+          hadParens = true;
+          return parenExpr->getSubExpr()->getSemanticsProvidingExpr();
+        }
+
+        arg = parenExpr->getSubExpr();
+        if (auto innerParenExpr = dyn_cast<ParenExpr>(arg)) {
+          hadParens = true;
+          arg = innerParenExpr->getSubExpr();
+        }
+      }
+
+      return arg->getSemanticsProvidingExpr();
+    };
+
     // Dig out the argument.
-    Expr *arg = call->getArg()->getSemanticsProvidingExpr();
+    Expr *arg = lookThroughParens(call->getArg(), /*outermost=*/true);
     if (auto tupleExpr = dyn_cast<TupleExpr>(arg)) {
       if (tupleExpr->getNumElements() == 1 &&
           tupleExpr->getElementName(0) == TC.Context.Id_stringLiteral)
-        arg = tupleExpr->getElement(0)->getSemanticsProvidingExpr();
+        arg = lookThroughParens(tupleExpr->getElement(0), /*outermost=*/false);
     }
 
     // If the argument is a call, it might be to
@@ -2005,9 +2095,8 @@ public:
               dyn_cast_or_null<ConstructorDecl>(ctorRefCall->getCalledValue())){
           auto argArgumentNames = argCtor->getFullName().getArgumentNames();
           if (argArgumentNames.size() == 3 &&
-              argArgumentNames[0] == TC.Context.Id_builtinStringLiteral) {
-            arg = argCall->getArg()->getSemanticsProvidingExpr();
-          }
+              argArgumentNames[0] == TC.Context.Id_builtinStringLiteral)
+            arg = lookThroughParens(argCall->getArg(), /*outermost=*/false);
         }
       }
     }
@@ -2068,10 +2157,28 @@ public:
 
     // If we didn't find any methods, complain.
     if (allMethods.empty()) {
-      auto diag =
-        TC.diagnose(stringLiteral->getLoc(), diag::selector_literal_undeclared,
-                    *selector);
-      addSelectorConstruction(diag);
+      // If this was Selector(("selector-name")), suppress, the
+      // diagnostic.
+      if (!fromStringLiteral && hadParens)
+        return { true, expr };
+
+      {
+        auto diag = TC.diagnose(stringLiteral->getLoc(),
+                                diag::selector_literal_undeclared,
+                                *selector);
+        addSelectorConstruction(diag);
+      }
+
+      // If the result was from a Selector("selector-name"), add a
+      // separate note that suggests wrapping the selector in
+      // parentheses to silence the warning.
+      if (!fromStringLiteral) {
+        TC.diagnose(stringLiteral->getLoc(),
+                    diag::selector_construction_suppress_warning)
+          .fixItInsert(stringLiteral->getStartLoc(), "(")
+          .fixItInsertAfter(stringLiteral->getEndLoc(), ")");
+      }
+
       return { true, expr };
     }
 
@@ -2245,6 +2352,9 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
     
   if (auto forStmt = dyn_cast<ForStmt>(S))
     checkCStyleForLoop(TC, forStmt);
+  
+  if (auto switchStmt = dyn_cast<SwitchStmt>(S))
+    checkSwitch(TC, switchStmt);
 }
 
 //===----------------------------------------------------------------------===//

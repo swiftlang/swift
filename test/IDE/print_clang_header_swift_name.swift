@@ -8,16 +8,16 @@
 
 // CHECK: enum Normal : Int {
 // CHECK-NOT: {{^}}}
-// CHECK: case One
-// CHECK-NEXT: case Two
-// CHECK-NEXT: case Three
+// CHECK: case one
+// CHECK-NEXT: case two
+// CHECK-NEXT: case three
 // CHECK-NEXT: }
 
 // CHECK: enum SwiftEnum : Int {
 // CHECK-NOT: {{^}}}
-// CHECK: case One
-// CHECK-NEXT: case Two
-// CHECK-NEXT: case Three
+// CHECK: case one
+// CHECK-NEXT: case two
+// CHECK-NEXT: case three
 // CHECK-NEXT: }
 
 // CHECK: enum SwiftEnumTwo : Int {

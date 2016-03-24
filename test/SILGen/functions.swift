@@ -302,12 +302,12 @@ func calls(i:Int, j:Int, k:Int) {
 }
 
 // -- Curried entry points
-// CHECK-LABEL: sil shared @_TFV9functions10SomeStruct6method{{.*}} : $@convention(thin) (@inout SomeStruct) -> @owned @callee_owned (Builtin.Int64) -> () {
-// CHECK:   [[UNCURRIED:%.*]] = function_ref @_TFV9functions10SomeStruct6method{{.*}} : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> () // user: %2
+// CHECK-LABEL: sil shared [thunk] @_TFV9functions10SomeStruct6method{{.*}} : $@convention(thin) (@inout SomeStruct) -> @owned @callee_owned (Builtin.Int64) -> () {
+// CHECK:   [[UNCURRIED:%.*]] = function_ref @_TFV9functions10SomeStruct6method{{.*}} : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> (){{.*}} // user: %2
 // CHECK:   [[CURRIED:%.*]] = partial_apply [[UNCURRIED]]
 // CHECK:   return [[CURRIED]]
 
-// CHECK-LABEL: sil shared @_TFC9functions9SomeClass6method{{.*}} : $@convention(thin) (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
+// CHECK-LABEL: sil shared [thunk] @_TFC9functions9SomeClass6method{{.*}} : $@convention(thin) (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
 // CHECK: bb0(%0 : $SomeClass):
 // CHECK:   class_method %0 : $SomeClass, #SomeClass.method!1 : (SomeClass) -> (Builtin.Int64) -> ()
 // CHECK:   %2 = partial_apply %1(%0)
@@ -324,9 +324,9 @@ func standalone_generic<T>(x: T, y: T) -> T { return x }
 
 // CHECK-LABEL: sil hidden @_TF9functions14return_genericFT_FT1xBi64_1yBi64__Bi64_
 func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
-  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
+  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
   // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<Builtin.Int64>()
-  // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @owned @callee_owned (@out Builtin.Int64, @in Builtin.Int64, @in Builtin.Int64) -> ()) -> Builtin.Int64
+  // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @owned @callee_owned (@in Builtin.Int64, @in Builtin.Int64) -> @out Builtin.Int64) -> Builtin.Int64
   // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]
   return standalone_generic
@@ -335,9 +335,9 @@ func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
 // CHECK-LABEL: sil hidden @_TF9functions20return_generic_tuple{{.*}}
 func return_generic_tuple()
 -> (x: (Builtin.Int64, Builtin.Int64), y: (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64) {
-  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}}  : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
+  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}}  : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
   // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<(Builtin.Int64, Builtin.Int64)>()
-  // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned @callee_owned (@out (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> ()) -> (Builtin.Int64, Builtin.Int64)
+  // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned @callee_owned (@in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> @out (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64)
   // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]
   return standalone_generic
@@ -398,7 +398,7 @@ final class r17828355Class {
 }
 
 // The curry thunk for the method should not include a class_method instruction.
-// CHECK-LABEL: sil shared @_TFC9functions14r17828355Class6methodF
+// CHECK-LABEL: sil shared [thunk] @_TFC9functions14r17828355Class6methodF
 // CHECK: bb0(%0 : $r17828355Class):
 // CHECK-NEXT: // function_ref functions.r17828355Class.method (Builtin.Int64) -> ()
 // CHECK-NEXT:  %1 = function_ref @_TFC9functions14r17828355Class6method{{.*}} : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
@@ -470,12 +470,12 @@ func partialApplyEnumCases(x: S, y: C) {
   let right2 = right(C())
 }
 
-// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload4Left{{.*}}
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TFO9functions23PartialApplyEnumPayload4Left{{.*}}
 // CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload4Left{{.*}}
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
 // CHECK:         return [[CLOSURE]]
 
-// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload5Right{{.*}}
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TFO9functions23PartialApplyEnumPayload5Right{{.*}}
 // CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload5Right{{.*}}
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
 // CHECK:         return [[CLOSURE]]

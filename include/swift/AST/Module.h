@@ -147,22 +147,6 @@ enum ASTNameLookupFlags {
                           NL_RemoveNonVisible | NL_RemoveOverridden
 };
 
-/// Describes the result of looking for the conformance of a given type
-/// to a specific protocol.
-enum class ConformanceKind {
-  /// The type does not conform to the protocol.
-  DoesNotConform,
-  /// The type conforms to the protocol, with the given conformance.
-  Conforms,
-  /// The type is specified to conform to the protocol, but that conformance
-  /// has not yet been checked.
-  UncheckedConforms
-};
-
-/// The result of looking for a specific conformance.
-typedef llvm::PointerIntPair<ProtocolConformance *, 2, ConformanceKind>
-  LookupConformanceResult;
-
 /// Discriminator for file-units.
 enum class FileUnitKind {
   /// For a .swift source file.
@@ -389,14 +373,7 @@ public:
   /// Look for the conformance of the given type to the given protocol.
   ///
   /// This routine determines whether the given \c type conforms to the given
-  /// \c protocol. It only looks for explicit conformances (which are
-  /// required by the language), and will return a \c ProtocolConformance*
-  /// describing the conformance.
-  ///
-  /// During type-checking, it is possible that this routine will find an
-  /// explicit declaration of conformance that has not yet been type-checked,
-  /// in which case it will return note the presence of an unchecked
-  /// conformance.
+  /// \c protocol.
   ///
   /// \param type The type for which we are computing conformance.
   ///
@@ -404,9 +381,10 @@ public:
   ///
   /// \param resolver The lazy resolver.
   ///
-  /// \returns The result of the conformance search, with a conformance
-  /// structure when possible.
-  LookupConformanceResult
+  /// \returns The result of the conformance search, which will be
+  /// None if the type does not conform to the protocol or contain a
+  /// ProtocolConformanceRef if it does conform.
+  Optional<ProtocolConformanceRef>
   lookupConformance(Type type, ProtocolDecl *protocol, LazyResolver *resolver);
 
   /// Find a member named \p name in \p container that was declared in this
@@ -672,6 +650,21 @@ public:
 
   virtual Optional<StringRef>
   getGroupNameForDecl(const Decl *D) const {
+    return None;
+  }
+
+  virtual Optional<StringRef>
+  getSourceFileNameForDecl(const Decl *D) const {
+    return None;
+  }
+
+  virtual Optional<unsigned>
+  getSourceOrderForDecl(const Decl *D) const {
+    return None;
+  }
+
+  virtual Optional<StringRef>
+  getGroupNameByUSR(StringRef USR) const {
     return None;
   }
 
@@ -1246,6 +1239,7 @@ public:
 
   bool isSystemModule() const;
   bool isBuiltinModule() const;
+  const ModuleDecl *getAsSwiftModule() const;
 
   explicit operator bool() const { return !Mod.isNull(); }
 };

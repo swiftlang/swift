@@ -934,19 +934,19 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
          ElementNames.size() == ElementNameLocs.size());
 
   // Copy elements.
-  memcpy(getElements().data(), SubExprs.data(), 
-         SubExprs.size() * sizeof(Expr *));
+  std::uninitialized_copy(SubExprs.begin(), SubExprs.end(),
+                          getTrailingObjects<Expr *>());
 
   // Copy element names, if provided.
   if (hasElementNames()) {
-    memcpy(getElementNamesBuffer().data(), ElementNames.data(),
-           ElementNames.size() * sizeof(Identifier));
+    std::uninitialized_copy(ElementNames.begin(), ElementNames.end(),
+                            getTrailingObjects<Identifier>());
   }
 
   // Copy element name locations, if provided.
   if (hasElementNameLocs()) {
-    memcpy(getElementNameLocsBuffer().data(), ElementNameLocs.data(),
-           ElementNameLocs.size() * sizeof(SourceLoc));
+    std::uninitialized_copy(ElementNameLocs.begin(), ElementNameLocs.end(),
+                            getTrailingObjects<SourceLoc>());
   }
 }
 
@@ -957,10 +957,10 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                              ArrayRef<SourceLoc> ElementNameLocs,
                              SourceLoc RParenLoc, bool HasTrailingClosure, 
                              bool Implicit, Type Ty) {
-  unsigned size = sizeof(TupleExpr);
-  size += SubExprs.size() * sizeof(Expr*);
-  size += ElementNames.size() * sizeof(Identifier);
-  size += ElementNameLocs.size() * sizeof(SourceLoc);
+  size_t size =
+      totalSizeToAlloc<Expr *, Identifier, SourceLoc>(SubExprs.size(),
+                                                      ElementNames.size(),
+                                                      ElementNameLocs.size());
   void *mem = ctx.Allocate(size, alignof(TupleExpr));
   return new (mem) TupleExpr(LParenLoc, SubExprs, ElementNames, ElementNameLocs,
                              RParenLoc, HasTrailingClosure, Implicit, Ty);

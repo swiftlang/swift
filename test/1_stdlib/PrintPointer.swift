@@ -12,7 +12,7 @@ import ObjectiveC
 
 let PrintTests = TestSuite("PrintPointer")
 PrintTests.test("Printable") {
-  let nullUP = UnsafeMutablePointer<Float>()
+  let nullUP: UnsafeMutablePointer<Float> = nil
   let fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234 as UInt)
   
 #if !(arch(i386) || arch(arm))
@@ -31,15 +31,17 @@ PrintTests.test("Printable") {
   
   expectPrinted(expectedNull, nullUP)
   
-  expectPrinted("UnsafeBufferPointer(start: \(expectedNull), length: 0)",
+  expectPrinted("UnsafeBufferPointer(start: \(expectedNull), count: 0)",
     UnsafeBufferPointer(start: nullUP, count: 0))
-  expectPrinted("UnsafeMutableBufferPointer(start: \(expectedNull), length: 0)",
+  expectPrinted("UnsafeMutableBufferPointer(start: \(expectedNull), count: 0)",
     UnsafeMutableBufferPointer(start: nullUP, count: 0))
   
-  expectPrinted(expectedNull, COpaquePointer())
+  let nullOpaque: OpaquePointer = nil
+  expectPrinted(expectedNull, nullOpaque)
   expectPrinted(expectedNull, CVaListPointer(_fromUnsafeMutablePointer: nullUP))
 #if _runtime(_ObjC)
-  expectPrinted(expectedNull, AutoreleasingUnsafeMutablePointer<Int>())
+  let nullAutoUP: AutoreleasingUnsafeMutablePointer<Int> = nil
+  expectPrinted(expectedNull, nullAutoUP)
 #endif
 }
 

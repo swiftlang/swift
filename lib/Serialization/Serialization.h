@@ -178,25 +178,26 @@ private:
   SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
 
   /// The last assigned DeclID for decls from this module.
-  DeclID LastDeclID = 0;
+  uint32_t /*DeclID*/ LastDeclID = 0;
 
   /// The last assigned DeclContextID for decl contexts from this module.
-  DeclContextID LastDeclContextID = 0;
+  uint32_t /*DeclContextID*/ LastDeclContextID = 0;
 
   /// The last assigned DeclContextID for local decl contexts from this module.
-  DeclContextID LastLocalDeclContextID = 0;
+  uint32_t /*DeclContextID*/ LastLocalDeclContextID = 0;
 
   /// The last assigned NormalConformanceID for decl contexts from this module.
-  NormalConformanceID LastNormalConformanceID = 0;
+  uint32_t /*NormalConformanceID*/ LastNormalConformanceID = 0;
 
   /// The last assigned DeclID for types from this module.
-  TypeID LastTypeID = 0;
+  uint32_t /*TypeID*/ LastTypeID = 0;
 
   /// The last assigned IdentifierID for types from this module.
   ///
   /// Note that special module IDs must not be valid IdentifierIDs, except that
   /// 0 will always represent the empty identifier.
-  IdentifierID LastIdentifierID = serialization::NUM_SPECIAL_MODULES - 1;
+  uint32_t /*IdentifierID*/ LastIdentifierID =
+      serialization::NUM_SPECIAL_MODULES - 1;
 
   /// Returns the record code for serializing the given vector of offsets.
   ///
@@ -257,6 +258,12 @@ private:
   /// \param isClass True if the context could be a class context (class,
   ///        class extension, or protocol).
   void writeMembers(DeclRange members, bool isClass);
+
+  /// Write a default witness table for a protocol.
+  ///
+  /// \param proto The protocol.
+  void writeDefaultWitnessTable(const ProtocolDecl *proto,
+                                const std::array<unsigned, 256> &abbrCodes);
 
   /// Check if a decl is cross-referenced.
   bool isDeclXRef(const Decl *D) const;
@@ -337,7 +344,8 @@ public:
                             const SerializationOptions &options);
 
   /// Serialize module documentation to the given stream.
-  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC);
+  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                               StringRef GroupInfoPath, ASTContext &Ctx);
 
   /// Records the use of the given Type.
   ///

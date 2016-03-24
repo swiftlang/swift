@@ -21,8 +21,8 @@ let total = 15.0
 let count = 7
 let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int), (Double, Double)}}
 
-if (1) {} // expected-error{{type 'Int' does not conform to protocol 'BooleanType'}}
-if 1 {} // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+if (1) {} // expected-error{{type 'Int' does not conform to protocol 'Boolean'}}
+if 1 {} // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 
 var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 var b: Int = [1, 2, 3] // expected-error{{contextual type 'Int' cannot be used with array literal}}
@@ -51,8 +51,7 @@ struct MyArray<Element> {}
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error{{no '<' candidates produce the expected contextual result type 'MyArray<Int>'}}
-      // expected-note @-1 {{produces result of type 'Bool'}}
+        a = MyArray<Int // expected-error{{'<' produces 'Bool', not the expected contextual result type 'MyArray<Int>'}}
     }
 }
 
@@ -74,8 +73,7 @@ func bad_return2() -> (Int, Int) {
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
 func bad_return3(lhs:Int, rhs:Int) {
-  return lhs != 0  // expected-error {{no '!=' candidates produce the expected contextual result type '()'}}
-  // expected-note @-1 {{produces result of type 'Bool'}}
+  return lhs != 0  // expected-error {{'!=' produces 'Bool', not the expected contextual result type '()'}}
 }
 
 class MyBadReturnClass {
@@ -90,7 +88,7 @@ func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
 func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
 
-func insertA<T>(inout array : [T], elt : T) {
+func insertA<T>(array : inout [T], elt : T) {
   array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}} expected-note {{expected an argument list of type '(T)'}}
 }
 

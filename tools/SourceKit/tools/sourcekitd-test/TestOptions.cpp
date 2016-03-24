@@ -102,6 +102,9 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     switch (InputArg->getOption().getID()) {
     case OPT_req:
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
+        .Case("version", SourceKitRequest::ProtocolVersion)
+        .Case("demangle", SourceKitRequest::DemangleNames)
+        .Case("mangle", SourceKitRequest::MangleSimpleClasses)
         .Case("index", SourceKitRequest::Index)
         .Case("complete", SourceKitRequest::CodeComplete)
         .Case("complete.open", SourceKitRequest::CodeCompleteOpen)
@@ -130,7 +133,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
-            << "index/complete/cursor/related-idents/syntax-map/structure/"
+            << "version/demangle/mangle/index/complete/cursor/related-idents/syntax-map/structure/"
                "format/expand-placeholder/doc-info/sema/interface-gen/interface-gen-open/"
                "find-usr/find-interface/open/edit/print-annotations/extract-comment/"
                "module-groups\n";
@@ -179,6 +182,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ModuleGroupName = InputArg->getValue();
       break;
 
+    case OPT_interested_usr:
+      InterestedUSR = InputArg->getValue();
+      break;
+
     case OPT_header:
       HeaderPath = InputArg->getValue();
       break;
@@ -212,13 +219,26 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       PrintResponseAsJSON = true;
       break;
 
+    case OPT_print_raw_response:
+      PrintRawResponse = true;
+      break;
+
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
       SourceText = llvm::None;
+      Inputs.push_back(InputArg->getValue());
       break;
 
     case OPT_json_request_path:
       JsonRequestPath = InputArg->getValue();
+      break;
+
+    case OPT_simplified_demangling:
+      SimplifiedDemangling = true;
+      break;
+
+    case OPT_synthesized_extension:
+      SynthesizedExtensions = true;
       break;
 
     case OPT_UNKNOWN:

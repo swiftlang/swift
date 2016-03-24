@@ -27,6 +27,8 @@ namespace swift {
   static const char LLVM_IR_EXTENSION[] = "ll";
   /// The name of the standard library, which is a reserved module name.
   static const char STDLIB_NAME[] = "Swift";
+  /// The name of the Onone support library, which is a reserved module name.
+  static const char SWIFT_ONONE_SUPPORT[] = "SwiftOnoneSupport";
   /// The name of the SwiftShims module, which contains private stdlib decls.
   static const char SWIFT_SHIMS_NAME[] = "SwiftShims";
   /// The prefix of module names used by LLDB to capture Swift expressions
@@ -38,4 +40,4 @@ namespace swift {
   static const char MANGLING_MODULE_C[] = "__C";
 } // end namespace swift
 
-#endif
+#endif // SWIFT_STRINGS_H

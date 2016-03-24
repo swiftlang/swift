@@ -68,10 +68,6 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     self.value = value
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return ClassA.self
-  }
-
   func _bridgeToObjectiveC() -> ClassA {
     return ClassA(value: value)
   }
@@ -82,7 +78,7 @@ struct BridgedValueType : _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: ClassA,
-    inout result: BridgedValueType?
+    result: inout BridgedValueType?
   ) {
     assert(x.value % 2 == 0, "not bridged to Objective-C")
     result = BridgedValueType(value: x.value)
@@ -90,7 +86,7 @@ struct BridgedValueType : _ObjectiveCBridgeable {
 
   static func _conditionallyBridgeFromObjectiveC(
     x: ClassA,
-    inout result: BridgedValueType?
+    result: inout BridgedValueType?
   ) -> Bool {
     if x.value % 2 == 0 {
       result = BridgedValueType(value: x.value)
@@ -117,10 +113,6 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
     value7 = value
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return ClassA.self
-  }
-
   func _bridgeToObjectiveC() -> ClassA {
     assert(value == value0)
     return ClassA(value: value0)
@@ -132,7 +124,7 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: ClassA,
-    inout result: BridgedLargeValueType?
+    result: inout BridgedLargeValueType?
   ) {
     assert(x.value % 2 == 0, "not bridged to Objective-C")
     result = BridgedLargeValueType(value: x.value)
@@ -140,7 +132,7 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
 
   static func _conditionallyBridgeFromObjectiveC(
     x: ClassA,
-    inout result: BridgedLargeValueType?
+    result: inout BridgedLargeValueType?
   ) -> Bool {
     if x.value % 2 == 0 {
       result = BridgedLargeValueType(value: x.value)
@@ -169,17 +161,13 @@ struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
     self.value = value
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return ClassA.self
-  }
-
   func _bridgeToObjectiveC() -> ClassA {
     return ClassA(value: value)
   }
 
   static func _forceBridgeFromObjectiveC(
     x: ClassA,
-    inout result: ConditionallyBridgedValueType?
+    result: inout ConditionallyBridgedValueType?
   ) {
     assert(x.value % 2 == 0, "not bridged from Objective-C")
     result = ConditionallyBridgedValueType(value: x.value)
@@ -187,7 +175,7 @@ struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
 
   static func _conditionallyBridgeFromObjectiveC(
     x: ClassA,
-    inout result: ConditionallyBridgedValueType?
+    result: inout ConditionallyBridgedValueType?
   ) -> Bool {
     if x.value % 2 == 0 {
       result = ConditionallyBridgedValueType(value: x.value)
@@ -537,7 +525,7 @@ var nsStringCanaryCount = 0
   @objc override var length: Int {
     return 0
   }
-  @objc override func characterAtIndex(index: Int) -> unichar {
+  @objc override func character(at index: Int) -> unichar {
     fatalError("out-of-bounds access")
   }
 }
@@ -555,22 +543,12 @@ RuntimeFoundationWrappers.test(
   expectEqual(0, nsStringCanaryCount)
 }
 
-RuntimeFoundationWrappers.test("_stdlib_NSStringNFDHashValue/NoLeak") {
+RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringNFDHashValue(a)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringASCIIHashValue/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringASCIIHashValue(a)
+    _stdlib_NSStringHashValue(a, true)
   }
   expectEqual(0, nsStringCanaryCount)
 }
@@ -669,7 +647,7 @@ Reflection.test("Class/ObjectiveCBase/Default") {
   do {
     let value = SwiftFooMoreDerivedObjCClass()
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ This is FooObjCClass #0\n" +
@@ -693,20 +671,20 @@ Reflection.test("MetatypeMirror") {
     let expectedSomeClass = "- a.SomeClass #0\n"
     let objcProtocolMetatype: SomeObjCProto.Type = SomeClass.self
     var output = ""
-    dump(objcProtocolMetatype, &output)
+    dump(objcProtocolMetatype, to: &output)
     expectEqual(expectedSomeClass, output)
-                
+
     let objcProtocolConcreteMetatype = SomeObjCProto.self
     let expectedObjCProtocolConcrete = "- a.SomeObjCProto #0\n"
     output = ""
-    dump(objcProtocolConcreteMetatype, &output)
+    dump(objcProtocolConcreteMetatype, to: &output)
     expectEqual(expectedObjCProtocolConcrete, output)
 
     typealias Composition = protocol<SomeNativeProto, SomeObjCProto>
     let compositionConcreteMetatype = Composition.self
     let expectedComposition = "- protocol<a.SomeNativeProto, a.SomeObjCProto> #0\n"
     output = ""
-    dump(compositionConcreteMetatype, &output)
+    dump(compositionConcreteMetatype, to: &output)
     expectEqual(expectedComposition, output)
     
     let objcDefinedProtoType = NSObjectProtocol.self
@@ -716,7 +694,7 @@ Reflection.test("MetatypeMirror") {
 
 Reflection.test("CGPoint") {
   var output = ""
-  dump(CGPoint(x: 1.25, y: 2.75), &output)
+  dump(CGPoint(x: 1.25, y: 2.75), to: &output)
 
   let expected =
     "▿ (1.25, 2.75)\n" +
@@ -728,7 +706,7 @@ Reflection.test("CGPoint") {
 
 Reflection.test("CGSize") {
   var output = ""
-  dump(CGSize(width: 1.25, height: 2.75), &output)
+  dump(CGSize(width: 1.25, height: 2.75), to: &output)
 
   let expected =
     "▿ (1.25, 2.75)\n" +
@@ -744,7 +722,7 @@ Reflection.test("CGRect") {
     CGRect(
       origin: CGPoint(x: 1.25, y: 2.25),
       size: CGSize(width: 10.25, height: 11.75)),
-    &output)
+    to: &output)
 
   let expected =
     "▿ (1.25, 2.25, 10.25, 11.75)\n" +
@@ -761,7 +739,7 @@ Reflection.test("CGRect") {
 Reflection.test("Unmanaged/nil") {
   var output = ""
   var optionalURL: Unmanaged<CFURL>? = nil
-  dump(optionalURL, &output)
+  dump(optionalURL, to: &output)
 
   let expected = "- nil\n"
 
@@ -772,11 +750,11 @@ Reflection.test("Unmanaged/not-nil") {
   var output = ""
   var optionalURL: Unmanaged<CFURL>? =
     Unmanaged.passRetained(CFURLCreateWithString(nil, "http://llvm.org/", nil))
-  dump(optionalURL, &output)
+  dump(optionalURL, to: &output)
 
   let expected =
     "▿ Optional(Swift.Unmanaged<__ObjC.CFURL>(_value: http://llvm.org/))\n" +
-    "  ▿ Some: Swift.Unmanaged<__ObjC.CFURL>\n" +
+    "  ▿ some: Swift.Unmanaged<__ObjC.CFURL>\n" +
     "    - _value: http://llvm.org/ #0\n" +
     "      - super: NSObject\n"
 
@@ -792,7 +770,7 @@ Reflection.test("TupleMirror/NoLeak") {
       var tuple = (1, NSObjectCanary())
       expectEqual(1, nsObjectCanaryCount)
       var output = ""
-      dump(tuple, &output)
+      dump(tuple, to: &output)
     }
     expectEqual(0, nsObjectCanaryCount)
   }
@@ -802,7 +780,7 @@ Reflection.test("TupleMirror/NoLeak") {
       var tuple = (1, NSObjectCanaryStruct())
       expectEqual(1, nsObjectCanaryCount)
       var output = ""
-      dump(tuple, &output)
+      dump(tuple, to: &output)
     }
     expectEqual(0, nsObjectCanaryCount)
   }
@@ -812,7 +790,7 @@ Reflection.test("TupleMirror/NoLeak") {
       var tuple = (1, SwiftObjectCanary())
       expectEqual(1, swiftObjectCanaryCount)
       var output = ""
-      dump(tuple, &output)
+      dump(tuple, to: &output)
     }
     expectEqual(0, swiftObjectCanaryCount)
   }
@@ -822,7 +800,7 @@ Reflection.test("TupleMirror/NoLeak") {
       var tuple = (1, SwiftObjectCanaryStruct())
       expectEqual(1, swiftObjectCanaryCount)
       var output = ""
-      dump(tuple, &output)
+      dump(tuple, to: &output)
     }
     expectEqual(0, swiftObjectCanaryCount)
   }
@@ -837,7 +815,7 @@ var KVOHandle = 0
 Reflection.test("Name of metatype of artificial subclass") {
   let obj = TestArtificialSubclass()
   // Trigger the creation of a KVO subclass for TestArtificialSubclass.
-  obj.addObserver(obj, forKeyPath: "foo", options: [.New], context: &KVOHandle)
+  obj.addObserver(obj, forKeyPath: "foo", options: [.new], context: &KVOHandle)
   obj.removeObserver(obj, forKeyPath: "foo")
 
   expectEqual("\(obj.dynamicType)", "TestArtificialSubclass")
@@ -857,7 +835,7 @@ Reflection.test("NSRange QuickLook") {
   let rng = NSRange(location:Int.min, length:5)
   let ql = PlaygroundQuickLook(reflecting: rng)
   switch ql {
-  case .Range(let loc, let len):
+  case .range(let loc, let len):
     expectEqual(loc, Int64(Int.min))
     expectEqual(len, 5)
   default:

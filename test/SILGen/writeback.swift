@@ -39,7 +39,7 @@ var readonly: Foo {
   }
 }
 
-func bar(inout x x: Foo) {}
+func bar(x x: inout Foo) {}
 
 // Writeback to value type 'self' argument
 x.foo()
@@ -102,13 +102,13 @@ var addressOnly: Fungible {
   set {}
 }
 
-func funge(inout x x: Fungible) {}
+func funge(x x: inout Fungible) {}
 
 funge(x: &addressOnly)
 // CHECK: [[FUNGE:%.*]] = function_ref @_TF9writeback5fungeFT1xRPS_8Fungible__T_ : $@convention(thin) (@inout Fungible) -> ()
 // CHECK: [[TEMP:%.*]] = alloc_stack $Fungible
-// CHECK: [[GET:%.*]] = function_ref @_TF9writebackg11addressOnlyPS_8Fungible_ : $@convention(thin) (@out Fungible) -> ()
-// CHECK: apply [[GET]]([[TEMP]]) : $@convention(thin) (@out Fungible) -> ()
+// CHECK: [[GET:%.*]] = function_ref @_TF9writebackg11addressOnlyPS_8Fungible_ : $@convention(thin) () -> @out Fungible
+// CHECK: apply [[GET]]([[TEMP]]) : $@convention(thin) () -> @out Fungible
 // CHECK: apply [[FUNGE]]([[TEMP]]) : $@convention(thin) (@inout Fungible) -> ()
 // CHECK: [[SET:%.*]] = function_ref @_TF9writebacks11addressOnlyPS_8Fungible_ : $@convention(thin) (@in Fungible) -> ()
 // CHECK: apply [[SET]]([[TEMP]]) : $@convention(thin) (@in Fungible) -> ()
@@ -118,13 +118,13 @@ funge(x: &addressOnly)
 // <rdar://problem/16525257> 
 
 protocol Runcible {
-  typealias Frob: Frobable
+  associatedtype Frob: Frobable
 
   var frob: Frob { get set }
 }
 
 protocol Frobable {
-  typealias Anse
+  associatedtype Anse
   
   var anse: Anse { get set }
 }
@@ -132,13 +132,13 @@ protocol Frobable {
 // CHECK-LABEL: sil hidden @_TF9writeback12test_generic 
 // CHECK:         witness_method $Runce, #Runcible.frob!materializeForSet.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
-func test_generic<Runce: Runcible>(inout runce runce: Runce, anse: Runce.Frob.Anse) {
+func test_generic<Runce: Runcible>(runce runce: inout Runce, anse: Runce.Frob.Anse) {
   runce.frob.anse = anse
 }
 
 // We should *not* write back when referencing decls or members as rvalues.
 // <rdar://problem/16530235>
-// CHECK-LABEL: sil hidden @_TF9writeback15loadAddressOnlyFT_PS_8Fungible_ : $@convention(thin) (@out Fungible) -> () {
+// CHECK-LABEL: sil hidden @_TF9writeback15loadAddressOnlyFT_PS_8Fungible_ : $@convention(thin) () -> @out Fungible {
 func loadAddressOnly() -> Fungible {
   // CHECK:       function_ref writeback.addressOnly.getter
   // CHECK-NOT:   function_ref writeback.addressOnly.setter

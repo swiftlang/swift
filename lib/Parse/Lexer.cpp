@@ -592,9 +592,9 @@ void Lexer::lexHash() {
     return lexImpl();
   }
 
-  // Scan for [a-z]+ to see what we match.
+  // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
-  while (clang::isLowercase(*tmpPtr))
+  while (clang::isLetter(*tmpPtr))
     ++tmpPtr;
 
   // Map the character sequence onto
@@ -837,11 +837,6 @@ void Lexer::lexHexNumber() {
     
   while (isHexDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
-  if (CurPtr - TokStart == 2) {
-    diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
-    return formToken(tok::unknown, TokStart);
-  }
   
   if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P')
     return formToken(tok::integer_literal, TokStart);
@@ -914,8 +909,6 @@ void Lexer::lexNumber() {
       
     while ((*CurPtr >= '0' && *CurPtr <= '7') || *CurPtr == '_')
       ++CurPtr;
-    if (CurPtr - TokStart == 2)
-      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     return formToken(tok::integer_literal, TokStart);
   }
   
@@ -926,8 +919,6 @@ void Lexer::lexNumber() {
       return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     while (*CurPtr == '0' || *CurPtr == '1' || *CurPtr == '_')
       ++CurPtr;
-    if (CurPtr - TokStart == 2)
-      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     return formToken(tok::integer_literal, TokStart);
   }
 

@@ -1,0 +1,153 @@
+#!/usr/bin/env python
+# utils/rth - Resilience test helper
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+import argparse
+import os
+import pipes
+import shlex
+import shutil
+import subprocess
+import sys
+
+VERBOSE = True
+
+
+def verbose_print_command(command):
+    if VERBOSE:
+        print(" ".join(pipes.quote(c) for c in command))
+        sys.stdout.flush()
+
+
+class ResilienceTest(object):
+
+    def __init__(self, target_build_swift, target_run, tmp_dir, test_dir,
+                 test_src, additional_compile_flags_library,
+                 no_backward_deployment):
+        self.target_build_swift = shlex.split(target_build_swift)
+        self.target_run = shlex.split(target_run)
+        self.tmp_dir = tmp_dir
+        self.test_dir = test_dir
+        self.test_src = test_src
+        self.additional_compile_flags_library = \
+            shlex.split(additional_compile_flags_library)
+
+        self.before_dir = os.path.join(self.tmp_dir, 'before')
+        self.after_dir = os.path.join(self.tmp_dir, 'after')
+        self.config_dir_map = {'BEFORE': self.before_dir,
+                               'AFTER': self.after_dir}
+
+        self.lib_src_name = os.path.basename(self.test_src)[5:]
+        self.lib_obj_name = self.lib_src_name[:-6] + '.o'
+        self.lib_src = os.path.join(self.test_dir, 'Inputs', self.lib_src_name)
+
+        self.no_backward_deployment = no_backward_deployment
+
+    def run(self):
+        self.set_up()
+        self.compile_library()
+        self.compile_main()
+        self.link()
+        self.execute()
+        return 0
+
+    def set_up(self):
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
+        os.makedirs(self.after_dir)
+        os.makedirs(self.before_dir)
+
+    def compile_library(self):
+        for config in self.config_dir_map:
+            for emit_flag in ['-emit-library', '-emit-module']:
+                output_obj = os.path.join(self.config_dir_map[config],
+                                          self.lib_obj_name)
+                compiler_flags = [emit_flag, '-Xfrontend',
+                                  '-enable-resilience', '-D', config, '-c',
+                                  self.lib_src, '-o', output_obj]
+                command = self.target_build_swift + \
+                    self.additional_compile_flags_library + compiler_flags
+                verbose_print_command(command)
+                returncode = subprocess.call(command)
+                assert returncode == 0, str(command)
+
+    def compile_main(self):
+        for config in self.config_dir_map:
+            output_obj = os.path.join(self.config_dir_map[config], 'main.o')
+            compiler_flags = ['-D', config, '-c', self.test_src, '-I',
+                              self.config_dir_map[config], '-o', output_obj]
+            command = self.target_build_swift + compiler_flags
+            verbose_print_command(command)
+            returncode = subprocess.call(command)
+            assert returncode == 0, str(command)
+
+    def configs(self):
+        for config1 in self.config_dir_map:
+            for config2 in self.config_dir_map:
+                # --no-backward-deployment skips testing a new application
+                # linked against an old library.
+                if config1 == "BEFORE" and \
+                   config2 == "AFTER" and \
+                   self.no_backward_deployment:
+                    continue
+
+                yield (config1, config2)
+
+    def link(self):
+        for config1, config2 in self.configs():
+            config1_lower = config1.lower()
+            config2_lower = config2.lower()
+            output_obj = os.path.join(self.tmp_dir,
+                                      config1_lower + '_' + config2_lower)
+            compiler_flags = [
+                os.path.join(self.config_dir_map[config1],
+                             self.lib_obj_name),
+                os.path.join(self.config_dir_map[config2],
+                             'main.o'),
+                '-o', output_obj
+            ]
+            command = self.target_build_swift + compiler_flags
+            verbose_print_command(command)
+            returncode = subprocess.call(command)
+            assert returncode == 0, str(command)
+
+    def execute(self):
+        for config1, config2 in self.configs():
+            config1_lower = config1.lower()
+            config2_lower = config2.lower()
+            output_obj = os.path.join(self.tmp_dir,
+                                      config1_lower + '_' + config2_lower)
+            command = self.target_run + [output_obj]
+            verbose_print_command(command)
+            returncode = subprocess.call(command)
+            assert returncode == 0, str(command)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Resilience test helper')
+    parser.add_argument('--target-build-swift', required=True)
+    parser.add_argument('--target-run', required=True)
+    parser.add_argument('--t', required=True)
+    parser.add_argument('--S', required=True)
+    parser.add_argument('--s', required=True)
+    parser.add_argument('--additional-compile-flags-library', default='')
+    parser.add_argument('--no-backward-deployment', default=False,
+                        action='store_true')
+
+    args = parser.parse_args()
+
+    resilience_test = ResilienceTest(args.target_build_swift, args.target_run,
+                                     args.t, args.S, args.s,
+                                     args.additional_compile_flags_library,
+                                     args.no_backward_deployment)
+
+    return resilience_test.run()
+
+if __name__ == '__main__':
+    exit(main())

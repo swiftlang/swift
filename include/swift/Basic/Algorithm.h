@@ -24,6 +24,6 @@ namespace swift {
   constexpr const T& min(const T &a, const T &b) {
     return !(b < a) ? a : b;
   }
-} // namespace swift
+} // end namespace swift
 
-#endif
+#endif /* SWIFT_BASIC_ALGORITHM_H */

@@ -202,7 +202,7 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   } while (false)
 
   CHECK_NAMED_TYPE("CGFloat", convertMemberType(swiftDecl, "NativeType"));
-  CHECK_NAMED_TYPE("COpaquePointer", ctx.VoidPtrTy);
+  CHECK_NAMED_TYPE("OpaquePointer", ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
   CHECK_NAMED_TYPE("DarwinBoolean", ctx.UnsignedCharTy);
   CHECK_NAMED_TYPE(swiftDecl->getASTContext().getSwiftName(
@@ -530,13 +530,19 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   }
   
   // Convert the return and parameter types.
-  auto resultType = Converter.convert(IGM,
-                type->getSemanticResultSILType().getSwiftRValueType());
-  if (resultType.isNull())
-    return clang::CanQualType();
+  auto allResults = type->getAllResults();
+  assert(allResults.size() <= 1 && "multiple results with C convention");
+  clang::QualType resultType;
+  if (allResults.empty()) {
+    resultType = clangCtx.VoidTy;
+  } else {
+    resultType = Converter.convert(IGM, allResults[0].getType());
+    if (resultType.isNull())
+      return clang::CanQualType();
+  }
   
   SmallVector<clang::QualType, 4> paramTypes;
-  for (auto paramTy : type->getParametersWithoutIndirectResult()) {
+  for (auto paramTy : type->getParameters()) {
     // Blocks should only take direct +0 parameters.
     switch (paramTy.getConvention()) {
     case ParameterConvention::Direct_Guaranteed:
@@ -550,7 +556,6 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
-    case ParameterConvention::Indirect_Out:
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("block takes indirect parameter");
     }

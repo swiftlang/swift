@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
+public final class LifetimeTracked : ForwardIndex, CustomStringConvertible {
   public init(_ value: Int, identity: Int = 0) {
     LifetimeTracked.instances += 1
     LifetimeTracked._nextSerialNumber += 1
@@ -32,7 +32,7 @@ public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// Requires: the next value is representable.
+  /// Precondition: the next value is representable.
   public func successor() -> LifetimeTracked {
     return LifetimeTracked(self.value.successor())
   }

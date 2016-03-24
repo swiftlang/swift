@@ -84,6 +84,7 @@ enum class ActionType {
   PrintComments,
   PrintModuleComments,
   PrintModuleImports,
+  PrintModuleGroups,
   PrintUSRs,
   PrintLocalTypes,
   PrintTypeInterface,
@@ -200,6 +201,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::ReconstructType,
                       "reconstruct-type",
                       "Reconstruct type from mangled name"),
+           clEnumValN(ActionType::PrintModuleGroups,
+                      "print-module-groups",
+                      "Print group names in a module"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -254,9 +258,19 @@ SkipImports("skip-imports",
             llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+SkipOverrides("skip-overrides",
+            llvm::cl::desc("Whether to skip printing overrides/witnesses"),
+            llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 SkipParameterNames("skip-parameter-names",
                    llvm::cl::desc("Whether to skip parameter names"),
                    llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+AlwaysArgumentLabels("always-argument-labels",
+  llvm::cl::desc("Whether to always print separate argument labels"),
+  llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 DisableAccessControl("disable-access-control",
@@ -273,25 +287,8 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-InferDefaultArguments(
-  "enable-infer-default-arguments",
-  llvm::cl::desc("Infer default arguments for imported parameters"),
-  llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-UseSwiftLookupTables(
-  "enable-swift-name-lookup-tables",
-  llvm::cl::desc("Use Swift-specific name lookup tables in the importer"),
-  llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 Swift3Migration("swift3-migration",
                    llvm::cl::desc("Enable Fix-It based migration aids for Swift 3"),
-                   llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-OmitNeedlessWords("enable-omit-needless-words",
-                   llvm::cl::desc("Omit needless words when importing Objective-C names"),
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
@@ -390,6 +387,10 @@ MangledNameToFind("find-mangled",
 static llvm::cl::list<std::string>
 ModuleToPrint("module-to-print",
               llvm::cl::desc("Name of the module to print"));
+
+static llvm::cl::list<std::string>
+ModuleGroupToPrint("module-group",
+                   llvm::cl::desc("Name of the module group to print"));
 
 static llvm::cl::opt<bool>
 ModulePrintSubmodules("module-print-submodules",
@@ -509,6 +510,11 @@ HeaderToPrint("header-to-print",
 
 static llvm::cl::opt<std::string>
 LineColumnPair("pos", llvm::cl::desc("Line:Column pair"));
+
+static llvm::cl::opt<bool>
+NoEmptyLineBetweenMembers("no-empty-line-between-members",
+                          llvm::cl::desc("Print no empty line between members."),
+                          llvm::cl::init(false));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -784,7 +790,7 @@ public:
         OS << CStr;
       }
     } else {
-      OS << llvm::sys::Process::ResetColor();
+      OS.resetColor();
     }
   }
 
@@ -844,9 +850,6 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
-
-  // We must use the Swift lookup tables.
-  Invocation.getClangImporterOptions().UseSwiftLookupTables = true;
 
   CompilerInstance CI;
 
@@ -1246,7 +1249,7 @@ private:
       OS << CStr;
     }
     OS << Text;
-    OS << llvm::sys::Process::ResetColor();
+    OS.resetColor();
     return true;
   }
 };
@@ -1379,9 +1382,10 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   case NodeKind::Enum:
   case NodeKind::Protocol:
   case NodeKind::Structure:
+  case NodeKind::TypeAlias:
     break;
   default:
-    llvm::errs() << "Name does not refer to a nominal type.\n";
+    llvm::errs() << "Name does not refer to a nominal type or typealias.\n";
     return EXIT_FAILURE;
   }
 
@@ -1389,17 +1393,6 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   SmallVector<std::pair<DeclName, Identifier>, 4> identifiers;
   do {
-    switch (node->getKind()) {
-    case NodeKind::Class:
-    case NodeKind::Enum:
-    case NodeKind::Protocol:
-    case NodeKind::Structure:
-      break;
-    default:
-      llvm::errs() << "Name does not refer to a nominal type.\n";
-      return EXIT_FAILURE;
-    }
-
     auto nameNode = node->getChild(1);
     switch (nameNode->getKind()) {
     case NodeKind::Identifier:
@@ -1418,6 +1411,20 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     }
 
     node = node->getChild(0);
+
+    switch (node->getKind()) {
+    case NodeKind::Module:
+      // Will break out of loop below.
+      break;
+    case NodeKind::Class:
+    case NodeKind::Enum:
+    case NodeKind::Protocol:
+    case NodeKind::Structure:
+      break;
+    default:
+      llvm::errs() << "Name does not refer to a nominal type.\n";
+      return EXIT_FAILURE;
+    }
   } while (node->getKind() != NodeKind::Module);
 
   Module *M = getModuleByFullName(ctx, node->getText());
@@ -1558,7 +1565,7 @@ class AnnotatingPrinter : public StreamPrinter {
 public:
   using StreamPrinter::StreamPrinter;
 
-  void printDeclPre(const Decl *D) override {
+  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
     OS << "<decl:" << Decl::getKindName(D->getKind()) << '>';
   }
   void printDeclLoc(const Decl *D) override {
@@ -1567,13 +1574,38 @@ public:
   void printDeclNameOrSignatureEndLoc(const Decl *D) override {
     OS << "</loc>";
   }
-  void printDeclPost(const Decl *D) override {
+  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
     OS << "</decl>";
   }
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
+    if (D)
+      printDeclPre(D, None);
+  }
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
+    if (D)
+      printDeclPost(D, None);
+  }
 
-  void printTypeRef(const TypeDecl *TD, Identifier Name) override {
+
+  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                                    const NominalTypeDecl *NTD,
+                                    Optional<BracketOptions> Bracket) override {
+    if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension)
+      return;
+    OS << "<synthesized>";
+  }
+
+  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                     const NominalTypeDecl *NTD,
+                                     Optional<BracketOptions> Bracket) override {
+    if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension)
+      return;
+    OS << "</synthesized>";
+  }
+
+  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
     OS << "<ref:" << Decl::getKindName(TD->getKind()) << '>';
-    StreamPrinter::printTypeRef(TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name);
     OS << "</ref>";
   }
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
@@ -1584,8 +1616,77 @@ public:
 };
 }
 
+struct GroupNamesPrinter {
+  llvm::StringSet<> Groups;
+  raw_ostream &OS;
+  GroupNamesPrinter(raw_ostream &OS) : OS(OS) {}
+  ~GroupNamesPrinter() {
+    OS << "Module groups begin:\n";
+    for (auto &Entry : Groups) {
+      OS << Entry.getKey() << "\n";
+    }
+    OS << "Module groups end.\n";
+  }
+
+  void addDecl(const Decl *D) {
+    if(auto VD = dyn_cast<ValueDecl>(D)) {
+      if (!VD->isImplicit() && !VD->isPrivateStdlibDecl()) {
+        StringRef Name = VD->getGroupName().hasValue() ?
+          VD->getGroupName().getValue() : "";
+        Groups.insert(Name.empty() ? "<NULL>" : Name);
+      }
+    }
+  }
+};
+
+static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
+                               const std::vector<std::string> ModulesToPrint) {
+  CompilerInvocation Invocation(InitInvok);
+
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+
+  auto &Context = CI.getASTContext();
+
+  // Load standard library so that Clang importer can use it.
+  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
+  if (!Stdlib) {
+    llvm::errs() << "Failed loading stdlib\n";
+    return 1;
+  }
+
+  int ExitCode = 0;
+  for (StringRef ModuleToPrint : ModulesToPrint) {
+    if (ModuleToPrint.empty()) {
+      ExitCode = 1;
+      continue;
+    }
+
+    // Get the (sub)module to print.
+    auto *M = getModuleByFullName(Context, ModuleToPrint);
+    if (!M) {
+      ExitCode = 1;
+      continue;
+    }
+    {
+      GroupNamesPrinter Printer(llvm::outs());
+      llvm::SmallVector<Decl*, 256> Results;
+      M->getDisplayDecls(Results);
+      for (auto R : Results) {
+        Printer.addDecl(R);
+      }
+    }
+  }
+  return ExitCode;
+}
+
 static int doPrintModules(const CompilerInvocation &InitInvok,
                           const std::vector<std::string> ModulesToPrint,
+                          const std::vector<std::string> GroupsToPrint,
                           ide::ModuleTraversalOptions TraversalOptions,
                           const PrintOptions &Options,
                           bool AnnotatePrint,
@@ -1648,9 +1749,13 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
         continue;
       }
     }
+    std::vector<StringRef> GroupNames;
+    for (StringRef G : GroupsToPrint) {
+      GroupNames.push_back(G);
+    }
 
-    printSubmoduleInterface(M, ModuleName, None, TraversalOptions, *Printer, Options,
-                            SynthesizeExtensions);
+    printSubmoduleInterface(M, ModuleName, GroupNames, TraversalOptions,
+                            *Printer, Options, SynthesizeExtensions);
   }
 
   return ExitCode;
@@ -2007,6 +2112,21 @@ public:
       OS << " ";
       printDocComment(D);
       OS << "\n";
+    } else if (D->getKind() == DeclKind::Extension) {
+      SourceLoc Loc = D->getLoc();
+      if (Loc.isValid()) {
+        auto LineAndColumn = SM.getLineAndColumn(Loc);
+        OS << getBufferIdentifier(D->getLoc())
+        << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
+      }
+      OS << Decl::getKindName(D->getKind()) << "/";
+      OS << " ";
+      printRawComment(D->getRawComment());
+      OS << " ";
+      printBriefComment(D->getBriefComment());
+      OS << " ";
+      printDocComment(D);
+      OS << "\n";
     }
     return true;
   }
@@ -2259,33 +2379,69 @@ private:
 class TypeReconstructWalker : public SourceEntityWalker {
   ASTContext &Ctx;
   llvm::raw_ostream &Stream;
+  llvm::DenseSet<ValueDecl *> SeenDecls;
 
 public:
-  TypeReconstructWalker(ASTContext &Ctx,llvm::raw_ostream &Stream) : Ctx(Ctx), Stream(Stream) {}
+  TypeReconstructWalker(ASTContext &Ctx, llvm::raw_ostream &Stream)
+      : Ctx(Ctx), Stream(Stream) {}
+
+  bool walkToDeclPre(Decl *D, CharSourceRange range) override {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (SeenDecls.insert(VD).second)
+        tryDemangleDecl(VD, range, /*isRef=*/false);
+    }
+    return true;
+  }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, Type T) override {
-    if (T.isNull())
-      return true;
-    T = T->getRValueType();
-    Mangle::Mangler Man(/* DWARFMangling */true);
-    Man.mangleType(T, 0);
-    std::string MangledName(Man.finalize());
-    std::string Error;
-    Type ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
-                                                        Error);
-    if (ReconstructedType) {
-      Stream << "reconstructed type from usr for \'" << Range.str() <<"\' is ";
-      Stream << "\'";
-      ReconstructedType->print(Stream);
-      Stream << "\'";
-      Stream << '\n';
-    } else {
-      ReconstructedType = getTypeFromMangledTypename(Ctx, MangledName.data(),
-                                                     Error);
-      Stream << "cannot reconstruct type from usr for \'" << Range.str() << "\'" << '\n';
+    if (SeenDecls.insert(D).second)
+      tryDemangleDecl(D, Range, /*isRef=*/true);
+
+    if (T) {
+      T = T->getRValueType();
+      tryDemangleType(T, D->getDeclContext(), Range);
     }
     return true;
+  }
+
+private:
+  void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
+    Mangle::Mangler Man(/* DWARFMangling */true);
+    Man.mangleTypeForDebugger(T, DC);
+    std::string mangledName(Man.finalize());
+    std::string Error;
+    Type ReconstructedType =
+        getTypeFromMangledSymbolname(Ctx, mangledName, Error);
+    Stream << "type: ";
+    if (ReconstructedType) {
+      ReconstructedType->print(Stream);
+    } else {
+      Stream << "FAILURE";
+    }
+    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << "\n";
+  }
+
+  void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
+    std::string USR;
+    {
+      llvm::raw_string_ostream OS(USR);
+      printDeclUSR(VD, OS);
+    }
+
+    std::string error;
+    if (isRef) {
+      Stream << "dref: ";
+    } else {
+      Stream << "decl: ";
+    }
+
+    if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
+      reDecl->print(Stream, PrintOptions());
+    } else {
+      Stream << "FAILURE";
+    }
+    Stream << "\tfor '" << range.str() << "' usr=" << USR << "\n";
   }
 };
 
@@ -2489,17 +2645,9 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
-  InitInvok.getLangOptions().OmitNeedlessWords |=
-    options::OmitNeedlessWords;
   InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
-  InitInvok.getClangImporterOptions().OmitNeedlessWords |=
-    options::OmitNeedlessWords;
-  InitInvok.getClangImporterOptions().InferDefaultArguments |=
-    options::InferDefaultArguments;
-  InitInvok.getClangImporterOptions().UseSwiftLookupTables |=
-    options::UseSwiftLookupTables;
 
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
@@ -2549,9 +2697,13 @@ int main(int argc, char *argv[]) {
     PrintOpts.SkipUnavailable = options::SkipUnavailable;
     PrintOpts.SkipDeinit = options::SkipDeinit;
     PrintOpts.SkipImports = options::SkipImports;
+    PrintOpts.SkipOverrides = options::SkipOverrides;
     if (options::SkipParameterNames) {
       PrintOpts.ArgAndParamPrinting
         = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
+    } else if (options::AlwaysArgumentLabels) {
+      PrintOpts.ArgAndParamPrinting
+        = PrintOptions::ArgAndParamPrintingMode::BothAlways;
     }
   }
   if (options::SkipUnderscoredStdlibProtocols)
@@ -2562,9 +2714,6 @@ int main(int argc, char *argv[]) {
   if (PrintOpts.PrintDocumentationComments) {
     InitInvok.getLangOptions().AttachCommentsToDecls = true;
   }
-
-  if (InitInvok.getClangImporterOptions().InferDefaultArguments)
-    PrintOpts.PrintDefaultParameterPlaceholder = true;
 
   int ExitCode;
 
@@ -2634,6 +2783,7 @@ int main(int argc, char *argv[]) {
     ExitCode = doPrintLocalTypes(InitInvok, options::ModuleToPrint);
     break;
 
+  case ActionType::PrintModuleGroups:
   case ActionType::PrintModule: {
     ide::ModuleTraversalOptions TraversalOptions;
     if (options::ModulePrintSubmodules)
@@ -2643,9 +2793,16 @@ int main(int argc, char *argv[]) {
     if (options::ModulePrintSkipOverlay)
       TraversalOptions |= ide::ModuleTraversal::SkipOverlay;
 
-    ExitCode = doPrintModules(
-        InitInvok, options::ModuleToPrint, TraversalOptions, PrintOpts,
-        options::AnnotatePrint, options::SynthesizeExtension);
+    if (options::Action == ActionType::PrintModuleGroups)
+      ExitCode = doPrintModuleGroups(InitInvok, options::ModuleToPrint);
+    else {
+      if (options::NoEmptyLineBetweenMembers.getNumOccurrences() > 0)
+        PrintOpts.EmptyLineBetweenMembers = !options::NoEmptyLineBetweenMembers;
+      ExitCode = doPrintModules(
+        InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
+        TraversalOptions, PrintOpts, options::AnnotatePrint,
+        options::SynthesizeExtension);
+    }
     break;
   }
 

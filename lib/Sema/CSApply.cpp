@@ -20,7 +20,6 @@
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Attr.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -625,50 +624,10 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto resultTy = result->getType();
       if (resultTy->hasOpenedExistential(record.Archetype)) {
-        // Erase the opened existential.
-
-        // Remove the optional, if present.
-        OptionalTypeKind optKind;
-        if (auto optValueTy = resultTy->getAnyOptionalObjectType(optKind)) {
-          resultTy = optValueTy;
-        }
-
-        //   - Drill down to the optional value (if necessary).
-        if (optKind) {
-          result = new (tc.Context) BindOptionalExpr(result,
-                                                     result->getEndLoc(),
-                                                     0,
-                                                     resultTy);
-          result->setImplicit(true);
-        }
-
-        Type erasedTy;
-        if (resultTy->isEqual(record.Archetype)) {
-          //   - Coerce to an existential value.
-          erasedTy = record.Archetype->getOpenedExistentialType();
-
-          result = coerceToType(result, erasedTy, nullptr);
-          // FIXME: can this really ever fail? We'll leave behind rogue
-          // OpaqueValueExprs if that is the case.
-          assert(result);
-        } else {
-          //   - Perform a covariant function coercion.
-          erasedTy = resultTy->eraseOpenedExistential(
-                       cs.DC->getParentModule(),
-                       record.Archetype);
-          result = new (tc.Context) CovariantFunctionConversionExpr(
-                                      result,
-                                      erasedTy);
-        }
-
-        //   - Bind up the result back up as an optional (if necessary).
-        if (optKind) {
-          Type optErasedTy = OptionalType::get(optKind, erasedTy);
-          result = new (tc.Context) InjectIntoOptionalExpr(result,
-                                                           optErasedTy);
-          result = new (tc.Context) OptionalEvaluationExpr(result,
-                                                           optErasedTy);
-        }
+        Type erasedTy = resultTy->eraseOpenedExistential(
+                          cs.DC->getParentModule(),
+                          record.Archetype);
+        result = coerceToType(result, erasedTy, nullptr);
       }
 
       // If the opaque value has an l-value access kind, then
@@ -701,10 +660,9 @@ namespace {
     static bool isPolymorphicConstructor(AbstractFunctionDecl *fn) {
       if (!isa<ConstructorDecl>(fn))
         return false;
-      DeclContext *parent = fn->getParent();
-      if (auto extension = dyn_cast<ExtensionDecl>(parent))
-        parent = extension->getExtendedType()->getAnyNominal();
-      return (isa<ClassDecl>(parent) || isa<ProtocolDecl>(parent));
+      auto *parent =
+        fn->getParent()->getAsGenericTypeOrGenericTypeExtensionContext();
+      return parent && (isa<ClassDecl>(parent) || isa<ProtocolDecl>(parent));
     }
 
     /// \brief Build a new member reference with the given base and member.
@@ -1318,9 +1276,11 @@ namespace {
       // Find the conformance of the value type to _BridgedToObjectiveC.
       Type valueType = value->getType()->getRValueType();
       ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
-                                            ConformanceCheckFlags::InExpression,
-                                            &conformance);
+      bool conforms =
+        tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
+                              (ConformanceCheckFlags::InExpression|
+                               ConformanceCheckFlags::Used),
+                              &conformance);
       assert(conforms && "Should already have checked the conformance");
       (void)conforms;
 
@@ -1360,7 +1320,8 @@ namespace {
         = tc.conformsToProtocol(valueType,
                                 bridgedProto,
                                 cs.DC,
-                                ConformanceCheckFlags::InExpression,
+                                (ConformanceCheckFlags::InExpression|
+                                 ConformanceCheckFlags::Used),
                                 &conformance);
 
       FuncDecl *fn = nullptr;
@@ -1791,14 +1752,14 @@ namespace {
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinUTF16StringLiteral,
-                         tc.Context.getIdentifier("numberOfCodeUnits") });
+                         tc.Context.getIdentifier("utf16CodeUnitCount") });
 
           elements.push_back(
             TupleTypeElt(tc.Context.TheRawPointerType,
                          tc.Context.Id_builtinUTF16StringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                         tc.Context.getIdentifier("numberOfCodeUnits")));
+                         tc.Context.getIdentifier("utf16CodeUnitCount")));
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF16);
           else
@@ -1811,13 +1772,13 @@ namespace {
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinStringLiteral,
-                         tc.Context.getIdentifier("byteSize"),
+                         tc.Context.getIdentifier("utf8CodeUnitCount"),
                          tc.Context.getIdentifier("isASCII") });
           elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType,
                                          tc.Context.Id_builtinStringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                         tc.Context.getIdentifier("byteSize")));
+                         tc.Context.getIdentifier("utf8CodeUnitCount")));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
                          tc.Context.getIdentifier("isASCII")));
@@ -1836,7 +1797,7 @@ namespace {
         builtinLiteralFuncName
           = DeclName(tc.Context, tc.Context.Id_init,
                      { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
-                       tc.Context.getIdentifier("byteSize"),
+                       tc.Context.getIdentifier("utf8CodeUnitCount"),
                        tc.Context.getIdentifier("isASCII") });
 
         builtinProtocol = tc.getProtocol(
@@ -1847,7 +1808,7 @@ namespace {
                        tc.Context.Id_builtinExtendedGraphemeClusterLiteral));
         elements.push_back(
           TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                       tc.Context.getIdentifier("byteSize")));
+                       tc.Context.getIdentifier("utf8CodeUnitCount")));
         elements.push_back(
           TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
                        tc.Context.getIdentifier("isASCII")));
@@ -2416,35 +2377,16 @@ namespace {
 
         Type toType = simplifyType(expr->getType());
         
-        // Don't allow lvalues when indexing into a tuple expr.
-        // If we get any lvalues, add load exprs to convert the tuple to be all rvalues.
-        if (auto *tupleExpr = dyn_cast<TupleExpr>(base)) {
-          unsigned count = tupleExpr->getNumElements();
-          unsigned lvalues = 0;
-          auto &tc = cs.getTypeChecker();
-          SmallVector<TupleTypeElt, 4> tupleElts;
-          for (unsigned i = 0; i < count; i++) {
-            Expr *elementExpr = tupleExpr->getElement(i);
-            Type elementType = elementExpr->getType();
-            if (elementType->isLValueType()) {
-              lvalues++;
-              elementExpr->propagateLValueAccessKind(AccessKind::Read, true);
-              elementExpr = new (tc.Context) LoadExpr(elementExpr, elementType->getRValueType());
-              tupleExpr->setElement(i, elementExpr);
-            }
-            tupleElts.push_back(elementExpr->getType());
-          }
-          
-          if (lvalues > 0) {
-            auto &Context = tupleExpr->getType()->getASTContext();
-            tupleExpr->setType(TupleType::get(tupleElts, Context));
-            toType = toType->getRValueType();
-          }
-        }
+        // If the result type is an rvalue and the base contains lvalues, need a full
+        // tuple coercion to properly load & set access kind on all underlying elements
+        // before taking a single element.
+        baseTy = base->getType();
+        if (!toType->isLValueType() && baseTy->isLValueType())
+          base = coerceToType(base, baseTy->getRValueType(), cs.getConstraintLocator(base));
 
         return new (cs.getASTContext()) TupleElementExpr(base, dotLoc,
-                                          selected.choice.getTupleIndex(),
-                                          nameLoc.getBaseNameLoc(), toType);
+                                                         selected.choice.getTupleIndex(),
+                                                         nameLoc.getBaseNameLoc(), toType);
       }
 
       case OverloadChoiceKind::BaseType: {
@@ -2772,7 +2714,7 @@ namespace {
         = solution.convertBooleanTypeToBuiltinI1(expr->getCondExpr(),
                                                  cs.getConstraintLocator(expr));
       if (!cond) {
-        cond->setType(ErrorType::get(cs.getASTContext()));
+        expr->getCondExpr()->setType(ErrorType::get(cs.getASTContext()));
       } else {
         expr->setCondExpr(cond);
       }
@@ -3402,11 +3344,20 @@ namespace {
       // complain.
       auto func = dyn_cast<AbstractFunctionDecl>(foundDecl);
       if (!func) {
-        tc.diagnose(E->getLoc(),
-                    isa<VarDecl>(foundDecl)
-                      ? diag::expr_selector_property
-                      : diag::expr_selector_not_method_or_init)
-          .highlight(subExpr->getSourceRange());
+        Optional<InFlightDiagnostic> diag;
+        if (auto VD = dyn_cast<VarDecl>(foundDecl)) {
+          diag.emplace(tc.diagnose(E->getLoc(), diag::expr_selector_var,
+                                   isa<ParamDecl>(VD)
+                                   ? 1
+                                   : VD->getDeclContext()->isTypeContext()
+                                     ? 0
+                                     : 2));
+        } else {
+          diag.emplace(tc.diagnose(E->getLoc(),
+                                   diag::expr_selector_not_method_or_init));
+        }
+        diag->highlight(subExpr->getSourceRange());
+        diag.reset();
         tc.diagnose(foundDecl, diag::decl_declared_here,
                     foundDecl->getFullName());
         return E;
@@ -3441,6 +3392,12 @@ namespace {
 
     Expr *walkToExprPost(Expr *expr) {
       Expr *result = visit(expr);
+
+      // Mark any _ObjectiveCBridgeable conformances as 'used'.
+      if (result) {
+        auto &tc = cs.getTypeChecker();
+        tc.useObjectiveCBridgeableConformances(cs.DC, result->getType());
+      }
 
       assert(expr == ExprStack.back());
       ExprStack.pop_back();
@@ -4211,12 +4168,12 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   return new (ctx) ErasureExpr(expr, toType, conformances);
 }
 
-static uint getOptionalBindDepth(const BoundGenericType *bgt) {
+static unsigned getOptionalBindDepth(const BoundGenericType *bgt) {
   
   if (bgt->getDecl()->classifyAsOptionalType()) {
     auto tyarg = bgt->getGenericArgs()[0];
     
-    uint innerDepth = 0;
+    unsigned innerDepth = 0;
     
     if (auto wrappedBGT = dyn_cast<BoundGenericType>(tyarg->
                                                      getCanonicalType())) {
@@ -4834,6 +4791,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::LValueToRValue: {
+      if (toType->is<TupleType>() || fromType->is<TupleType>())
+        break;
+      
       // Load from the lvalue.
       expr->propagateLValueAccessKind(AccessKind::Read);
       expr = new (tc.Context) LoadExpr(expr, fromType->getRValueType());
@@ -4969,8 +4929,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::BridgeToNSError: {
-      // Tell the ErrorType to become an NSError, using _bridgeErrorTypeToNSError.
-      auto fn = tc.Context.getBridgeErrorTypeToNSError(&tc);
+      // Tell the ErrorProtocol to become an NSError, using
+      // _bridgeErrorProtocolToNSError.
+      auto fn = tc.Context.getBridgeErrorProtocolToNSError(&tc);
       if (!fn) {
         tc.diagnose(expr->getLoc(), diag::missing_nserror_bridging_function);
         return nullptr;
@@ -4986,9 +4947,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
       
-      // The return type of _bridgeErrorTypeToNSError is formally 'AnyObject' to
-      // avoid stdlib-to-Foundation dependencies, but it's really NSError.
-      // Abuse CovariantReturnConversionExpr to fix this.
+      // The return type of _bridgeErrorProtocolToNSError is formally
+      // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's really
+      // NSError.  Abuse CovariantReturnConversionExpr to fix this.
       return new (tc.Context) CovariantReturnConversionExpr(call, toType);
     }
 
@@ -5171,6 +5132,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // Coercions from a type to an existential type.
   if (toType->isAnyExistentialType()) {
     return coerceExistential(expr, toType, locator);
+  }
+
+  if (toType->getAnyOptionalObjectType() &&
+      expr->getType()->getAnyOptionalObjectType()) {
+    return coerceOptionalToOptional(expr, toType, locator);
   }
 
   // Coercion to Optional<T>.
@@ -5902,7 +5868,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   
   if (!resolved->getPath().empty()) {
     // We allow OptionalToBoolean fixes with an opened type to refer to the
-    // BooleanType conformance.
+    // Boolean conformance.
     if (fix.first.getKind() == FixKind::OptionalToBoolean &&
         resolved->getPath().size() == 1 &&
         resolved->getPath()[0].getKind() == ConstraintLocator::OpenedGeneric)
@@ -5943,6 +5909,15 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
         diag.fixItInsertAfter(affected->getEndLoc(), "!");
       }
     }
+    return true;
+  }
+          
+  case FixKind::OptionalChaining: {
+    auto type = solution.simplifyType(TC, affected->getType())
+                ->getRValueObjectType();
+    auto diag = TC.diagnose(affected->getLoc(),
+                            diag::missing_unwrap_optional, type);
+    diag.fixItInsertAfter(affected->getEndLoc(), "?");
     return true;
   }
 
@@ -6469,7 +6444,7 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) 
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
-                                 KnownProtocolKind::BooleanType),
+                                 KnownProtocolKind::Boolean),
                   tc.Context.Id_boolValue,
                   tc.Context.Id_getBuiltinLogicValue,
                   diag::condition_broken_proto,
@@ -6490,7 +6465,7 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
 
   // Find the library intrinsic.
   auto &ctx = tc.Context;
-  auto *fn = ctx.getDoesOptionalHaveValueAsBoolDecl(&tc, OTK_Optional);
+  auto *fn = ctx.getOptionalIsSomeDecl(&tc, OTK_Optional);
   tc.validateDecl(fn);
 
   // Form a reference to the function. This library intrinsic is generic, so we

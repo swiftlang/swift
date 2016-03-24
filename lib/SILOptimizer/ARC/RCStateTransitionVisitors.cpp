@@ -51,6 +51,43 @@ visitAutoreleasePoolCall(ValueBase *V) {
   return DataflowResult(RCStateTransitionDataflowResultKind::NoEffects);
 }
 
+// private helper method since C++ does not have extensions... *sigh*.
+//
+// TODO: This needs a better name.
+template <class ARCState>
+static bool isKnownSafe(BottomUpDataflowRCStateVisitor<ARCState> *State,
+                        SILInstruction *I, SILValue Op) {
+  // If we are running with 'frozen' owned arg releases, check if we have a
+  // frozen use in the side table. If so, this release must be known safe.
+  if (State->FreezeOwnedArgEpilogueReleases)
+    if (auto *OwnedRelease =
+            State->EpilogueReleaseMatcher.getSingleReleaseForArgument(Op))
+      if (I != OwnedRelease)
+        return true;
+
+  // A guaranteed function argument is guaranteed to outlive the function we are
+  // processing. So bottom up for such a parameter, we are always known safe.
+  if (auto *Arg = dyn_cast<SILArgument>(Op)) {
+    if (Arg->isFunctionArg() &&
+        Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed)) {
+      return true;
+    }
+  }
+
+  // If Op is a load from an in_guaranteed parameter, it is guaranteed as well.
+  if (auto *LI = dyn_cast<LoadInst>(Op)) {
+    SILValue RCIdentity = State->RCFI->getRCIdentityRoot(LI->getOperand());
+    if (auto *Arg = dyn_cast<SILArgument>(RCIdentity)) {
+      if (Arg->isFunctionArg() &&
+          Arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 template <class ARCState>
 typename BottomUpDataflowRCStateVisitor<ARCState>::DataflowResult
 BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
@@ -68,16 +105,10 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
     return DataflowResult(Op);
 
   BottomUpRefCountState &State = DataflowState.getBottomUpRefCountState(Op);
-  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I));
+  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I), RCFI);
 
-  // If we are running with 'frozen' owned arg releases, check if we have a
-  // frozen use in the side table. If so, this release must be known safe.
-  if (FreezeOwnedArgEpilogueReleases) {
-    if (auto *OwnedRelease = EpilogueReleaseMatcher.getSingleReleaseForArgument(Op)) {
-      if (I != OwnedRelease) {
-        State.updateKnownSafe(true);
-      }
-    }
+  if (isKnownSafe(this, I, Op)) {
+    State.updateKnownSafe(true);
   }
 
   DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT! Known Safe: "
@@ -203,7 +234,7 @@ TopDownDataflowRCStateVisitor<ARCState>::visitStrongIncrement(ValueBase *V) {
   // count state and continue...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
   auto &State = DataflowState.getTopDownRefCountState(Op);
-  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I));
+  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I), RCFI);
 
   DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
                      << (State.isKnownSafe() ? "yes" : "no") << "\n");
@@ -219,7 +250,7 @@ TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongEntranceArgument(SILArgument *Arg) {
   DEBUG(llvm::dbgs() << "VISITING ENTRANCE ARGUMENT: " << *Arg);
 
-  if (!Arg->hasConvention(ParameterConvention::Direct_Owned)) {
+  if (!Arg->hasConvention(SILArgumentConvention::Direct_Owned)) {
     DEBUG(llvm::dbgs() << "    Not owned! Bailing!\n");
     return DataflowResult();
   }
@@ -240,8 +271,14 @@ visitStrongEntranceApply(ApplyInst *AI) {
 
   // We should have checked earlier that AI has an owned result value. To
   // prevent mistakes, assert that here.
-  assert(AI->hasResultConvention(ResultConvention::Owned) &&
-         "Expected AI to be Owned here");
+#ifndef NDEBUG
+  bool hasOwnedResult = false;
+  for (auto result : AI->getSubstCalleeType()->getDirectResults()) {
+    if (result.getConvention() == ResultConvention::Owned)
+      hasOwnedResult = true;
+  }
+  assert(hasOwnedResult && "Expected AI to be Owned here");
+#endif
 
   // Otherwise, return a dataflow result containing a +1.
   DEBUG(llvm::dbgs() << "    Initializing state.\n");

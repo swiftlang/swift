@@ -627,6 +627,23 @@ SILCloner<ImplClass>::visitMarkUninitializedInst(MarkUninitializedInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitMarkUninitializedBehaviorInst(
+                                          MarkUninitializedBehaviorInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+     getBuilder().createMarkUninitializedBehavior(
+                       getOpLocation(Inst->getLoc()),
+                       getOpValue(Inst->getInitStorageFunc()),
+                       getOpSubstitutions(Inst->getInitStorageSubstitutions()),
+                       getOpValue(Inst->getStorage()),
+                       getOpValue(Inst->getSetterFunc()),
+                       getOpSubstitutions(Inst->getSetterSubstitutions()),
+                       getOpValue(Inst->getSelf()),
+                       getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *Inst){
   auto OpElements = getOpValueArray<8>(Inst->getElements());
   auto OpLoc = getOpLocation(Inst->getLoc());
@@ -1031,6 +1048,15 @@ SILCloner<ImplClass>::visitAutoreleaseValueInst(AutoreleaseValueInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createAutoreleaseValue(getOpLocation(Inst->getLoc()),
                                         getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitSetDeallocatingInst(SetDeallocatingInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createSetDeallocating(getOpLocation(Inst->getLoc()),
+                                       getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

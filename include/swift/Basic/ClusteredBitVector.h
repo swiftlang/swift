@@ -48,6 +48,7 @@
 #include <cassert>
 #include <climits>
 #include <cstdlib>
+#include <type_traits>
 
 namespace llvm {
   class APInt;
@@ -58,7 +59,8 @@ namespace swift {
 /// A vector of bits.  This data structure is optimized to store an
 /// empty vector of any size without doing any allocation.
 class ClusteredBitVector {
-  using ChunkType = uint64_t; // must be unsigned
+  using ChunkType = uint64_t;
+  static_assert(std::is_unsigned<ChunkType>::value, "ChunkType must be unsigned");
   enum {
     ChunkSizeInBits = sizeof(ChunkType) * CHAR_BIT
   };
@@ -144,11 +146,7 @@ class ClusteredBitVector {
   /// is a relatively important operation because it's needed on every
   /// append.
   size_t getCapacityInBits() const {
-    if (hasOutOfLineData()) {
-      return getOutOfLineCapacityInBits();
-    } else {
-      return ChunkSizeInBits;
-    }
+    return hasOutOfLineData() ? getOutOfLineCapacityInBits() : ChunkSizeInBits;
   }
 
   /// Return the current capacity of this bit vector, in chunks.
@@ -172,11 +170,11 @@ class ClusteredBitVector {
   /// Return a pointer to the data storage of this bit vector.
   ChunkType *getChunksPtr() {
     assert(hasSufficientChunkStorage());
-    return (hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data);
+    return hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data;
   }
   const ChunkType *getChunksPtr() const {
     assert(hasSufficientChunkStorage());
-    return (hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data);
+    return hasOutOfLineData() ? getOutOfLineChunksPtr() : &Data;
   }
 
   MutableArrayRef<ChunkType> getChunks() {
@@ -240,9 +238,9 @@ public:
   }
 
   ClusteredBitVector &operator=(const ClusteredBitVector &other) {
-    // Do something with our current out-of-line capacity.
+    // Do something with our current out-of-line storage.
     if (hasOutOfLineData()) {
-      // Copy into our current capacity if it's adequate.
+      // Copy into our current storage if its capacity is adequate.
       auto otherLengthInChunks = other.getLengthInChunks();
       if (otherLengthInChunks <= getOutOfLineCapacityInChunks()) {
         LengthInBits = other.LengthInBits;
@@ -256,7 +254,7 @@ public:
         return *this;
       }
 
-      // Otherwise, destroy our current capacity.
+      // Otherwise, destroy our current storage.
       destroy();
     }
 
@@ -271,7 +269,7 @@ public:
   }
 
   ClusteredBitVector &operator=(ClusteredBitVector &&other) {
-    // Just drop our current capacity.
+    // Just drop our current out-of-line storage.
     if (hasOutOfLineData()) {
       destroy();
     }
@@ -667,7 +665,7 @@ private:
   void appendReserved(size_t numBits,
                 llvm::function_ref<ChunkType(size_t numBitsWanted)> generator);
 
-  /// The slow cases of equality-checking.
+  /// The slow case of equality-checking.
   static bool equalsSlowCase(const ClusteredBitVector &lhs,
                              const ClusteredBitVector &rhs);
 };

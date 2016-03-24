@@ -17,5 +17,11 @@ protocol Takeaway {
 
 extension FishAndChips: Takeaway {}
 
+protocol Beverage {
+  var abv: Int { get set }
+}
+
+extension Beer : Beverage {}
+
 // Dummy statement
 _ = ()

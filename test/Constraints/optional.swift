@@ -35,10 +35,10 @@ func test1(a: A) {
 extension Optional {
   func bind<U>(f: Wrapped -> U?) -> U? {
     switch self {
-    case .Some(let x):
+    case .some(let x):
       return f(x)
-    case .None:
-      return .None
+    case .none:
+      return .none
     }
   }
 }

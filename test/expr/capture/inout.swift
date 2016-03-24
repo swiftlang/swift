@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 // An inout parameter can be captured.
-func foo(inout x: Int) {
+func foo(x: inout Int) {
   func bar() -> Int {
     return x
   }

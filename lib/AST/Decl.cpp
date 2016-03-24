@@ -43,8 +43,21 @@
 
 using namespace swift;
 
-bool impl::isTestingEnabled(const ValueDecl *VD) {
-  return VD->getModuleContext()->isTestingEnabled();
+bool impl::isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
+  assert(VD->getFormalAccess() == Accessibility::Internal);
+
+  if (VD->getAttrs().hasAttribute<VersionedAttr>())
+    return true;
+
+  if (auto *fn = dyn_cast<FuncDecl>(VD))
+    if (auto *ASD = fn->getAccessorStorageDecl())
+      if (ASD->getAttrs().hasAttribute<VersionedAttr>())
+        return true;
+
+  if (VD->getModuleContext()->isTestingEnabled())
+    return true;
+
+  return false;
 }
 
 clang::SourceLocation ClangNode::getLocation() const {
@@ -301,6 +314,13 @@ bool Decl::isUserAccessible() const {
   return true;
 }
 
+bool Decl::canHaveComment() const {
+  return !this->hasClangNode() &&
+         (isa<ValueDecl>(this) || isa<ExtensionDecl>(this)) &&
+         !isa<ParamDecl>(this) &&
+         (!isa<AbstractTypeParamDecl>(this) || isa<AssociatedTypeDecl>(this));
+}
+
 Module *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
@@ -427,6 +447,8 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   }
 
   if (auto PD = dyn_cast<ProtocolDecl>(D)) {
+    if (PD->getAttrs().hasAttribute<ShowInInterfaceAttr>())
+      return false;
     StringRef NameStr = PD->getNameStr();
     if (NameStr.startswith("_Builtin"))
       return true;
@@ -722,10 +744,8 @@ loadAllConformances(const T *container,
                         container->getASTContext().AllocateCopy(Conformances));
 }
 
-DeclRange NominalTypeDecl::getMembers(bool forceDelayedMembers) const {
+DeclRange NominalTypeDecl::getMembers() const {
   loadAllMembers();
-  if (forceDelayedMembers)
-    const_cast<NominalTypeDecl*>(this)->forceDelayedMemberDecls();
   return IterableDeclContext::getMembers();
 }
 
@@ -803,7 +823,7 @@ void ExtensionDecl::setGenericSignature(GenericSignature *sig) {
   GenericSig = sig;
 }
 
-DeclRange ExtensionDecl::getMembers(bool forceDelayedMembers) const {
+DeclRange ExtensionDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
 }
@@ -952,19 +972,17 @@ SourceRange PatternBindingDecl::getSourceRange() const {
 }
 
 static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
-  auto StaticSpelling = StaticSpellingKind::KeywordStatic;
-  if (Type T = D->getDeclContext()->getDeclaredTypeInContext()) {
-    if (auto NTD = T->getAnyNominal()) {
-      if (isa<ClassDecl>(NTD))
-        StaticSpelling = StaticSpellingKind::KeywordClass;
-    }
-  }
-  return StaticSpelling;
+  if (!D->getDeclContext()->getAsClassOrClassExtensionContext())
+    return StaticSpellingKind::KeywordStatic;
+
+  return StaticSpellingKind::KeywordClass;
 }
 
 StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   if (!isStatic())
     return StaticSpellingKind::None;
+  if (getStaticSpelling() != StaticSpellingKind::None)
+    return getStaticSpelling();
 
   return getCorrectStaticSpellingForDecl(this);
 }
@@ -1015,11 +1033,10 @@ SourceRange IfConfigDecl::getSourceRange() const {
 }
 
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
-  auto ctx = storage->getDeclContext()->getDeclaredTypeInContext();
-  if (!ctx) return false;
+  auto nominal = storage->getDeclContext()
+      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!nominal) return false;
 
-  auto nominal = ctx->getNominalOrBoundGenericNominal();
-  assert(nominal && "context wasn't a nominal type?");
   switch (nominal->getKind()) {
 #define DECL(ID, BASE) case DeclKind::ID:
 #define NOMINAL_TYPE_DECL(ID, BASE)
@@ -1602,7 +1619,7 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
 
-  // Dynamic lookup can only find [objc] members.
+  // Dynamic lookup can only find @objc members.
   if (!isObjC())
     return false;
 
@@ -1734,7 +1751,7 @@ Type TypeDecl::getDeclaredType() const {
 
 Type TypeDecl::getDeclaredInterfaceType() const {
   Type interfaceType = getInterfaceType();
-  if (interfaceType->is<ErrorType>())
+  if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
 
   return interfaceType->castTo<MetatypeType>()->getInstanceType();
@@ -1777,26 +1794,14 @@ bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,
 }
 
 
-/// Provide the set of parameters to a generic type, or null if
-/// this function is not generic.
-void NominalTypeDecl::setGenericParams(GenericParamList *params) {
-  assert(!GenericParams && "Already has generic parameters");
-  GenericParams = params;
-  
-  if (params)
-    for (auto Param : *params)
-      Param->setDeclContext(this);
-}
-
-
 bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   // Only known protocols can be derived.
   auto knownProtocol = protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return false;
 
-  // All nominal types can derive their ErrorType conformance.
-  if (*knownProtocol == KnownProtocolKind::ErrorType)
+  // All nominal types can derive their ErrorProtocol conformance.
+  if (*knownProtocol == KnownProtocolKind::ErrorProtocol)
     return true;
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
@@ -1821,11 +1826,6 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
     }
   }
   return false;
-}
-
-void NominalTypeDecl::setGenericSignature(GenericSignature *sig) {
-  assert(!GenericSig && "Already have generic signature");
-  GenericSig = sig;
 }
 
 void NominalTypeDecl::computeType() {
@@ -1854,11 +1854,9 @@ void NominalTypeDecl::computeType() {
   //
   // If this protocol has been deserialized, it already has generic parameters.
   // Don't add them again.
-  if (!getGenericParams()) {
-    if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-      GenericParams = proto->createGenericParams(proto);
-    }
-  }
+  if (!getGenericParams())
+    if (auto proto = dyn_cast<ProtocolDecl>(this))
+      setGenericParams(proto->createGenericParams(proto));
 }
 
 Type NominalTypeDecl::getDeclaredTypeInContext() const {
@@ -1872,7 +1870,7 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
   if (UnboundGenericType *UGT = Ty->getAs<UnboundGenericType>()) {
     // If we have an unbound generic type, bind the type to the archetypes
     // in the type's definition.
-    NominalTypeDecl *D = UGT->getDecl();
+    auto *D = cast<NominalTypeDecl>(UGT->getDecl());
     SmallVector<Type, 4> GenericArgs;
     for (auto Param : *D->getGenericParams()) {
       auto Archetype = Param->getArchetype();
@@ -1963,13 +1961,38 @@ OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
   }
 }
 
+GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
+                                 Identifier name, SourceLoc nameLoc,
+                                 MutableArrayRef<TypeLoc> inherited,
+                                 GenericParamList *GenericParams) :
+    TypeDecl(K, DC, name, nameLoc, inherited),
+    DeclContext(DeclContextKind::GenericTypeDecl, DC) {
+  setGenericParams(GenericParams);
+}
+
+
+void GenericTypeDecl::setGenericParams(GenericParamList *params) {
+  // Set the specified generic parameters onto this type alias, setting
+  // the parameters' context along the way.
+  GenericParams = params;
+  if (params)
+    for (auto Param : *params)
+      Param->setDeclContext(this);
+}
+
+void GenericTypeDecl::setGenericSignature(GenericSignature *sig) {
+  assert(!GenericSig && "Already have generic signature");
+  GenericSig = sig;
+}
+
+
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
-                             DeclContext *DC)
-  : TypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}),
-    TypeAliasLoc(TypeAliasLoc),
-    UnderlyingTy(UnderlyingTy)
+                             GenericParamList *GenericParams, DeclContext *DC)
+  : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
+    TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy)
 {
+
   // Set the type of the TypeAlias to the right MetatypeType.
   ASTContext &Ctx = getASTContext();
   AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
@@ -1994,8 +2017,8 @@ Type AbstractTypeParamDecl::getSuperclass() const {
   return nullptr;
 }
 
-ArrayRef<ProtocolDecl *> AbstractTypeParamDecl::getConformingProtocols(
-                             LazyResolver *resolver) const {
+ArrayRef<ProtocolDecl *>
+AbstractTypeParamDecl::getConformingProtocols(LazyResolver *resolver) const {
   if (Archetype)
     return Archetype->getConformsTo();
 
@@ -2457,6 +2480,163 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
   return true;
 }
 
+/// Determine whether the given type is the 'Self' generic parameter
+/// of a protocol.
+static bool isProtocolSelf(const ProtocolDecl *proto, Type type) {
+  return proto->getProtocolSelf()->getDeclaredType()->isEqual(type);
+}
+
+/// Classify usages of Self in the given type.
+static SelfReferenceKind
+findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
+                           bool skipAssocTypes) {
+  // Tuples preserve variance.
+  if (auto tuple = type->getAs<TupleType>()) {
+    auto kind = SelfReferenceKind::None();
+    for (auto &elt: tuple->getElements()) {
+      kind |= findProtocolSelfReferences(proto, elt.getType(),
+                                         skipAssocTypes);
+    }
+    return kind;
+  } 
+
+  // Function preserve variance in the result type, and flip variance in
+  // the parameter type.
+  if (auto funcTy = type->getAs<AnyFunctionType>()) {
+    auto inputKind = findProtocolSelfReferences(proto, funcTy->getInput(),
+                                                skipAssocTypes);
+    auto resultKind = findProtocolSelfReferences(proto, funcTy->getResult(),
+                                                 skipAssocTypes);
+
+    auto kind = inputKind.flip();
+    kind |= resultKind;
+    return kind;
+  }
+
+  // Metatypes preserve variance.
+  if (auto metaTy = type->getAs<MetatypeType>()) {
+    return findProtocolSelfReferences(proto, metaTy->getInstanceType(),
+                                      skipAssocTypes);
+  }
+
+  // Optionals preserve variance.
+  if (auto optType = type->getAnyOptionalObjectType()) {
+    return findProtocolSelfReferences(proto, optType,
+                                      skipAssocTypes);
+  }
+
+  // DynamicSelfType preserves variance.
+  // FIXME: This shouldn't ever appear in protocol requirement
+  // signatures.
+  if (auto selfType = type->getAs<DynamicSelfType>()) {
+    return findProtocolSelfReferences(proto, selfType->getSelfType(),
+                                      skipAssocTypes);
+  }
+
+  // InOut types are invariant.
+  if (auto inOutType = type->getAs<InOutType>()) {
+    if (findProtocolSelfReferences(proto, inOutType->getObjectType(),
+                                   skipAssocTypes)) {
+      return SelfReferenceKind::Other();
+    }
+  }
+
+  // Bound generic types are invariant.
+  if (auto boundGenericType = type->getAs<BoundGenericType>()) {
+    for (auto paramType : boundGenericType->getGenericArgs()) {
+      if (findProtocolSelfReferences(proto, paramType,
+                                     skipAssocTypes)) {
+        return SelfReferenceKind::Other();
+      }
+    }
+  }
+
+  // A direct reference to 'Self' is covariant.
+  if (isProtocolSelf(proto, type))
+    return SelfReferenceKind::Result();
+
+  // Special handling for associated types.
+  if (!skipAssocTypes && type->is<DependentMemberType>()) {
+    while (auto depMemTy = type->getAs<DependentMemberType>()) {
+      type = depMemTy->getBase();
+    }
+
+    if (isProtocolSelf(proto, type))
+      return SelfReferenceKind::Other();
+  }
+
+  return SelfReferenceKind::None();
+}
+
+/// Find Self references within the given requirement.
+SelfReferenceKind
+ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
+                                         bool allowCovariantParameters,
+                                         bool skipAssocTypes) const {
+  // Types never refer to 'Self'.
+  if (isa<TypeDecl>(value))
+    return SelfReferenceKind::None();
+
+  auto type = value->getInterfaceType();
+
+  // FIXME: Deal with broken recursion.
+  if (!type)
+    return SelfReferenceKind::None();
+
+  // Skip invalid declarations.
+  if (type->is<ErrorType>())
+    return SelfReferenceKind::None();
+
+  if (isa<AbstractFunctionDecl>(value)) {
+    // Skip the 'self' parameter.
+    type = type->castTo<AnyFunctionType>()->getResult();
+
+    // Methods of non-final classes can only contain a covariant 'Self'
+    // as a function result type.
+    if (!allowCovariantParameters) {
+      auto inputType = type->castTo<AnyFunctionType>()->getInput();
+      auto inputKind = ::findProtocolSelfReferences(this, inputType,
+                                                    skipAssocTypes);
+      if (inputKind.parameter)
+        return SelfReferenceKind::Other();
+    }
+
+    return ::findProtocolSelfReferences(this, type,
+                                        skipAssocTypes);
+  } else if (isa<SubscriptDecl>(value)) {
+    return ::findProtocolSelfReferences(this, type,
+                                        skipAssocTypes);
+  } else {
+    if (::findProtocolSelfReferences(this, type,
+                                     skipAssocTypes)) {
+      return SelfReferenceKind::Other();
+    }
+    return SelfReferenceKind::None();
+  }
+}
+
+bool FuncDecl::hasArchetypeSelf() const {
+  if (auto proto = getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    return proto->findProtocolSelfReferences(this,
+                                             /*allowCovariantParameters=*/true,
+                                             /*skipAssocTypes=*/true).result;
+  }
+
+  return false;
+}
+
+bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
+  // If the member type uses 'Self' in non-covariant position,
+  // we cannot use the existential type.
+  auto selfKind = findProtocolSelfReferences(decl,
+                                             /*allowCovariantParameters=*/true,
+                                             /*skipAssocTypes=*/false);
+  if (selfKind.parameter || selfKind.other)
+    return false;
+
+  return true;
+}
+
 bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   // Assume for now that the existential type is supported; this
   // prevents circularity issues.
@@ -2467,7 +2647,6 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   if (resolver && !hasType())
     resolver->resolveDeclSignature(this);
 
-  auto selfType = getProtocolSelf()->getArchetype();
   for (auto member : getMembers()) {
     if (auto vd = dyn_cast<ValueDecl>(member)) {
       if (resolver && !vd->hasType())
@@ -2486,34 +2665,17 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
     }
 
     // For value members, look at their type signatures.
-    auto valueMember = dyn_cast<ValueDecl>(member);
-    if (!valueMember || !valueMember->hasType())
-      continue;
+    if (auto valueMember = dyn_cast<ValueDecl>(member)) {
+      // materializeForSet has a funny type signature.
+      if (auto func = dyn_cast<FuncDecl>(member)) {
+        if (func->getAccessorKind() == AccessorKind::IsMaterializeForSet)
+          continue;
+      }
 
-    // Extract the type of the member, ignoring the 'self' parameter and return
-    // type of functions.
-    auto memberTy = valueMember->getType();
-    if (memberTy->is<ErrorType>())
-      continue;
-    if (isa<AbstractFunctionDecl>(valueMember)) {
-      // Drop the 'Self' parameter.
-      memberTy = memberTy->castTo<AnyFunctionType>()->getResult();
-      // Drop the return type. Methods are allowed to return Self.
-      memberTy = memberTy->castTo<AnyFunctionType>()->getInput();
-    }
-
-    // If we find 'Self' anywhere in the member's type, we cannot use the
-    // existential type.
-    if (memberTy.findIf([&](Type type) -> bool {
-          // If we found our archetype, return null.
-          if (auto archetype = type->getAs<ArchetypeType>()) {
-            return archetype == selfType;
-          }
-
-          return false;
-        })) {
-      ProtocolDeclBits.ExistentialTypeSupported = false;
-      return false;
+      if (!isAvailableInExistential(valueMember)) {
+        ProtocolDeclBits.ExistentialTypeSupported = false;
+        return false;
+      }
     }
   }
 
@@ -2572,6 +2734,26 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
                                          SourceLoc());
   result->setOuterParameters(outerGenericParams);
   return result;
+}
+
+/// Returns the default witness for a requirement, or nullptr if there is
+/// no default.
+ConcreteDeclRef ProtocolDecl::getDefaultWitness(ValueDecl *requirement) const {
+  loadAllMembers();
+
+  auto found = DefaultWitnesses.find(requirement);
+  if (found == DefaultWitnesses.end())
+    return nullptr;
+  return found->second;
+}
+
+/// Record the default witness for a requirement.
+void ProtocolDecl::setDefaultWitness(ValueDecl *requirement,
+                                     ConcreteDeclRef witness) {
+  assert(witness);
+  auto pair = DefaultWitnesses.insert(std::make_pair(requirement, witness));
+  assert(pair.second && "Already have a default witness!");
+  (void) pair;
 }
 
 /// \brief Return true if the 'getter' is mutating, i.e. that it requires an
@@ -2736,6 +2918,15 @@ void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
            Set->getFormalAccess() == setterAccess.getValue());
     Set->overwriteAccessibility(setterAccess.getValue());
   }
+}
+
+void AbstractStorageDecl::addBehavior(TypeRepr *Type,
+                                      Expr *Param) {
+  assert(BehaviorInfo.getPointer() == nullptr && "already set behavior!");
+  auto mem = getASTContext().Allocate(sizeof(BehaviorRecord),
+                                      alignof(BehaviorRecord));
+  auto behavior = new (mem) BehaviorRecord{Type, Param};
+  BehaviorInfo.setPointer(behavior);
 }
 
 void AbstractStorageDecl::makeComputedWithMutableAddress(SourceLoc lbraceLoc,
@@ -2932,9 +3123,14 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
     }
   }
 
-  // The getter selector is the property name itself.
+  // If the Swift name starts with the word "is", use that Swift name as the
+  // getter name.
   auto var = cast<VarDecl>(this);
-  return VarDecl::getDefaultObjCGetterSelector(ctx, var->getObjCPropertyName());
+  if (camel_case::getFirstWord(var->getName().str()) == "is")
+    return ObjCSelector(ctx, 0, { var->getName() });
+
+  // The getter selector is the property name itself.
+  return ObjCSelector(ctx, 0, { var->getObjCPropertyName() });
 }
 
 ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
@@ -3039,8 +3235,8 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
     // If this init is defined inside of the same type (or in an extension
     // thereof) as the let property, then it is mutable.
     if (!CDC->isTypeContext() ||
-        CDC->getDeclaredTypeInContext()->getAnyNominal() !=
-        getDeclContext()->getDeclaredTypeInContext()->getAnyNominal())
+        CDC->getAsNominalTypeOrNominalTypeExtensionContext() !=
+        getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext())
       return false;
 
     if (base && CD->getImplicitSelfDecl() != base->getDecl())
@@ -3203,6 +3399,10 @@ bool VarDecl::isAnonClosureParam() const {
 StaticSpellingKind VarDecl::getCorrectStaticSpelling() const {
   if (!isStatic())
     return StaticSpellingKind::None;
+  if (auto *PBD = getParentPatternBinding()) {
+    if (PBD->getStaticSpelling() != StaticSpellingKind::None)
+      return PBD->getStaticSpelling();
+  }
 
   return getCorrectStaticSpellingForDecl(this);
 }
@@ -3213,21 +3413,25 @@ Identifier VarDecl::getObjCPropertyName() const {
       return name->getSelectorPieces()[0];
   }
 
+  // If the Swift property name starts with the word "is", strip the
+  // "is" and lowercase the rest when forming the Objective-C property
+  // name.
+  ASTContext &ctx = getASTContext();
+  StringRef nameStr = getName().str();
+  if (camel_case::getFirstWord(nameStr) == "is") {
+    SmallString<16> scratch;
+    return ctx.getIdentifier(camel_case::toLowercaseWord(nameStr.substr(2),
+                                                         scratch));
+  }
+
   return getName();
 }
-
-ObjCSelector VarDecl::getDefaultObjCGetterSelector(ASTContext &ctx,
-                                                   Identifier propertyName) {
-  return ObjCSelector(ctx, 0, propertyName);
-}
-
 
 ObjCSelector VarDecl::getDefaultObjCSetterSelector(ASTContext &ctx,
                                                    Identifier propertyName) {
   llvm::SmallString<16> scratch;
   scratch += "set";
   camel_case::appendSentenceCase(scratch, propertyName.str());
-
   return ObjCSelector(ctx, 1, ctx.getIdentifier(scratch));
 }
 
@@ -3300,7 +3504,32 @@ ParamDecl::ParamDecl(ParamDecl *PD)
 
 
 /// \brief Retrieve the type of 'self' for the given context.
-static Type getSelfTypeForContext(DeclContext *dc) {
+Type DeclContext::getSelfTypeInContext() const {
+  // For a protocol or extension thereof, the type is 'Self'.
+  if (getAsProtocolOrProtocolExtensionContext()) {
+    // In the parser, generic parameters won't be wired up yet, just give up on
+    // producing a type.
+    if (getGenericParamsOfContext() == nullptr)
+      return Type();
+    return getProtocolSelf()->getArchetype();
+  }
+  return getDeclaredTypeInContext();
+}
+
+/// \brief Retrieve the interface type of 'self' for the given context.
+Type DeclContext::getSelfInterfaceType() const {
+  // For a protocol or extension thereof, the type is 'Self'.
+  if (getAsProtocolOrProtocolExtensionContext()) {
+    if (getGenericParamsOfContext() == nullptr)
+      return Type();
+    return getProtocolSelf()->getDeclaredType();
+  }
+  return getDeclaredInterfaceType();
+}
+
+/// \brief Retrieve the type of 'self' for the given context.
+/// FIXME: Can this be integrated with getSelfTypeInContext above?
+static Type getSelfTypeOfContext(DeclContext *dc) {
   // For a protocol or extension thereof, the type is 'Self'.
   // FIXME: Weird that we're producing an archetype for protocol Self,
   // but the declared type of the context in non-protocol cases.
@@ -3314,7 +3543,6 @@ static Type getSelfTypeForContext(DeclContext *dc) {
   return dc->getDeclaredTypeOfContext();
 }
 
-
 /// Create an implicit 'self' decl for a method in the specified decl context.
 /// If 'static' is true, then this is self for a static method in the type.
 ///
@@ -3325,7 +3553,7 @@ static Type getSelfTypeForContext(DeclContext *dc) {
 ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                  bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
-  auto selfType = getSelfTypeForContext(DC);
+  auto selfType = getSelfTypeOfContext(DC);
 
   // If we have a selfType (i.e. we're not in the parser before we know such
   // things, configure it.
@@ -3902,6 +4130,8 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
   assert(getDeclContext()->isTypeContext());
   if (!isStatic())
     return StaticSpellingKind::None;
+  if (getStaticSpelling() != StaticSpellingKind::None)
+    return getStaticSpelling();
 
   return getCorrectStaticSpellingForDecl(this);
 }
@@ -4085,19 +4315,6 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
   return DynamicSelfType::get(extType, getASTContext());
 }
 
-bool FuncDecl::hasArchetypeSelf() const {
-  if (!getDeclContext()->getAsProtocolExtensionContext())
-    return false;
-
-  auto selfTy = getDeclContext()->getProtocolSelf()->getArchetype();
-
-  auto resultTy = getResultType();
-  auto optionalResultTy = resultTy->getAnyOptionalObjectType();
-  if (optionalResultTy)
-    return optionalResultTy->isEqual(selfTy);
-  return resultTy->isEqual(selfTy);
-}
-
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc StartLoc = getStartLoc();
   if (StartLoc.isInvalid()) return SourceRange();
@@ -4106,8 +4323,10 @@ SourceRange FuncDecl::getSourceRange() const {
       getBodyKind() == BodyKind::Skipped)
     return { StartLoc, BodyRange.End };
 
-  if (auto *B = getBody())
-    return { StartLoc, B->getEndLoc() };
+  if (auto *B = getBody()) {
+    if (!B->isImplicit())
+      return { StartLoc, B->getEndLoc() };
+  }
   if (getBodyResultTypeLoc().hasLocation() &&
       getBodyResultTypeLoc().getSourceRange().End.isValid() &&
       !this->isAccessor())
@@ -4126,10 +4345,15 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-void EnumElementDecl::computeType() {
+bool EnumElementDecl::computeType() {
   EnumDecl *ED = getParentEnum();
-
   Type resultTy = ED->getDeclaredTypeInContext();
+
+  if (resultTy->is<ErrorType>()) {
+    setType(resultTy);
+    return false;
+  }
+
   Type argTy = MetatypeType::get(resultTy);
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
@@ -4143,6 +4367,7 @@ void EnumElementDecl::computeType() {
     resultTy = FunctionType::get(argTy, resultTy);
 
   setType(resultTy);
+  return true;
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {
@@ -4342,8 +4567,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // If wes till don't know, check whether we have a class with a superclass: it
   // gets an implicit chained initializer.
   if (Kind == BodyInitKind::None) {
-    if (auto classDecl = getDeclContext()->getDeclaredTypeInContext()
-                           ->getClassOrBoundGenericClass()) {
+    if (auto classDecl = getDeclContext()->getAsClassOrClassExtensionContext()) {
       if (classDecl->getSuperclass())
         Kind = BodyInitKind::ImplicitChained;
     }

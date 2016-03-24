@@ -62,10 +62,10 @@ extension NSObject : CustomDebugStringConvertible {}
 // Strings
 //===----------------------------------------------------------------------===//
 
-@available(*, unavailable, message="Please use String or NSString")
+@available(*, unavailable, message: "Please use String or NSString")
 public class NSSimpleCString {}
 
-@available(*, unavailable, message="Please use String or NSString")
+@available(*, unavailable, message: "Please use String or NSString")
 public class NSConstantString {}
 
 @warn_unused_result
@@ -73,16 +73,6 @@ public class NSConstantString {}
 public // COMPILER_INTRINSIC
 func _convertStringToNSString(string: String) -> NSString {
   return string._bridgeToObjectiveC()
-}
-
-@warn_unused_result
-@_semantics("convertFromObjectiveC")
-public // COMPILER_INTRINSIC
-func _convertNSStringToString(nsstring: NSString?) -> String {
-  if nsstring == nil { return "" }
-  var result: String?
-  String._forceBridgeFromObjectiveC(nsstring!, result: &result)
-  return result!
 }
 
 extension NSString : StringLiteralConvertible {
@@ -103,7 +93,7 @@ extension NSString : StringLiteralConvertible {
     if value.hasPointerRepresentation {
       immutableResult = NSString(
         bytesNoCopy: UnsafeMutablePointer<Void>(value.utf8Start),
-        length: Int(value.byteSize),
+        length: Int(value.utf8CodeUnitCount),
         encoding: value.isASCII ? NSASCIIStringEncoding : NSUTF8StringEncoding,
         freeWhenDone: false)!
     } else {
@@ -136,31 +126,36 @@ extension String : _ObjectiveCBridgeable {
     return true
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSString.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSString {
     // This method should not do anything extra except calling into the
     // implementation inside core.  (These two entry points should be
     // equivalent.)
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), NSString.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSString.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
     x: NSString,
-    inout result: String?
+    result: inout String?
   ) {
     result = String(x)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSString,
-    inout result: String?
+    result: inout String?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return result != nil
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    source: NSString?
+  ) -> String {
+    // `nil` has historically been used as a stand-in for an empty
+    // string; map it to an empty string.
+    if _slowPath(source == nil) { return String() }
+    return String(source!)
   }
 }
 
@@ -181,10 +176,6 @@ extension Int : _ObjectiveCBridgeable {
     self = number.integerValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(integer: self)
@@ -192,17 +183,23 @@ extension Int : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Int?
+    result: inout Int?
   ) {
     result = x.integerValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Int?
+    result: inout Int?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    source: NSNumber?
+  ) -> Int {
+    return source!.integerValue
   }
 }
 
@@ -215,10 +212,6 @@ extension UInt : _ObjectiveCBridgeable {
     self = number.unsignedIntegerValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(unsignedInteger: self)
@@ -226,16 +219,23 @@ extension UInt : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: UInt?
+    result: inout UInt?
   ) {
     result = x.unsignedIntegerValue
   }
+
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: UInt?
+    result: inout UInt?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    source: NSNumber?
+  ) -> UInt {
+    return source!.unsignedIntegerValue
   }
 }
 
@@ -248,10 +248,6 @@ extension Float : _ObjectiveCBridgeable {
     self = number.floatValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(float: self)
@@ -259,17 +255,23 @@ extension Float : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Float?
+    result: inout Float?
   ) {
     result = x.floatValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Float?
+    result: inout Float?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    source: NSNumber?
+  ) -> Float {
+    return source!.floatValue
   }
 }
 
@@ -282,10 +284,6 @@ extension Double : _ObjectiveCBridgeable {
     self = number.doubleValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(double: self)
@@ -293,17 +291,23 @@ extension Double : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Double?
+    result: inout Double?
   ) {
     result = x.doubleValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Double?
+    result: inout Double?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    source: NSNumber?
+  ) -> Double {
+    return source!.doubleValue
   }
 }
 
@@ -316,10 +320,6 @@ extension Bool: _ObjectiveCBridgeable {
     self = number.boolValue
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(bool: self)
@@ -327,17 +327,23 @@ extension Bool: _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Bool?
+    result: inout Bool?
   ) {
     result = x.boolValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Bool?
+    result: inout Bool?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    source: NSNumber?
+  ) -> Bool {
+    return source!.boolValue
   }
 }
 
@@ -351,10 +357,6 @@ extension CGFloat : _ObjectiveCBridgeable {
     self.native = CGFloat.NativeType(number)
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
     return self.native._bridgeToObjectiveC()
@@ -362,7 +364,7 @@ extension CGFloat : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: CGFloat?
+    result: inout CGFloat?
   ) {
     var nativeResult: CGFloat.NativeType? = 0.0
     CGFloat.NativeType._forceBridgeFromObjectiveC(x, result: &nativeResult)
@@ -371,10 +373,17 @@ extension CGFloat : _ObjectiveCBridgeable {
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: CGFloat?
+    result: inout CGFloat?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    source: NSNumber?
+  ) -> CGFloat {
+    return CGFloat(
+             CGFloat.NativeType._unconditionallyBridgeFromObjectiveC(source))
   }
 }
 
@@ -414,33 +423,6 @@ extension NSArray : ArrayLiteralConvertible {
   }
 }
 
-/// The entry point for converting `NSArray` to `Array` in bridge
-/// thunks.  Used, for example, to expose :
-///
-///     func f([NSView]) {}
-///
-/// to Objective-C code as a method that accepts an `NSArray`.  This operation
-/// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
-@warn_unused_result
-@_semantics("convertFromObjectiveC")
-public func _convertNSArrayToArray<T>(source: NSArray?) -> [T] {
-  if _slowPath(source == nil) { return [] }
-  var result: [T]?
-  Array._forceBridgeFromObjectiveC(source!, result: &result)
-  return result!
-}
-
-/// The entry point for converting `Array` to `NSArray` in bridge
-/// thunks.  Used, for example, to expose :
-///
-///     func f() -> [NSView] { return [] }
-///
-/// to Objective-C code as a method that returns an `NSArray`.
-@warn_unused_result
-public func _convertArrayToNSArray<T>(array: [T]) -> NSArray {
-  return array._bridgeToObjectiveC()
-}
-
 extension Array : _ObjectiveCBridgeable {
 
   /// Private initializer used for bridging.
@@ -462,32 +444,29 @@ extension Array : _ObjectiveCBridgeable {
     // and watchOS.
     self = Array(
       _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copyWithZone(nil), _NSArrayCoreType.self))
+        unsafeBitCast(_cocoaArray.copy(), to: _NSArrayCore.self))
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Element.self)
   }
 
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSArray.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSArray {
-    return unsafeBitCast(self._buffer._asCocoaArray(), NSArray.self)
+    return unsafeBitCast(self._buffer._asCocoaArray(), to: NSArray.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
     source: NSArray,
-    inout result: Array?
+    result: inout Array?
   ) {
     _precondition(
       Swift._isBridgedToObjectiveC(Element.self),
       "array element type is not bridged to Objective-C")
 
     // If we have the appropriate native storage already, just adopt it.
-    if let native = Array._bridgeFromObjectiveCAdoptingNativeStorage(source) {
+    if let native =
+        Array._bridgeFromObjectiveCAdoptingNativeStorageOf(source) {
       result = native
       return
     }
@@ -503,13 +482,38 @@ extension Array : _ObjectiveCBridgeable {
 
   public static func _conditionallyBridgeFromObjectiveC(
     source: NSArray,
-    inout result: Array?
+    result: inout Array?
   ) -> Bool {
     // Construct the result array by conditionally bridging each element.
     let anyObjectArr = [AnyObject](_cocoaArray: source)
 
     result = _arrayConditionalCast(anyObjectArr)
     return result != nil
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    source: NSArray?
+  ) -> Array {
+    _precondition(
+      Swift._isBridgedToObjectiveC(Element.self),
+      "array element type is not bridged to Objective-C")
+
+    // `nil` has historically been used as a stand-in for an empty
+    // array; map it to an empty array instead of failing.
+    if _slowPath(source == nil) { return Array() }
+
+    // If we have the appropriate native storage already, just adopt it.
+    if let native =
+        Array._bridgeFromObjectiveCAdoptingNativeStorageOf(source!) {
+      return native
+    }
+
+    if _fastPath(_isBridgedVerbatimToObjectiveC(Element.self)) {
+      // Forced down-cast (possible deferred type-checking)
+      return Array(_cocoaArray: source!)
+    }
+
+    return _arrayForceCast([AnyObject](_cocoaArray: source!))
   }
 }
 
@@ -533,7 +537,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaDictionary: _NSDictionaryType) {
+  public init(_cocoaDictionary: _NSDictionary) {
     _sanityCheck(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
@@ -549,74 +553,22 @@ extension Dictionary {
     // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copyWithZone(nil), _NSDictionaryType.self))
+        unsafeBitCast(_cocoaDictionary.copy(with: nil), to: _NSDictionary.self))
   }
-}
-
-/// The entry point for bridging `NSDictionary` to `Dictionary` in bridge
-/// thunks.  Used, for example, to expose:
-///
-///     func f([String : String]) {}
-///
-/// to Objective-C code as a method that accepts an `NSDictionary`.
-///
-/// This is a forced downcast.  This operation should have O(1) complexity
-/// when `Key` and `Value` are bridged verbatim.
-///
-/// The cast can fail if bridging fails.  The actual checks and bridging can be
-/// deferred.
-@warn_unused_result
-@_semantics("convertFromObjectiveC")
-public func _convertNSDictionaryToDictionary<
-  Key : Hashable, Value
->(d: NSDictionary?) -> [Key : Value] {
-  // Note: there should be *a good justification* for doing something else
-  // than just dispatching to `_forceBridgeFromObjectiveC`.
-  if _slowPath(d == nil) { return [:] }
-  var result: [Key : Value]?
-  Dictionary._forceBridgeFromObjectiveC(d!, result: &result)
-  return result!
-}
-
-// FIXME: right now the following is O(n), not O(1).
-
-/// The entry point for bridging `Dictionary` to `NSDictionary` in bridge
-/// thunks.  Used, for example, to expose:
-///
-///     func f() -> [String : String] {}
-///
-/// to Objective-C code as a method that returns an `NSDictionary`.
-///
-/// This is a forced downcast.  This operation should have O(1) complexity.
-///
-/// The cast can fail if bridging fails.  The actual checks and bridging can be
-/// deferred.
-@warn_unused_result
-public func _convertDictionaryToNSDictionary<Key, Value>(
-  d: [Key : Value]
-) -> NSDictionary {
-
-  // Note: there should be *a good justification* for doing something else
-  // than just dispatching to `_bridgeToObjectiveC`.
-  return d._bridgeToObjectiveC()
 }
 
 // Dictionary<Key, Value> is conditionally bridged to NSDictionary
 extension Dictionary : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSDictionary.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), NSDictionary.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSDictionary.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
     d: NSDictionary,
-    inout result: Dictionary?
+    result: inout Dictionary?
   ) {
-    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorage(
+    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
         d as AnyObject) {
       result = native
       return
@@ -625,26 +577,26 @@ extension Dictionary : _ObjectiveCBridgeable {
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       result = [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d, _NSDictionaryType.self))
+        _cocoaDictionary: unsafeBitCast(d, to: _NSDictionary.self))
       return
     }
 
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
-    d.enumerateKeysAndObjectsUsingBlock {
+    d.enumerateKeysAndObjects({
       (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
        stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(
           key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
           value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
-    }
+    })
     result = builder.take()
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSDictionary,
-    inout result: Dictionary?
+    result: inout Dictionary?
   ) -> Bool {
     let anyDict = x as [NSObject : AnyObject]
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
@@ -661,6 +613,37 @@ extension Dictionary : _ObjectiveCBridgeable {
     return Swift._isBridgedToObjectiveC(Key.self) &&
            Swift._isBridgedToObjectiveC(Value.self)
   }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    d: NSDictionary?
+  ) -> Dictionary {
+    // `nil` has historically been used as a stand-in for an empty
+    // dictionary; map it to an empty dictionary.
+    if _slowPath(d == nil) { return Dictionary() }
+
+    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
+        d! as AnyObject) {
+      return native
+    }
+
+    if _isBridgedVerbatimToObjectiveC(Key.self) &&
+       _isBridgedVerbatimToObjectiveC(Value.self) {
+      return [Key : Value](
+        _cocoaDictionary: unsafeBitCast(d!, to: _NSDictionary.self))
+    }
+
+    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
+    // may not be backed by an NSDictionary.
+    var builder = _DictionaryBuilder<Key, Value>(count: d!.count)
+    d!.enumerateKeysAndObjects({
+      (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
+       stop: UnsafeMutablePointer<ObjCBool>) in
+      builder.add(
+          key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
+          value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
+    })
+    return builder.take()
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -671,7 +654,7 @@ extension Dictionary : _ObjectiveCBridgeable {
 // to the enumeration state, so the state cannot be moved in memory. We will
 // probably need to implement fast enumeration in the compiler as a primitive
 // to implement it both correctly and efficiently.
-final public class NSFastGenerator : GeneratorType {
+final public class NSFastEnumerationIterator : IteratorProtocol {
   var enumerable: NSFastEnumeration
   var state: [NSFastEnumerationState]
   var n: Int
@@ -680,29 +663,30 @@ final public class NSFastGenerator : GeneratorType {
   /// Size of ObjectsBuffer, in ids.
   var STACK_BUF_SIZE: Int { return 4 }
 
+  // FIXME: Replace with _CocoaFastEnumerationStackBuf.
   /// Must have enough space for STACK_BUF_SIZE object references.
   struct ObjectsBuffer {
-    var buf = (COpaquePointer(), COpaquePointer(),
-               COpaquePointer(), COpaquePointer())
+    var buf: (OpaquePointer, OpaquePointer, OpaquePointer, OpaquePointer) =
+      (nil, nil, nil, nil)
   }
   var objects: [ObjectsBuffer]
 
   public func next() -> AnyObject? {
     if n == count {
       // FIXME: Is this check necessary before refresh()?
-      if count == 0 { return .None }
+      if count == 0 { return nil }
       refresh()
-      if count == 0 { return .None }
+      if count == 0 { return nil }
     }
-    let next : AnyObject = state[0].itemsPtr[n]!
+    let next: AnyObject = state[0].itemsPtr[n]!
     n += 1
     return next
   }
 
   func refresh() {
     n = 0
-    count = enumerable.countByEnumeratingWithState(
-      state._baseAddressIfContiguous,
+    count = enumerable.countByEnumerating(
+      with: state._baseAddressIfContiguous,
       objects: AutoreleasingUnsafeMutablePointer(
         objects._baseAddressIfContiguous),
       count: STACK_BUF_SIZE)
@@ -720,17 +704,17 @@ final public class NSFastGenerator : GeneratorType {
   }
 }
 
-extension NSArray : SequenceType {
-  /// Return a *generator* over the elements of this *sequence*.
+extension NSArray : Sequence {
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  final public func generate() -> NSFastGenerator {
-    return NSFastGenerator(self)
+  final public func makeIterator() -> NSFastEnumerationIterator {
+    return NSFastEnumerationIterator(self)
   }
 }
 
 /* TODO: API review
-extension NSArray : Swift.CollectionType {
+extension NSArray : Swift.Collection {
   final public var startIndex: Int {
     return 0
   }
@@ -746,7 +730,7 @@ extension Set {
   ///
   /// The provided `NSSet` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaSet: _NSSetType) {
+  public init(_cocoaSet: _NSSet) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
     // FIXME: We would like to call CFSetCreateCopy() to avoid doing an
@@ -760,30 +744,30 @@ extension Set {
     // and watchOS.
     self = Set(
       _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copyWithZone(nil), _NSSetType.self))
+        unsafeBitCast(_cocoaSet.copy(with: nil), to: _NSSet.self))
   }
 }
 
-extension NSSet : SequenceType {
-  /// Return a *generator* over the elements of this *sequence*.
+extension NSSet : Sequence {
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSFastGenerator {
-    return NSFastGenerator(self)
+  public func makeIterator() -> NSFastEnumerationIterator {
+    return NSFastEnumerationIterator(self)
   }
 }
 
-extension NSOrderedSet : SequenceType {
-  /// Return a *generator* over the elements of this *sequence*.
+extension NSOrderedSet : Sequence {
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSFastGenerator {
-    return NSFastGenerator(self)
+  public func makeIterator() -> NSFastEnumerationIterator {
+    return NSFastEnumerationIterator(self)
   }
 }
 
 // FIXME: move inside NSIndexSet when the compiler supports this.
-public struct NSIndexSetGenerator : GeneratorType {
+public struct NSIndexSetIterator : IteratorProtocol {
   public typealias Element = Int
 
   internal let _set: NSIndexSet
@@ -811,91 +795,48 @@ public struct NSIndexSetGenerator : GeneratorType {
   }
 }
 
-extension NSIndexSet : SequenceType {
-  /// Return a *generator* over the elements of this *sequence*.
+extension NSIndexSet : Sequence {
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSIndexSetGenerator {
-    return NSIndexSetGenerator(set: self)
+  public func makeIterator() -> NSIndexSetIterator {
+    return NSIndexSetIterator(set: self)
   }
-}
-
-// FIXME: right now the following is O(n), not O(1).
-
-/// The entry point for bridging `Set` to `NSSet` in bridge
-/// thunks.  Used, for example, to expose:
-///
-///     func f() -> Set<String> {}
-///
-/// to Objective-C code as a method that returns an `NSSet`.
-///
-/// This is a forced downcast.  This operation should have O(1) complexity.
-///
-/// The cast can fail if bridging fails.  The actual checks and bridging can be
-/// deferred.
-@warn_unused_result
-public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
-  return s._bridgeToObjectiveC()
-}
-
-/// The entry point for bridging `NSSet` to `Set` in bridge
-/// thunks.  Used, for example, to expose:
-///
-///     func f(Set<String>) {}
-///
-/// to Objective-C code as a method that accepts an `NSSet`.
-///
-/// This is a forced downcast.  This operation should have O(1) complexity
-/// when `T` is bridged verbatim.
-///
-/// The cast can fail if bridging fails.  The actual checks and bridging can be
-/// deferred.
-@warn_unused_result
-@_semantics("convertFromObjectiveC")
-public func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
-  if _slowPath(s == nil) { return [] }
-  var result: Set<T>?
-  Set._forceBridgeFromObjectiveC(s!, result: &result)
-  return result!
 }
 
 // Set<Element> is conditionally bridged to NSSet
 extension Set : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSSet.self
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSSet {
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), NSSet.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSSet.self)
   }
 
-  public static func _forceBridgeFromObjectiveC(s: NSSet, inout result: Set?) {
+  public static func _forceBridgeFromObjectiveC(s: NSSet, result: inout Set?) {
     if let native =
-      Set<Element>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
+      Set<Element>._bridgeFromObjectiveCAdoptingNativeStorageOf(s as AnyObject) {
 
       result = native
       return
     }
 
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      result = Set<Element>(_cocoaSet: unsafeBitCast(s, _NSSetType.self))
+      result = Set<Element>(_cocoaSet: unsafeBitCast(s, to: _NSSet.self))
       return
     }
 
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s.count)
-    s.enumerateObjectsUsingBlock {
+    s.enumerateObjects({
       (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
         anyObjectMember, Element.self))
-    }
+    })
     result = builder.take()
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSSet, inout result: Set?
+    x: NSSet, result: inout Set?
   ) -> Bool {
     let anySet = x as Set<NSObject>
     if _isBridgedVerbatimToObjectiveC(Element.self) {
@@ -907,51 +848,75 @@ extension Set : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  public static func _unconditionallyBridgeFromObjectiveC(s: NSSet?) -> Set {
+    // `nil` has historically been used as a stand-in for an empty
+    // set; map it to an empty set.
+    if _slowPath(s == nil) { return Set() }
+
+    if let native =
+      Set<Element>._bridgeFromObjectiveCAdoptingNativeStorageOf(s! as AnyObject) {
+
+      return native
+    }
+
+    if _isBridgedVerbatimToObjectiveC(Element.self) {
+      return Set<Element>(_cocoaSet: unsafeBitCast(s!, to: _NSSet.self))
+    }
+
+    // `Set<Element>` where `Element` is a value type may not be backed by
+    // an NSSet.
+    var builder = _SetBuilder<Element>(count: s!.count)
+    s!.enumerateObjects({
+      (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
+      builder.add(member: Swift._forceBridgeFromObjectiveC(
+        anyObjectMember, Element.self))
+    })
+    return builder.take()
+  }
+
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Element.self)
   }
 }
 
-extension NSDictionary : SequenceType {
+extension NSDictionary : Sequence {
   // FIXME: A class because we can't pass a struct with class fields through an
   // [objc] interface without prematurely destroying the references.
-  final public class Generator : GeneratorType {
-    var _fastGenerator: NSFastGenerator
+  final public class Iterator : IteratorProtocol {
+    var _fastIterator: NSFastEnumerationIterator
     var _dictionary: NSDictionary {
-      return _fastGenerator.enumerable as! NSDictionary
+      return _fastIterator.enumerable as! NSDictionary
     }
 
     public func next() -> (key: AnyObject, value: AnyObject)? {
-      switch _fastGenerator.next() {
-      case .None:
-        return .None
-      case .Some(let key):
+      if let key = _fastIterator.next() {
         // Deliberately avoid the subscript operator in case the dictionary
         // contains non-copyable keys. This is rare since NSMutableDictionary
         // requires them, but we don't want to paint ourselves into a corner.
-        return (key: key, value: _dictionary.objectForKey(key)!)
+        return (key: key, value: _dictionary.object(forKey: key)!)
       }
+      return nil
     }
 
-    init(_ _dict: NSDictionary) {
-      _fastGenerator = NSFastGenerator(_dict)
+    internal init(_ _dict: NSDictionary) {
+      _fastIterator = NSFastEnumerationIterator(_dict)
     }
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Generator {
-    return Generator(self)
+  public func makeIterator() -> Iterator {
+    return Iterator(self)
   }
 }
 
-extension NSEnumerator : SequenceType {
-  /// Return a *generator* over the *enumerator*.
+extension NSEnumerator : Sequence {
+  /// Return an *iterator* over the *enumerator*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSFastGenerator {
-    return NSFastGenerator(self)
+  public func makeIterator() -> NSFastEnumerationIterator {
+    return NSFastEnumerationIterator(self)
   }
 }
 
@@ -968,7 +933,7 @@ extension NSRange {
   @warn_unused_result
   public func toRange() -> Range<Int>? {
     if location == NSNotFound { return nil }
-    return Range(start: location, end: location + length)
+    return location..<(location+length)
   }
 }
 
@@ -981,17 +946,17 @@ extension NSRange {
 public
 func NSLocalizedString(key: String,
                        tableName: String? = nil,
-                       bundle: NSBundle = NSBundle.mainBundle(),
+                       bundle: NSBundle = NSBundle.main(),
                        value: String = "",
                        comment: String) -> String {
-  return bundle.localizedStringForKey(key, value:value, table:tableName)
+  return bundle.localizedString(forKey: key, value:value, table:tableName)
 }
 
 //===----------------------------------------------------------------------===//
 // NSLog
 //===----------------------------------------------------------------------===//
 
-public func NSLog(format: String, _ args: CVarArgType...) {
+public func NSLog(format: String, _ args: CVarArg...) {
   withVaList(args) { NSLogv(format, $0) }
 }
 
@@ -1006,19 +971,19 @@ public func NSLog(format: String, _ args: CVarArgType...) {
 // have CGRectEdge type.  This is not correct for Swift (as there is no
 // implicit conversion to NSRectEdge).
 
-@available(*, unavailable, renamed="NSRectEdge.MinX")
+@available(*, unavailable, renamed: "NSRectEdge.MinX")
 public var NSMinXEdge: NSRectEdge {
   fatalError("unavailable property can't be accessed")
 }
-@available(*, unavailable, renamed="NSRectEdge.MinY")
+@available(*, unavailable, renamed: "NSRectEdge.MinY")
 public var NSMinYEdge: NSRectEdge {
   fatalError("unavailable property can't be accessed")
 }
-@available(*, unavailable, renamed="NSRectEdge.MaxX")
+@available(*, unavailable, renamed: "NSRectEdge.MaxX")
 public var NSMaxXEdge: NSRectEdge {
   fatalError("unavailable property can't be accessed")
 }
-@available(*, unavailable, renamed="NSRectEdge.MaxY")
+@available(*, unavailable, renamed: "NSRectEdge.MaxY")
 public var NSMaxYEdge: NSRectEdge {
   fatalError("unavailable property can't be accessed")
 }
@@ -1047,12 +1012,12 @@ public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 public typealias ErrorPointer = NSErrorPointer
 
 public // COMPILER_INTRINSIC
-let _nilObjCError: ErrorType = _GenericObjCError.NilError
+let _nilObjCError: ErrorProtocol = _GenericObjCError.nilError
 
 @warn_unused_result
-@_silgen_name("swift_convertNSErrorToErrorType")
+@_silgen_name("swift_convertNSErrorToErrorProtocol")
 public // COMPILER_INTRINSIC
-func _convertNSErrorToErrorType(error: NSError?) -> ErrorType {
+func _convertNSErrorToErrorProtocol(error: NSError?) -> ErrorProtocol {
   if let error = error {
     return error
   }
@@ -1060,10 +1025,10 @@ func _convertNSErrorToErrorType(error: NSError?) -> ErrorType {
 }
 
 @warn_unused_result
-@_silgen_name("swift_convertErrorTypeToNSError")
+@_silgen_name("swift_convertErrorProtocolToNSError")
 public // COMPILER_INTRINSIC
-func _convertErrorTypeToNSError(error: ErrorType) -> NSError {
-  return unsafeDowncast(_bridgeErrorTypeToNSError(error))
+func _convertErrorProtocolToNSError(error: ErrorProtocol) -> NSError {
+  return unsafeDowncast(_bridgeErrorProtocolToNSError(error), to: NSError.self)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1073,7 +1038,7 @@ func _convertErrorTypeToNSError(error: ErrorType) -> NSError {
 extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
-  convenience init(format predicateFormat: String, _ args: CVarArgType...) {
+  convenience init(format predicateFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     self.init(format: predicateFormat, arguments: va_args)
   }
@@ -1082,14 +1047,14 @@ extension NSPredicate {
 extension NSExpression {
   // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat, ...;
   public
-  convenience init(format expressionFormat: String, _ args: CVarArgType...) {
+  convenience init(format expressionFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     self.init(format: expressionFormat, arguments: va_args)
   }
 }
 
 extension NSString {
-  public convenience init(format: NSString, _ args: CVarArgType...) {
+  public convenience init(format: NSString, _ args: CVarArg...) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
     let va_args = getVaList(args)
@@ -1097,7 +1062,7 @@ extension NSString {
   }
 
   public convenience init(
-    format: NSString, locale: NSLocale?, _ args: CVarArgType...
+    format: NSString, locale: NSLocale?, _ args: CVarArg...
   ) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
@@ -1107,26 +1072,26 @@ extension NSString {
 
   @warn_unused_result
   public class func localizedStringWithFormat(
-    format: NSString, _ args: CVarArgType...
+    format: NSString, _ args: CVarArg...
   ) -> Self {
     return withVaList(args) {
-      self.init(format: format as String, locale: NSLocale.currentLocale(), arguments: $0)
+      self.init(format: format as String, locale: NSLocale.current(), arguments: $0)
     }
   }
 
   @warn_unused_result
-  public func stringByAppendingFormat(format: NSString, _ args: CVarArgType...)
+  public func appendingFormat(format: NSString, _ args: CVarArg...)
   -> NSString {
     return withVaList(args) {
-      self.stringByAppendingString(NSString(format: format as String, arguments: $0) as String) as NSString
+      self.appending(NSString(format: format as String, arguments: $0) as String) as NSString
     }
   }
 }
 
 extension NSMutableString {
-  public func appendFormat(format: NSString, _ args: CVarArgType...) {
+  public func appendFormat(format: NSString, _ args: CVarArg...) {
     return withVaList(args) {
-      self.appendString(NSString(format: format as String, arguments: $0) as String)
+      self.append(NSString(format: format as String, arguments: $0) as String)
     }
   }
 }
@@ -1310,11 +1275,11 @@ extension NSCoder {
     var classesAsNSObjects: Set<NSObject>? = nil
     if let theClasses = classes {
       classesAsNSObjects =
-        Set(GeneratorSequence(NSFastGenerator(theClasses)).map {
-          unsafeBitCast($0, NSObject.self)
+        Set(IteratorSequence(NSFastEnumerationIterator(theClasses)).map {
+          unsafeBitCast($0, to: NSObject.self)
         })
     }
-    return self.__decodeObjectOfClasses(classesAsNSObjects, forKey: key)
+    return self.__decodeObject(ofClasses: classesAsNSObjects, forKey: key)
   }
 
   @warn_unused_result
@@ -1382,7 +1347,7 @@ extension NSKeyedUnarchiver {
 
 extension NSURL : _FileReferenceLiteralConvertible {
   private convenience init(failableFileReferenceLiteral path: String) {
-    let fullPath = NSBundle.mainBundle().pathForResource(path, ofType: nil)!
+    let fullPath = NSBundle.main().path(forResource: path, ofType: nil)!
     self.init(fileURLWithPath: fullPath)
   }
 
@@ -1398,56 +1363,56 @@ public typealias _FileReferenceLiteralType = NSURL
 //===----------------------------------------------------------------------===//
 
 extension NSURL : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .URL(absoluteString)
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .url(absoluteString)
   }
 }
 
 extension NSRange : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(self, children: ["location": location, "length": length])
   }
 }
 
 extension NSRange : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .Range(Int64(location), Int64(length))
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .range(Int64(location), Int64(length))
   }
 }
 
 extension NSDate : CustomPlaygroundQuickLookable {
   var summary: String {
     let df = NSDateFormatter()
-    df.dateStyle = .MediumStyle
-    df.timeStyle = .ShortStyle
-    return df.stringFromDate(self)
+    df.dateStyle = .mediumStyle
+    df.timeStyle = .shortStyle
+    return df.string(from: self)
   }
 
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .Text(summary)
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(summary)
   }
 }
 
 extension NSSet : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: self as Set<NSObject>)
   }
 }
 
 extension NSString : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-    return .Text(self as String)
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(self as String)
   }
 }
 
 extension NSArray : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: self as [AnyObject])
   }
 }
 
 extension NSDictionary : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: self as [NSObject : AnyObject])
   }
 }

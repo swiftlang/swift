@@ -6,7 +6,7 @@
 // RUN: mkdir %t
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
@@ -91,8 +91,11 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
 // CHECK-NEXT: @end
 @objc class ClassWithNSObjectProtocol : NSObjectProtocol {
   var description: String { return "me" }
-  func conformsToProtocol(_: Protocol) -> Bool { return false }
-  func isKindOfClass(aClass: AnyClass) -> Bool { return false }
+  @objc(conformsToProtocol:)
+  func conforms(to _: Protocol) -> Bool { return false }
+
+  @objc(isKindOfClass:)
+  func isKind(of aClass: AnyClass) -> Bool { return false }
 }
 
 // CHECK-LABEL: @interface Initializers
@@ -161,7 +164,7 @@ class NotObjC {}
   class func test2() {}
 
   func testPrimitives(b: Bool, i: Int, f: Float, d: Double, u: UInt)
-    -> COpaquePointer { return COpaquePointer() }
+    -> OpaquePointer { return nil }
   func testString(s: String) {}
   func testSelector(sel: Selector, boolean b: ObjCBool) {}
 
@@ -236,7 +239,7 @@ typealias AliasForNSRect = NSRect
   func emptyArray() -> NSArray { return NSArray() }
   func maybeArray() -> NSArray? { return nil }
 
-  func someEnum() -> NSRuncingMode { return .Mince }
+  func someEnum() -> NSRuncingMode { return .mince }
 
   func zone() -> NSZone { return nil }
 
@@ -257,7 +260,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
-  func test(a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> { return UnsafeMutablePointer() }
+  func test(a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> { return nil }
 
   func testNested(a: UnsafeMutablePointer<UnsafeMutablePointer<Int>>) {}
 
@@ -394,6 +397,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: + (double)staticDouble;
 // CHECK-NEXT: @property (nonatomic, strong) Properties * _Nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
+// CHECK-NEXT: @property (nonatomic, getter=isAnimated) BOOL animated;
 // CHECK-NEXT: @property (nonatomic, getter=register, setter=setRegister:) BOOL register_;
 // CHECK-NEXT: @property (nonatomic, readonly, strong, getter=this) Properties * _Nonnull this_;
 // CHECK-NEXT: init
@@ -425,7 +429,7 @@ public class NonObjCClass { }
 
   weak var weakProto: MyProtocol?
   weak var weakCF: CFTypeRef?
-  weak var weakCFString: CFStringRef?
+  weak var weakCFString: CFString?
 
   typealias CFTypeRefAlias = CFTypeRef
 
@@ -433,7 +437,7 @@ public class NonObjCClass { }
   var strongCFAlias: CFTypeRefAlias?
 
   var anyCF: CFAliasForType?
-  var anyCF2: CFAliasForTypeRef?
+  var anyCF2: CFAliasForType?
 
   @IBOutlet weak var outlet: AnyObject!
   @IBOutlet var typedOutlet: Properties!
@@ -467,6 +471,8 @@ public class NonObjCClass { }
     @objc(isEnabled) get { return true }
     @objc(setIsEnabled:) set { }
   }
+
+  var isAnimated: Bool = true
 
   var register: Bool = false
   var this: Properties { return self }

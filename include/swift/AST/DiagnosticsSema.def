@@ -264,9 +264,9 @@ ERROR(cannot_convert_to_return_type_nil,none,
       "nil is incompatible with return type %0", (Type))
 
 ERROR(cannot_convert_thrown_type,none,
-      "thrown expression type %0 does not conform to 'ErrorType'", (Type))
+      "thrown expression type %0 does not conform to 'ErrorProtocol'", (Type))
 ERROR(cannot_throw_nil,none,
-      "cannot infer concrete ErrorType for thrown 'nil' value", ())
+      "cannot infer concrete ErrorProtocol for thrown 'nil' value", ())
 
 
 ERROR(cannot_convert_raw_initializer_value,none,
@@ -287,6 +287,9 @@ ERROR(cannot_convert_argument_value,none,
       (Type,Type))
 ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))
+ERROR(cannot_convert_partial_argument_value_protocol,none,
+      "in argument type %0, %1 does not conform to expected type %2", (Type, Type, Type))
+
 ERROR(cannot_convert_argument_value_nil,none,
       "nil is not compatible with expected argument type %0", (Type))
 
@@ -364,8 +367,8 @@ ERROR(expr_selector_module_missing,none,
       "import the 'ObjectiveC' module to use '#selector'", ())
 ERROR(expr_selector_no_declaration,none,
       "argument of '#selector' does not refer to an initializer or method", ())
-ERROR(expr_selector_property,none,
-      "argument of '#selector' cannot refer to a property", ())
+ERROR(expr_selector_var,none,
+      "argument of '#selector' cannot refer to a %select{property|parameter|variable}0", (int))
 ERROR(expr_selector_not_method_or_init,none,
       "argument of '#selector' does not refer to a method or initializer", ())
 ERROR(expr_selector_not_objc,none,
@@ -389,6 +392,8 @@ WARNING(selector_literal_deprecated_suggest,none,
         "use '#selector' instead", ())
 WARNING(selector_construction_suggest,none,
         "use '#selector' instead of explicitly constructing a 'Selector'", ())
+NOTE(selector_construction_suppress_warning,none,
+     "wrap the selector name in parentheses to suppress this warning", ())
 
 ERROR(cannot_return_value_from_void_func,none,
       "unexpected non-void return value in void function", ())
@@ -465,6 +470,9 @@ ERROR(invalid_member_type,none,
 ERROR(invalid_member_type_suggest,none,
       "%0 does not have a member type named %1; did you mean %2?",
       (Type, Identifier, Identifier))
+ERROR(invalid_member_type_alias,none,
+      "typealias %0 is too complex to be used as a generic constraint; "
+      "use an associatedtype instead", (Identifier))
 ERROR(ambiguous_member_type,none,
       "ambiguous type name %0 in %1", (Identifier, Type))
 ERROR(no_module_type,none,
@@ -725,7 +733,7 @@ ERROR(string_index_not_integer,none,
       (Type))
 NOTE(string_index_not_integer_note,none,
      "consider using an existing high level algorithm, "
-     "str.startIndex.advancedBy(n), or a projection like str.utf8", ())
+     "str.startIndex.advanced(by: n), or a projection like str.utf8", ())
 
 ERROR(invalid_c_function_pointer_conversion_expr,none,
       "a C function pointer can only be formed from a reference to a 'func' or "
@@ -833,6 +841,14 @@ ERROR(no_objc_tagged_pointer_not_class_protocol,none,
 ERROR(swift_native_objc_runtime_base_not_on_root_class,none,
       "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
       "to root classes", ())
+
+ERROR(cdecl_not_at_top_level,none,
+      "@_cdecl can only be applied to global functions", ())
+ERROR(cdecl_empty_name,none,
+      "@_cdecl symbol name cannot be empty", ())
+ERROR(cdecl_throws,none,
+      "raising errors from @_cdecl functions is not supported", ())
+
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
 ERROR(access_control_in_protocol,none,
@@ -936,8 +952,8 @@ ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 
 // Variables (var and let).
-ERROR(unimplemented_type_var,none,
-      "%select{ERROR|static|class}1 stored properties not yet supported"
+ERROR(unimplemented_static_var,none,
+      "%select{ERROR|static|class}1 stored properties not supported"
       "%select{ in this context| in generic types| in classes}0"
       "%select{|; did you mean 'static'?}2",
       (unsigned, StaticSpellingKind, unsigned))
@@ -1501,7 +1517,7 @@ ERROR(broken_equatable_requirement,none,
 ERROR(broken_hashable_requirement,none,
       "Hashable protocol is broken: unexpected requirement", ())
 ERROR(broken_errortype_requirement,none,
-      "ErrorType protocol is broken: unexpected requirement", ())
+      "ErrorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
@@ -1523,6 +1539,63 @@ ERROR(dynamic_self_struct_enum,none,
 ERROR(duplicate_enum_element,none,
       "duplicate definition of enum element",())
 
+// Property behaviors
+ERROR(property_behavior_not_protocol,none,
+      "property behavior name must refer to a protocol", ())
+ERROR(property_behavior_protocol_reqt_ambiguous,none,
+      "property behavior protocol has ambiguous %0 member", (Identifier))
+NOTE(property_behavior_protocol_reqt_here,none,
+     "%0 declared here", (Identifier))
+ERROR(property_behavior_protocol_no_value,none,
+      "property behavior protocol does not have a 'value' property", ())
+ERROR(property_behavior_protocol_no_initStorage,none,
+      "property behavior protocol has a 'storage' requirement but does not "
+      "have a static 'initStorage' method with the expected type %0 or %1",
+      (Type, Type))
+ERROR(property_behavior_unknown_requirement,none,
+      "property behavior protocol %0 has non-behavior requirement %1",
+      (Identifier, Identifier))
+NOTE(property_behavior_unknown_requirement_here,none,
+     "declared here", ())
+NOTE(self_conformance_required_by_property_behavior,none,
+     "conformance to %0 required to contain an instance property with "
+     "behavior %1",
+     (Identifier, Identifier))
+NOTE(value_conformance_required_by_property_behavior,none,
+     "behavior %1 requires property type to conform to protocol %0",
+     (Identifier, Identifier))
+ERROR(property_behavior_with_self_requirement_not_in_type,none,
+      "property behavior %0 can only be used on instance properties "
+      "because it has 'Self' requirements",
+      (Identifier))
+ERROR(property_behavior_with_feature_not_supported,none,
+      "property behavior %0 with %1 is not supported outside of "
+      "type contexts",
+      (Identifier, StringRef))
+ERROR(property_behavior_value_type_doesnt_match,none,
+      "property behavior %0 provides 'value' property implementation with "
+      "type %1 that doesn't match type %2 of declared property %3",
+      (Identifier, Type, Identifier, Type))
+NOTE(property_behavior_value_decl_here,none,
+     "'value' property declared here", ())
+ERROR(property_behavior_invalid_parameter_reqt,none,
+      "property behavior %0 has a 'parameter' requirement that is "
+      "static or generic", (Identifier))
+ERROR(property_behavior_requires_parameter,none,
+      "property behavior %0 requires a parameter in the declaration of %1",
+      (Identifier, Identifier))
+ERROR(property_behavior_invalid_initializer,none,
+      "initializer expression provided, but property behavior %0 does not "
+      "use it",
+      (Identifier))
+ERROR(property_behavior_unsupported_initializer,none,
+      "property behaviors do not support destructuring initialization of "
+      "multiple properties", ())
+ERROR(property_behavior_invalid_parameter,none,
+      "parameter expression provided, but property behavior %0 does not "
+      "use it",
+      (Identifier))
+
 //------------------------------------------------------------------------------
 // Type Check Attributes
 //------------------------------------------------------------------------------
@@ -1532,7 +1605,10 @@ ERROR(attr_only_only_one_decl_kind,none,
 
 
 ERROR(override_final,none,
-      "%0 overrides a 'final' %0", (DescriptiveDeclKind))
+      "%0 overrides a 'final' %1", (DescriptiveDeclKind, DescriptiveDeclKind))
+
+ERROR(override_static,none,
+      "cannot override %0", (DescriptiveDeclKind))
 
 ERROR(member_cannot_be_final,none,
       "only classes and class members may be marked with 'final'",
@@ -1776,7 +1852,7 @@ ERROR(try_assign_rhs_noncovering,none,
 NOTE(subscript_decl_here,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,none,
-      "protocol 'BooleanType' is broken", ())
+      "protocol 'Boolean' is broken", ())
 
 ERROR(broken_bool,none, "type 'Bool' is broken", ())
 
@@ -1902,6 +1978,8 @@ ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(generic_type_declared_here,none,
      "generic type %0 declared here", (Identifier))
+ERROR(cannot_partially_specialize_generic_function,none,
+     "cannot partially specialize a generic function", ())
 
 // Ambiguities
 ERROR(ambiguous_decl_ref,none,
@@ -1982,7 +2060,8 @@ NOTE(fix_unqualified_access_top_level_multi,none,
 ERROR(type_of_metatype,none,
       "'.dynamicType' is not allowed after a type name", ())
 ERROR(invalid_noescape_use,none,
-      "@noescape parameter %0 may only be called", (Identifier))
+      "@noescape %select{value|parameter}1 %0 may only be called",
+      (Identifier, bool))
 NOTE(noescape_autoclosure,none,
     "parameter %0 is implicitly @noescape because it was declared @autoclosure",
      (Identifier))
@@ -2068,8 +2147,8 @@ NOTE(cant_fix_c_style_for_stmt,none,
 // ForEach Stmt
 ERROR(sequence_protocol_broken,none,
       "SequenceType protocol definition is broken", ())
-ERROR(generator_protocol_broken,none,
-      "GeneratorType protocol definition is broken", ())
+ERROR(iterator_protocol_broken,none,
+      "IteratorProtocol protocol definition is broken", ())
 
 ERROR(label_shadowed, none,
       "label %0 cannot be reused on an inner statement", (Identifier))
@@ -2097,6 +2176,18 @@ ERROR(fallthrough_into_case_with_var_binding,none,
 
 ERROR(unnecessary_cast_over_optionset,none,
       "unnecessary cast over raw value of %0", (Type))
+
+ERROR(type_mismatch_multiple_pattern_list,none,
+      "pattern variable bound to type %0, expected type %1", (Type, Type))
+
+WARNING(where_on_one_item, none,
+        "'where' only applies to the second pattern match in this case", ())
+
+NOTE(add_where_newline, none,
+     "disambiguate by adding a line break between them if this is desired", ())
+
+NOTE(duplicate_where, none,
+     "duplicate the 'where' on both patterns to check both patterns",())
 
 //------------------------------------------------------------------------------
 // Type Check Patterns
@@ -2253,7 +2344,7 @@ ERROR(recursive_enum_not_indirect,none,
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
-      "ErrorType}0 type", (unsigned))
+      "ErrorProtocol}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())
@@ -2341,13 +2432,13 @@ ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
 ERROR(sil_function_ellipsis,PointsToFirstBadToken,
       "SIL function types cannot be variadic", ())
-ERROR(sil_function_label,PointsToFirstBadToken,
+ERROR(sil_function_input_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
+ERROR(sil_function_output_label,PointsToFirstBadToken,
+      "SIL function types cannot have labeled results", ())
 ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
       "repeated %select{parameter|result|callee}0 convention attribute",
       (unsigned))
-ERROR(sil_function_multiple_results,PointsToFirstBadToken,
-      "SIL function types cannot have multiple results", ())
 ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,
@@ -2420,7 +2511,7 @@ ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -2508,6 +2599,10 @@ ERROR(objc_override_method_selector_mismatch,none,
 ERROR(objc_override_property_name_mismatch,none,
       "Objective-C property has a different name from the "
       "property it overrides (%0 vs. %1)", (Identifier, Identifier))
+
+ERROR(nonlocal_bridged_to_objc,none,
+      "conformance of %0 to %1 can only be written in module %2",
+      (Identifier, Identifier, Identifier))
 
 ERROR(broken_bridged_to_objc_protocol,none,
       "_BridgedToObjectiveC protocol is broken", ())

@@ -29,12 +29,13 @@
 from __future__ import print_function
 
 import re
+import subprocess
 import sys
 import tempfile
-import subprocess
+
 
 def help():
-  print("""\
+    print("""\
 Usage:
 
 viewcfg [output-suffix] < file
@@ -43,43 +44,44 @@ By default all CFGs are opened in the same window.
 Use the a unique output-suffix to open a CFG in a new window.
 """)
 
-class Block:
 
-    currentIndex = 0
+class Block(object):
+
+    current_index = 0
 
     def __init__(self, name, preds):
         self.name = name
         self.content = None
-        self.lastLineContent = None
         self.preds = []
         self.succs = None
-        self.lastLine = None
-        self.index = Block.currentIndex
-        Block.currentIndex += 1
+        self.last_line = None
+        self.index = Block.current_index
+        Block.current_index += 1
         if preds is not None:
             for pred in re.split("[, %]", preds):
-                canPred = pred.strip()
-                if canPred:
-                    self.preds.append(canPred)
+                can_pred = pred.strip()
+                if can_pred:
+                    self.preds.append(can_pred)
 
-    def addLine(self, text):
+    def add_line(self, text):
         if self.content is None:
             self.content = ""
-        escapedText = re.sub(r'([\\<>{}"|])', r'\\\1', text[0:80]).rstrip()
-        self.content += escapedText + '\\l'
-        self.lastLine = text
+        escaped_text = re.sub(r'([\\<>{}"|])', r'\\\1', text[0:80]).rstrip()
+        self.content += escaped_text + '\\l'
+        self.last_line = text
 
-    def getSuccs(self):
+    def get_succs(self):
         if self.succs is None:
             self.succs = []
-            if self.lastLine is not None:
-                for match in re.finditer(r'\bbb[0-9]+\b', self.lastLine):
+            if self.last_line is not None:
+                for match in re.finditer(r'\bbb[0-9]+\b', self.last_line):
                     self.succs.append(match.group())
 
-                for match in re.finditer(r'\blabel %(\S+)\b', self.lastLine):
+                for match in re.finditer(r'\blabel %(\S+)\b', self.last_line):
                     self.succs.append(match.group(1))
 
         return self.succs
+
 
 def main():
     suffix = ""
@@ -90,83 +92,86 @@ def main():
         suffix = sys.argv[1]
 
     blocks = {}
-    curBlock = None
-    silBlockPattern = re.compile(r'^(\S+)(\(.*\))?: *(\/\/ *Preds:(.*))?$')
-    llvmBlockPattern1 = re.compile(r'^(\S+): *; *preds =(.*)?$')
-    llvmBlockPattern2 = re.compile(r'^; <label>:(\d+) *; *preds =(.*)?$')
+    cur_block = None
+    sil_block_pattern = re.compile(r'^(\S+)(\(.*\))?: *(\/\/ *Preds:(.*))?$')
+    llvm_block_pattern1 = re.compile(r'^(\S+): *; *preds =(.*)?$')
+    llvm_block_pattern2 = re.compile(r'^; <label>:(\d+) *; *preds =(.*)?$')
 
     # Scan the input file.
 
     for line in sys.stdin:
-        silBlockMatch = silBlockPattern.match(line)
-        llvmBlockMatch1 = llvmBlockPattern1.match(line)
-        llvmBlockMatch2 = llvmBlockPattern2.match(line)
-        blockName = None
+        sil_block_match = sil_block_pattern.match(line)
+        llvm_block_match1 = llvm_block_pattern1.match(line)
+        llvm_block_match2 = llvm_block_pattern2.match(line)
+        block_name = None
         preds = None
-        if silBlockMatch:
-            blockName = silBlockMatch.group(1)
-            preds = silBlockMatch.group(4)
-        elif llvmBlockMatch1:
-            blockName = llvmBlockMatch1.group(1)
-            preds = llvmBlockMatch1.group(2)
-        elif llvmBlockMatch2:
-            blockName = llvmBlockMatch2.group(1)
-            preds = llvmBlockMatch2.group(2)
+        if sil_block_match:
+            block_name = sil_block_match.group(1)
+            preds = sil_block_match.group(4)
+        elif llvm_block_match1:
+            block_name = llvm_block_match1.group(1)
+            preds = llvm_block_match1.group(2)
+        elif llvm_block_match2:
+            block_name = llvm_block_match2.group(1)
+            preds = llvm_block_match2.group(2)
         elif line.startswith(' '):
-            if curBlock is not None:
-                curBlock.addLine(line)
+            if cur_block is not None:
+                cur_block.add_line(line)
         elif not line[:1].isspace():
             if line.startswith('}') and blocks:
                 break
-            curBlock = None
+            cur_block = None
 
-        if blockName is not None:
-            curBlock = Block(blockName, preds)
-            curBlock.addLine(line)
-            blocks[blockName] = curBlock
+        if block_name is not None:
+            cur_block = Block(block_name, preds)
+            cur_block.add_line(line)
+            blocks[block_name] = cur_block
 
     # Add empty blocks which we didn't see, but which are referenced.
-    newBlocks = {}
+    new_blocks = {}
     for name, block in blocks.iteritems():
-        for adjName in (block.preds + block.getSuccs()):
-            if adjName not in blocks:
-                newBlocks[adjName] = Block(adjName, None)
+        for adj_name in (block.preds + block.get_succs()):
+            if adj_name not in blocks:
+                new_blocks[adj_name] = Block(adj_name, None)
 
-    blocks = dict(blocks.items() + newBlocks.items())
+    blocks = dict(blocks.items() + new_blocks.items())
 
     # Add missing edges if we didn't see a successor in the terminator
     # but the block is mentioned in the pred list of the successor.
 
     for name, block in blocks.iteritems():
-        for predName in block.preds:
-            predBlock = blocks[predName]
-            if name not in predBlock.getSuccs():
-                predBlock.getSuccs().append(name)
+        for pred_name in block.preds:
+            pred_block = blocks[pred_name]
+            if name not in pred_block.get_succs():
+                pred_block.get_succs().append(name)
 
     # Write the output dot file.
 
-    fileName = tempfile.gettempdir() + "/viewcfg" + suffix + ".dot"
-    with open(fileName, 'w') as outFile:
-        outFile.write('digraph "CFG" {\n')
+    file_name = tempfile.gettempdir() + "/viewcfg" + suffix + ".dot"
+    with open(file_name, 'w') as out_file:
+        out_file.write('digraph "CFG" {\n')
         for name, block in blocks.iteritems():
             if block.content is not None:
-                outFile.write("\tNode" + str(block.index) +
+                out_file.write(
+                    "\tNode" + str(block.index) +
                     " [shape=record,label=\"{" + block.content + "}\"];\n")
             else:
-                outFile.write("\tNode" + str(block.index) +
+                out_file.write(
+                    "\tNode" + str(block.index) +
                     " [shape=record,color=gray,fontcolor=gray,label=\"{" +
                     block.name + "}\"];\n")
 
-            for succName in block.getSuccs():
-                succBlock = blocks[succName]
-                outFile.write("\tNode" + str(block.index) + " -> Node" +
-                    str(succBlock.index) + ";\n")
+            for succ_name in block.get_succs():
+                succ_block = blocks[succ_name]
+                out_file.write(
+                    "\tNode" + str(block.index) + " -> Node" +
+                    str(succ_block.index) + ";\n")
 
-        outFile.write("}\n")
+        out_file.write("}\n")
 
     # Open the dot file (should be done with Graphviz).
 
-    subprocess.call(["open", fileName])
+    subprocess.call(["open", file_name])
 
 if __name__ == '__main__':
     main()

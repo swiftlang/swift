@@ -44,13 +44,13 @@ class Vector<T> {
       let size = Int(Builtin.sizeof(T.self))
       let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
       for i in 0..<length {
-        (newbase + i).initialize((base+i).move())
+        (newbase + i).initialize(with: (base+i).move())
       }
       c_free(base)
       base = newbase
       capacity = newcapacity
     }
-    (base+length).initialize(elem)
+    (base+length).initialize(with: elem)
     length += 1
   }
 
@@ -64,19 +64,19 @@ class Vector<T> {
       if i >= length {
         Builtin.int_trap()
       }
-      return (base + i).memory
+      return (base + i).pointee
     }
     set {
       if i >= length {
         Builtin.int_trap()
       }
-      (base + i).memory = newValue
+      (base + i).pointee = newValue
     }
   }
 
   deinit {
     for i in 0..<length {
-      (base + i).destroy()
+      (base + i).deinitialize()
     }
     c_free(base)
   }
@@ -86,7 +86,7 @@ protocol Comparable {
   func <(lhs: Self, rhs: Self) -> Bool
 }
 
-func sort<T : Comparable>(inout array: [T]) {
+func sort<T : Comparable>(array: inout [T]) {
   for i in 0..<array.count {
     for j in i+1..<array.count {
       if array[j] < array[i] {

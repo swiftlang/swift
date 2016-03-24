@@ -69,12 +69,22 @@ struct Y1 {
   }
 }
 
+// Mutating getters on constants (https://bugs.swift.org/browse/SR-845)
+struct Y2 {
+  subscript(_: Int) -> Int {
+    mutating get { return 0 }
+  }
+}
+
+let y2 = Y2() // expected-note{{change 'let' to 'var' to make it mutable}}{{1-4=var}}
+_ = y2[0] // expected-error{{cannot use mutating getter on immutable value: 'y2' is a 'let' constant}}
+
 // Parsing errors
 // FIXME: Recovery here is horrible
-struct A0 {
+struct A0 { // expected-note{{in declaration of 'A0'}}
   subscript // expected-error{{expected '(' for subscript parameters}}
     i : Int // expected-error{{expected declaration}}
-     -> Int { 
+     -> Int {
     get {
       return stored
     }
@@ -84,7 +94,7 @@ struct A0 {
   }
 }
 
-struct A1 {
+struct A1 { // expected-note{{in declaration of 'A1'}}
   subscript (i : Int) // expected-error{{expected '->' for subscript element type}}
      Int {  // expected-error{{expected declaration}}
     get {
@@ -96,7 +106,7 @@ struct A1 {
   }
 }
 
-struct A2 {
+struct A2 { // expected-note{{in declaration of 'A2'}}
   subscript (i : Int) -> // expected-error{{expected subscripting element type}}
      {  // expected-error{{expected declaration}}
     get {
@@ -108,7 +118,7 @@ struct A2 {
   }
 }
 
-struct A3 {
+struct A3 { // expected-note{{in declaration of 'A3'}}
   subscript(i : Int) // expected-error {{expected '->' for subscript element type}}
   { // expected-error {{expected declaration}}
     get {
@@ -117,7 +127,7 @@ struct A3 {
   }
 }
 
-struct A4 {
+struct A4 { // expected-note{{in declaration of 'A4'}}
   subscript(i : Int) { // expected-error {{expected '->' for subscript element type}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{21-21=;}} expected-error {{expected declaration}}
     get {
       return i
@@ -129,7 +139,7 @@ struct A5 {
   subscript(i : Int) -> Int // expected-error {{expected '{' in subscript to specify getter and setter implementation}}
 }
 
-struct A6 {
+struct A6 { // expected-note{{in declaration of 'A6'}}
   subscript(i: Int)(j: Int) -> Int { // expected-error {{expected '->' for subscript element type}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{20-20=;}} expected-error {{expected declaration}}
     get {
       return i + j
@@ -153,7 +163,7 @@ struct A7b {
   }
 }
 
-struct A8 {
+struct A8 { // expected-note{{in declaration of 'A8'}}
   subscript(i : Int) -> Int // expected-error{{expected '{' in subscript to specify getter and setter implementation}}
     get { // expected-error{{expected declaration}}
       return stored
@@ -163,4 +173,3 @@ struct A8 {
     }
   }
 } // expected-error{{extraneous '}' at top level}} {{1-3=}}
-

@@ -14,8 +14,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7typical{{.*}} : $@convention(method) (Int, @owned Gizmo, @guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[X]], [[Y]], [[THIS]]) {{.*}} line:[[@LINE-7]]:8:auto_gen
-  // CHECK-NEXT:   strong_release [[THIS]] : $Hoozit // {{.*}}
-  // CHECK-NEXT:   return [[RES]] : $Gizmo // {{.*}} line:[[@LINE-9]]:8:auto_gen
+  // CHECK-NEXT:   strong_release [[THIS]] : $Hoozit
+  // CHECK-NEXT:   return [[RES]] : $Gizmo{{.*}} line:[[@LINE-9]]:8:auto_gen
   // CHECK-NEXT: }
 
   // NS_CONSUMES_SELF by inheritance
@@ -66,7 +66,7 @@ class Hoozit : Gizmo {
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   debug_value %0
-  // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty {{.*}}
+  // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]] {{.*}}
   // CHECK-NEXT:   strong_retain [[RES]] : $Gizmo
   // CHECK-NEXT:   return [[RES]]
@@ -201,7 +201,7 @@ class Hoozit : Gizmo {
   // CHECK: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
-  // CHECK: function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+  // CHECK: function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
   // CHECK: unchecked_ref_cast
   // CHECK: return
   override init(bellsOn x : Int) {
@@ -265,8 +265,9 @@ class Wotsit<T> : Gizmo {
   // CHECK-NEXT:   [[RESULT:%.*]] = apply [[NATIVE:%.*]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> @owned String
   // CHECK-NEXT:   strong_release [[SELF]] : $Wotsit<T>
   // CHECK-NEXT:   // function_ref
-  // CHECK-NEXT:   [[BRIDGE:%.*]] = function_ref @swift_StringToNSString : $@convention(thin) (@owned String) -> @owned NSString
-  // CHECK-NEXT:   [[NSRESULT:%.*]] = apply [[BRIDGE]]([[RESULT]]) : $@convention(thin) (@owned String) -> @owned NSString
+  // CHECK-NEXT:   [[BRIDGE:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
+  // CHECK-NEXT:   [[NSRESULT:%.*]] = apply [[BRIDGE]]([[RESULT]]) : $@convention(method) (@guaranteed String) -> @owned NSString
+  // CHECK-NEXT:   release_value [[RESULT]]
   // CHECK-NEXT:   return [[NSRESULT]] : $NSString
   // CHECK-NEXT: }
   override var description : String {
@@ -396,19 +397,19 @@ class DesignatedOverrides : Gizmo {
 
 func registerAnsible() {
   // CHECK: function_ref @_TFF11objc_thunks15registerAnsibleFT_T_U_FGSQFT_T__T_
-  // CHECK: function_ref @_TTRXFo_oGSQFT_T___dT__XFdCb_dGSQbT_T___dT__
+  // CHECK: function_ref @_TTRXFo_oGSQFT_T____XFdCb_dGSQbT_T____
   Ansible.anseAsync({ completion in completion() })
 }
 
 // FIXME: would be nice if we didn't need to re-abstract as much here.
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSQFT_T___dT__XFdCb_dGSQbT_T___dT__ : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> (), ImplicitlyUnwrappedOptional<@convention(block) () -> ()>) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSQFT_T____XFdCb_dGSQbT_T____ : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> (), ImplicitlyUnwrappedOptional<@convention(block) () -> ()>) -> ()
 // CHECK: [[HEAP_BLOCK_IUO:%.*]] = copy_block %1
 // CHECK: select_enum [[HEAP_BLOCK_IUO]]
 // CHECK: bb1:
 // CHECK: [[HEAP_BLOCK:%.*]] = unchecked_enum_data [[HEAP_BLOCK_IUO]]
-// CHECK: [[BLOCK_THUNK:%.*]] = function_ref @_TTRXFdCb__dT__XFo__dT__
+// CHECK: [[BLOCK_THUNK:%.*]] = function_ref @_TTRXFdCb___XFo___
 // CHECK: [[BRIDGED_BLOCK:%.*]] = partial_apply [[BLOCK_THUNK]]([[HEAP_BLOCK]])
-// CHECK: [[REABS_THUNK:%.*]] = function_ref @_TTRXFo__dT__XFo_iT__iT__
+// CHECK: [[REABS_THUNK:%.*]] = function_ref @_TTRXFo___XFo_iT__iT__
 // CHECK: [[REABS_BLOCK:%.*]] = partial_apply [[REABS_THUNK]]([[BRIDGED_BLOCK]])
 // CHECK: [[REABS_BLOCK_IUO:%.*]] = enum $ImplicitlyUnwrappedOptional<() -> ()>, {{.*}} [[REABS_BLOCK]]

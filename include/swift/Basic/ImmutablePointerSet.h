@@ -1,4 +1,4 @@
-//===--- ImmutablePointerSet.h --------------------------------------------===//
+//===--- ImmutablePointerSet.h ----------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -55,100 +55,6 @@
 #include <algorithm>
 #include <type_traits>
 
-// Include these here for now to reduce build times while I am testing. Putting
-// things into STLExtras causes pretty much everything to recompile.
-namespace swift {
-
-/// @{
-
-/// The equivalent of std::for_each, but visits the set union of two sorted
-/// lists without allocating additional memory.
-template <typename InputIt1, typename InputIt2, typename BinaryFunction>
-inline void set_union_for_each(InputIt1 I1, InputIt1 E1, InputIt2 I2,
-                               InputIt2 E2, BinaryFunction f) {
-  while (true) {
-    // If we have reached the end of either list, visit the rest of the other
-    // list, We do not need to worry about duplicates since each array we know
-    // is unique.
-    if (I1 == E1) {
-      std::for_each(I2, E2, f);
-      return;
-    }
-
-    if (I2 == E2) {
-      std::for_each(I1, E1, f);
-      return;
-    }
-
-    // If I1 < I2, then visit I1 and continue.
-    if (*I1 < *I2) {
-      f(*I1);
-      ++I1;
-      continue;
-    }
-
-    // If I2 < I1, visit I2 and continue.
-    if (*I2 < *I1) {
-      f(*I2);
-      ++I2;
-      continue;
-    }
-
-    // Otherwise, we know that I1 and I2 equal. We know that we can only have
-    // one of each element in each list, so we can just visit I1 and continue.
-    f(*I1);
-    ++I1;
-    ++I2;
-  }
-}
-
-/// A container adapter for set_union_for_each.
-template <typename Container1, typename Container2, typename BinaryFunction>
-inline void set_union_for_each(Container1 &&C1, Container2 &&C2,
-                               BinaryFunction f) {
-  set_union_for_each(C1.begin(), C1.end(), C2.begin(), C2.end(), f);
-}
-
-/// @}
-
-/// Returns true if [II, IE) is a sorted and uniqued array. Returns false
-/// otherwise.
-template <typename IterTy> bool is_sorted_and_uniqued(IterTy II, IterTy IE) {
-  // The empty list is always sorted and uniqued.
-  if (II == IE)
-    return true;
-
-  // The list of one element is always sorted and uniqued.
-  auto LastI = II;
-  ++II;
-  if (II == IE)
-    return true;
-
-  // Otherwise, until we reach the end of the list...
-  while (II != IE) {
-    // If LastI is greater than II then we know that our array is not sorted. If
-    // LastI equals II, then we know that our array is not unique. If both of
-    // those are conditions are false, then visit the next iterator element.
-    if (*LastI < *II) {
-      LastI = II;
-      ++II;
-      continue;
-    }
-
-    // Return false otherwise.
-    return false;
-  }
-
-  // Success!
-  return true;
-}
-
-template <typename Container> bool is_sorted_and_uniqued(Container &&C) {
-  return is_sorted_and_uniqued(C.begin(), C.end());
-}
-
-} // end swift namespace
-
 namespace swift {
 
 template <typename PtrTy> class ImmutablePointerSetFactory;
@@ -175,19 +81,18 @@ public:
   ImmutablePointerSet &operator=(ImmutablePointerSet &&) = default;
 
   bool operator==(const ImmutablePointerSet<T> &P) const {
-    // If both are empty, they must be equivalent.
-    if (empty() && P.empty())
-      return true;
-    // Ok, at least one is non-empty. If either are empty at this point, then we
-    // are comparing a non-empty set with an empty set, i.e. they do not equal.
-    if (empty() || P.empty())
+    // If this and P have different sizes, we can not be equivalent.
+    if (size() != P.size())
       return false;
 
-    // Ok, both sets are not empty. Compare their profiles.
-    llvm::FoldingSetNodeID ID1, ID2;
-    Profile(ID1);
-    P.Profile(ID2);
-    return ID1 == ID2;
+    // Ok, we now know that both have the same size. If one is empty, the other
+    // must be as well, implying equality.
+    if (empty())
+      return true;
+
+    // Ok, both sets are not empty and the same number of elements. Compare
+    // element wise.
+    return std::equal(begin(), end(), P.begin());
   }
 
   bool operator!=(const ImmutablePointerSet<T> &P) const {
@@ -221,13 +126,53 @@ public:
     }
   }
 
-  ImmutablePointerSet<T> *concat(ImmutablePointerSet<T> *Other) {
+  ImmutablePointerSet<T> *merge(ImmutablePointerSet<T> *Other) {
     if (empty())
       return Other;
     if (Other->empty())
       return this;
     assert(Other->ParentFactory.get() == ParentFactory.get());
-    return ParentFactory.get()->concat(this, Other);
+    return ParentFactory.get()->merge(this, Other);
+  }
+
+  bool hasEmptyIntersection(const ImmutablePointerSet<T> *Other) const {
+    // If we are empty or Other is empty, then there are automatically no
+    // elements that could be in the intersection. Return true.
+    if (empty() || Other->empty())
+      return true;
+
+    // Ok, at this point we know that both self and Other are non-empty. They
+    // can only have a non-empty intersection if they have elements in common.
+    // Sadly it seems the STL does not have such a predicate that is
+    // non-constructive in the algorithm library, so we implement it ourselves.
+    auto LHSI = begin();
+    auto LHSE = end();
+    auto RHSI = Other->begin();
+    auto RHSE = Other->end();
+
+    // Our implementation is to perform a sorted merge like traversal of both
+    // lists, always advancing the iterator with a smaller value. If we ever hit
+    // an equality in between our iterators, we have a non-empty intersection.
+    //
+    // Until either of our iterators hits the end of our target arrays...
+    while (LHSI != LHSE && RHSI != RHSE) {
+      // If LHSI is equivalent to RHSI, then we have a non-empty intersection...
+      // Early exit.
+      if (*LHSI == *RHSI)
+        return false;
+
+      // Otherwise, if *LHSI is less than *RHSI, advance LHSI.
+      if (*LHSI < *RHSI) {
+        ++LHSI;
+        continue;
+      }
+
+      // Otherwise, We know that *RHSI < *LHSI. Advance RHSI.
+      ++RHSI;
+    }
+
+    // We did not have any overlapping intersection.
+    return true;
   }
 };
 
@@ -253,6 +198,8 @@ public:
   // We use a sentinel value here so that we can create an empty value
   // statically.
   static PtrSet *getEmptySet() { return &EmptyPtrSet; }
+
+  void clear() { Set.clear(); }
 
   /// Given a sorted and uniqued list \p Array, return the ImmutablePointerSet
   /// containing Array. Asserts if \p Array is not sorted and uniqued.
@@ -294,7 +241,7 @@ public:
     return NewNode;
   }
 
-  PtrSet *concat(PtrSet *S1, ArrayRef<PtrTy> S2) {
+  PtrSet *merge(PtrSet *S1, ArrayRef<PtrTy> S2) {
     if (S1->empty())
       return get(S2);
 
@@ -303,6 +250,12 @@ public:
 
     // We assume that S2 is sorted and uniqued.
     assert(is_sorted_and_uniqued(S2));
+
+    // If S1 and S2 have the same size, do a quick check to see if they
+    // equal. If so, we can bail early and just return S1.
+    if (S1->size() == S2.size() &&
+        std::equal(S1->begin(), S1->end(), S2.begin()))
+      return S1;
 
     llvm::FoldingSetNodeID ID;
 
@@ -340,11 +293,17 @@ public:
     return NewNode;
   }
 
-  PtrSet *concat(PtrSet *S1, PtrSet *S2) {
+  PtrSet *merge(PtrSet *S1, PtrSet *S2) {
     // If either S1 or S2 are the empty PtrSet, just return S2 or S1.
     if (S1->empty())
       return S2;
     if (S2->empty())
+      return S1;
+
+    // We know that all of our PtrSets are uniqued. So if S1 and S2 are the same
+    // set, their pointers must also be the same set. In such a case, we return
+    // early returning S1 without any loss of generality.
+    if (S1 == S2)
       return S1;
 
     llvm::FoldingSetNodeID ID;

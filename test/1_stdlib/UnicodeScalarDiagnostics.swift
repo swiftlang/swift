@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func isString(inout s: String) {}
+func isString(s: inout String) {}
 
 func test_UnicodeScalarDoesNotImplementArithmetic(us: UnicodeScalar, i: Int) {
   var a1 = "a" + "b" // OK

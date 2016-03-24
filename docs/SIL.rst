@@ -299,7 +299,7 @@ formal type.  For example, consider the following generic type:
 would normally lower to the type ``@callee_owned () -> Int``, i.e.
 returning its result directly.  But if that type is properly lowered
 with the pattern of its unsubstituted type ``() -> T``, it becomes
-``@callee_owned (@out Int) -> ()``.
+``@callee_owned () -> @out Int``.
 
 When a type is lowered using the abstraction pattern of an
 unrestricted type, it is lowered as if the pattern were replaced with
@@ -312,14 +312,14 @@ lowered using the pattern ``() -> T``, which eventually causes ``(Int,Int)
 lowering it with the pattern ``U -> V``; the result is that ``g.fn``
 has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ().
+  @callee_owned () -> @owned @callee_owned (@in (Int,Int)) -> @out Float.
 
 As another example, suppose that ``h`` has type
 ``Generator<(Int, @inout Int) -> Float>``.  Neither ``(Int, @inout Int)``
 nor ``@inout Int`` are potential results of substitution because they
 aren't materializable, so ``h.fn`` has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@out Float, @in Int, @inout Int)
+  @callee_owned () -> @owned @callee_owned (@in Int, @inout Int) -> @out Float
 
 This system has the property that abstraction patterns are preserved
 through repeated substitutions.  That is, you can consider a lowered
@@ -417,11 +417,10 @@ number of ways:
   - Otherwise, the context value is treated as an unowned direct
     parameter.
 
-- A SIL function type declares the conventions for its parameters,
-  including any implicit out-parameters.  The parameters are written
-  as an unlabelled tuple; the elements of that tuple must be legal SIL
-  types, optionally decorated with one of the following convention
-  attributes.
+- A SIL function type declares the conventions for its parameters.
+  The parameters are written as an unlabelled tuple; the elements of that
+  tuple must be legal SIL types, optionally decorated with one of the
+  following convention attributes.
 
   The value of an indirect parameter has type ``*T``; the value of a
   direct parameter has type ``T``.
@@ -450,11 +449,6 @@ number of ways:
     aliases however can be assumed to be well-typed and well-ordered; ill-typed
     accesses and data races to the parameter are still undefined.
 
-  - An ``@out`` parameter is indirect.  The address must be of an
-    uninitialized object; the function is responsible for initializing
-    a value there.  If there is an ``@out`` parameter, it must be
-    the first parameter, and the direct result must be ``()``.
-
   - An ``@owned`` parameter is an owned direct parameter.
 
   - A ``@guaranteed`` parameter is a guaranteed direct parameter.
@@ -465,12 +459,35 @@ number of ways:
 
   - Otherwise, the parameter is an unowned direct parameter.
 
-- A SIL function type declares the convention for its direct result.
-  The result must be a legal SIL type.
+- A SIL function type declares the conventions for its results.
+  The results are written as an unlabelled tuple; the elements of that
+  tuple must be legal SIL types, optionally decorated with one of the
+  following convention attributes.  Indirect and direct results may
+  be interleaved.
+
+  Indirect results correspond to implicit arguments of type ``*T`` in
+  function entry blocks and in the arguments to ``apply`` and ``try_apply``
+  instructions.  These arguments appear in the order in which they appear
+  in the result list, always before any parameters.
+
+  Direct results correspond to direct return values of type ``T``.  A 
+  SIL function type has a ``return type`` derived from its direct results
+  in the following way: when there is a single direct result, the return
+  type is the type of that result; otherwise, it is the tuple type of the
+  types of all the direct results, in the order they appear in the results
+  list.  The return type is the type of the operand of ``return``
+  instructions, the type of ``apply`` instructions, and the type of
+  the normal result of ``try_apply`` instructions.
+
+  - An ``@out`` result is indirect.  The address must be of an
+    uninitialized object.  The function is required to leave an
+    initialized value there unless it terminates with a ``throw``
+    instruction or it has a non-Swift calling convention.
 
   - An ``@owned`` result is an owned direct result.
 
   - An ``@autoreleased`` result is an autoreleased direct result.
+    If there is an autoreleased result, it must be the only direct result.
 
   - Otherwise, the parameter is an unowned direct result.
 
@@ -743,6 +760,7 @@ Basic Blocks
   sil-argument ::= sil-value-name ':' sil-type
 
   sil-instruction-def ::= (sil-value-name '=')? sil-instruction
+                          (',' sil-loc)? (',' sil-scope-ref)?
 
 A function body consists of one or more basic blocks that correspond
 to the nodes of the function's control flow graph. Each basic block
@@ -781,6 +799,30 @@ are bound by the function's caller::
     %3 = tuple ()
     return %3 : $()
   }
+
+
+Debug Information
+~~~~~~~~~~~~~~~~~
+::
+
+  sil-scope-ref ::= 'scope' [0-9]+
+  sil-scope ::= 'sil_scope' [0-9]+ '{'
+                   sil-loc
+                   'parent' scope-parent
+                   ('inlined_at' sil-scope-ref )?
+                '}'
+  scope-parent ::= sil-function-name ':' sil-type
+  scope-parent ::= sil-scope-ref
+  sil-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
+
+Each instruction may have a debug location and a SIL scope reference
+at the end.  Debug locations consist of a filename, a line number, and
+a column number.  If the debug location is omitted, it defaults to the
+location in the SIL source file.  SIL scopes describe the position
+inside the lexical scope structure that the Swift expression a SIL
+instruction was generated from had originally. SIL scopes also hold
+inlining information.
+
 
 Declaration References
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -2258,6 +2300,21 @@ zero, the object is destroyed and ``@weak`` references are cleared.  When both
 its strong and unowned reference counts reach zero, the object's memory is
 deallocated.
 
+set_deallocating
+````````````````
+::
+
+  set_deallocating %0 : $T
+  // $T must be a reference type.
+
+Explicitly sets the state of the object referenced by ``%0`` to deallocated.
+This is the same operation what's done by a strong_release immediately before
+it calls the deallocator of the object.
+
+It is expected that the strong reference count of the object is one.
+Furthermore, no other thread may increment the strong reference count during
+execution of this instruction.
+
 strong_retain_unowned
 `````````````````````
 ::
@@ -2333,6 +2390,16 @@ This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
 ``store_weak`` or ``load_weak`` operations on the same address.
 
+load_unowned
+````````````
+
+TODO: Fill this in
+
+store_unowned
+`````````````
+
+TODO: Fill this in
+
 fix_lifetime
 ````````````
 
@@ -2373,6 +2440,16 @@ the same.  Transformations should be somewhat forgiving here.
 The second operand may have either object or address type.  In the
 latter case, the dependency is on the current value stored in the
 address.
+
+strong_pin
+``````````
+
+TODO: Fill me in!
+
+strong_unpin
+````````````
+
+TODO: Fill me in!
 
 is_unique
 `````````
@@ -3308,7 +3385,7 @@ container may use one of several representations:
   * `init_existential_metatype`_
   * `open_existential_metatype`_
 
-- **Boxed existential containers**: The standard library ``ErrorType`` protocol
+- **Boxed existential containers**: The standard library ``ErrorProtocol`` protocol
   uses a size-optimized reference-counted container, which indirectly stores
   the conforming value. Boxed existential containers can be ``retain``-ed
   and ``release``-d. The following instructions manipulate boxed existential
@@ -3321,22 +3398,22 @@ container may use one of several representations:
 
 Some existential types may additionally support specialized representations
 when they contain certain known concrete types. For example, when Objective-C
-interop is available, the ``ErrorType`` protocol existential supports
+interop is available, the ``ErrorProtocol`` protocol existential supports
 a class existential container representation for ``NSError`` objects, so it
 can be initialized from one using ``init_existential_ref`` instead of the
 more expensive ``alloc_existential_box``::
 
   bb(%nserror: $NSError):
-    // The slow general way to form an ErrorType, allocating a box and
+    // The slow general way to form an ErrorProtocol, allocating a box and
     // storing to its value buffer:
-    %error1 = alloc_existential_box $ErrorType, $NSError
-    %addr = project_existential_box $NSError in %error1 : $ErrorType
+    %error1 = alloc_existential_box $ErrorProtocol, $NSError
+    %addr = project_existential_box $NSError in %error1 : $ErrorProtocol
     strong_retain %nserror: $NSError
     store %nserror to %addr : $NSError
 
     // The fast path supported for NSError:
     strong_retain %nserror: $NSError
-    %error2 = init_existential_ref %nserror: $NSError, $ErrorType
+    %error2 = init_existential_ref %nserror: $NSError, $ErrorProtocol
 
 init_existential_addr
 `````````````````````
@@ -3658,7 +3735,7 @@ unchecked_addr_cast
 
 Converts an address to a different address type. Using the resulting
 address is undefined unless ``B`` is layout compatible with ``A``. The
-layout of ``A`` may be smaller than that of ``B`` as long as the lower
+layout of ``B`` may be smaller than that of ``A`` as long as the lower
 order bytes have identical layout.
 
 unchecked_trivial_bit_cast

@@ -119,11 +119,16 @@ public:
   Optional<SILDeclRef> ObjCBoolToBoolFn;
   Optional<SILDeclRef> BoolToDarwinBooleanFn;
   Optional<SILDeclRef> DarwinBooleanToBoolFn;
-  Optional<SILDeclRef> NSErrorToErrorTypeFn;
-  Optional<SILDeclRef> ErrorTypeToNSErrorFn;
+  Optional<SILDeclRef> NSErrorToErrorProtocolFn;
+  Optional<SILDeclRef> ErrorProtocolToNSErrorFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
-  
+
+  Optional<ProtocolDecl*> ObjectiveCBridgeable;
+  Optional<FuncDecl*> BridgeToObjectiveCRequirement;
+  Optional<FuncDecl*> UnconditionallyBridgeFromObjectiveCRequirement;
+  Optional<AssociatedTypeDecl*> BridgedObjectiveCType;
+
 public:
   SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile);
   ~SILGenModule();
@@ -214,6 +219,8 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
+
+  void emitPropertyBehavior(VarDecl *vd);
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
@@ -343,9 +350,28 @@ public:
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getBoolToDarwinBooleanFn();
   SILDeclRef getDarwinBooleanToBoolFn();
-  SILDeclRef getNSErrorToErrorTypeFn();
-  SILDeclRef getErrorTypeToNSErrorFn();
+  SILDeclRef getNSErrorToErrorProtocolFn();
+  SILDeclRef getErrorProtocolToNSErrorFn();
   
+  /// Retrieve the _ObjectiveCBridgeable protocol definition.
+  ProtocolDecl *getObjectiveCBridgeable(SILLocation loc);
+
+  /// Retrieve the _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
+  FuncDecl *getBridgeToObjectiveCRequirement(SILLocation loc);
+
+  /// Retrieve the
+  /// _ObjectiveCBridgeable._unconditionallyBridgeFromObjectiveC
+  /// requirement.
+  FuncDecl *getUnconditionallyBridgeFromObjectiveCRequirement(SILLocation loc);
+
+  /// Retrieve the _ObjectiveCBridgeable._ObjectiveCType requirement.
+  AssociatedTypeDecl *getBridgedObjectiveCTypeRequirement(SILLocation loc);
+
+  /// Find the conformance of the given Swift type to the
+  /// _ObjectiveCBridgeable protocol.
+  ProtocolConformance *getConformanceToObjectiveCBridgeable(SILLocation loc,
+                                                            Type type);
+
   /// Report a diagnostic.
   template<typename...T, typename...U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
@@ -370,6 +396,12 @@ public:
 
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(ArrayRef<Substitution> subs);
+
+  /// Substitute the `Self` type from a protocol conformance into a protocol
+  /// requirement's type to get the type of the witness.
+  CanAnyFunctionType
+  substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
+                                           ProtocolConformance *conformance);
 
 private:
   /// Emit the deallocator for a class that uses the objc allocator.

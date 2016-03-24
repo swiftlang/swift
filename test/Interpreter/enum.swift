@@ -364,7 +364,7 @@ func test_generic()
 {
     var x: Rdar15383966? = Rdar15383966(1)
     generic(x)
-    x = .None
+    x = .none
     generic(x)
 }
 // CHECK: X(1)
@@ -375,7 +375,7 @@ func test_nongeneric()
 {
     var x: Rdar15383966? = Rdar15383966(2)
     nongeneric(x)
-    x = .None
+    x = .none
     nongeneric(x)
 }
 // CHECK: X(2)
@@ -386,7 +386,7 @@ func test_generic_over_classes()
 {
     var x: Rdar15383966? = Rdar15383966(3)
     generic_over_classes(x)
-    x = .None
+    x = .none
     generic_over_classes(x)
 }
 // CHECK: X(3)

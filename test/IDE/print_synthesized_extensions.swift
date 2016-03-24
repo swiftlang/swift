@@ -1,12 +1,31 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %target-swift-frontend -emit-module-path %t/print_synthesized_extensions.swiftmodule %s
-// RUN: %target-swift-ide-test -print-module -synthesize-extension -print-interface -module-to-print=print_synthesized_extensions -I %t -source-filename=%s | FileCheck %s
+// RUN: %target-swift-frontend -emit-module-path %t/print_synthesized_extensions.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_synthesized_extensions.swiftdoc %s
+// RUN: %target-swift-ide-test -print-module -annotate-print -synthesize-extension -print-interface -no-empty-line-between-members -module-to-print=print_synthesized_extensions -I %t -source-filename=%s > %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK1 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK2 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK3 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK4 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK5 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK6 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK7 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK8 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK9 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK10 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK11 < %t.syn.txt
 
 public protocol P1{
   associatedtype T1
   associatedtype T2
   func f1(t : T1) -> T1
   func f2(t : T2) -> T2
+}
+
+public extension P1 where T1 == Int {
+  func p1IntFunc(i : Int) -> Int {return 0}
+}
+
+public extension P1 where T1 : P3 {
+  func p3Func(i : Int) -> Int {return 0}
 }
 
 public protocol P2 {
@@ -47,24 +66,184 @@ public struct S1<T> : P1, P2 {
   }
 }
 
-// CHECK: /// Synthesized extension from P2
-// CHECK: extension S1 where T : P2 {
-// CHECK:     public func p2member()
-// CHECK: }
+public struct S3<T> : P1 {
+  public typealias T1 = (T, T)
+  public typealias T2 = (T, T)
+  public func f1(t : T1) -> T1 {
+    return t
+  }
+  public func f2(t : T2) -> T2 {
+    return t
+  }
+}
 
-// CHECK: /// Synthesized extension from P1
-// CHECK: extension S1 where T : P2 {
-// CHECK:     public func ef1(t: T)
-// CHECK:     public func ef2(t: S2)
-// CHECK: }
+public struct S4<T> : P1  {
+  public typealias T1 = Int
+  public typealias T2 = Int
+  public func f1(t : T1) -> T1 {
+    return t
+  }
+  public func f2(t : T2) -> T2 {
+    return t
+  }
+}
 
-// CHECK: /// Synthesized extension from P1
-// CHECK: extension S1 where T == P2, S2 : P3 {
-// CHECK:     public func ef3(t: P2)
-// CHECK:     public func ef4(t: P2)
-// CHECK: }
+public struct S5 : P3 {}
 
-// CHECK: /// Synthesized extension from P1
-// CHECK: extension S1 where S2 : P3 {
-// CHECK:    public func ef5(t: S2)
-// CHECK: }
+public struct S6<T> : P1  {
+  public typealias T1 = S5
+  public typealias T2 = S5
+  public func f1(t : T1) -> T1 {
+    return t
+  }
+  public func f2(t : T2) -> T2 {
+    return t
+  }
+}
+public extension S6 {
+  public func f3() {}
+}
+public struct S7 {
+  public struct S8 : P1  {
+    public typealias T1 = S5
+    public typealias T2 = S5
+    public func f1(t : T1) -> T1 {
+      return t
+    }
+    public func f2(t : T2) -> T2 {
+      return t
+    }
+  }
+}
+
+public extension P1 where T1 == S9<Int> {
+  public func S9IntFunc() {}
+}
+
+public struct S9<T> : P3 {}
+
+public struct S10 : P1 {
+  public typealias T1 = S9<Int>
+  public typealias T2 = S9<Int>
+  public func f1(t : T1) -> T1 {
+    return t
+  }
+  public func f2(t : T2) -> T2 {
+    return t
+  }
+}
+
+public protocol P4 {}
+
+/// Extension on P4Func1
+public extension P4 {
+  func P4Func1() {}
+}
+
+/// Extension on P4Func2
+public extension P4 {
+  func P4Func2() {}
+}
+
+public struct S11 : P4 {}
+
+public extension S6 {
+  public func fromActualExtension() {}
+}
+
+public protocol P5 {
+  associatedtype T1
+
+  /// This is picked
+  func foo1()
+}
+public extension P5 {
+
+  /// This is not picked
+  public func foo1() {}
+}
+
+public extension P5 where T1 == Int {
+  /// This is picked
+  public func foo2() {}
+}
+
+public extension P5 {
+  /// This is not picked
+ public func foo2() {}
+}
+
+public struct S12 : P5{
+  public typealias T1 = Int
+  public func foo1() {}
+}
+
+// CHECK1: <synthesized>extension <ref:Struct>S1</ref> where T : P2 {
+// CHECK1-NEXT:     <decl:Func>public func <loc>p2member()</loc></decl>
+// CHECK1-NEXT:     <decl:Func>public func <loc>ef1(<decl:Param>t: T</decl>)</loc></decl>
+// CHECK1-NEXT:     <decl:Func>public func <loc>ef2(<decl:Param>t: <ref:Struct>S2</ref></decl>)</loc></decl>
+// CHECK1-NEXT: }</synthesized>
+
+// CHECK2:  <synthesized>extension <ref:Struct>S1</ref> where T : P3 {
+// CHECK2-NEXT:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK2-NEXT: }</synthesized>
+
+// CHECK3:  <synthesized>extension <ref:Struct>S1</ref> where T == Int {
+// CHECK3-NEXT:     <decl:Func>public func <loc>p1IntFunc(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK3-NEXT: }</synthesized>
+
+// CHECK4:  <synthesized>extension <ref:Struct>S1</ref> where T == S9<Int> {
+// CHECK4-NEXT:     <decl:Func>public func <loc>S9IntFunc()</loc></decl>
+// CHECK4-NEXT: }</synthesized>
+
+// CHECK5:      <decl:Struct>public struct <loc>S10</loc> : <ref:Protocol>P1</ref> {
+// CHECK5-NEXT:   <decl:TypeAlias>public typealias <loc>T1</loc> = <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S9</ref><<ref:Struct>Int</ref>></decl>
+// CHECK5-NEXT: <decl:TypeAlias>public typealias <loc>T2</loc> = <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S9</ref><<ref:Struct>Int</ref>></decl>
+// CHECK5-NEXT: <decl:Func>public func <loc>f1(<decl:Param>t: <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S10</ref>.Type.<ref:TypeAlias>T1</ref></decl>)</loc> -> <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S10</ref>.Type.<ref:TypeAlias>T1</ref></decl>
+// CHECK5-NEXT: <decl:Func>public func <loc>f2(<decl:Param>t: <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S10</ref>.Type.<ref:TypeAlias>T2</ref></decl>)</loc> -> <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S10</ref>.Type.<ref:TypeAlias>T2</ref></decl></decl>
+// CHECK5-NEXT: <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK5-NEXT: <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S9</ref><<ref:Struct>Int</ref>></decl>)</loc></decl>
+// CHECK5-NEXT: <decl:Func>public func <loc>S9IntFunc()</loc></decl>
+// CHECK5-NEXT: }</synthesized>
+
+// CHECK6:  <synthesized>/// Extension on P4Func1
+// CHECK6-NEXT:  extension <ref:Struct>S11</ref> {
+// CHECK6-NEXT:      <decl:Func>public func <loc>P4Func1()</loc></decl>
+// CHECK6-NEXT:  }</synthesized>
+
+// CHECK7:  <synthesized>/// Extension on P4Func2
+// CHECK7-NEXT:  extension <ref:Struct>S11</ref> {
+// CHECK7-NEXT:  <decl:Func>public func <loc>P4Func2()</loc></decl>
+// CHECK7-NEXT:  }</synthesized>
+
+// CHECK8:      <decl:Struct>public struct <loc>S4<<decl:GenericTypeParam>T</decl>></loc> : <ref:Protocol>P1</ref> {
+// CHECK8-NEXT:   <decl:TypeAlias>public typealias <loc>T1</loc> = <ref:Struct>Int</ref></decl>
+// CHECK8-NEXT:   <decl:TypeAlias>public typealias <loc>T2</loc> = <ref:Struct>Int</ref></decl>
+// CHECK8-NEXT:   <decl:Func>public func <loc>f1(<decl:Param>t: <ref:TypeAlias>T1</ref></decl>)</loc> -> <ref:TypeAlias>T1</ref></decl>
+// CHECK8-NEXT:   <decl:Func>public func <loc>f2(<decl:Param>t: <ref:TypeAlias>T2</ref></decl>)</loc> -> <ref:TypeAlias>T2</ref></decl></decl>
+// CHECK8-NEXT:   <decl:Func>public func <loc>p1IntFunc(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK8-NEXT:   }</synthesized>
+
+// CHECK9:      <decl:Struct>public struct <loc>S6<<decl:GenericTypeParam>T</decl>></loc> : <ref:Protocol>P1</ref> {
+// CHECK9-NEXT:    <decl:TypeAlias>public typealias <loc>T1</loc> = <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S5</ref></decl>
+// CHECK9-NEXT:    <decl:TypeAlias>public typealias <loc>T2</loc> = <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S5</ref></decl>
+// CHECK9-NEXT:    <decl:Func>public func <loc>f1(<decl:Param>t: <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S6</ref>.Type.<ref:TypeAlias>T1</ref></decl>)</loc> -> <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S6</ref>.Type.<ref:TypeAlias>T1</ref></decl>
+// CHECK9-NEXT:    <decl:Func>public func <loc>f2(<decl:Param>t: <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S6</ref>.Type.<ref:TypeAlias>T2</ref></decl>)</loc> -> <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S6</ref>.Type.<ref:TypeAlias>T2</ref></decl></decl>
+// CHECK9-NEXT:    <decl:Extension><decl:Func>public func <loc>f3()</loc></decl></decl>
+// CHECK9-NEXT:    <decl:Extension><decl:Func>public func <loc>fromActualExtension()</loc></decl></decl>
+// CHECK9-NEXT:    <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK9-NEXT:    <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S5</ref></decl>)</loc></decl>
+// CHECK9-NEXT: }</synthesized>
+
+// CHECK10: <synthesized>extension <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S7</ref>.<ref:Struct>S8</ref> {
+// CHECK10-NEXT:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK10-NEXT:     <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S5</ref></decl>)</loc></decl>
+// CHECK10-NEXT: }</synthesized>
+
+// CHECK11: <decl:Struct>public struct <loc>S12</loc> : <ref:Protocol>P5</ref> {
+// CHECK11-NEXT: <decl:TypeAlias>public typealias <loc>T1</loc> = <ref:Struct>Int</ref></decl>
+// CHECK11-NEXT: <decl:Func>/// This is picked
+// CHECK11-NEXT: public func <loc>foo1()</loc></decl></decl>
+// CHECK11-NEXT: <decl:Func>/// This is picked
+// CHECK11-NEXT: public func <loc>foo2()</loc></decl>
+// CHECK11-NEXT: }</synthesized>

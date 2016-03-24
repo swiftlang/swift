@@ -3,12 +3,12 @@
 // validate declarations when resolving declaration signatures.
 // This file relies on the minimum deployment target for OS X being 10.9.
 
-@available(OSX, introduced=10.52)
+@available(OSX, introduced: 10.52)
 private class PrivateIntroduced10_52 { }
 
 class OtherIntroduced10_9 { }
 
-@available(OSX, introduced=10.51)
+@available(OSX, introduced: 10.51)
 class OtherIntroduced10_51 {
   func uses10_52() {
     // If this were the primary file then the below would emit an error, because
@@ -27,7 +27,7 @@ class OtherIntroduced10_51 {
     return OtherIntroduced10_52()
   }
 
-  @available(OSX, introduced=10.52)
+  @available(OSX, introduced: 10.52)
   func returns10_52Introduced10_52() -> OtherIntroduced10_52 {
     return OtherIntroduced10_52()
   }
@@ -35,7 +35,7 @@ class OtherIntroduced10_51 {
   func takes10_52(o: OtherIntroduced10_52) { 
   }
 
-  @available(OSX, introduced=10.52)
+  @available(OSX, introduced: 10.52)
   func takes10_52Introduced10_52(o: OtherIntroduced10_52) {
   }
 
@@ -44,25 +44,25 @@ class OtherIntroduced10_51 {
 
       OtherIntroduced10_52() // We don't expect an error here because the initializer is not type checked (by design).
 
-  @available(OSX, introduced=10.52)
+  @available(OSX, introduced: 10.52)
   var propOf10_52Introduced10_52: OtherIntroduced10_52 = OtherIntroduced10_52()
 
-  @available(OSX, introduced=10.52)
+  @available(OSX, introduced: 10.52)
   class NestedIntroduced10_52 : OtherIntroduced10_52 {
     override func returns10_52() -> OtherIntroduced10_52 {
     }
 
-    @available(OSX, introduced=10.53)
+    @available(OSX, introduced: 10.53)
     func returns10_53() -> OtherIntroduced10_53 {
     }
   }
 }
 
-@available(OSX, introduced=10.51)
+@available(OSX, introduced: 10.51)
 class SubOtherIntroduced10_51 : OtherIntroduced10_51 {
 }
 
-@available(OSX, introduced=10.52)
+@available(OSX, introduced: 10.52)
 class OtherIntroduced10_52 : OtherIntroduced10_51 {
 }
 
@@ -71,19 +71,19 @@ extension OtherIntroduced10_51 { // expected-error {{'OtherIntroduced10_51' is o
 }
 
 extension OtherIntroduced10_9 {
-  @available(OSX, introduced=10.51)
+  @available(OSX, introduced: 10.51)
   func extensionMethodOnOtherIntroduced10_9AvailableOn10_51(p: OtherIntroduced10_51) { }
 }
 
-@available(OSX, introduced=10.51)
+@available(OSX, introduced: 10.51)
 extension OtherIntroduced10_51 {
   func extensionMethodOnOtherIntroduced10_51() { }
 
-  @available(OSX, introduced=10.52)
+  @available(OSX, introduced: 10.52)
   func extensionMethodOnOtherIntroduced10_51AvailableOn10_52() { }
 }
 
-@available(OSX, introduced=10.53)
+@available(OSX, introduced: 10.53)
 class OtherIntroduced10_53 {
 }
 

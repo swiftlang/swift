@@ -323,7 +323,7 @@ parse_operator:
       // Parse a type after the 'is' token instead of an expression.
       ParserResult<Expr> is = parseExprIs();
       if (is.isNull() || is.hasCodeCompletion())
-        return nullptr;
+        return is;
       
       // Store the expr itself as a placeholder RHS. The real RHS is the
       // type parameter stored in the node itself.
@@ -338,7 +338,7 @@ parse_operator:
     case tok::kw_as: {
       ParserResult<Expr> as = parseExprAs();
       if (as.isNull() || as.hasCodeCompletion())
-        return nullptr;
+        return as;
         
       // Store the expr itself as a placeholder RHS. The real RHS is the
       // type parameter stored in the node itself.
@@ -746,9 +746,66 @@ static bool isStartOfGetSetAccessor(Parser &P) {
          P.Tok.isContextualKeyword("willSet");
 }
 
+/// Disambiguate and diagnose invalid uses of trailing closures in a situation
+/// where the parser requires an expr-basic (which does not allow them).  We
+/// handle this by doing some lookahead in common situations and emitting a
+/// diagnostic with a fixit to add wrapping parens.
+static bool isValidTrailingClosure(bool isExprBasic, Expr *baseExpr, Parser &P){
+  assert(P.Tok.is(tok::l_brace) && "Couldn't be a trailing closure");
+  
+  // If this is the start of a get/set accessor, then it isn't a trailing
+  // closure.
+  if (isStartOfGetSetAccessor(P))
+    return false;
+
+  // If this is a normal expression (not an expr-basic) then trailing closures
+  // are allowed, so this is obviously one.
+  // TODO: We could handle try to diambiguate cases like:
+  //   let x = foo
+  //   {...}()
+  // by looking ahead for the ()'s, but this has been replaced by do{}, so this
+  // probably isn't worthwhile.
+  //
+  if (!isExprBasic)
+    return true;
+  
+  // If this is an expr-basic, then a trailing closure is not allowed.  However,
+  // it is very common for someone to write something like:
+  //
+  //    for _ in numbers.filter {$0 > 4} {
+  //
+  // and we want to recover from this very well.   We need to perform arbitrary
+  // look-ahead to disambiguate this case, so we only do this in the case where
+  // the token after the { is on the same line as the {.
+  if (P.peekToken().isAtStartOfLine())
+    return false;
+  
+  
+  // Determine if the {} goes with the expression by eating it, and looking
+  // to see if it is immediately followed by another {.  If so, we consider it
+  // to be part of the proceeding expression.
+  Parser::BacktrackingScope backtrack(P);
+  auto startLoc = P.consumeToken(tok::l_brace);
+  P.skipUntil(tok::r_brace);
+  SourceLoc endLoc;
+  if (!P.consumeIf(tok::r_brace, endLoc) ||
+      P.Tok.isNot(tok::l_brace))
+    return false;
+  
+  // Diagnose the bad case and return true so that the caller parses this as a
+  // trailing closure.
+  P.diagnose(startLoc, diag::trailing_closure_requires_parens)
+    .fixItInsert(baseExpr->getStartLoc(), "(")
+    .fixItInsertAfter(endLoc, ")");
+  return true;
+}
+
+
+
 /// Map magic literal tokens such as #file to their
 /// MagicIdentifierLiteralExpr kind.
-MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
+static MagicIdentifierLiteralExpr::Kind
+getMagicIdentifierLiteralKind(tok Kind) {
   switch (Kind) {
   case tok::kw___COLUMN__:
   case tok::pound_column:
@@ -770,6 +827,7 @@ MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
     llvm_unreachable("not a magic literal");
   }
 }
+
 
 /// parseExprPostfix
 ///
@@ -865,7 +923,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     SWIFT_FALLTHROUGH;
       
   case tok::string_literal:  // "foo"
-    Result = makeParserResult(parseExprStringLiteral());
+    Result = parseExprStringLiteral();
     break;
   
   case tok::kw_nil:
@@ -1260,8 +1318,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     }
 
     // Check for a trailing closure, if allowed.
-    if (!isExprBasic && Tok.is(tok::l_brace) &&
-        !isStartOfGetSetAccessor(*this)) {
+    if (Tok.is(tok::l_brace) &&
+        isValidTrailingClosure(isExprBasic, Result.get(), *this)) {
       SourceLoc braceLoc = Tok.getLoc();
       // Parse the closure.
       ParserResult<Expr> closure = parseExprClosure();
@@ -1383,7 +1441,7 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
 
 ///   expr-literal:
 ///     string_literal
-Expr *Parser::parseExprStringLiteral() {
+ParserResult<Expr> Parser::parseExprStringLiteral() {
   SmallVector<Lexer::StringSegment, 1> Segments;
   L->getStringLiteralSegments(Tok, Segments);
   SourceLoc Loc = consumeToken();
@@ -1391,10 +1449,11 @@ Expr *Parser::parseExprStringLiteral() {
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
       Segments.front().Kind == Lexer::StringSegment::Literal) {
-    return createStringLiteralExprFromSegment(Context, L, Segments.front(),
-                                              Loc);
+    return makeParserResult(
+        createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
   }
-    
+
+  ParserStatus Status;
   SmallVector<Expr*, 4> Exprs;
   bool First = true;
   for (auto Segment : Segments) {
@@ -1436,6 +1495,7 @@ Expr *Parser::parseExprStringLiteral() {
       assert(Tok.is(tok::l_paren));
       
       ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
+      Status |= E;
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
 
@@ -1448,12 +1508,14 @@ Expr *Parser::parseExprStringLiteral() {
     }
     First = false;
   }
-  
-  if (Exprs.empty())
-    return new (Context) ErrorExpr(Loc);
 
-  return new (Context) InterpolatedStringLiteralExpr(Loc,
-                                        Context.AllocateCopy(Exprs));
+  if (Exprs.empty()) {
+    Status.setIsParseError();
+    return makeParserResult(Status, new (Context) ErrorExpr(Loc));
+  }
+
+  return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
+                                      Loc, Context.AllocateCopy(Exprs)));
 }
 
 void Parser::diagnoseEscapedArgumentLabel(const Token &tok) {
@@ -1587,7 +1649,7 @@ Expr *Parser::parseExprIdentifier() {
     hasGenericArgumentList = !args.empty();
   }
   
-  ValueDecl *D = lookupInScope(name.getBaseName());
+  ValueDecl *D = lookupInScope(name);
   // FIXME: We want this to work: "var x = { x() }", but for now it's better
   // to disallow it than to crash.
   if (D) {

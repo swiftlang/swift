@@ -75,7 +75,7 @@ static void diagnoseUnreachable(const SILInstruction *I,
     // transparently inlined. We should have already emitted these
     // diagnostics when we process the callee function prior to
     // inlining it.
-    if (!L.hasASTLocation() || L.is<MandatoryInlinedLocation>())
+    if (!L || L.is<MandatoryInlinedLocation>())
       return;
 
     // The most common case of getting an unreachable instruction is a

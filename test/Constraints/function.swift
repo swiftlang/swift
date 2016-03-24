@@ -23,8 +23,8 @@ func ff() -> (Int) -> (Float) { return weirdCast }
 
 // Block <-> function conversions
 
-var funct: String -> String = { $0 }
-var block: @convention(block) String -> String = funct
+var funct: Int -> Int = { $0 }
+var block: @convention(block) Int -> Int = funct
 funct = block
 block = funct
 

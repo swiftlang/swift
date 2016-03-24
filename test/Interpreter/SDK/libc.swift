@@ -21,12 +21,12 @@ print("\(UINT32_MAX)")
 // CHECK: the magic word is ///* magic *///
 let sourceFile = open(sourcePath, O_RDONLY)
 assert(sourceFile >= 0)
-var bytes = UnsafeMutablePointer<CChar>.alloc(12)
+var bytes = UnsafeMutablePointer<CChar>(allocatingCapacity: 12)
 var readed = read(sourceFile, bytes, 11)
 close(sourceFile)
 assert(readed == 11)
 bytes[11] = CChar(0)
-print("the magic word is //\(String.fromCString(bytes)!)//")
+print("the magic word is //\(String(cString: bytes))//")
 
 // CHECK: O_CREAT|O_EXCL returned errno *17*
 let errFile = 

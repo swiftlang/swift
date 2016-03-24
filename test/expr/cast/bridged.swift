@@ -16,22 +16,18 @@ struct BridgedStruct : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedClass.self
-  }
-
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
   }
 
   static func _forceBridgeFromObjectiveC(
     x: BridgedClass,
-    inout result: BridgedStruct?
+    result: inout BridgedStruct?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: BridgedClass,
-    inout result: BridgedStruct?
+    result: inout BridgedStruct?
   ) -> Bool {
     return true
   }

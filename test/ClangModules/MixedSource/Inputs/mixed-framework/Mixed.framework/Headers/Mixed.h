@@ -30,7 +30,7 @@ __attribute__((objc_root_class))
 - (void)categoryMethod:(struct PureClangType)arg;
 @end
 
-SWIFT_PROTOCOL_NAMED("CustomNameType")
+SWIFT_PROTOCOL_NAMED("CustomName")
 @protocol SwiftProtoWithCustomName
 @end
 

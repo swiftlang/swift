@@ -25,7 +25,7 @@ extension String: XOutputStream {
 
 /// \brief A thing that can be written to an XOutputStream
 protocol XStreamable {
-  func writeTo<Target: XOutputStream>(inout target: Target)
+  func writeTo<Target: XOutputStream>(target: inout Target)
 }
 
 /// \brief A thing that can be printed in the REPL and the Debugger
@@ -35,7 +35,7 @@ protocol XStreamable {
 /// declare conformance: simply give the type a debugFormat().
 protocol XDebugPrintable {
 
-  typealias DebugRepresentation : XStreamable // = String
+  associatedtype DebugRepresentation : XStreamable // = String
 
   /// \brief Produce a textual representation for the REPL and
   /// Debugger.
@@ -57,7 +57,7 @@ protocol XDebugPrintable {
 
 /// \brief Strings are XStreamable
 extension String : XStreamable {
-  func writeTo<Target: XOutputStream>(inout target: Target) {
+  func writeTo<Target: XOutputStream>(target: inout Target) {
     target.append(self)
   }
 }
@@ -89,7 +89,7 @@ func ~> <T:XDebugPrintable> (x: T, _: __PrintedFormat) -> T.DebugRepresentation 
 /// to do is declare conformance to XPrintable, and there's nothing to
 /// implement.
 protocol XPrintable: XDebugPrintable {
-  typealias PrintRepresentation: XStreamable = DebugRepresentation
+  associatedtype PrintRepresentation: XStreamable = DebugRepresentation
 
   /// \brief produce a "pretty" textual representation that can be
   /// distinct from the debug format.  For example,
@@ -129,10 +129,10 @@ struct EscapedStringFormat : XStreamable {
     self._value = s
   }
 
-  func writeTo<Target: XOutputStream>(inout target: Target) {
+  func writeTo<Target: XOutputStream>(target: inout Target) {
     target.append("\"")
     for c in _value.unicodeScalars {
-      target.append(c.escape(asASCII: true))
+      target.append(c.escaped(asASCII: true))
     }
     target.append("\"")
   }
@@ -154,7 +154,7 @@ extension String : XPrintable {
 }
 
 /// \brief An integral type that can be printed
-protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumberType, XPrintable {
+protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber, XPrintable {
   func %(lhs: Self, rhs: Self) -> Self
   func /(lhs: Self, rhs: Self) -> Self
 
@@ -189,7 +189,7 @@ func format(radix radix: Int = 10, fill: String = " ", width: Int = 0) -> _forma
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
 func _writePositive<T:XPrintableInteger, S: XOutputStream>(
-  value: T, inout _ stream: S, _ args: _formatArgs) -> Int
+  value: T, _ stream: inout S, _ args: _formatArgs) -> Int
 {
 
   if value == 0 {
@@ -210,7 +210,7 @@ func _writePositive<T:XPrintableInteger, S: XOutputStream>(
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
 func _writeSigned<T:XPrintableInteger, S: XOutputStream>(
-  value: T, inout _ target: S, _ args: _formatArgs
+  value: T, _ target: inout S, _ args: _formatArgs
 ) {
   var width = 0
   var result = ""
@@ -241,7 +241,7 @@ struct RadixFormat<T: XPrintableInteger> : XStreamable {
     self.args = args
   }
 
-  func writeTo<S: XOutputStream>(inout target: S) {
+  func writeTo<S: XOutputStream>(target: inout S) {
     _writeSigned(value, &target, args)
   }
 
@@ -276,11 +276,11 @@ struct StdoutStream : XOutputStream {
   }
 }
 
-func xprint<Target: XOutputStream, T: XStreamable>(inout target: Target, _ x: T) {
+func xprint<Target: XOutputStream, T: XStreamable>(target: inout Target, _ x: T) {
   x.writeTo(&target)
 }
 
-func xprint<Target: XOutputStream, T: XPrintable>(inout target: Target, _ x: T) {
+func xprint<Target: XOutputStream, T: XPrintable>(target: inout Target, _ x: T) {
   xprint(&target, x~>format())
 }
 
@@ -294,12 +294,12 @@ func xprint<T: XStreamable>(x: T) {
   xprint(&target, x)
 }
 
-func xprintln<Target: XOutputStream, T: XPrintable>(inout target: Target, _ x: T) {
+func xprintln<Target: XOutputStream, T: XPrintable>(target: inout Target, _ x: T) {
   xprint(&target, x)
   target.append("\n")
 }
 
-func xprintln<Target: XOutputStream, T: XStreamable>(inout target: Target, _ x: T) {
+func xprintln<Target: XOutputStream, T: XStreamable>(target: inout Target, _ x: T) {
   xprint(&target, x)
   target.append("\n")
 }

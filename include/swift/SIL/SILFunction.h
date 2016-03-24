@@ -18,7 +18,9 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILLinkage.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
@@ -35,6 +37,24 @@ enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
 enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
+
+class SILSpecializeAttr final :
+    private llvm::TrailingObjects<SILSpecializeAttr, Substitution> {
+  friend TrailingObjects;
+
+  unsigned numSubs;
+  
+  SILSpecializeAttr(ArrayRef<Substitution> subs);
+
+public:
+  static SILSpecializeAttr *create(SILModule &M, ArrayRef<Substitution> subs);
+
+  ArrayRef<Substitution> getSubstitutions() const {
+    return { getTrailingObjects<Substitution>(), numSubs };
+  }
+  
+  void print(llvm::raw_ostream &OS) const;
+};
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
@@ -138,6 +158,9 @@ private:
   /// TODO: Why is this using a std::string? Why don't we use uniqued
   /// StringRefs?
   llvm::SmallVector<std::string, 1> SemanticsAttrSet;
+
+  /// The function's remaining set of specialize attributes.
+  std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
@@ -365,7 +388,7 @@ public:
 
   /// \returns True if the function has the semantics flag \p Value;
   bool hasSemanticsAttr(StringRef Value) const {
-    return std::count(SemanticsAttrSet.begin(), SemanticsAttrSet.end(), Value);
+    return count(SemanticsAttrSet, Value);
   }
 
   /// Add the given semantics attribute to the attr list set.
@@ -381,6 +404,18 @@ public:
     auto Iter =
         std::remove(SemanticsAttrSet.begin(), SemanticsAttrSet.end(), Ref);
     SemanticsAttrSet.erase(Iter);
+  }
+
+  /// \returns the range of specialize attributes.
+  ArrayRef<SILSpecializeAttr*> getSpecializeAttrs() const {
+    return SpecializeAttrSet;
+  }
+
+  /// Removes all specialize attributes from this function.
+  void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
+
+  void addSpecializeAttr(SILSpecializeAttr *attr) {
+    SpecializeAttrSet.push_back(attr);
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
@@ -491,6 +526,10 @@ public:
   /// SILFunction.
   SILType mapTypeIntoContext(SILType type) const;
 
+  /// Map the given type, which is based on a contextual SILFunctionType and may
+  /// therefore contain context archetypes, to an interface type.
+  Type mapTypeOutOfContext(Type type) const;
+
   /// Converts the given function definition to a declaration.
   void convertToDeclaration();
 
@@ -584,6 +623,18 @@ public:
     return begin()->getBBArgs();
   }
 
+  ArrayRef<SILArgument *> getIndirectResults() const {
+    assert(!empty() && "Cannot get arguments of a function without a body");
+    return begin()->getBBArgs().slice(0,
+                            getLoweredFunctionType()->getNumIndirectResults());
+  }
+
+  ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
+    assert(!empty() && "Cannot get arguments of a function without a body");
+    return begin()->getBBArgs().slice(
+                            getLoweredFunctionType()->getNumIndirectResults());
+  }
+
   const SILArgument *getSelfArgument() const {
     assert(hasSelfParam() && "This method can only be called if the "
                              "SILFunction has a self parameter");
@@ -614,12 +665,16 @@ public:
   /// cannot be opened.
   void dump(const char *FileName) const;
 
-  /// Pretty-print the SILFunction with the designated stream as a 'sil'
-  /// definition.
+  /// Pretty-print the SILFunction to the tream \p OS.
   ///
-  /// \param Verbose In verbose mode, print the SIL locations.
-  void print(raw_ostream &OS, bool Verbose = false,
-             bool SortedSIL = false) const;
+  /// \param Verbose Dump SIL location information in verbose mode.
+  void print(raw_ostream &OS, bool Verbose = false) const {
+    SILPrintContext PrintCtx(OS, Verbose);
+    print(PrintCtx);
+  }
+
+  /// Pretty-print the SILFunction with the context \p PrintCtx.
+  void print(SILPrintContext &PrintCtx) const;
 
   /// Pretty-print the SILFunction's name using SIL syntax,
   /// '@function_mangled_name'.

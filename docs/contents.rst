@@ -16,7 +16,7 @@ Contents
    Generics
    LogicalObjects
    ObjectInitialization
-   Pattern Matching
+   PatternMatching
    StoredAndComputedVariables
    SIL
    TypeChecker

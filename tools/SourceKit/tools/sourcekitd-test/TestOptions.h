@@ -21,6 +21,9 @@ namespace sourcekitd_test {
 
 enum class SourceKitRequest {
   None,
+  ProtocolVersion,
+  DemangleNames,
+  MangleSimpleClasses,
   Index,
   CodeComplete,
   CodeCompleteOpen,
@@ -50,11 +53,13 @@ enum class SourceKitRequest {
 
 struct TestOptions {
   SourceKitRequest Request = SourceKitRequest::None;
+  std::vector<std::string> Inputs;
   std::string SourceFile;
   std::string TextInputFile;
   std::string JsonRequestPath;
   llvm::Optional<std::string> SourceText;
   std::string ModuleGroupName;
+  std::string InterestedUSR;
   unsigned Line = 0;
   unsigned Col = 0;
   unsigned Offset = 0;
@@ -70,7 +75,9 @@ struct TestOptions {
   bool CheckInterfaceIsASCII = false;
   bool UsedSema = false;
   bool PrintResponseAsJSON = false;
-
+  bool PrintRawResponse = false;
+  bool SimplifiedDemangling = false;
+  bool SynthesizedExtensions = false;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
 };
 

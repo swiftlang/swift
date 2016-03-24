@@ -20,6 +20,97 @@ namespace swift {
   class SILBasicBlock;
   class SILModule;
 
+/// Conventions for apply operands and function-entry arguments in SIL.
+///
+/// By design, this is exactly the same as ParameterConvention, plus
+/// Indirect_Out.
+enum class SILArgumentConvention : uint8_t {
+  Indirect_In,
+  Indirect_In_Guaranteed,
+  Indirect_Inout,
+  Indirect_InoutAliasable,
+  Indirect_Out,
+  Direct_Owned,
+  Direct_Unowned,
+  Direct_Deallocating,
+  Direct_Guaranteed,
+};
+
+inline bool isIndirectConvention(SILArgumentConvention convention) {
+  return convention <= SILArgumentConvention::Indirect_Out;
+}
+
+/// Turn a ParameterConvention into a SILArgumentConvention.
+inline SILArgumentConvention getSILArgumentConvention(ParameterConvention conv){
+  switch (conv) {
+  case ParameterConvention::Indirect_In:
+    return SILArgumentConvention::Indirect_In;
+  case ParameterConvention::Indirect_Inout:
+    return SILArgumentConvention::Indirect_Inout;
+  case ParameterConvention::Indirect_InoutAliasable:
+    return SILArgumentConvention::Indirect_InoutAliasable;
+  case ParameterConvention::Indirect_In_Guaranteed:
+    return SILArgumentConvention::Indirect_In_Guaranteed;
+  case ParameterConvention::Direct_Unowned:
+    return SILArgumentConvention::Direct_Unowned;
+  case ParameterConvention::Direct_Guaranteed:
+    return SILArgumentConvention::Direct_Guaranteed;
+  case ParameterConvention::Direct_Owned:
+    return SILArgumentConvention::Direct_Owned;
+  case ParameterConvention::Direct_Deallocating:
+    return SILArgumentConvention::Direct_Deallocating;
+  }
+  llvm_unreachable("covered switch isn't covered?!");
+}
+
+inline SILArgumentConvention
+SILFunctionType::getSILArgumentConvention(unsigned index) const {
+  assert(index <= getNumSILArguments());
+  auto numIndirectResults = getNumIndirectResults();
+  if (index < numIndirectResults) {
+    return SILArgumentConvention::Indirect_Out;
+  } else {
+    auto param = getParameters()[index - numIndirectResults];
+    return swift::getSILArgumentConvention(param.getConvention());
+  }
+}
+
+enum class InoutAliasingAssumption {
+  /// Assume that an inout indirect parameter may alias other objects.
+  /// This is the safe assumption an optimizations should make if it may break
+  /// memory safety in case the inout aliasing rule is violation.
+  Aliasing,
+
+  /// Assume that an inout indirect parameter cannot alias other objects.
+  /// Optimizations should only use this if they can guarantee that they will
+  /// not break memory safety even if the inout aliasing rule is violated.
+  NotAliasing
+};
+
+/// Returns true if \p conv is a not-aliasing indirect parameter.
+/// The \p isInoutAliasing specifies what to assume about the inout convention.
+/// See InoutAliasingAssumption.
+inline bool isNotAliasedIndirectParameter(SILArgumentConvention conv,
+                                     InoutAliasingAssumption isInoutAliasing) {
+  switch (conv) {
+  case SILArgumentConvention::Indirect_In:
+  case SILArgumentConvention::Indirect_Out:
+  case SILArgumentConvention::Indirect_In_Guaranteed:
+    return true;
+
+  case SILArgumentConvention::Indirect_Inout:
+    return isInoutAliasing == InoutAliasingAssumption::NotAliasing;
+
+  case SILArgumentConvention::Indirect_InoutAliasable:
+  case SILArgumentConvention::Direct_Unowned:
+  case SILArgumentConvention::Direct_Guaranteed:
+  case SILArgumentConvention::Direct_Owned:
+  case SILArgumentConvention::Direct_Deallocating:
+    return false;
+  }
+  llvm_unreachable("covered switch isn't covered?!");
+}
+
 class SILArgument : public ValueBase {
   void operator=(const SILArgument &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
@@ -65,10 +156,30 @@ public:
     llvm_unreachable("SILArgument not argument of its parent BB");
   }
 
-  /// Returns the SILParameterInfo for this SILArgument.
-  SILParameterInfo getParameterInfo() const {
+  bool isIndirectResult() const {
     assert(isFunctionArg() && "Only function arguments have SILParameterInfo");
-    return getFunction()->getLoweredFunctionType()->getParameters()[getIndex()];
+    auto numIndirectResults =
+      getFunction()->getLoweredFunctionType()->getNumIndirectResults();
+    return (getIndex() < numIndirectResults);
+  }
+
+  SILArgumentConvention getArgumentConvention() const {
+    assert(isFunctionArg() && "Only function arguments have SILParameterInfo");
+    return getFunction()->getLoweredFunctionType()
+                        ->getSILArgumentConvention(getIndex());
+  }
+
+  /// Given that this is an entry block argument, and given that it does
+  /// not correspond to an indirect result, return the corresponding
+  /// SILParameterInfo.
+  SILParameterInfo getKnownParameterInfo() const {
+    assert(isFunctionArg() && "Only function arguments have SILParameterInfo");
+    auto index = getIndex();
+    auto fnType = getFunction()->getLoweredFunctionType();
+    auto numIndirectResults = fnType->getNumIndirectResults();
+    assert(index >= numIndirectResults && "Cannot be an indirect result");
+    auto param = fnType->getParameters()[index - numIndirectResults];
+    return param;
   }
 
   /// Returns the incoming SILValue from the \p BBIndex predecessor of this
@@ -99,8 +210,8 @@ public:
   bool isSelf() const;
 
   /// Returns true if this SILArgument is passed via the given convention.
-  bool hasConvention(ParameterConvention P) const {
-    return getParameterInfo().getConvention() == P;
+  bool hasConvention(SILArgumentConvention P) const {
+    return getArgumentConvention() == P;
   }
 
 private:

@@ -47,6 +47,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
     // an ObjC method. This would change if we introduced a native
     // runtime-hookable mechanism.
     SILGenFunction SGF(*this, *F);
+    F->setThunk(IsThunk);
     SGF.emitForeignToNativeThunk(constant);
   }
 
@@ -58,18 +59,6 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
     return getFunction(derived, NotForDefinition);
-
-  // Generate the thunk name.
-  // TODO: If we allocated a new vtable slot for the derived method, then
-  // further derived methods would potentially need multiple thunks, and we
-  // would need to mangle the base method into the symbol as well.
-  auto name = derived.mangle("_TTV");
-
-  // If we already emitted this thunk, reuse it.
-  // TODO: Allocating new vtable slots for derived methods with different ABIs
-  // would invalidate the assumption that the same thunk is correct, as above.
-  if (auto existingThunk = M.lookUpFunction(name))
-    return existingThunk;
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
@@ -85,13 +74,25 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   if (overrideInfo == derivedInfo)
     return getFunction(derived, NotForDefinition);
 
+  // Generate the thunk name.
+  // TODO: If we allocated a new vtable slot for the derived method, then
+  // further derived methods would potentially need multiple thunks, and we
+  // would need to mangle the base method into the symbol as well.
+  auto name = derived.mangle("_TTV");
+
+  // If we already emitted this thunk, reuse it.
+  // TODO: Allocating new vtable slots for derived methods with different ABIs
+  // would invalidate the assumption that the same thunk is correct, as above.
+  if (auto existingThunk = M.lookUpFunction(name))
+    return existingThunk;
+
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
   auto thunk =
       M.getOrCreateFunction(SILLinkage::Private, name, overrideInfo.SILFnType,
                             derivedDecl->getGenericParams(), loc, IsBare,
                             IsNotTransparent, IsNotFragile);
-  thunk->setDebugScope(new (M) SILDebugScope(loc, *thunk));
+  thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   SILGenFunction(*this, *thunk)
     .emitVTableThunk(derived, basePattern,
@@ -332,9 +333,8 @@ public:
     }
 
     if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
-      if (!protocol->hasFixedLayout())
+      if (!protocol->isObjC())
         SGM.emitDefaultWitnessTable(protocol);
-
       return;
     }
 
@@ -393,6 +393,9 @@ public:
   }
 
   void visitVarDecl(VarDecl *vd) {
+    if (vd->hasBehavior())
+      SGM.emitPropertyBehavior(vd);
+
     // Collect global variables for static properties.
     // FIXME: We can't statically emit a global variable for generic properties.
     if (vd->isStatic() && vd->hasStorage()) {
@@ -484,6 +487,8 @@ public:
   }
 
   void visitVarDecl(VarDecl *vd) {
+    if (vd->hasBehavior())
+      SGM.emitPropertyBehavior(vd);
     if (vd->isStatic() && vd->hasStorage()) {
       ExtensionDecl *ext = cast<ExtensionDecl>(vd->getDeclContext());
       NominalTypeDecl *theType = ext->getExtendedType()->getAnyNominal();
@@ -506,54 +511,4 @@ public:
 
 void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {
   SILGenExtension(*this).emitExtension(ed);
-}
-
-namespace {
-
-/// Emit a default witness table for a resilient protocol definition.
-struct SILGenDefaultWitnessTable
-    : public SILWitnessVisitor<SILGenDefaultWitnessTable> {
-
-  unsigned MinimumWitnessCount;
-  SmallVector<SILDefaultWitnessTable::Entry, 8> DefaultWitnesses;
-
-  SILGenDefaultWitnessTable() : MinimumWitnessCount(0) {}
-
-  void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
-    MinimumWitnessCount++;
-  }
-
-  void addMethod(FuncDecl *func) {
-    MinimumWitnessCount++;
-  }
-
-  void addConstructor(ConstructorDecl *ctor) {
-    MinimumWitnessCount++;
-  }
-
-  void addAssociatedType(AssociatedTypeDecl *ty,
-                         ArrayRef<ProtocolDecl *> protos) {
-    MinimumWitnessCount++;
-
-    for (auto *protocol : protos) {
-      // Only reference the witness if the protocol requires it.
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-        continue;
-
-      MinimumWitnessCount++;
-    }
-  }
-};
-
-}
-
-void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
-  SILDefaultWitnessTable *defaultWitnesses =
-      M.createDefaultWitnessTableDeclaration(protocol);
-
-  SILGenDefaultWitnessTable builder;
-  builder.visitProtocolDecl(protocol);
-
-  defaultWitnesses->convertToDefinition(builder.MinimumWitnessCount,
-                                        builder.DefaultWitnesses);
 }

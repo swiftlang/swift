@@ -2,6 +2,10 @@
 # introducing static constructors or destructors.
 set(SWIFT_CORE_CXX_FLAGS)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
+  list(APPEND SWIFT_CORE_CXX_FLAGS "-mcmodel=large")
+endif()
+
 check_cxx_compiler_flag("-Werror -Wglobal-constructors" CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
 if(CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
   list(APPEND SWIFT_CORE_CXX_FLAGS "-Wglobal-constructors")
@@ -26,14 +30,12 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(runtime)
   add_subdirectory(stubs)
   add_subdirectory(core)
+  add_subdirectory(SwiftOnoneSupport)
+  add_subdirectory(Platform)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   if(SWIFT_BUILD_SDK_OVERLAY)
     add_subdirectory(SDK)
   endif()
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-  add_subdirectory(Glibc)
 endif()

@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Mangle.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
@@ -34,16 +35,14 @@ void SILDefaultWitnessTable::addDefaultWitnessTable() {
 }
 
 SILDefaultWitnessTable *
-SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol,
-                               unsigned MinimumWitnessTableSizeInWords,
+SILDefaultWitnessTable::create(SILModule &M, SILLinkage Linkage,
+                               const ProtocolDecl *Protocol,
                                ArrayRef<SILDefaultWitnessTable::Entry> entries){
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILDefaultWitnessTable),
                          alignof(SILDefaultWitnessTable));
   SILDefaultWitnessTable *wt =
-      ::new (buf) SILDefaultWitnessTable(M, Protocol,
-                                         MinimumWitnessTableSizeInWords,
-                                         entries);
+      ::new (buf) SILDefaultWitnessTable(M, Linkage, Protocol, entries);
 
   wt->addDefaultWitnessTable();
 
@@ -52,12 +51,13 @@ SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol,
 }
 
 SILDefaultWitnessTable *
-SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol) {
+SILDefaultWitnessTable::create(SILModule &M, SILLinkage Linkage,
+                               const ProtocolDecl *Protocol) {
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILDefaultWitnessTable),
                          alignof(SILDefaultWitnessTable));
   SILDefaultWitnessTable *wt =
-      ::new (buf) SILDefaultWitnessTable(M, Protocol);
+      ::new (buf) SILDefaultWitnessTable(M, Linkage, Protocol);
 
   wt->addDefaultWitnessTable();
 
@@ -67,27 +67,25 @@ SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol) {
 
 SILDefaultWitnessTable::
 SILDefaultWitnessTable(SILModule &M,
+                       SILLinkage Linkage,
                        const ProtocolDecl *Protocol,
-                       unsigned MinimumWitnessTableSizeInWords,
                        ArrayRef<Entry> entries)
-  : Mod(M), Protocol(Protocol), MinimumWitnessTableSizeInWords(0), Entries(),
+  : Mod(M), Linkage(Linkage), Protocol(Protocol), Entries(),
     IsDeclaration(true) {
 
-  convertToDefinition(MinimumWitnessTableSizeInWords, entries);
+  convertToDefinition(entries);
 }
 
 SILDefaultWitnessTable::SILDefaultWitnessTable(SILModule &M,
+                                               SILLinkage Linkage,
                                                const ProtocolDecl *Protocol)
-  : Mod(M), Protocol(Protocol), MinimumWitnessTableSizeInWords(0), Entries(),
+  : Mod(M), Linkage(Linkage), Protocol(Protocol), Entries(),
     IsDeclaration(true) {}
 
 void SILDefaultWitnessTable::
-convertToDefinition(unsigned MinimumWitnessTableSizeInWords,
-                    ArrayRef<Entry> entries) {
+convertToDefinition(ArrayRef<Entry> entries) {
   assert(IsDeclaration);
   IsDeclaration = false;
-
-  this->MinimumWitnessTableSizeInWords = MinimumWitnessTableSizeInWords;
 
   void *buf = Mod.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
   memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
@@ -99,6 +97,41 @@ convertToDefinition(unsigned MinimumWitnessTableSizeInWords,
       entry.getWitness()->incrementRefCount();
     }
   }
+}
+
+Identifier SILDefaultWitnessTable::getIdentifier() const {
+  std::string name;
+  {
+    Mangle::Mangler mangler;
+    mangler.mangleType(getProtocol()->getDeclaredType(), /*uncurry*/ 0);
+    name = mangler.finalize();
+  }
+  return Mod.getASTContext().getIdentifier(name);
+}
+
+unsigned SILDefaultWitnessTable::getMinimumWitnessTableSize() const {
+  unsigned defaultEntries = 0;
+  unsigned minimumEntries = 0;
+
+  // Count the number of entries up to and including the last null entry.
+  // This is the number of witnesses that all conforming types must
+  // provide.
+  //
+  // Any witnesses after the last null entry all have defaults, and can
+  // be omitted from conformances; these are the resilient defaults.
+  //
+  // FIXME: Really this should look at availability instead.
+  for (auto entry : Entries) {
+    if (entry.isValid()) {
+      defaultEntries++;
+    } else {
+      minimumEntries++;
+      minimumEntries += defaultEntries;
+      defaultEntries = 0;
+    }
+  }
+
+  return minimumEntries;
 }
 
 SILDefaultWitnessTable::~SILDefaultWitnessTable() {

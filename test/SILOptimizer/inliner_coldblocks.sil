@@ -1,0 +1,126 @@
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-test-threshold=10 | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil @callee : $@convention(thin) () -> () {
+bb0:
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @inline_into_hotblock
+// CHECK: builtin
+// CHECK: builtin
+// CHECK: return
+sil @inline_into_hotblock : $@convention(thin) () -> () {
+bb0:
+  %i1 = integer_literal $Builtin.Int1, -1
+  %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %ex, bb1, bb2
+
+bb1:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  br bb2
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_inline_into_coldblock__simple
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+sil @dont_inline_into_coldblock__simple : $@convention(thin) () -> () {
+bb0:
+  %i0 = integer_literal $Builtin.Int1, 0
+  %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i0 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %ex, bb1, bb2
+
+bb1:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  br bb2
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_inline_into_coldblock__condition_is_arg__simple
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+sil @dont_inline_into_coldblock__condition_is_arg__simple : $@convention(thin) () -> () {
+bb0:
+  %i0 = integer_literal $Builtin.Int1, 0
+  %i1 = integer_literal $Builtin.Int1, -1
+  %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %ex, bb1, bb2
+
+bb1:
+  br bb3(%i0 : $Builtin.Int1)
+
+bb2:
+  br bb3(%i1 : $Builtin.Int1)
+
+bb3(%c : $Builtin.Int1):
+  cond_br %c, bb4, bb5
+
+bb4:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  br bb5
+
+bb5:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_inline_into_coldblock__condition_is_arg__complex
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+sil @dont_inline_into_coldblock__condition_is_arg__complex : $@convention(thin) () -> () {
+bb0:
+  %i0 = integer_literal $Builtin.Int1, 0
+  %i1 = integer_literal $Builtin.Int1, -1
+  %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %ex, bb1, bb4
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb5(%i0 : $Builtin.Int1)
+
+bb3:
+  br bb5(%i0 : $Builtin.Int1)
+
+bb4:
+  br bb5(%i1 : $Builtin.Int1)
+
+bb5(%c : $Builtin.Int1):
+  cond_br %c, bb6, bb7
+
+bb6:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+
+

@@ -37,6 +37,7 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
+  class AssociatedTypeDecl;
   class ClassDecl;
   class ConstructorDecl;
   class Decl;
@@ -273,6 +274,7 @@ public:
   void emitNativeStrongInit(llvm::Value *value, Address addr);
   void emitNativeStrongRetain(llvm::Value *value);
   void emitNativeStrongRelease(llvm::Value *value);
+  void emitNativeSetDeallocating(llvm::Value *value);
   //   - unowned references
   void emitNativeUnownedRetain(llvm::Value *value);
   void emitNativeUnownedRelease(llvm::Value *value);
@@ -358,6 +360,23 @@ public:
   void bindArchetype(ArchetypeType *type,
                      llvm::Value *metadata,
                      ArrayRef<llvm::Value*> wtables);
+
+  struct ArchetypeAccessPath {
+    CanArchetypeType BaseType;
+    AssociatedTypeDecl *Association;
+  };
+
+  /// Register an additional access path to the given archetype besides
+  /// (if applicable) just drilling down from its parent.
+  ///
+  /// This is necessary when an archetype gains conformances from an
+  /// associated type that it's been constrained to be equal to
+  /// but which is not simply its parent.
+  void addArchetypeAccessPath(CanArchetypeType targetArchetype,
+                              ArchetypeAccessPath accessPath);
+
+  ArrayRef<ArchetypeAccessPath>
+  getArchetypeAccessPaths(CanArchetypeType targetArchetype);
 
 //--- Type emission ------------------------------------------------------------
 public:
@@ -529,6 +548,9 @@ private:
   llvm::Value *LocalSelf = nullptr;
   
   LocalSelfKind SelfKind;
+
+  llvm::DenseMap<CanType, std::vector<ArchetypeAccessPath>>
+  ArchetypeAccessPaths;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;

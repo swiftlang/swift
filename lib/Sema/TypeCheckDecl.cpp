@@ -24,7 +24,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/NameLookup.h"
@@ -730,13 +729,12 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 }
 
-static void markInvalidGenericSignature(ValueDecl *VD,
-                                        TypeChecker &TC) {
+static void markInvalidGenericSignature(ValueDecl *VD, TypeChecker &TC) {
   GenericParamList *genericParams;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
     genericParams = AFD->getGenericParams();
   else
-    genericParams = cast<NominalTypeDecl>(VD)->getGenericParams();
+    genericParams = cast<GenericTypeDecl>(VD)->getGenericParams();
   
   // If there aren't any generic parameters at this level, we're done.
   if (genericParams == nullptr)
@@ -765,8 +763,7 @@ static void markInvalidGenericSignature(ValueDecl *VD,
 /// the generic parameters.
 static void finalizeGenericParamList(ArchetypeBuilder &builder,
                                      GenericParamList *genericParams,
-                                     DeclContext *dc,
-                                     TypeChecker &TC) {
+                                     DeclContext *dc, TypeChecker &TC) {
   Accessibility access;
   if (auto *fd = dyn_cast<FuncDecl>(dc))
     access = fd->getFormalAccess();
@@ -1248,48 +1245,6 @@ static void validatePatternBindingDecl(TypeChecker &tc,
           ArchetypeBuilder::mapTypeOutOfContext(dc, var->getType()));
       });
     }
-
-    // For now, we only support static/class variables in specific contexts.
-    if (binding->isStatic()) {
-      // Selector for unimplemented_type_var message.
-      enum : unsigned {
-        Misc,
-        GenericTypes,
-        Classes,
-      };
-      auto unimplementedStatic = [&](unsigned diagSel) {
-        auto staticLoc = binding->getStaticLoc();
-        tc.diagnose(staticLoc, diag::unimplemented_type_var,
-                    diagSel, binding->getStaticSpelling(),
-                    diagSel == Classes)
-          .highlight(staticLoc);
-      };
-
-      assert(dc->isTypeContext());
-      // The parser only accepts 'type' variables in type contexts, so
-      // we're either in a nominal type context or an extension.
-      NominalTypeDecl *nominal;
-      if (auto extension = dyn_cast<ExtensionDecl>(dc)) {
-        nominal = extension->getExtendedType()->getAnyNominal();
-        assert(nominal);
-      } else {
-        nominal = cast<NominalTypeDecl>(dc);
-      }
-
-      // Non-stored properties are fine.
-      if (!binding->hasStorage()) {
-        // do nothing
-
-      // Stored type variables in a generic context need to logically
-      // occur once per instantiation, which we don't yet handle.
-      } else if (dc->isGenericContext()) {
-        unimplementedStatic(GenericTypes);
-      } else if (dc->getAsClassOrClassExtensionContext()) {
-        auto staticSpelling = binding->getStaticSpelling();
-        if (staticSpelling != StaticSpellingKind::KeywordStatic)
-          unimplementedStatic(Classes);
-      }
-    }
   }
 }
 
@@ -1532,11 +1487,11 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::FileUnit:
       D->setAccessibility(Accessibility::Internal);
       break;
-    case DeclContextKind::NominalTypeDecl: {
-      auto nominal = cast<NominalTypeDecl>(DC);
-      validateAccessibility(nominal);
-      Accessibility access = nominal->getFormalAccess();
-      if (!isa<ProtocolDecl>(nominal))
+    case DeclContextKind::GenericTypeDecl: {
+      auto generic = cast<GenericTypeDecl>(DC);
+      validateAccessibility(generic);
+      Accessibility access = generic->getFormalAccess();
+      if (!isa<ProtocolDecl>(generic))
         access = std::min(access, Accessibility::Internal);
       D->setAccessibility(access);
       break;
@@ -2216,27 +2171,12 @@ static void checkBridgedFunctions(TypeChecker &TC) {
   }
   #include "swift/SIL/BridgedTypes.def"
   
-  if (Module *module = TC.Context.getLoadedModule(ID_Foundation)) {
-    checkObjCBridgingFunctions(TC, module,
-                               TC.Context.getSwiftName(
-                                 KnownFoundationEntity::NSArray),
-                               "_convertNSArrayToArray",
-                               "_convertArrayToNSArray");
-    checkObjCBridgingFunctions(TC, module,
-                               TC.Context.getSwiftName(
-                                 KnownFoundationEntity::NSDictionary),
-                               "_convertNSDictionaryToDictionary",
-                               "_convertDictionaryToNSDictionary");
-    checkObjCBridgingFunctions(TC, module,
-                               TC.Context.getSwiftName(
-                                 KnownFoundationEntity::NSSet),
-                               "_convertNSSetToSet",
-                               "_convertSetToNSSet");
+  if (Module *module = TC.Context.getLoadedModule(TC.Context.Id_Foundation)) {
     checkObjCBridgingFunctions(TC, module,
                                TC.Context.getSwiftName(
                                  KnownFoundationEntity::NSError),
-                               "_convertNSErrorToErrorType",
-                               "_convertErrorTypeToNSError");
+                               "_convertNSErrorToErrorProtocol",
+                               "_convertErrorProtocolToNSError");
   }
 }
 
@@ -2272,6 +2212,8 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
   // Make sure we have the appropriate bridging operations.
   checkBridgedFunctions(TC);
+  TC.useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
+                                         D->getInterfaceType());
 
   // Record the name of this Objective-C method in its class.
   if (auto classDecl
@@ -2653,6 +2595,390 @@ findNonImplicitRequiredInit(const ConstructorDecl *CD) {
   return CD;
 }
 
+static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
+  // No behavior, no problems.
+  if (!decl->hasBehavior())
+    return;
+  
+  // Don't try to check the behavior if we already encountered an error.
+  if (decl->getType()->is<ErrorType>())
+    return;
+  
+  auto behavior = decl->getMutableBehavior() ;
+  // We should have set up the conformance during validation.
+  assert(behavior->Conformance.hasValue());
+  // If the behavior couldn't be resolved during validation, we can't really
+  // do much more.
+  auto *conformance = behavior->Conformance.getValue();
+  if (!conformance)
+    return;
+  
+  assert(behavior->ValueDecl);
+  
+  auto dc = decl->getDeclContext();
+  auto behaviorSelf = conformance->getType();
+  auto behaviorInterfaceSelf = conformance->getInterfaceType();
+  auto behaviorProto = conformance->getProtocol();
+  auto behaviorProtoTy = ProtocolType::get(behaviorProto, TC.Context);
+  
+  // Treat any inherited protocols as constraints on `Self`, and gather
+  // conformances from the containing type.
+  //
+  // It'd probably be cleaner to model as `where Self: ...` constraints when
+  // we have those.
+  //
+  // TODO: Handle non-protocol requirements ('class', base class, etc.)
+  for (auto refinedProto : behaviorProto->getInheritedProtocols(&TC)) {
+    ProtocolConformance *inherited = nullptr;
+    
+    // A behavior in non-type or static context is never going to be able to
+    // satisfy Self constraints (until we give structural types that ability).
+    // Give a tailored error message for this case.
+    if (!dc->isTypeContext() || decl->isStatic()) {
+      TC.diagnose(behavior->getLoc(),
+                  diag::property_behavior_with_self_requirement_not_in_type,
+                  behaviorProto->getName());
+      break;
+    }
+    
+    // Blame conformance failures on the containing type.
+    SourceLoc blameLoc;
+    if (auto nomTy = dyn_cast<NominalTypeDecl>(dc)) {
+      blameLoc = nomTy->getLoc();
+    } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      blameLoc = ext->getLoc();
+    } else {
+      llvm_unreachable("unknown type context type?!");
+    }
+    bool conforms = TC.conformsToProtocol(behaviorSelf, refinedProto, dc,
+                                          ConformanceCheckFlags::Used,
+                                          &inherited,
+                                          blameLoc);
+    if (conforms) {
+      conformance->setInheritedConformance(refinedProto, inherited);
+    } else {
+      // Add some notes that the conformance is behavior-driven.
+      TC.diagnose(behavior->getLoc(),
+                  diag::self_conformance_required_by_property_behavior,
+                  refinedProto->getName(),
+                  behaviorProto->getName());
+      conformance->setInvalid();
+    }
+  }
+  
+  // Try to satisfy the protocol requirements from the property's traits.
+  
+  auto unknownRequirement = [&](ValueDecl *requirement) {
+    // Diagnose requirements that can't be satisfied from the behavior decl.
+    TC.diagnose(behavior->getLoc(),
+                diag::property_behavior_unknown_requirement,
+                behaviorProto->getName(),
+                requirement->getName());
+    TC.diagnose(requirement->getLoc(),
+                diag::property_behavior_unknown_requirement_here);
+    conformance->setInvalid();
+  };
+  
+  conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
+  
+  // First, satisfy any associated type requirements.
+  Substitution valueSub;
+  AssociatedTypeDecl *valueReqt = nullptr;
+  for (auto requirementDecl : behaviorProto->getMembers()) {
+    auto assocTy = dyn_cast<AssociatedTypeDecl>(requirementDecl);
+    if (!assocTy)
+      continue;
+  
+    // Match a Value associated type requirement to the property type.
+    if (assocTy->getName() != TC.Context.Id_Value) {
+      unknownRequirement(assocTy);
+      continue;
+    }
+    
+    valueReqt = assocTy;
+    
+    // Check for required protocol conformances.
+    // TODO: Handle secondary 'where' constraints on the associated types.
+    // TODO: Handle non-protocol constraints ('class', base class)
+    auto propTy = decl->getType();
+    SmallVector<ProtocolConformanceRef, 4> valueConformances;
+    for (auto proto : assocTy->getConformingProtocols(&TC)) {
+      ProtocolConformance *valueConformance = nullptr;
+      bool conforms = TC.conformsToProtocol(propTy, proto, dc,
+                                            ConformanceCheckFlags::Used,
+                                            &valueConformance,
+                                            decl->getLoc());
+      if (!conforms) {
+        conformance->setInvalid();
+        TC.diagnose(behavior->getLoc(),
+                    diag::value_conformance_required_by_property_behavior,
+                    proto->getName(),
+                    behaviorProto->getName());
+        goto next_requirement;
+      }
+      // FIXME: ProtocolConformanceRef should have an "error" representation
+      if (!valueConformance)
+        valueConformances.push_back(ProtocolConformanceRef(proto));
+      else
+        valueConformances.push_back(ProtocolConformanceRef(valueConformance));
+    }
+    
+    {
+      auto conformancesCopy = TC.Context.AllocateCopy(valueConformances);
+      valueSub = Substitution(propTy, conformancesCopy);
+      // FIXME: Maybe we should synthesize an implicit TypeAliasDecl? We
+      // really don't want the behavior conformances to show up in the
+      // enclosing namespace though.
+      conformance->setTypeWitness(assocTy, valueSub, /*typeDecl*/ nullptr);
+    }
+  next_requirement:;
+  }
+  
+  // Bail out if we didn't resolve type witnesses.
+  if (conformance->isInvalid()) {
+    decl->setInvalid();
+    decl->overwriteType(ErrorType::get(TC.Context));
+    return;
+  }
+
+  // Build a Substitution vector from the conformance.
+  auto conformanceMem =
+    TC.Context.AllocateUninitialized<ProtocolConformanceRef>(1);
+  auto selfConformance = new ((void*)conformanceMem.data())
+    ProtocolConformanceRef(conformance);
+  // FIXME: Additional associated types introduced by other requirements?
+  Substitution interfaceSubs[] = {
+    Substitution(behaviorInterfaceSelf, *selfConformance),
+    Substitution(decl->getInterfaceType(), valueSub.getConformances()),
+  };
+  Substitution contextSubs[] = {
+    Substitution(behaviorSelf, *selfConformance),
+    Substitution(decl->getType(), valueSub.getConformances()),
+  };
+  
+  // Now that type witnesses are done, satisfy property and method requirements.
+  conformance->setState(ProtocolConformanceState::Checking);
+
+  bool requiresParameter = false;
+  for (auto requirementDecl : behaviorProto->getMembers()) {
+    auto requirement = dyn_cast<ValueDecl>(requirementDecl);
+    if (!requirement)
+      continue;
+    if (isa<AssociatedTypeDecl>(requirement))
+      continue;
+    
+    if (auto varReqt = dyn_cast<VarDecl>(requirement)) {
+      // Match a storage requirement.
+      if (varReqt->getName() == TC.Context.Id_storage) {
+        TC.validateDecl(varReqt);
+
+        auto storageTy = varReqt->getInterfaceType();
+        // We need an initStorage extension method to initialize this storage.
+        // Should have the signature:
+        //   static func initStorage() -> Storage
+        // for default initialization, or:
+        //   static func initStorage(_: Value) -> Storage
+        // for parameterized initialization.
+        auto expectedDefaultInitStorageTy =
+          FunctionType::get(TC.Context.TheEmptyTupleType, storageTy);
+        Type valueTy = DependentMemberType::get(
+                                          behaviorProto->getSelfInterfaceType(),
+                                          valueReqt,
+                                          TC.Context);
+        
+        auto expectedParameterizedInitStorageTy =
+          FunctionType::get(valueTy, storageTy);
+
+        auto lookup = TC.lookupMember(dc, behaviorProtoTy,
+                                      TC.Context.Id_initStorage);
+        FuncDecl *defaultInitStorageDecl = nullptr;
+        FuncDecl *parameterizedInitStorageDecl = nullptr;
+        for (auto found : lookup) {
+          if (auto foundFunc = dyn_cast<FuncDecl>(found.Decl)) {
+            if (!foundFunc->isStatic())
+              continue;
+            auto methodTy = foundFunc->getInterfaceType()
+              ->castTo<AnyFunctionType>()
+              ->getResult();
+            if (methodTy->isEqual(expectedDefaultInitStorageTy))
+              defaultInitStorageDecl = foundFunc;
+            else if (methodTy->isEqual(expectedParameterizedInitStorageTy))
+              parameterizedInitStorageDecl = foundFunc;
+          }
+        }
+        
+        if (defaultInitStorageDecl && parameterizedInitStorageDecl) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_protocol_reqt_ambiguous,
+                      TC.Context.Id_initStorage);
+          TC.diagnose(defaultInitStorageDecl->getLoc(),
+                      diag::property_behavior_protocol_reqt_here,
+                      TC.Context.Id_initStorage);
+          TC.diagnose(parameterizedInitStorageDecl->getLoc(),
+                      diag::property_behavior_protocol_reqt_here,
+                      TC.Context.Id_initStorage);
+          conformance->setInvalid();
+          continue;
+        }
+        
+        if (!defaultInitStorageDecl && !parameterizedInitStorageDecl) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_protocol_no_initStorage,
+                      expectedDefaultInitStorageTy,
+                      expectedParameterizedInitStorageTy);
+          for (auto found : lookup)
+            TC.diagnose(found.Decl->getLoc(),
+                        diag::found_candidate);
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // TODO: Support storage-backed behaviors in non-type contexts.
+        if (!dc->isTypeContext()) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_with_feature_not_supported,
+                      behaviorProto->getName(), "storage");
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // TODO: Support destructured initializers such as
+        // `var (a, b) = tuple __behavior blah`. This ought to be supportable
+        // if the behavior allows for DI-like initialization.
+        if (parameterizedInitStorageDecl
+            && !isa<NamedPattern>(decl->getParentPattern()
+                                      ->getSemanticsProvidingPattern())) {
+          TC.diagnose(decl->getLoc(),
+                      diag::property_behavior_unsupported_initializer);
+          auto PBD = decl->getParentPatternBinding();
+          unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(decl);
+          PBD->setInit(entryIndex, nullptr);
+          PBD->setInitializerChecked(entryIndex);
+          continue;
+        }
+        
+        // Instantiate the storage next to us in the enclosing scope.
+        TC.completePropertyBehaviorStorage(decl, varReqt,
+                                           defaultInitStorageDecl,
+                                           parameterizedInitStorageDecl,
+                                           behaviorSelf,
+                                           storageTy,
+                                           conformance,
+                                           interfaceSubs,
+                                           contextSubs);
+        continue;
+      }
+    } else if (auto func = dyn_cast<FuncDecl>(requirement)) {
+      // Handle accessors as part of their property.
+      if (func->isAccessor())
+        continue;
+      
+      // Handle a parameter block requirement.
+      if (func->getName() == TC.Context.Id_parameter) {
+        requiresParameter = true;
+        
+        TC.validateDecl(func);
+        
+        // The requirement should be for a nongeneric, nonmutating instance
+        // method.
+        if (func->isStatic() || func->isGeneric() || func->isMutating()) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_invalid_parameter_reqt,
+                      behaviorProto->getName());
+          TC.diagnose(varReqt->getLoc(),
+                      diag::property_behavior_protocol_reqt_here,
+                      TC.Context.Id_parameter);
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // The declaration must have a parameter.
+        if (!decl->getBehavior()->Param) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_requires_parameter,
+                      behaviorProto->getName(),
+                      decl->getName());
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // TODO: Support parameter requirements in non-type contexts.
+        if (!dc->isTypeContext()) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_with_feature_not_supported,
+                      behaviorProto->getName(), "parameter requirement");
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // Build the parameter witness method.
+        TC.completePropertyBehaviorParameter(decl, func,
+                                             conformance,
+                                             interfaceSubs,
+                                             contextSubs);
+        continue;
+      }
+    }
+
+    unknownRequirement(requirement);
+  }
+  
+  // If the property was declared with an initializer, but the behavior
+  // didn't use it, complain.
+  if (decl->getParentInitializer()) {
+    TC.diagnose(decl->getParentInitializer()->getLoc(),
+                diag::property_behavior_invalid_initializer,
+                behaviorProto->getName());
+  }
+  
+  // If the property was declared with a parameter, but the behavior didn't
+  // use it, complain.
+  // TODO: The initializer could eventually be consumed by DI-style
+  // initialization.
+  if (!requiresParameter && decl->getBehavior()->Param) {
+    TC.diagnose(decl->getBehavior()->Param->getLoc(),
+                diag::property_behavior_invalid_parameter,
+                behaviorProto->getName());
+  }
+  
+  // Bail out if we didn't resolve method witnesses.
+  if (conformance->isInvalid()) {
+    decl->setInvalid();
+    decl->overwriteType(ErrorType::get(TC.Context));
+    return;
+  }
+
+  conformance->setState(ProtocolConformanceState::Complete);
+
+  // Check that the 'value' property from the protocol matches the
+  // declared property type in context.
+  auto sig = behaviorProto->getGenericSignatureOfContext();
+  auto map = sig->getSubstitutionMap(interfaceSubs);
+  auto substValueTy = behavior->ValueDecl->getInterfaceType()
+    .subst(decl->getModuleContext(), map, SubstOptions());
+  
+  if (!substValueTy->isEqual(decl->getInterfaceType())) {
+    TC.diagnose(behavior->getLoc(),
+                diag::property_behavior_value_type_doesnt_match,
+                behaviorProto->getName(),
+                substValueTy,
+                decl->getName(),
+                decl->getInterfaceType());
+    TC.diagnose(behavior->ValueDecl->getLoc(),
+                diag::property_behavior_value_decl_here);
+    decl->setInvalid();
+    decl->overwriteType(ErrorType::get(TC.Context));
+    return;
+  }
+
+  // Synthesize the bodies of the property's accessors now, forwarding to the
+  // 'value' implementation.
+  TC.completePropertyBehaviorAccessors(decl, behavior->ValueDecl,
+                                       interfaceSubs, contextSubs);
+  
+  return;
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2788,6 +3114,9 @@ public:
     }
 
     TC.validateDecl(VD);
+    
+    // Check the behavior.
+    checkVarBehavior(VD, TC);
 
     // WARNING: Anything you put in this function will only be run when the
     // VarDecl is fully type-checked within its own file. It will NOT be run
@@ -2819,6 +3148,40 @@ public:
         VD->setInvalid();
         VD->overwriteType(ErrorType::get(TC.Context));
       }
+      
+      // We haven't implemented type-level storage in some contexts.
+      if (VD->isStatic()) {
+        auto PBD = VD->getParentPatternBinding();
+        // Selector for unimplemented_static_var message.
+        enum : unsigned {
+          Misc,
+          GenericTypes,
+          Classes,
+        };
+        auto unimplementedStatic = [&](unsigned diagSel) {
+          auto staticLoc = PBD->getStaticLoc();
+          TC.diagnose(VD->getLoc(), diag::unimplemented_static_var,
+                      diagSel, PBD->getStaticSpelling(),
+                      diagSel == Classes)
+            .highlight(staticLoc);
+        };
+
+        auto DC = VD->getDeclContext();
+
+        // Non-stored properties are fine.
+        if (!PBD->hasStorage()) {
+          // do nothing
+
+        // Stored type variables in a generic context need to logically
+        // occur once per instantiation, which we don't yet handle.
+        } else if (DC->isGenericContext()) {
+          unimplementedStatic(GenericTypes);
+        } else if (DC->getAsClassOrClassExtensionContext()) {
+          auto StaticSpelling = PBD->getStaticSpelling();
+          if (StaticSpelling != StaticSpellingKind::KeywordStatic)
+            unimplementedStatic(Classes);
+        }
+      }
     }
 
     // Synthesize accessors for lazy, all checking already been performed.
@@ -2839,7 +3202,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
-      if (!VD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      if (!isa<ProtocolDecl>(VD->getDeclContext())) {
         synthesizeMaterializeForSet(materializeForSet, VD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -3072,7 +3435,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = SD->getMaterializeForSetFunc()) {
-      if (!SD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      if (!isa<ProtocolDecl>(SD->getDeclContext())) {
         synthesizeMaterializeForSet(materializeForSet, SD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -3083,26 +3446,12 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (TAD->isBeingTypeChecked()) {
-      
-      if (!TAD->hasUnderlyingType()) {
-        TAD->setInvalid();
-        TAD->overwriteType(ErrorType::get(TC.Context));
-        TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-        
-        TC.diagnose(TAD->getLoc(), diag::circular_type_alias, TAD->getName());
-      }
-      return;
-    }
-    
-    TAD->setIsBeingTypeChecked();
-    
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessibility(TAD);
     if (!IsSecondPass) {
       if (!TAD->hasType())
-        TAD->computeType();
-
+        TC.validateDecl(TAD);
+      
       TypeResolutionOptions options;
       if (!TAD->getDeclContext()->isTypeContext())
         options |= TR_GlobalTypeAlias;
@@ -3133,8 +3482,6 @@ public:
       checkAccessibility(TC, TAD);
 
     TC.checkDeclAttributes(TAD);
-    
-    TAD->setIsBeingTypeChecked(false);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
@@ -3182,7 +3529,9 @@ public:
                       NTD->getName(),
                       DC->getDeclaredTypeOfContext());
         return true;
-      } else if (DC->isLocalContext() && DC->isGenericContext()) {
+      }
+      
+      if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
           TC.diagnose(NTD->getLoc(),
@@ -4052,6 +4401,18 @@ public:
       markAsObjC(TC, FD, isObjC, errorConvention);
     }
     
+    // If the function is exported to C, it must be representable in (Obj-)C.
+    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      Optional<ForeignErrorConvention> errorConvention;
+      if (TC.isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
+                                   errorConvention)) {
+        if (FD->isBodyThrowing()) {
+          FD->setForeignErrorConvention(*errorConvention);
+          TC.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
+        }
+      }
+    }
+    
     inferDynamic(TC.Context, FD);
 
     TC.checkDeclAttributes(FD);
@@ -4694,6 +5055,7 @@ public:
 
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Alignment)
+    UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(IBAction)
@@ -4722,9 +5084,12 @@ public:
     UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(SetterAccessibility)
     UNINTERESTING_ATTR(UIApplicationMain)
+    UNINTERESTING_ATTR(Versioned)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
+    UNINTERESTING_ATTR(ShowInInterface)
+    UNINTERESTING_ATTR(Specialize)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(AutoClosure)
@@ -4775,8 +5140,19 @@ public:
       }
 
       // FIXME: Customize message to the kind of thing.
-      TC.diagnose(Override, diag::override_final, 
-                  Override->getDescriptiveKind());
+      auto baseKind = Base->getDescriptiveKind();
+      switch (baseKind) {
+      case DescriptiveDeclKind::StaticLet:
+      case DescriptiveDeclKind::StaticVar:
+      case DescriptiveDeclKind::StaticMethod:
+        TC.diagnose(Override, diag::override_static, baseKind);
+        break;
+      default:
+        TC.diagnose(Override, diag::override_final,
+                    Override->getDescriptiveKind(), baseKind);
+        break;
+      }
+
       TC.diagnose(Base, diag::overridden_here);
     }
 
@@ -5156,11 +5532,14 @@ public:
       EED->setRecursiveness(ElementRecursiveness::NotRecursive);
     }
 
-    // Now that we have an argument type we can set the element's declared
-    // type.
-    if (!EED->hasType())
-      EED->computeType();
-    EED->setIsBeingTypeChecked(false);
+    {
+      defer { EED->setIsBeingTypeChecked(false); };
+
+      // Now that we have an argument type we can set the element's declared
+      // type.
+      if (!EED->hasType() && !EED->computeType())
+        return;
+    }
 
     // Test for type parameters, as opposed to a generic decl context, in
     // case the enclosing enum type was illegally declared inside of a generic
@@ -5531,17 +5910,15 @@ bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
 }
 
 bool TypeChecker::isAvailabilitySafeForConformance(
-    ValueDecl *witness, ValueDecl *requirement,
-    NormalProtocolConformance *conformance,
-    AvailabilityContext &requirementInfo) {
-  DeclContext *DC = conformance->getDeclContext();
+    ProtocolDecl *proto, ValueDecl *requirement, ValueDecl *witness,
+    DeclContext *dc, AvailabilityContext &requirementInfo) {
 
   // We assume conformances in
   // non-SourceFiles have already been checked for availability.
-  if (!DC->getParentSourceFile())
+  if (!dc->getParentSourceFile())
     return true;
 
-  NominalTypeDecl *conformingDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *conformingDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   assert(conformingDecl && "Must have conforming declaration");
 
   // Make sure that any access of the witness through the protocol
@@ -5566,10 +5943,8 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   witnessInfo.constrainWith(infoForConformingDecl);
   requirementInfo.constrainWith(infoForConformingDecl);
 
-  ProtocolDecl *protocolDecl = conformance->getProtocol();
   AvailabilityContext infoForProtocolDecl =
-      overApproximateAvailabilityAtLocation(protocolDecl->getLoc(),
-                                            protocolDecl);
+      overApproximateAvailabilityAtLocation(proto->getLoc(), proto);
 
   witnessInfo.constrainWith(infoForProtocolDecl);
   requirementInfo.constrainWith(infoForProtocolDecl);
@@ -5797,27 +6172,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
   case DeclKind::Module:
     return;
-
-  case DeclKind::TypeAlias: {
-    // Type aliases may not have an underlying type yet.
-    auto typeAlias = cast<TypeAliasDecl>(D);
-
-    if (typeAlias->getDeclContext()->isModuleScopeContext()) {
-      IterativeTypeChecker ITC(*this);
-      ITC.satisfy(requestResolveTypeDecl(typeAlias));
-    } else {
-      // Compute the declared type.
-      if (!typeAlias->hasType())
-        typeAlias->computeType();
-
-      if (typeAlias->getUnderlyingTypeLoc().getTypeRepr() &&
-          !typeAlias->getUnderlyingTypeLoc().wasValidated())
-        typeCheckDecl(typeAlias, true);
-    }
-
-    break;
-  }
-
+      
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType: {
     auto typeParam = cast<AbstractTypeParamDecl>(D);
@@ -5849,8 +6204,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::SubscriptDecl:
       llvm_unreachable("cannot have type params");
 
-    case DeclContextKind::NominalTypeDecl: {
-      auto nominal = cast<NominalTypeDecl>(DC);
+    case DeclContextKind::GenericTypeDecl: {
+      auto nominal = cast<GenericTypeDecl>(DC);
       typeCheckDecl(nominal, true);
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
         if (!assocType->hasType())
@@ -5884,6 +6239,54 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     break;
   }
   
+
+  case DeclKind::TypeAlias: {
+    // Type aliases may not have an underlying type yet.
+    auto typeAlias = cast<TypeAliasDecl>(D);
+    
+    // Compute the declared type.
+    if (typeAlias->hasType()) {
+      
+      // If we have are recursing into validation and already have a type set...
+      // but also don't have the underlying type computed, then we are are
+      // recursing into interface validation while checking the body of the
+      // type.  Reject this with a circularity diagnostic.
+      if (!typeAlias->hasUnderlyingType()) {
+        diagnose(typeAlias->getLoc(), diag::circular_type_alias,
+                 typeAlias->getName());
+        typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
+        typeAlias->setInvalid();
+        typeAlias->overwriteType(ErrorType::get(Context));
+      }
+      return;
+    }
+    typeAlias->computeType();
+
+    // Check generic parameters, if needed.
+    if (auto gp = typeAlias->getGenericParams()) {
+      // Validate the generic type parameters.
+      if (validateGenericTypeSignature(typeAlias)) {
+        markInvalidGenericSignature(typeAlias, *this);
+        return;
+      }
+      
+      // If we're already validating the type declaration's generic signature,
+      // avoid a potential infinite loop by not re-validating the generic
+      // parameter list.
+      if (!typeAlias->IsValidatingGenericSignature()) {
+        revertGenericParamList(gp);
+        
+        auto builder = createArchetypeBuilder(typeAlias->getModuleContext());
+        checkGenericParamList(&builder, gp, nullptr/*parentSig*/);
+        finalizeGenericParamList(builder, gp, typeAlias, *this);
+      }
+    }
+    
+    // Otherwise, perform the heavy lifting now.
+    typeCheckDecl(typeAlias, true);
+    break;
+  }
+
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class: {
@@ -6270,7 +6673,7 @@ static Type checkExtensionGenericParams(
   NominalTypeDecl *nominal;
   if (auto unbound = type->getAs<UnboundGenericType>()) {
     parentType = unbound->getParent();
-    nominal = unbound->getDecl();
+    nominal = cast<NominalTypeDecl>(unbound->getDecl());
   } else if (auto bound = type->getAs<BoundGenericType>()) {
     parentType = bound->getParent();
     nominal = bound->getDecl();
@@ -6750,6 +7153,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // variable.
   bool FoundMemberwiseInitializedProperty = false;
   bool SuppressDefaultInitializer = false;
+  bool SuppressMemberwiseInitializer = false;
   bool FoundDesignatedInit = false;
   decl->setAddedImplicitInitializers();
   SmallPtrSet<CanType, 4> initializerParamTypes;
@@ -6792,6 +7196,12 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
         
         FoundMemberwiseInitializedProperty = true;
       }
+      
+      // FIXME: Disable memberwise initializer if a property uses a behavior.
+      // Behaviors should be able to control whether they interact with
+      // memberwise initialization.
+      if (var->hasBehavior())
+        SuppressMemberwiseInitializer = true;
       continue;
     }
 
@@ -6821,7 +7231,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(decl)) {
-    if (!FoundDesignatedInit && !structDecl->hasUnreferenceableStorage()) {
+    if (!FoundDesignatedInit && !SuppressMemberwiseInitializer
+        && !structDecl->hasUnreferenceableStorage()) {
       // For a struct with memberwise initialized properties, we add a
       // memberwise init.
       if (FoundMemberwiseInitializedProperty) {

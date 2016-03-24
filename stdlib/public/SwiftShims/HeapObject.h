@@ -19,9 +19,14 @@
 #include "swift/Basic/type_traits.h"
 
 namespace swift {
-#endif 
 
-struct HeapMetadata;
+struct InProcess;
+
+template <typename Target> struct TargetHeapMetadata;
+using HeapMetadata = TargetHeapMetadata<InProcess>;
+#else
+typedef struct HeapMetadata HeapMetadata;
+#endif
 
 // The members of the HeapObject header that are not shared by a
 // standard Objective-C instance
@@ -32,7 +37,7 @@ struct HeapMetadata;
 /// The Swift heap-object header.
 struct HeapObject {
   /// This is always a valid pointer to a metadata object.
-  struct HeapMetadata const *metadata;
+  HeapMetadata const *metadata;
 
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
   // FIXME: allocate two words of metadata on 32-bit platforms

@@ -116,25 +116,25 @@ func randomGraphemeCluster(minSize: Int, _ maxSize: Int) -> String {
 var CharacterTests = TestSuite("Character")
 
 CharacterTests.test("literal") {
-  if true {
+  do {
     // U+0041 LATIN CAPITAL LETTER A
     let ch: Character = "A"
     expectEqual("\u{0041}", String(ch))
   }
 
-  if true {
+  do {
     // U+3042 HIRAGANA LETTER A
     let ch: Character = "あ"
     expectEqual("\u{3042}", String(ch))
   }
 
-  if true {
+  do {
     // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
     let ch: Character = "例"
     expectEqual("\u{4F8B}", String(ch))
   }
 
-  if true {
+  do {
     // U+304B HIRAGANA LETTER KA
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let ch: Character = "\u{304b}\u{3099}"
@@ -184,8 +184,8 @@ func checkRoundTripThroughCharacter(s: String) {
 }
 
 func isSmallRepresentation(s: String) -> Bool {
-  switch(Character(s)._representation) {
-    case .Small:
+  switch Character(s)._representation {
+    case .small:
       return true
     default:
       return false
@@ -272,7 +272,7 @@ UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
 }
 
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -289,11 +289,11 @@ UnicodeScalarTests.test("UInt32(_: UnicodeScalar),UInt64(_: UnicodeScalar)") {
 }
 
 UnicodeScalarTests.test("isASCII()") {
-  expectTrue(UnicodeScalar(0).isASCII())
-  expectTrue(("A" as UnicodeScalar).isASCII())
-  expectTrue(UnicodeScalar(127).isASCII())
-  expectFalse(UnicodeScalar(128).isASCII())
-  expectFalse(UnicodeScalar(256).isASCII())
+  expectTrue(UnicodeScalar(0).isASCII)
+  expectTrue(("A" as UnicodeScalar).isASCII)
+  expectTrue(UnicodeScalar(127).isASCII)
+  expectFalse(UnicodeScalar(128).isASCII)
+  expectFalse(UnicodeScalar(256).isASCII)
 }
 
 UnicodeScalarTests.test("Comparable") {

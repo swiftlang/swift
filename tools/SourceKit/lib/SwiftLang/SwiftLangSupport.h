@@ -20,6 +20,7 @@
 #include "SourceKit/Support/ThreadSafeRefCntPtr.h"
 #include "SourceKit/Support/Tracing.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/IDE/Formatting.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Mutex.h"
@@ -57,17 +58,13 @@ namespace SourceKit {
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {
 
-
   struct Implementation;
   Implementation &Impl;
 
-  size_t getLineOffset(unsigned LineIndex);
-  size_t getTrimmedLineOffset(unsigned LineIndex);
-
 public:
-  struct CodeFormatOptions;
 
-  SwiftEditorDocument(StringRef FilePath, SwiftLangSupport &LangSupport);
+  SwiftEditorDocument(StringRef FilePath, SwiftLangSupport &LangSupport,
+       swift::ide::CodeFormatOptions Options = swift::ide::CodeFormatOptions());
   ~SwiftEditorDocument();
 
   ImmutableTextSnapshotRef initializeText(llvm::MemoryBuffer *Buf,
@@ -91,10 +88,7 @@ public:
   void formatText(unsigned Line, unsigned Length, EditorConsumer &Consumer);
   void expandPlaceholder(unsigned Offset, unsigned Length,
                          EditorConsumer &Consumer);
-  StringRef getTrimmedTextForLine(unsigned Line);
-  size_t getExpandedIndentForLine(unsigned LineIndex);
-
-  const CodeFormatOptions &getFormatOptions();
+  const swift::ide::CodeFormatOptions &getFormatOptions();
 
   static void reportDocumentStructure(swift::SourceFile &SrcFile,
                                       EditorConsumer &Consumer);
@@ -263,6 +257,17 @@ public:
                                swift::AccessorKind AccKind,
                                llvm::raw_ostream &OS);
 
+  /// Annotates a declaration with XML tags that describe the key substructure
+  /// of the declaration for CursorInfo/DocInfo.
+  ///
+  /// Prints declarations with decl- and type-specific tags derived from the
+  /// UIDs used for decl/refs.
+  ///
+  /// FIXME: This move to libIDE, but currently depends on the UIdentVisitor.
+  static void printFullyAnnotatedDeclaration(const swift::ValueDecl *VD,
+                                             swift::Type BaseTy,
+                                             llvm::raw_ostream &OS);
+
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;
   static std::string resolvePathSymlinks(StringRef FilePath);
@@ -307,12 +312,15 @@ public:
                            StringRef Name,
                            StringRef ModuleName,
                            Optional<StringRef> Group,
-                           ArrayRef<const char *> Args) override;
+                           ArrayRef<const char *> Args,
+                           bool SynthesizedExtensions,
+                           Optional<StringRef> InterestedUSR) override;
 
   void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                  StringRef Name,
                                  StringRef HeaderName,
-                                 ArrayRef<const char *> Args) override;
+                                 ArrayRef<const char *> Args,
+                                 bool SynthesizedExtensions) override;
 
   void editorOpenSwiftSourceInterface(StringRef Name,
                                       StringRef SourceName,
@@ -340,6 +348,10 @@ public:
   void getCursorInfo(StringRef Filename, unsigned Offset,
                      ArrayRef<const char *> Args,
                      std::function<void(const CursorInfo &)> Receiver) override;
+
+  void getCursorInfoFromUSR(
+      StringRef Filename, StringRef USR, ArrayRef<const char *> Args,
+      std::function<void(const CursorInfo &)> Receiver) override;
 
   void findRelatedIdentifiersInFile(StringRef Filename, unsigned Offset,
                                     ArrayRef<const char *> Args,

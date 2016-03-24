@@ -173,7 +173,7 @@ operations. For example, let's try to write a Comparable protocol that could be
 used to search for a generic find() operation::
 
   protocol Comparable {
-    func isEqual(other : ???) -> bool
+    func isEqual(other : ???) -> Bool
   }
 
 Our options for filling in ??? are currently very poor. We could use the syntax
@@ -216,7 +216,7 @@ allows one to refer to the eventual type of 'self' (which we call
 Comparable protocol in a natural way::
 
   protocol Comparable {
-    func isEqual(other : Self) -> bool
+    func isEqual(other : Self) -> Bool
   }
 
 By expressing Comparable in this way, we know that if we have two objects of
@@ -261,9 +261,9 @@ requirements. Protocols can also contain operators, properties, and subscript
 operators::
   
   protocol RandomAccessContainer : Collection {
-    var length : Int
-    func ==(lhs : Self, rhs : Self)
-    subscript (i : Int) -> Element
+    var count: Int
+    func == (lhs: Self, rhs: Self)
+    subscript(i: Int) -> Element
   }
 
 Operator requirements can be satisfied by operator definitions, property
@@ -712,6 +712,35 @@ or (if we have a JIT) run-time) for these types, we can eliminate the cost of
 the virtual dispatch, inline calls when appropriate, and eliminate the overhead
 of the generic system. Such optimizations can be performed based on heuristics,
 user direction, or profile-guided optimization.
+
+An internal @_specialize function attribute allows developers to force
+full specialization by listing concrete type names corresponding to the
+function's generic signature. A function's generic signature is a
+concatenation of its generic context and the function's own generic
+type parameters.::
+
+  struct S<T> {
+    var x: T
+    @_specialize(Int, Float)
+    mutating func exchangeSecond<U>(u: U, _ t: T) -> (U, T) {
+      x = t
+      return (u, x)
+    }
+  }
+
+  // Substitutes: <T, U> with <Int, Float> producing:
+  // S<Int>::exchangeSecond<Float>(u: Float, t: Int) -> (Float, Int)
+
+@_specialize currently acts as a hint to the optimizer, which
+generates type checks and code to dispatch to the specialized routine
+without affecting the signature of the generic function. The
+intention is to support efforts at evaluating the performance of
+specialized code. The performance impact is not guaranteed and is
+likely to change with the optimizer. This attribute should only be
+used in conjunction with rigorous performance analysis. Eventually,
+a similar attribute could be defined in the language, allowing it to be
+exposed as part of a function's API. That would allow direct dispatch
+to specialized code without type checks, even across modules.
 
 Existential Types and Generics
 ------------------------------

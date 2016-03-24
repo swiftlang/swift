@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension LazySequenceType {
+extension LazySequenceProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
@@ -18,15 +18,15 @@ extension LazySequenceType {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func flatMap<Intermediate: SequenceType>(
-    transform: (Elements.Generator.Element) -> Intermediate
+  public func flatMap<SegmentOfResult : Sequence>(
+    transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazySequence<
-    FlattenSequence<LazyMapSequence<Elements, Intermediate>>> {
+    FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
     return self.map(transform).flatten()
   }
 }
 
-extension LazyCollectionType {
+extension LazyCollectionProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
@@ -34,17 +34,17 @@ extension LazyCollectionType {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func flatMap<Intermediate: CollectionType>(
-    transform: (Elements.Generator.Element) -> Intermediate
+  public func flatMap<SegmentOfResult : Collection>(
+    transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenCollection<
-      LazyMapCollection<Elements, Intermediate>>
+      LazyMapCollection<Elements, SegmentOfResult>>
   > {
     return self.map(transform).flatten()
   }
 }
 
-extension LazyCollectionType where Elements.Index : BidirectionalIndexType
+extension LazyCollectionProtocol where Elements.Index : BidirectionalIndex
 {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
@@ -54,13 +54,13 @@ extension LazyCollectionType where Elements.Index : BidirectionalIndexType
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<
-    Intermediate: CollectionType
-    where Intermediate.Index : BidirectionalIndexType
+    SegmentOfResult : Collection
+    where SegmentOfResult.Index : BidirectionalIndex
   >(
-    transform: (Elements.Generator.Element) -> Intermediate
+    transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenBidirectionalCollection<
-      LazyMapCollection<Elements, Intermediate>
+      LazyMapCollection<Elements, SegmentOfResult>
   >> {
     return self.map(transform).flatten()
   }

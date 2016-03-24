@@ -11,13 +11,15 @@
 # This file contains the data structure that transforms arguments into usable
 # values
 
-import tempfile
 import os
+import tempfile
 
 
-class Config():
+class Config(object):
     """A class to store configuration information specified by command-line
-    arguments."""
+    arguments.
+    """
+
     def __init__(self, out_dir, no_remove_files):
         self.out_dir = out_dir
         self.tmp_dir = tempfile.mkdtemp()

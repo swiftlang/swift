@@ -120,7 +120,7 @@ func test() {
   print(Bar.staticStoredBar)
   
 
-  func increment(inout x: Int) {
+  func increment(x: inout Int) {
     x += 1
   }
 
@@ -292,3 +292,16 @@ assert(HasStaticVar.a === DerivesHasStaticVar.a)
 assert(HasStaticVar.i == DerivesHasStaticVar.i)
 HasStaticVar.i = 2020
 assert(HasStaticVar.i == DerivesHasStaticVar.i)
+
+var _x: Int = 0
+
+class HasClassVar {
+  class var x: Int {
+    get { return _x }
+    set { _x = newValue }
+  }
+}
+
+assert(HasClassVar.x == 0)
+HasClassVar.x += 10
+assert(HasClassVar.x == 10)

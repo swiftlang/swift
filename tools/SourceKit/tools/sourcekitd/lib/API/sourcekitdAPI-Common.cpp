@@ -32,6 +32,8 @@ using llvm::StringRef;
 using llvm::raw_ostream;
 
 
+UIdent sourcekitd::KeyVersionMajor("key.version_major");;
+UIdent sourcekitd::KeyVersionMinor("key.version_minor");;
 UIdent sourcekitd::KeyResults("key.results");
 UIdent sourcekitd::KeyRequest("key.request");
 UIdent sourcekitd::KeyCompilerArgs("key.compilerargs");
@@ -40,6 +42,7 @@ UIdent sourcekitd::KeySourceFile("key.sourcefile");
 UIdent sourcekitd::KeySourceText("key.sourcetext");
 UIdent sourcekitd::KeyModuleName("key.modulename");
 UIdent sourcekitd::KeyGroupName("key.groupname");
+UIdent sourcekitd::KeySynthesizedExtension("key.synthesizedextensions");
 UIdent sourcekitd::KeyNotification("key.notification");
 UIdent sourcekitd::KeyKeyword("key.keyword");
 UIdent sourcekitd::KeyName("key.name");
@@ -53,6 +56,8 @@ UIdent sourcekitd::KeyKind("key.kind");
 UIdent sourcekitd::KeyAccessibility("key.accessibility");
 UIdent sourcekitd::KeySetterAccessibility("key.setter_accessibility");
 UIdent sourcekitd::KeyUSR("key.usr");
+UIdent sourcekitd::KeyOriginalUSR("key.original_usr");
+UIdent sourcekitd::KeyInterestedUSR("key.interested_usr");
 UIdent sourcekitd::KeyLine("key.line");
 UIdent sourcekitd::KeyColumn("key.column");
 UIdent sourcekitd::KeyReceiverUSR("key.receiver_usr");
@@ -112,6 +117,7 @@ UIdent sourcekitd::KeyNextRequestStart("key.nextrequeststart");
 UIdent sourcekitd::KeyPopular("key.popular");
 UIdent sourcekitd::KeyUnpopular("key.unpopular");
 UIdent sourcekitd::KeyHide("key.hide");
+UIdent sourcekitd::KeySimplified("key.simplified");
 
 UIdent sourcekitd::KeyIsDeprecated("key.is_deprecated");
 UIdent sourcekitd::KeyIsUnavailable("key.is_unavailable");
@@ -127,6 +133,8 @@ UIdent sourcekitd::KeyModuleGroups("key.modulegroups");
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.
 static UIdent *OrderedKeys[] = {
+  &KeyVersionMajor,
+  &KeyVersionMinor,
   &KeyResults,
   &KeyRequest,
   &KeyNotification,
@@ -136,6 +144,8 @@ static UIdent *OrderedKeys[] = {
   &KeyKeyword,
   &KeyName,
   &KeyUSR,
+  &KeyOriginalUSR,
+  &KeyInterestedUSR,
   &KeyGenericParams,
   &KeyGenericRequirements,
   &KeyDocFullAsXML,
@@ -342,7 +352,9 @@ public:
 
   void visitString(StringRef Str) {
     OS << '\"';
-    OS.write_escaped(Str);
+    // Avoid raw_ostream's write_escaped, we don't want to escape unicode
+    // characters because it will be invalid JSON.
+    writeEscaped(Str, OS);
     OS << '\"';
   }
 
@@ -354,6 +366,30 @@ public:
     }
   }
 };
+}
+
+void sourcekitd::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
+  for (unsigned i = 0, e = Str.size(); i != e; ++i) {
+    unsigned char c = Str[i];
+
+    switch (c) {
+    case '\\':
+      OS << '\\' << '\\';
+      break;
+    case '\t':
+      OS << '\\' << 't';
+      break;
+    case '\n':
+      OS << '\\' << 'n';
+      break;
+    case '"':
+      OS << '\\' << '"';
+      break;
+    default:
+      OS << c;
+      break;
+    }
+  }
 }
 
 static void printError(sourcekitd_response_t Err, raw_ostream &OS) {

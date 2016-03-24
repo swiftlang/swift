@@ -19,6 +19,7 @@
 #include "swift/Runtime/Debug.h"
 #include "Private.h"
 #include <cassert>
+#include <cstdio>
 #include <cstring>
 #include <new>
 #include <string>
@@ -168,10 +169,6 @@ struct PlaygroundQuickLook {
   } Kind;
 };
   
-struct StringMirrorTuple {
-  String first;
-  Mirror second;
-};
 struct OptionalPlaygroundQuickLook {
   union {
     struct {
@@ -220,7 +217,7 @@ static_assert(sizeof(MagicMirrorData) == sizeof(ValueBuffer),
 /// arbitrary object.
 ///
 /// This type is layout-compatible with a Swift existential container for the
-/// _MirrorType protocol.
+/// _Mirror protocol.
 class MagicMirror {
 public:
   // The data for the mirror.
@@ -379,7 +376,7 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
       new (result) String("(Heap Generic Local Variable)");
       break;
     case MetadataKind::ErrorObject:
-      new (result) String("(ErrorType Object)");
+      new (result) String("(ErrorProtocol Object)");
       break;
   }
 }
@@ -393,18 +390,7 @@ const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
   auto isa = _swift_getClass(object);
   return swift_getObjCClassMetadata(isa);
 }
-  
-// -- Tuple destructuring.
-  
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-intptr_t swift_TupleMirror_count(HeapObject *owner,
-                                 const OpaqueValue *value,
-                                 const Metadata *type) {
-  auto Tuple = static_cast<const TupleTypeMetadata *>(type);
-  return Tuple->NumElements;
-}
-  
+ 
 static std::tuple<const _ReflectableWitnessTable *, const Metadata *,
                   const OpaqueValue *>
 getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
@@ -500,17 +486,28 @@ static Mirror reflect(HeapObject *owner,
   ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
   return result;
 }
+
+// -- Tuple destructuring.
   
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C"
+intptr_t swift_TupleMirror_count(HeapObject *owner,
+                                 const OpaqueValue *value,
+                                 const Metadata *type) {
+  auto Tuple = static_cast<const TupleTypeMetadata *>(type);
+  return Tuple->NumElements;
+}
+
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
-StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
-                                              HeapObject *owner,
-                                              const OpaqueValue *value,
-                                              const Metadata *type) {
-  StringMirrorTuple result;
-  
+void swift_TupleMirror_subscript(String *outString,
+                                 Mirror *outMirror,
+                                 intptr_t i,
+                                 HeapObject *owner,
+                                 const OpaqueValue *value,
+                                 const Metadata *type) {
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
   
   if (i < 0 || (size_t)i > Tuple->NumElements)
@@ -520,7 +517,7 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   char buf[32];
   snprintf(buf, 31, ".%zd", i);
   buf[31] = 0;
-  result.first = String(buf, strlen(buf));
+  new (outString) String(buf, strlen(buf));
   
   // Get a Mirror for the nth element.
   auto &elt = Tuple->getElement(i);
@@ -531,9 +528,7 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   swift_retain(owner);
 
   // 'owner' is consumed by this call.
-  result.second = reflect(owner, eltData, elt.Type);
-
-  return result;
+  new (outMirror) Mirror(reflect(owner, eltData, elt.Type));
 }
   
 // Get a field name from a doubly-null-terminated list.
@@ -561,12 +556,12 @@ intptr_t swift_StructMirror_count(HeapObject *owner,
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
-StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
-                                               HeapObject *owner,
-                                               const OpaqueValue *value,
-                                               const Metadata *type) {
-  StringMirrorTuple result;
-  
+void swift_StructMirror_subscript(String *outString,
+                                  Mirror *outMirror,
+                                  intptr_t i,
+                                  HeapObject *owner,
+                                  const OpaqueValue *value,
+                                  const Metadata *type) {
   auto Struct = static_cast<const StructMetadata *>(type);
   
   if (i < 0 || (size_t)i > Struct->Description->Struct.NumFields)
@@ -579,17 +574,14 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
   auto bytes = reinterpret_cast<const char*>(value);
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
 
-  result.first = String(getFieldName(Struct->Description->Struct.FieldNames, i));
+  new (outString) String(getFieldName(Struct->Description->Struct.FieldNames, i));
 
   // This matches the -1 in reflect.
   swift_retain(owner);
 
   // 'owner' is consumed by this call.
   assert(!fieldType.isIndirect() && "indirect struct fields not implemented");
-  result.second = reflect(owner, fieldData,
-                                         fieldType.getType());
-
-  return result;
+  new (outMirror) Mirror(reflect(owner, fieldData, fieldType.getType()));
 }
 
 // -- Enum destructuring.
@@ -695,12 +687,12 @@ intptr_t swift_EnumMirror_count(HeapObject *owner,
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
-StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
-                                             HeapObject *owner,
-                                             const OpaqueValue *value,
-                                             const Metadata *type) {
-  StringMirrorTuple result;
-
+void swift_EnumMirror_subscript(String *outString,
+                                Mirror *outMirror,
+                                intptr_t i,
+                                HeapObject *owner,
+                                const OpaqueValue *value,
+                                const Metadata *type) {
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = Enum->Description->Enum;
 
@@ -727,10 +719,8 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
   // This matches the -1 in reflect.
   swift_retain(owner);
 
-  result.first = String(getFieldName(Description.CaseNames, tag));
-  result.second = reflect(owner, value, payloadType);
-
-  return result;
+  new (outString) String(getFieldName(Description.CaseNames, tag));
+  new (outMirror) Mirror(reflect(owner, value, payloadType));
 }
   
 // -- Class destructuring.
@@ -760,12 +750,12 @@ intptr_t swift_ClassMirror_count(HeapObject *owner,
 /// \param value passed unowned.
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
-StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
-                                              HeapObject *owner,
-                                              const OpaqueValue *value,
-                                              const Metadata *type) {
-  StringMirrorTuple result;
-  
+void swift_ClassMirror_subscript(String *outString,
+                                 Mirror *outMirror,
+                                 intptr_t i,
+                                 HeapObject *owner,
+                                 const OpaqueValue *value,
+                                 const Metadata *type) {
   auto Clas = static_cast<const ClassMetadata*>(type);
 
   if (classHasSuperclass(Clas)) {
@@ -773,10 +763,10 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
     // first child.
     if (i == 0) {
       // FIXME: Put superclass name here
-      result.first = String("super");
-      result.second
-        = getMirrorForSuperclass(Clas->SuperClass, owner, value, type);
-      return result;
+      new (outString) String("super");
+      new (outMirror) Mirror(
+        getMirrorForSuperclass(Clas->SuperClass, owner, value, type));
+      return;
     }
     --i;
   }
@@ -808,10 +798,9 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   auto bytes = *reinterpret_cast<const char * const*>(value);
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
   
-  result.first = String(getFieldName(Clas->getDescription()->Class.FieldNames, i));
+  new (outString) String(getFieldName(Clas->getDescription()->Class.FieldNames, i));
   // 'owner' is consumed by this call.
-  result.second = reflect(owner, fieldData, fieldType.getType());
-  return result;
+  new (outMirror) Mirror(reflect(owner, fieldData, fieldType.getType()));
 }
   
 // -- Mirror witnesses for ObjC classes.
@@ -918,10 +907,12 @@ static Mirror ObjC_getMirrorForSuperclass(Class sup,
   
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
-StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
-                                             HeapObject *owner,
-                                             const OpaqueValue *value,
-                                             const Metadata *type) {
+void swift_ObjCMirror_subscript(String *outString,
+                                Mirror *outMirror,
+                                intptr_t i,
+                                HeapObject *owner,
+                                const OpaqueValue *value,
+                                const Metadata *type) {
 #if REFLECT_OBJC_IVARS
   id object = *reinterpret_cast<const id *>(value);
 #endif
@@ -930,11 +921,11 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   // If there's a superclass, it becomes the first child.
   if (auto sup = (Class) _swift_getSuperclass((const ClassMetadata*) isa)) {
     if (i == 0) {
-      StringMirrorTuple result;
       const char *supName = class_getName(sup);
-      result.first = String(supName, strlen(supName));
-      result.second = ObjC_getMirrorForSuperclass(sup, owner, value, type);
-      return result;
+      new (outString) String(supName, strlen(supName));
+      new (outMirror) Mirror(
+                        ObjC_getMirrorForSuperclass(sup, owner, value, type));
+      return;
     }
     --i;
   }
@@ -968,11 +959,9 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   
   const Metadata *ivarType = getMetadataForEncoding(typeEncoding);
   
-  StringMirrorTuple result;
-  result.first = String(name, strlen(name));
+  new (outString) String(name, strlen(name));
   // 'owner' is consumed by this call.
-  result.second = reflect(owner, ivar, ivarType);
-  return result;
+  new (outMirror) Mirror(reflect(owner, ivar, ivarType));
 #else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
@@ -1079,61 +1068,65 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
   
 // -- MagicMirror implementation.
 
-// TODO: There are other non-Apple platforms that underscore asm symbols.
-#if defined(__APPLE__)
-# define UNDERSCORE "_"
-#else
-# define UNDERSCORE
+#if !defined(__USER_LABEL_PREFIX__)
+#error __USER_LABEL_PREFIX__ is undefined
 #endif
+
+#define GLUE_EXPANDED(a,b) a##b
+#define GLUE(a,b) GLUE_EXPANDED(a,b)
+#define SYMBOL_NAME(name) GLUE(__USER_LABEL_PREFIX__,name)
+
+#define QUOTE_EXPANDED(literal) #literal
+#define QUOTE(literal) QUOTE_EXPANDED(literal)
+
+#define QUOTED_SYMBOL_NAME(name) QUOTE(SYMBOL_NAME(name))
 
 // Addresses of the type metadata and Mirror witness tables for the primitive
 // mirrors.
 extern "C" const Metadata OpaqueMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs13_OpaqueMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs13_OpaqueMirror));
 extern "C" const MirrorWitnessTable OpaqueMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs13_OpaqueMirrors11_MirrorTypes");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs13_OpaqueMirrors7_Mirrors));
 extern "C" const Metadata TupleMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs12_TupleMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs12_TupleMirror));
 extern "C" const MirrorWitnessTable TupleMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs12_TupleMirrors11_MirrorTypes");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs12_TupleMirrors7_Mirrors));
 
 extern "C" const Metadata StructMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs13_StructMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs13_StructMirror));
 extern "C" const MirrorWitnessTable StructMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs13_StructMirrors11_MirrorTypes");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs13_StructMirrors7_Mirrors));
 
 extern "C" const Metadata EnumMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs11_EnumMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs11_EnumMirror));
 extern "C" const MirrorWitnessTable EnumMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs11_EnumMirrors11_MirrorTypes");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs11_EnumMirrors7_Mirrors));
 
 extern "C" const Metadata ClassMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs12_ClassMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs12_ClassMirror));
 extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs12_ClassMirrors11_MirrorTypes");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs12_ClassMirrors7_Mirrors));
 
 extern "C" const Metadata ClassSuperMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs17_ClassSuperMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs17_ClassSuperMirror));
 extern "C" const MirrorWitnessTable ClassSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs17_ClassSuperMirrors11_MirrorTypes");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs17_ClassSuperMirrors7_Mirrors));
 
 extern "C" const Metadata MetatypeMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs15_MetatypeMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs15_MetatypeMirror));
 extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs15_MetatypeMirrors11_MirrorTypes");
-  
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs15_MetatypeMirrors7_Mirrors));
+
 #if SWIFT_OBJC_INTEROP
 extern "C" const Metadata ObjCMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs11_ObjCMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs11_ObjCMirror));
 extern "C" const MirrorWitnessTable ObjCMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs11_ObjCMirrors11_MirrorTypes");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs11_ObjCMirrors7_Mirrors));
 extern "C" const Metadata ObjCSuperMirrorMetadata
-  __asm__(UNDERSCORE "_TMVs16_ObjCSuperMirror");
+  __asm__(QUOTED_SYMBOL_NAME(_TMVs16_ObjCSuperMirror));
 extern "C" const MirrorWitnessTable ObjCSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVs16_ObjCSuperMirrors11_MirrorTypes");
+  __asm__(QUOTED_SYMBOL_NAME(_TWPVs16_ObjCSuperMirrors7_Mirrors));
 #endif
-
-#undef UNDERSCORE
 
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.

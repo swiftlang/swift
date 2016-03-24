@@ -13,7 +13,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
 
   init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) { 
   }
@@ -22,7 +22,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) { 
   }
 
@@ -36,7 +36,7 @@ struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralCo
 
   init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) { 
   }
@@ -45,13 +45,13 @@ struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralCo
 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) { }
 
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    numberOfCodeUnits: Builtin.Word
+    utf16CodeUnitCount: Builtin.Word
   ) { 
   }
 
@@ -141,7 +141,7 @@ func structs() {
 }
 
 
-func inoutcallee(inout x: Int) {}
+func inoutcallee(x: inout Int) {}
 func address_of_expr() {
   var x: Int = 4
   inoutcallee(&x)
@@ -284,7 +284,7 @@ func interpolated_string(x: Int, y: String) -> String {
 }
 
 protocol Runcible {
-  typealias U
+  associatedtype U
   var free:Int { get }
   var associated:U { get }
 
@@ -542,14 +542,10 @@ func dontEmitIgnoredLoadExpr(a : NonTrivialStruct) -> NonTrivialStruct.Type {
 func implodeRecursiveTuple(expr: ((Int, Int), Int)?) {
 
   // CHECK:      [[WHOLE:%[0-9]+]] = load {{.*}} : $*((Int, Int), Int)
-  // CHECK-NEXT: [[WHOLE0:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
-  // CHECK-NEXT: [[WHOLE00:%[0-9]+]] = tuple_extract [[WHOLE0]] : $(Int, Int), 0
-  // CHECK-NEXT: [[WHOLE01:%[0-9]+]] = tuple_extract [[WHOLE0]] : $(Int, Int), 1
-  // CHECK-NEXT: [[WHOLE1:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 1
-
-  // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[WHOLE00]] : $Int, [[WHOLE01]] : $Int)
+  // CHECK-NEXT: [[X:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
   // CHECK-NEXT: debug_value [[X]] : $(Int, Int), let, name "x"
-  // CHECK-NEXT: debug_value [[WHOLE1]] : $Int, let, name "y"
+  // CHECK-NEXT: [[Y:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 1
+  // CHECK-NEXT: debug_value [[Y]] : $Int, let, name "y"
 
   let (x, y) = expr!
 }

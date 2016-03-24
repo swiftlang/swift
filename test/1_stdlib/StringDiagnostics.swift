@@ -43,34 +43,34 @@ func testAmbiguousStringComparisons(s: String) {
   let a12 = nsString > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
 }
 
-func acceptsSequence<S : SequenceType>(sequence: S) {}
+func acceptsSequence<S : Sequence>(sequence: S) {}
 
 func testStringIsNotASequence(s: String) {
-  acceptsSequence(s) // expected-error {{argument type 'String' does not conform to expected type 'SequenceType'}}
+  acceptsSequence(s) // expected-error {{argument type 'String' does not conform to expected type 'Sequence'}}
 }
 
 func testStringDeprecation(hello: String) {
   let hello2 = hello
-    .stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding) // expected-warning{{'stringByAddingPercentEscapesUsingEncoding' is deprecated}}
+    .addingPercentEscapes(usingEncoding: NSUTF8StringEncoding) // expected-warning{{'addingPercentEscapes(usingEncoding:)' is deprecated}}
 
   _ = hello2?
-    .stringByReplacingPercentEscapesUsingEncoding(NSUTF8StringEncoding) // expected-warning{{'stringByReplacingPercentEscapesUsingEncoding' is deprecated}}
+    .replacingPercentEscapes(usingEncoding: NSUTF8StringEncoding) // expected-warning{{'replacingPercentEscapes(usingEncoding:)' is deprecated}}
 
 
 }
 
 // Positive and negative tests for String index types
-func acceptsForwardIndex<I: ForwardIndexType>(index: I) {}
-func acceptsBidirectionalIndex<I: BidirectionalIndexType>(index: I) {}
-func acceptsRandomAccessIndex<I: RandomAccessIndexType>(index: I) {}
+func acceptsForwardIndex<I: ForwardIndex>(index: I) {}
+func acceptsBidirectionalIndex<I: BidirectionalIndex>(index: I) {}
+func acceptsRandomAccessIndex<I: RandomAccessIndex>(index: I) {}
 
 func testStringIndexTypes(s: String) {
   acceptsForwardIndex(s.utf8.startIndex)
-  acceptsBidirectionalIndex(s.utf8.startIndex) // expected-error{{argument type 'String.UTF8View.Index' does not conform to expected type 'BidirectionalIndexType'}}
+  acceptsBidirectionalIndex(s.utf8.startIndex) // expected-error{{argument type 'String.UTF8View.Index' does not conform to expected type 'BidirectionalIndex'}}
   acceptsBidirectionalIndex(s.unicodeScalars.startIndex)
-  acceptsRandomAccessIndex(s.unicodeScalars.startIndex) // expected-error{{argument type 'String.UnicodeScalarView.Index' does not conform to expected type 'RandomAccessIndexType'}}
+  acceptsRandomAccessIndex(s.unicodeScalars.startIndex) // expected-error{{argument type 'String.UnicodeScalarView.Index' does not conform to expected type 'RandomAccessIndex'}}
   acceptsBidirectionalIndex(s.characters.startIndex)
-  acceptsRandomAccessIndex(s.characters.startIndex) // expected-error{{argument type 'String.CharacterView.Index' does not conform to expected type 'RandomAccessIndexType'}}
+  acceptsRandomAccessIndex(s.characters.startIndex) // expected-error{{argument type 'String.CharacterView.Index' does not conform to expected type 'RandomAccessIndex'}}
   
   // UTF16View.Index is random-access with Foundation, bidirectional without
   acceptsRandomAccessIndex(s.utf16.startIndex)

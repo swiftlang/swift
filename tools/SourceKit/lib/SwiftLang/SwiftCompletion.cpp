@@ -263,6 +263,9 @@ static void getResultStructure(
         C.is(ChunkKind::CallParameterBegin))
       break;
 
+    if (C.is(ChunkKind::Equal))
+      isOperator = true;
+
     if (C.hasText())
       textSize += C.getText().size();
   }
@@ -779,6 +782,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyHideUnderscores("key.codecomplete.hideunderscores");
   static UIdent KeyHideLowPriority("key.codecomplete.hidelowpriority");
   static UIdent KeyHideByName("key.codecomplete.hidebyname");
+  static UIdent KeyIncludeExactMatch("key.codecomplete.includeexactmatch");
   static UIdent KeyAddInnerResults("key.codecomplete.addinnerresults");
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
@@ -799,6 +803,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   to.hideUnderscores = howMuchHiding;
   to.reallyHideAllUnderscores = howMuchHiding > 1;
   from.valueForOption(KeyHideLowPriority, to.hideLowPriority);
+  from.valueForOption(KeyIncludeExactMatch, to.includeExactMatch);
   from.valueForOption(KeyAddInnerResults, to.addInnerResults);
   from.valueForOption(KeyAddInnerOperators, to.addInnerOperators);
   from.valueForOption(KeyAddInitsToTopLevel, to.addInitsToTopLevel);
@@ -858,18 +863,22 @@ static bool checkInnerResult(CodeCompletionResult *result, bool &hasDot,
   if (!chunks.empty() &&
       chunks[0].is(CodeCompletionString::Chunk::ChunkKind::Dot)) {
     hasDot = true;
+    return true;
   } else if (chunks.size() >= 2 &&
              chunks[0].is(
                  CodeCompletionString::Chunk::ChunkKind::QuestionMark) &&
              chunks[1].is(CodeCompletionString::Chunk::ChunkKind::Dot)) {
     hasQDot = true;
+    return true;
   } else if (result->getKind() ==
                  CodeCompletion::SwiftResult::ResultKind::Declaration &&
              result->getAssociatedDeclKind() ==
                  CodeCompletionDeclKind::Constructor) {
     hasInit = true;
+    return true;
+  } else {
+    return false;
   }
-  return hasInit || hasDot || hasQDot;
 }
 
 template <typename Result>

@@ -1,8 +1,12 @@
 
 public struct NUPixelSize {
+
     public var width: Int
+
     public var height: Int
+
     public init()
+
     public init(width: Int, height: Int)
 }
 
@@ -24,107 +28,107 @@ public struct NUPixelSize {
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 33,
+    key.offset: 34,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 40,
+    key.offset: 41,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 44,
+    key.offset: 45,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 51,
+    key.offset: 52,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 59,
+    key.offset: 61,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 66,
+    key.offset: 68,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 70,
+    key.offset: 72,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 78,
+    key.offset: 80,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 86,
+    key.offset: 89,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 93,
+    key.offset: 96,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 104,
+    key.offset: 108,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 111,
+    key.offset: 115,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 116,
+    key.offset: 120,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 123,
+    key.offset: 127,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 128,
+    key.offset: 132,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 136,
+    key.offset: 140,
     key.length: 3
   }
 ]
 [
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 51,
+    key.offset: 52,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 78,
+    key.offset: 80,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 123,
+    key.offset: 127,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 136,
+    key.offset: 140,
     key.length: 3,
     key.is_system: 1
   }
@@ -135,21 +139,21 @@ public struct NUPixelSize {
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "NUPixelSize",
     key.offset: 8,
-    key.length: 134,
+    key.length: 138,
     key.nameoffset: 15,
     key.namelength: 11,
     key.bodyoffset: 28,
-    key.bodylength: 113,
+    key.bodylength: 117,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "width",
-        key.offset: 40,
+        key.offset: 41,
         key.length: 14,
         key.typename: "Int",
-        key.nameoffset: 44,
+        key.nameoffset: 45,
         key.namelength: 5
       },
       {
@@ -157,46 +161,46 @@ public struct NUPixelSize {
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "height",
-        key.offset: 66,
+        key.offset: 68,
         key.length: 15,
         key.typename: "Int",
-        key.nameoffset: 70,
+        key.nameoffset: 72,
         key.namelength: 6
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "init()",
-        key.offset: 93,
+        key.offset: 96,
         key.length: 6,
-        key.nameoffset: 93,
+        key.nameoffset: 96,
         key.namelength: 6
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "init(width:height:)",
-        key.offset: 111,
+        key.offset: 115,
         key.length: 29,
-        key.nameoffset: 111,
+        key.nameoffset: 115,
         key.namelength: 29,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "width",
-            key.offset: 116,
+            key.offset: 120,
             key.length: 10,
             key.typename: "Int",
-            key.nameoffset: 116,
+            key.nameoffset: 120,
             key.namelength: 5
           },
           {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "height",
-            key.offset: 128,
+            key.offset: 132,
             key.length: 11,
             key.typename: "Int",
-            key.nameoffset: 128,
+            key.nameoffset: 132,
             key.namelength: 6
           }
         ]

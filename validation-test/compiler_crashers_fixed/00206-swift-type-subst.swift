@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 struct d<f : e, g: e where g.h == f.h> {
 }
 protocol e {
@@ -15,7 +17,7 @@ protocol a {
 class b: a {
     c T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func f() {
     ({})
 }
@@ -27,7 +29,7 @@ func c<d {
         var _ = e
     }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] -> Bool {
@@ -41,7 +43,7 @@ class b: a {
 (b() as a).dynamicType.c()
 b
 protocol c : b { func b
-func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
+func some<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
     for (mx :       if let x = mx {
      d: f{  ceanTy b {
     clasi() {
@@ -101,9 +103,9 @@ struct c<h : b> : b {
     typealias d = h
     typealias e = a<c<h>, d>
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func i(c: () -> ()) {
 }
 c1, f1)
@@ -121,7 +123,7 @@ protocol a {
   typealias e = d
   typealeanType>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func a<T>() {
     enum b {
         case c

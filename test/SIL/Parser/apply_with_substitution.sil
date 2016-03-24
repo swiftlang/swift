@@ -21,18 +21,18 @@ bb0(%0 : $Optional<() -> ()>):
   br bb2                                          // id: %13
 
 bb2:                                              // Preds: bb0
-  %14 = function_ref @_TFs17_getOptionalValueU__FT1vGSqQ___Q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> () // user: %16
-  %15 = alloc_stack $@callee_owned (@out (), @in ()) -> () // users: %16, %17, %23
-  // CHECK: apply %{{[0-9]+}}<() -> ()>(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> ()
-  %16 = apply %14<() -> ()>(%15, %5) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> ()
-  %17 = load %15 : $*@callee_owned (@out (), @in ()) -> () // user: %19
-  %18 = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@owned @callee_owned (@out (), @in ()) -> ()) -> () // user: %19
-  %19 = partial_apply %18(%17) : $@convention(thin) (@owned @callee_owned (@out (), @in ()) -> ()) -> () // user: %20
+  %14 = function_ref @_TFs17_getOptionalValueU__FT1vGSqQ___Q_ : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>) -> @out τ_0_0 // user: %16
+  %15 = alloc_stack $@callee_owned (@in ()) -> @out () // users: %16, %17, %23
+  // CHECK: apply %{{[0-9]+}}<() -> ()>(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>) -> @out τ_0_0
+  %16 = apply %14<() -> ()>(%15, %5) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>) -> @out τ_0_0
+  %17 = load %15 : $*@callee_owned (@in ()) -> @out () // user: %19
+  %18 = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@owned @callee_owned (@in ()) -> @out ()) -> () // user: %19
+  %19 = partial_apply %18(%17) : $@convention(thin) (@owned @callee_owned (@in ()) -> @out ()) -> () // user: %20
   %20 = apply %19() : $@callee_owned () -> ()
-  %21 = function_ref @_TFs24_injectValueIntoOptionalU__FT1vQ__GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0) -> () // user: %22
-  // CHECK: apply %{{[0-9]+}}<()>(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0) -> ()
-  %22 = apply %21<()>(%3, %4) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0) -> ()
-  dealloc_stack %15 : $*@callee_owned (@out (), @in ()) -> () // id: %23
+  %21 = function_ref @_TFs24_injectValueIntoOptionalU__FT1vQ__GSqQ__ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out Optional<τ_0_0> // user: %22
+  // CHECK: apply %{{[0-9]+}}<()>(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out Optional<τ_0_0>
+  %22 = apply %21<()>(%3, %4) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out Optional<τ_0_0>
+  dealloc_stack %15 : $*@callee_owned (@in ()) -> @out () // id: %23
   dealloc_stack %5 : $*Optional<() -> ()> // id: %24
   dealloc_stack %4 : $*()        // id: %25
   br bb4                                          // id: %26
@@ -46,6 +46,6 @@ bb4:                                              // Preds: bb2 bb3
 }
 
 sil [transparent] @_TFs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
-sil [transparent] @_TFs17_getOptionalValueU__FT1vGSqQ___Q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> ()
-sil [transparent] @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@owned @callee_owned (@out (), @in ()) -> ()) -> ()
-sil [transparent] @_TFs24_injectValueIntoOptionalU__FT1vQ__GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0) -> ()
+sil [transparent] @_TFs17_getOptionalValueU__FT1vGSqQ___Q_ : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>) -> @out τ_0_0
+sil [transparent] @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@owned @callee_owned (@in ()) -> @out ()) -> ()
+sil [transparent] @_TFs24_injectValueIntoOptionalU__FT1vQ__GSqQ__ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out Optional<τ_0_0>

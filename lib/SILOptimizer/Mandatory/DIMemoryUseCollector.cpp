@@ -704,6 +704,19 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       auto FTI = Apply->getSubstCalleeType();
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 
+      // If this is an out-parameter, it is like a store.
+      unsigned NumIndirectResults = FTI->getNumIndirectResults();
+      if (ArgumentNumber < NumIndirectResults) {
+        assert(!InStructSubElement && "We're initializing sub-members?");
+        addElementUses(BaseEltNo, PointeeType, User,
+                       DIUseKind::Initialization);
+        continue;
+
+      // Otherwise, adjust the argument index.      
+      } else {
+        ArgumentNumber -= NumIndirectResults;
+      }
+
       auto ParamConvention = FTI->getParameters()[ArgumentNumber]
         .getConvention();
 
@@ -718,13 +731,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
-        continue;
-
-      // If this is an out-parameter, it is like a store.
-      case ParameterConvention::Indirect_Out:
-        assert(!InStructSubElement && "We're initializing sub-members?");
-        addElementUses(BaseEltNo, PointeeType, User,
-                       DIUseKind::Initialization);
         continue;
 
       // If this is an @inout parameter, it is like both a load and store.
@@ -1025,8 +1031,8 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
       // If we're reading a .sil file, treat a call to "superinit" as a
       // super.init call as a hack to allow us to write testcases.
       auto *AI = dyn_cast<ApplyInst>(inst);
-      if (AI && inst->getLoc().is<SILFileLocation>())
-        if (auto *Fn = AI->getCalleeFunction())
+      if (AI && inst->getLoc().isSILFile())
+        if (auto *Fn = AI->getReferencedFunction())
           if (Fn->getName() == "superinit")
             return inst;
       continue;
@@ -1064,9 +1070,9 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
 static bool isSelfInitUse(SILInstruction *I) {
   // If we're reading a .sil file, treat a call to "selfinit" as a
   // self.init call as a hack to allow us to write testcases.
-  if (I->getLoc().is<SILFileLocation>()) {
+  if (I->getLoc().isSILFile()) {
     if (auto *AI = dyn_cast<ApplyInst>(I))
-      if (auto *Fn = AI->getCalleeFunction())
+      if (auto *Fn = AI->getReferencedFunction())
         if (Fn->getName().startswith("selfinit"))
           return true;
     

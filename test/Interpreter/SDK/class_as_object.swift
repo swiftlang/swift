@@ -8,9 +8,9 @@
 import Foundation
 
 let classes = NSMutableArray()
-classes.addObject(NSObject.self)
-classes.addObject(NSString.self)
-classes.addObject(NSNumber.self)
+classes.add(NSObject.self)
+classes.add(NSString.self)
+classes.add(NSNumber.self)
 
 for obj: AnyObject in classes {
   print(obj.description)
@@ -19,7 +19,7 @@ for obj: AnyObject in classes {
 // CHECK-NEXT: NSString
 // CHECK-NEXT: NSNumber
 
-print(NSObject.conformsToProtocol(NSCopying.self))
+print(NSObject.conforms(to: NSCopying.self))
 // CHECK-NEXT: false
-print(NSString.conformsToProtocol(NSCopying.self))
+print(NSString.conforms(to: NSCopying.self))
 // CHECK-NEXT: true

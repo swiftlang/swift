@@ -8,9 +8,9 @@ typealias MyInt = Int
 // CHECK: TypeAliasDecl '''MyInt''' MyInt.Type{{$}}
 // FULL:  TypeAliasDecl '''MyInt''' swift_ide_test.MyInt.Type{{$}}
 
-func testVariableTypes(param: Int, inout param2: Double) {
-// CHECK: FuncDecl '''testVariableTypes''' (Int, inout param2: Double) -> (){{$}}
-// FULL:  FuncDecl '''testVariableTypes''' (Swift.Int, inout param2: Swift.Double) -> (){{$}}
+func testVariableTypes(param: Int, param2: inout Double) {
+// CHECK: FuncDecl '''testVariableTypes''' (Int, param2: inout Double) -> (){{$}}
+// FULL:  FuncDecl '''testVariableTypes''' (Swift.Int, param2: inout Swift.Double) -> (){{$}}
 
   var a1 = 42
 // CHECK: VarDecl '''a1''' Int{{$}}
@@ -56,12 +56,12 @@ func testVariableTypes(param: Int, inout param2: Double) {
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
   _ = typealias1 ; typealias1 = 1
 
-  var optional1 = Optional<Int>.None
+  var optional1 = Optional<Int>.none
 // CHECK: VarDecl '''optional1''' Optional<Int>{{$}}
 // FULL:  VarDecl '''optional1''' Swift.Optional<Swift.Int>{{$}}
   _ = optional1 ; optional1 = nil
 
-  var optional2 = Optional<[Int]>.None
+  var optional2 = Optional<[Int]>.none
   _ = optional2 ; optional2 = nil
 // CHECK: VarDecl '''optional2''' Optional<[Int]>{{$}}
 // FULL:  VarDecl '''optional2''' Swift.Optional<[Swift.Int]>{{$}}

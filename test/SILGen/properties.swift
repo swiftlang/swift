@@ -30,7 +30,7 @@ func physical_tuple_rvalue() -> Int {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties16tuple_assignment
-func tuple_assignment(inout a: Int, inout b: Int) {
+func tuple_assignment(a: inout Int, b: inout Int) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int):
   // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
   // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
@@ -44,7 +44,7 @@ func tuple_assignment(inout a: Int, inout b: Int) {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties18tuple_assignment_2
-func tuple_assignment_2(inout a: Int, inout b: Int, xy: (Int, Int)) {
+func tuple_assignment_2(a: inout Int, b: inout Int, xy: (Int, Int)) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int, [[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int):
   // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
   // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
@@ -164,7 +164,7 @@ func logical_struct_get() -> Int {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties18logical_struct_set
-func logical_struct_set(inout value: Val, z: Int) {
+func logical_struct_set(value: inout Val, z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
@@ -175,7 +175,7 @@ func logical_struct_set(inout value: Val, z: Int) {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties27logical_struct_in_tuple_set
-func logical_struct_in_tuple_set(inout value: (Int, Val), z: Int) {
+func logical_struct_in_tuple_set(value: inout (Int, Val), z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $(Int, Val)
@@ -187,7 +187,7 @@ func logical_struct_in_tuple_set(inout value: (Int, Val), z: Int) {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties29logical_struct_in_reftype_set
-func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
+func logical_struct_in_reftype_set(value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.ref.val_prop.z_tuple.1 = z1
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
@@ -200,19 +200,24 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[VAL_REF_VAL_PROP_TEMP:%.*]] = alloc_stack $Val
   // CHECK: [[T0:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_TEMP]] : $*Val to $Builtin.RawPointer
-  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : (Ref) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, (@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ())?)
+  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : (Ref) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?)
   // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]], [[VAL_REF]])
-  // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 0
+  // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
+  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1  
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
-  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 1  
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
   // CHECK: retain_value [[LD]]
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
+  // CHECK: [[A0:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 0
+  // CHECK: [[A1:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: [[V_R_VP_Z_TUPLE:%[0-9]+]] = apply [[GET_Z_TUPLE_METHOD]]([[LD]])
-  // CHECK: store [[V_R_VP_Z_TUPLE]] to [[V_R_VP_Z_TUPLE_MAT]]
+  // CHECK: [[T0:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 0
+  // CHECK: [[T1:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 1
+  // CHECK: store [[T0]] to [[A0]]
+  // CHECK: store [[T1]] to [[A1]]
   // -- write to val.ref.val_prop.z_tuple.1
   // CHECK: [[V_R_VP_Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[V_R_VP_Z_TUPLE_1]]
@@ -221,8 +226,9 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
   // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]])
   // -- writeback to val.ref.val_prop
-  // CHECK: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
-  // CHECK: [[WRITEBACK]]([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> ()):
+  // CHECK: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
+  // CHECK: [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
+  // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> ()
   // CHECK: [[REF_MAT:%.*]] = alloc_stack $Ref
   // CHECK: store [[VAL_REF]] to [[REF_MAT]]
   // CHECK: [[T0:%.*]] = metatype $@thick Ref.Type
@@ -244,7 +250,7 @@ func reftype_rvalue_set(value: Val) {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties27tuple_in_logical_struct_set
-func tuple_in_logical_struct_set(inout value: Val, z1: Int) {
+func tuple_in_logical_struct_set(value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
@@ -253,8 +259,13 @@ func tuple_in_logical_struct_set(inout value: Val, z1: Int) {
   // CHECK: [[VAL1:%[0-9]+]] = load [[PB]]
   // CHECK: retain_value [[VAL1]]
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
+  // CHECK: [[A0:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 0
+  // CHECK: [[A1:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
-  // CHECK: store [[Z_TUPLE]] to [[Z_TUPLE_MATERIALIZED]]
+  // CHECK: [[T0:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 0
+  // CHECK: [[T1:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 1
+  // CHECK: store [[T0]] to [[A0]]
+  // CHECK: store [[T1]] to [[A1]]
   // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]
   // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [[Z_TUPLE_MATERIALIZED]]
@@ -322,7 +333,7 @@ func logical_local_captured_get(x: Int) -> Int {
 // CHECK: sil shared @_TFF10properties26logical_local_captured_get
 // CHECK: bb0(%{{[0-9]+}} : $Int):
 
-func inout_arg(inout x: Int) {}
+func inout_arg(x: inout Int) {}
 
 // CHECK-LABEL: sil hidden  @_TF10properties14physical_inout
 func physical_inout(x: Int) {
@@ -403,14 +414,14 @@ func generic_mono_subscript_get<T>(g: Generic<T>, i: Int) -> Float {
 }
 
 // CHECK-LABEL: sil hidden  @{{.*}}generic_mono_subscript_set
-func generic_mono_subscript_set<T>(inout g: Generic<T>, i: Int, x: Float) {
+func generic_mono_subscript_set<T>(g: inout Generic<T>, i: Int, x: Float) {
   g[i] = x
   // CHECK: [[GENERIC_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties7Generics9subscript
   // CHECK: apply [[GENERIC_SET_METHOD]]<
 }
 
 // CHECK-LABEL: sil hidden  @{{.*}}bound_generic_mono_phys_get
-func bound_generic_mono_phys_get(inout g: Generic<UnicodeScalar>, x: Int) -> Int {
+func bound_generic_mono_phys_get(g: inout Generic<UnicodeScalar>, x: Int) -> Int {
   return g.mono_phys
   // CHECK: struct_element_addr %{{.*}}, #Generic.mono_phys
 }
@@ -528,7 +539,7 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK: bb0(%0 : $DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
-  // CHECK-NEXT:   return %2 : $Int                      // id: %3
+  // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
   
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.setter
   // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestss1a
@@ -719,7 +730,7 @@ class DerivedProperty : BaseProperty {
 // CHECK: bb0(%0 : $DerivedProperty):
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
 // CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1xSi : $@convention(method) (@guaranteed BaseProperty) -> Int 
-// CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int // user: %7
+// CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int{{.*}} // user: %7
 
 
 // <rdar://problem/16411449> ownership qualifiers don't work with non-mutating struct property

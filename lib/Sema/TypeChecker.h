@@ -37,6 +37,7 @@ namespace swift {
 class ArchetypeBuilder;
 class GenericTypeResolver;
 class NominalTypeDecl;
+class NormalProtocolConformance;
 class TopLevelContext;
 class TypeChecker;
 
@@ -198,6 +199,10 @@ enum class TypeCheckExprFlags {
   /// If set, this expression is being re-type checked as part of diagnostics,
   /// and so we should not visit bodies of non-single expression closures.
   SkipMultiStmtClosures = 0x40,
+
+  /// Set if the client prefers fixits to be in the form of force unwrapping
+  /// or optional chaining to return an optional.
+  PreferForceUnwrapToOptional = 0x80,
 };
 
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
@@ -394,6 +399,7 @@ withoutContext(TypeResolutionOptions options) {
 /// the OBJC_ATTR_SELECT macro in DiagnosticsSema.def.
 enum class ObjCReason {
   DoNotDiagnose,
+  ExplicitlyCDecl,
   ExplicitlyDynamic,
   ExplicitlyObjC,
   ExplicitlyIBOutlet,
@@ -417,7 +423,12 @@ enum class ConformanceCheckFlags {
   /// Whether we will be using the conformance in the AST.
   ///
   /// This implies that the conformance will have to be complete.
-  Used = 0x02
+  Used = 0x02,
+  /// Whether to suppress dependency tracking entirely.
+  ///
+  /// FIXME: This deals with some oddities with the
+  /// _ObjectiveCBridgeable conformances.
+  SuppressDependencyTracking = 0x04,
 };
 
 /// Options that control protocol conformance checking.
@@ -521,21 +532,11 @@ private:
   /// The \c Swift.UnsafeMutablePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
 
-  /// A set of types that can be trivially mapped to Objective-C types.
-  llvm::DenseSet<CanType> ObjCMappedTypes;
-
   /// A set of types that can be mapped to C integer types.
   llvm::DenseSet<CanType> CIntegerTypes;
 
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
-
-  /// A set of types that are representable in Objective-C, but require
-  /// non-trivial bridging.
-  ///
-  /// The value of the map is a flag indicating whether the bridged
-  /// type can be optional.
-  llvm::DenseMap<CanType, bool> ObjCRepresentableTypes;
 
   Module *StdlibModule = nullptr;
 
@@ -894,6 +895,9 @@ public:
   AnyFunctionType::ExtInfo
   applyFunctionTypeAttributes(AbstractFunctionDecl *func, unsigned i);
 
+  /// Infer default value witnesses for all requirements in the given protocol.
+  void inferDefaultWitnesses(ProtocolDecl *proto);
+
   /// Determine whether the given (potentially constrained) protocol extension
   /// is usable for the given type.
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
@@ -945,7 +949,7 @@ public:
   /// \param nominal The generic type.
   ///
   /// \returns true if an error occurred, or false otherwise.
-  bool validateGenericTypeSignature(NominalTypeDecl *nominal);
+  bool validateGenericTypeSignature(GenericTypeDecl *nominal);
 
   /// Check the generic parameters in the given generic parameter list (and its
   /// parent generic parameter lists) according to the given resolver.
@@ -1019,6 +1023,32 @@ public:
   /// Provide storage and accessor implementations for the given property,
   /// which must be lazy.
   void completeLazyVarImplementation(VarDecl *lazyVar);
+  
+  /// Instantiate the storage implementation for a behavior-backed property.
+  void completePropertyBehaviorStorage(VarDecl *VD,
+                               VarDecl *BehaviorStorage,
+                               FuncDecl *DefaultInitStorage,
+                               FuncDecl *ParamInitStorage,
+                               Type SelfTy,
+                               Type StorageTy,
+                               NormalProtocolConformance *BehaviorConformance,
+                               ArrayRef<Substitution> SelfInterfaceSubs,
+                               ArrayRef<Substitution> SelfContextSubs);
+  
+  /// Instantiate the parameter implementation for a behavior-backed
+  /// property.
+  void completePropertyBehaviorParameter(VarDecl *VD,
+                               FuncDecl *BehaviorParameter,
+                               NormalProtocolConformance *BehaviorConformance,
+                               ArrayRef<Substitution> SelfInterfaceSubs,
+                               ArrayRef<Substitution> SelfContextSubs);
+  
+  /// Instantiate the accessor implementations for a behavior-backed
+  /// property.
+  void completePropertyBehaviorAccessors(VarDecl *VD,
+                                     VarDecl *ValueImpl,
+                                     ArrayRef<Substitution> SelfInterfaceSubs,
+                                     ArrayRef<Substitution> SelfContextSubs);
 
   /// Sets up and solves the constraint system \p cs to type check the given
   /// expression.
@@ -1434,6 +1464,9 @@ public:
                           ProtocolConformance **Conformance = nullptr,
                           SourceLoc ComplainLoc = SourceLoc());
 
+  /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+  void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
+
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
   ///
@@ -1515,7 +1548,7 @@ public:
                                    LookupTypeResult &lookup);
 
   /// Emit a diagnostic for references to declarations that have been
-  /// marked as unavailable, either through "unavailable" or "obsoleted=".
+  /// marked as unavailable, either through "unavailable" or "obsoleted:".
   bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                       SourceRange R,
                                       const DeclContext *DC);
@@ -1602,8 +1635,6 @@ public:
                              Optional<ForeignErrorConvention> &errorConvention);
   bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
   bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
-  bool isTriviallyRepresentableInObjC(const DeclContext *DC, Type T);
-  bool isRepresentableInObjC(const DeclContext *DC, Type T);
 
   void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
                                           Type T, SourceRange TypeRange);
@@ -1627,9 +1658,8 @@ public:
   /// the provided conformance. On return, requiredAvailability holds th
   /// availability levels required for conformance.
   bool
-  isAvailabilitySafeForConformance(ValueDecl *witness,
-                                   ValueDecl *requirement,
-                                   NormalProtocolConformance *conformance,
+  isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
+                                   ValueDecl *witness, DeclContext *dc,
                                    AvailabilityContext &requiredAvailability);
 
   /// Returns an over-approximation of the range of operating system versions

@@ -56,8 +56,7 @@ func tuple_patterns() {
   // CHECK: [[EFGH:%[0-9]+]] = apply
   // CHECK: [[E:%[0-9]+]] = tuple_extract {{.*}}, 0
   // CHECK: [[F:%[0-9]+]] = tuple_extract {{.*}}, 1
-  // CHECK: [[G:%[0-9]+]] = tuple_extract {{.*}}, 2
-  // CHECK: [[H:%[0-9]+]] = tuple_extract {{.*}}, 3
+  // CHECK: [[H:%[0-9]+]] = tuple_extract {{.*}}, 2
   // CHECK: store [[E]] to [[PBE]]
   // CHECK: store [[F]] to [[PBF]]
   // CHECK: store [[H]] to [[PBH]]
@@ -111,7 +110,7 @@ func tuple_argument(x: (Int, Float, ())) {
 // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
 // CHECK: [[PBY:%[0-9]+]] = project_box [[YADDR]]
 // CHECK: copy_addr [[PBY]] to [[PBX]]
-func inout_argument(inout x: Int, y: Int) {
+func inout_argument(x: inout Int, y: Int) {
   var y = y
   x = y
 }

@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 func b<d-> d { class d:b class b
 class l {
     func f((k, l() -> f
@@ -201,7 +203,7 @@ d ""
 e}
 class d {
     func b((Any, d)typealias b = b
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 func r<t>() {
@@ -297,7 +299,7 @@ func s<S: y, t i o<t> == S.k.b>(r : S) -> t? {
 }
 let r : [n?] = [w o = h
     typealias h = x<g<h
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
     l g: e
 }
 func h<e>() -> [l<e>] {
@@ -498,7 +500,7 @@ class e: n, p {
 func s<o : m, o : p o o.m == o> (m: o) {
 }
 func s<v : p o v.m == m> (u: String) -> <t>(() -> t) -
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 func f<m>() -> (m, m -> m) -> m {
    e c e.i = {
 }
@@ -543,7 +545,7 @@ protocol f {
   i []
 }
 func f<g>() -> (g, g -> g) -> g
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b:  [c<d>] {
     return []
 }
@@ -554,9 +556,9 @@ class b: a {
     class func c() { }
 }
 (b() as a).dynamicType.c()
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func a(x: Any, y: Any) -> (((Any, Any) -> Any) -> A  var d: b.Type
     func e() {
         d.e()
@@ -844,9 +846,9 @@ class g {
 func g(f: Int = k) {
 }
 let i = g
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 o
 class w<r>: c {
     init(g: r) {
@@ -936,7 +938,7 @@ class c {
         b(a)
     }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {

@@ -15,14 +15,14 @@ protocol Test {
   var major : Int { get }
   var minor : Int { get }
   var subminor : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  static var staticProperty: Int // expected-error{{static stored properties not yet supported in generic types}} expected-error{{property in protocol must have explicit { get } or { get set } specifier}}
+  static var staticProperty: Int // expected-error{{property in protocol must have explicit { get } or { get set } specifier}}
 }
 
 protocol Test2 {
   var property: Int { get }
 
   var title: String = "The Art of War" { get } // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{static stored properties not yet supported in generic types}}
+  static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
 
   associatedtype mytype
   associatedtype mybadtype = Int
@@ -150,36 +150,36 @@ struct StreamTypeWithInferredAssociatedTypes : StreamWithAssoc {
 }
 
 protocol SequenceViaStream {
-  associatedtype SequenceStreamTypeType : GeneratorType // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
-  func generate() -> SequenceStreamTypeType
+  associatedtype SequenceStreamTypeType : IteratorProtocol // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
+  func makeIterator() -> SequenceStreamTypeType
 }
 
-struct IntGeneratorType : GeneratorType /*, SequenceType, ReplPrintable*/ {
+struct IntIterator : IteratorProtocol /*, Sequence, ReplPrintable*/ {
   typealias Element = Int
   var min : Int
   var max : Int
   var stride : Int
 
   mutating func next() -> Int? {
-    if min >= max { return .None }
+    if min >= max { return .none }
     let prev = min
     min += stride
     return prev
   }
 
-  typealias Generator = IntGeneratorType
-  func generate() -> IntGeneratorType {
+  typealias Generator = IntIterator
+  func makeIterator() -> IntIterator {
     return self
   }
 }
 
-extension IntGeneratorType : SequenceViaStream {
-  typealias SequenceStreamTypeType = IntGeneratorType
+extension IntIterator : SequenceViaStream {
+  typealias SequenceStreamTypeType = IntIterator
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'GeneratorType'}}
-  func generate() -> Int {}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
+  func makeIterator() -> Int {}
 }
 
 protocol GetATuple {
@@ -242,21 +242,21 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 // Using values of existential type.
 //===----------------------------------------------------------------------===//
 
-func existentialSequence(e: SequenceType) { // expected-error{{has Self or associated type requirements}}
-  var x = e.generate() // expected-error{{type 'SequenceType' does not conform to protocol 'GeneratorType'}}
+func existentialSequence(e: Sequence) { // expected-error{{has Self or associated type requirements}}
+  var x = e.makeIterator() // expected-error{{type 'Sequence' does not conform to protocol 'IteratorProtocol'}}
   x.next()
   x.nonexistent()
 }
 
 protocol HasSequenceAndStream {
-  associatedtype R : GeneratorType, SequenceType
+  associatedtype R : IteratorProtocol, Sequence
   func getR() -> R
 }
 
 func existentialSequenceAndStreamType(h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Crummy diagnostics.
   var x = h.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'HasSequenceAndStream'; use a generic constraint instead}}
-  x.generate()
+  x.makeIterator()
   x.next()
 
   x.nonexistent()
@@ -464,4 +464,14 @@ func g<T : C2>(x : T) {
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
 func h<T : C3>(x : T) {
   x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+}
+
+
+
+protocol P4 {
+  associatedtype T // expected-note {{protocol requires nested type 'T'}}
+}
+
+class C4 : P4 { // expected-error {{type 'C4' does not conform to protocol 'P4'}}
+  associatedtype T = Int  // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}} {{3-17=typealias}}
 }

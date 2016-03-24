@@ -544,7 +544,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, inheritedCount, defaultedCount;
+  unsigned valueCount, typeCount, inheritedCount;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -556,7 +556,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, valueCount,
                                               typeCount, inheritedCount,
-                                              defaultedCount, rawIDs);
+                                              rawIDs);
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
   ASTContext &ctx = getContext();
@@ -935,6 +935,43 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
   return false;
 }
 
+bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
+  using namespace decls_block;
+
+  auto entry = DeclTypeCursor.advance();
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return true;
+
+  SmallVector<uint64_t, 16> witnessIDBuffer;
+
+  unsigned kind = DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer);
+  assert(kind == DEFAULT_WITNESS_TABLE);
+  (void)kind;
+
+  ArrayRef<uint64_t> rawWitnessIDs;
+  decls_block::DefaultWitnessTableLayout::readRecord(
+      witnessIDBuffer, rawWitnessIDs);
+
+  if (rawWitnessIDs.empty())
+    return false;
+
+  unsigned e = rawWitnessIDs.size();
+  assert(e % 2 == 0 && "malformed default witness table");
+
+  for (unsigned i = 0, e = rawWitnessIDs.size(); i < e; i += 2) {
+    ValueDecl *requirement = cast<ValueDecl>(getDecl(rawWitnessIDs[i]));
+    assert(requirement && "unable to deserialize next requirement");
+    ValueDecl *witness = cast<ValueDecl>(getDecl(rawWitnessIDs[i + 1]));
+    assert(witness && "unable to deserialize next witness");
+    assert(requirement->getDeclContext() == proto);
+
+    // FIXME: substitutions
+    proto->setDefaultWitness(requirement, ConcreteDeclRef(witness));
+  }
+
+  return false;
+}
+
 static Optional<swift::CtorInitializerKind>
 getActualCtorInitializerKind(uint8_t raw) {
   switch (serialization::CtorInitializerKind(raw)) {
@@ -1059,13 +1096,9 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
     // HACK HACK HACK: Omit-needless-words hack to try to cope with
     // the "NS" prefix being added/removed. No "real" compiler mode
-    // has to go through this path: a Swift 2 compiler will have the
-    // prefix, while a Swift 3 compiler will not have the
-    // prefix. However, one can set OmitNeedlessWords in a Swift 2
-    // compiler to get API dumps and perform basic testing; this hack
-    // keeps that working.
+    // has to go through this path, but it's an option we toggle for
+    // testing.
     if (values.empty() && !retrying &&
-        getContext().LangOpts.OmitNeedlessWords &&
         getContext().LangOpts.StripNSPrefix &&
         (M->getName().str() == "ObjectiveC" ||
          M->getName().str() == "Foundation")) {
@@ -1073,7 +1106,6 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         if (name.str().size() > 2 && name.str() != "NSCocoaError") {
           auto known = getKnownFoundationEntity(name.str());
           if (!known || !nameConflictsWithStandardLibrary(*known)) {
-            // FIXME: lowercasing magic for non-types.
             name = getContext().getIdentifier(name.str().substr(2));
             retrying = true;
             goto retry;
@@ -1884,6 +1916,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
+      case decls_block::CDecl_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::CDeclDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) CDeclAttr(blobData, isImplicit);
+        break;
+      }
+
       case decls_block::Alignment_DECL_ATTR: {
         bool isImplicit;
         unsigned alignment;
@@ -2050,6 +2090,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
+      case decls_block::Specialize_DECL_ATTR: {
+        ArrayRef<uint64_t> rawTypeIDs;
+        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
+          scratch, rawTypeIDs);
+
+        SmallVector<TypeLoc, 8> typeLocs;
+        for (auto tid : rawTypeIDs)
+          typeLocs.push_back(TypeLoc::withoutLoc(getType(tid)));
+
+        Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
+                                      typeLocs);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \
@@ -2113,8 +2167,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
     auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
-                                           SourceLoc(), underlyingType, DC);
+                                           SourceLoc(), underlyingType,
+                                           genericParams, DC);
     declOrOffset = alias;
 
     alias->computeType();
@@ -3258,7 +3317,6 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   case serialization::ParameterConvention::ID: \
     return swift::ParameterConvention::ID;
   CASE(Indirect_In)
-  CASE(Indirect_Out)
   CASE(Indirect_Inout)
   CASE(Indirect_InoutAliasable)
   CASE(Indirect_In_Guaranteed)
@@ -3278,6 +3336,7 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   switch (serialization::ResultConvention(raw)) {
 #define CASE(ID) \
   case serialization::ResultConvention::ID: return swift::ResultConvention::ID;
+  CASE(Indirect)
   CASE(Owned)
   CASE(Unowned)
   CASE(UnownedInnerPointer)
@@ -3846,26 +3905,22 @@ Type ModuleFile::getType(TypeID TID) {
   }
       
   case decls_block::SIL_FUNCTION_TYPE: {
-    TypeID interfaceResultID;
-    uint8_t rawInterfaceResultConvention;
-    TypeID interfaceErrorResultID;
-    uint8_t rawInterfaceErrorResultConvention;
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
     bool noreturn = false;
-    unsigned numGenericParams;
-    ArrayRef<uint64_t> paramIDs;
+    bool hasErrorResult;
+    unsigned numParams;
+    unsigned numResults;
+    ArrayRef<uint64_t> variableData;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
-                                             interfaceResultID,
-                                             rawInterfaceResultConvention,
-                                             interfaceErrorResultID,
-                                             rawInterfaceErrorResultConvention,
                                              rawCalleeConvention,
                                              rawRepresentation,
                                              noreturn,
-                                             numGenericParams,
-                                             paramIDs);
+                                             hasErrorResult,
+                                             numParams,
+                                             numResults,
+                                             variableData);
 
     // Process the ExtInfo.
     auto representation
@@ -3875,44 +3930,6 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
     SILFunctionType::ExtInfo extInfo(*representation, noreturn);
-    // Process the result.
-    auto interfaceResultConvention
-      = getActualResultConvention(rawInterfaceResultConvention);
-    if (!interfaceResultConvention.hasValue()) {
-      error();
-      return nullptr;
-    }
-    SILResultInfo interfaceResult(getType(interfaceResultID)->getCanonicalType(),
-                                  interfaceResultConvention.getValue());
-
-    // Process the error result.
-    Optional<SILResultInfo> interfaceErrorResult;
-    if (interfaceErrorResultID != 0) {
-      auto convention
-        = getActualResultConvention(rawInterfaceErrorResultConvention);
-      if (!convention.hasValue()) {
-        error();
-        return nullptr;
-      }
-      interfaceErrorResult =
-        SILResultInfo(getType(interfaceErrorResultID)->getCanonicalType(),
-                      convention.getValue());
-    }
-
-    // Process the parameters.
-    unsigned numParamIDs = paramIDs.size() - numGenericParams;
-    SmallVector<SILParameterInfo, 8> allParams;
-    allParams.reserve(numParamIDs);
-    for (size_t i = 0, e = numParamIDs; i != e; i += 2) {
-      auto type = getType(paramIDs[i])->getCanonicalType();
-      auto convention = getActualParameterConvention(paramIDs[i+1]);
-      if (!convention.hasValue()) {
-        error();
-        return nullptr;
-      }
-      SILParameterInfo param(type, convention.getValue());
-      allParams.push_back(param);
-    }
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
@@ -3921,9 +3938,74 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
 
+    auto processParameter = [&](TypeID typeID, uint64_t rawConvention)
+                                  -> Optional<SILParameterInfo> {
+      auto convention = getActualParameterConvention(rawConvention);
+      auto type = getType(typeID);
+      if (!convention || !type) return None;
+      return SILParameterInfo(type->getCanonicalType(), *convention);
+    };
+
+    auto processResult = [&](TypeID typeID, uint64_t rawConvention)
+                               -> Optional<SILResultInfo> {
+      auto convention = getActualResultConvention(rawConvention);
+      auto type = getType(typeID);
+      if (!convention || !type) return None;
+      return SILResultInfo(type->getCanonicalType(), *convention);
+    };
+
+    // Bounds check.  FIXME: overflow
+    if (2 * numParams + 2 * numResults + 2 * unsigned(hasErrorResult)
+          > variableData.size()) {
+      error();
+      return nullptr;
+    }
+
+    unsigned nextVariableDataIndex = 0;
+
+    // Process the parameters.
+    SmallVector<SILParameterInfo, 8> allParams;
+    allParams.reserve(numParams);
+    for (unsigned i = 0; i != numParams; ++i) {
+      auto typeID = variableData[nextVariableDataIndex++];
+      auto rawConvention = variableData[nextVariableDataIndex++];
+      auto param = processParameter(typeID, rawConvention);
+      if (!param) {
+        error();
+        return nullptr;
+      }
+      allParams.push_back(*param);
+    }
+
+    // Process the results.
+    SmallVector<SILResultInfo, 8> allResults;
+    allParams.reserve(numResults);
+    for (unsigned i = 0; i != numResults; ++i) {
+      auto typeID = variableData[nextVariableDataIndex++];
+      auto rawConvention = variableData[nextVariableDataIndex++];
+      auto result = processResult(typeID, rawConvention);
+      if (!result) {
+        error();
+        return nullptr;
+      }
+      allResults.push_back(*result);
+    }
+
+    // Process the error result.
+    Optional<SILResultInfo> errorResult;
+    if (hasErrorResult) {
+      auto typeID = variableData[nextVariableDataIndex++];
+      auto rawConvention = variableData[nextVariableDataIndex++];
+      errorResult = processResult(typeID, rawConvention);
+      if (!errorResult) {
+        error();
+        return nullptr;
+      }
+    }
+
     // Process the generic signature parameters.
     SmallVector<GenericTypeParamType *, 8> genericParamTypes;
-    for (auto id : paramIDs.slice(numParamIDs)) {
+    for (auto id : variableData.slice(nextVariableDataIndex)) {
       genericParamTypes.push_back(
                   cast<GenericTypeParamType>(getType(id)->getCanonicalType()));
     }
@@ -3939,8 +4021,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     typeOrOffset = SILFunctionType::get(genericSig, extInfo,
                                         calleeConvention.getValue(),
-                                        allParams, interfaceResult,
-                                        interfaceErrorResult,
+                                        allParams, allResults, errorResult,
                                         ctx);
     break;
   }
@@ -4012,13 +4093,19 @@ void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
   (void)Err;
 
   IterableDeclContext *IDC;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(D))
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
     IDC = nominal;
   else
     IDC = cast<ExtensionDecl>(D);
 
   for (auto member : members)
     IDC->addMember(member);
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(D)) {
+    bool Err = readDefaultWitnessTable(proto);
+    assert(!Err && "unable to read default witness table");
+    (void)Err;
+  }
 }
 
 void
@@ -4060,7 +4147,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, inheritedCount, defaultedCount;
+  unsigned valueCount, typeCount, inheritedCount;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -4071,7 +4158,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, valueCount,
                                               typeCount, inheritedCount,
-                                              defaultedCount, rawIDs);
+                                              rawIDs);
 
   // Skip trailing inherited conformances.
   while (inheritedCount--)
@@ -4103,13 +4190,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
-  SmallVector<ValueDecl *, 4> defaultedDefinitions;
-  while (defaultedCount--) {
-    auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
-    defaultedDefinitions.push_back(decl);
-  }
-  assert(rawIDIter <= rawIDs.end() && "read too much");
-
   // Set type witnesses.
   for (auto typeWitness : typeWitnesses) {
     conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
@@ -4119,11 +4199,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   // Set witnesses.
   for (auto witness : witnesses) {
     conformance->setWitness(witness.first, witness.second);
-  }
-
-  // Note any defaulted definitions.
-  for (auto defaulted : defaultedDefinitions) {
-    conformance->addDefaultDefinition(defaulted);
   }
 }
 

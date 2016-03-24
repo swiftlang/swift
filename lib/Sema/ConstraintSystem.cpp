@@ -604,7 +604,15 @@ namespace {
         auto unboundDecl = unbound->getDecl();
         if (unboundDecl->isInvalid())
           return ErrorType::get(cs.getASTContext());
-
+        
+        // If the unbound decl hasn't been validated yet, we have a circular
+        // dependency that isn't being diagnosed properly.
+        if (!unboundDecl->getGenericSignature()) {
+          cs.TC.diagnose(unboundDecl, diag::circular_reference);
+          return ErrorType::get(cs.getASTContext());
+        }
+        
+        
         // Open up the generic type.
         cs.openGeneric(unboundDecl,
                        unboundDecl->getInnermostGenericParamTypes(),
@@ -613,15 +621,20 @@ namespace {
                        minOpeningDepth,
                        locator,
                        replacements);
-
+        
         // Map the generic parameters to their corresponding type variables.
-        llvm::SmallVector<Type, 4> arguments;
+        llvm::SmallVector<TypeLoc, 4> arguments;
         for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
-          assert(replacements.count(gp->getCanonicalType()) && 
+          assert(replacements.count(gp->getCanonicalType()) &&
                  "Missing generic parameter?");
-          arguments.push_back(replacements[gp->getCanonicalType()]);
+          arguments.push_back(TypeLoc::withoutLoc(
+                              replacements[gp->getCanonicalType()]));
         }
-        return BoundGenericType::get(unboundDecl, parentTy, arguments);
+        
+        return cs.TC.applyUnboundGenericArguments(unbound, SourceLoc(), cs.DC,
+                                                  arguments,
+                                                  /*isGenericSignature*/false,
+                                                  /*resolver*/nullptr);
       }
       
       return type;
@@ -1385,7 +1398,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     } else {
       // When the base is a tuple rvalue, the member is always an rvalue.
       auto tuple = choice.getBaseType()->castTo<TupleType>();
-      refType = tuple->getElementType(choice.getTupleIndex());
+      refType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
     }
     break;
   }
@@ -1459,7 +1472,7 @@ static bool isPrivilegedAccessToImplicitlyUnwrappedOptional(DeclContext *DC,
     // If we're in a type context that's defining or extending
     // ImplicitlyUnwrappedOptional<T>, we're privileged.
     } else if (DC->isTypeContext()) {
-      if (DC->getDeclaredTypeInContext()->getAnyNominal() == D)
+      if (DC->getAsNominalTypeOrNominalTypeExtensionContext() == D)
         return true;
 
     // Otherwise, we're privileged if we're within the same file that

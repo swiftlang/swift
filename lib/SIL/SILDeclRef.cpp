@@ -240,34 +240,6 @@ Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
   return AnyFunctionRef(loc.get<AbstractClosureExpr*>());
 }
 
-static SILLinkage getLinkageForLocalContext(DeclContext *dc) {
-  auto isClangImported = [](AbstractFunctionDecl *fn) -> bool {
-    if (fn->hasClangNode())
-      return true;
-    if (auto func = dyn_cast<FuncDecl>(fn))
-      if (auto storage = func->getAccessorStorageDecl())
-        return storage->hasClangNode();
-    return false;
-  };
-
-  while (!dc->isModuleScopeContext()) {
-    // Local definitions in transparent contexts are forced public because
-    // external references to them can be exposed by mandatory inlining.
-    // For Clang-imported decls, though, the closure should get re-synthesized
-    // on use.
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc))
-      if (fn->isTransparent() && !isClangImported(fn))
-        return SILLinkage::Public;
-    // Check that this local context is not itself in a local transparent
-    // context.
-    dc = dc->getParent();
-  }
-
-  // FIXME: Once we have access control at the AST level, we should not assume
-  // shared always, but rather base it off of the local decl context.
-  return SILLinkage::Shared;
-}
-
 bool SILDeclRef::isThunk() const {
   return isCurried || isForeignToNativeThunk() || isNativeToForeignThunk();
 }
@@ -300,6 +272,8 @@ bool SILDeclRef::isClangGenerated() const {
 
   auto clangNode = getDecl()->getClangNode().getAsDecl();
   if (auto nd = dyn_cast_or_null<clang::NamedDecl>(clangNode)) {
+    // ie, 'static inline' functions for which we must ask Clang to emit a body
+    // for explicitly
     if (!nd->isExternallyVisible())
       return true;
   }
@@ -308,24 +282,28 @@ bool SILDeclRef::isClangGenerated() const {
 }
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
-  // Anonymous functions have local linkage.
-  if (auto closure = getAbstractClosureExpr())
-    return getLinkageForLocalContext(closure->getParent());
+  // Anonymous functions have shared linkage.
+  // FIXME: This should really be the linkage of the parent function.
+  if (getAbstractClosureExpr())
+    return SILLinkage::Shared;
   
-  // Native function-local declarations have local linkage.
+  // Native function-local declarations have shared linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
   // of marking them "used" other than making them external. 
   ValueDecl *d = getDecl();
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
     if (!isForeign && moduleContext->isLocalContext())
-      return getLinkageForLocalContext(moduleContext);
+      return SILLinkage::Shared;
     moduleContext = moduleContext->getParent();
   }
   
   // Currying and calling convention thunks have shared linkage.
   if (isThunk())
-    return SILLinkage::Shared;
+    // If a function declares a @_cdecl name, its native-to-foreign thunk
+    // is exported with the visibility of the function.
+    if (!isNativeToForeignThunk() || !d->getAttrs().hasAttribute<CDeclAttr>())
+      return SILLinkage::Shared;
   
   // Enum constructors are essentially the same as thunks, they are
   // emitted by need and have shared linkage.
@@ -378,6 +356,36 @@ bool SILDeclRef::isTransparent() const {
     return true;
 
   return hasDecl() ? getDecl()->isTransparent() : false;
+}
+
+/// \brief True if the function should have its body serialized.
+bool SILDeclRef::isFragile() const {
+  DeclContext *dc;
+  if (auto closure = getAbstractClosureExpr())
+    dc = closure->getLocalContext();
+  else
+    dc = getDecl()->getDeclContext();
+
+  while (!dc->isModuleScopeContext()) {
+    // Local definitions in transparent contexts are fragile because
+    // external references to them can be exposed by mandatory inlining.
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc))
+      if (fn->isTransparent() &&
+          fn->getEffectiveAccess() == Accessibility::Public)
+        return true;
+    // Check that this local context is not itself in a local transparent
+    // context.
+    dc = dc->getParent();
+  }
+
+  // Externally-visible transparent functions are fragile.
+  if (hasDecl())
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(getDecl()))
+      if (fn->isTransparent() &&
+          fn->getEffectiveAccess() == Accessibility::Public)
+        return true;
+
+  return false;
 }
 
 /// \brief True if the function has noinline attribute.
@@ -483,13 +491,20 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
       return mangler.finalize();
     }
 
-    // As a special case, functions can have external asm names.
-    // Use the asm name only for the original non-thunked, non-curried entry
+    // As a special case, functions can have manually mangled names.
+    // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
-    if (auto AsmA = c.getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
+    if (auto NameA = c.getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
           && !c.isCurried) {
-        mangler.append(AsmA->Name);
+        mangler.append(NameA->Name);
+        return mangler.finalize();
+      }
+      
+    // Use a given cdecl name for native-to-foreign thunks.
+    if (auto CDeclA = c.getDecl()->getAttrs().getAttribute<CDeclAttr>())
+      if (c.isNativeToForeignThunk()) {
+        mangler.append(CDeclA->Name);
         return mangler.finalize();
       }
 

@@ -17,7 +17,9 @@
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Reflection/Records.h"
 
 #include "ConstantBuilder.h"
 #include "IRGenModule.h"
@@ -28,7 +30,9 @@ using namespace irgen;
 class ReflectionMetadataBuilder : public ConstantBuilder<> {
 protected:
   void addTypeRef(Module *ModuleContext, CanType type) {
-    Mangle::Mangler mangler;
+    Mangle::Mangler mangler(/*DWARFMangling*/false,
+                            /*usePunyCode*/ true,
+                            /*OptimizeProtocolNames*/ false);
     mangler.setModuleContext(ModuleContext);
     mangler.mangleType(type, 0);
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
@@ -43,19 +47,17 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   static const uint32_t AssociatedTypeRecordSize = 8;
   ArrayRef<const NominalTypeDecl *> NominalTypeDecls;
 
-  void addDecl(const NominalTypeDecl *Decl) {
-    for (auto Conformance : Decl->getAllConformances()) {
+  void addDecl(const NominalTypeDecl *decl) {
+    PrettyStackTraceDecl DebugStack("emitting associated type metadata", decl);
+    for (auto Conformance : decl->getAllConformances()) {
       SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
 
       auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
                                     const Substitution &Sub,
                                     const TypeDecl *TD) -> bool {
 
-        Type Subst = Sub.getReplacement();
-        if (auto InterfaceTy = ArchetypeBuilder::mapTypeOutOfContext(
-            Conformance->getDeclContext(), Subst)) {
-          Subst = InterfaceTy;
-        }
+        auto Subst = ArchetypeBuilder::mapTypeOutOfContext(
+            Conformance->getDeclContext(), Sub.getReplacement());
 
         AssociatedTypes.push_back({
           AssocTy->getNameStr(),
@@ -64,12 +66,10 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
         return false;
       };
 
-      auto ModuleContext = Decl->getModuleContext();
+      auto ModuleContext = decl->getModuleContext();
+      addTypeRef(ModuleContext, decl->getDeclaredType()->getCanonicalType());
 
-      auto ConformingTy = Conformance->getInterfaceType();
-      addTypeRef(ModuleContext, ConformingTy->getCanonicalType());
-
-      auto ProtoTy = Conformance->getProtocol()->getInterfaceType();
+      auto ProtoTy = Conformance->getProtocol()->getDeclaredType();
       addTypeRef(ModuleContext, ProtoTy->getCanonicalType());
 
       Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
@@ -103,6 +103,9 @@ public:
 
     layout();
     auto init = getInit();
+    if (!init)
+      return nullptr;
+
     auto var = new llvm::GlobalVariable(*IGM.getModule(), init->getType(),
                                         /*isConstant*/ true,
                                         llvm::GlobalValue::PrivateLinkage,
@@ -120,10 +123,15 @@ public:
 
 class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
-  const uint32_t fieldRecordSize = 8;
+  const uint32_t fieldRecordSize = 12;
   ArrayRef<const NominalTypeDecl *> NominalTypeDecls;
 
   void addFieldDecl(const ValueDecl *value) {
+    swift::reflection::FieldRecordFlags Flags;
+    Flags.setIsObjC(value->isObjC());
+
+    addConstantInt32(Flags.getRawValue());
+
     auto type = value->getInterfaceType()->getCanonicalType();
     addTypeRef(value->getModuleContext(), type);
 
@@ -136,7 +144,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void addDecl(const NominalTypeDecl *decl) {
-    auto type = decl->getDeclaredInterfaceType()->getCanonicalType();
+    PrettyStackTraceDecl DebugStack("emitting field type metadata", decl);
+    auto type = decl->getDeclaredType()->getCanonicalType();
     addTypeRef(decl->getModuleContext(), type);
 
     switch (decl->getKind()) {
@@ -175,6 +184,7 @@ public:
   }
 
   llvm::GlobalVariable *emit() {
+
     auto tempBase = std::unique_ptr<llvm::GlobalVariable>(
         new llvm::GlobalVariable(IGM.Int8Ty, /*isConstant*/ true,
                                  llvm::GlobalValue::PrivateLinkage));
@@ -182,6 +192,10 @@ public:
 
     layout();
     auto init = getInit();
+
+    if (!init)
+      return nullptr;
+
     auto var = new llvm::GlobalVariable(*IGM.getModule(), init->getType(),
                                         /*isConstant*/ true,
                                         llvm::GlobalValue::PrivateLinkage,
@@ -199,12 +213,12 @@ public:
 
 static std::string getReflectionSectionName(IRGenModule &IGM,
                                             std::string Base) {
-  assert(Base.size() <= 7
-         && "Mach-O section name length must be <= 16 characters");
   SmallString<50> SectionName;
   llvm::raw_svector_ostream OS(SectionName);
   switch (IGM.TargetInfo.OutputObjectFormat) {
     case llvm::Triple::MachO:
+      assert(Base.size() <= 7
+             && "Mach-O section name length must be <= 16 characters");
       OS << "__DATA, __swift3_" << Base << ", regular, no_dead_strip";
       break;
     case llvm::Triple::ELF:
@@ -262,6 +276,9 @@ llvm::Constant *IRGenModule::emitFieldTypeMetadataRecords() {
 
   FieldTypeMetadataBuilder builder(*this, NominalTypeDecls);
   auto var = builder.emit();
+  if (!var)
+    return nullptr;
+
   addUsedGlobal(var);
   return var;
 }
@@ -275,6 +292,9 @@ llvm::Constant *IRGenModule::emitAssociatedTypeMetadataRecords() {
 
   AssociatedTypeMetadataBuilder builder(*this, NominalTypeDecls);
   auto var = builder.emit();
+  if (!var)
+    return nullptr;
+
   addUsedGlobal(var);
   return var;
 }

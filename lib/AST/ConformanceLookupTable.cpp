@@ -507,10 +507,10 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
         resolver->resolveInheritanceClause(cast<ExtensionDecl>(dc));
     }
 
-    // An @objc enum that explicitly conforms to the ErrorType protocol also
-    // implicitly conforms to _ObjectiveCBridgeableErrorType, via the known
-    // protocol _BridgedNSError.
-    if (conformingProtocol->isSpecificProtocol(KnownProtocolKind::ErrorType) &&
+    // An @objc enum that explicitly conforms to the ErrorProtocol protocol
+    // also implicitly conforms to _ObjectiveCBridgeableErrorProtocol, via the
+    // known protocol _BridgedNSError.
+    if (conformingProtocol->isSpecificProtocol(KnownProtocolKind::ErrorProtocol) &&
         isa<EnumDecl>(nominal) && nominal->isObjC() &&
         cast<EnumDecl>(nominal)->hasOnlyCasesWithoutAssociatedValues()) {
       ASTContext &ctx = nominal->getASTContext();
@@ -788,8 +788,9 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
   if (!conformingDC)
     return nullptr;
 
-  NominalTypeDecl *conformingNominal
-    = conformingDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *conformingNominal =
+    cast<NominalTypeDecl>(conformingDC->
+                          getAsGenericTypeOrGenericTypeExtensionContext());
 
   // Form the conformance.
   Type type = entry->getDeclContext()->getDeclaredTypeInContext();
@@ -814,7 +815,9 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
                                   .getPointer();
 
     // Form the inherited conformance.
-    conformance = ctx.getInheritedConformance(type, inheritedConformance);
+    conformance = ctx.getInheritedConformance(
+                    type,
+                    inheritedConformance->getConcrete());
   } else {
     // Create or find the normal conformance.
     Type conformingType = conformingDC->getDeclaredTypeInContext();

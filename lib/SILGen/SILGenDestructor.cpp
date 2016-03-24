@@ -196,7 +196,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
     ->substGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
   B.createApply(cleanupLoc, superclassDtorValue,
                 SILType::getPrimitiveObjectType(substDtorType),
-                substDtorType->getResult().getSILType(),
+                substDtorType->getSILResult(),
                 subs, superSelf);
 
   // Return.

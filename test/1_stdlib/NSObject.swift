@@ -98,7 +98,7 @@ let s2 = NSMutableString.init(string:"hazcam")
 printIdentity(s1, s2, "s1", "s2")
 printEquality(s1, s2, "s1", "s2")
 print("mutate")
-s2.appendString("navcam")
+s2.append("navcam")
 printIdentity(s1, s2, "s1", "s2")
 printEquality(s1, s2, "s1", "s2")
 print("done NSMutableString ==")
@@ -127,7 +127,7 @@ func printHashValue<T : Hashable>(x: T, _ name: String) {
 print("NSMutableString hashValue")
 print("\(s1.hashValue)")
 print("\(s1.hash)")
-s1.appendString("pancam")
+s1.append("pancam")
 print("\(s1.hashValue)")
 print("\(s1.hash)")
 print("done NSMutableString hashValue")
@@ -227,12 +227,12 @@ class GenericNativeSwift<T> {}
 
 var native: AnyObject = NativeSwift()
 
-if native.respondsToSelector(".cxx_construct") {
+if native.responds(to: ".cxx_construct") {
   print("SwiftObject has nontrivial constructor")
 } else {
   print("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
 }
-if native.respondsToSelector(".cxx_destruct") {
+if native.responds(to: ".cxx_destruct") {
   print("SwiftObject has nontrivial destructor")
 } else {
   print("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
@@ -240,12 +240,12 @@ if native.respondsToSelector(".cxx_destruct") {
 
 native = GenericNativeSwift<Int>()
 
-if native.respondsToSelector(".cxx_construct") {
+if native.responds(to: ".cxx_construct") {
   print("SwiftObject has nontrivial constructor")
 } else {
   print("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
 }
-if native.respondsToSelector(".cxx_destruct") {
+if native.responds(to: ".cxx_destruct") {
   print("SwiftObject has nontrivial destructor")
 } else {
   print("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor

@@ -23,6 +23,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include <functional>
@@ -30,31 +31,34 @@
 namespace swift {
 
 class GenericCloner : public TypeSubstCloner<GenericCloner> {
+  const ReabstractionInfo &ReInfo;
   CloneCollector::CallbackType Callback;
 
 public:
   friend class SILCloner<GenericCloner>;
 
   GenericCloner(SILFunction *F,
-                TypeSubstitutionMap &InterfaceSubs,
+                const ReabstractionInfo &ReInfo,
                 TypeSubstitutionMap &ContextSubs,
+                ArrayRef<Substitution> ParamSubs,
                 StringRef NewName,
-                ArrayRef<Substitution> ApplySubs,
                 CloneCollector::CallbackType Callback)
-  : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
-                    ApplySubs), Callback(Callback) {
+  : TypeSubstCloner(*initCloned(F, ReInfo, NewName), *F, ContextSubs,
+                    ParamSubs), ReInfo(ReInfo), Callback(Callback) {
     assert(F->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
   }
   /// Clone and remap the types in \p F according to the substitution
-  /// list in \p Subs.
-  static SILFunction *cloneFunction(SILFunction *F,
-                                    TypeSubstitutionMap &InterfaceSubs,
-                                    TypeSubstitutionMap &ContextSubs,
-                                    StringRef NewName, ApplySite Caller,
-                            CloneCollector::CallbackType Callback =nullptr) {
+  /// list in \p Subs. Parameters are re-abstracted (changed from indirect to
+  /// direct) according to \p ReInfo.
+  static SILFunction *
+  cloneFunction(SILFunction *F,
+                const ReabstractionInfo &ReInfo,
+                TypeSubstitutionMap &ContextSubs,
+                ArrayRef<Substitution> ParamSubs,
+                StringRef NewName,
+                CloneCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.
-    GenericCloner SC(F, InterfaceSubs, ContextSubs, NewName,
-                     Caller.getSubstitutions(), Callback);
+    GenericCloner SC(F, ReInfo, ContextSubs, ParamSubs, NewName, Callback);
     SC.populateCloned();
     SC.cleanUp(SC.getCloned());
     return SC.getCloned();
@@ -77,7 +81,7 @@ protected:
 
 private:
   static SILFunction *initCloned(SILFunction *Orig,
-                                 TypeSubstitutionMap &InterfaceSubs,
+                                 const ReabstractionInfo &ReInfo,
                                  StringRef NewName);
   /// Clone the body of the function into the empty function that was created
   /// by initCloned.

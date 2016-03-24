@@ -182,4 +182,3 @@ func _squeezeHashValue(hashValue: Int, _ resultRange: Range<UInt>) -> UInt {
   }
   return resultRange.startIndex + (mixedHashValue % resultCardinality)
 }
-

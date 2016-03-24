@@ -94,7 +94,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
            && "generic global variable accessors not yet implemented");
     SILValue addr = B.createApply(loc, accessor, accessor->getType(),
                               accessor->getType().castTo<SILFunctionType>()
-                                      ->getResult().getSILType(),
+                                      ->getSingleResult().getSILType(),
                               {}, {});
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.

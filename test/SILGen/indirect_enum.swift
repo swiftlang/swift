@@ -46,7 +46,7 @@ func TreeA_cases<T>(t: T, l: TreeA<T>, r: TreeA<T>) {
 func TreeA_reabstract(f: Int -> Int) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<Int -> Int>.Type
-// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@callee_owned (@out Int, @in Int) -> ()
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@callee_owned (@in Int) -> @out Int
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    strong_retain %0
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_

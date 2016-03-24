@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 protocol A {
-  typealias B
+  associatedtype B
   func b(_: B)
 }
 

@@ -35,20 +35,17 @@ struct B : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return A.self
-  }
   func _bridgeToObjectiveC() -> A {
     return A()
   }
   static func _forceBridgeFromObjectiveC(
     x: A,
-    inout result: B?
+    result: inout B?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: A,
-    inout result: B?
+    result: inout B?
   ) -> Bool {
     return true
   }

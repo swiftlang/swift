@@ -43,6 +43,8 @@
 /// Misc |
 ///-------
 ///
+/// An invalid transition kind. This must always be first so that it is zero.
+KIND(Invalid)
 /// An unknown kind.
 KIND(Unknown)
 /// An autorelease pool call.

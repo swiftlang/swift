@@ -39,21 +39,18 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return C.self
-  }
   func _bridgeToObjectiveC() -> C {
     return C()
   }
   static func _forceBridgeFromObjectiveC(
     x: C,
-    inout result: BridgedValueType?
+    result: inout BridgedValueType?
   ) {
     _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: C,
-    inout result: BridgedValueType?
+    result: inout BridgedValueType?
   ) -> Bool {
     _preconditionFailure("implement")
   }
@@ -79,21 +76,18 @@ testBridging(PlainClass(), "PlainClass")
 
 //===----------------------------------------------------------------------===//
 struct ConditionallyBridged<T> : _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return C.self
-  }
   func _bridgeToObjectiveC() -> C {
     return C()
   }
   static func _forceBridgeFromObjectiveC(
     x: C,
-    inout result: ConditionallyBridged<T>?
+    result: inout ConditionallyBridged<T>?
   ) {
     _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: C,
-    inout result: ConditionallyBridged<T>?
+    result: inout ConditionallyBridged<T>?
   ) -> Bool {
     _preconditionFailure("implement")
   }

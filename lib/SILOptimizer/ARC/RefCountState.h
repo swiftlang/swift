@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_REFCOUNTSTATE_H
 
 #include "RCStateTransition.h"
+#include "swift/Basic/type_traits.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/SIL/SILInstruction.h"
@@ -21,8 +22,8 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include <algorithm>
-#include <type_traits>
 
 namespace swift {
 class AliasAnalysis;
@@ -37,9 +38,6 @@ namespace swift {
 /// A struct that abstracts over reference counts manipulated by strong_retain,
 /// retain_value, strong_release,
 class RefCountState {
-public:
-  using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 1>;
-
 protected:
   /// Return the SILValue that represents the RCRoot that we are
   /// tracking.
@@ -47,7 +45,7 @@ protected:
 
   /// The last state transition that this RefCountState went through. None if we
   /// have not see any transition on this ref count yet.
-  llvm::Optional<RCStateTransition> Transition;
+  RCStateTransition Transition;
 
   /// Was the pointer we are tracking known incremented when we visited the
   /// current increment we are tracking? In that case we know that it is safe
@@ -67,8 +65,8 @@ protected:
   bool Partial = false;
 
 public:
-  RefCountState() {}
-  ~RefCountState() {}
+  RefCountState() = default;
+  ~RefCountState() = default;
   RefCountState(const RefCountState &) = default;
   RefCountState &operator=(const RefCountState &) = default;
   RefCountState(RefCountState &&) = default;
@@ -76,20 +74,21 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I) {
+  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
+                           RCIdentityFunctionInfo *RCFI) {
     assert(I->size() == 1);
 
     // Are we already tracking a ref count modification?
     bool Nested = isTrackingRefCount();
 
     Transition = RCStateTransition(I);
-    assert((*Transition).isMutator() && "Expected I to be a mutator!\n");
+    assert(Transition.isMutator() && "Expected I to be a mutator!\n");
 
     // Initialize KnownSafe to a conservative false value.
     KnownSafe = false;
 
     // Initialize value.
-    RCRoot = stripCasts((*I->begin())->getOperand(0));
+    RCRoot = RCFI->getRCIdentityRoot((*I->begin())->getOperand(0));
 
     // Clear our insertion point list.
     InsertPts = ImmutablePointerSetFactory<SILInstruction>::getEmptySet();
@@ -105,31 +104,29 @@ public:
   }
 
   /// Is this ref count initialized and tracking a ref count ptr.
-  bool isTrackingRefCount() const {
-    return Transition.hasValue();
-  }
+  bool isTrackingRefCount() const { return Transition.isValid(); }
 
   /// Are we tracking an instruction currently? This returns false when given an
   /// uninitialized ReferenceCountState.
   bool isTrackingRefCountInst() const {
-    return Transition.hasValue() && Transition->isMutator();
+    return Transition.isValid() && Transition.isMutator();
   }
 
   /// Are we tracking a source of ref counts? This currently means that we are
   /// tracking an argument that is @owned. In the future this will include
   /// return values of functions that are @owned.
   bool isTrackingRefCountSource() const {
-    return Transition.hasValue() && Transition->isEndPoint();
+    return Transition.isValid() && Transition.isEndPoint();
   }
 
   /// Return the increment we are tracking.
   RCStateTransition::mutator_range getInstructions() const {
-    return Transition->getMutators();
+    return Transition.getMutators();
   }
 
   /// Returns true if I is in the instructions we are tracking.
   bool containsInstruction(SILInstruction *I) const {
-    return Transition.hasValue() && Transition->containsMutator(I);
+    return Transition.isValid() && Transition.containsMutator(I);
   }
 
   /// Return the value with reference semantics that is the operand of our
@@ -200,7 +197,8 @@ private:
   bool FoundNonARCUser = false;
 
 public:
-  BottomUpRefCountState() {}
+  BottomUpRefCountState() = default;
+  ~BottomUpRefCountState() = default;
   BottomUpRefCountState(const BottomUpRefCountState &) = default;
   BottomUpRefCountState &operator=(const BottomUpRefCountState &) = default;
   BottomUpRefCountState(BottomUpRefCountState &&) = default;
@@ -208,7 +206,8 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I);
+  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
+                           RCIdentityFunctionInfo *RCFI);
 
   /// Update this reference count's state given the instruction \p I. \p
   /// InsertPt is the point furthest up the CFG where we can move the currently
@@ -344,7 +343,8 @@ private:
   LatticeState LatState = LatticeState::None;
 
 public:
-  TopDownRefCountState() {}
+  TopDownRefCountState() = default;
+  ~TopDownRefCountState() = default;
   TopDownRefCountState(const TopDownRefCountState &) = default;
   TopDownRefCountState &operator=(const TopDownRefCountState &) = default;
   TopDownRefCountState(TopDownRefCountState &&) = default;
@@ -352,7 +352,8 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I);
+  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
+                           RCIdentityFunctionInfo *RCFI);
 
   /// Initialize the state given the consumed argument Arg.
   void initWithArg(SILArgument *Arg);
@@ -453,6 +454,12 @@ private:
   /// and false otherwise.
   bool handleRefCountInstMatch(SILInstruction *RefCountInst);
 };
+
+// These static asserts are here for performance reasons.
+static_assert(IsTriviallyCopyable<BottomUpRefCountState>::value,
+              "All ref count states must be trivially copyable");
+static_assert(IsTriviallyCopyable<TopDownRefCountState>::value,
+              "All ref count states must be trivially copyable");
 
 } // end swift namespace
 

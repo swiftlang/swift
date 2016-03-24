@@ -216,29 +216,25 @@ def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
 def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
   HelpText<"Enable experimental 'switch' pattern matching features">;
 
+def enable_experimental_property_behaviors :
+  Flag<["-"], "enable-experimental-property-behaviors">,
+  HelpText<"Enable experimental property behaviors">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
-
-def enable_omit_needless_words :
-  Flag<["-"], "enable-omit-needless-words">,
-  HelpText<"Omit needless words when importing Objective-C names">;
 
 def enable_strip_ns_prefix :
   Flag<["-"], "enable-strip-ns-prefix">,
   HelpText<"Strip 'NS' prefix from Foundation entities">;
 
-def enable_infer_default_arguments :
-  Flag<["-"], "enable-infer-default-arguments">,
-  HelpText<"Infer default arguments for imported parameters">;
-
-def enable_swift_name_lookup_tables :
-  Flag<["-"], "enable-swift-name-lookup-tables">,
-  HelpText<"Enable Swift name lookup tables in the Clang importer">;
-
 def swift3_migration :
   Flag<["-"], "swift3-migration">,
   HelpText<"Enable Fix-It based migration aids for Swift 3">;
+
+def disable_infer_iuos :
+  Flag<["-"], "disable-infer-iuos">,
+  HelpText<"Disable inferring IUO type for otherwise unconstrained variables">;
 
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,
@@ -289,8 +285,16 @@ def print_inst_counts : Flag<["-"], "print-inst-counts">,
   HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
            "in conjunction with -print-stats.">;
 
+def debug_on_sil : Flag<["-"], "gsil">,
+  HelpText<"Write the SIL into a file and generate debug-info to debug on SIL "
+           " level.">;
+
 def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
   HelpText<"Print the LLVM inline tree.">;
+
+def disable_incremental_llvm_codegeneration :
+  Flag<["-"], "disable-incremental-llvm-codegen">,
+       HelpText<"Disable incremental llvm code generation.">;
 
 def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
@@ -320,5 +324,8 @@ def dump_api_path : Separate<["-"], "dump-api-path">,
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Compile the module to export resilient interfaces for all "
             "public declarations by default">;
+
+def group_info_path : Separate<["-"], "group-info-path">,
+  HelpText<"The path to collect the group information of the compiled module">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

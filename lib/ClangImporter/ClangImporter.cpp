@@ -19,7 +19,6 @@
 #include "ClangDiagnosticConsumer.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/IRGenOptions.h"
@@ -118,6 +117,30 @@ namespace {
       if (!isOverridden)
         Importer.addDependency(file);
       return true;
+    }
+  };
+
+  class HeaderParsingASTConsumer : public clang::ASTConsumer {
+    SmallVector<clang::DeclGroupRef, 4> DeclGroups;
+  public:
+    void
+    HandleTopLevelDeclInObjCContainer(clang::DeclGroupRef decls) override {
+      DeclGroups.push_back(decls);
+    }
+
+    ArrayRef<clang::DeclGroupRef> getAdditionalParsedDecls() {
+      return DeclGroups;
+    }
+
+    void reset() {
+      DeclGroups.clear();
+    }
+  };
+
+  class ParsingAction : public clang::ASTFrontendAction {
+    std::unique_ptr<clang::ASTConsumer>
+    CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
+      return llvm::make_unique<HeaderParsingASTConsumer>();
     }
   };
 
@@ -262,6 +285,27 @@ void ClangImporter::clearTypeResolver() {
 #define SHIMS_INCLUDE_FLAG "-I"
 #endif
 
+static StringRef
+getMinVersionOptNameForDarwinTriple(const llvm::Triple &triple) {
+  switch(getDarwinPlatformKind(triple)) {
+    case DarwinPlatformKind::MacOS:
+      return "-mmacosx-version-min=";
+    case DarwinPlatformKind::IPhoneOS:
+      return "-mios-version-min=";
+    case DarwinPlatformKind::IPhoneOSSimulator:
+      return "-mios-simulator-version-min=";
+    case DarwinPlatformKind::TvOS:
+      return "-mtvos-version-min=";
+    case DarwinPlatformKind::TvOSSimulator:
+      return "-mtvos-simulator-version-min=";
+    case DarwinPlatformKind::WatchOS:
+      return "-mwatchos-version-min=";
+    case DarwinPlatformKind::WatchOSSimulator:
+      return "-mwatchos-simulator-version-min=";
+  }
+  llvm_unreachable("Unsupported Darwin platform");
+}
+
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -275,7 +319,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // Enable modules.
     "-fmodules",
 
-    // Enable implicit module maps
+    // Enable implicit module maps (this option is implied by "-fmodules").
     "-fimplicit-module-maps",
 
     // Don't emit LLVM IR.
@@ -338,36 +382,49 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       // Just use the most feature-rich C language mode.
       "-x", "c", "-std=gnu11",
     });
+
+    // The module map used for Glibc depends on the target we're compiling for,
+    // and is not included in the resource directory with the other implicit
+    // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
+    SmallString<128> GlibcModuleMapPath;
+    if (!importerOpts.OverrideResourceDir.empty()) {
+      GlibcModuleMapPath = importerOpts.OverrideResourceDir;
+    } else if (!searchPathOpts.RuntimeResourcePath.empty()) {
+      GlibcModuleMapPath = searchPathOpts.RuntimeResourcePath;
+    }
+
+    // Running without a resource directory is not a supported configuration.
+    assert(!GlibcModuleMapPath.empty());
+
+    llvm::sys::path::append(
+      GlibcModuleMapPath,
+      swift::getPlatformNameForTriple(triple), triple.getArchName(),
+      "glibc.modulemap");
+
+    // Only specify the module map if that file actually exists.
+    // It may not--for example in the case that
+    // `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
+    // a Swift compiler not built for Linux targets.
+    if (llvm::sys::fs::exists(GlibcModuleMapPath)) {
+      invocationArgStrs.push_back(
+        (Twine("-fmodule-map-file=") + GlibcModuleMapPath).str());
+    } else {
+      // FIXME: Emit a warning of some kind.
+    }
   }
 
   if (triple.isOSDarwin()) {
     std::string minVersionBuf;
     llvm::raw_string_ostream minVersionOpt{minVersionBuf};
+    minVersionOpt << getMinVersionOptNameForDarwinTriple(triple);
+
     unsigned major, minor, micro;
     if (triple.isiOS()) {
-      bool isiOSSimulator = swift::tripleIsiOSSimulator(triple);
-      if (triple.isTvOS()) {
-        if (isiOSSimulator)
-          minVersionOpt << "-mtvos-simulator-version-min=";
-        else
-          minVersionOpt << "-mtvos-version-min=";
-      } else {
-        if (isiOSSimulator)
-          minVersionOpt << "-mios-simulator-version-min=";
-        else
-          minVersionOpt << "-mios-version-min=";
-      }
-
       triple.getiOSVersion(major, minor, micro);
     } else if(triple.isWatchOS()) {
-      if (tripleIsWatchSimulator(triple))
-          minVersionOpt << "-mwatchos-simulator-version-min=";
-      else
-          minVersionOpt << "-mwatchos-version-min=";
-      triple.getOSVersion(major, minor, micro);
+      triple.getWatchOSVersion(major, minor, micro);
     } else {
       assert(triple.isMacOSX());
-      minVersionOpt << "-mmacosx-version-min=";
       triple.getMacOSXVersion(major, minor, micro);
     }
     minVersionOpt << clang::VersionTuple(major, minor, micro);
@@ -477,6 +534,14 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
+
+  // Add API notes paths.
+  for (const auto &searchPath : searchPathOpts.ImportSearchPaths) {
+    invocationArgStrs.push_back("-iapinotes-modules");
+    invocationArgStrs.push_back(searchPath);
+  }
+  invocationArgStrs.push_back("-iapinotes-modules");
+  invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
 }
 
 std::unique_ptr<ClangImporter>
@@ -571,7 +636,7 @@ ClangImporter::create(ASTContext &ctx,
   instance.setInvocation(&*invocation);
 
   // Create the associated action.
-  importer->Impl.Action.reset(new clang::SyntaxOnlyAction);
+  importer->Impl.Action.reset(new ParsingAction);
   auto *action = importer->Impl.Action.get();
 
   // Execute the action. We effectively inline most of
@@ -632,6 +697,9 @@ ClangImporter::create(ASTContext &ctx,
   for (auto path : searchPathOpts.ImportSearchPaths)
     importer->addSearchPath(path, /*isFramework*/false);
 
+  // FIXME: These decls are not being parsed correctly since (a) some of the
+  // callbacks are still being added, and (b) the logic to parse them has
+  // changed.
   clang::Parser::DeclGroupPtrTy parsed;
   while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {
     for (auto *D : parsed.get()) {
@@ -708,20 +776,18 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   if (shouldSuppressDeclImport(named)) return;
 
   // If we have a name to import as, add this entry to the table.
-  clang::DeclContext *effectiveContext;
-  if (auto importedName = importFullName(named, None, &effectiveContext,
-                                         &clangSema)) {
-    table.addEntry(importedName.Imported, named, effectiveContext);
+  if (auto importedName = importFullName(named, None, &clangSema)) {
+    table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
 
     // Also add the alias, if needed.
     if (importedName.Alias)
-      table.addEntry(importedName.Alias, named, effectiveContext);
+      table.addEntry(importedName.Alias, named, importedName.EffectiveContext);
 
     // Also add the subscript entry, if needed.
-    if (importedName.IsSubscriptAccessor)
+    if (importedName.isSubscriptAccessor())
       table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
                               ArrayRef<Identifier>()),
-                     named, effectiveContext);
+                     named, importedName.EffectiveContext);
   } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
     table.addCategory(category);
   }
@@ -804,28 +870,40 @@ bool ClangImporter::Implementation::importHeader(
                                                   /*LoadedID=*/0,
                                                   /*LoadedOffset=*/0,
                                                   includeLoc);
+  auto &consumer =
+      static_cast<HeaderParsingASTConsumer &>(Instance->getASTConsumer());
+  consumer.reset();
 
   pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
   // Force the import to occur.
   pp.LookAhead(0);
 
-  SmallVector<clang::NamedDecl *, 16> parsedNamedDecls;
+  SmallVector<clang::DeclGroupRef, 16> allParsedDecls;  
+  auto handleParsed = [&](clang::DeclGroupRef parsed) {
+    if (trackParsedSymbols) {
+      for (auto *D : parsed) {
+        addBridgeHeaderTopLevelDecls(D);
+      }
+    }
+
+    allParsedDecls.push_back(parsed);
+  };
+
   clang::Parser::DeclGroupPtrTy parsed;
   while (!Parser->ParseTopLevelDecl(parsed)) {
-    if (!parsed) continue;
-
-    for (auto *D : parsed.get()) {
-      if (trackParsedSymbols)
-        addBridgeHeaderTopLevelDecls(D);
-      if (auto named = dyn_cast<clang::NamedDecl>(D))
-        parsedNamedDecls.push_back(named);
-    }
+    if (parsed)
+      handleParsed(parsed.get());
+    for (auto additionalParsedGroup : consumer.getAdditionalParsedDecls())
+      handleParsed(additionalParsedGroup);
+    consumer.reset();
   }
 
   // We can't do this as we're parsing because we may want to resolve naming
   // conflicts between the things we've parsed.
-  for (auto *named : parsedNamedDecls)
-    addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable, named);
+  for (auto group : allParsedDecls)
+    for (auto *D : group)
+      if (auto named = dyn_cast<clang::NamedDecl>(D))
+        addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable, named);
 
   pp.EndSourceFile();
   bumpGeneration();
@@ -1080,9 +1158,6 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
     result->forAllVisibleModules({}, [](Module::ImportedModule import) {});
   }
 
-  // Try to load the API notes for this module.
-  (void)getAPINotesForModule(clangModule->getTopLevelModule());
-
   if (clangModule->isSubModule()) {
     finishLoadingClangModule(owner, clangModule->getTopLevelModule(), true);
   } else {
@@ -1106,9 +1181,6 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
                                               const ClangImporterOptions &opts)
   : SwiftContext(ctx),
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
-    OmitNeedlessWords(opts.OmitNeedlessWords),
-    InferDefaultArguments(opts.InferDefaultArguments),
-    UseSwiftLookupTables(opts.UseSwiftLookupTables),
     BridgingHeaderLookupTable(nullptr)
 {
   // Add filters to determine if a Clang availability attribute
@@ -1182,7 +1254,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
 
   // Prepopulate the set of module prefixes.
   // FIXME: Hard-coded list should move into the module map language.
-  if (OmitNeedlessWords && ctx.LangOpts.StripNSPrefix) {
+  if (ctx.LangOpts.StripNSPrefix) {
     ModulePrefixes["Foundation"] = "NS";
     ModulePrefixes["ObjectiveC"] = "NS";
   }
@@ -1215,61 +1287,6 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   cacheEntry.setPointer(file);
 
   return file;
-}
-
-api_notes::APINotesReader *
-ClangImporter::Implementation::getAPINotesForModule(
-    const clang::Module *underlying) {
-  assert(underlying == underlying->getTopLevelModule() &&
-         "Only allowed on a top-level module");
-  // Check whether we already have an API notes reader.
-  auto known = APINotesReaders.find(underlying);
-  if (known != APINotesReaders.end())
-    return known->second.get();
-
-  /// Determine the name of the API notes we're looking for.
-  llvm::SmallString<64> notesFilename(underlying->Name);
-  notesFilename += '.';
-  notesFilename += api_notes::BINARY_APINOTES_EXTENSION;
-
-  // Look for a compiled API notes file in at the given search path. Sets
-  // the reader and returns true if one was found.
-  llvm::SmallString<64> scratch;
-  std::unique_ptr<api_notes::APINotesReader> reader;
-  auto findAPINotes = [&](StringRef searchPath) -> bool {
-    // Compute the file name we're looking for.
-    scratch.clear();
-    llvm::sys::path::append(scratch, searchPath, notesFilename.str());
-
-    // Try to open the file.
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> bufferOrErr
-      = llvm::MemoryBuffer::getFile(scratch.str());
-    if (!bufferOrErr)
-      return false;
-
-    // We found the API notes file; try to load it.
-    reader = api_notes::APINotesReader::get(std::move(bufferOrErr.get()));
-    return true;
-  };
-
-  // Look for a ModuleName.apinotes file in the import search paths.
-  // FIXME: Good thing we have no notion of layering for these paths.
-  bool foundAny = false;
-  for (const auto& searchPath : SwiftContext.SearchPathOpts.ImportSearchPaths) {
-    if (findAPINotes(searchPath)) {
-      foundAny = true;
-      break;
-    }
-  }
-
-  // If we didn't find anything in the user-provided import search paths, look
-  // in the runtime library import path.
-  if (!foundAny)
-    findAPINotes(SwiftContext.SearchPathOpts.RuntimeLibraryImportPath);
-
-  // Add the reader we formed (if any) to the table.
-  return APINotesReaders.insert({underlying, std::move(reader)})
-           .first->second.get();
 }
 
 Optional<const clang::Decl *>
@@ -1648,12 +1665,8 @@ static bool hasErrorMethodNameCollision(ClangImporter::Implementation &importer,
 /// Determine the optionality of the given Objective-C method.
 ///
 /// \param method The Clang method.
-///
-/// \param knownNullability When API notes describe the nullability of this
-/// parameter, that nullability.
 static OptionalTypeKind getResultOptionality(
-                          const clang::ObjCMethodDecl *method,
-                          Optional<clang::NullabilityKind> knownNullability) {
+                          const clang::ObjCMethodDecl *method) {
   auto &clangCtx = method->getASTContext();
 
   // If nullability is available on the type, use it.
@@ -1664,12 +1677,6 @@ static OptionalTypeKind getResultOptionality(
   // If there is a returns_nonnull attribute, non-null.
   if (method->hasAttr<clang::ReturnsNonNullAttr>())
     return OTK_None;
-
-  // If API notes gives us nullability, use that.
-  if (knownNullability) {
-    return ClangImporter::Implementation::translateNullability(
-             *knownNullability);
-  }
 
   // Default to implicitly unwrapped optionals.
   return OTK_ImplicitlyUnwrappedOptional;
@@ -1701,17 +1708,9 @@ considerErrorImport(ClangImporter::Implementation &importer,
     if (!isErrorOutParameter(params[index], isErrorOwned))
       break;
 
-    // Determine the nullability of the result.
-    Optional<clang::NullabilityKind> knownResultNullability;
-    if (auto knownMethod = importer.getKnownObjCMethod(clangDecl)) {
-      if (knownMethod->NullabilityAudited)
-        knownResultNullability = knownMethod->getReturnTypeInfo();
-    }
-
     auto errorKind =
       classifyMethodErrorHandling(clangDecl,
-                                  getResultOptionality(clangDecl,
-                                                       knownResultNullability));
+                                  getResultOptionality(clangDecl));
     if (!errorKind) return None;
 
     // Consider adjusting the imported declaration name to remove the
@@ -1871,42 +1870,111 @@ Identifier ClangImporter::Implementation::importMacroName(
   if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
     return Identifier();
 
-  // If we aren't omitting needless words, no transformation is applied to the
-  // name.
+  // No transformation is applied to the name.
   StringRef name = clangIdentifier->getName();
-  if (!OmitNeedlessWords) return SwiftContext.getIdentifier(name);
-
-  // Determine which module defines this macro.
-  StringRef moduleName;
-  if (auto moduleID = macro->getOwningModuleID()) {
-    if (auto module = clangCtx.getExternalSource()->getModule(moduleID))
-      moduleName = module->getTopLevelModuleName();
-  }
-
-  if (moduleName.empty())
-    moduleName = clangCtx.getLangOpts().CurrentModule;
-
-  // Check whether we have a prefix to strip.
-  unsigned prefixLen = stripModulePrefixLength(ModulePrefixes, moduleName,
-                                               name);
-  if (prefixLen == 0) return SwiftContext.getIdentifier(name);
-
-  // Strip the prefix.
-  name = name.substr(prefixLen);
-
-  // If we should lowercase, do so.
-  StringScratchSpace scratch;
-  if (shouldLowercaseValueName(name))
-    name = camel_case::toLowercaseInitialisms(name, scratch);
-
-  // We're done.
   return SwiftContext.getIdentifier(name);
+}
+
+namespace {
+  typedef ClangImporter::Implementation::ImportedName ImportedName;
+}
+
+namespace llvm {
+  // An Identifier is "pointer like".
+  template<typename T> class PointerLikeTypeTraits;
+  template<>
+  class PointerLikeTypeTraits<swift::DeclName> {
+  public:
+    static inline void *getAsVoidPointer(swift::DeclName name) {
+      return name.getOpaqueValue();
+    }
+    static inline swift::DeclName getFromVoidPointer(void *ptr) {
+      return swift::DeclName::getFromOpaqueValue(ptr);
+    }
+    enum { NumLowBitsAvailable = 0 };
+  };
+}
+
+/// Retrieve the name of the given Clang declaration context for
+/// printing.
+static StringRef getClangDeclContextName(const clang::DeclContext *dc) {
+  auto type = ClangImporter::Implementation::getClangDeclContextType(dc);
+  if (type.isNull()) return StringRef();
+
+  return ClangImporter::Implementation::getClangTypeNameForOmission(
+           dc->getParentASTContext(),
+           type).Name;
+}
+
+namespace {
+  /// Merge the a set of imported names produced for the overridden
+  /// declarations of a given method or property.
+  template<typename DeclType>
+  void mergeOverriddenNames(ASTContext &ctx,
+                            const DeclType *decl,
+                            SmallVectorImpl<std::pair<const DeclType *,
+                                                      ImportedName>>
+                              &overriddenNames) {
+    typedef std::pair<const DeclType *, ImportedName> OverriddenName;
+    llvm::SmallPtrSet<DeclName, 4> known;
+    (void)known.insert(DeclName());
+    overriddenNames.erase(std::remove_if(overriddenNames.begin(),
+                                         overriddenNames.end(),
+                                         [&](OverriddenName overridden) {
+                                           return !known.insert(
+                                                     overridden.second.Imported)
+                                             .second;
+                                         }),
+                          overriddenNames.end());
+
+    if (overriddenNames.size() < 2)
+      return;
+
+    // Complain about inconsistencies.
+    std::string nameStr;
+    auto method = dyn_cast<clang::ObjCMethodDecl>(decl);
+    if (method)
+      nameStr = method->getSelector().getAsString();
+    else
+      nameStr = cast<clang::ObjCPropertyDecl>(decl)->getName().str();
+    for (unsigned i = 1, n = overriddenNames.size(); i != n; ++i) {
+      ctx.Diags.diagnose(SourceLoc(), diag::inconsistent_swift_name,
+                         method == nullptr,
+                         nameStr,
+                         getClangDeclContextName(decl->getDeclContext()),
+                         overriddenNames[0].second,
+                         getClangDeclContextName(
+                           overriddenNames[0].first->getDeclContext()),
+                         overriddenNames[i].second,
+                         getClangDeclContextName(
+                           overriddenNames[i].first->getDeclContext()));
+    }
+  }
+}
+
+/// Determine whether the given Objective-C class, or any of its
+/// superclasses, either has or inherits a swift_bridge attribute.
+static bool hasOrInheritsSwiftBridgeAttr(
+    const clang::ObjCInterfaceDecl *objcClass) {
+  do {
+    // Look at the definition, if there is one.
+    if (auto def = objcClass->getDefinition())
+      objcClass = def;
+
+    // Check for the swift_bridge attribute.
+    if (objcClass->hasAttr<clang::SwiftBridgeAttr>())
+      return true;
+
+    // Follow the superclass chain.
+    objcClass = objcClass->getSuperClass();
+  } while (objcClass);
+
+  return false;
 }
 
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
-       clang::DeclContext **effectiveContext,
        clang::Sema *clangSemaOverride) -> ImportedName {
   clang::Sema &clangSema = clangSemaOverride ? *clangSemaOverride
                                              : getClangSema();
@@ -1917,43 +1985,103 @@ auto ClangImporter::Implementation::importFullName(
   if (isa<clang::ObjCCategoryDecl>(D))
     return result;
 
-  // Compute the effective context, if requested.
-  if (effectiveContext) {
-    auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
+  // Compute the effective context.
+  auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
 
-    // Enumerators can end up within their enclosing enum or in the global
-    // scope, depending how their enclosing enumeration is imported.
-    if (isa<clang::EnumConstantDecl>(D)) {
-      auto enumDecl = cast<clang::EnumDecl>(dc);
-      switch (getEnumKind(enumDecl, &clangSema.getPreprocessor())) {
-      case EnumKind::Enum:
-      case EnumKind::Options:
-        // Enums are mapped to Swift enums, Options to Swift option sets.
-        *effectiveContext = enumDecl;
-        break;
+  // Enumerators can end up within their enclosing enum or in the global
+  // scope, depending how their enclosing enumeration is imported.
+  if (isa<clang::EnumConstantDecl>(D)) {
+    auto enumDecl = cast<clang::EnumDecl>(dc);
+    switch (getEnumKind(enumDecl, &clangSema.getPreprocessor())) {
+    case EnumKind::Enum:
+    case EnumKind::Options:
+      // Enums are mapped to Swift enums, Options to Swift option sets.
+      result.EffectiveContext = cast<clang::DeclContext>(enumDecl);
+      break;
 
-      case EnumKind::Constants:
-      case EnumKind::Unknown:
-        // The enum constant goes into the redeclaration context of the
-        // enum.
-        *effectiveContext = enumDecl->getRedeclContext();
-        break;
-      }
-    } else {
-      // Everything else goes into its redeclaration context.
-      *effectiveContext = dc->getRedeclContext();
+    case EnumKind::Constants:
+    case EnumKind::Unknown:
+      // The enum constant goes into the redeclaration context of the
+      // enum.
+      result.EffectiveContext = enumDecl->getRedeclContext();
+      break;
+    }
+  } else {
+    // Everything else goes into its redeclaration context.
+    result.EffectiveContext = dc->getRedeclContext();
+  }
+
+  // Anything in an Objective-C category or extension is adjusted to the
+  // class context.
+  if (auto category = dyn_cast_or_null<clang::ObjCCategoryDecl>(
+                        result.EffectiveContext.getAsDeclContext())) {
+    result.EffectiveContext = category->getClassInterface();
+  }
+
+  // Find the original method/property declaration and retrieve the
+  // name from thre.
+  if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
+    // Inherit the name from the "originating" declarations, if
+    // there are any.
+    SmallVector<std::pair<const clang::ObjCMethodDecl *, ImportedName>, 4>
+      overriddenNames;
+    SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+    method->getOverriddenMethods(overriddenMethods);
+    for (auto overridden : overriddenMethods) {
+      const auto overriddenName = importFullName(overridden, options,
+                                                 clangSemaOverride);
+      if (overriddenName.Imported)
+        overriddenNames.push_back({overridden, overriddenName});
     }
 
-    // Anything in an Objective-C category or extension is adjusted to the
-    // class context.
-    if (auto category = dyn_cast<clang::ObjCCategoryDecl>(*effectiveContext)) {
-      *effectiveContext = category->getClassInterface();
+    // If we found any names of overridden methods, return those names.
+    if (!overriddenNames.empty()) {
+      if (overriddenNames.size() > 1)
+        mergeOverriddenNames(SwiftContext, method, overriddenNames);
+      overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
+      return overriddenNames[0].second;
+    }
+  } else if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+    // Inherit the name from the "originating" declarations, if
+    // there are any.
+    if (auto getter = property->getGetterMethodDecl()) {
+      SmallVector<std::pair<const clang::ObjCPropertyDecl *, ImportedName>, 4>
+        overriddenNames;
+      SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+      SmallPtrSet<const clang::ObjCPropertyDecl *, 4> knownProperties;
+      (void)knownProperties.insert(property);
+
+      getter->getOverriddenMethods(overriddenMethods);
+      for (auto overridden : overriddenMethods) {
+        if (!overridden->isPropertyAccessor()) continue;
+        auto overriddenProperty = overridden->findPropertyDecl(true);
+        if (!overriddenProperty) continue;
+        if (!knownProperties.insert(overriddenProperty).second) continue;
+
+        const auto overriddenName = importFullName(overriddenProperty,
+                                                   options,
+                                                   clangSemaOverride);
+        if (overriddenName.Imported)
+          overriddenNames.push_back({overriddenProperty, overriddenName});
+      }
+
+      // If we found any names of overridden methods, return those names.
+      if (!overriddenNames.empty()) {
+        if (overriddenNames.size() > 1)
+          mergeOverriddenNames(SwiftContext, property, overriddenNames);
+        overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
+        return overriddenNames[0].second;
+      }
     }
   }
 
   // If we have a swift_name attribute, use that.
   if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
     bool skipCustomName = false;
+
+    // Parse the name.
+    ParsedDeclName parsedName = parseDeclName(nameAttr->getName());
+    if (!parsedName) return result;
 
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
@@ -1963,7 +2091,7 @@ auto ClangImporter::Implementation::importFullName(
     auto method = dyn_cast<clang::ObjCMethodDecl>(D);
     if (method) {
       unsigned initPrefixLength;
-      if (nameAttr->getName().startswith("init(")) {
+      if (parsedName.BaseName == "init" && parsedName.IsFunctionName) {
         if (!shouldImportAsInitializer(method, initPrefixLength,
                                        result.InitKind)) {
           // We cannot import this as an initializer anyway.
@@ -1985,29 +2113,35 @@ auto ClangImporter::Implementation::importFullName(
     }
 
     if (!skipCustomName) {
-      SmallVector<StringRef, 4> argumentNames;
-      bool isFunctionName;
-      StringRef baseName = parseDeclName(nameAttr->getName(), argumentNames,
-                                         isFunctionName);
-      if (baseName.empty()) return result;
-      
       result.HasCustomName = true;
-      result.Imported = formDeclName(SwiftContext, baseName, argumentNames,
-                                     isFunctionName);
+      result.Imported = parsedName.formDeclName(SwiftContext);
 
-      if (method) {
+      // Handle globals treated as members.
+      if (parsedName.isMember()) {
+        // FIXME: Make sure this thing is global.
+        result.EffectiveContext = parsedName.ContextName;
+      }
+
+      // Map property getters/setters.
+      if (parsedName.IsGetter)
+        result.AccessorKind = ImportedAccessorKind::PropertyGetter;
+      else if (parsedName.IsSetter)
+        result.AccessorKind = ImportedAccessorKind::PropertySetter;
+
+      if (method && parsedName.IsFunctionName) {
         // Get the parameters.
         ArrayRef<const clang::ParmVarDecl *> params{
           method->param_begin(),
           method->param_end()
         };
 
-        result.ErrorInfo = considerErrorImport(*this, method, baseName,
-                                               argumentNames, params,
+        result.ErrorInfo = considerErrorImport(*this, method,
+                                               parsedName.BaseName,
+                                               parsedName.ArgumentLabels,
+                                               params,
                                                isInitializer,
                                                /*hasCustomName=*/true);
       }
-
 
       return result;
     }
@@ -2039,13 +2173,11 @@ auto ClangImporter::Implementation::importFullName(
     // Map the identifier.
     baseName = D->getDeclName().getAsIdentifierInfo()->getName();
 
-    if (OmitNeedlessWords) {
-      // For Objective-C BOOL properties, use the name of the getter
-      // which, conventionally, has an "is" prefix.
-      if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
-        if (isBoolType(clangSema.Context, property->getType()))
-          baseName = property->getGetterName().getNameForSlot(0);
-      }
+    // For Objective-C BOOL properties, use the name of the getter
+    // which, conventionally, has an "is" prefix.
+    if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+      if (isBoolType(clangSema.Context, property->getType()))
+        baseName = property->getGetterName().getNameForSlot(0);
     }
 
     // For C functions, create empty argument names.
@@ -2101,13 +2233,6 @@ auto ClangImporter::Implementation::importFullName(
         argumentNames.push_back(StringRef());
       } else {
         StringRef argName = selector.getNameForSlot(index);
-
-        // Swift 2 lowercased all subsequent argument names.
-        // Swift 3 may handle this as part of omitting needless words, below,
-        // but don't preempt that here.
-        if (!OmitNeedlessWords)
-          argName = camel_case::toLowercaseWord(argName, stringScratch);
-
         argumentNames.push_back(argName);
       }
     }
@@ -2156,16 +2281,18 @@ auto ClangImporter::Implementation::importFullName(
 
     // Is this one of the accessors for subscripts?
     if (objcMethod->getMethodFamily() == clang::OMF_None &&
-        objcMethod->isInstanceMethod() &&
-        (isNonNullarySelector(objcMethod->getSelector(),
-                              { "objectAtIndexedSubscript" }) ||
-         isNonNullarySelector(objcMethod->getSelector(),
-                              { "setObject", "atIndexedSubscript" }) ||
-         isNonNullarySelector(objcMethod->getSelector(),
-                              { "objectForKeyedSubscript" }) ||
-         isNonNullarySelector(objcMethod->getSelector(),
-                              { "setObject", "forKeyedSubscript" })))
-      result.IsSubscriptAccessor = true;
+        objcMethod->isInstanceMethod()) {
+      if (isNonNullarySelector(objcMethod->getSelector(),
+                               { "objectAtIndexedSubscript" }) ||
+          isNonNullarySelector(objcMethod->getSelector(),
+                               { "objectForKeyedSubscript" }))
+        result.AccessorKind = ImportedAccessorKind::SubscriptGetter;
+      else if (isNonNullarySelector(objcMethod->getSelector(),
+                                    { "setObject", "atIndexedSubscript" }) ||
+               isNonNullarySelector(objcMethod->getSelector(),
+                                    { "setObject", "forKeyedSubscript" }))
+        result.AccessorKind = ImportedAccessorKind::SubscriptSetter;
+    }
 
     break;
   }
@@ -2319,11 +2446,15 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
-  if (OmitNeedlessWords && !result.IsSubscriptAccessor) {
+  if (!result.isSubscriptAccessor()) {
     // Check whether the module in which the declaration resides has a
-    // module prefix. If so, strip that prefix off when present.
+    // module prefix and will map into Swift as a type. If so, strip
+    // that prefix off when present.
     if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
-        D->getDeclName().getNameKind() == clang::DeclarationName::Identifier) {
+        (isa<clang::TypeDecl>(D) ||
+         (isa<clang::ObjCInterfaceDecl>(D) &&
+          !hasOrInheritsSwiftBridgeAttr(cast<clang::ObjCInterfaceDecl>(D))) ||
+         isa<clang::ObjCProtocolDecl>(D))) {
       // Find the original declaration, from which we can determine
       // the owning module.
       const clang::Decl *owningD = D->getCanonicalDecl();
@@ -2380,7 +2511,6 @@ auto ClangImporter::Implementation::importFullName(
         method->getReturnType(),
         method->getDeclContext(),
         getNonNullArgs(method, params),
-        getKnownObjCMethod(method),
         result.ErrorInfo ? Optional<unsigned>(result.ErrorInfo->ParamIndex)
                          : None,
         method->hasRelatedResultType(),
@@ -2548,279 +2678,10 @@ OptionalTypeKind ClangImporter::Implementation::translateNullability(
   }
 }
 
-api_notes::APINotesReader*
-ClangImporter::Implementation::getAPINotesForDecl(const clang::Decl *decl) {
-  if (auto module = getClangSubmoduleForDecl(decl))
-    if (*module)
-      return getAPINotesForModule((*module)->getTopLevelModule());
-  return nullptr;
-}
-
-std::tuple<StringRef, api_notes::APINotesReader *, api_notes::APINotesReader *>
-ClangImporter::Implementation::getAPINotesForContext(
-    const clang::ObjCContainerDecl *container) {
-  // Find the primary set of API notes, in the module where this container
-  // was declared.
-  api_notes::APINotesReader *primary = getAPINotesForDecl(container);
-
-  StringRef name;
-
-  // Find the secondary set of API notes, in the module where the original
-  // class was declared.
-  api_notes::APINotesReader *secondary = nullptr;
-  if (auto category = dyn_cast<clang::ObjCCategoryDecl>(container)) {
-    auto *objcClass = category->getClassInterface();
-    secondary = getAPINotesForDecl(objcClass);
-
-    // For categories, use the name of the class itself.
-    name = objcClass->getName();
-  } else {
-    // For protocols and classes, we just need the class name.
-    name = container->getName();
-  }
-
-  // If the primary and secondary are the same.
-  if (primary == secondary) {
-    // Drop the secondary; we only care about the primary.
-    secondary = nullptr;
-  }
-
-  return std::make_tuple(name, primary, secondary);
-}
-
-void ClangImporter::Implementation::mergePropInfoIntoAccessor(
-    const clang::ObjCMethodDecl *method, api_notes::ObjCMethodInfo &methodInfo){
-
-  if (!method->isPropertyAccessor())
-    return;
-
-  const clang::ObjCPropertyDecl *pDecl = method->findPropertyDecl();
-  if (!pDecl)
-    return;
-
-  if (auto pInfo = getKnownObjCProperty(pDecl)) {
-    if (method->param_size() == 0) {
-      methodInfo.mergePropInfoIntoGetter(*pInfo);
-    } else {
-      assert(method->param_size() == 1);
-      methodInfo.mergePropInfoIntoSetter(*pInfo);
-    }
-  }
-}
-
-static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-lookupObjCContext(api_notes::APINotesReader *reader, StringRef contextName,
-                  const clang::ObjCContainerDecl *contextDecl) {
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    contextInfo;
-
-  // Look for context information in the primary source.
-  if (isa<clang::ObjCProtocolDecl>(contextDecl))
-    contextInfo = reader->lookupObjCProtocol(contextName);
-  else
-    contextInfo = reader->lookupObjCClass(contextName);
-
-  return contextInfo;
-}
-
-
-Optional<api_notes::ObjCMethodInfo>
-ClangImporter::Implementation::getKnownObjCMethod(
-    const clang::ObjCMethodDecl *method,
-    const clang::ObjCContainerDecl *container) {
-  if (!container)
-    container = cast<clang::ObjCContainerDecl>(method->getDeclContext());
-
-  // Figure out where to look for context information.
-  StringRef contextName;
-  api_notes::APINotesReader *primary;
-  api_notes::APINotesReader *secondary;
-  std::tie(contextName, primary, secondary) = getAPINotesForContext(container);
-
-  // Map the selector.
-  SmallVector<StringRef, 2> selectorPieces;
-  api_notes::ObjCSelectorRef selectorRef;
-  selectorRef.NumPieces = method->getSelector().getNumArgs();
-  for (unsigned i = 0, n = std::max(1u, selectorRef.NumPieces); i != n; ++i) {
-    selectorPieces.push_back(method->getSelector().getNameForSlot(i));
-  }
-  selectorRef.Identifiers = selectorPieces;
-
-  // Look for method and context information in the primary source.
-  Optional<api_notes::ObjCMethodInfo> methodInfo;
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    contextInfo;
-
-  if (primary) {
-    // Look for context information in the primary source.
-    contextInfo = lookupObjCContext(primary, contextName, container);
-
-    // Look for method information in the primary source.
-    if (contextInfo) {
-      methodInfo = primary->lookupObjCMethod(contextInfo->first, selectorRef,
-                                             method->isInstanceMethod());
-    }
-  }
-
-  // If we found method or class information in the primary source, return what
-  // we found.
-  if (methodInfo || contextInfo) {
-    if (!methodInfo)
-      methodInfo = api_notes::ObjCMethodInfo();
-
-    // If accessor, merge the property info in.
-    mergePropInfoIntoAccessor(method, *methodInfo);
-
-    // Merge class information into the method.
-    *methodInfo |= contextInfo->second;
-
-    return methodInfo;
-  }
-
-  // Look for method information in the secondary source.
-  if (secondary) {
-    // Look for the context information in the secondary source.
-    contextInfo = lookupObjCContext(secondary, contextName, container);
-
-    // Look for the method in the secondary source. We don't merge context
-    // information from the secondary source.
-    if (contextInfo) {
-      methodInfo = secondary->lookupObjCMethod(contextInfo->first, selectorRef,
-                                               method->isInstanceMethod());
-
-      if (!methodInfo)
-        methodInfo = api_notes::ObjCMethodInfo();
-
-      // If accessor, merge the property info in.
-      mergePropInfoIntoAccessor(method, *methodInfo);
-
-      return methodInfo;
-    }
-  }
-
-  return None;
-}
-
-Optional<api_notes::ObjCContextInfo>
-ClangImporter::Implementation::getKnownObjCContext(
-    const clang::ObjCContainerDecl *container) {
-  // Figure out where to look for context information.
-  StringRef name;
-  api_notes::APINotesReader *primary;
-  api_notes::APINotesReader *secondary;
-  std::tie(name, primary, secondary) = getAPINotesForContext(container);
-
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    primaryInfo;
-  if (primary)
-    primaryInfo = lookupObjCContext(primary, name, container);
-
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    secondaryInfo;
-  if (secondary)
-    secondaryInfo = lookupObjCContext(secondary, name, container);
-
-  // If neither place had information about this class, we're done.
-  if (!primaryInfo && !secondaryInfo)
-    return None;
-
-  api_notes::ObjCContextInfo info;
-
-  // Merge in primary information, if available.
-  if (primaryInfo) {
-    info |= primaryInfo->second;
-  }
-
-  // Merge in secondary information after stripping out anything that is not
-  // propagated from the context's defining module.
-  if (secondaryInfo) {
-    secondaryInfo->second.stripModuleLocalInfo();
-    info |= secondaryInfo->second;
-  }
-
-  return info;
-}
-
-Optional<api_notes::ObjCPropertyInfo>
-ClangImporter::Implementation::getKnownObjCProperty(
-    const clang::ObjCPropertyDecl *property) {
-  auto *container = cast<clang::ObjCContainerDecl>(property->getDeclContext());
-
-  // Figure out where to look for context information.
-  StringRef contextName;
-  api_notes::APINotesReader *primary;
-  api_notes::APINotesReader *secondary;
-  std::tie(contextName, primary, secondary) = getAPINotesForContext(container);
-
-  // Look for property and context information in the primary source.
-  Optional<api_notes::ObjCPropertyInfo> propertyInfo;
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    contextInfo;
-
-  if (primary) {
-    // Look for context information in the primary source.
-    contextInfo = lookupObjCContext(primary, contextName, container);
-
-    // Look for property information in the primary source.
-    if (contextInfo) {
-      propertyInfo = primary->lookupObjCProperty(contextInfo->first,
-                                                 property->getName());
-    }
-  }
-
-  // If we found property or class information in the primary source, return what
-  // we found.
-  if (propertyInfo || contextInfo) {
-    if (!propertyInfo)
-      propertyInfo = api_notes::ObjCPropertyInfo();
-
-    // Merge class information into the property.
-    *propertyInfo |= contextInfo->second;
-
-    return propertyInfo;
-  }
-
-  // Look for property information in the secondary source.
-  if (secondary) {
-    // Look for the context information in the secondary source.
-    contextInfo = lookupObjCContext(secondary, contextName, container);
-
-    // Look for the property in the secondary source. We don't merge context
-    // information from the secondary source.
-    if (contextInfo) {
-      return secondary->lookupObjCProperty(contextInfo->first,
-                                           property->getName());
-    }
-  }
-
-  return None;
-}
-
-Optional<api_notes::GlobalVariableInfo>
-ClangImporter::Implementation::getKnownGlobalVariable(
-    const clang::VarDecl *global) {
-  if (auto notesReader = getAPINotesForDecl(global))
-    return notesReader->lookupGlobalVariable(global->getName());
-  
-  return None;
-}
-
-Optional<api_notes::GlobalFunctionInfo>
-ClangImporter::Implementation::getKnownGlobalFunction(
-    const clang::FunctionDecl *fn) {
-  if (auto notesReader = getAPINotesForDecl(fn))
-    return notesReader->lookupGlobalFunction(fn->getName());
-  
-  return None;
-}
-
 bool ClangImporter::Implementation::hasDesignatedInitializers(
        const clang::ObjCInterfaceDecl *classDecl) {
   if (classDecl->hasDesignatedInitializers())
     return true;
-
-  if (auto info = getKnownObjCContext(classDecl))
-    return info->hasDesignatedInits();
 
   return false;
 }
@@ -2837,33 +2698,27 @@ bool ClangImporter::Implementation::isDesignatedInitializer(
     }
   }
 
-  if (auto info = getKnownObjCMethod(method, classDecl))
-    return info->DesignatedInit;
-
   return false;
 }
 
 bool ClangImporter::Implementation::isRequiredInitializer(
        const clang::ObjCMethodDecl *method) {
   // FIXME: No way to express this in Objective-C.
-
-  if (auto info = getKnownObjCMethod(method))
-    return info->Required;
-
   return false;
 }
 
 FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
                     const clang::ObjCInterfaceDecl *classDecl,
                     const clang::ObjCMethodDecl *method) {
-  if (auto info = getKnownObjCMethod(method, classDecl))
-    return info->getFactoryAsInitKind();
-
   if (auto *customNameAttr = method->getAttr<clang::SwiftNameAttr>()) {
     if (customNameAttr->getName().startswith("init("))
       return FactoryAsInitKind::AsInitializer;
     else
       return FactoryAsInitKind::AsClassMethod;
+  }
+
+  if (method->hasAttr<clang::SwiftSuppressFactoryAsInitAttr>()) {
+    return FactoryAsInitKind::AsClassMethod;
   }
 
   return FactoryAsInitKind::Infer;
@@ -4088,8 +3943,7 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            Impl.OmitNeedlessWords,
-                            Impl.InferDefaultArguments);
+                            Impl.SwiftContext.LangOpts.StripNSPrefix);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>

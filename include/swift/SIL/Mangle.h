@@ -29,6 +29,7 @@ class AbstractClosureExpr;
 
 enum class SpecializationKind : uint8_t {
   Generic,
+  NotReAbstractedGeneric,
   FunctionSignature,
 };
 
@@ -66,6 +67,9 @@ protected:
     switch (Kind) {
     case SpecializationKind::Generic:
       M.append("g");
+      break;
+    case SpecializationKind::NotReAbstractedGeneric:
+      M.append("r");
       break;
     case SpecializationKind::FunctionSignature:
       M.append("f");
@@ -124,9 +128,18 @@ class GenericSpecializationMangler :
   ArrayRef<Substitution> Subs;
 
 public:
+
+  enum ReAbstractionMode {
+    ReAbstracted,
+    NotReabstracted
+  };
+
   GenericSpecializationMangler(Mangle::Mangler &M, SILFunction *F,
-                               ArrayRef<Substitution> Subs)
-    : SpecializationMangler(SpecializationKind::Generic,
+                               ArrayRef<Substitution> Subs,
+                               ReAbstractionMode isReAbstracted = ReAbstracted)
+    : SpecializationMangler(isReAbstracted == ReAbstracted ?
+                              SpecializationKind::Generic :
+                              SpecializationKind::NotReAbstractedGeneric,
                             SpecializationPass::GenericSpecializer,
                             M, F), Subs(Subs) {}
 
@@ -138,6 +151,18 @@ class FunctionSignatureSpecializationMangler
   : public SpecializationMangler<FunctionSignatureSpecializationMangler> {
 
   friend class SpecializationMangler<FunctionSignatureSpecializationMangler>;
+
+  using ReturnValueModifierIntBase = uint16_t;
+  enum class ReturnValueModifier : ReturnValueModifierIntBase {
+    // Option Space 4 bits (i.e. 16 options).
+    Unmodified=0,
+    First_Option=0, Last_Option=31,
+
+    // Option Set Space. 12 bits (i.e. 12 option).
+    Dead=32,
+    OwnedToUnowned=64,
+    First_OptionSetEntry=32, LastOptionSetEntry=32768,
+  };
 
   // We use this private typealias to make it easy to expand ArgumentModifier's
   // size if we need to.
@@ -162,6 +187,8 @@ class FunctionSignatureSpecializationMangler
                             NullablePtr<SILInstruction>>;
   llvm::SmallVector<ArgInfo, 8> Args;
 
+  ReturnValueModifierIntBase ReturnValue;
+
 public:
   FunctionSignatureSpecializationMangler(SpecializationPass Pass,
                                          Mangle::Mangler &M, SILFunction *F);
@@ -173,6 +200,7 @@ public:
   void setArgumentSROA(unsigned ArgNo);
   void setArgumentBoxToValue(unsigned ArgNo);
   void setArgumentBoxToStack(unsigned ArgNo);
+  void setReturnValueOwnedToUnowned();
 
 private:
   void mangleSpecialization();
@@ -181,6 +209,7 @@ private:
   void mangleClosureProp(ThinToThickFunctionInst *TTTFI);
   void mangleArgument(ArgumentModifierIntBase ArgMod,
                       NullablePtr<SILInstruction> Inst);
+  void mangleReturnValue(ReturnValueModifierIntBase RetMod);
 };
 
 } // end namespace swift

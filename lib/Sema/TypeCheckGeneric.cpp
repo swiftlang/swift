@@ -121,7 +121,7 @@ Type PartialGenericTypeToArchetypeResolver::resolveSelfAssociatedType(
        AssociatedTypeDecl *assocType) {
   // We don't have enough information to find the associated type.
   // FIXME: Nonsense, but we shouldn't need this code anyway.
-  return DependentMemberType::get(selfTy, assocType->getName(), TC.Context);
+  return DependentMemberType::get(selfTy, assocType, TC.Context);
 }
 
 Type
@@ -174,6 +174,13 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     return DependentMemberType::get(baseTy, assocType, TC.Context);
   }
 
+  // If the nested type comes from a type alias, use either the alias's
+  // concrete type, or resolve its components down to another dependent member.
+  if (auto alias = nestedPA->getTypeAliasDecl()) {
+    return TC.substMemberTypeWithBase(DC->getParentModule(), alias,
+                                      baseTy, true);
+  }
+  
   Identifier name = ref->getIdentifier();
   SourceLoc nameLoc = ref->getIdLoc();
 
@@ -239,7 +246,7 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
   TypeResolutionOptions options;
   DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
   if (!lookupDC->isModuleScopeContext()) {
-    assert(isa<NominalTypeDecl>(lookupDC) || isa<ExtensionDecl>(lookupDC) ||
+    assert(isa<GenericTypeDecl>(lookupDC) || isa<ExtensionDecl>(lookupDC) ||
            isa<AbstractFunctionDecl>(lookupDC) &&
            "not a proper generic parameter context?");
     options = TR_GenericSignature;
@@ -743,17 +750,17 @@ GenericSignature *TypeChecker::validateGenericSignature(
   return sig;
 }
 
-bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
+bool TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   bool invalid = false;
-  if (!nominal->IsValidatingGenericSignature()) {
-    nominal->setIsValidatingGenericSignature();
-    auto sig = validateGenericSignature(nominal->getGenericParams(),
-                                        nominal->getDeclContext(),
+  if (!typeDecl->IsValidatingGenericSignature()) {
+    typeDecl->setIsValidatingGenericSignature();
+    auto sig = validateGenericSignature(typeDecl->getGenericParams(),
+                                        typeDecl->getDeclContext(),
                                         nullptr, nullptr, invalid);
     assert(sig->getInnermostGenericParams().size()
-             == nominal->getGenericParams()->size());
-    nominal->setGenericSignature(sig);
-    nominal->setIsValidatingGenericSignature(false);
+             == typeDecl->getGenericParams()->size());
+    typeDecl->setGenericSignature(sig);
+    typeDecl->setIsValidatingGenericSignature(false);
   }
   return invalid;
 }

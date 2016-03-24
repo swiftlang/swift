@@ -52,7 +52,7 @@ class Hash {
     return x
   }
 
-  func digestFast(inout Res : [UInt8]) {
+  func digestFast(Res: inout [UInt8]) {
     fillBlock()
     hash()
     // We use [UInt8] to avoid using String::append.
@@ -64,7 +64,7 @@ class Hash {
   // Hash state:
   final var messageLength : Int = 0
   final var dataLength : Int = 0
-  final var data = [UInt8](count: 64, repeatedValue: 0)
+  final var data = [UInt8](repeating: 0, count: 64)
   final var blocksize : Int
 
   /// \brief Hash the internal data.
@@ -76,7 +76,7 @@ class Hash {
   func hashState() -> String {
     fatalError("Pure virtual")
   }
-  func hashStateFast(inout Res : [UInt8]) {
+  func hashStateFast(Res: inout [UInt8]) {
     fatalError("Pure virtual")
   }
 
@@ -102,7 +102,7 @@ class Hash {
   }
 
   final
-  func toHexFast(In: UInt32, inout _ Res: Array<UInt8>, _ Index : Int) {
+  func toHexFast(In: UInt32, _ Res: inout Array<UInt8>, _ Index : Int) {
     var In = In
     for i in 0..<4 {
       // Convert one byte each iteration.
@@ -178,7 +178,7 @@ class MD5 : Hash {
     dataLength = 0
   }
 
-  func appendBytes(Val: Int, inout _ Message: Array<UInt8>, _ Offset : Int) {
+  func appendBytes(Val: Int, _ Message: inout Array<UInt8>, _ Offset : Int) {
     Message[Offset] = UInt8(truncatingBitPattern: Val)
     Message[Offset + 1] = UInt8(truncatingBitPattern: Val >> 8)
     Message[Offset + 2] = UInt8(truncatingBitPattern: Val >> 16)
@@ -223,7 +223,7 @@ class MD5 : Hash {
     return first | second | third | fourth
   }
 
-  var w = [UInt32](count: 16, repeatedValue: 0)
+  var w = [UInt32](repeating: 0, count: 16)
   override
   func hash() {
     assert(dataLength == blocksize, "Invalid block size")
@@ -290,7 +290,7 @@ class MD5 : Hash {
   }
 
   override
-  func hashStateFast(inout Res : [UInt8]) {
+  func hashStateFast(Res: inout [UInt8]) {
 #if !NO_RANGE
     var Idx : Int = 0
     for h in [h0, h1, h2, h3] {
@@ -362,7 +362,7 @@ class SHA1 : Hash {
     assert(dataLength == blocksize, "Invalid block size")
 
     // Init the "W" buffer.
-    var w = [UInt32](count: 80, repeatedValue: 0)
+    var w = [UInt32](repeating: 0, count: 80)
 
     // Convert the Byte array to UInt32 array.
     var word : UInt32 = 0
@@ -497,7 +497,7 @@ class SHA256 :  Hash {
     assert(dataLength == blocksize, "Invalid block size")
 
     // Init the "W" buffer.
-    var w = [UInt32](count: 64, repeatedValue: 0)
+    var w = [UInt32](repeating: 0, count: 64)
 
     // Convert the Byte array to UInt32 array.
     var word : UInt32 = 0

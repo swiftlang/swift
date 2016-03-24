@@ -107,7 +107,7 @@ class C<T> {
 
 // rdar://problem/22036358
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22036358
-public extension AnyGenerator {
+public extension AnyIterator {
   public extension AnySequence {
     public func take(n: Int) -> AnySequence<Element> {
       var xs: [Element] = []
@@ -162,7 +162,7 @@ func rdar22834017() {
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | FileCheck %s -check-prefix=RDAR_23173692
 func rdar23173692() {
-  return IndexingGenerator(#^RDAR_23173692^#)
+  return IndexingIterator(#^RDAR_23173692^#)
 }
 // RDAR_23173692: Begin completions
 

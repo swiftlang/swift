@@ -16,6 +16,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 
+#include <vector>
+
 namespace swift {
 class ASTContext;
 class ASTPrinter;
@@ -38,7 +40,13 @@ enum class ModuleTraversal : unsigned {
 /// Options used to describe the traversal of a module for printing.
 typedef OptionSet<ModuleTraversal> ModuleTraversalOptions;
 
-void printModuleInterface(ModuleDecl *M,
+ArrayRef<StringRef> collectModuleGroups(ModuleDecl *M,
+                                        std::vector<StringRef> &Scratch);
+
+Optional<StringRef>
+findGroupNameForUSR(ModuleDecl *M, StringRef USR);
+
+void printModuleInterface(ModuleDecl *M, Optional<StringRef> Group,
                           ModuleTraversalOptions TraversalOptions,
                           ASTPrinter &Printer, const PrintOptions &Options,
                           const bool PrintSynthesizedExtensions);
@@ -46,7 +54,7 @@ void printModuleInterface(ModuleDecl *M,
 // FIXME: this API should go away when Swift can represent Clang submodules as
 // 'swift::Module *' objects.
 void printSubmoduleInterface(ModuleDecl *M, ArrayRef<StringRef> FullModuleName,
-                             Optional<StringRef> GroupName,
+                             ArrayRef<StringRef> GroupNames,
                              ModuleTraversalOptions TraversalOptions,
                              ASTPrinter &Printer, const PrintOptions &Options,
                              const bool PrintSynthesizedExtensions);

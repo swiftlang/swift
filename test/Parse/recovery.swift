@@ -67,7 +67,7 @@ static protocol StaticProtocol {} // expected-error {{declaration cannot be mark
 static typealias StaticTypealias = Int // expected-error {{declaration cannot be marked 'static'}} {{1-8=}}
 
 class ClassWithStaticDecls {
-  class var a = 42 // expected-error {{class stored properties not yet supported}}
+  class var a = 42 // expected-error {{class stored properties not supported}}
 }
 
 //===--- Recovery for missing controlling expression in statements.
@@ -204,18 +204,18 @@ for{{ // expected-error {{expression resolves to an unused function}}
 }
 
 func missingControllingExprInForEach() {
-  for in { // expected-error {{expected pattern}} expected-error {{expected SequenceType expression for for-each loop}}
+  for in { // expected-error {{expected pattern}} expected-error {{expected Sequence expression for for-each loop}}
   }
 
 
   // expected-error @+4 {{expected 'in' after for-each pattern}}
   // expected-error @+3 {{expected '{' to start the body of for-each loop}}
   // expected-error @+2 {{expected pattern}}
-  // expected-error @+1 {{expected SequenceType expression for for-each loop}}
-  for for in { // expected-error {{expected pattern}} expected-error {{expected SequenceType expression for for-each loop}}
+  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  for for in { // expected-error {{expected pattern}} expected-error {{expected Sequence expression for for-each loop}}
   }
 
-  for i in { // expected-error {{expected SequenceType expression for for-each loop}}
+  for i in { // expected-error {{expected Sequence expression for for-each loop}}
   }
 }
 
@@ -354,7 +354,7 @@ struct ErrorTypeInVarDeclFunctionType1 {
   var v2 : Int
 }
 
-struct ErrorTypeInVarDeclArrayType1 {
+struct ErrorTypeInVarDeclArrayType1 { // expected-note{{in declaration of 'ErrorTypeInVarDeclArrayType1'}}
   var v1 : Int[+] // expected-error {{expected declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}}
   // expected-error @-1 {{expected expression after unary operator}}
   // expected-error @-2 {{expected expression}}
@@ -409,7 +409,7 @@ struct ErrorInFunctionSignatureResultArrayType5 {
 }
 
 
-struct ErrorInFunctionSignatureResultArrayType11 {
+struct ErrorInFunctionSignatureResultArrayType11 { // expected-note{{in declaration of 'ErrorInFunctionSignatureResultArrayType11'}}
   func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{use of unresolved identifier 'a'}} expected-error {{expected declaration}}
   }
 }
@@ -448,7 +448,7 @@ class ExprSuper2 {
 
 //===--- Recovery for braces inside a nominal decl.
 
-struct BracesInsideNominalDecl1 {
+struct BracesInsideNominalDecl1 { // expected-note{{in declaration of 'BracesInsideNominalDecl1'}}
   { // expected-error {{expected declaration}}
     aaa
   }
@@ -459,9 +459,18 @@ func use_BracesInsideNominalDecl1() {
   var _ : BracesInsideNominalDecl1.A // no-error
 }
 
+class SR771 { // expected-note {{in declaration of 'SR771'}}
+    print("No one else was in the room where it happened") // expected-error {{expected declaration}}
+}
+
+extension SR771 { // expected-note {{in extension of 'SR771'}}
+    print("The room where it happened, the room where it happened") // expected-error {{expected declaration}}
+}
+
+
 //===--- Recovery for wrong decl introducer keyword.
 
-class WrongDeclIntroducerKeyword1 {
+class WrongDeclIntroducerKeyword1 { // expected-note{{in declaration of 'WrongDeclIntroducerKeyword1'}}
   notAKeyword() {} // expected-error {{expected declaration}}
   func foo() {}
   class func bar() {}
@@ -664,3 +673,14 @@ func postfixDot(a : String) {
   _ = a.       // expected-error {{expected member name following '.'}}
     a.         // expected-error {{expected member name following '.'}}
 }
+
+// <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
+func r23036383(arr : [Int]?) {
+  if let _ = arr?.map {$0+1} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{14-14=(}} {{29-29=)}}
+  }
+
+  let numbers = [1, 2]
+  for _ in numbers.filter {$0 > 4} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{12-12=(}} {{35-35=)}}
+  }
+}
+

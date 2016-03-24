@@ -16,14 +16,14 @@ struct Array2D {
   let cols: Int
 
   init(numRows: Int, numCols: Int) {
-    storage = [Int](count: numRows * numCols, repeatedValue: 0)
+    storage = [Int](repeating: 0, count: numRows * numCols)
     rows = numRows
     cols = numCols
   }
 }
 
 @inline(never)
-func workload_2DArrayTest(inout A: Array2D) {
+func workload_2DArrayTest(A: inout Array2D) {
   for _ in 0 ..< 10 {
     for r in 0 ..< A.rows {
       for c in 0 ..< A.cols {

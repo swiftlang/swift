@@ -15,6 +15,9 @@ list(APPEND CMAKE_MODULE_PATH
 include(AddSwiftBenchmarkSuite)
 
 set(SWIFT_BENCH_MODULES
+    single-source/unit-tests/ObjectiveCBridging
+    single-source/unit-tests/ObjectiveCBridgingStubs
+    single-source/unit-tests/StackPromo
     single-source/Ackermann
     single-source/AngryPhonebook
     single-source/Array2D
@@ -65,6 +68,7 @@ set(SWIFT_BENCH_MODULES
     single-source/PopFrontGeneric
     single-source/Prims
     single-source/ProtocolDispatch
+    single-source/ProtocolDispatch2
     single-source/RangeAssignment
     single-source/RC4
     single-source/RecursiveOwnedParameter
@@ -84,6 +88,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SuperChars
     single-source/TwoSum
     single-source/TypeFlood
+    single-source/UTF8Decode
     single-source/Walsh
     single-source/XorLoop
 )
@@ -194,17 +199,26 @@ endforeach()
 
 set(executable_targets)
 
-set(srcdir "${CMAKE_CURRENT_SOURCE_DIR}")
-set(bindir "${CMAKE_CURRENT_BINARY_DIR}/bin")
-set(libdir "${CMAKE_CURRENT_BINARY_DIR}/lib")
-set(libswiftdir "${CMAKE_CURRENT_BINARY_DIR}/lib/swift")
-file(MAKE_DIRECTORY "${bindir}")
-file(MAKE_DIRECTORY "${libdir}")
-file(MAKE_DIRECTORY "${libswiftdir}")
-
 if(SWIFT_SDKS)
   set(IS_SWIFT_BUILD true)
 endif()
+
+set(srcdir "${CMAKE_CURRENT_SOURCE_DIR}")
+
+if(IS_SWIFT_BUILD)
+  get_filename_component(swift-bin-dir "${SWIFT_EXEC}" DIRECTORY)
+else()
+  set(swift-bin-dir "${CMAKE_BINARY_DIR}/bin")
+endif()
+
+set(benchmark-bin-dir "${CMAKE_CURRENT_BINARY_DIR}/bin")
+set(benchmark-lib-dir "${CMAKE_CURRENT_BINARY_DIR}/lib")
+set(benchmark-lib-swift-dir "${CMAKE_CURRENT_BINARY_DIR}/lib/swift")
+
+file(MAKE_DIRECTORY "${swift-bin-dir}")
+file(MAKE_DIRECTORY "${benchmark-bin-dir}")
+file(MAKE_DIRECTORY "${benchmark-lib-dir}")
+file(MAKE_DIRECTORY "${benchmark-lib-swift-dir}")
 
 # Compile the perf test suite for each platform
 foreach(platform ${platforms})

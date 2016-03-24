@@ -20,6 +20,9 @@
 // RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: FileCheck -check-prefix LINUX-armv7 %s < %t.linux.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target thumbv7-unknown-linux-gnueabihf -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: FileCheck -check-prefix LINUX-thumbv7 %s < %t.linux.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix COMPLEX %s < %t.complex.txt
@@ -40,9 +43,9 @@
 
 // REQUIRES: X86
 
-// FIXME: Need to set up a sysroot for osx so the DEBUG checks work on linux
+// FIXME: Need to set up a sysroot for osx so the DEBUG checks work on linux/freebsd
 // rdar://problem/19692770
-// XFAIL: linux
+// XFAIL: freebsd, linux
 
 // CHECK: swift
 // CHECK: -o [[OBJECTFILE:.*]]
@@ -108,7 +111,6 @@
 // LINUX-x86_64-DAG: -lswiftCore
 // LINUX-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-x86_64-DAG: -Xlinker -T /{{[^ ]+}}/linux/x86_64/swift.ld
 // LINUX-x86_64-DAG: -F foo
 // LINUX-x86_64-DAG: -framework bar
 // LINUX-x86_64-DAG: -L baz
@@ -125,7 +127,6 @@
 // LINUX-armv6-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-armv6-DAG: --target=armv6-unknown-linux-gnueabihf
 // LINUX-armv6-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-armv6-DAG: -Xlinker -T /{{[^ ]+}}/linux/armv6/swift.ld
 // LINUX-armv6-DAG: -F foo
 // LINUX-armv6-DAG: -framework bar
 // LINUX-armv6-DAG: -L baz
@@ -142,13 +143,28 @@
 // LINUX-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-armv7-DAG: --target=armv7-unknown-linux-gnueabihf
 // LINUX-armv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-armv7-DAG: -Xlinker -T /{{[^ ]+}}/linux/armv7/swift.ld
 // LINUX-armv7-DAG: -F foo
 // LINUX-armv7-DAG: -framework bar
 // LINUX-armv7-DAG: -L baz
 // LINUX-armv7-DAG: -lboo
 // LINUX-armv7-DAG: -Xlinker -undefined
 // LINUX-armv7: -o linker
+
+// LINUX-thumbv7: swift
+// LINUX-thumbv7: -o [[OBJECTFILE:.*]]
+
+// LINUX-thumbv7: clang++{{"? }}
+// LINUX-thumbv7-DAG: [[OBJECTFILE]]
+// LINUX-thumbv7-DAG: -lswiftCore
+// LINUX-thumbv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// LINUX-thumbv7-DAG: --target=thumbv7-unknown-linux-gnueabihf
+// LINUX-thumbv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
+// LINUX-thumbv7-DAG: -F foo
+// LINUX-thumbv7-DAG: -framework bar
+// LINUX-thumbv7-DAG: -L baz
+// LINUX-thumbv7-DAG: -lboo
+// LINUX-thumbv7-DAG: -Xlinker -undefined
+// LINUX-thumbv7: -o linker
 
 // COMPLEX: bin/ld{{"? }}
 // COMPLEX-DAG: -dylib

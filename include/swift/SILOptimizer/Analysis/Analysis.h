@@ -117,6 +117,18 @@ namespace swift {
     /// Invalidate all of the information for a specific function.
     virtual void invalidate(SILFunction *F, InvalidationKind K) {}
 
+    /// Invalidate all of the information for a specific function. Also, we
+    /// know that this function is a dead function and going to be deleted from
+    /// the module.
+    virtual void invalidateForDeadFunction(SILFunction *F, InvalidationKind K) {
+      // Call the normal invalidate function unless overridden by specific
+      // analysis.
+      invalidate(F, K);
+    }
+    
+    /// Notify the analysis about a newly created function.
+    virtual void notifyAnalysisOfFunction(SILFunction *F) {}
+
     /// Verify the state of this analysis.
     virtual void verify() const {}
 

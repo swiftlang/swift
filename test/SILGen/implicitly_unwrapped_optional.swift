@@ -17,14 +17,14 @@ func foo(f f: (()->())!) {
 // CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[PF]]
 // CHECK-NEXT: [[FN0:%.*]] = load [[FN0_ADDR]]
 //   ...unnecessarily reabstract back to () -> ()...
-// CHECK:      [[T0:%.*]] = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@owned @callee_owned (@out (), @in ()) -> ()) -> ()
+// CHECK:      [[T0:%.*]] = function_ref @_TTRXFo_iT__iT__XFo___ : $@convention(thin) (@owned @callee_owned (@in ()) -> @out ()) -> ()
 // CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
 //   .... then call it
 // CHECK-NEXT: apply [[FN1]]()
 // CHECK:      br bb2
 //   (first nothing block)
 // CHECK:    bb3:
-// CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
+// CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br bb2
 //   The rest of this is tested in optional.swift
 
@@ -32,7 +32,7 @@ func wrap<T>(x x: T) -> T! { return x }
 
 // CHECK-LABEL: sil hidden @_TF29implicitly_unwrapped_optional16wrap_then_unwrap
 func wrap_then_unwrap<T>(x x: T) -> T {
-  // CHECK: [[FORCE:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+  // CHECK: [[FORCE:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
   // CHECK: apply [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x: x)!
 }

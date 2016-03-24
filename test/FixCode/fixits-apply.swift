@@ -16,7 +16,7 @@ var i : Int = opti
 // But remove unnecessary bang.
 var i2 : Int = i!
 
-struct MyMask : OptionSetType {
+struct MyMask : OptionSet {
   init(_ rawValue: UInt) {}
   init(rawValue: UInt) {}
   init(nilLiteral: ()) {}
@@ -38,9 +38,9 @@ func foo() -> Int {
   }
 }
 
-func goo(var e : ErrorType) {}
+func goo(var e : ErrorProtocol) {}
 
-struct Test1 : RawOptionSetType {
+struct Test1 : OptionSet {
   init(rawValue: Int) {}
   var rawValue: Int { return 0 }
 }

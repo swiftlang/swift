@@ -24,7 +24,7 @@ class ArrayWrapper {
   var data: [Int]
 
   init(_ count: Int, _ initialValue: Int) {
-    data = [Int](count: count, repeatedValue: initialValue)
+    data = [Int](repeating: initialValue, count: count)
   }
 
   func compare(b: ArrayWrapper, _ iteration: Int, _ stopIteration: Int) -> Bool {

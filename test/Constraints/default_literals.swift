@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
-func acceptInt(inout _ : Int) {}
-func acceptDouble(inout _ : Double) {}
+func acceptInt(_ : inout Int) {}
+func acceptDouble(_ : inout Double) {}
 
 var i1 = 1
 acceptInt(&i1)

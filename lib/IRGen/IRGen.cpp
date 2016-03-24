@@ -84,7 +84,13 @@ static void addSwiftStackPromotionPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftStackPromotionPass());
 }
 
-// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp. 
+static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
+                                      legacy::PassManagerBase &PM) {
+  PM.add(createAddressSanitizerFunctionPass());
+  PM.add(createAddressSanitizerModulePass());
+}
+
+// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp.
 // These should be moved to a single definition shared by clang and swift.
 enum ImageInfoFlags {
   eImageInfo_FixAndContinue      = (1 << 0),
@@ -149,6 +155,13 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addSwiftContractPass);
   }
+
+  if (Opts.Sanitize == SanitizerKind::Address) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addAddressSanitizerPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addAddressSanitizerPasses);
+  }
   
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
@@ -211,7 +224,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 class MD5Stream : public llvm::raw_ostream {
 private:
 
-  uint64_t Pos;
+  uint64_t Pos = 0;
   llvm::MD5 Hash;
 
   void write_impl(const char *Ptr, size_t Size) override {
@@ -304,7 +317,7 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
                         StringRef OutputFilename) {
-  if (HashGlobal) {
+  if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
     MD5::MD5Result Result;

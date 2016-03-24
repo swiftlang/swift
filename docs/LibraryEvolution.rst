@@ -48,11 +48,6 @@ published should not limit its evolution in the future.
 
     - Drew Crawford is concerned about inlineable code breaking modularity;
       you can't just release a new dylib to fix a bug.
-    - Joe Groff has brought up always-emitted-into-the-client code, which has
-      fewer restrictions and different behavior than may-inline code.
-    - David Owens wants it to be clearer that this document doesn't really
-      cover behavior changes and proper semantic versioning, just binary
-      compatibility.
 
 
 Introduction
@@ -70,6 +65,23 @@ current version of the library. In simple terms:
 This document will frequently refer to a *library* which vends public APIs, and
 a single *client* that uses them. The same principles apply even when multiple
 libraries and multiple clients are involved.
+
+This document is primarily concerned with `binary compatibility`, i.e. what
+changes can safely be made to a library between releases that will not break
+memory-safety or type-safety, or cause clients to fail to run at all. A
+secondary concern is identifying `binary-compatible source-breaking changes
+<binary-compatible source-breaking change>`, where clients compiled against the
+previous version of a library are likely to behave differently than clients
+compiled against the new version of the library.
+
+.. note::
+
+    These rules do not (and cannot) guarantee that a change is *semantically*
+    backwards-compatible or forwards-compatible. *Any* change to a library's
+    existing API that affects its observable behavior may affect clients. It is
+    the responsibility of a library author to be sure that the changes they are
+    making are *semantically* correct, preserving the preconditions,
+    postconditions, and invariants of previously-published APIs.
 
 This model is largely not of interest to libraries that are bundled with their
 clients (distribution via source, static library, or embedded/sandboxed dynamic
@@ -178,11 +190,6 @@ Code within a library may generally use all other entities declared within the
 library (barring their own availability checks), since the entire library is
 shipped as a unit. That is, even if a particular API was introduced in v1.0,
 its (non-public) implementation may refer to APIs introduced in later versions.
-
-Swift libraries are strongly encouraged to use `semantic versioning`_, but this
-is not enforced by the language.
-
-.. _semantic versioning: http://semver.org
 
 Certain uses of ``internal`` entities require them to be part of a library's
 binary interface, which means they need to be versioned as well. See
@@ -322,7 +329,6 @@ available to clients as part of the module's public interface. ``@inlineable``
 is a `versioned attribute`; clients may not assume that the body of the
 function is suitable when deploying against older versions of the library.
 
-
 Clients are not required to inline a function marked ``@inlineable``.
 
 .. note::
@@ -369,11 +375,13 @@ and the ``x`` and ``y`` properties have now disappeared. To avoid this, the bodi
 
 - They may not define any local types (other than typealiases).
 
-- They must not reference any ``private`` entities, except for local functions
-  declared within the inlineable function itself.
+- They must not reference any ``private`` entities, except for those marked
+  ``@always_emit_into_client`` (see below). This includes local functions
+  defined within the inlineable function.
 
 - They must not reference any ``internal`` entities except for those that have
-  been `versioned`_. See below for a discussion of versioning internal API.
+  been `versioned`_ and those declared ``@always_emit_into_client``. See below
+  for a discussion of versioning internal API.
 
 - They must not reference any entities from the current module introduced
   after the function was made inlineable.
@@ -386,29 +394,91 @@ as the current body makes sense when deploying against an earlier version of
 the library.
 
 
-Local Functions
----------------
+``@always_emit_into_client``
+----------------------------
 
-If an inlineable function contains local functions or closures, these are
-implicitly made inlineable as well. This is important in case the library
-author decides to change the inlineable function later. If the inlineable
-function is emitted into a client module as described above, the local
-functions must be as well. (At the SIL level, these local functions are
-considered to have ``shared`` linkage.)
+The normal ``@inlineable`` attribute states that a function *may* be inlined
+into a client binary. There are a few cases where it is worth *guaranteeing*
+that the function is emitted into the client:
 
-Local functions are subject to the same restrictions as the inlineable
-functions containing them, as described above.
+- The function is used to determine which version of the library a client was
+  compiled against.
+
+- The function is a helper for an ``@inlineable`` function, but should not be
+  part of the library's ABI.
+
+This is handled by the ``@always_emit_into_client`` attribute. If one of these
+functions is referenced by a client module, its implementation is always copied
+into the client module. ``@always_emit_into_client`` functions are subject to
+the same restrictions as regular ``@inlineable`` functions, as described above.
+The description "inlineable" collectively refers to declarations marked with
+``@inlineable`` and declarations marked with ``@always_emit_into_client``. A
+declaration may not be both ``@inlineable`` and ``@always_emit_into_client``.
+
+.. note::
+
+    This is represented by a ``shared`` function in SIL.
+
+.. admonition:: TODO
+
+    All of these names are provisional. In particular, It Would Be Nice(tm) if
+    the final name for ``@always_emit_into_client`` was a variation of the
+    final name for ``@inlineable``.
+
+Any local functions or closures within an inlineable function are themselves
+treated as ``@always_emit_into_client``. This is important in case it is
+necessary to change the inlineable function later; existing clients should not
+be depending on internal details of the previous implementation.
+
+``@always_emit_into_client`` is *not* a versioned attribute, and therefore it
+may not be added to a declaration that was versioned in a previous release of a
+library. An existing ``@inlineable`` function may not be changed to an
+``@always_emit_into_client`` function or vice versa.
+
+It is a `binary-compatible source-breaking change` to completely remove a
+public entity marked ``@always_emit_into_client`` from a library. (Non-public,
+non-versioned entities may always be removed from a library; they are not part
+of its API or ABI.)
+
+Removing ``@always_emit_into_client`` from a public entity is also a
+`binary-compatible source-breaking change`, and requires updating the
+availability of that entity. Removing ``@always_emit_into_client`` from a
+non-public entity is always permitted.
+
+.. note::
+
+    As an example, if an API is marked ``@always_emit_into_client`` in version
+    1 of a library, and the attribute is removed in version 2, the entity
+    itself must be updated to state that it is introduced in version 2. This is
+    equivalent to removing the entity and then adding a new one with the same
+    name.
+
+Although they are not a supported feature for arbitrary libraries at this time,
+`transparent`_ functions are implicitly marked ``@always_emit_into_client``.
+
+.. _transparent: https://github.com/apple/swift/blob/master/docs/TransparentAttr.rst
+
+.. note::
+
+    Why have both ``@inlineable`` and ``@always_emit_into_client``? Because for
+    a larger function, like ``MutableCollectionType.sort``, it may be useful to
+    provide the body to clients for analysis, but not duplicate code when not
+    necessary. ``@always_emit_into_client`` also may not be added to an
+    existing versioned declaration.
+
+.. admonition:: TODO
+
+    What does it mean for an ``@always_emit_into_client`` declaration to
+    satisfy a protocol requirement?
 
 
 Default Argument Expressions
 ----------------------------
 
-Default argument expressions are subject to the same restrictions as inlineable
-functions, because they are implemented as inlineable functions. However,
-default arguments are *always* inlined into their callers and cannot be
-referenced as first-class functions, so they do not need to be versioned. (More
-explicitly, a default argument implicitly has the same availability as the
-function it is attached to.)
+Default argument expressions are implemented as ``@always_emit_into_client``
+functions and thus are subject to the same restrictions as inlineable
+functions. A default argument implicitly has the same availability as the
+function it is attached to.
 
 .. note::
 
@@ -494,8 +564,9 @@ clients to access them more efficiently. This restricts changes a fair amount:
     inlineable while still allowing the setter to change. This would need
     syntax, though.
 
-Any inlineable accessors must follow the rules for `inlineable functions`_,
-as described above.
+Any inlineable accessors must follow the rules for `inlineable functions`_, as
+described above. Top-level computed variables may be marked
+``@always_emit_into_client``, with the same restrictions as for functions.
 
 Note that if a constant's initial value expression has any observable side
 effects, including the allocation of class instances, it must not be treated
@@ -546,10 +617,11 @@ Methods and Initializers
 
 For the most part struct methods and initializers are treated exactly like
 top-level functions. They permit all of the same modifications and can also be
-marked ``@inlineable``, with the same restrictions. Inlineable initializers
-must always delegate to another initializer, since new properties may be added
-between new releases. For the same reason, initializers declared outside of the
-struct's module must always delegate to another initializer.
+marked ``@inlineable`` or ``@always_emit_into_client``, with the same
+restrictions. Inlineable initializers must always delegate to another
+initializer, since new properties may be added between new releases. For the
+same reason, initializers declared outside of the struct's module must always
+delegate to another initializer.
 
 
 Properties
@@ -559,10 +631,10 @@ Struct properties behave largely the same as top-level bindings. They permit
 all of the same modifications, and also allow adding or removing an initial
 value entirely.
 
-Struct properties can also be marked ``@inlineable``, with the same
-restrictions as for top-level bindings. An inlineable stored property may not
-become computed, but the offset of its storage within the struct is not
-necessarily fixed.
+Struct properties can also be marked ``@inlineable`` or
+``@always_emit_into_client``, with the same restrictions as for top-level
+bindings. An inlineable stored property may not become computed, but the offset
+of its storage within the struct is not necessarily fixed.
 
 .. note::
 
@@ -570,6 +642,8 @@ necessarily fixed.
     the start of the struct, sorted by availability, so that the offset *could*
     be fixed. This would have to be balanced against other goals for struct
     layout.
+
+Only computed properties may be marked ``@always_emit_into_client``.
 
 Like top-level constants, it is *not* safe to change a ``let`` property into a
 variable or vice versa. Properties declared with ``let`` are assumed not to
@@ -586,8 +660,8 @@ stored subscripts. This means that the following changes are permitted:
 - Adding or removing a non-public, non-versioned setter.
 - Changing the body of an accessor.
 
-Like properties, subscripts can be marked ``@inlineable``, which restricts the
-set of changes:
+Like properties, subscripts can be marked ``@inlineable`` or
+``@always_emit_into_client``, which restricts the set of changes:
 
 - Adding a versioned setter is still permitted.
 - Adding or removing a non-public, non-versioned setter is still permitted.
@@ -684,9 +758,10 @@ still be modified in limited ways:
 - A versioned ``internal`` property may be made ``public`` (without changing
   its version).
 
-An initializer of a fixed-contents struct may be declared ``@inlineable`` even
-if it does not delegate to another initializer, as long as the ``@inlineable``
-attribute is not introduced earlier than the ``@fixed_contents`` attribute and
+An initializer of a fixed-contents struct may be declared ``@inlineable`` or
+``@always_emit_into_client`` even if it does not delegate to another
+initializer, as long as the ``@inlineable`` attribute, or the initializer
+itself, is not introduced earlier than the ``@fixed_contents`` attribute and
 the struct has no non-versioned stored properties.
 
 A ``@fixed_contents`` struct is *not* guaranteed to use the same layout as a C
@@ -764,9 +839,10 @@ Initializers
 
 For the most part enum initializers are treated exactly like top-level
 functions. They permit all of the same modifications and can also be marked
-``@inlineable``, with the same restrictions. Unlike struct initializers, enum
-initializers do not always need to delegate to another initializer, even if
-they are ``@inlineable`` or declared in a separate module.
+``@inlineable`` or ``@always_emit_into_client``, with the same restrictions.
+Unlike struct initializers, enum initializers do not always need to delegate to
+another initializer, even if they are inlineable or declared in a separate
+module.
 
 
 Methods and Subscripts
@@ -961,9 +1037,9 @@ convenience initializer; that initializer may only call existing ``required``
 initializers. An existing initializer may not be marked ``required``.
 
 All of the modifications permitted for top-level functions are also permitted
-for class initializers. Convenience initializers may be marked ``@inlineable``,
-with the same restrictions as top-level functions; designated initializers may
-not.
+for class initializers. Convenience initializers may be marked ``@inlineable``
+or ``@always_emit_into_client``, with the same restrictions as top-level
+functions; designated initializers may not.
 
 
 Methods
@@ -987,7 +1063,8 @@ top-level functions, but the potential for overrides complicates things a little
 
 Class and instance methods may be marked ``@inlineable``, with the same
 restrictions as struct methods. ``dynamic`` methods may not be marked
-``@inlineable``.
+``@inlineable``. Only non-overriding ``final`` methods may be marked
+``@always_emit_into_client``.
 
 If an inlineable method is overridden, the overriding method does not need to
 also be inlineable. Clients may only inline a method when they can devirtualize
@@ -1026,8 +1103,9 @@ Constant properties (those declared with ``let``) still permit changing their
 value, as well as adding or removing an initial value entirely.
 
 Both variable and constant properties (on both instances and classes) may be
-marked ``@inlineable``. This behaves as described for struct properties.
-``dynamic`` properties may not be marked ``@inlineable``.
+marked ``@inlineable``; non-overriding ``final`` computed properties may also
+be marked ``@always_emit_into_client``. This behaves as described for struct
+properties. ``dynamic`` properties may not be marked ``@inlineable``.
 
 If an inlineable property is overridden, the overriding property does not need
 to also be inlineable. Clients may only inline a property access when they can
@@ -1050,7 +1128,9 @@ Adding a public setter to a subscript that may be overridden is a
 know what to do with the setter and will likely not behave correctly.
 
 Class subscripts may be marked ``@inlineable``, which behaves as described for
-struct subscripts. ``dynamic`` subscripts may not be marked ``@inlineable``.
+struct subscripts. Non-overriding ``final`` subscripts may also be marked
+``@always_emit_into_client``. ``dynamic`` subscripts may not be marked
+``@inlineable``.
 
 If an inlineable subscript is overridden, the overriding subscript does not need
 to also be inlineable. Clients may only inline a subscript access when they can
@@ -1193,6 +1273,14 @@ Non-public conformances are never considered versioned, even if both the
 conforming type and the protocol are versioned. A conformance is considered
 public if and only if both the conforming type and protocol are public.
 
+Non-public entities declared ``@always_emit_into_client`` may not be versioned.
+
+.. admonition:: TODO
+
+    ...but we do need a way for ``@always_emit_into_client`` functions to
+    declare the minimum version of the library they can be used in, right?
+    Syntax?
+
 Entities declared ``private`` may not be versioned; the mangled name of such an
 entity includes an identifier based on the containing file, which means moving
 the declaration to another file changes the entity's mangled name. This implies
@@ -1298,11 +1386,12 @@ outside the current module, since once it's inlined it will be.
 
 For inlineable code, the availability context is exactly the same as the
 equivalent non-inlineable code except that the assumed version of the
-containing library is the version attached to the ``@inlineable`` attribute,
-and any `library version dependencies
-<#declaring-library-version-dependencies>`_ or minimum deployment target must
-be specified explicitly using ``@available``. Code within this context must be
-treated as if the containing library were just a normal dependency.
+containing library is the version attached to the ``@inlineable`` attribute, or
+the version of the library in which the entity was introduced, and any `library
+version dependencies <#declaring-library-version-dependencies>`_ or minimum
+deployment target must be specified explicitly using ``@available``. Code
+within this context must be treated as if the containing library were just a
+normal dependency.
 
 A versioned inlineable function still has an exported symbol in the library
 binary, which may be used when the function is referenced from a client rather

@@ -108,11 +108,11 @@ class E3 :C3 {}
 func foo(a: A3) -> Int {
 // Check that call to A3.f() can be devirtualized.
 //
-// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
-// CHECK: function_ref @{{.*}}TFC19devirt_default_case2B31f
-// CHECK: function_ref @{{.*}}TFC19devirt_default_case2A31f
+// CHECK-NORMAL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
+// CHECK-TESTABLE: sil{{( hidden)?}} [thunk] [always_inline] @_TF19devirt_default_case3fooFCS_2A3Si
+// CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2B31f
+// CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2A31f
 // CHECK-NORMAL-NOT: class_method
-// CHECK-TESTABLE: class_method %0 : $A3, #A3.f!1
 // CHECK: }
   return a.f()
 }
@@ -166,7 +166,7 @@ class D6 : C6 {
 func check_static_class_devirt(c: C6) -> Int { 
 // Check that C.bar() and D.bar() are devirtualized.
 //
-// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TTSf4g___TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
 // CHECK: checked_cast_br [exact] %0 : $C6 to $C6
 // CHECK: checked_cast_br [exact] %0 : $C6 to $D6
 // CHECK: class_method

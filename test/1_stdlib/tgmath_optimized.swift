@@ -3,9 +3,11 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
-import Darwin
+#if os(Linux) || os(FreeBSD)
+  import Glibc
+#else
+  import Darwin
+#endif
 import StdlibUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This

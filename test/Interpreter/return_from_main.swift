@@ -4,5 +4,5 @@
 
 // rdar://20809122
 // CHECK: Error raised at top level: return_from_main.Error.Foo
-enum Error : ErrorType { case Foo }
+enum Error : ErrorProtocol { case Foo }
 throw Error.Foo

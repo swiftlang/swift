@@ -17,6 +17,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 #include <map>
 #include <set>
@@ -253,11 +254,10 @@ bool CtorTesterSet::hasLiveTesters() const {
 }
 
 bool CtorTesterSet::numLiveTesters() const {
-  return std::count_if(Constructed.begin(), Constructed.end(),
-                       [](CtorTester *T) -> bool {
-                         assert(T);
-                         return !T->isIgnorableTester();
-                       });
+  return count_if(Constructed, [](CtorTester *T) -> bool {
+    assert(T);
+    return !T->isIgnorableTester();
+  });
 }
 
 void CtorTesterSet::clearTesters() {

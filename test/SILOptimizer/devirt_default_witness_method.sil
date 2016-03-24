@@ -1,0 +1,62 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -enable-resilience | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public protocol ResilientProtocol {
+  func defaultA()
+}
+
+sil @defaultA : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+sil_default_witness_table ResilientProtocol {
+  method #ResilientProtocol.defaultA!1: @defaultA
+}
+
+struct ConformingStruct : ResilientProtocol {
+  func defaultA()
+}
+
+sil_witness_table ConformingStruct : ResilientProtocol module protocol_resilience {
+  method #ResilientProtocol.defaultA!1: @defaultA
+}
+
+struct ConformingGenericStruct<T> : ResilientProtocol {
+  func defaultA()
+}
+
+sil_witness_table <T> ConformingGenericStruct<T> : ResilientProtocol module protocol_resilience {
+  method #ResilientProtocol.defaultA!1: @defaultA
+}
+
+// CHECK-LABEL: sil hidden @test_devirt_of_default_witness_method : $@convention(thin) (@in_guaranteed ConformingStruct) -> ()
+// CHECK:       bb0(%0 : $*ConformingStruct):
+// CHECK:         [[FN:%.*]] = function_ref @defaultA : $@convention(witness_method) <τ_0_0 where τ_0_0 : ResilientProtocol> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]<ConformingStruct>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ResilientProtocol> (@in_guaranteed τ_0_0)
+// CHECK-NEXT:    return [[RESULT]] : $()
+
+sil hidden @test_devirt_of_default_witness_method : $@convention(thin) (@in_guaranteed ConformingStruct) -> () {
+bb0(%0 : $*ConformingStruct):
+  %fn = witness_method $ConformingStruct, #ResilientProtocol.defaultA!1 : $@convention(witness_method) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  %result = apply %fn<ConformingStruct>(%0) : $@convention(witness_method) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil hidden @test_devirt_of_generic_default_witness_method : $@convention(thin) (@in_guaranteed ConformingGenericStruct<Int>) -> ()
+// CHECK:       bb0(%0 : $*ConformingGenericStruct<Int>):
+// CHECK:         [[FN:%.*]] = function_ref @defaultA : $@convention(witness_method) <τ_0_0 where τ_0_0 : ResilientProtocol> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]<ConformingGenericStruct<Int>>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ResilientProtocol> (@in_guaranteed τ_0_0)
+// CHECK-NEXT:    return [[RESULT]] : $()
+
+sil hidden @test_devirt_of_generic_default_witness_method : $@convention(thin) (@in_guaranteed ConformingGenericStruct<Int>) -> () {
+bb0(%0 : $*ConformingGenericStruct<Int>):
+  %fn = witness_method $ConformingGenericStruct<Int>, #ResilientProtocol.defaultA!1 : $@convention(witness_method) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  %result = apply %fn<ConformingGenericStruct<Int>>(%0) : $@convention(witness_method) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  return %result : $()
+}

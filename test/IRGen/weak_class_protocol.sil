@@ -18,7 +18,7 @@ protocol Foo: class { }
 // CHECK-native:  call void @swift_weakAssign(%swift.weak* [[INSTANCE_SLOT]], %swift.refcounted* [[INSTANCE]]) {{#[0-9]+}}
 // CHECK:         ret void
 // CHECK:       }
-sil @store_weak : $@convention(thin) (@out @sil_weak Foo?, @owned Foo?) -> () {
+sil @store_weak : $@convention(thin) (@owned Foo?) -> @out @sil_weak Foo? {
 entry(%w : $*@sil_weak Foo?, %x : $Foo?):
   store_weak %x to %w : $*@sil_weak Foo?
   return undef : $()

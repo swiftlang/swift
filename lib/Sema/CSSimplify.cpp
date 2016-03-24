@@ -848,7 +848,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // An @autoclosure function type can be a subtype of a
   // non-@autoclosure function type.
   if (func1->isAutoClosure() != func2->isAutoClosure() &&
-      (func2->isAutoClosure() || kind < TypeMatchKind::Subtype))
+      kind < TypeMatchKind::Subtype)
     return SolutionKind::Error;
   
   // A non-throwing function can be a subtype of a throwing function.
@@ -1096,19 +1096,6 @@ static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
     return false;
 
   return true;
-}
-
-/// Check whether the given value type is one of a few specific
-/// bridged types.
-static bool isArrayDictionarySetOrString(const ASTContext &ctx, Type type) {
-  if (auto structDecl = type->getStructOrBoundGenericStruct()) {
-    return (structDecl == ctx.getStringDecl() ||
-            structDecl == ctx.getArrayDecl() ||
-            structDecl == ctx.getDictionaryDecl() ||
-            structDecl == ctx.getSetDecl());
-  }
-
-  return false;
 }
 
 /// Given that 'tupleTy' is the argument type of a function that's being
@@ -1480,10 +1467,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                           ConstraintLocator::InstanceType));
     }
 
-    case TypeKind::Function:
-      return matchFunctionTypes(cast<FunctionType>(desugar1),
-                                cast<FunctionType>(desugar2),
-                                kind, flags, locator);
+    case TypeKind::Function: {
+      auto func1 = cast<FunctionType>(desugar1);
+      auto func2 = cast<FunctionType>(desugar2);
+
+      // If the 2nd type is an autoclosure, then we don't actually want to
+      // treat these as parallel. The first type needs wrapping in a closure
+      // despite already being a function type.
+      if (!func1->isAutoClosure() && func2->isAutoClosure())
+        break;
+      return matchFunctionTypes(func1, func2, kind, flags, locator);
+    }
 
     case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:
@@ -1697,11 +1691,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       
       auto isBridgeableTargetType = type2->isBridgeableObjectType();
       
-      // Allow bridged conversions to CVarArgType through NSObject.
+      // Allow bridged conversions to CVarArg through NSObject.
       if (!isBridgeableTargetType && type2->isExistentialType()) {
         if (auto nominalType = type2->getAs<NominalType>())
           isBridgeableTargetType = nominalType->getDecl()->getName() ==
-                                      TC.Context.Id_CVarArgType;
+                                      TC.Context.Id_CVarArg;
       }
       
       if (isBridgeableTargetType && TC.getBridgedToObjC(DC, type1)) {
@@ -1720,8 +1714,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
       }
       
-      // Bridging from an ErrorType to an Objective-C NSError.
-      if (auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorType)) {
+      // Bridging from an ErrorProtocol to an Objective-C NSError.
+      if (auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorProtocol)) {
         if (TC.containsProtocol(type1, errorType, DC,
                                 ConformanceCheckFlags::InExpression))
           if (auto NSErrorTy = TC.getNSErrorType(DC))
@@ -1996,9 +1990,19 @@ commit_to_conversions:
       type1WithoutIUO = elt;
 
     // If we could perform a bridging cast, try it.
-    if (isArrayDictionarySetOrString(TC.Context, type2) &&
-        TC.getDynamicBridgedThroughObjCClass(DC, type1WithoutIUO, type2)){
-      conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
+    if (auto bridged =
+          TC.getDynamicBridgedThroughObjCClass(DC, type1WithoutIUO, type2)) {
+      // Note: don't perform this recovery for NSNumber;
+      bool useFix = true;
+      if (auto classType = bridged->getAs<ClassType>()) {
+        SmallString<16> scratch;
+        if (classType->getDecl()->isObjC() &&
+            classType->getDecl()->getObjCRuntimeName(scratch) == "NSNumber")
+          useFix = false;
+      }
+
+      if (useFix)
+        conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
     }
 
     // If we're converting an lvalue to an inout type, add the missing '&'.
@@ -2249,8 +2253,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // See if there's anything we can do to fix the conformance:
   OptionalTypeKind optionalKind;
   if (auto optionalObjectType = type->getAnyOptionalObjectType(optionalKind)) {
-    if (protocol->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
-      // Optionals don't conform to BooleanType; suggest '!= nil'.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Boolean)) {
+      // Optionals don't conform to Boolean; suggest '!= nil'.
       if (recordFix(FixKind::OptionalToBoolean, getConstraintLocator(locator)))
         return SolutionKind::Error;
       return SolutionKind::Solved;
@@ -2486,61 +2490,6 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   case CheckedCastKind::Unresolved:
     llvm_unreachable("Not a valid result");
   }
-}
-
-/// Determine whether the given type is the Self type of the protocol.
-static bool isProtocolSelf(Type type) {
-  if (auto genericParam = type->getAs<GenericTypeParamType>())
-    return genericParam->getDepth() == 0;
-  
-  return false;
-}
-
-/// Determine whether the given type contains a reference to the 'Self' type
-/// of a protocol.
-static bool containsProtocolSelf(Type type) {
-  // If the type is not dependent, it doesn't refer to 'Self'.
-  if (!type->hasTypeParameter())
-    return false;
-
-  return type.findIf([](Type type) -> bool {
-    return isProtocolSelf(type);
-  });
-}
-
-/// Determine whether the given protocol member's signature prevents
-/// it from being used in an existential reference.
-static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
-  Type type = decl->getInterfaceType();
-  if (!type) // FIXME: deal with broken recursion
-    return true;
-  
-  // For a function or constructor, skip the implicit 'this'.
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-    type = type->castTo<AnyFunctionType>()->getResult();
-
-    // Allow functions to return Self, but not have Self anywhere in
-    // their argument types.
-    for (unsigned i = 1, n = afd->getNumParameterLists(); i != n; ++i) {
-      // Check whether the input type contains Self anywhere.
-      auto fnType = type->castTo<AnyFunctionType>();
-      if (containsProtocolSelf(fnType->getInput()))
-        return true;
-      
-      type = fnType->getResult();
-    }
-
-    // Look through one level of optional on the result type.
-    if (auto valueType = type->getAnyOptionalObjectType())
-      type = valueType;
-    
-    if (isProtocolSelf(type) || type->is<DynamicSelfType>())
-      return false;
-
-    return containsProtocolSelf(type);
-  }
-
-  return containsProtocolSelf(type);
 }
 
 ConstraintSystem::SolutionKind
@@ -2791,27 +2740,35 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // Introduce a new overload set.
   retry_ctors_after_fail:
     bool labelMismatch = false;
-    for (auto constructor : ctors) {
+    for (auto ctor : ctors) {
       // If the constructor is invalid, we fail entirely to avoid error cascade.
-      TC.validateDecl(constructor, true);
-      if (constructor->isInvalid())
+      TC.validateDecl(ctor, true);
+      if (ctor->isInvalid())
         return result.markErrorAlreadyDiagnosed();
+
+      // FIXME: Deal with broken recursion
+      if (!ctor->getInterfaceType())
+        continue;
 
       // If the argument labels for this result are incompatible with
       // the call site, skip it.
-      if (!hasCompatibleArgumentLabels(constructor)) {
+      if (!hasCompatibleArgumentLabels(ctor)) {
         labelMismatch = true;
-        result.addUnviable(constructor, MemberLookupResult::UR_LabelMismatch);
+        result.addUnviable(ctor, MemberLookupResult::UR_LabelMismatch);
         continue;
       }
 
       // If our base is an existential type, we can't make use of any
       // constructor whose signature involves associated types.
-      if (isExistential &&
-          isUnavailableInExistential(getTypeChecker(), constructor)) {
-        result.addUnviable(constructor,
-                           MemberLookupResult::UR_UnavailableInExistential);
-        continue;
+      if (isExistential) {
+        if (auto *proto = ctor->getDeclContext()
+                ->getAsProtocolOrProtocolExtensionContext()) {
+          if (!proto->isAvailableInExistential(ctor)) {
+            result.addUnviable(ctor,
+                               MemberLookupResult::UR_UnavailableInExistential);
+            continue;
+          }
+        }
       }
       
       // If the invocation's argument expression has a favored constraint,
@@ -2820,7 +2777,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       if (favoredType && result.FavoredChoice == ~0U) {
         // Only try and favor monomorphic initializers.
         if (auto fnTypeWithSelf =
-            constructor->getType()->getAs<FunctionType>()) {
+            ctor->getType()->getAs<FunctionType>()) {
           
           if (auto fnType =
                   fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
@@ -2838,7 +2795,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         }
       }
       
-      result.addViable(OverloadChoice(baseTy, constructor,
+      result.addViable(OverloadChoice(baseTy, ctor,
                                       /*isSpecialized=*/false, *this));
     }
 
@@ -2919,6 +2876,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       return;
     }
 
+    // FIXME: Deal with broken recursion
+    if (!cand->getInterfaceType())
+      return;
+
     // If the argument labels for this result are incompatible with
     // the call site, skip it.
     if (!hasCompatibleArgumentLabels(cand)) {
@@ -2927,12 +2888,17 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       return;
     }
 
-    
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
-    if (isExistential && isUnavailableInExistential(getTypeChecker(), cand)) {
-      result.addUnviable(cand, MemberLookupResult::UR_UnavailableInExistential);
-      return;
+    if (isExistential) {
+      if (auto *proto = cand->getDeclContext()
+              ->getAsProtocolOrProtocolExtensionContext()) {
+        if (!proto->isAvailableInExistential(cand)) {
+          result.addUnviable(cand,
+                             MemberLookupResult::UR_UnavailableInExistential);
+          return;
+        }
+      }
     }
 
     // See if we have an instance method, instance member or static method,
@@ -3151,8 +3117,17 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (constraint.getKind() == ConstraintKind::TypeMember) {
     // If the base type was an optional, try to look through it.
     if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
+      // Determine whether or not we want to provide an optional chaining fixit or
+      // a force unwrap fixit.
+      bool optionalChain;
+      if (!contextualType)
+        optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
+      else
+        optionalChain = !contextualType->getOptionalObjectType().isNull();
+      auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
+
       // Note the fix.
-      if (recordFix(FixKind::ForceOptional, constraint.getLocator()))
+      if (recordFix(fixKind, constraint.getLocator()))
         return SolutionKind::Error;
       
       // Look through one level of optional.
@@ -3175,8 +3150,17 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
     // If the base type was an optional, look through it.
     
+    // Determine whether or not we want to provide an optional chaining fixit or
+    // a force unwrap fixit.
+    bool optionalChain;
+    if (!contextualType)
+      optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
+    else
+      optionalChain = !contextualType->getOptionalObjectType().isNull();
+    auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
+
     // Note the fix.
-    if (recordFix(FixKind::ForceOptional, constraint.getLocator()))
+    if (recordFix(fixKind, constraint.getLocator()))
       return SolutionKind::Error;
     
     // Look through one level of optional.
@@ -4092,8 +4076,8 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   case ConversionRestrictionKind::BridgeToNSError: {
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
     
-    // The input type must be an ErrorType subtype.
-    auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorType)
+    // The input type must be an ErrorProtocol subtype.
+    auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorProtocol)
       ->getDeclaredType();
     return matchTypes(type1, errorType, TypeMatchKind::Subtype, subFlags,
                       locator);
@@ -4173,6 +4157,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
     return matchTypes(type1, type2, matchKind, subFlags, locator);
 
   case FixKind::ForceOptional:
+  case FixKind::OptionalChaining:
     // Assume that '!' was applied to the first type.
     return matchTypes(type1->getRValueObjectType()->getOptionalObjectType(),
                       type2, matchKind, subFlags, locator);

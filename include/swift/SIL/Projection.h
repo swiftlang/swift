@@ -9,11 +9,14 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the class Projection and related utilities. A projection is
-// a representation of type projections that is nominal, tuple agnostic. These
-// utilities are useful for working with aggregate type trees at a high level.
-//
+///
+/// \file
+///
+/// This file defines the class Projection and related utilities. A projection
+/// is a representation of type projections that is nominal, tuple
+/// agnostic. These utilities are useful for working with aggregate type trees
+/// at a high level.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_PROJECTION_H
@@ -36,6 +39,7 @@ namespace swift {
 
 class SILBuilder;
 class ProjectionPath;
+using ProjectionPathSet = llvm::DenseSet<ProjectionPath>;
 using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
 
 enum class SubSeqRelation_t : uint8_t {
@@ -533,6 +537,10 @@ public:
     return *this;
   }
 
+  /// Create a path of AddrProjection or ValueProjection with the given VA
+  /// and Path.
+  SILValue createExtract(SILValue VA, SILInstruction *Inst, bool IsVal) const;
+
   /// Create a new projection path from the SILValue Start to End.  Returns
   /// Nothing::None if there is no such path.
   ///
@@ -559,14 +567,10 @@ public:
                                                 SILModule *Mod,
                                                 ProjectionPathList &P);
 
-  /// Given the SILType Base, expand every intermediate and leaf nodes in the
-  /// type tree.
-  ///
-  /// NOTE: this function returns a single empty projection path if the BaseType
-  /// is a leaf node in the type tree.
-  static void expandTypeIntoNodeProjectionPaths(SILType BaseType,
-                                                SILModule *Mod,
-                                                ProjectionPathList &P);
+  /// Return true if the given projection paths in \p CPaths does not cover
+  /// all the fields with non-trivial semantics, false otherwise.
+  static bool hasUncoveredNonTrivials(SILType B, SILModule *Mod,
+                                      ProjectionPathSet &CPaths);
 
   /// Returns true if the two paths have a non-empty symmetric
   /// difference.
@@ -715,8 +719,8 @@ class ProjectionTreeNode {
 
   /// Constructor for the root of the tree.
   ProjectionTreeNode(SILType NodeTy)
-    : Index(0), NodeType(NodeTy), Proj(), Parent(),
-      NonProjUsers(), ChildProjections(), Initialized(false), IsLive(false) {}
+    : Index(0), NodeType(NodeTy), Proj(), Parent(), NonProjUsers(),
+      ChildProjections(), Initialized(false), IsLive(false) {}
 
   // Normal constructor for non-root nodes.
   ProjectionTreeNode(ProjectionTreeNode *Parent, unsigned Index, SILType NodeTy,
@@ -726,6 +730,11 @@ class ProjectionTreeNode {
       Initialized(false), IsLive(false) {}
 
 public:
+  enum LivenessKind : unsigned {
+    NormalUseLiveness = 0,
+    IgnoreEpilogueReleases = 1,
+  };
+
   class NewAggregateBuilder;
 
   ~ProjectionTreeNode() = default;
@@ -736,6 +745,10 @@ public:
   }
 
   llvm::Optional<Projection> &getProjection() { return Proj; }
+
+  llvm::SmallVector<Operand *, 4> getNonProjUsers() const {
+    return NonProjUsers;
+  };
 
   SILType getType() const { return NodeType; }
 
@@ -758,6 +771,8 @@ public:
 
   NullablePtr<SILInstruction> createProjection(SILBuilder &B, SILLocation Loc,
                                                SILValue Arg) const;
+
+  std::string getNameEncoding(const ProjectionTree &PT) const;
 
   SILInstruction *
   createAggregate(SILBuilder &B, SILLocation Loc,
@@ -784,8 +799,8 @@ private:
 
   void processUsersOfValue(ProjectionTree &Tree,
                            llvm::SmallVectorImpl<ValueNodePair> &Worklist,
-                           SILValue Value);
-
+                           SILValue Value, ProjectionTreeNode::LivenessKind Kind,
+                           llvm::DenseSet<SILInstruction *> &Releases);
 
   void createNextLevelChildren(ProjectionTree &Tree);
 
@@ -801,6 +816,11 @@ class ProjectionTree {
 
   llvm::BumpPtrAllocator &Allocator;
 
+  /// The way we compute what is live and what is dead.
+  ProjectionTreeNode::LivenessKind Kind;
+
+  llvm::DenseSet<SILInstruction *> EpilogueReleases;
+
   // A common pattern is a 3 field struct.
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
   llvm::SmallVector<unsigned, 3> LiveLeafIndices;
@@ -811,6 +831,13 @@ public:
   /// Construct a projection tree from BaseTy.
   ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
                  SILType BaseTy);
+  ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
+                 SILType BaseTy, ProjectionTreeNode::LivenessKind Kind, 
+                 llvm::DenseSet<SILInstruction*> Insts);
+  /// Construct an uninitialized projection tree, which can then be
+  /// initialized by initializeWithExistingTree.
+  ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator) 
+    : Mod(Mod), Allocator(Allocator) {}
   ~ProjectionTree();
   ProjectionTree(const ProjectionTree &) = delete;
   ProjectionTree(ProjectionTree &&) = default;
@@ -820,6 +847,13 @@ public:
   /// Compute liveness and use information in this projection tree using Base.
   /// All debug instructions (debug_value, debug_value_addr) are ignored.
   void computeUsesAndLiveness(SILValue Base);
+
+  /// Return a name encoding of the projection tree.
+  std::string getNameEncoding() const; 
+
+  /// Initialize an empty projection tree with an existing, computed projection
+  /// tree.
+  void initializeWithExistingTree(const ProjectionTree &PT);
 
   /// Create a root SILValue iout of the given leaf node values by walking on
   /// the projection tree.
@@ -882,11 +916,21 @@ public:
     return false;
   }
 
+
   void getLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
     for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
       assert(Node->IsLive && "We are only interested in leafs that are live");
       OutArray.push_back(Node->getType());
+    }
+  }
+
+  void
+  getLeafNodes(llvm::SmallVectorImpl<const ProjectionTreeNode *> &Out) const {
+    for (unsigned LeafIndex : LiveLeafIndices) {
+      const ProjectionTreeNode *Node = getNode(LeafIndex);
+      assert(Node->IsLive && "We are only interested in leafs that are live");
+      Out.push_back(Node);
     }
   }
 
@@ -902,17 +946,6 @@ public:
   replaceValueUsesWithLeafUses(SILBuilder &B, SILLocation Loc,
                                llvm::SmallVectorImpl<SILValue> &Leafs);
  
-
-  /// Return true if we have seen releases to part or all of \p Derived in
-  /// \p Insts.
-  /// 
-  /// NOTE: This function relies on projections to analyze the relation
-  /// between the releases values in \p Insts and \p Derived, it also bails
-  /// out and return true if projection path can not be formed between Base
-  /// and any one the released values.
-  static bool
-  isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
-
 private:
   void createRoot(SILType BaseTy) {
     assert(ProjectionTreeNodes.empty() &&
@@ -955,5 +988,26 @@ private:
 };
 
 } // end swift namespace
+
+namespace llvm {
+using swift::ProjectionPath;
+/// Allow ProjectionPath to be used in DenseMap.
+template <> struct DenseMapInfo<ProjectionPath> {
+  static inline ProjectionPath getEmptyKey() {
+    return ProjectionPath(DenseMapInfo<swift::SILType>::getEmptyKey(),
+                          DenseMapInfo<swift::SILType>::getEmptyKey());
+  }
+  static inline ProjectionPath getTombstoneKey() {
+    return ProjectionPath(DenseMapInfo<swift::SILType>::getTombstoneKey(),
+                          DenseMapInfo<swift::SILType>::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(const ProjectionPath &Val) {
+    return hash_value(Val);
+  }
+  static bool isEqual(const ProjectionPath &LHS, const ProjectionPath &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
 
 #endif

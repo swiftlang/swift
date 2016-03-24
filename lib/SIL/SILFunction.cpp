@@ -25,6 +25,19 @@
 using namespace swift;
 using namespace Lowering;
 
+SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Substitution> subs)
+  : numSubs(subs.size()) {
+  std::copy(subs.begin(), subs.end(), getTrailingObjects<Substitution>());
+}
+
+SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
+                                             ArrayRef<Substitution> subs) {
+  unsigned size =
+    sizeof(SILSpecializeAttr) + (subs.size() * sizeof(Substitution));
+  void *buf = M.allocate(size, alignof(SILSpecializeAttr));
+  return ::new (buf) SILSpecializeAttr(subs);
+}
+
 SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  StringRef name,
                                  CanSILFunctionType loweredType,
@@ -94,6 +107,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
     Module.functions.push_back(this);
+
+  Module.removeFromZombieList(Name);
 
   // Set our BB list to have this function as its parent. This enables us to
   // splice efficiently basic blocks in between functions.
@@ -220,11 +235,13 @@ struct SubstDependentSILType
       params.push_back(param.map([&](CanType pt) -> CanType {
         return visit(pt);
       }));
-    
-    SILResultInfo result = t->getResult().map([&](CanType elt) -> CanType {
-        return visit(elt);
-      });
 
+    SmallVector<SILResultInfo, 4> results;
+    for (auto &result : t->getAllResults())
+      results.push_back(result.map([&](CanType pt) -> CanType {
+        return visit(pt);
+      }));
+    
     Optional<SILResultInfo> errorResult;
     if (t->hasErrorResult()) {
       errorResult = t->getErrorResult().map([&](CanType elt) -> CanType {
@@ -235,7 +252,7 @@ struct SubstDependentSILType
     return SILFunctionType::get(t->getGenericSignature(),
                                 t->getExtInfo(),
                                 t->getCalleeConvention(),
-                                params, result, errorResult,
+                                params, results, errorResult,
                                 t->getASTContext());
   }
   
@@ -266,6 +283,12 @@ SILType ArchetypeBuilder::substDependentType(SILModule &M, SILType type) {
   return doSubstDependentSILType(M,
     [&](CanType t) { return substDependentType(t)->getCanonicalType(); },
     type);
+}
+
+Type SILFunction::mapTypeOutOfContext(Type type) const {
+  return ArchetypeBuilder::mapTypeOutOfContext(getModule().getSwiftModule(),
+                                               getContextGenericParams(),
+                                               type);
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {

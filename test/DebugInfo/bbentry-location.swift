@@ -14,12 +14,12 @@ class ActionViewController
         let itemProvider = provider as! NSItemProvider
 // CHECK: load {{.*}}selector
 // CHECK:; <label>{{.*}}  ; preds = %{{[0-9]+}}
-// CHECK: @swift_allocObject({{.*}}, !dbg ![[DBG:[0-9]+]]
+// CHECK: @rt_swift_allocObject({{.*}}, !dbg ![[DBG:[0-9]+]]
 // Test that the location is reset at the entry of a new basic block.        
 // CHECK: ![[DBG]] = {{.*}}line: 0
-        if itemProvider.hasItemConformingToTypeIdentifier("") {
+        if itemProvider.hasItemConforming(toTypeIdentifier: "") {
           weak var weakImageView = self.imageView
-          itemProvider.loadItemForTypeIdentifier("", options: nil,
+          itemProvider.loadItem(forTypeIdentifier: "", options: nil,
                completionHandler: { (image, error) in
               if let imageView = weakImageView {
               }

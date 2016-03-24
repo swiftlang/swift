@@ -247,8 +247,8 @@ protocol Runcible {
 
 protocol Bendable { }
 
-// CHECK-LABEL: $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
-sil [fragile] @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> () {
+// CHECK-LABEL: $@convention(thin) (@in protocol<Bendable, Runcible>) -> @out Runcible
+sil [fragile] @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in protocol<Bendable, Runcible>) -> (@out Runcible) {
 bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: alloc_box
   %2 = alloc_box $protocol<Bendable, Runcible>
@@ -362,8 +362,8 @@ enum Gimel {
   case DataCase(Q)
 }
 
-// CHECK-LABEL: @test_union_addr_empty_case : $@convention(thin) (@out Gimel) -> () {
-sil [fragile] @test_union_addr_empty_case : $@convention(thin) (@out Gimel) -> () {
+// CHECK-LABEL: @test_union_addr_empty_case : $@convention(thin) () -> @out Gimel {
+sil [fragile] @test_union_addr_empty_case : $@convention(thin) () -> @out Gimel {
 bb0(%0 : $*Gimel):
   // CHECK: inject_enum_addr {{%.*}} : $*Gimel, #Gimel.EmptyCase!enumelt
   inject_enum_addr %0 : $*Gimel, #Gimel.EmptyCase!enumelt
@@ -371,8 +371,8 @@ bb0(%0 : $*Gimel):
   return %t : $()
 }
 
-// CHECK-LABEL: @test_union_addr_data_case : $@convention(thin) (@out Gimel, @in Q) -> () {
-sil [fragile] @test_union_addr_data_case : $@convention(thin) (@out Gimel, @in Q) -> () {
+// CHECK-LABEL: @test_union_addr_data_case : $@convention(thin) (@in Q) -> @out Gimel {
+sil [fragile] @test_union_addr_data_case : $@convention(thin) (@in Q) -> @out Gimel {
 bb0(%0 : $*Gimel, %1 : $*Q):
   // CHECK: {{%.*}} = init_enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt.1
   %p = init_enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
@@ -467,7 +467,7 @@ isa(%6 : $Builtin.Int1):
 sil [fragile] @_TF7literal8literalsFT_T_ : $@convention(thin) () -> ()
 
 sil [fragile] @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-sil [fragile] @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+sil [fragile] @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp17utf8CodeUnitCountBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
 
 // CHECK-LABEL: @_TF5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
 sil [fragile] @_TF5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
@@ -788,8 +788,8 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil public_external [fragile] @test_init_existential : $@convention(thin) (@out Bendable, Spoon) -> ()
-sil [fragile] @test_init_existential : $@convention(thin) (@out Bendable, Spoon) -> () {
+// CHECK-LABEL: sil public_external [fragile] @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
+sil [fragile] @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
   %2a = project_box %2 : $@box Spoon
@@ -939,6 +939,15 @@ bb0(%0 : $X):
   // CHECK-NEXT: return [[T0]] : $X
 }
 
+// CHECK-LABEL: sil public_external [fragile] @test_set_deallocating
+sil [fragile] @test_set_deallocating : $@convention(thin) (X) -> (X) {
+bb0(%0 : $X):
+  set_deallocating %0 : $X
+  return %0 : $X
+  // CHECK: set_deallocating [[T0:%.*]] : $X
+  // CHECK-NEXT: return [[T0]] : $X
+}
+
 public func serialize_all() {
 }
 
@@ -989,26 +998,26 @@ sil [fragile] @block_invoke : $@convention(c) (@inout_aliasable @block_storage I
 
 // Test try_apply and throws
 // rdar://20925014
-// CHECK-LABEL: sil public_external [fragile] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType {
-sil [fragile]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType {
-bb0(%0 : $@convention(thin) () -> @error ErrorType):
-  // CHECK: try_apply %0() : $@convention(thin) () -> @error ErrorType, normal bb1, error bb2
-  try_apply %0() : $@convention(thin) () -> @error ErrorType, normal bb1, error bb2
+// CHECK-LABEL: sil public_external [fragile] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> @error ErrorProtocol {
+sil [fragile]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> @error ErrorProtocol {
+bb0(%0 : $@convention(thin) () -> @error ErrorProtocol):
+  // CHECK: try_apply %0() : $@convention(thin) () -> @error ErrorProtocol, normal bb1, error bb2
+  try_apply %0() : $@convention(thin) () -> @error ErrorProtocol, normal bb1, error bb2
 
 bb1(%1 : $()):
   %2 = tuple ()
   return %2 : $()
 
-bb2(%3 : $ErrorType):
-  throw %3 : $ErrorType
+bb2(%3 : $ErrorProtocol):
+  throw %3 : $ErrorProtocol
 }
 
 // Test apply with the nothrow attribute
-// CHECK-LABEL: sil public_external [fragile] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> () {
-sil [fragile]  @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> () {
-bb0(%0 : $@convention(thin) () -> @error ErrorType):
-  // CHECK: apply [nothrow] %0() : $@convention(thin) () -> @error ErrorType
-  apply [nothrow] %0() : $@convention(thin) () -> @error ErrorType
+// CHECK-LABEL: sil public_external [fragile] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> () {
+sil [fragile]  @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> () {
+bb0(%0 : $@convention(thin) () -> @error ErrorProtocol):
+  // CHECK: apply [nothrow] %0() : $@convention(thin) () -> @error ErrorProtocol
+  apply [nothrow] %0() : $@convention(thin) () -> @error ErrorProtocol
   %2 = tuple ()
   return %2 : $()
 }
@@ -1032,14 +1041,14 @@ bb0(%0 : $@box Int, %1 : $Int):
 // CHECK-LABEL: @test_forward_ref
 sil [fragile]  @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
 
-// CHECK-LABEL: sil public_external [fragile] @partial_apply : $@convention(thin) (@convention(thin) (@out Int, Int) -> (), Int) -> Int {
-// CHECK: [[PA:%.*]] = partial_apply {{%.*}}({{%.*}}) : $@convention(thin) (@out Int, Int) -> ()
-// CHECK: apply [[PA]]({{%.*}}) : $@callee_owned (@out Int) -> ()
-sil [fragile] @partial_apply : $@convention(thin) (@convention(thin) (@out Int, Int) -> (), Int) -> Int {
-entry(%f : $@convention(thin) (@out Int, Int) -> (), %x : $Int):
-  %p = partial_apply %f(%x) : $@convention(thin) (@out Int, Int) -> ()
+// CHECK-LABEL: sil public_external [fragile] @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int {
+// CHECK: [[PA:%.*]] = partial_apply {{%.*}}({{%.*}}) : $@convention(thin) (Int) -> @out Int
+// CHECK: apply [[PA]]({{%.*}}) : $@callee_owned () -> @out Int
+sil [fragile] @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int {
+entry(%f : $@convention(thin) (Int) -> @out Int, %x : $Int):
+  %p = partial_apply %f(%x) : $@convention(thin) (Int) -> @out Int
   %i = alloc_stack $Int
-  %z = apply %p(%i) : $@callee_owned (@out Int) -> ()
+  %z = apply %p(%i) : $@callee_owned () -> @out Int
   %y = load %i : $*Int
   dealloc_stack %i : $*Int
   return %y : $Int
@@ -1101,7 +1110,7 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
-struct SomeError: ErrorType {
+struct SomeError: ErrorProtocol {
   var _domain: String { get }
   var _code: Int { get }
 }
@@ -1109,18 +1118,18 @@ struct SomeError: ErrorType {
 // CHECK-LABEL: sil public_external [fragile] @existential_box : $@convention(thin) (SomeError) -> () {
 sil [fragile] @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
-  // CHECK: %1 = alloc_existential_box $ErrorType, $SomeError
-  %1 = alloc_existential_box $ErrorType, $SomeError
-  // CHECK: %2 = project_existential_box $SomeError in %1 : $ErrorType
-  %2 = project_existential_box $SomeError in %1 : $ErrorType
+  // CHECK: %1 = alloc_existential_box $ErrorProtocol, $SomeError
+  %1 = alloc_existential_box $ErrorProtocol, $SomeError
+  // CHECK: %2 = project_existential_box $SomeError in %1 : $ErrorProtocol
+  %2 = project_existential_box $SomeError in %1 : $ErrorProtocol
   // CHECK: store %0 to %2 : $*SomeError
   store %0 to %2 : $*SomeError
-  // CHECK: %4 = open_existential_box %1 : $ErrorType to $*[[OPENED:@opened\(".*"\)]] ErrorType
-  %4 = open_existential_box %1 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: destroy_addr %4 : $*[[OPENED]] ErrorType
-  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: dealloc_existential_box %1 : $ErrorType, $SomeError
-  dealloc_existential_box %1 : $ErrorType, $SomeError
+  // CHECK: %4 = open_existential_box %1 : $ErrorProtocol to $*[[OPENED:@opened\(".*"\)]] ErrorProtocol
+  %4 = open_existential_box %1 : $ErrorProtocol to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
+  // CHECK: destroy_addr %4 : $*[[OPENED]] ErrorProtocol
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
+  // CHECK: dealloc_existential_box %1 : $ErrorProtocol, $SomeError
+  dealloc_existential_box %1 : $ErrorProtocol, $SomeError
   return undef : $()
 }
 
@@ -1244,8 +1253,8 @@ sil_witness_table ConformingAssoc: AssocReqt module def_basic {
 }
 
 protocol AnyProtocol {
-  typealias AssocType
-  typealias AssocWithReqt : AssocReqt
+  associatedtype AssocType
+  associatedtype AssocWithReqt : AssocReqt
   func assocTypesMethod(x: AssocType, y: AssocWithReqt)
   static func staticMethod(x: Self)
 }
@@ -1290,21 +1299,21 @@ bb0:
   %13 = function_ref @return_constant : $@convention(thin) () -> Int
   %23 = function_ref @existentials : $@convention(thin) (@in P) -> ()
   %25 = function_ref @classes : $@convention(thin) () -> ()
-  %27 = function_ref @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
+  %27 = function_ref @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in protocol<Bendable, Runcible>) -> @out Runcible
   %29 = function_ref @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (@owned ClassBound) -> ()
   %31 = function_ref @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
   %33 = function_ref @_TFV6struct5AlephCfMS0_FT_S0_ : $@convention(thin) (@thin Aleph.Type) -> Aleph
   %35 = function_ref @test_union_empty_case : $@convention(thin) () -> Beth
   %37 = function_ref @test_union_data_case : $@convention(thin) Int -> Beth
-  %39 = function_ref @test_union_addr_empty_case : $@convention(thin) (@out Gimel) -> ()
-  %41 = function_ref @test_union_addr_data_case : $@convention(thin) (@out Gimel, @in Q) -> ()
+  %39 = function_ref @test_union_addr_empty_case : $@convention(thin) () -> @out Gimel
+  %41 = function_ref @test_union_addr_data_case : $@convention(thin) (@in Q) -> @out Gimel
   %43 = function_ref @_TF5tuple5floatFT1xSf_T_ : $@convention(thin) (Float32) -> ()
   %45 = function_ref @_TF5tuple5tupleFT_TSiSf_ : $@convention(thin) () -> (Int, Float32)
   %47 = function_ref @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@convention(thin) (Int, Float32) -> ()
   %49 = function_ref @_TFC3ref1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, @guaranteed M) -> ()
   %51 = function_ref @_TF4null3isaFT1bCS_1B_Sb : $@convention(thin) (B) -> Builtin.Int1
   %53 = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-  %55 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+  %55 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp17utf8CodeUnitCountBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
   %57 = function_ref @_TF7literal8literalsFT_T_ : $@convention(thin) () -> ()
   %59 = function_ref @_TF5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
   %60 = function_ref @global_code : $@convention(thin) () -> ()
@@ -1324,7 +1333,7 @@ bb0:
   %97 = function_ref @test_switch_union : $@convention(thin) (MaybePair) -> ()
   %99 = function_ref @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
   %101 = function_ref @test_switch_value : $@convention(thin) (Builtin.Word) -> ()
-  %103 = function_ref @test_init_existential : $@convention(thin) (@out Bendable, Spoon) -> ()
+  %103 = function_ref @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
   %105 = function_ref @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP
 
   %107 = function_ref @test_assign : $@convention(thin) (Int, @inout Int) -> ()
@@ -1337,15 +1346,16 @@ bb0:
   %113 = function_ref @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
   %115 = function_ref @test_mark_fn_escape : $@convention(thin) () -> ()
   %117 = function_ref @test_copy_release_value : $@convention(thin) (X) -> (X)
-  %118 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
+  %118 = function_ref @test_set_deallocating : $@convention(thin) (X) -> (X)
+  %119 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
 
   %124 = function_ref @block_storage_type : $@convention(thin) Int -> @convention(block) () -> ()
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
-  %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType
-  %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> ()
+  %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> @error ErrorProtocol
+  %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> ()
   %134 = function_ref @box_type : $@convention(thin) (@box Int, Int) -> ()
   %120 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
-  %121 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (@out Int, Int) -> (), Int) -> Int
+  %121 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int
   %122 = function_ref @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()
   %123 = function_ref @extract_generic_struct : $@convention(thin) GenericStruct<Int64> -> Int64
   %128 = function_ref @select_enum : $@convention(thin) (@in Beth) -> ()
@@ -1354,7 +1364,7 @@ bb0:
   %150 = function_ref @a_reabstraction_thunk: $@convention(thin) () -> ()
   %151 = function_ref @a_regular_thunk: $@convention(thin) () -> ()
 
-  %119 = tuple ()
-  return %119 : $()
+  %r = tuple ()
+  return %r : $()
 }
 

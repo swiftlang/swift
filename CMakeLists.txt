@@ -32,6 +32,10 @@ option(SWIFT_SERIALIZE_STDLIB_UNITTEST
     "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
     FALSE)
 
+option(SWIFT_STDLIB_SIL_DEBUGGING
+    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    FALSE)
+
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
@@ -122,6 +126,13 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Swift tools that are executable on the build machine")
 
+option(SWIFT_ENABLE_LTO
+  "If set to true, build the swift compiler with link time optimization enabled" FALSE)
+
+# The following only works with the Ninja generator in CMake >= 3.0.
+set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
+  "Define the maximum number of linker jobs for swift.")
+
 #
 # User-configurable Darwin-specific options.
 #
@@ -136,9 +147,6 @@ option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
 
 set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
     "The name of the toolchain to pass to 'xcrun'")
-
-set(SWIFT_DARWIN_ICU_INCLUDE_PATH "" CACHE STRING
-    "Path to the directory where the ICU headers are located")
 
 set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "@rpath" CACHE STRING
     "The directory of the install_name for standard library dylibs")
@@ -202,14 +210,19 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
 
+option(SWIFT_STDLIB_SIL_SERIALIZE_ALL
+    "Build the standard libraries and overlays serializing all method bodies"
+    TRUE)
+
 if(SWIFT_SERIALIZE_STDLIB_UNITTEST AND SWIFT_STDLIB_ENABLE_RESILIENCE)
   message(WARNING "Ignoring SWIFT_SERIALIZE_STDLIB_UNITTEST because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
   set(SWIFT_SERIALIZE_STDLIB_UNITTEST FALSE)
 endif()
 
-option(SWIFT_XCODE_GENERATE_FOR_IDE_ONLY
-    "Generate an Xcode project suitable for IDE use, but which cannot build"
-    FALSE)
+if(SWIFT_STDLIB_SIL_SERIALIZE_ALL AND SWIFT_STDLIB_ENABLE_RESILIENCE)
+  message(WARNING "Ignoring SWIFT_STDLIB_SIL_SERIALIZE_ALL because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
+  set(SWIFT_STDLIB_SIL_SERIALIZE_ALL FALSE)
+endif()
 
 #
 # End of user-configurable options.
@@ -221,7 +234,7 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 if(SWIFT_BUILT_STANDALONE)
-  project(Swift)
+  project(Swift C CXX ASM)
 endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "")
@@ -244,7 +257,6 @@ include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
 include(SwiftTranslateFlag)
 include(SwiftHandleGybSources)
-include(SwiftHandleDTraceSources)
 include(SwiftSetIfArchBitness)
 include(AddSwift)
 include(SwiftConfigureSDK)
@@ -305,7 +317,6 @@ set(SWIFT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
-set(SWIFT_INCLUDE_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/include")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 endif()
@@ -451,6 +462,19 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
   set(SWIFT_HOST_VARIANT_ARCH "x86_64")
 
   set(SWIFT_PRIMARY_VARIANT_SDK_default "FREEBSD")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
+  configure_sdk_unix(CYGWIN "Cygwin" "windows" "cygwin" "x86_64" "x86_64-unknown-windows-cygnus")
+
+#  set(CMAKE_EXECUTABLE_FORMAT "ELF")
+
+  set(SWIFT_HOST_VARIANT "windows" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [windows].")
+
+  set(SWIFT_HOST_VARIANT_SDK "CYGWIN")
+  set(SWIFT_HOST_VARIANT_ARCH "x86_64")
+  
+  set(SWIFT_PRIMARY_VARIANT_SDK_default "CYGWIN")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Set defaults.
@@ -612,9 +636,19 @@ foreach(sdk ${SWIFT_SDKS})
   unset(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR} CACHE)
 endforeach()
 
+if(SWIFT_PARALLEL_LINK_JOBS)
+  if(CMAKE_VERSION VERSION_LESS 3.0 OR NOT CMAKE_MAKE_PROGRAM MATCHES "ninja")
+    message(WARNING "Job pooling is only available with Ninja generators and CMake 3.0 and later.")
+  else()
+    set_property(GLOBAL APPEND PROPERTY JOB_POOLS swift_link_job_pool=${SWIFT_PARALLEL_LINK_JOBS})
+    set(CMAKE_JOB_POOL_LINK swift_link_job_pool)
+  endif()
+endif()
+
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
+message(STATUS "  LTO:        ${SWIFT_ENABLE_LTO}")
 message(STATUS "")
 
 message(STATUS "Building Swift standard library and SDK overlays for SDKs: ${SWIFT_SDKS}")
@@ -623,7 +657,6 @@ message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
 message(STATUS "")
 
 message(STATUS "Building Swift runtime with:")
-message(STATUS "  Dtrace:                             ${SWIFT_RUNTIME_ENABLE_DTRACE}")
 message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
 message(STATUS "")
 

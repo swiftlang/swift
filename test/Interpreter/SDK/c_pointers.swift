@@ -25,7 +25,7 @@ typealias XXColor = UIColor
 let rgb = CGColorSpaceCreateDeviceRGB()
 let cgRed = CGColorCreate(rgb, [1.0, 0.0, 0.0, 1.0])!
 
-let nsRed = XXColor(CGColor: cgRed)
+let nsRed = XXColor(cgColor: cgRed)
 
 var r: CGFloat = 0.5, g: CGFloat = 0.5, b: CGFloat = 0.5, a: CGFloat = 0.5
 #if os(OSX)
@@ -95,7 +95,7 @@ autoreleasepool {
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died
 class DumbString: NSString {
-  override func characterAtIndex(x: Int) -> unichar { _preconditionFailure("nope") }
+  override func character(at x: Int) -> unichar { _preconditionFailure("nope") }
   override var length: Int { return 0 }
 
   convenience init(contentsOfFile s: String, encoding: NSStringEncoding) throws {
@@ -128,7 +128,7 @@ puts(s)
 
 var unsorted = [3, 14, 15, 9, 2, 6, 5]
 qsort(&unsorted, unsorted.count, sizeofValue(unsorted[0])) { a, b in
-  return Int32(UnsafePointer<Int>(a).memory - UnsafePointer<Int>(b).memory)
+  return Int32(UnsafePointer<Int>(a).pointee - UnsafePointer<Int>(b).pointee)
 }
 // CHECK-NEXT: [2, 3, 5, 6, 9, 14, 15]
 print(unsorted)

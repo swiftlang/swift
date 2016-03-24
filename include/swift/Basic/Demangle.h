@@ -126,7 +126,7 @@ enum class ValueWitnessKind {
   StoreExtraInhabitant,
   GetExtraInhabitantIndex,
   GetEnumTag,
-  DestructiveProjectEnumData
+  DestructiveProjectEnumData,
 };
 
 enum class Directness {
@@ -319,7 +319,7 @@ enum class OperatorKind {
   NotOperator,
   Prefix,
   Postfix,
-  Infix
+  Infix,
 };
 
 /// \brief Mangle an identifier using Swift's mangling rules.
@@ -332,7 +332,7 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
-/// \brief Transform the node structure in a string.
+/// \brief Transform the node structure to a string.
 ///
 /// Typical usage:
 /// \code

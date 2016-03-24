@@ -57,17 +57,23 @@ struct TextRange {
 
 struct TextEntity {
   const Decl *Dcl = nullptr;
+  const Decl *SynthesizeTarget = nullptr;
   StringRef Argument;
   TextRange Range;
   unsigned LocOffset = 0;
   std::vector<TextEntity> SubEntities;
 
-  TextEntity(const Decl *D, unsigned StartOffset)
-    : Dcl(D), Range{StartOffset, 0} {}
-  TextEntity(const Decl *D, TextRange TR, unsigned LocOffset)
-    : Dcl(D), Range(TR), LocOffset(LocOffset) {}
-  TextEntity(const Decl *D, StringRef Arg, TextRange TR, unsigned LocOffset)
-    : Dcl(D), Argument(Arg), Range(TR), LocOffset(LocOffset) {}
+  TextEntity(const Decl *D, const Decl *SynthesizeTarget, unsigned StartOffset)
+    : Dcl(D), SynthesizeTarget(SynthesizeTarget), Range{StartOffset, 0} {}
+
+  TextEntity(const Decl *D, const Decl *SynthesizeTarget, TextRange TR,
+             unsigned LocOffset) : Dcl(D), SynthesizeTarget(SynthesizeTarget),
+                                   Range(TR), LocOffset(LocOffset) {}
+
+  TextEntity(const Decl *D, const Decl *SynthesizeTarget, StringRef Arg,
+             TextRange TR, unsigned LocOffset)
+    : Dcl(D), SynthesizeTarget(SynthesizeTarget), Argument(Arg), Range(TR),
+      LocOffset(LocOffset) {}
 };
 
 struct TextReference {
@@ -80,6 +86,8 @@ struct TextReference {
 };
 
 class AnnotatingPrinter : public StreamPrinter {
+  const NominalTypeDecl *SynthesizeTarget = nullptr;
+
 public:
   std::vector<TextEntity> TopEntities;
   std::vector<TextEntity> EntitiesStack;
@@ -91,20 +99,42 @@ public:
     assert(EntitiesStack.empty());
   }
 
-  void printDeclPre(const Decl *D) override {
+  bool shouldContinuePre(const Decl *D, Optional<BracketOptions> Bracket) {
+    assert(Bracket.hasValue());
+    if (!Bracket.getValue().shouldOpenExtension &&
+        D->getKind() == DeclKind::Extension)
+      return false;
+    return true;
+  }
+
+  bool shouldContinuePost(const Decl *D, Optional<BracketOptions> Bracket) {
+    assert(Bracket.hasValue());
+    if (!Bracket.getValue().shouldCloseNominal && dyn_cast<NominalTypeDecl>(D))
+      return false;
+    if (!Bracket.getValue().shouldCloseExtension &&
+        D->getKind() == DeclKind::Extension)
+      return false;
+    return true;
+  }
+
+  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                                    const NominalTypeDecl *NTD,
+                                    Optional<BracketOptions> Bracket) override {
+    assert(!SynthesizeTarget);
+    SynthesizeTarget = NTD;
+    if (!shouldContinuePre(ED, Bracket))
+      return;
     unsigned StartOffset = OS.tell();
-    EntitiesStack.emplace_back(D, StartOffset);
+    EntitiesStack.emplace_back(ED, SynthesizeTarget, StartOffset);
   }
 
-  void printDeclLoc(const Decl *D) override {
-    if (EntitiesStack.back().Dcl == D) {
-      unsigned LocOffset = OS.tell();
-      EntitiesStack.back().LocOffset = LocOffset;
-    }
-  }
-
-  void printDeclPost(const Decl *D) override {
-    assert(EntitiesStack.back().Dcl == D);
+  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                     const NominalTypeDecl *NTD,
+                                     Optional<BracketOptions> Bracket) override {
+    assert(SynthesizeTarget);
+    SynthesizeTarget = nullptr;
+    if (!shouldContinuePost(ED, Bracket))
+      return;
     TextEntity Entity = std::move(EntitiesStack.back());
     EntitiesStack.pop_back();
     unsigned EndOffset = OS.tell();
@@ -115,10 +145,42 @@ public:
       EntitiesStack.back().SubEntities.push_back(std::move(Entity));
   }
 
-  void printTypeRef(const TypeDecl *TD, Identifier Name) override {
+  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
+    if (isa<ParamDecl>(D))
+      return; // Parameters are handled specially in addParameters().
+    if (!shouldContinuePre(D, Bracket))
+      return;
+    unsigned StartOffset = OS.tell();
+    EntitiesStack.emplace_back(D, SynthesizeTarget, StartOffset);
+  }
+
+  void printDeclLoc(const Decl *D) override {
+    if (EntitiesStack.back().Dcl == D) {
+      unsigned LocOffset = OS.tell();
+      EntitiesStack.back().LocOffset = LocOffset;
+    }
+  }
+
+  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
+    if (isa<ParamDecl>(D))
+      return; // Parameters are handled specially in addParameters().
+    if (!shouldContinuePost(D, Bracket))
+      return;
+    assert(!EntitiesStack.empty());
+    TextEntity Entity = std::move(EntitiesStack.back());
+    EntitiesStack.pop_back();
+    unsigned EndOffset = OS.tell();
+    Entity.Range.Length = EndOffset - Entity.Range.Offset;
+    if (EntitiesStack.empty())
+      TopEntities.push_back(std::move(Entity));
+    else
+      EntitiesStack.back().SubEntities.push_back(std::move(Entity));
+  }
+
+  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
     unsigned StartOffset = OS.tell();
     References.emplace_back(TD, StartOffset, Name.str().size());
-    StreamPrinter::printTypeRef(TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name);
   }
 };
 
@@ -164,7 +226,8 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   }
 }
 
-static bool initDocEntityInfo(const Decl *D, bool IsRef, DocEntityInfo &Info,
+static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
+                              bool IsRef, DocEntityInfo &Info,
                               StringRef Arg = StringRef()) {
   if (!D || isa<ParamDecl>(D) ||
       (isa<VarDecl>(D) && D->getDeclContext()->isLocalContext())) {
@@ -188,10 +251,20 @@ static bool initDocEntityInfo(const Decl *D, bool IsRef, DocEntityInfo &Info,
   if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
     llvm::raw_svector_ostream NameOS(Info.Name);
     SwiftLangSupport::printDisplayName(VD, NameOS);
-
-    llvm::raw_svector_ostream OS(Info.USR);
-    SwiftLangSupport::printUSR(VD, OS);
+    {
+      llvm::raw_svector_ostream OS(Info.USR);
+      SwiftLangSupport::printUSR(VD, OS);
+      if (SynthesizedTarget) {
+        OS << SwiftLangSupport::SynthesizedUSRSeparator;
+        SwiftLangSupport::printUSR(dyn_cast<ValueDecl>(SynthesizedTarget), OS);
+        {
+          llvm::raw_svector_ostream OS(Info.OriginalUSR);
+          SwiftLangSupport::printUSR(VD, OS);
+        }
+      }
+    }
   }
+
   Info.IsUnavailable = AvailableAttr::isUnavailable(D);
   Info.IsDeprecated = D->getAttrs().getDeprecated(D->getASTContext()) != nullptr;
 
@@ -200,6 +273,11 @@ static bool initDocEntityInfo(const Decl *D, bool IsRef, DocEntityInfo &Info,
     ide::getDocumentationCommentAsXML(D, OS);
 
     initDocGenericParams(D, Info);
+
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      llvm::raw_svector_ostream OS(Info.FullyAnnotatedDecl);
+      SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
+    }
   }
 
   return false;
@@ -207,7 +285,8 @@ static bool initDocEntityInfo(const Decl *D, bool IsRef, DocEntityInfo &Info,
 
 static bool initDocEntityInfo(const TextEntity &Entity,
                               DocEntityInfo &Info) {
-  if (initDocEntityInfo(Entity.Dcl, /*IsRef=*/false, Info, Entity.Argument))
+  if (initDocEntityInfo(Entity.Dcl, Entity.SynthesizeTarget,
+                        /*IsRef=*/false, Info, Entity.Argument))
     return true;
   Info.Offset = Entity.Range.Offset;
   Info.Length = Entity.Range.Length;
@@ -222,13 +301,13 @@ static const TypeDecl *getTypeDeclFromType(Type Ty) {
 
 static void passInherits(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, /*IsRef=*/true, EntInfo))
+  if (initDocEntityInfo(D, nullptr, /*IsRef=*/true, EntInfo))
     return;
   Consumer.handleInheritsEntity(EntInfo);
 }
 static void passConforms(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, /*IsRef=*/true, EntInfo))
+  if (initDocEntityInfo(D, nullptr, /*IsRef=*/true, EntInfo))
     return;
   Consumer.handleConformsToEntity(EntInfo);
 }
@@ -264,7 +343,7 @@ static void passConforms(ArrayRef<ValueDecl *> Dcls,
 }
 static void passExtends(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, /*IsRef=*/true, EntInfo))
+  if (initDocEntityInfo(D, nullptr, /*IsRef=*/true, EntInfo))
     return;
   Consumer.handleExtendsEntity(EntInfo);
 }
@@ -471,7 +550,7 @@ private:
       const TextReference &Ref = References.front();
       References = References.slice(1);
       DocEntityInfo Info;
-      if (initDocEntityInfo(Ref.Dcl, /*IsRef=*/true, Info))
+      if (initDocEntityInfo(Ref.Dcl, nullptr, /*IsRef=*/true, Info))
         continue;
       Info.Offset = Ref.Range.Offset;
       Info.Length = Ref.Range.Length;
@@ -535,7 +614,7 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
         SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
                                 BufferID);
       TextRange TR{ StartOffs, EndOffs-StartOffs };
-      TextEntity Param(param, Arg, TR, StartOffs);
+      TextEntity Param(param, nullptr, Arg, TR, StartOffs);
       Ent.SubEntities.push_back(std::move(Param));
     }
   }
@@ -666,8 +745,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
-  printModuleInterface(M, TraversalOptions, Printer, Options, false);
-
+  printModuleInterface(M, None, TraversalOptions, Printer, Options,
+                       true);
   Info.Text = OS.str();
   Info.TopEntities = std::move(Printer.TopEntities);
   Info.References = std::move(Printer.References);
@@ -729,7 +808,7 @@ public:
       return true;
     TextRange TR = getTextRange(D->getSourceRange());
     unsigned LocOffset = getOffset(Range.getStart());
-    EntitiesStack.emplace_back(D, TR, LocOffset);
+    EntitiesStack.emplace_back(D, nullptr, TR, LocOffset);
     return true;
   }
 
@@ -901,11 +980,6 @@ void SwiftLangSupport::findModuleGroups(StringRef ModuleName,
     Receiver(Groups, Error);
     return;
   }
-  for (auto File : M->getFiles()) {
-    File->collectAllGroups(Groups);
-  }
-  std::sort(Groups.begin(), Groups.end(), [](StringRef L, StringRef R) {
-    return L.compare_lower(R) < 0;
-  });
-  Receiver(Groups, Error);
+  std::vector<StringRef> Scratch;
+  Receiver(collectModuleGroups(M, Scratch), Error);
 }

@@ -8,9 +8,9 @@ enum E {}
 protocol P {}
 protocol P2 {}
 protocol AssociatedTypes {
-  typealias A
-  typealias B
-  typealias C
+  associatedtype A
+  associatedtype B
+  associatedtype C
 }
 
 class Model : AssociatedTypes {

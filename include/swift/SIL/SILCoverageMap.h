@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ProfileData/CoverageMapping.h"
@@ -60,6 +61,9 @@ private:
   // The mangled name of the function covered by this mapping.
   StringRef Name;
 
+  // Whether or not the covered function may have external linkage.
+  bool External;
+
   // The coverage hash of the function covered by this mapping.
   uint64_t Hash;
 
@@ -80,14 +84,14 @@ private:
   SILCoverageMap &operator=(const SILCoverageMap &) = delete;
 
   /// Private constructor. Create these using SILCoverageMap::create.
-  SILCoverageMap(uint64_t Hash);
+  SILCoverageMap(uint64_t Hash, bool External);
 
 public:
   ~SILCoverageMap();
 
   static SILCoverageMap *
-  create(SILModule &M, StringRef Filename, StringRef Name, uint64_t Hash,
-         ArrayRef<MappedRegion> MappedRegions,
+  create(SILModule &M, StringRef Filename, StringRef Name, bool External,
+         uint64_t Hash, ArrayRef<MappedRegion> MappedRegions,
          ArrayRef<llvm::coverage::CounterExpression> Expressions);
 
   /// Return the name of the source file where this mapping is found.
@@ -95,6 +99,9 @@ public:
 
   /// Return the mangled name of the function this mapping covers.
   StringRef getName() const { return Name; }
+
+  /// Check whether the covered function may have external linkage.
+  bool isPossiblyUsedExternally() const { return External; }
 
   /// Return the coverage hash for function this mapping covers.
   uint64_t getHash() const { return Hash; }
@@ -112,8 +119,14 @@ public:
   void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const;
 
   /// Print the coverage map.
-  void print(llvm::raw_ostream &OS, bool ShouldSort = false,
-             bool Verbose = false) const;
+  void print(llvm::raw_ostream &OS, bool Verbose = false,
+             bool ShouldSort = false) const {
+    SILPrintContext Ctx(OS, Verbose, ShouldSort);
+    print(Ctx);
+  }
+
+  void print(SILPrintContext &PrintCtx) const;
+
   void dump() const;
 };
 

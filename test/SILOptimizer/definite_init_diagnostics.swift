@@ -13,7 +13,7 @@ func test1() -> Int {
   return a     // expected-error {{variable 'a' used before being initialized}}
 }
 
-func takes_inout(inout a: Int) {}
+func takes_inout(a: inout Int) {}
 func takes_closure(fn: () -> ()) {}
 
 class SomeClass { 
@@ -162,7 +162,7 @@ func test4() {
   markUsed(t6.b)
 }
 
-func tupleinout(inout a: (lo: Int, hi: Int)) {
+func tupleinout(a: inout (lo: Int, hi: Int)) {
   markUsed(a.0)   // ok
   markUsed(a.1)   // ok
 }
@@ -284,7 +284,7 @@ func emptyStructTest() {
   useEmptyStruct(g.1)
 }
 
-func takesTuplePair(inout a : (SomeClass, SomeClass)) {}
+func takesTuplePair(a : inout (SomeClass, SomeClass)) {}
 
 // This tests cases where a store might be an init or assign based on control
 // flow path reaching it.
@@ -1018,7 +1018,7 @@ struct StructMutatingMethodTest {
 }
 
 @_transparent
-func myTransparentFunction(inout x : Int) {}
+func myTransparentFunction(x : inout Int) {}
 
 
 // <rdar://problem/19782264> Immutable, optional class members can't have their subproperties read from during init()
@@ -1133,13 +1133,13 @@ extension ProtocolInitTest {
   }
 
   init(test2 ii: Int) {
-    self = unsafeBitCast(0, Self.self)
+    self = unsafeBitCast(0, to: Self.self)
     i = ii
   }
 
   init(test3 ii: Int) {
     i = ii                // expected-error {{'self' used before chaining to another self.init requirement}}
-    self = unsafeBitCast(0, Self.self)
+    self = unsafeBitCast(0, to: Self.self)
   }
 
   init(test4 ii: Int) {

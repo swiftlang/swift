@@ -27,11 +27,10 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/APINotes/APINotesReader.h"
+#include "clang/AST/DeclVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Serialization/ModuleFileExtension.h"
-#include "clang/AST/Attr.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -217,8 +216,15 @@ enum class SpecialMethodKind {
 #define SWIFT_PROTOCOL_SUFFIX "Protocol"
 #define SWIFT_CFTYPE_SUFFIX "Ref"
 
-namespace api_notes = clang::api_notes;
-using api_notes::FactoryAsInitKind;
+/// Describes whether to classify a factory method as an initializer.
+enum class FactoryAsInitKind {
+  /// Infer based on name and type (the default).
+  Infer,
+  /// Treat as a class method.
+  AsClassMethod,
+  /// Treat as an initializer.
+  AsInitializer
+};
 
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
@@ -255,9 +261,6 @@ public:
   ASTContext &SwiftContext;
 
   const bool ImportForwardDeclarations;
-  const bool OmitNeedlessWords;
-  const bool InferDefaultArguments;
-  const bool UseSwiftLookupTables;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";
@@ -331,55 +334,6 @@ public:
 
   /// Translation API nullability from an API note into an optional kind.
   static OptionalTypeKind translateNullability(clang::NullabilityKind kind);
-
-  /// Retrieve the API notes readers that may contain information for the
-  /// given Objective-C container.
-  ///
-  /// \returns a (name, primary, secondary) tuple containing the name of the
-  /// entity to look for and the API notes readers where information could be
-  /// found. The "primary" reader is the reader describes the module where the
-  /// specific container is defined; the "secondary" reader describes the
-  /// module in which the type is originally defined, if it's different from
-  /// the primary. Either or both of the readers may be null.
-  std::tuple<StringRef, api_notes::APINotesReader*, api_notes::APINotesReader*>
-  getAPINotesForContext(const clang::ObjCContainerDecl *container);
-
-  /// Retrieve the API notes reader that contains information for the
-  /// given declaration. Note, use getAPINotesForContext to get notes for ObjC
-  /// properties and methods.
-  api_notes::APINotesReader* getAPINotesForDecl(const clang::Decl *decl);
-
-  /// Retrieve any information known a priori about the given Objective-C
-  /// method, if we have it.
-  ///
-  /// If \p container is specified, we're looking for a method with the same
-  /// selector and instance-ness in \p container.
-  Optional<api_notes::ObjCMethodInfo>
-  getKnownObjCMethod(const clang::ObjCMethodDecl *method,
-                     const clang::ObjCContainerDecl *container = nullptr);
-
-  /// For ObjC property accessor, if the property is known, lookup
-  /// the property info and merge it in.
-  void mergePropInfoIntoAccessor(const clang::ObjCMethodDecl *method,
-                                 api_notes::ObjCMethodInfo &methodInfo);
-
-  /// Retrieve information about the given Objective-C context scoped to the
-  /// given Swift module.
-  Optional<api_notes::ObjCContextInfo>
-  getKnownObjCContext(const clang::ObjCContainerDecl *container);
-
-  /// Retrieve any information known a priori about the given Objective-C
-  /// property.
-  Optional<api_notes::ObjCPropertyInfo>
-  getKnownObjCProperty(const clang::ObjCPropertyDecl *property);
-
-  /// Retrieve any information known a priori about the given global variable.
-  Optional<api_notes::GlobalVariableInfo>
-  getKnownGlobalVariable(const clang::VarDecl *global);
-
-  /// Retrieve any information known a priori about the given global function.
-  Optional<api_notes::GlobalFunctionInfo>
-  getKnownGlobalFunction(const clang::FunctionDecl *function);
 
   /// Determine whether the given class has designated initializers,
   /// consulting 
@@ -516,6 +470,8 @@ public:
       if (*moduleOpt)
         moduleName = (*moduleOpt)->getTopLevelModuleName();
     }
+    if (moduleName.empty())
+      moduleName = decl->getASTContext().getLangOpts().CurrentModule;
 
     StringRef enumName =
       decl->getDeclName() ? decl->getName()
@@ -538,7 +494,7 @@ public:
     // If there is no name for linkage, the computation is trivial and we
     // wouldn't be able to perform name-based caching anyway.
     if (!decl->hasNameForLinkage())
-      return importer::EnumInfo(decl, preprocessor);
+      return importer::EnumInfo(SwiftContext, decl, preprocessor);
 
     SmallString<32> keyScratch;
     auto key = getEnumInfoKey(decl, keyScratch);
@@ -546,7 +502,7 @@ public:
     if (known != enumInfos.end())
       return known->second;
 
-    importer::EnumInfo enumInfo(decl, preprocessor);
+    importer::EnumInfo enumInfo(SwiftContext, decl, preprocessor);
     enumInfos[key] = enumInfo;
     return enumInfo;
   }
@@ -622,11 +578,6 @@ public:
   /// A map from Clang modules to their Swift wrapper modules.
   llvm::SmallDenseMap<const clang::Module *, ModuleInitPair, 16> ModuleWrappers;
 
-  /// A map from Clang modules to their associated API notes.
-  llvm::SmallDenseMap<
-    const clang::Module *,
-    std::unique_ptr<api_notes::APINotesReader>> APINotesReaders;
-
   /// The module unit that contains declarations from imported headers.
   ClangModuleUnit *ImportedHeaderUnit = nullptr;
 
@@ -651,7 +602,8 @@ public:
   clang::Selector setObjectForKeyedSubscript;
 
 private:
-  Optional<Module *> checkedFoundationModule, checkedSIMDModule;
+  /// Records those modules that we have looked up.
+  llvm::DenseMap<Identifier, Module *> checkedModules;
 
   /// External Decls that we have imported but not passed to the ASTContext yet.
   SmallVector<Decl *, 4> RegisteredExternalDecls;
@@ -796,7 +748,7 @@ public:
 
   /// Retrieve the type of an instance of the given Clang declaration context,
   /// or a null type if the DeclContext does not have a corresponding type.
-  clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
+  static clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
 
   /// Determine whether this typedef is a CF type.
   static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
@@ -820,7 +772,6 @@ public:
          clang::QualType resultType,
          const clang::DeclContext *dc,
          const llvm::SmallBitVector &nonNullArgs,
-         const Optional<api_notes::ObjCMethodInfo> &knownMethod,
          Optional<unsigned> errorParamIndex,
          bool returnsSelf,
          bool isInstanceMethod,
@@ -842,6 +793,15 @@ public:
     bool ReplaceParamWithVoid;
   };
 
+  /// The kind of accessor that an entity will be imported as.
+  enum class ImportedAccessorKind {
+    None = 0,
+    PropertyGetter,
+    PropertySetter,
+    SubscriptGetter,
+    SubscriptSetter,
+  };
+
   /// Describes a name that was imported from Clang.
   struct ImportedName {
     /// The imported name.
@@ -860,11 +820,21 @@ public:
     /// than refuse to import the initializer.
     bool DroppedVariadic = false;
 
-    /// Whether this declaration is a subscript accessor (getter or setter).
-    bool IsSubscriptAccessor = false;
+    /// What kind of accessor this name refers to, if any.
+    ImportedAccessorKind AccessorKind = ImportedAccessorKind::None;
 
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind InitKind = CtorInitializerKind::Designated;
+
+    /// The context into which this declaration will be imported.
+    ///
+    /// When the context into which the declaration will be imported
+    /// matches a Clang declaration context (the common case), the
+    /// result will be expressed as a declaration context. Otherwise,
+    /// if the Clang type is not itself a declaration context (for
+    /// example, a typedef that comes into Swift as a strong type),
+    /// the type declaration will be provided.
+    EffectiveClangContext EffectiveContext;
 
     /// For names that map Objective-C error handling conventions into
     /// throwing Swift methods, describes how the mapping is performed.
@@ -876,6 +846,34 @@ public:
 
     /// Whether any name was imported.
     explicit operator bool() const { return static_cast<bool>(Imported); }
+
+    /// Whether this declaration is a property accessor (getter or setter).
+    bool isPropertyAccessor() const {
+      switch (AccessorKind) {
+      case ImportedAccessorKind::None:
+      case ImportedAccessorKind::SubscriptGetter:
+      case ImportedAccessorKind::SubscriptSetter:
+        return false;
+
+      case ImportedAccessorKind::PropertyGetter:
+      case ImportedAccessorKind::PropertySetter:
+        return true;
+      }
+    }
+
+    /// Whether this declaration is a subscript accessor (getter or setter).
+    bool isSubscriptAccessor() const {
+      switch (AccessorKind) {
+      case ImportedAccessorKind::None:
+      case ImportedAccessorKind::PropertyGetter:
+      case ImportedAccessorKind::PropertySetter:
+        return false;
+
+      case ImportedAccessorKind::SubscriptGetter:
+      case ImportedAccessorKind::SubscriptSetter:
+        return true;
+      }
+    }
   };
 
   /// Flags that control the import of names in importFullName.
@@ -893,14 +891,8 @@ public:
   /// so it should not be used when referencing Clang symbols.
   ///
   /// \param D The Clang declaration whose name should be imported.
-  ///
-  /// \param effectiveContext If non-null, will be set to the effective
-  /// Clang declaration context in which the declaration will be imported.
-  /// This can differ from D's redeclaration context when the Clang importer
-  /// introduces nesting, e.g., for enumerators within an NS_ENUM.
   ImportedName importFullName(const clang::NamedDecl *D,
                               ImportNameOptions options = None,
-                              clang::DeclContext **effectiveContext = nullptr,
                               clang::Sema *clangSemaOverride = nullptr);
 
   /// Imports the name of the given Clang macro into Swift.
@@ -1005,9 +997,19 @@ public:
   /// \brief Import the declaration context of a given Clang declaration into
   /// Swift.
   ///
+  /// \param context The effective context as determined by importFullName.
+  ///
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
-  DeclContext *importDeclContextOf(const clang::Decl *D);
+  DeclContext *importDeclContextOf(const clang::Decl *D,
+                                   EffectiveClangContext context);
+
+  /// \brief Import the declaration context of a given Clang
+  /// declaration into Swift.
+  DeclContext *importDeclContextOf(const clang::Decl *D) {
+    return importDeclContextOf(
+             D, const_cast<clang::DeclContext *>(D->getDeclContext()));
+  }
 
   /// \brief Create a new named constant with the given value.
   ///
@@ -1087,13 +1089,6 @@ public:
   ClangModuleUnit *getWrapperForModule(ClangImporter &importer,
                                        const clang::Module *underlying);
 
-  /// Retrieve the API notes reader that corresponds to the given Clang module,
-  /// loading it if necessary.
-  ///
-  /// \returns an unowned pointer to the corresponding API notes reader, or
-  /// nullptr if no API notes file exists.
-  api_notes::APINotesReader *getAPINotesForModule(const clang::Module *module);
-
   /// \brief Constructs a Swift module for the given Clang module.
   Module *finishLoadingClangModule(ClangImporter &importer,
                                    const clang::Module *clangModule,
@@ -1101,7 +1096,16 @@ public:
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///
-  /// \param module The name of the module in which the type should occur.
+  /// \param moduleName The name of the module in which the type should occur.
+  ///
+  /// \param name The name of the type to find.
+  ///
+  /// \returns The named type, or null if the type could not be found.
+  Type getNamedSwiftType(StringRef moduleName, StringRef name);
+
+  /// \brief Retrieve the named Swift type, e.g., Int32.
+  ///
+  /// \param module The module in which the type should occur.
   ///
   /// \param name The name of the type to find.
   ///
@@ -1199,6 +1203,7 @@ public:
                                            Identifier baseName,
                                            unsigned numParams,
                                            StringRef argumentLabel,
+                                           bool isFirstParameter,
                                            bool isLastParameter);
 
   /// Retrieve a bit vector containing the non-null argument

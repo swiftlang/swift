@@ -40,6 +40,7 @@ struct EntityInfo {
   UIdent Kind;
   llvm::SmallString<32> Name;
   llvm::SmallString<64> USR;
+  llvm::SmallString<16> Group;
   unsigned Line = 0;
   unsigned Column = 0;
 
@@ -294,6 +295,8 @@ struct CursorInfo {
   ArrayRef<StringRef> OverrideUSRs;
   /// Related declarations, overloaded functions etc., in annotated XML form.
   ArrayRef<StringRef> AnnotatedRelatedDeclarations;
+  /// All groups of the module name under cursor.
+  ArrayRef<StringRef> ModuleGroupArray;
   bool IsSystem = false;
 };
 
@@ -325,7 +328,9 @@ struct DocEntityInfo {
   llvm::SmallString<32> Name;
   llvm::SmallString<32> Argument;
   llvm::SmallString<64> USR;
+  llvm::SmallString<64> OriginalUSR;
   llvm::SmallString<64> DocComment;
+  llvm::SmallString<64> FullyAnnotatedDecl;
   std::vector<DocGenericParam> GenericParams;
   std::vector<std::string> GenericRequirements;
   unsigned Offset = 0;
@@ -375,6 +380,9 @@ class LangSupport {
   virtual void anchor();
 
 public:
+  /// A separator between parts in a synthesized usr.
+  const static std::string SynthesizedUSRSeparator;
+
   virtual ~LangSupport() { }
 
   virtual void indexSource(StringRef Filename,
@@ -417,12 +425,15 @@ public:
                                    StringRef Name,
                                    StringRef ModuleName,
                                    Optional<StringRef> Group,
-                                   ArrayRef<const char *> Args) = 0;
+                                   ArrayRef<const char *> Args,
+                                   bool SynthesizedExtensions,
+                                   Optional<StringRef> InterestedUSR) = 0;
 
   virtual void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                          StringRef Name,
                                          StringRef HeaderName,
-                                         ArrayRef<const char *> Args) = 0;
+                                         ArrayRef<const char *> Args,
+                                         bool SynthesizedExtensions) = 0;
 
   virtual void editorOpenSwiftSourceInterface(StringRef Name,
                                               StringRef SourceName,
@@ -451,6 +462,11 @@ public:
   virtual void getCursorInfo(StringRef Filename, unsigned Offset,
                              ArrayRef<const char *> Args,
                           std::function<void(const CursorInfo &)> Receiver) = 0;
+
+  virtual void
+  getCursorInfoFromUSR(StringRef Filename, StringRef USR,
+                       ArrayRef<const char *> Args,
+                       std::function<void(const CursorInfo &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,

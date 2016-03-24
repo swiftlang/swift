@@ -110,6 +110,9 @@ public:
   /// True if this rvalue has been used.
   bool isUsed() const & { return elementsToBeAdded == Used; }
   explicit operator bool() const & { return !isUsed(); }
+
+  /// True if this rvalue was emitted into context.
+  bool isInContext() const & { return isUsed(); }
   
   /// True if this represents an lvalue.
   bool isLValue() const & {
@@ -165,11 +168,14 @@ public:
   }
 
   /// Use this rvalue to initialize an Initialization.
-  void forwardInto(SILGenFunction &gen, Initialization *I, SILLocation Loc) &&;
+  void forwardInto(SILGenFunction &gen, SILLocation loc, Initialization *I) &&;
 
   /// Copy this rvalue to initialize an Initialization without consuming the
   /// rvalue.
-  void copyInto(SILGenFunction &gen, Initialization *I, SILLocation Loc) const&;
+  void copyInto(SILGenFunction &gen, SILLocation loc, Initialization *I) const&;
+
+  /// Assign this r-value into the destination.
+  void assignInto(SILGenFunction &gen, SILLocation loc, SILValue destAddr) &&;
   
   /// Forward the exploded SILValues into a SmallVector.
   void forwardAll(SILGenFunction &gen,

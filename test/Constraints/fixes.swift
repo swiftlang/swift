@@ -63,7 +63,8 @@ func forgotOptionalBang(a: A, obj: AnyObject) {
 class Dinner {}
 
 func microwave() -> Dinner {
-  return (n: Dinner?()) // expected-error{{value of optional type 'Dinner?' not unwrapped; did you mean to use '!' or '?'?}} {{24-24=!}}
+  let d: Dinner? = nil
+  return (n: d) // expected-error{{value of optional type 'Dinner?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=!}}
 }
 
 func forgotAnyObjectBang(obj: AnyObject) {
@@ -72,7 +73,7 @@ func forgotAnyObjectBang(obj: AnyObject) {
   _ = a
 }
 
-func increment(inout x: Int) { }
+func increment(x: inout Int) { }
 
 func forgotAmpersand() {
   var i = 5
@@ -124,4 +125,14 @@ ciuo ? true : false // expected-error{{optional type 'C!' cannot be used as a bo
 !ciuo // expected-error{{optional type 'C!' cannot be used as a boolean; test for '== nil' instead}}{{1-2=}} {{2-2=(}} {{6-6= == nil)}}
 
 // Forgotten ! or ?
-var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
+var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=?}}
+
+// SR-839
+struct Q {
+  let s: String?
+}
+let q = Q(s: nil)
+let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=?}}
+let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
+let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=!}}
+let c = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}

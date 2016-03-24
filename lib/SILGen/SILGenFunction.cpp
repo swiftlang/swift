@@ -66,10 +66,15 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
     return getMagicFunctionName(closure->getParent());
   }
   if (auto absFunc = dyn_cast<AbstractFunctionDecl>(dc)) {
-    // If this is an accessor, use the name of the storage.
     if (auto func = dyn_cast<FuncDecl>(absFunc)) {
-      if (auto storage = func->getAccessorStorageDecl())
+      // If this is an accessor, use the name of the storage.
+      if (auto storage = func->getAccessorStorageDecl()) {
         return storage->getFullName();
+      }
+      // If this is a defer body, use the parent name.
+      if (func->isDeferBody()) {
+        return getMagicFunctionName(func->getParent());
+      }
     }
 
     return absFunc->getFullName();
@@ -459,9 +464,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     ProtocolDecl *anyObjectProtocol =
       getASTContext().getProtocol(KnownProtocolKind::AnyObject);
     auto mainClassAnyObjectConformance = ProtocolConformanceRef(
-      SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
-                                                nullptr)
-        .getPointer());
+      *SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
+                                                nullptr));
     CanType anyObjectTy = anyObjectProtocol
       ->getDeclaredTypeInContext()
       ->getCanonicalType();
@@ -537,9 +541,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   argc->getType(), {}, args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
-    if (r->getType() != F.getLoweredFunctionType()->getResult().getSILType())
-      r = B.createStruct(mainClass,
-                       F.getLoweredFunctionType()->getResult().getSILType(), r);
+    auto rType = F.getLoweredFunctionType()->getSingleResult().getSILType();
+    if (r->getType() != rType)
+      r = B.createStruct(mainClass, rType, r);
 
     B.createReturn(mainClass, r);
     return;
@@ -581,9 +585,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   argc->getType(), {}, args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
-    if (r->getType() != F.getLoweredFunctionType()->getResult().getSILType())
-      r = B.createStruct(mainClass,
-                       F.getLoweredFunctionType()->getResult().getSILType(), r);
+    auto rType = F.getLoweredFunctionType()->getSingleResult().getSILType();
+    if (r->getType() != rType)
+      r = B.createStruct(mainClass, rType, r);
     B.createReturn(mainClass, r);
     return;
   }
@@ -725,7 +729,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
                                          curriedArgs, subs);
   SILType resultTy
     = SGM.getConstantType(from).castTo<SILFunctionType>()
-         ->getResult().getSILType();
+         ->getSingleResult().getSILType();
   resultTy = F.mapTypeIntoContext(resultTy);
   auto toTy = toFn->getType();
 

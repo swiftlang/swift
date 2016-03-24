@@ -541,7 +541,7 @@ public:
     getScopeInfo().addToScope(D, *this);
   }
 
-  ValueDecl *lookupInScope(Identifier Name) {
+  ValueDecl *lookupInScope(DeclName Name) {
     return getScopeInfo().lookupValueName(Name);
   }
 
@@ -553,6 +553,11 @@ public:
   ///
   /// \returns false on success, true on error.
   bool parseIdentifier(Identifier &Result, SourceLoc &Loc, const Diagnostic &D);
+  
+  /// Consume an identifier with a specific expected name.  This is useful for
+  /// contextually sensitive keywords that must always be present.
+  bool parseSpecificIdentifier(StringRef expected, SourceLoc &Loc,
+                               const Diagnostic &D);
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseIdentifier(Identifier &Result, Diag<DiagArgTypes...> ID,
@@ -567,6 +572,12 @@ public:
     return parseIdentifier(Result, L, Diagnostic(ID, Args...));
   }
   
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  bool parseSpecificIdentifier(StringRef expected,
+                               Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+    SourceLoc L;
+    return parseSpecificIdentifier(expected, L, Diagnostic(ID, Args...));
+  }
 
   /// \brief Consume an identifier or operator if present and return its name
   /// in \p Result.  Otherwise, emit an error and return true.
@@ -646,15 +657,14 @@ public:
     PD_HasContainerType     = 1 << 2,
     PD_DisallowNominalTypes = 1 << 3,
     PD_DisallowInit         = 1 << 4,
-    PD_DisallowTypeAliasDef = 1 << 5,
-    PD_AllowDestructor      = 1 << 6,
-    PD_AllowEnumElement     = 1 << 7,
-    PD_InProtocol           = 1 << 8,
-    PD_InClass              = 1 << 9,
-    PD_InExtension          = 1 << 10,
-    PD_InStruct             = 1 << 11,
-    PD_InEnum               = 1 << 12,
-    PD_InLoop               = 1 << 13
+    PD_AllowDestructor      = 1 << 5,
+    PD_AllowEnumElement     = 1 << 6,
+    PD_InProtocol           = 1 << 7,
+    PD_InClass              = 1 << 8,
+    PD_InExtension          = 1 << 9,
+    PD_InStruct             = 1 << 10,
+    PD_InEnum               = 1 << 11,
+    PD_InLoop               = 1 << 12
   };
 
   /// Options that control the parsing of declarations.
@@ -690,13 +700,16 @@ public:
   ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, ParseDeclOptions Flags);
   void parseDeclDelayed();
 
-  ParserResult<TypeDecl> parseDeclTypeAlias(bool WantDefinition,
-                                            bool isAssociatedType,
+  ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
                                             DeclAttributes &Attributes);
+
+  ParserResult<TypeDecl> parseDeclAssociatedType(ParseDeclOptions Flags,
+                                                 DeclAttributes &Attributes);
   
   ParserResult<IfConfigDecl> parseDeclIfConfig(ParseDeclOptions Flags);
-  /// Parse a #line directive.
-  ParserStatus parseLineDirective();
+  /// Parse a #line/#setline directive.
+  /// 'isLine = true' indicates parsing #line instead of #setline
+  ParserStatus parseLineDirective(bool isLine = false);
 
   void setLocalDiscriminator(ValueDecl *D);
 
@@ -835,6 +848,7 @@ public:
   bool parseSILWitnessTable();
   bool parseSILDefaultWitnessTable();
   bool parseSILCoverageMap();
+  bool parseSILScope();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing
@@ -1096,7 +1110,7 @@ public:
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprConfiguration();
-  Expr *parseExprStringLiteral();
+  ParserResult<Expr> parseExprStringLiteral();
 
   /// If the token is an escaped identifier being used as an argument
   /// label, but doesn't need to be, diagnose it.
@@ -1229,10 +1243,58 @@ public:
   ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
 };
 
-/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
-StringRef parseDeclName(StringRef name,
-                        SmallVectorImpl<StringRef> &argumentLabels,
-                        bool &isFunctionName);
+/// Describes a parsed declaration name.
+struct ParsedDeclName {
+  /// The name of the context of which the corresponding entity should
+  /// become a member.
+  StringRef ContextName;
+
+  /// The base name of the declaration.
+  StringRef BaseName;
+
+  /// The argument labels for a function declaration.
+  SmallVector<StringRef, 4> ArgumentLabels;
+
+  /// Whether this is a function name (vs. a value name).
+  bool IsFunctionName = false;
+
+  /// Whether this is a getter for the named property.
+  bool IsGetter = false;
+
+  /// Whether this is a setter for the named property.
+  bool IsSetter = false;
+
+  /// For a declaration name that makes the declaration into an
+  /// instance member, the index of the "Self" parameter.
+  Optional<unsigned> SelfIndex;
+
+  /// Determine whether this is a valid name.
+  explicit operator bool() const { return !BaseName.empty(); }
+
+  /// Whether this declaration name turns the declaration into a
+  /// member of some named context.
+  bool isMember() const { return !ContextName.empty(); }
+
+  /// Whether the result is translated into an instance member.
+  bool isInstanceMember() const {
+    return isMember() && static_cast<bool>(SelfIndex);
+  }
+
+  /// Whether the result is translated into a static/class member.
+  bool isClassMember() const {
+    return isMember() && !static_cast<bool>(SelfIndex);
+  }
+
+  /// Whether this is a property accessor.
+  bool isPropertyAccessor() const { return IsGetter || IsSetter; }
+
+  /// Form a declaration name from this parsed declaration name.
+  DeclName formDeclName(ASTContext &ctx) const;
+};
+
+/// Parse a stringified Swift declaration name,
+/// e.g. "Foo.translateBy(self:x:y:)".
+ParsedDeclName parseDeclName(StringRef name);
 
 /// Form a Swift declaration name from its constituent parts.
 DeclName formDeclName(ASTContext &ctx,

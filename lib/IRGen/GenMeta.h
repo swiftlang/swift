@@ -38,10 +38,10 @@ namespace swift {
   enum class SpecialProtocol : uint8_t;
   
 namespace irgen {
-  class AbstractCallee;
   class Callee;
   class Explosion;
   class FieldTypeInfo;
+  class GenericTypeRequirements;
   class IRGenFunction;
   class IRGenModule;
   class Size;
@@ -135,20 +135,21 @@ namespace irgen {
                                      llvm::Value *metadata);
 
   /// Given a reference to nominal type metadata of the given type,
-  /// derive a reference to the nth argument metadata.  The type must
-  /// have generic arguments.
+  /// derive a reference to the type metadata stored in the nth
+  /// requirement slot.  The type must have generic arguments.
   llvm::Value *emitArgumentMetadataRef(IRGenFunction &IGF,
                                        NominalTypeDecl *theDecl,
-                                       unsigned argumentIndex,
+                                       const GenericTypeRequirements &reqts,
+                                       unsigned reqtIndex,
                                        llvm::Value *metadata);
 
   /// Given a reference to nominal type metadata of the given type,
-  /// derive a reference to a protocol witness table for the nth
-  /// argument metadata.  The type must have generic arguments.
+  /// derive a reference to a protocol witness table stored in the nth
+  /// requirement slot.  The type must have generic arguments.
   llvm::Value *emitArgumentWitnessTableRef(IRGenFunction &IGF,
                                            NominalTypeDecl *theDecl,
-                                           unsigned argumentIndex,
-                                           ProtocolDecl *targetProtocol,
+                                           const GenericTypeRequirements &reqts,
+                                           unsigned reqtIndex,
                                            llvm::Value *metadata);
 
   /// Get the offset of a field in the class type metadata.
@@ -213,10 +214,6 @@ namespace irgen {
                                                 llvm::Value *object,
                                                 SILType objectType,
                                                 bool suppressCast = false);
-
-  /// Derive the abstract callee for a virtual call to the given method.
-  AbstractCallee getAbstractVirtualCallee(IRGenFunction &IGF,
-                                          FuncDecl *method);
 
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.

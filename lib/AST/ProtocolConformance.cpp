@@ -151,7 +151,8 @@ ProtocolConformance::getInheritedConformances() const {
 
 /// Determine whether the witness for the given requirement
 /// is either the default definition or was otherwise deduced.
-bool ProtocolConformance::usesDefaultDefinition(ValueDecl *requirement) const {
+bool ProtocolConformance::
+usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
@@ -171,19 +172,6 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
   }
 }
 
-Type ProtocolConformance::getInterfaceType() const {
-  switch (getKind()) {
-  case ProtocolConformanceKind::Normal:
-  case ProtocolConformanceKind::Inherited:
-    return getDeclContext()->getDeclaredInterfaceType();
-
-  case ProtocolConformanceKind::Specialized:
-    // Assume a specialized conformance is fully applied.
-    return getType();
-  }
-  llvm_unreachable("bad ProtocolConformanceKind");
-}
-
 GenericSignature *ProtocolConformance::getGenericSignature() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Inherited:
@@ -198,6 +186,14 @@ GenericSignature *ProtocolConformance::getGenericSignature() const {
     // type variables.
     return nullptr;
   }
+}
+
+bool ProtocolConformance::isBehaviorConformance() const {
+  return getRootNormalConformance()->isBehaviorConformance();
+}
+
+AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
+  return getRootNormalConformance()->getBehaviorDecl();
 }
 
 void NormalProtocolConformance::resolveLazyInfo() const {
@@ -302,7 +298,11 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     ProtocolConformance *genericConformance,
     ArrayRef<Substitution> substitutions)
-  : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
+  : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType,
+                        // FIXME: interface type should be passed in.
+                        // assumes specialized conformance is always fully
+                        // specialized
+                        conformingType),
     GenericConformance(genericConformance),
     GenericSubstitutions(substitutions)
 {
@@ -359,12 +359,13 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   for (auto proto : assocType->getConformingProtocols(resolver)) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
                                                         resolver);
-    assert((conforms.getInt() == ConformanceKind::Conforms ||
+    assert((conforms ||
             specializedType->is<TypeVariableType>() ||
             specializedType->isTypeParameter() ||
             specializedType->is<ErrorType>()) &&
            "Improperly checked substitution");
-    conformances.push_back(ProtocolConformanceRef(proto, conforms.getPointer()));
+    conformances.push_back(conforms ? *conforms 
+                                    : ProtocolConformanceRef(proto));
   }
 
   // Form the substitution.
@@ -401,6 +402,11 @@ ProtocolConformance::getRootNormalConformance() const {
     }
   }
   return cast<NormalProtocolConformance>(C);
+}
+
+bool ProtocolConformance::isVisibleFrom(DeclContext *dc) const {
+  // FIXME: Implement me!
+  return true;
 }
 
 ProtocolConformance *ProtocolConformance::subst(Module *module,
@@ -522,7 +528,7 @@ found_inherited:
                                  subMap, conformanceMap);
   }
   assert((getType()->isEqual(foundInherited->getType()) ||
-          foundInherited->getType()->isSuperclassOf(getType(), nullptr))
+          foundInherited->getType()->isExactSuperclassOf(getType(), nullptr))
          && "inherited conformance does not match type");
   return foundInherited;
 }

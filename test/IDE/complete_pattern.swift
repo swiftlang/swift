@@ -20,6 +20,12 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AFTER_PATTERN_IS | FileCheck %s -check-prefix=AFTER_PATTERN_IS
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_1 | FileCheck %s -check-prefix=MULTI_PATTERN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_2 | FileCheck %s -check-prefix=MULTI_PATTERN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_3 | FileCheck %s -check-prefix=MULTI_PATTERN_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_4 | FileCheck %s -check-prefix=MULTI_PATTERN_4
+
+
 //===--- Helper types that are used in this test
 
 struct FooStruct {
@@ -142,3 +148,50 @@ func test<T>(x: T) {
     #^AFTER_PATTERN_IS^#
   }
 }
+
+func test_multiple_patterns1(x: Int) {
+    switch (x, x) {
+    case (0, let a), #^MULTI_PATTERN_1^#
+    }
+}
+
+// MULTI_PATTERN_1: Begin completions
+// MULTI_PATTERN_1-NOT: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
+// MULTI_PATTERN_1-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
+// MULTI_PATTERN_1: End completions
+
+func test_multiple_patterns2(x: Int) {
+    switch (x, x) {
+    case (0, let a), (let a, 0):
+        #^MULTI_PATTERN_2^#
+    }
+}
+
+// MULTI_PATTERN_2: Begin completions
+// MULTI_PATTERN_2-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
+// MULTI_PATTERN_2-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
+// MULTI_PATTERN_2: End completions
+
+func test_multiple_patterns3(x: Int) {
+    switch (x, x) {
+    case (0, let a), (let b, 0):
+        #^MULTI_PATTERN_3^#
+    }
+}
+
+// MULTI_PATTERN_3: Begin completions
+// MULTI_PATTERN_3-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
+// MULTI_PATTERN_3: End completions
+
+func test_multiple_patterns4(x: Int) {
+    switch (x, x) {
+    case (0, let a) where #^MULTI_PATTERN_4^#
+        
+    }
+}
+
+// MULTI_PATTERN_4: Begin completions
+// MULTI_PATTERN_4-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
+// MULTI_PATTERN_4-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
+// MULTI_PATTERN_4: End completions
+

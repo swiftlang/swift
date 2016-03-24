@@ -31,7 +31,6 @@ namespace swift {
   class Substitution;
 
 namespace irgen {
-  class AbstractCallee;
   class CallEmission;
   class IRGenFunction;
   class IRGenModule;

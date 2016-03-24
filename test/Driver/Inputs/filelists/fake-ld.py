@@ -18,9 +18,9 @@ import sys
 filelistFile = sys.argv[sys.argv.index('-filelist') + 1]
 
 with open(filelistFile, 'r') as f:
-  lines = f.readlines()
-  assert lines[0].endswith("/a.o\n")
-  assert lines[1].endswith("/b.o\n")
-  assert lines[2].endswith("/c.o\n")
+    lines = f.readlines()
+    assert lines[0].endswith("/a.o\n")
+    assert lines[1].endswith("/b.o\n")
+    assert lines[2].endswith("/c.o\n")
 
 print("Handled link")

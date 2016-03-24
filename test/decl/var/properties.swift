@@ -66,7 +66,7 @@ var a5: X {
 
 // Reading/writing properties
 func accept_x(x: X) { }
-func accept_x_inout(inout x: X) { }
+func accept_x_inout(x: inout X) { }
 
 func test_global_properties(x: X) {
   accept_x(a1)
@@ -226,11 +226,11 @@ class C {
   }
 }
 
-protocol TrivialInitType {
+protocol TrivialInit {
   init()
 }
 
-class CT<T : TrivialInitType> {
+class CT<T : TrivialInit> {
   var prop1 = 42 {
     didSet { }
   }
@@ -449,11 +449,11 @@ extension StructWithExtension1 {
 
 class ClassWithExtension1 {
   var foo: Int = 0
-  class var fooStatic = 4 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
+  class var fooStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 extension ClassWithExtension1 {
   var fooExt: Int // expected-error {{extensions may not contain stored properties}}
-  class var fooExtStatic = 4 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
+  class var fooExtStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 
 enum EnumWithExtension1 {
@@ -471,7 +471,7 @@ protocol ProtocolWithExtension1 {
 }
 extension ProtocolWithExtension1 {
   final var fooExt: Int // expected-error{{extensions may not contain stored properties}}
-  final static var fooExtStatic = 4 // expected-error{{static stored properties not yet supported in generic types}}
+  final static var fooExtStatic = 4 // expected-error{{static stored properties not supported in generic types}}
 }
 
 func getS() -> S {
@@ -479,7 +479,7 @@ func getS() -> S {
   return s
 }
 
-func test_extension_properties(inout s: S, inout x: X) {
+func test_extension_properties(s: inout S, x: inout X) {
   accept_x(s.x)
   accept_x(s.x2)
   accept_x(s.x3)
@@ -511,7 +511,7 @@ func test_extension_properties(inout s: S, inout x: X) {
 
 extension S {
   mutating
-  func test(inout other_x: X) {
+  func test(other_x: inout X) {
     x = other_x
     x2 = other_x
     x3 = other_x // expected-error{{cannot assign to property: 'x3' is a get-only property}}
@@ -536,7 +536,7 @@ struct Beth {
   var c: Int
 }
 
-func accept_int_inout(inout c: Int) { }
+func accept_int_inout(c: inout Int) { }
 func accept_int(c: Int) { }
 
 func test_settable_of_nonsettable(a: Aleph) {
@@ -558,7 +558,7 @@ struct MonoStruct {
     return 0
   }
 
-  static var zang = UnicodeScalar()
+  static var zang = UnicodeScalar("\0")
 
   static var zung: UInt16 {
     get {
@@ -584,11 +584,11 @@ enum MonoEnum {
 }
 
 struct GenStruct<T> {
-  static var foo: Int = 0 // expected-error{{static stored properties not yet supported in generic types}}
+  static var foo: Int = 0 // expected-error{{static stored properties not supported in generic types}}
 }
 
 class MonoClass {
-  class var foo: Int = 0 // expected-error{{class stored properties not yet supported in classes; did you mean 'static'?}}
+  class var foo: Int = 0 // expected-error{{class stored properties not supported in classes; did you mean 'static'?}}
 }
 
 protocol Proto {
@@ -884,7 +884,7 @@ class Box {
   }
 }
 
-func double(inout val: Int) {
+func double(val: inout Int) {
   val *= 2
 }
 

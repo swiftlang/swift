@@ -89,7 +89,7 @@ protocol P5 { }
 struct S7a {}
 
 protocol P6 {
-  func foo<Target: P5>(inout target: Target)
+  func foo<Target: P5>(target: inout Target)
 }
 
 protocol P7 : P6 {
@@ -101,16 +101,17 @@ func ~> <T:P6>(x: T, _: S7a) -> S7b { return S7b() }
 
 struct S7b : P7 {
   typealias Assoc = S7b
-  func foo<Target: P5>(inout target: Target) {}
+  func foo<Target: P5>(target: inout Target) {}
 }
 
 // <rdar://problem/14685674>
-struct zip<A: GeneratorType, B: GeneratorType> : GeneratorType, SequenceType {
-     func next() -> (A.Element, B.Element)? { }
+struct zip<A : IteratorProtocol, B : IteratorProtocol>
+  : IteratorProtocol, Sequence {
 
-     typealias Generator = zip
-     func generate() -> zip { }
-     
+  func next() -> (A.Element, B.Element)? { }
+
+  typealias Generator = zip
+  func makeIterator() -> zip { }
 }
 
 protocol P8 { }
@@ -172,7 +173,7 @@ struct C<a : B> : B { // expected-error {{type 'C<a>' does not conform to protoc
 
 // SR-511
 protocol sr511 {
-  typealias Foo // expected-warning {{use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead}} {{3-12=associatedtype}}
+  typealias Foo // expected-error {{typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement}} 
 }
 
 associatedtype Foo = Int // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}}

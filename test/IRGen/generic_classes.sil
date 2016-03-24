@@ -214,7 +214,7 @@ sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@convention(meth
 // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
 // CHECK:   [[ALIGN32:%.*]] = load i32, i32* [[T1]], align 4
 // CHECK:   [[ALIGN:%.*]] = zext i32 [[ALIGN32]] to i64
-// CHECK:   call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], i64 [[SIZE]], i64 [[ALIGN]])
+// CHECK:   call noalias %swift.refcounted* @rt_swift_allocObject(%swift.type* [[METADATA]], i64 [[SIZE]], i64 [[ALIGN]])
 sil @RootGeneric_fragile_dependent_alloc : $<G> () -> RootGeneric<G> {
 entry:
   %x = alloc_ref $RootGeneric<G>
@@ -239,7 +239,7 @@ entry(%c : $RootGeneric<F>):
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
 // CHECK:   bitcast i8* [[Y_ADDR]] to %swift.opaque*
-sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (@out F, RootGeneric<F>) -> () {
+sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (RootGeneric<F>) -> @out F {
 entry(%z : $*F, %c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*F
@@ -254,7 +254,7 @@ entry(%z : $*F, %c : $RootGeneric<F>):
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
 // CHECK:   bitcast i8* [[Y_ADDR]] to %Si*
-sil @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(@out Int, RootGeneric<Int>) -> () {
+sil @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(RootGeneric<Int>) -> @out Int {
 entry(%z : $*Int, %c : $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*Int
@@ -317,11 +317,10 @@ entry(%c : $RootGeneric<Int32>):
 
 // CHECK: define{{( protected)?}} private %swift.type* @create_generic_metadata_GenericInheritsGeneric(%swift.type_pattern*, i8**) {{.*}} {
 //   Bind the generic parameters.
-// CHECK:   [[T0:%.*]] = load i8*, i8** %1
-// CHECK:   %A = bitcast i8* [[T0]] to %swift.type*
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %1, i32 1
-// CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]]
-// CHECK:   %B = bitcast i8* [[T1]] to %swift.type*
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   %A  = load %swift.type*, %swift.type** [[T0]]
+// CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
+// CHECK:   %B  = load %swift.type*, %swift.type** [[T1]]
 //   Construct the superclass.
 // CHECK:   [[SUPER:%.*]] = call %swift.type* @_TMaC15generic_classes11RootGeneric(%swift.type* %A)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[SUPER]] to %objc_class*

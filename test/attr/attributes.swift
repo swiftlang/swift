@@ -8,7 +8,7 @@ enum binary {
   init() { self = .Zero }
 }
 
-func f5(inout x: binary) {}
+func f5(x: inout binary) {}
 
 //===---
 //===--- IB attributes
@@ -226,3 +226,6 @@ class B {
 class SILStored {
   @sil_stored var x : Int = 42  // expected-error {{'sil_stored' only allowed in SIL modules}}
 }
+
+@_show_in_interface protocol _underscored {}
+@_show_in_interface class _notapplicable {} // expected-error {{may only be used on 'protocol' declarations}}

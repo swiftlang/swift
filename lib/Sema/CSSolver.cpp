@@ -57,7 +57,7 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   // If the type references the type variable, don't permit the binding.
   SmallVector<TypeVariableType *, 4> referencedTypeVars;
   type->getTypeVariables(referencedTypeVars);
-  if (std::count(referencedTypeVars.begin(), referencedTypeVars.end(), typeVar))
+  if (count(referencedTypeVars, typeVar))
     return None;
 
   // If the type is a type variable itself, don't permit the binding.
@@ -875,6 +875,21 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       }
     }
 
+    Type alternateType;
+    ASTContext &ctx = cs.getTypeChecker().Context;
+    if (!ctx.LangOpts.InferIUOs) {
+      // Don't deduce IUO types.
+      if (kind == AllowedBindingKind::Supertypes &&
+          constraint->getKind() >= ConstraintKind::Conversion &&
+          constraint->getKind() <= ConstraintKind::OperatorArgumentConversion) {
+        if (auto objectType =
+            cs.lookThroughImplicitlyUnwrappedOptionalType(type)) {
+          type = OptionalType::get(objectType);
+          alternateType = objectType;
+        }
+      }
+    }
+
     // Make sure we aren't trying to equate type variables with different
     // lvalue-binding rules.
     if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
@@ -899,6 +914,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     if (exactTypes.insert(type->getCanonicalType()).second)
       result.Bindings.push_back({type, kind, None});
+    if (alternateType &&
+        exactTypes.insert(alternateType->getCanonicalType()).second)
+      result.Bindings.push_back({alternateType, kind, None});
   }
 
   // If we have any literal constraints, check whether there is already a

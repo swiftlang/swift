@@ -493,9 +493,12 @@ rewriteLoopHeaderPredecessors(LoopTy *SubLoop, RegionTy *SubLoopRegion) {
     }
 
     DEBUG(llvm::dbgs() << "            Is in loop... Erasing...\n");
+    // Ok, we have a predecessor inside the loop. This must be a backedge.
+    //
     // We are abusing the fact that a block can only be a local successor.
     PredRegion->removeLocalSucc(SubLoopHeaderRegion->getID());
     propagateLivenessDownNonLocalSuccessorEdges(PredRegion);
+    SubLoopRegion->getSubregionData().addBackedgeSubregion(PredRegion->getID());
   }
   SubLoopHeaderRegion->Preds.clear();
 
@@ -512,10 +515,10 @@ static void getExitingRegions(LoopRegionFunctionInfo *LRFI, SILLoop *Loop,
   // this subloop's region. That is the *true* exiting region.
   for (auto *BB : ExitingBlocks) {
     auto *Region = LRFI->getRegion(BB);
-    unsigned RegionParentID = Region->getParentID();
+    unsigned RegionParentID = *Region->getParentID();
     while (RegionParentID != LRegion->getID()) {
       Region = LRFI->getRegion(RegionParentID);
-      RegionParentID = Region->getParentID();
+      RegionParentID = *Region->getParentID();
     }
     ExitingRegions.push_back(Region->getID());
   }
@@ -565,6 +568,7 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
     auto *ExitingSubregion = getRegion(ExitingSubregionID);
     DEBUG(llvm::dbgs() << "        Exiting Region: "
                        << ExitingSubregion->getID() << "\n");
+    bool HasBackedge = false;
 
     // For each successor region S of ER...
     for (auto SuccID : ExitingSubregion->getSuccs()) {
@@ -605,14 +609,23 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
         continue;
       }
 
-      // If the edge from ER to S is a back edge, we want to clip it.
+      // If the edge from ER to S is a back edge, we want to clip it and add
+      // exiting subregion to
       DEBUG(llvm::dbgs() << "            Is a subregion and a backedge, "
             "removing.\n");
+      HasBackedge = true;
       auto Iter =
           std::remove(SuccRegion->Preds.begin(), SuccRegion->Preds.end(),
                       ExitingSubregion->getID());
       SuccRegion->Preds.erase(Iter);
     }
+
+    // If we found a backedge, add ER's ID to LRegion's Backedge list.
+    if (!HasBackedge) {
+      continue;
+    }
+
+    LRegion->getSubregionData().addBackedgeSubregion(ExitingSubregion->getID());
   }
 }
 
@@ -745,7 +758,7 @@ getRegionForNonLocalSuccessor(const LoopRegion *Child, unsigned SuccID) const {
   LoopRegion::SuccessorID Succ = {0, 0};
 
   do {
-    Iter = getRegion(Iter->getParentID());
+    Iter = getRegion(*Iter->getParentID());
     Succ = Iter->Succs[SuccID].getValue();
     SuccID = Succ.ID;
   } while (Succ.IsNonLocal);
@@ -848,6 +861,19 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
         Subregion->print(os, true);
       }
     }
+    os << ")\n";
+
+    os << "    (backedge-regs";
+    if (!R->isBlock()) {
+      auto BackedgeIDs = R->getBackedgeRegions();
+      if (!BackedgeIDs.empty()) {
+        for (unsigned BackedgeID : BackedgeIDs) {
+          os << "\n        ";
+          LoopRegion *BackedgeRegion = getRegion(BackedgeID);
+          BackedgeRegion->print(os, true);
+        }
+      }
+    }
     os << "))\n";
   }
 }
@@ -876,7 +902,7 @@ struct LoopRegionWrapper {
   LoopRegion *Region;
 
   LoopRegionWrapper *getParent() const {
-    unsigned ParentIndex = Region->getParentID();
+    unsigned ParentIndex = *Region->getParentID();
     return &FuncInfo.Data[ParentIndex];
   }
 
@@ -890,20 +916,26 @@ struct alledge_iterator
     : std::iterator<std::forward_iterator_tag, LoopRegionWrapper> {
   LoopRegionWrapper *Wrapper;
   LoopRegion::subregion_iterator SubregionIter;
-  LoopRegion::const_succ_iterator SuccIter;
+  LoopRegion::backedge_iterator BackedgeIter;
+
+  using SuccIterTy =
+    OptionalTransformIterator<LoopRegion::const_succ_iterator,
+                              LoopRegion::SuccessorID::ToLiveSucc>;
+  SuccIterTy SuccIter;
 
   alledge_iterator(LoopRegionWrapper *w,
                    swift::LoopRegion::subregion_iterator subregioniter,
-                   LoopRegion::const_succ_iterator succiter)
-      : Wrapper(w), SubregionIter(subregioniter), SuccIter(succiter) {
+                   LoopRegion::const_succ_iterator succiter,
+                   LoopRegion::backedge_iterator backedgeiter)
+      : Wrapper(w), SubregionIter(subregioniter),
+        BackedgeIter(backedgeiter),
+        SuccIter(succiter, w->Region->succ_end(),
+                 LoopRegion::SuccessorID::ToLiveSucc()) {}
 
-    // Prime the successor iterator so that we skip over any initial dead
-    // successor edges.
-    //
-    // TODO: Refactor this to use a FilterRange.
-    for (auto SuccEnd = Wrapper->Region->succ_end();
-         !SuccIter->hasValue() && SuccIter != SuccEnd; ++SuccIter) {
-    }
+  // This is not efficient, but this is graphing code...
+  SuccIterTy getSuccEnd() const {
+    return SuccIterTy(Wrapper->Region->succ_end(), Wrapper->Region->succ_end(),
+                      LoopRegion::SuccessorID::ToLiveSucc());
   }
 
   bool isSubregion() const {
@@ -911,42 +943,68 @@ struct alledge_iterator
   }
 
   bool isNonLocalEdge() const {
+    // If we are not a subregion...
     if (isSubregion())
       return false;
-    return SuccIter->getValue().IsNonLocal;
+
+    // Then if succ iterator is not succ end, we are a non local edge if that
+    // value is Non Local.
+    return getSuccEnd() != SuccIter && (*SuccIter).IsNonLocal;
+  }
+
+  bool isBackEdge() const {
+    if (isSubregion())
+      return false;
+    // If our successor iterator has reached the end of the successor list.
+    return getSuccEnd() == SuccIter;
   }
 
   LoopRegionWrapper *operator*() const {
-    if (SubregionIter != Wrapper->Region->subregion_end()) {
+    // If we have a subregion... return the wrapper for it.
+    if (isSubregion()) {
       return &Wrapper->FuncInfo.Data[*SubregionIter];
     }
+
+    // If we have a backedge... return the wrapper for that.
+    if (isBackEdge()) {
+      return &Wrapper->FuncInfo.Data[*BackedgeIter];
+    }
+
     // If we have a non-local id, just return the parent region's data.
-    if ((*SuccIter)->IsNonLocal)
-      return &Wrapper->FuncInfo.Data[Wrapper->Region->getParentID()];
+    if ((*SuccIter).IsNonLocal)
+      return &Wrapper->FuncInfo.Data[*(Wrapper->Region->getParentID())];
     // Otherwise return the data associated with this successor.
-    return &Wrapper->FuncInfo.Data[(*SuccIter)->ID];
+    return &Wrapper->FuncInfo.Data[(*SuccIter).ID];
   }
 
   alledge_iterator &operator++() {
-    if (SubregionIter != Wrapper->Region->subregion_end()) {
-      SubregionIter++;
-    } else {
-      // Make sure that we skip past any dead successors.
-      auto End = Wrapper->Region->succ_end();
-      do {
-        SuccIter++;
-      } while (!SuccIter->hasValue() && SuccIter != End);
+    // If we are still a subregion, increment the SubregionIter and return.
+    if (isSubregion()) {
+      ++SubregionIter;
+      return *this;
     }
+
+    // Make sure that we skip past any dead successors. If after skipping dead
+    // successors, if our SuccIter is not end, then return. We have a true
+    // successor.
+    if (SuccIter != getSuccEnd()) {
+      ++SuccIter;
+      return *this;
+    }
+
+    // Ok, now we know that we have a back edge region. Increment the backedge
+    // region.
+    ++BackedgeIter;
+
     return *this;
   }
+
   alledge_iterator operator++(int) {
-    if (SubregionIter != Wrapper->Region->subregion_end()) {
-      return alledge_iterator{Wrapper, SubregionIter++, SuccIter};
-    }
-    auto NewIter = *this;
-    ++NewIter;
-    return NewIter;
+    alledge_iterator copy = *this;
+    ++copy;
+    return copy;
   }
+
   bool operator==(alledge_iterator rhs) {
     if (Wrapper->Region != rhs.Wrapper->Region)
       return false;
@@ -954,20 +1012,24 @@ struct alledge_iterator
       return false;
     if (SuccIter != rhs.SuccIter)
       return false;
-    return true;
+    if (BackedgeIter.hasValue() != rhs.BackedgeIter.hasValue())
+      return false;
+    return BackedgeIter == rhs.BackedgeIter;
   }
+
   bool operator!=(alledge_iterator rhs) { return !(*this == rhs); }
 };
 
 } // end anonymous namespace
 
 alledge_iterator LoopRegionWrapper::begin() {
-  return alledge_iterator(this, Region->subregion_begin(),
-                          Region->succ_begin());
+  return alledge_iterator(this, Region->subregion_begin(), Region->succ_begin(),
+                          Region->backedge_begin());
 }
 
 alledge_iterator LoopRegionWrapper::end() {
-  return alledge_iterator(this, Region->subregion_end(), Region->succ_end());
+  return alledge_iterator(this, Region->subregion_end(), Region->succ_end(),
+                          Region->backedge_end());
 }
 
 namespace llvm {
@@ -1129,6 +1191,8 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
       return "NLSuc";
     if (I.isSubregion())
       return "Sub";
+    if (I.isBackEdge())
+      return "B";
     return "LSuc";
   }
 
@@ -1141,6 +1205,8 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
       return "color=red";
     if (EI.isNonLocalEdge())
       return "color=blue";
+    if (EI.isBackEdge())
+      return "color=darkgreen";
     return "";
   }
 
@@ -1160,9 +1226,9 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
                                  "local edge");
     auto *ParentRegion = Node->getParent();
     auto SuccIter = ParentRegion->Region->succ_begin();
-    std::advance(SuccIter, (*I.SuccIter)->ID);
+    std::advance(SuccIter, (*I.SuccIter).ID);
     return alledge_iterator(ParentRegion, ParentRegion->Region->subregion_end(),
-                            SuccIter);
+                            SuccIter, ParentRegion->Region->backedge_begin());
   }
 };
 } // end llvm namespace

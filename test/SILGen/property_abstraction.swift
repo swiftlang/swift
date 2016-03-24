@@ -26,11 +26,11 @@ func getF(x: Foo<Int, Int>) -> Int -> Int {
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]({{%.*}})
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
-func setF(inout x: Foo<Int, Int>, f: Int -> Int) {
+func setF(x: inout Foo<Int, Int>, f: Int -> Int) {
   x.f = f
 }
 
-func inOutFunc(inout f: (Int -> Int)) { }
+func inOutFunc(f: inout (Int -> Int)) { }
 
 // CHECK-LABEL: sil hidden @_TF20property_abstraction6inOutF
 // CHECK:         [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFunc
@@ -102,8 +102,8 @@ struct T20341012 {
     private var options: ArrayLike<Test20341012> { get {} set {} }
 
     // CHECK-LABEL: sil hidden @_TFV20property_abstraction9T203410121t{{.*}}
-    // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_owned (@out (), @in ()) -> ())
-    // CHECK:         store {{.*}} to [[TMP1]]
+    // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_owned (@in ()) -> @out ())
+    // CHECK:         apply {{.*}}<(title: (), action: () -> ())>([[TMP1]],
     mutating func t() {
         _ = self.options[].title
     }
@@ -114,10 +114,10 @@ class MyClass {}
 // When simply assigning to a property, reabstract the r-value and assign
 // to the base instead of materializing and then assigning.
 protocol Factory {
-  typealias Product
+  associatedtype Product
   var builder : () -> Product { get set }
 }
-func setBuilder<F: Factory where F.Product == MyClass>(inout factory: F) {
+func setBuilder<F: Factory where F.Product == MyClass>(factory: inout F) {
   factory.builder = { return MyClass() }
 }
 // CHECK: sil hidden @_TF20property_abstraction10setBuilder{{.*}} : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()

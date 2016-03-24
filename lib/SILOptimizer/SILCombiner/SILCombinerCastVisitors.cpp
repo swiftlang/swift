@@ -204,7 +204,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
   // (unchecked-addr-cast cls->superclass) -> (upcast cls->superclass)
   if (UADCI->getType() != UADCI->getOperand()->getType() &&
-      UADCI->getType().isSuperclassOf(UADCI->getOperand()->getType()))
+      UADCI->getType().isExactSuperclassOf(UADCI->getOperand()->getType()))
     return Builder.createUpcast(UADCI->getLoc(), UADCI->getOperand(),
                                 UADCI->getType());
 
@@ -287,7 +287,7 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
                                               URCI->getType());
 
   if (URCI->getType() != URCI->getOperand()->getType() &&
-      URCI->getType().isSuperclassOf(URCI->getOperand()->getType()))
+      URCI->getType().isExactSuperclassOf(URCI->getOperand()->getType()))
     return Builder.createUpcast(URCI->getLoc(), URCI->getOperand(),
                                 URCI->getType());
 

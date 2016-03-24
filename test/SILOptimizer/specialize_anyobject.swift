@@ -2,7 +2,7 @@
 
 // rdar://problem/20338028
 protocol PA: class { }
-protocol PB { typealias B: PA }
+protocol PB { associatedtype B: PA }
 
 class CA: PA { }
 class CB: PB { typealias B = CA }

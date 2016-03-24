@@ -81,13 +81,15 @@ MergeTopDownLatticeStates(TopDownRefCountState::LatticeState L1,
 /// Initializes/reinitialized the state for I. If we reinitialize we return
 /// true.
 bool BottomUpRefCountState::initWithMutatorInst(
-    ImmutablePointerSet<SILInstruction> *I) {
+    ImmutablePointerSet<SILInstruction> *I,
+    RCIdentityFunctionInfo *RCFI) {
   assert(I->size() == 1);
   SILInstruction *Inst = *I->begin();
   assert((isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst)) &&
          "strong_release and release_value are only supported.");
+  (void) Inst;
 
-  bool NestingDetected = SuperTy::initWithMutatorInst(I);
+  bool NestingDetected = SuperTy::initWithMutatorInst(I, RCFI);
 
   // If we know that there is another decrement on the same pointer that has
   // not been matched up to an increment, then the pointer must have a
@@ -124,7 +126,7 @@ void BottomUpRefCountState::clear() {
   // be removed, be conservative and clear the transition state, so we do not
   // propagate KnownSafety forward.
   if (mightRemoveMutators())
-    Transition = None;
+    Transition = RCStateTransition();
   LatState = LatticeState::None;
   SuperTy::clear();
 }
@@ -261,13 +263,13 @@ bool BottomUpRefCountState::handleGuaranteedUser(
 bool BottomUpRefCountState::isRefCountInstMatchedToTrackedInstruction(
     SILInstruction *RefCountInst) {
   // If we are not tracking any state transitions bail.
-  if (!Transition.hasValue())
+  if (!Transition.isValid())
     return false;
 
   // Otherwise, ask the transition state if this instruction causes a
   // transition that can be matched with the transition in order to eliminate
   // the transition.
-  if (!Transition->matchingInst(RefCountInst))
+  if (!Transition.matchingInst(RefCountInst))
     return false;
 
   return handleRefCountInstMatch(RefCountInst);
@@ -328,8 +330,8 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
     return false;
   }
 
-  if (!Transition.hasValue() || !Other.Transition.hasValue() ||
-      !Transition->merge(Other.Transition.getValue())) {
+  if (!Transition.isValid() || !Other.Transition.isValid() ||
+      !Transition.merge(Other.Transition)) {
     DEBUG(llvm::dbgs() << "            Failed merge!\n");
     clear();
     return false;
@@ -340,7 +342,7 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   Partial |= Other.Partial;
   if (*InsertPts != *Other.InsertPts) {
     Partial = true;
-    InsertPts = InsertPts->concat(Other.InsertPts);
+    InsertPts = InsertPts->merge(Other.InsertPts);
   }
 
   DEBUG(llvm::dbgs() << "            Partial: " << (Partial ? "yes" : "no")
@@ -544,14 +546,15 @@ void BottomUpRefCountState::updateForPredTerminators(
 /// Initializes/reinitialized the state for I. If we reinitialize we return
 /// true.
 bool TopDownRefCountState::initWithMutatorInst(
-    ImmutablePointerSet<SILInstruction> *I) {
+    ImmutablePointerSet<SILInstruction> *I,
+    RCIdentityFunctionInfo *RCFI) {
   assert(I->size() == 1);
   SILInstruction *Inst = *I->begin();
   (void)Inst;
   assert((isa<StrongRetainInst>(Inst) || isa<RetainValueInst>(Inst)) &&
          "strong_retain and retain_value are only supported.");
 
-  bool NestingDetected = SuperTy::initWithMutatorInst(I);
+  bool NestingDetected = SuperTy::initWithMutatorInst(I, RCFI);
 
   // This retain is known safe if the operand we are tracking was already
   // known incremented previously. This occurs when you have nested
@@ -568,7 +571,7 @@ bool TopDownRefCountState::initWithMutatorInst(
 void TopDownRefCountState::initWithArg(SILArgument *Arg) {
   LatState = LatticeState::Incremented;
   Transition = RCStateTransition(Arg);
-  assert((*Transition).getKind() == RCStateTransitionKind::StrongEntrance &&
+  assert(Transition.getKind() == RCStateTransitionKind::StrongEntrance &&
          "Expected a strong entrance here");
   RCRoot = Arg;
   KnownSafe = false;
@@ -581,7 +584,7 @@ void TopDownRefCountState::initWithEntranceInst(
     ImmutablePointerSet<SILInstruction> *I, SILValue RCIdentity) {
   LatState = LatticeState::Incremented;
   Transition = RCStateTransition(I);
-  assert((*Transition).getKind() == RCStateTransitionKind::StrongEntrance &&
+  assert(Transition.getKind() == RCStateTransitionKind::StrongEntrance &&
          "Expected a strong entrance here");
   RCRoot = RCIdentity;
   KnownSafe = false;
@@ -590,7 +593,7 @@ void TopDownRefCountState::initWithEntranceInst(
 
 /// Uninitialize the current state.
 void TopDownRefCountState::clear() {
-  Transition = None;
+  Transition = RCStateTransition();
   LatState = LatticeState::None;
   SuperTy::clear();
 }
@@ -628,7 +631,7 @@ bool TopDownRefCountState::handleDecrement(
   switch (LatState) {
   case LatticeState::Incremented:
     LatState = LatticeState::MightBeDecremented;
-    InsertPts = SetFactory.concat(InsertPts, NewInsertPt);
+    InsertPts = SetFactory.merge(InsertPts, NewInsertPt);
     return true;
   case LatticeState::None:
   case LatticeState::MightBeDecremented:
@@ -719,13 +722,13 @@ bool TopDownRefCountState::handleGuaranteedUser(
 bool TopDownRefCountState::isRefCountInstMatchedToTrackedInstruction(
     SILInstruction *RefCountInst) {
   // If we are not tracking any state transitions bail.
-  if (!Transition.hasValue())
+  if (!Transition.isValid())
     return false;
 
   // Otherwise, ask the transition state if this instruction causes a
   // transition that can be matched with the transition in order to eliminate
   // the transition.
-  if (!Transition->matchingInst(RefCountInst))
+  if (!Transition.matchingInst(RefCountInst))
     return false;
 
   return handleRefCountInstMatch(RefCountInst);
@@ -783,8 +786,8 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
     return false;
   }
 
-  if (!Transition.hasValue() || !Other.Transition.hasValue() ||
-      !Transition->merge(Other.Transition.getValue())) {
+  if (!Transition.isValid() || !Other.Transition.isValid() ||
+      !Transition.merge(Other.Transition)) {
     DEBUG(llvm::dbgs() << "            Failed merge!\n");
     clear();
     return false;
@@ -793,7 +796,7 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   Partial |= Other.Partial;
   if (*InsertPts != *Other.InsertPts) {
     Partial = true;
-    InsertPts = InsertPts->concat(Other.InsertPts);
+    InsertPts = InsertPts->merge(Other.InsertPts);
   }
 
   DEBUG(llvm::dbgs() << "            Partial: " << (Partial ? "yes" : "no")

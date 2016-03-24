@@ -77,7 +77,7 @@ func use_subscript_archetype_rvalue_get<T : SubscriptableGet>(generic : T, idx :
 // CHECK-NEXT: destroy_addr %0
 
 
-func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(inout generic : T, idx : Int) -> Int {
+func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(generic: inout T, idx : Int) -> Int {
   return generic[idx]
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_get
@@ -95,7 +95,7 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(inout generic :
 // CHECK: return [[APPLYRESULT]]
 
 
-func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(inout generic : T, idx : Int) {
+func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(generic: inout T, idx : Int) {
   generic[idx] = idx
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
@@ -190,7 +190,7 @@ func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(generic : T
 // CHECK-NEXT: destroy_addr %0
 
 
-func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(inout generic : T, v : Int) {
+func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(generic: inout T, v : Int) {
   generic.b = v
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
@@ -210,10 +210,10 @@ protocol Initializable {
 
 // CHECK-LABEL: sil hidden @_TF9protocols27use_initializable_archetype
 func use_initializable_archetype<T: Initializable>(t: T, i: Int) {
-  // CHECK:   [[T_INIT:%[0-9]+]] = witness_method $T, #Initializable.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+  // CHECK:   [[T_INIT:%[0-9]+]] = witness_method $T, #Initializable.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
   // CHECK:   [[T_META:%[0-9]+]] = metatype $@thick T.Type
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
-  // CHECK:   [[T_RESULT_ADDR:%[0-9]+]] = apply [[T_INIT]]<T>([[T_RESULT]], %1, [[T_META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+  // CHECK:   [[T_RESULT_ADDR:%[0-9]+]] = apply [[T_INIT]]<T>([[T_RESULT]], %1, [[T_META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
   // CHECK:   destroy_addr [[T_RESULT]] : $*T
   // CHECK:   dealloc_stack [[T_RESULT]] : $*T
   // CHECK:   destroy_addr [[VAR_0:%[0-9]+]] : $*T
@@ -228,8 +228,8 @@ func use_initializable_existential(im: Initializable.Type, i: Int) {
 // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[IM]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
 // CHECK:   [[TEMP_VALUE:%[0-9]+]] = alloc_stack $Initializable
 // CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential_addr [[TEMP_VALUE]] : $*Initializable, $@opened([[N]]) Initializable
-// CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened([[N]]) Initializable, #Initializable.init!allocator.1, [[ARCHETYPE_META]]{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
-// CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[TEMP_ADDR]], [[I]], [[ARCHETYPE_META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+// CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened([[N]]) Initializable, #Initializable.init!allocator.1, [[ARCHETYPE_META]]{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[TEMP_ADDR]], [[I]], [[ARCHETYPE_META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   destroy_addr [[TEMP_VALUE]] : $*Initializable
 // CHECK:   dealloc_stack [[TEMP_VALUE]] : $*Initializable
   im.init(int: i)
@@ -379,7 +379,7 @@ protocol ExistentialProperty {
   var p: PropertyWithGetterSetter { get set }
 }
 
-func testExistentialPropertyRead<T: ExistentialProperty>(inout t: T) {
+func testExistentialPropertyRead<T: ExistentialProperty>(t: inout T) {
     let b = t.p.b
 }
 // CHECK-LABEL: sil hidden @_TF9protocols27testExistentialPropertyRead
@@ -400,6 +400,32 @@ func testExistentialPropertyRead<T: ExistentialProperty>(inout t: T) {
 // CHECK-NEXT: destroy_addr [[T0]]
 // CHECK-NOT:  witness_method
 // CHECK:      return
+
+func modify(x: inout Int) {}
+
+// Make sure we call the materializeForSet callback with the correct
+// generic signature.
+
+func modifyProperty<T : PropertyWithGetterSetter>(x: inout T) {
+  modify(&x.b)
+}
+// CHECK-LABEL: sil hidden @_TF9protocols14modifyPropertyuRxS_24PropertyWithGetterSetterrFRxT_
+// CHECK:      [[SELF_BOX:%.*]] = alloc_box $T
+// CHECK:      [[SELF:%.*]] = project_box %1 : $@box T
+// CHECK:      [[MODIFY_FN:%.*]] = function_ref @_TF9protocols6modifyFRSiT_
+// CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!materializeForSet.1
+// CHECK:      [[RESULT:%.*]] = apply [[WITNESS_FN]]<T>
+// CHECK:      [[TEMPORARY:%.*]] = tuple_extract [[RESULT]]
+// CHECK:      [[CALLBACK:%.*]] = tuple_extract [[RESULT]]
+// CHECK:      [[TEMPORARY_ADDR_TMP:%.*]] = pointer_to_address [[TEMPORARY]] : $Builtin.RawPointer to $*Int
+// CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on [[SELF]] : $*T
+// CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ADDR]])
+// CHECK:      switch_enum [[CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+// CHECK:    bb1([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
+// CHECK:      [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]]
+// CHECK:      [[METATYPE:%.*]] = metatype $@thick T.Type
+// CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ADDR]] : $*Int to $Builtin.RawPointer
+// CHECK:      apply [[CALLBACK]]<T>
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: @_TTWC9protocols15ClassWithGetterS_18PropertyWithGetterS_FS1_g1aSi

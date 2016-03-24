@@ -1,5 +1,8 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+import Foundation
+
 struct S0 {
   init!(int: Int) { }
   init! (uint: UInt) { }

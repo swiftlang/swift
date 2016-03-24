@@ -11,7 +11,7 @@ import gizmo
 class DesignatedStubs : Gizmo {
   override init() { super.init() }
 }
-// CHECK-DEBUG: string_literal utf8 "{{.*}}unimplemented_initializer.swift"
+// CHECK-DEBUG: string_literal utf8 "{{.*}}unimplemented_initializer.swift",
 
-// CHECK-RELEASE-NOT: unimplemented_initializer.swift"
+// CHECK-RELEASE-NOT: unimplemented_initializer.swift",
 

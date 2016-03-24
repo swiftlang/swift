@@ -55,7 +55,7 @@ CastsTests.test("No leak for failed tuple casts") {
 }
 
 protocol P {}
-class ErrClass : ErrorType { }
+class ErrClass : ErrorProtocol { }
 
 CastsTests.test("No overrelease of existential boxes in failed casts") {
     // Test for crash from SR-392
@@ -69,7 +69,7 @@ CastsTests.test("No overrelease of existential boxes in failed casts") {
         }
     }
     
-    let err: ErrorType = ErrClass()
+    let err: ErrorProtocol = ErrClass()
     bar(err)
 }
 
