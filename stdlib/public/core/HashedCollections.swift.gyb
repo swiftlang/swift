@@ -1749,6 +1749,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     }
   }
 
+  @_versioned
   internal var _capacity: Int {
     @warn_unused_result
     get {

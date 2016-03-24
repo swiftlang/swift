@@ -124,6 +124,8 @@ public prefix func + <T : SignedNumber>(x: T) -> T {
 
 //===--- abs(x) -----------------------------------------------------------===//
 public struct _Abs {}
+
+@_versioned
 internal func _abs<Args>(args: Args) -> (_Abs, Args) {
   return (_Abs(), args)
 }

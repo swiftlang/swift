@@ -74,6 +74,7 @@ public func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
 }
 
+@_versioned
 @warn_unused_result
 internal func _roundUp(offset: Int, toAlignment alignment: Int) -> Int {
   _sanityCheck(offset >= 0)
@@ -174,12 +175,14 @@ func _conditionallyUnreachable() {
   Builtin.conditionallyUnreachable()
 }
 
+@_versioned
 @warn_unused_result
 @_silgen_name("swift_isClassOrObjCExistentialType")
 func _swift_isClassOrObjCExistentialType<T>(x: T.Type) -> Bool
 
 /// Returns `true` iff `T` is a class type or an `@objc` existential such as
 /// `AnyObject`.
+@_versioned
 @inline(__always)
 @warn_unused_result
 internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
@@ -287,6 +290,7 @@ public func _slowPath<C : Boolean>(x: C) -> Bool {
 
 /// Returns `true` iff the class indicated by `theClass` uses native
 /// Swift reference-counting.
+@_versioned
 @inline(__always)
 @warn_unused_result
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
@@ -323,6 +327,7 @@ internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
 #if arch(i386) || arch(arm)
+@_versioned
 internal var _objectPointerSpareBits: UInt {
     @inline(__always) get { return 0x0000_0003 }
 }
@@ -336,6 +341,7 @@ internal var _objCTaggedPointerBits: UInt {
   @inline(__always) get { return 0 }
 }
 #elseif arch(x86_64)
+@_versioned
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x7F00_0000_0000_0006 }
 }
@@ -349,6 +355,7 @@ internal var _objCTaggedPointerBits: UInt {
   @inline(__always) get { return 0x8000_0000_0000_0001 }
 }
 #elseif arch(arm64)
+@_versioned
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x7F00_0000_0000_0007 }
 }
@@ -377,6 +384,7 @@ internal var _objCTaggedPointerBits: UInt {
 #endif
 
 /// Extract the raw bits of `x`.
+@_versioned
 @inline(__always)
 @warn_unused_result
 internal func _bitPattern(x: Builtin.BridgeObject) -> UInt {

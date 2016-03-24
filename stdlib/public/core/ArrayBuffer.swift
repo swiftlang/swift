@@ -341,6 +341,7 @@ extension _ArrayBuffer {
     return _fastPath(_isNative) ? _native.capacity : _nonNative.count
   }
 
+  @_versioned
   @inline(__always)
   @warn_unused_result
   func getElement(i: Int, wasNativeTypeChecked: Bool) -> Element {
@@ -350,6 +351,7 @@ extension _ArrayBuffer {
     return unsafeBitCast(_getElementSlowPath(i), to: Element.self)
   }
 
+  @_versioned
   @inline(never)
   @warn_unused_result
   func _getElementSlowPath(i: Int) -> AnyObject {
@@ -471,6 +473,7 @@ extension _ArrayBuffer {
   typealias Storage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
+  @_versioned
   var _isNative: Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return true
@@ -493,6 +496,7 @@ extension _ArrayBuffer {
   /// Our native representation.
   ///
   /// - Precondition: `_isNative`.
+  @_versioned
   var _native: NativeBuffer {
     return NativeBuffer(
       _isClassOrObjCExistential(Element.self)
@@ -502,6 +506,7 @@ extension _ArrayBuffer {
   /// Fast access to the native representation.
   ///
   /// - Precondition: `_isNativeTypeChecked`.
+  @_versioned
   var _nativeTypeChecked: NativeBuffer {
     return NativeBuffer(_storage.nativeInstance_noSpareBits)
   }

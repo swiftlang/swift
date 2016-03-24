@@ -320,6 +320,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return self
   }
 
+  @_versioned
   @warn_unused_result
   func getElement(i: Int) -> Element {
     _sanityCheck(i >= 0 && i < count, "Array index out of range")

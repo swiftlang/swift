@@ -293,6 +293,7 @@ public func lgamma(x: ${T}) -> (${T}, Int) {
 #else
 % # On Darwin platform,
 % # The real lgamma_r is not imported because it hides behind macro _REENTRANT.
+@_versioned
 @warn_unused_result
 @_silgen_name("_swift_Darwin_lgamma${f}_r")
 func _swift_Darwin_lgamma${f}_r(_: ${CT},
