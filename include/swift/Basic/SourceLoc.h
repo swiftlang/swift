@@ -87,7 +87,7 @@ public:
   SourceLoc Start, End;
 
   SourceRange() {}
-  SourceRange(SourceLoc Loc) : Start(Loc), End(Loc) { }
+  SourceRange(SourceLoc Loc) : Start(Loc), End(Loc) {}
   SourceRange(SourceLoc Start, SourceLoc End) : Start(Start), End(End) {
     assert(Start.isValid() == End.isValid() &&
            "Start and end should either both be valid or both be invalid!");
@@ -122,7 +122,7 @@ public:
   CharSourceRange() {}
 
   CharSourceRange(SourceLoc Start, unsigned ByteLength)
-    : Start(Start), ByteLength(ByteLength) { }
+    : Start(Start), ByteLength(ByteLength) {}
 
   /// \brief Constructs a character range which starts and ends at the
   /// specified character locations.
