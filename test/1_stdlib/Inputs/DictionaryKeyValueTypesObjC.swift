@@ -3,6 +3,16 @@ import Darwin
 import StdlibUnittest
 import Foundation
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 func convertDictionaryToNSDictionary<Key, Value>(
   d: [Key : Value]
 ) -> NSDictionary {

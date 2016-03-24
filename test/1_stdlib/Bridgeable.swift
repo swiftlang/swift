@@ -4,6 +4,16 @@
 // XFAIL: interpret
 // REQUIRES: objc_interop
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 // CHECK: testing...
 print("testing...")
 

@@ -88,6 +88,11 @@ extension Int : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: Number?
+  ) -> Int {
+    return Int()
+  }
 }
 
 extension Array : _ObjectiveCBridgeable {
@@ -108,6 +113,11 @@ extension Array : _ObjectiveCBridgeable {
     result: inout Array?
   ) -> Bool {
     return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSArray?
+  ) -> Array {
+    return Array()
   }
 }
 
@@ -130,6 +140,11 @@ extension Dictionary : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSDictionary?
+  ) -> Dictionary {
+    return Dictionary()
+  }
 }
 
 extension Set : _ObjectiveCBridgeable {
@@ -151,6 +166,11 @@ extension Set : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSSet?
+  ) -> Set {
+    return Set()
+  }
 }
 
 extension CGFloat : _ObjectiveCBridgeable {
@@ -171,6 +191,11 @@ extension CGFloat : _ObjectiveCBridgeable {
     result: inout CGFloat?
   ) -> Bool {
     return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: Number?
+  ) -> CGFloat {
+    return CGFloat()
   }
 }
 
@@ -196,6 +221,11 @@ extension NSRange : _ObjectiveCBridgeable {
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: Value?
+  ) -> NSRange {
+    return NSRange()
   }
 }
 

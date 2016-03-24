@@ -4,6 +4,16 @@
 
 // Test casting through a class type to a bridged value type.
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 class NSObject { }
 
 class BridgedClass : NSObject { 
