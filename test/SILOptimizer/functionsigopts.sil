@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline -sil-inline-test-threshold=1 -function-signature-opt-cloner %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -inline -sil-inline-test-threshold=1 -function-signature-opt-cloner %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline -sil-inline-test-threshold=1 -function-signature-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline -sil-inline-test-threshold=1 -function-signature-opts %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
 
 import Builtin
 import Swift
