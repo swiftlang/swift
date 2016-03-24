@@ -285,10 +285,12 @@ TEST(MutexTest, ConditionThreaded) {
       [&](int index) {
         ScopedLock guard(mutex);
         while (true) {
-          if (count - index >= 50) {
-            count -= index;
-            mutex.unlock(); // Only to give other consumers a chance.
-            mutex.lock();
+          if (count > 50) {
+            count -= 1;
+            {
+              // To give other consumers a chance.
+              ScopedUnlock unguard(mutex);
+            }
             if (trace)
               printf("Consumer[%d] count-%d = %d\n", index, index, count);
             continue; // keep trying to consume before waiting again.
@@ -297,7 +299,7 @@ TEST(MutexTest, ConditionThreaded) {
               printf("Consumer[%d] count == %d and done!\n", index, count);
             break;
           }
-          guard.wait(condition);
+          mutex.wait(condition);
         }
       },
       [&](int index) {
@@ -328,10 +330,12 @@ TEST(MutexTest, ConditionLockOrWaitLockAndNotifyThreaded) {
       [&](int index) {
         mutex.lockOrWait(condition, [&, index] {
           while (true) {
-            if (count - index >= 50) {
-              count -= index;
-              mutex.unlock(); // Only to give other consumers a chance.
-              mutex.lock();
+            if (count > 50) {
+              count -= 1;
+              {
+                // To give other consumers a chance.
+                ScopedUnlock unguard(mutex);
+              }
               if (trace)
                 printf("Consumer[%d] count-%d = %d\n", index, index, count);
               continue; // keep trying to consume before waiting again.

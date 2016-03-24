@@ -19,6 +19,8 @@
 
 #if (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__))
 #define SWIFT_RUNTIME_MUTEX_HAVE_PHTREADS
+#else
+#error "Must implement the following if your platform doesn't support phtreads."
 #endif
 
 #ifdef SWIFT_RUNTIME_MUTEX_HAVE_PHTREADS
@@ -74,18 +76,15 @@ public:
   MutexImpl(MutexImpl &&) = delete;
   MutexImpl &operator=(MutexImpl &&) = delete;
 
-protected:
-  explicit MutexImpl(bool checked);
-
 public:
   void lock();
   void unlock();
   bool try_lock();
-
-public:
   void wait(Condition &condition);
 
 private:
+  explicit MutexImpl(bool checked);
+
 #ifdef SWIFT_RUNTIME_MUTEX_HAVE_PHTREADS
   pthread_mutex_t PThreadMutex;
 #endif
@@ -95,6 +94,7 @@ private:
 /// Use ScopedLock instead (see below).
 class ScopedLockImpl {
   friend class Mutex;
+  friend class ScopedLock;
 
 public:
   ScopedLockImpl() = delete;
@@ -105,13 +105,8 @@ public:
   ScopedLockImpl(ScopedLockImpl &&) = delete;
   ScopedLockImpl &operator=(ScopedLockImpl &&) = delete;
 
-protected:
-  ScopedLockImpl(MutexImpl &impl) : Impl(impl) { Impl.lock(); }
-
-public:
-  void wait(Condition &condition) { Impl.wait(condition); }
-
 private:
+  ScopedLockImpl(MutexImpl &impl) : Impl(impl) { Impl.lock(); }
   MutexImpl &Impl;
 };
 
@@ -119,6 +114,7 @@ private:
 /// Use ScopedUnlock instead (see below).
 class ScopedUnlockImpl {
   friend class Mutex;
+  friend class ScopedUnlock;
 
 public:
   ScopedUnlockImpl() = delete;
@@ -129,10 +125,8 @@ public:
   ScopedUnlockImpl(ScopedUnlockImpl &&) = delete;
   ScopedUnlockImpl &operator=(ScopedUnlockImpl &&) = delete;
 
-protected:
-  ScopedUnlockImpl(MutexImpl &impl) : Impl(impl) { Impl.unlock(); }
-
 private:
+  ScopedUnlockImpl(MutexImpl &impl) : Impl(impl) { Impl.unlock(); }
   MutexImpl &Impl;
 };
 
@@ -292,12 +286,6 @@ public:
   ScopedLock &operator=(const ScopedLock &) = delete;
   ScopedLock(ScopedLock &&) = delete;
   ScopedLock &operator=(ScopedLock &&) = delete;
-
-public:
-  /// Releases lock, waits on supplied condition, and relocks before returning.
-  ///
-  /// Precondition: Mutex locked by this thread, undefined otherwise.
-  void wait(Condition &condition) { ScopedLockImpl::wait(condition); }
 };
 
 /// A stack based object that unlocks the supplied mutex on construction
