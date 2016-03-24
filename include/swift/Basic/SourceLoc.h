@@ -41,7 +41,7 @@ public:
   explicit SourceLoc(llvm::SMLoc Value) : Value(Value) {}
   
   bool isValid() const { return Value.isValid(); }
-  bool isInvalid() const { return !Value.isValid(); }
+  bool isInvalid() const { return !isValid(); }
   
   bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
   bool operator!=(const SourceLoc &RHS) const { return RHS.Value != Value; }
