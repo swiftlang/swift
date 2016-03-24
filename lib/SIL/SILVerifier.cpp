@@ -902,35 +902,6 @@ public:
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
   }
   
-  bool isValidLinkageForFragileRef(SILLinkage linkage) {
-    switch (linkage) {
-    case SILLinkage::Private:
-    case SILLinkage::PrivateExternal:
-    case SILLinkage::Hidden:
-    case SILLinkage::HiddenExternal:
-      return false;
-
-    case SILLinkage::Shared:
-    case SILLinkage::SharedExternal:
-      // This allows fragile functions to reference thunks, generated
-      // methods on Clang types, and optimizer specializations.
-      return true;
-
-    case SILLinkage::Public:
-    case SILLinkage::PublicExternal:
-      return true;
-    }
-  }
-
-  bool isValidLinkageForFragileRef(const SILFunction *RefF) {
-    if (RefF->isFragile() ||
-        RefF->isExternalDeclaration()) {
-      return true;
-    }
-
-    return isValidLinkageForFragileRef(RefF->getLinkage());
-  }
-
   /// Returns true if \p FRI is only used as a callee and will always be
   /// inlined at those call sites.
   static bool isAlwaysInlined(FunctionRefInst *FRI) {
@@ -955,7 +926,7 @@ public:
     if (F.isFragile()) {
       SILFunction *RefF = FRI->getReferencedFunction();
       require(isAlwaysInlined(FRI)
-                || isValidLinkageForFragileRef(RefF),
+                || RefF->hasValidLinkageForFragileRef(),
               "function_ref inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -966,7 +937,7 @@ public:
     if (F.isFragile()) {
       SILGlobalVariable *RefG = AGI->getReferencedGlobal();
       require(RefG->isFragile()
-                || isValidLinkageForFragileRef(RefG->getLinkage()),
+                || hasPublicVisibility(RefG->getLinkage()),
               "alloc_global inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -982,7 +953,7 @@ public:
     if (F.isFragile()) {
       SILGlobalVariable *RefG = GAI->getReferencedGlobal();
       require(RefG->isFragile()
-                || isValidLinkageForFragileRef(RefG->getLinkage()),
+                || hasPublicVisibility(RefG->getLinkage()),
               "global_addr inside fragile function cannot "
               "reference a private or hidden symbol");
     }
