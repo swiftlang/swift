@@ -269,7 +269,7 @@ Index.test(
 
 Index.test(
   "${Kind}Index/advance(_:by:limit:)/avoidsSuccessorAndPredecessor/dispatch"
-).xfail(.custom({ true }, reason: "Implementation missing in new indexing model"))
+).xfail(.custom({ true }, reason: "[swift-3-indexing-model] Implementation missing"))
 .code {
   for test in advancedByTests.filter({$0.limit != nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(Array(0..<10))
