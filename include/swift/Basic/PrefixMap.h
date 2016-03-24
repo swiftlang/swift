@@ -35,12 +35,12 @@
 #define SWIFT_BASIC_PREFIXMAP_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/type_traits.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <iterator>
-#include "swift/Basic/type_traits.h"
 
 namespace swift {
 
