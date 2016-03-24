@@ -179,37 +179,37 @@ public func foo(x: Double) {
   // p(z, y, 0, x)
 }
 
-// CHECK-LABEL: sil shared @_TTOFVSC7Struct1CfT5valueSd_S_
+// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct1CfT5valueSd_S_
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1CreateSimple
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared @_TTOFVSC7Struct19translatefT7radiansSd_S_
+// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct19translatefT7radiansSd_S_
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         store [[SELF]] to [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared @_TTOFVSC7Struct15scalefSdS_
+// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct15scalefSdS_
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Scale
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared @_TTOZFVSC7Struct112staticMethodfT_Vs5Int32
+// CHECK-LABEL: sil shared [thunk] @_TTOZFVSC7Struct112staticMethodfT_Vs5Int32
 // CHECK:       bb0([[SELF:%.*]] : $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1StaticMethod
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared @_TTOFVSC7Struct113selfComesLastfT1xSd_T_
+// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct113selfComesLastfT1xSd_T_
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesLast
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
-// CHECK-LABEL: sil shared @_TTOFVSC7Struct114selfComesThirdfT1aVs5Int321bSf1xSd_T_
+// CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct114selfComesThirdfT1aVs5Int321bSf1xSd_T_
 // CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])
