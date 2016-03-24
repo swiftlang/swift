@@ -12,20 +12,17 @@ typedef NSObject<ImportedProtocolBase> * ImportedProtocolBase_t;
 @protocol IAMProto <ImportedProtocolBase>
 @end
 
-// HACK HACK HACK: There is a bug in the importer where we can't begin with the type name...
-typedef NSObject<IAMProto> * zIAMProto_t;
-typedef NSObject<IAMProto> * Dummy;
+typedef NSObject<IAMProto> * IAMProto_t;
 
-
-void mutateSomeState(zIAMProto_t)
+void mutateSomeState(IAMProto_t)
 __attribute__((swift_name("IAMProto.mutateSomeState(self:)")));
 
-void mutateSomeStateWithOtherProto(zIAMProto_t, zIAMProto_t other)
+void mutateSomeStateWithOtherProto(IAMProto_t, IAMProto_t other)
 __attribute__((swift_name("IAMProto.mutateSomeState(self:otherProto:)")));
 
-int getSomeValue(zIAMProto_t)
+int getSomeValue(IAMProto_t)
 __attribute__((swift_name("getter:IAMProto.someValue(self:)")));
-int setSomeValue(zIAMProto_t, int v)
+int setSomeValue(IAMProto_t, int v)
 __attribute__((swift_name("setter:IAMProto.someValue(self:_:)")));
 
 #endif // IMPORT_AS_MEMBER_PROTO_H

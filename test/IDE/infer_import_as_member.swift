@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=InferImportAsMember -enable-omit-needless-words -always-argument-labels -enable-infer-import-as-member > %t.printed.A.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=InferImportAsMember -always-argument-labels -enable-infer-import-as-member > %t.printed.A.txt
 // RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 
 import InferImportAsMember
