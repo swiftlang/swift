@@ -34,7 +34,7 @@ template <class T> class DiverseStackImpl;
 ///
 /// \tparam T - A common base class of the objects on the stack; must
 ///   provide an allocated_size() const method.
-/// \tparam InlineCapacity - the amount of inline storage to provide, in bytes
+/// \tparam InlineCapacity - the amount of inline storage to provide, in bytes.
 template <class T, unsigned InlineCapacity>
 class DiverseStack : public DiverseStackImpl<T> {
   char InlineStorage[InlineCapacity];
