@@ -379,7 +379,7 @@ function set_deployment_target_based_options() {
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
-                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${#CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]})"
+                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_COMPILER_RT})"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL="$(false_true ${SKIP_IOS})"
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
@@ -634,6 +634,11 @@ if [[ "${CMAKE_GENERATOR}" == "Ninja" && \
       -z "$(which ninja 2>/dev/null)" &&
       -z "$(which ninja-build 2>/dev/null)" ]] ; then
     BUILD_NINJA=1
+fi
+
+# FIXME: We currently do not support cross-compiling swift with compiler-rt.
+if [[ "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS}" ]]; then
+    SKIP_COMPILER_RT=1
 fi
 
 # WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
@@ -1114,6 +1119,9 @@ case "${CMAKE_GENERATOR}" in
               -DSWIFT_XCODE_GENERATE_FOR_IDE_ONLY=ON
           )
         fi
+        # FIXME: We currently do not support building compiler-rt with the
+        # Xcode generator.
+        SKIP_COMPILER_RT=1
         ;;
 esac
 
