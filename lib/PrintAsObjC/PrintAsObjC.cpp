@@ -905,7 +905,7 @@ private:
         = { "CGFloat", false };
 
       // Use typedefs we set up for SIMD vector types.
-#define MAP_SIMD_TYPE(BASENAME, __) \
+#define MAP_SIMD_TYPE(BASENAME, _, __) \
       specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "2")}] \
         = { "swift_" #BASENAME "2", false };                        \
       specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "3")}] \
@@ -1724,12 +1724,12 @@ public:
            "typedef uint_least16_t char16_t;\n"
            "typedef uint_least32_t char32_t;\n"
            "# endif\n"
-#define MAP_SIMD_TYPE(C_TYPE, _) \
-           "typedef " #C_TYPE " swift_" #C_TYPE "2"       \
+#define MAP_SIMD_TYPE(C_TYPE, SCALAR_TYPE, _) \
+           "typedef " #SCALAR_TYPE " swift_" #C_TYPE "2"       \
            "  __attribute__((__ext_vector_type__(2)));\n" \
-           "typedef " #C_TYPE " swift_" #C_TYPE "3"       \
+           "typedef " #SCALAR_TYPE " swift_" #C_TYPE "3"       \
            "  __attribute__((__ext_vector_type__(3)));\n" \
-           "typedef " #C_TYPE " swift_" #C_TYPE "4"       \
+           "typedef " #SCALAR_TYPE " swift_" #C_TYPE "4"       \
            "  __attribute__((__ext_vector_type__(4)));\n"
 #include "swift/ClangImporter/SIMDMappedTypes.def"
            "#endif\n"
