@@ -663,6 +663,11 @@ public:
     return None;
   }
 
+  virtual Optional<StringRef>
+  getGroupNameByUSR(StringRef USR) const {
+    return None;
+  }
+
   virtual void collectAllGroups(std::vector<StringRef> &Names) const {}
 
   /// Returns an implementation-defined "discriminator" for \p D, which

@@ -182,6 +182,16 @@ swift::ide::collectModuleGroups(Module *M, std::vector<StringRef> &Scratch) {
   return llvm::makeArrayRef(Scratch);
 }
 
+Optional<StringRef>
+swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
+  for (auto File : M->getFiles()) {
+    if (auto Name = File->getGroupNameByUSR(USR)) {
+      return Name;
+    }
+  }
+  return None;
+}
+
 void swift::ide::printSubmoduleInterface(
        Module *M,
        ArrayRef<StringRef> FullModuleName,

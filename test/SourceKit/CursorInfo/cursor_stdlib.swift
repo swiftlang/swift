@@ -19,6 +19,7 @@ func foo2(var a : [S1]) {
 }
 
 import Swift
+func foo3(a: Float, b: Bool) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=3:18 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-OVERLAY %s
 // CHECK-OVERLAY:      source.lang.swift.ref.var.global
@@ -61,3 +62,12 @@ import Swift
 // CHECK-MODULE-GROUP1-DAG: Collection
 // CHECK-MODULE-GROUP1-DAG: Collection/Array
 // CHECK-MODULE-GROUP1: MODULE GROUPS END
+
+// RUN: %sourcekitd-test -req=cursor -pos=7:21 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-INT1 %s
+// CHECK-INT1: s:Si
+
+// RUN: %sourcekitd-test -req=cursor -pos=22:17 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-FLOAT1 %s
+// CHECK-FLOAT1: s:Sf
+
+// RUN: %sourcekitd-test -req=cursor -pos=22:25 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-BOOL1 %s
+// CHECK-BOOL1: s:Sb
