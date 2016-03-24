@@ -338,11 +338,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.setStageName("LowLevel");
 
-  // Rewrite to get the benefit of release devirtualizer.
-  // Also, Make sure the run the rewriter to create the optimized functions before
-  // the cloner on the current function is run !.
-  PM.addFunctionSignatureOptRewriter();
-
   // Should be after FunctionSignatureOpts and before the last inliner.
   PM.addReleaseDevirtualizer();
 

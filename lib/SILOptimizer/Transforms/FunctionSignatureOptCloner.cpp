@@ -566,7 +566,13 @@ public:
                  createOptimizedFunction(RCIA->get(F), FSA->get(F), AA, F);
   
     if (NewF) { 
-      // Make sure the PM knows about this function.
+      // The thunk now carries the information on how the signature is
+      // optimized. If we inline the thunk, we will get the benefit of calling
+      // the signature optimized function without additional setup on the
+      // caller side.
+      F->setInlineStrategy(AlwaysInline);
+      // Make sure the PM knows about this function. This will also help us
+      // with self-recursion.
       notifyPassManagerOfFunction(NewF);
       invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
     }
