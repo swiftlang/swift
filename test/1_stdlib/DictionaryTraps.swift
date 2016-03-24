@@ -13,6 +13,16 @@
 import StdlibUnittest
 import Foundation
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 // Also import modules which are used by StdlibUnittest internally. This
 // workaround is needed to link all required libraries in case we compile
 // StdlibUnittest with -sil-serialize-all.

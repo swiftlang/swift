@@ -92,15 +92,6 @@ public protocol _ObjectiveCBridgeable {
       -> Self
 }
 
-public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
-      -> Self {
-    var result: Self? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-}
-
 //===--- Bridging for metatypes -------------------------------------------===//
 
 /// A stand-in for a value of metatype type.
@@ -141,6 +132,13 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 
     result = nil
     return false
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(source: AnyObject?)
+      -> _BridgeableMetatype {
+    var result: _BridgeableMetatype?
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
   }
 }
 

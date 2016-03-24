@@ -8,6 +8,12 @@ import Builtin
 import Swift
 import Foundation
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self
+}
+
 class AnNSArray {
 }
 
