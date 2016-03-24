@@ -11,13 +11,13 @@ public func returnGlobalVar() -> Double {
 // SIL:   return %2 : $Double
 // SIL-NEXT: }
 
-// FIXME: this crashes
+// SIL-LABEL: sil {{.*}}useProto{{.*}} (@owned IAMProto) -> () {
+// TODO: Move this test case into test/SILGen, then add in body checks
 public func useProto(p: IAMProto) {
 	p.mutateSomeState()
 	let v = p.someValue
 	p.someValue = v+1
 }
-// XFAIL:
 
 // SIL-LABEL: sil {{.*}}anchor{{.*}} () -> () {
 func anchor() {}
