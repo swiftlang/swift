@@ -107,7 +107,7 @@ public:
       return a.Offset == b.Offset;
     }
     friend bool operator!=(stable_iterator a, stable_iterator b) {
-      return a.Offset != b.Offset;
+      return !operator==(a, b);
     }    
   };
   stable_iterator stable_begin() const {
@@ -206,7 +206,7 @@ public:
     }
 
     friend bool operator==(iterator a, iterator b) { return a.Ptr == b.Ptr; }
-    friend bool operator!=(iterator a, iterator b) { return a.Ptr != b.Ptr; }
+    friend bool operator!=(iterator a, iterator b) { return !operator==(a, b); }
   };
   iterator begin() { checkValid(); return iterator(Begin); }
   iterator end() { checkValid(); return iterator(End); }
@@ -252,7 +252,7 @@ public:
       return a.Ptr == b.Ptr;
     }
     friend bool operator!=(const_iterator a, const_iterator b) {
-      return a.Ptr != b.Ptr;
+      return !operator==(a, b);
     }
   };
   const_iterator begin() const { checkValid(); return const_iterator(Begin); }
