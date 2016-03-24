@@ -13,7 +13,7 @@ func getStaticFunc1<T: Foo>(t: T.Type) -> () -> () {
 // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil shared @_TZFP21partial_apply_generic3Foo10staticFunc
+// CHECK-LABEL: sil shared [thunk] @_TZFP21partial_apply_generic3Foo10staticFunc
 // CHECK: [[REF:%.*]] = witness_method $Self, #Foo.staticFunc!1
 // CHECK-NEXT: partial_apply [[REF]]<Self>(%0)
 // CHECK-NEXT: return
@@ -39,7 +39,7 @@ func getInstanceFunc1<T: Foo>(t: T) -> () -> () {
 // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil shared @_TFP21partial_apply_generic3Foo12instanceFunc
+// CHECK-LABEL: sil shared [thunk] @_TFP21partial_apply_generic3Foo12instanceFunc
 // CHECK: [[REF:%.*]] = witness_method $Self, #Foo.instanceFunc!1
 // CHECK-NEXT: partial_apply [[REF]]<Self>(%0)
 // CHECK-NEXT: return

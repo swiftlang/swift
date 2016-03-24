@@ -379,7 +379,7 @@ class D: C {
     super.init()
   }
 
-  // CHECK-LABEL: sil shared [transparent] @_TTDFC15guaranteed_self1D3foo{{.*}} : $@convention(method) (Int, @guaranteed D) -> ()
+  // CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC15guaranteed_self1D3foo{{.*}} : $@convention(method) (Int, @guaranteed D) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]]):
   // CHECK:         retain{{.*}} [[SELF]]
   // CHECK:         release{{.*}} [[SELF]]
