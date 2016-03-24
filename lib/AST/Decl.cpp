@@ -1057,15 +1057,6 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
   llvm_unreachable("bad DeclKind");
 }
 
-static ResilienceExpansion getResilienceExpansion(const DeclContext *DC) {
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC))
-    if (AFD->isTransparent() &&
-        AFD->getFormalAccess() == Accessibility::Public)
-      return ResilienceExpansion::Minimal;
-
-  return ResilienceExpansion::Maximal;
-}
-
 /// Determines the access semantics to use in a DeclRefExpr or
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
@@ -1073,7 +1064,7 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
   // If we're inside a @_transparent function, use the most conservative
   // access pattern, since we may be inlined from a different resilience
   // domain.
-  ResilienceExpansion expansion = getResilienceExpansion(UseDC);
+  ResilienceExpansion expansion = UseDC->getResilienceExpansion();
 
   if (auto *var = dyn_cast<AbstractStorageDecl>(this)) {
     // Observing member are accessed directly from within their didSet/willSet
