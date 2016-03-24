@@ -87,9 +87,8 @@ public:
       char *newStorage = End;
       End += needed;
       return newStorage;
-    } else {
-      return addNewStorageSlow(needed);
     }
+    return addNewStorageSlow(needed);
   }
   char *addNewStorageSlow(std::size_t needed);
 
