@@ -252,8 +252,6 @@ std::string FunctionSignatureInfo::getOptimizedName() const {
   auto P = SpecializationPass::FunctionSignatureOpts;
   FunctionSignatureSpecializationMangler FSSM(P, M, F);
 
-  std::string ArgEnc;
-
   // Handle arguments' changes.
   for (unsigned i : indices(ArgDescList)) {
     const ArgumentDescriptor &Arg = ArgDescList[i];
@@ -271,9 +269,6 @@ std::string FunctionSignatureInfo::getOptimizedName() const {
     // mangling.
     if (Arg.Explode && !Arg.IsEntirelyDead) {
       FSSM.setArgumentSROA(i);
-      // Generate a string of encoding for the argument projection tree.
-      // TODO: we can put this into the mangler itself.
-      ArgEnc += "_arg" + std::to_string(i) + "_" + Arg.ProjTree.getNameEncoding();
     }
   }
 
@@ -285,7 +280,7 @@ std::string FunctionSignatureInfo::getOptimizedName() const {
 
   FSSM.mangle();
 
-  return M.finalize() + ArgEnc;
+  return M.finalize();
 }
 
 
