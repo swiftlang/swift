@@ -610,11 +610,18 @@ static void walkForProfiling(AbstractFunctionDecl *Root, ASTWalker &Walker) {
 
 static llvm::GlobalValue::LinkageTypes
 getEquivalentPGOLinkage(FormalLinkage Linkage) {
-  return (Linkage == FormalLinkage::HiddenUnique ||
-          Linkage == FormalLinkage::HiddenNonUnique ||
-          Linkage == FormalLinkage::Private)
-             ? llvm::GlobalValue::PrivateLinkage
-             : llvm::GlobalValue::ExternalLinkage;
+  switch (Linkage) {
+  case FormalLinkage::Top:
+  case FormalLinkage::PublicUnique:
+  case FormalLinkage::PublicNonUnique:
+    return llvm::GlobalValue::ExternalLinkage;
+
+  case FormalLinkage::Bottom:
+  case FormalLinkage::HiddenUnique:
+  case FormalLinkage::HiddenNonUnique:
+  case FormalLinkage::Private:
+    return llvm::GlobalValue::PrivateLinkage;
+  }
 }
 
 void SILGenProfiling::assignRegionCounters(AbstractFunctionDecl *Root) {
