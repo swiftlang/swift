@@ -315,7 +315,7 @@ def write_to_file(file_name, data):
 
 def sort_ratio_list(ratio_list, changes_only=False):
     """
-    Return 3 sorted list imporvment, regression and normal.
+    Return 3 sorted list improvement, regression and normal.
     """
     decreased_perf_list = []
     increased_perf_list = []

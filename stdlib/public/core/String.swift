@@ -484,7 +484,7 @@ extension String : Hashable {
 #else
     let hashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
 #endif
-    // If we have a contigous string then we can use the stack optimization.
+    // If we have a contiguous string then we can use the stack optimization.
     let core = self._core
     let isASCII = core.isASCII
     if core.hasContiguousStorage {

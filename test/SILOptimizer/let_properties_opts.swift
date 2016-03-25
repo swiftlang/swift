@@ -236,10 +236,10 @@ func testStructWithMultipleInits( _ boos1: Boo3, _ boos2: Boo3) -> Int32 {
 
 public func testStructWithMultipleInitsAndInlinedInitializer() {
   let things = [C()]
-  // This line results in inlinig of the initializer Boo3(C, C) and later
+  // This line results in inlining of the initializer Boo3(C, C) and later
   // removal of this initializer by the dead function elimination pass.
   // As a result, only one initializer, Boo3(C) is seen by the Let Properties Propagation
-  // pass. This pass may think that there is only one intializer and take the
+  // pass. This pass may think that there is only one initializer and take the
   // values of let properties assigned there as constants and try to propagate
   // those values into uses. But this is wrong! The pass should be clever enough
   // to detect all stores to the let properties, including those outside of

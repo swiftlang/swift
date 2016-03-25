@@ -2157,7 +2157,6 @@ auto ClangImporter::Implementation::importFullName(
   StringRef baseName;
   SmallVector<StringRef, 4> argumentNames;
   SmallString<16> selectorSplitScratch;
-  StringScratchSpace stringScratch;
   ArrayRef<const clang::ParmVarDecl *> params;
   switch (D->getDeclName().getNameKind()) {
   case clang::DeclarationName::CXXConstructorName:

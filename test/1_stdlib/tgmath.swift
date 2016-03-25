@@ -157,7 +157,7 @@ f1 = acosh(fx)
 g1 = acosh(gx)
 print3("acosh", d1.isNaN, f1.isNaN, g1.isNaN)
 // CHECK-NEXT: acosh true true acosh
-// Note: We cannot check the output with "nan nan" using  String interpolations
+// Note: We cannot check the output with "nan nan" using String interpolations
 // because glibc on Linux outputs the result as "-nan" instead of "nan".
 
 d1 = asinh(dx)

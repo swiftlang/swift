@@ -31,7 +31,7 @@ size_t getOffsetOfTrimmedLine(unsigned LineIndex, StringRef Text);
 /// \brief Returns the Text on \p LineIndex, excluding Leading WS
 StringRef getTrimmedTextForLine(unsigned LineIndex, StringRef Text);
 
-/// \brief Returns the number of spaces at the begining of \p LineIndex
+/// \brief Returns the number of spaces at the beginning of \p LineIndex
 /// or if indenting is done by Tabs, the number of Tabs * TabWidthp
 size_t getExpandedIndentForLine(unsigned LineIndex, CodeFormatOptions Options,
                                 StringRef Text);

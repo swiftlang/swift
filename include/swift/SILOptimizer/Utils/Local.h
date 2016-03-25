@@ -70,7 +70,7 @@ recursivelyDeleteTriviallyDeadInstructions(
 /// This routine only examines the state of the instruction at hand.
 bool isInstructionTriviallyDead(SILInstruction *I);
 
-/// \brief Return true if this is a release instruction thats not going to
+/// \brief Return true if this is a release instruction that's not going to
 /// free the object.
 bool isIntermediateRelease(SILInstruction *I,
                            ConsumedArgToEpilogueReleaseMatcher &ERM); 
