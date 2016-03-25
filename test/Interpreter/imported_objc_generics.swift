@@ -28,10 +28,10 @@ ImportedObjCGenerics.test("Blocks") {
   let cs = Container<NSString>(object: "and-this-is-crazy")
 
   var fromBlock: NSString = ""
-  cs.processObjectWithBlock { fromBlock = $0 }
+  cs.processObject { fromBlock = $0 }
   expectEqual("and-this-is-crazy", fromBlock)
 
-  cs.updateObjectWithBlock { "but-heres-my-number" }
+  cs.updateObject { "but-heres-my-number" }
   expectEqual("but-heres-my-number", cs.object)
 }
 
@@ -100,7 +100,7 @@ ImportedObjCGenerics.test("SwiftGenerics/Creation") {
 
 ImportedObjCGenerics.test("ProtocolConstraints") {
   func copyContainerContents<T: NSCopying>(x: CopyingContainer<T>) -> T {
-    return x.object.copyWithZone(nil) as! T
+    return x.object.copy(with: nil) as! T
   }
 
   let cs = CopyingContainer<NSString>(object: "Happy 2012")
@@ -129,19 +129,19 @@ ImportedObjCGenerics.test("ClassWithMethodsUsingObjCGenerics") {
   let y = CopyingContainer<NSString>(object: "")
   let z = x.copyContainer(y)
   expectTrue(y === z)
-  let w = x.performSelector(#selector(ClassWithMethodsUsingObjCGenerics.copyContainer), withObject: y).takeUnretainedValue()
+  let w = x.perform(#selector(ClassWithMethodsUsingObjCGenerics.copyContainer), with: y).takeUnretainedValue()
   expectTrue(y === w)
 
   let zq = x.maybeCopyContainer(y)
   expectTrue(y === zq!)
-  let wq = x.performSelector(#selector(ClassWithMethodsUsingObjCGenerics.maybeCopyContainer), withObject: y).takeUnretainedValue()
+  let wq = x.perform(#selector(ClassWithMethodsUsingObjCGenerics.maybeCopyContainer), with: y).takeUnretainedValue()
   expectTrue(y === wq)
 }
 
 ImportedObjCGenerics.test("InheritanceFromNongeneric") {
   // Test NSObject methods inherited into Container<>
   let gc = Container<NSString>(object: "")
-  expectTrue(gc.description.rangeOfString("Container") != nil)
+  expectTrue(gc.description.range(of: "Container") != nil)
   expectTrue(gc.dynamicType.superclass() == NSObject.self)
   expectTrue(Container<NSString>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.superclass() == NSObject.self)
