@@ -4341,10 +4341,10 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 }
 
 inline Type TypeBase::getNominalParent() {
-  if (auto classType = getAs<ClassType>()) {
+  if (auto classType = getAs<NominalType>()) {
     return classType->getParent();
   } else {
-    return castTo<BoundGenericClassType>()->getParent();
+    return castTo<BoundGenericType>()->getParent();
   }
 }
 
@@ -4418,10 +4418,10 @@ inline CanType CanType::getLValueOrInOutObjectTypeImpl(CanType type) {
 }
 
 inline CanType CanType::getNominalParent() const {
-  if (auto classType = dyn_cast<ClassType>(*this)) {
+  if (auto classType = dyn_cast<NominalType>(*this)) {
     return classType.getParent();
   } else {
-    return cast<BoundGenericClassType>(*this).getParent();
+    return cast<BoundGenericType>(*this).getParent();
   }
 }
 
