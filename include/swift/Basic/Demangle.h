@@ -370,8 +370,7 @@ struct NodeFactory {
   /// A class for printing to a std::string.
 class DemanglerPrinter {
 public:
-  DemanglerPrinter(std::string &out) : Stream(out) {}
-  DemanglerPrinter(std::string &&out) : Stream(out) {}
+  DemanglerPrinter() = default;
 
   DemanglerPrinter &operator<<(llvm::StringRef Value) & {
     Stream.append(Value.data(), Value.size());
@@ -405,7 +404,7 @@ public:
   std::string &&str() && { return std::move(Stream); }
   
 private:
-  std::string &Stream;
+  std::string Stream;
 };
 
 /// Is a character considered a digit by the demangling grammar?
