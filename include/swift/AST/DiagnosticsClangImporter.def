@@ -64,6 +64,10 @@ WARNING(inconsistent_swift_name,none,
         (bool, StringRef, StringRef, DeclName, StringRef, DeclName,
          StringRef))
 
+WARNING(pruned_module_interface, none,
+        "interface %0 imported from module '%1' will be unavailable",
+        (DeclName, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

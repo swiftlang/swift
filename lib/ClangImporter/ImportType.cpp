@@ -1326,8 +1326,24 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
                                   allowNSUIntegerAsInt,
                                   /*isFullyBridgeable*/true,
                                   OptionalityOfReturn);
-  if (!swiftResultTy)
+  if (!swiftResultTy) {
+    StringRef moduleName;
+    if (auto M = clangDecl->getImportedOwningModule())
+      moduleName = M->getTopLevelModuleName();
+    else
+      moduleName = clangDecl->getASTContext().getLangOpts().CurrentModule;
+
+    auto &SM = getClangASTContext().getSourceManager();
+    auto &Diag =
+        static_cast<ClangDiagnosticConsumer &>(Instance->getDiagnosticClient());
+
+    SourceLoc Loc = Diag.resolveSourceLocation(SM, clangDecl->getLocation());
+    if (Loc.isValid())
+      SwiftContext.Diags.diagnose(Loc, diag::pruned_module_interface, name,
+                                  moduleName);
+
     return Type();
+  }
 
   // Import the parameters.
   SmallVector<ParamDecl*, 4> parameters;
