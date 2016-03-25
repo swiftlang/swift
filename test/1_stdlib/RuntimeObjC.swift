@@ -553,12 +553,59 @@ RuntimeFoundationWrappers.test(
   expectEqual(0, nsStringCanaryCount)
 }
 
+RuntimeFoundationWrappers.test(
+  "_stdlib_compareNSStringDeterministicUnicodeCollationPtr/NoLeak"
+) {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    let b = NSStringCanary()
+    expectEqual(2, nsStringCanaryCount)
+    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
+    let ptrB = unsafeBitCast(b, to: OpaquePointer.self)
+    _stdlib_compareNSStringDeterministicUnicodeCollationPointer(ptrA, ptrB)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
 RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
     _stdlib_NSStringHashValue(a, true)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringHashValueNonASCII/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringHashValue(a, false)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointer/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
+    _stdlib_NSStringHashValuePointer(ptrA, true)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointerNonASCII/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
+    _stdlib_NSStringHashValuePointer(ptrA, false)
   }
   expectEqual(0, nsStringCanaryCount)
 }
