@@ -135,12 +135,7 @@ public:
   bool isInvalid() const { return !isValid(); }
 
   SourceLoc getStart() const { return Start; }
-  SourceLoc getEnd() const {
-    if (Start.isValid())
-      return Start.getAdvancedLoc(ByteLength);
-    else
-      return SourceLoc();
-  }
+  SourceLoc getEnd() const { return Start.getAdvancedLocOrInvalid(ByteLength); }
 
   /// Returns true if the given source location is contained in the range.
   bool contains(SourceLoc loc) const {
