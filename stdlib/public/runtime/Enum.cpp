@@ -272,7 +272,7 @@ swift::swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
   }
   
   // Store the max payload size in the metadata.
-  enumType->getPayloadSize() = payloadSize;
+  assignUnlessEqual(enumType->getPayloadSize(), payloadSize);
   
   // The total size includes space for the tag.
   unsigned totalSize = payloadSize + getNumTagBytes(payloadSize,
