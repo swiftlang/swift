@@ -308,16 +308,16 @@ private:
   static void deleteTree(Node *root) {
     if (!root) return;
 
-    SmallVector<Node *, 8> queue; // actually a stack
-    auto enqueueChildrenAndDelete = [&](Node *node) {
-      if (node->Left) queue.push_back(node->Left);
-      if (node->Right) queue.push_back(node->Right);
-      if (node->Further) queue.push_back(node->Further);
+    SmallVector<Node *, 8> stack;
+    auto pushChildrenAndDelete = [&](Node *node) {
+      if (node->Left) stack.push_back(node->Left);
+      if (node->Right) stack.push_back(node->Right);
+      if (node->Further) stack.push_back(node->Further);
       delete node;
     };
-    enqueueChildrenAndDelete(root);
-    while (!queue.empty()) {
-      enqueueChildrenAndDelete(queue.pop_back_val());
+    pushChildrenAndDelete(root);
+    while (!stack.empty()) {
+      pushChildrenAndDelete(stack.pop_back_val());
     }
   }
 
@@ -325,18 +325,18 @@ private:
   static Node *cloneTree(Node *root) {
     if (!root) return nullptr;
 
-    SmallVector<Node **, 8> queue; // actually a stack.
-    auto copyAndEnqueueChildren = [&](Node **ptr) {
+    SmallVector<Node **, 8> stack;
+    auto copyAndPushChildren = [&](Node **ptr) {
       assert(*ptr);
       Node *copy = new Node(**ptr);
       *ptr = copy;
-      if (copy->Left) queue.push_back(&copy->Left);
-      if (copy->Right) queue.push_back(&copy->Right);
-      if (copy->Further) queue.push_back(&copy->Further);
+      if (copy->Left) stack.push_back(&copy->Left);
+      if (copy->Right) stack.push_back(&copy->Right);
+      if (copy->Further) stack.push_back(&copy->Further);
     };
     copyAndEnqueueChildren(&root);
-    while (!queue.empty()) {
-      copyAndEnqueueChildren(queue.pop_back_val());
+    while (!stack.empty()) {
+      copyAndEnqueueChildren(stack.pop_back_val());
     }
     return root;
   }
