@@ -5140,6 +5140,14 @@ namespace {
 
     Size AddressPoint = Size::invalid();
 
+    bool computeUnfilledParent() {
+      if (auto parentType = asImpl().getTargetType().getNominalParent()) {
+        return !tryEmitConstantTypeMetadataRef(IGM, parentType,
+                                               SymbolReferenceKind::Absolute);
+      }
+      return false;
+    }
+
   public:
     void layout() {
       if (asImpl().requiresInitializationFunction())
@@ -5166,7 +5174,29 @@ namespace {
     }
 
     void addInitializationFunction() {
-      asImpl().addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+      auto type = cast<NominalType>(asImpl().getTargetType());
+
+      auto fnTy = llvm::FunctionType::get(IGM.VoidTy, {IGM.TypeMetadataPtrTy},
+                                          /*variadic*/ false);
+      llvm::Function *fn = llvm::Function::Create(fnTy,
+                                           llvm::GlobalValue::PrivateLinkage,
+                                           Twine("initialize_metadata_")
+                                             + type->getDecl()->getName().str(),
+                                           &IGM.Module);
+      fn->setAttributes(IGM.constructInitialAttributes());
+      
+      // Set up the function.
+      IRGenFunction IGF(IGM, fn);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, fn);
+
+      // Emit the initialization.
+      llvm::Value *metadata = IGF.collectParameters().claimNext();
+      asImpl().emitInitialization(IGF, metadata);
+
+      IGF.Builder.CreateRetVoid();
+
+      asImpl().addWord(fn);
     }
 
     void noteAddressPoint() {
@@ -5183,6 +5213,11 @@ namespace {
   public:
     ForeignClassMetadataBuilder(IRGenModule &IGM, ClassDecl *target)
       : ForeignMetadataBuilderBase(IGM, target) {}
+
+    void emitInitialization(IRGenFunction &IGF, llvm::Value *metadata) {
+      // TODO: superclasses?
+      llvm_unreachable("no supported forms of initialization");
+    }
 
     // Visitor methods.
 
@@ -5215,25 +5250,40 @@ namespace {
     public ForeignMetadataBuilderBase<ForeignStructMetadataBuilder,
                       StructMetadataBuilderBase<ForeignStructMetadataBuilder>>
   {
+    bool HasUnfilledParent = false;
   public:
     ForeignStructMetadataBuilder(IRGenModule &IGM, StructDecl *target,
                                  llvm::GlobalVariable *relativeAddressBase)
-      : ForeignMetadataBuilderBase(IGM, target, relativeAddressBase)
-    {}
+      : ForeignMetadataBuilderBase(IGM, target, relativeAddressBase) {
+      HasUnfilledParent = computeUnfilledParent();
+    }
     
     CanType getTargetType() const {
       return Target->getDeclaredType()->getCanonicalType();
     }
+
     bool requiresInitializationFunction() const {
-      return false;
+      return HasUnfilledParent;
     }
+    void emitInitialization(IRGenFunction &IGF, llvm::Value *metadata) {
+      if (HasUnfilledParent) {
+        auto parentType = getTargetType().getNominalParent();
+        auto parentMetadata = IGF.emitTypeMetadataRef(parentType);
+
+        int index = ValueTypeParentIndex;
+        Address slot = emitAddressOfMetadataSlotAtIndex(IGF, metadata, index,
+                                                    IGF.IGM.TypeMetadataPtrTy);
+        IGF.Builder.CreateStore(parentMetadata, slot);
+      }
+    }
+
     void addValueWitnessTable() {
       auto type = this->Target->getDeclaredType()->getCanonicalType();
       addWord(emitValueWitnessTable(IGM, type));
     }
 
     void flagUnfilledParent() {
-      llvm_unreachable("foreign type with parent type metadata?");
+      assert(HasUnfilledParent);
     }
   };
   
@@ -5242,18 +5292,33 @@ namespace {
     public ForeignMetadataBuilderBase<ForeignEnumMetadataBuilder,
                       EnumMetadataBuilderBase<ForeignEnumMetadataBuilder>>
   {
+    bool HasUnfilledParent = false;
   public:
     ForeignEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *target,
                                llvm::GlobalVariable *relativeAddressBase)
-      : ForeignMetadataBuilderBase(IGM, target, relativeAddressBase)
-    {}
+      : ForeignMetadataBuilderBase(IGM, target, relativeAddressBase) {
+      HasUnfilledParent = computeUnfilledParent();
+    }
     
     CanType getTargetType() const {
       return Target->getDeclaredType()->getCanonicalType();
     }
+
     bool requiresInitializationFunction() const {
-      return false;
+      return HasUnfilledParent;
     }
+    void emitInitialization(IRGenFunction &IGF, llvm::Value *metadata) {
+      if (HasUnfilledParent) {
+        auto parentType = getTargetType().getNominalParent();
+        auto parentMetadata = IGF.emitTypeMetadataRef(parentType);
+
+        int index = ValueTypeParentIndex;
+        Address slot = emitAddressOfMetadataSlotAtIndex(IGF, metadata, index,
+                                                    IGF.IGM.TypeMetadataPtrTy);
+        IGF.Builder.CreateStore(parentMetadata, slot);
+      }
+    }
+
     void addValueWitnessTable() {
       auto type = this->Target->getDeclaredType()->getCanonicalType();
       addWord(emitValueWitnessTable(IGM, type));
@@ -5264,7 +5329,7 @@ namespace {
     }
 
     void flagUnfilledParent() {
-      llvm_unreachable("foreign type with parent type metadata?");
+      assert(HasUnfilledParent);
     }
   };
 }
