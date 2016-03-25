@@ -90,7 +90,7 @@ uploading SSH keys to GitHub):
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 2.8.12.2 is required. Your
 favorite Linux distribution likely already has a CMake package you can install.
-On OS X, you can download the [CMake Binary Distribution](https://cmake.org/install),
+On OS X, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded
 command line tools to your `PATH`:
 
