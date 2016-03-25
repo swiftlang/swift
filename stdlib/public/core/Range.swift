@@ -16,6 +16,7 @@ public struct RangeIterator<
 > : IteratorProtocol, Sequence {
 
   /// Construct an instance that traverses the elements of `bounds`.
+  @_versioned
   @_transparent
   internal init(_bounds: Range<Element>) {
     self.startIndex = _bounds.startIndex
@@ -24,6 +25,7 @@ public struct RangeIterator<
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
+  @inline(__always)
   public mutating func next() -> Element? {
     if startIndex == endIndex { return nil }
     let element = startIndex
@@ -115,6 +117,7 @@ public struct Range<
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
+  @inline(__always)
   public func makeIterator() -> RangeIterator<Element> {
     return RangeIterator(_bounds: self)
   }
