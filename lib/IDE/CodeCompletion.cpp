@@ -1597,6 +1597,24 @@ public:
     }
   }
 
+  void collectImportedModules(llvm::StringSet<> &ImportedModules) {
+    SmallVector<Module::ImportedModule, 16> Imported;
+    SmallVector<Module::ImportedModule, 16> FurtherImported;
+    CurrDeclContext->getParentSourceFile()->getImportedModules(Imported,
+      Module::ImportFilter::All);
+    while(!Imported.empty()) {
+      ModuleDecl *MD = Imported.front().second;
+      Imported.erase(Imported.begin());
+      if (!ImportedModules.insert(MD->getNameStr()).second)
+        continue;
+      FurtherImported.clear();
+      MD->getImportedModules(FurtherImported, Module::ImportFilter::Public);
+      for (auto SubMod : FurtherImported) {
+        Imported.push_back(SubMod);
+      }
+    }
+  }
+
   void addImportModuleNames() {
     // FIXME: Add user-defined swift modules
     SmallVector<clang::Module*, 20> Modules;
@@ -1606,6 +1624,8 @@ public:
                 return LHS->getTopLevelModuleName().compare_lower(
                   RHS->getTopLevelModuleName()) < 0;
               });
+    llvm::StringSet<> ImportedModules;
+    collectImportedModules(ImportedModules);
     for (auto *M : Modules) {
       if (M->isAvailable() &&
           !M->getTopLevelModuleName().startswith("_") &&
@@ -1623,7 +1643,7 @@ public:
         Builder.addTypeAnnotation("Module");
 
         // Imported modules are not recommended.
-        Builder.setNotRecommended(ClangImporter::isModuleImported(M));
+        Builder.setNotRecommended(ImportedModules.count(MD->getNameStr()) != 0);
       }
     }
   }
@@ -2476,7 +2496,7 @@ public:
           addCompoundFunctionName(CD, Reason);
           return;
         }
-        
+
         if (auto MT = ExprType->getRValueType()->getAs<AnyMetatypeType>()) {
           if (HaveDot) {
             Type Ty;
