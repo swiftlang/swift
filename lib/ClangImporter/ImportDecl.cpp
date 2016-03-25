@@ -3123,7 +3123,7 @@ namespace {
       if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
         std::tie(type, interfaceType)
           = getProtocolMethodType(proto, type->castTo<AnyFunctionType>());
-      } else if (dc->getGenericParamsOfContext()) {
+      } else if (dc->isGenericContext()) {
         std::tie(type, interfaceType)
           = getGenericMethodType(dc, type->castTo<AnyFunctionType>());
         selfVar->overwriteType(type->castTo<AnyFunctionType>()->getInput());
@@ -3579,7 +3579,7 @@ namespace {
 
         result->setInitializerInterfaceType(interfaceInitType);
         result->setInterfaceType(interfaceAllocType);
-      } else if (dc->getGenericParamsOfContext()) {
+      } else if (dc->isGenericContext()) {
         Type interfaceAllocType;
         Type interfaceInitType;
         std::tie(allocType, interfaceAllocType)
@@ -3752,7 +3752,7 @@ namespace {
       if (dc->getAsProtocolOrProtocolExtensionContext()) {
         std::tie(getterType, interfaceType)
           = getProtocolMethodType(dc, getterType->castTo<AnyFunctionType>());
-      } else if (dc->getGenericParamsOfContext()) {
+      } else if (dc->isGenericContext()) {
         std::tie(getterType, interfaceType)
           = getGenericMethodType(dc, getterType->castTo<AnyFunctionType>());
         getterArgs[0]->get(0)->overwriteType(
@@ -3822,7 +3822,7 @@ namespace {
       if (dc->getAsProtocolOrProtocolExtensionContext()) {
         std::tie(setterType, interfaceType)
           = getProtocolMethodType(dc, setterType->castTo<AnyFunctionType>());
-      } else if (dc->getGenericParamsOfContext()) {
+      } else if (dc->isGenericContext()) {
         std::tie(setterType, interfaceType)
           = getGenericMethodType(dc, setterType->castTo<AnyFunctionType>());
         selfDecl->overwriteType(
