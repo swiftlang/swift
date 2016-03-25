@@ -3632,18 +3632,6 @@ class DeclGroupNameContext {
     };
   };
 
-  // FIXME: Implement better name collectors.
-  struct GroupNameCollectorFromFileName : public GroupNameCollector {
-    GroupNameCollectorFromFileName(bool Enable) : GroupNameCollector(Enable) {}
-    StringRef getGroupNameInternal(const Decl *VD) override {
-      auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
-      if (!PathOp.hasValue())
-        return NullGroupName;
-      return llvm::sys::path::stem(StringRef(VD->getASTContext().SourceMgr.
-        getIdentifierForBuffer(PathOp.getValue())));
-    }
-  };
-
   class GroupNameCollectorFromJson : public GroupNameCollector {
     StringRef RecordPath;
     FileNameToGroupNameMap* pMap = nullptr;
