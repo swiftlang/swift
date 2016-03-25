@@ -225,7 +225,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
   assert(Worklist.empty() && "Worklist must be empty to add initial group");
   Worklist.reserve(List.size()+16);
-  WorklistMap.resize(List.size());
+  WorklistMap.reserve(List.size());
   DEBUG(llvm::dbgs() << "SC: ADDING: " << List.size()
         << " instrs to worklist\n");
   while (!List.empty()) {
