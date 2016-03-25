@@ -1714,7 +1714,7 @@ namespace {
       auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
-      
+
       // Create the constant.
       auto convertKind = ConstantConvertKind::Construction;
       if (isa<EnumDecl>(theStruct))
@@ -1724,6 +1724,19 @@ namespace {
                                      clang::APValue(decl->getInitVal()),
                                      convertKind, /*isStatic*/ true, decl);
       Impl.importAttributes(decl, CD);
+
+      // NS_OPTIONS members that have a value of 0 (typically named "None") do
+      // not operate as a set-like member.  Mark them unavailable with a message
+      // that says that they should be used as [].
+      if (!decl->getInitVal() && !CD->getAttrs().hasAttribute<AvailableAttr>()){
+        /// Create an AvailableAttr that indicates specific availability
+        /// for all platforms.
+        auto attr =
+          AvailableAttr::createUnconditional(Impl.SwiftContext,
+                           "use [] to construct an empty option set");
+        CD->getAttrs().add(attr);
+      }
+
       return CD;
     }
 
