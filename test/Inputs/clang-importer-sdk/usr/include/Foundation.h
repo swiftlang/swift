@@ -445,6 +445,7 @@ enum {
 
 /// Aaa.  NSRuncingOptions.  Bbb.
 typedef NS_OPTIONS(NSUInteger, NSRuncingOptions) {
+  NSRuncingNone = 0,
   NSRuncingEnableMince = 1,
   NSRuncingEnableQuince = 2,
 };
@@ -506,7 +507,7 @@ typedef NS_OPTIONS(NSUInteger, NSCalendarUnitDeprecated) {
 };
 
 typedef NS_OPTIONS(NSUInteger, NSOptionsAlsoGetSwiftName) {
-  ThisIsAnNSOptionsCaseWithSwiftName __attribute__((swift_name("Case")))
+  ThisIsAnNSOptionsCaseWithSwiftName __attribute__((swift_name("Case"))) = 0x1
 };
 
 #define CF_SWIFT_UNAVAILABLE(_msg) __attribute__((availability(swift, unavailable, message=_msg)))
@@ -555,9 +556,10 @@ typedef CF_OPTIONS(unsigned int, CMTimeFlagsWithNumber) {
 
 // Contrived name with a plural "-es"...normally these are "beeps".
 typedef NS_OPTIONS(NSInteger, AlertBuzzes) {
-  AlertBuzzFunk,
-  AlertBuzzHero,
-  AlertBuzzSosumi
+  AlertBuzzNone = 0,
+  AlertBuzzFunk = 1 << 0,
+  AlertBuzzHero = 1 << 1,
+  AlertBuzzSosumi = 1 << 2
 };
 
 // From AppKit
@@ -584,25 +586,25 @@ typedef NS_OPTIONS(NSUInteger, NSBitmapFormatReversed) {
 };
 
 typedef NS_OPTIONS(NSUInteger, NSBitmapFormat2) {
-  NSU16a,
-  NSU32a,
+  NSU16a = 1,
+  NSU32a = 2,
 };
 
 typedef NS_OPTIONS(NSUInteger, NSBitmapFormat3) {
-  NSU16b,
-  NSU32b,
-  NSS16b,
-  NSS32b,
+  NSU16b = 1,
+  NSU32b = 2,
+  NSS16b = 4,
+  NSS32b = 8,
 };
 
 typedef NS_OPTIONS(NSUInteger, NSUBitmapFormat4) {
-  NSU16c,
-  NSU32c,
+  NSU16c = 1,
+  NSU32c = 2,
 };
 
 typedef NS_OPTIONS(NSUInteger, NSABitmapFormat5) {
-  NSAA16d,
-  NSAB32d,
+  NSAA16d = 1,
+  NSAB32d = 2,
 };
 
 /// Aaa.  NSPotentiallyUnavailableOptions.  Bbb.

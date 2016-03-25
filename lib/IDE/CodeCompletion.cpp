@@ -1610,12 +1610,13 @@ public:
     CurrDeclContext->getParentSourceFile()->getImportedModules(Imported,
       Module::ImportFilter::All);
     while(!Imported.empty()) {
-      ModuleDecl *MD = Imported.front().second;
-      Imported.erase(Imported.begin());
+      ModuleDecl *MD = Imported.back().second;
+      Imported.pop_back();
       if (!ImportedModules.insert(MD->getNameStr()).second)
         continue;
       FurtherImported.clear();
       MD->getImportedModules(FurtherImported, Module::ImportFilter::Public);
+      Imported.append(FurtherImported.begin(), FurtherImported.end());
       for (auto SubMod : FurtherImported) {
         Imported.push_back(SubMod);
       }
