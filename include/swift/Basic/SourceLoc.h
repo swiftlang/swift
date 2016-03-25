@@ -41,7 +41,7 @@ public:
   explicit SourceLoc(llvm::SMLoc Value) : Value(Value) {}
   
   bool isValid() const { return Value.isValid(); }
-  bool isInvalid() const { return !Value.isValid(); }
+  bool isInvalid() const { return !isValid(); }
   
   bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
   bool operator!=(const SourceLoc &RHS) const { return RHS.Value != Value; }
@@ -94,7 +94,7 @@ public:
   }
   
   bool isValid() const { return Start.isValid(); }
-  bool isInvalid() const { return Start.isInvalid(); }
+  bool isInvalid() const { return !isValid(); }
 
   /// Print out the SourceRange.  If the locations are in the same buffer
   /// as specified by LastBufferID, then we don't print the filename.  If not,
@@ -132,7 +132,7 @@ public:
   CharSourceRange(const SourceManager &SM, SourceRange Range) = delete;
 
   bool isValid() const { return Start.isValid(); }
-  bool isInvalid() const { return Start.isInvalid(); }
+  bool isInvalid() const { return !isValid(); }
 
   SourceLoc getStart() const { return Start; }
   SourceLoc getEnd() const {
