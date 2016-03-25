@@ -201,11 +201,20 @@ public func expectOptionalEqual<T>(
 }
 
 public func expectEqual<T : Equatable>(_ expected: T?, _ actual: T?, ${TRACE}) {
-  if (actual == nil) != (expected == nil)
-    || actual != nil && expected! != actual! {
+  if expected != actual {
     expectationFailure(
       "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      trace: ${trace})
+  }
+}
+
+public func expectNotEqual<T : Equatable>(
+  _ expected: T?, _ actual: T?, ${TRACE}
+) {
+  if expected == actual {
+    expectationFailure(
+      "unexpected value: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
   }
 }
