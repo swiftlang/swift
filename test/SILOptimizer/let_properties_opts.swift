@@ -123,6 +123,47 @@ struct Boo3 {
   }
 }
 
+// The initializer of this struct can be defined elswhere,
+// e.g. in an extension of this struct in a different module.
+public struct StructWithOnlyPublicLetProperties {
+  public let Prop0: Int32
+  public let Prop1: Int32
+
+  init(_ v: Int32, _ u: Int32) {
+    Prop0 = 10
+    Prop1 = 11
+  }
+}
+
+// The initializer of this struct cannot be defined outside
+// of the current module, because it contains an internal stored
+// property, which is impossible to intialize outside of this module.
+public struct StructWithPublicAndInternalLetProperties {
+  public let Prop0: Int32
+  internal let Prop1: Int32
+
+  init(_ v: Int32, _ u: Int32) {
+    Prop0 = 10
+    Prop1 = 11
+  }
+}
+
+// The initializer of this struct cannot be defined elswhere,
+// because it contains a private stored property, which is
+// impossible to intialize outside of this file.
+public struct StructWithPublicAndInternalAndPrivateLetProperties {
+  public let Prop0: Int32
+  internal let Prop1: Int32
+  private let Prop2: Int32
+
+  init(_ v: Int32, _ u: Int32) {
+    Prop0 = 10
+    Prop1 = 11
+    Prop2 = 12
+  }
+}
+
+
 // Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
@@ -250,4 +291,67 @@ public func testStructWithMultipleInitsAndInlinedInitializer() {
   let boos1 = things.map { Boo3($0, C()) }
   let boos2 = things.map(Boo3.init)
   print(testStructWithMultipleInits(boos1[0], boos2[0]))
+}
+
+// Since all properties are public, they can be initialized in a
+// different module.
+// Their values are not known and cannot be propagated.
+
+// CHECK-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_33StructWithOnlyPublicLetPropertiesVs5Int32 
+// CHECK: struct_extract %0 : $StructWithOnlyPublicLetProperties, #StructWithOnlyPublicLetProperties.Prop0
+// CHECK: return
+
+// CHECK-WMO-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_33StructWithOnlyPublicLetPropertiesVs5Int32 
+// CHECK-WMO: struct_extract %0 : $StructWithOnlyPublicLetProperties, #StructWithOnlyPublicLetProperties.Prop0
+// CHECK-WMO: return
+public func testStructPropertyAccessibility(b: StructWithOnlyPublicLetProperties) -> Int32 {
+  return b.Prop0 + b.Prop1
+}
+
+// Properties can be initialized in a different file in the same module.
+// Their values are not known and cannot be propagated,
+// unless it is a WMO compilation.
+
+// CHECK-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_40StructWithPublicAndInternalLetPropertiesVs5Int32
+// CHECK: struct_extract %0 : $StructWithPublicAndInternalLetProperties, #StructWithPublicAndInternalLetProperties.Prop0
+// CHECK-NOT: integer_literal $Builtin.Int32, 21
+// CHECK: return
+
+// CHECK-WMO-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_40StructWithPublicAndInternalLetPropertiesVs5Int32
+// CHECK-WMO: integer_literal $Builtin.Int32, 21
+// CHECK-WMO-NEXT: struct $Int32
+// CHECK-WMO-NEXT: return
+public func testStructPropertyAccessibility(b: StructWithPublicAndInternalLetProperties) -> Int32 {
+  return b.Prop0 + b.Prop1
+}
+
+// Properties can be initialized only in this file, because one of the
+// properties is private.
+// Therefore their values are known and can be propagated.
+
+// CHECK: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_50StructWithPublicAndInternalAndPrivateLetPropertiesVs5Int32
+// CHECK: integer_literal $Builtin.Int32, 33
+// CHECK-NEXT: struct $Int32
+// CHECK-NEXT: return
+
+// CHECK-WMO-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_50StructWithPublicAndInternalAndPrivateLetPropertiesVs5Int32
+// CHECK-WMO: integer_literal $Builtin.Int32, 33
+// CHECK-WMO-NEXT: struct $Int32
+// CHECK-WMO-NEXT: return
+public func testStructPropertyAccessibility(b: StructWithPublicAndInternalAndPrivateLetProperties) -> Int32 {
+  return b.Prop0 + b.Prop1 + b.Prop2
+}
+
+// Force use of initializers, otherwise they got removed by the dead-function-elimination pass
+// and the values of let properties cannot be determined.
+public func useIntiializers() -> StructWithOnlyPublicLetProperties {
+  return StructWithOnlyPublicLetProperties(1, 1)
+}
+
+public func useIntiializers() -> StructWithPublicAndInternalLetProperties {
+  return StructWithPublicAndInternalLetProperties(1, 1)
+}
+
+public func useIntiializers() -> StructWithPublicAndInternalAndPrivateLetProperties {
+  return StructWithPublicAndInternalAndPrivateLetProperties(1, 1)
 }
