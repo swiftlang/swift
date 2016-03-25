@@ -131,6 +131,7 @@ MathTests.test("Unary functions") {
 
   (d1, f1, g1) = (acosh(dx), acosh(fx), acosh(gx))
   expectEqual("acosh nan nan acosh", print3("acosh", d1, f1, g1))
+  expectEqual("acosh true true acosh", print3("acosh", d1.isNaN, f1.isNaN, g1.isNaN))
 
   (d1, f1, g1) = (asinh(dx), asinh(fx), asinh(gx))
   expectEqual("asinh 0.0998340788992076 0.0998341 asinh",
