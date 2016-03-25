@@ -6,7 +6,7 @@ import resilient_enum
 
 // CHECK: %Si = type <{ [[INT:i32|i64]] }>
 
-// CHECK-LABEL: @_TMfV17struct_resilience26StructWithResilientStorage = internal constant
+// CHECK-LABEL: @_TMfV17struct_resilience26StructWithResilientStorage = internal global
 
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
