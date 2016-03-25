@@ -19,16 +19,19 @@
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang %t/classes.h
 // RUN: not %check-in-clang -fno-modules %t/classes.h
-// RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h
+// RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
 // CHECK-NOT: Swift;
 // CHECK-LABEL: @import Foundation;
 // CHECK-NEXT: @import CoreGraphics;
+// CHECK-NEXT: @import CoreFoundation;
+// CHECK-NEXT: @import objc_generics;
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Swift;
 import Foundation
+import objc_generics
 import AppKit // only used in implementations
 import CoreFoundation
 
