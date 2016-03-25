@@ -3359,9 +3359,9 @@ bool VarDecl::isSelfParameter() const {
 
 /// Return true if this stored property needs to be accessed with getters and
 /// setters for Objective-C.
-bool AbstractStorageDecl::hasObjCGetterAndSetter() const {
+bool AbstractStorageDecl::hasForeignGetterAndSetter() const {
   if (auto override = getOverriddenDecl())
-    return override->hasObjCGetterAndSetter();
+    return override->hasForeignGetterAndSetter();
 
   if (!isObjC())
     return false;
@@ -3369,10 +3369,12 @@ bool AbstractStorageDecl::hasObjCGetterAndSetter() const {
   return true;
 }
 
-bool AbstractStorageDecl::requiresObjCGetterAndSetter() const {
+bool AbstractStorageDecl::requiresForeignGetterAndSetter() const {
   if (isFinal())
     return false;
-  if (!hasObjCGetterAndSetter())
+  if (hasAccessorFunctions() && getGetter()->isImportAsMember())
+    return true;
+  if (!hasForeignGetterAndSetter())
     return false;
   // Imported accessors are foreign and only have objc entry points.
   if (hasClangNode())

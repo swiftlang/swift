@@ -57,7 +57,7 @@ enum class MethodDispatch {
 MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
 
 /// True if calling the given method or property should use ObjC dispatch.
-bool requiresObjCDispatch(ValueDecl *vd);
+bool requiresForeignEntryPoint(ValueDecl *vd);
 
 /// True if the entry point is natively foreign.
 bool requiresForeignToNativeThunk(ValueDecl *vd);

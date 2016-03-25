@@ -670,6 +670,10 @@ public:
     return getConstantInfo(constant).SILFnType;
   }
   
+  /// Returns the SILParameterInfo for the given declaration's `self` parameter.
+  /// `constant` must refer to a method.
+  SILParameterInfo getConstantSelfParameter(SILDeclRef constant);
+  
   /// Returns the SILFunctionType the given declaration must use to override.
   /// Will be the same as getConstantFunctionType if the declaration does
   /// not override.

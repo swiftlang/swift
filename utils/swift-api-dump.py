@@ -95,6 +95,8 @@ def create_parser():
                         help='Add additional framework directories')
     parser.add_argument('-I', '--include-dir', action='append',
                         help='Add additional include directories')
+    parser.add_argument('--enable-infer-import-as-member', action='store_true', 
+                        help='Infer when a global could be imported as a member.')
     return parser
 
 
@@ -287,7 +289,8 @@ def main():
 
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
-
+    if args.enable_infer_import_as_member:
+        extra_args = extra_args + ['-enable-infer-import-as-member']
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])
 

@@ -10,3 +10,35 @@ module ImportedProtocols {
     header "ImportedProtocols.h"
   }
 }
+
+module ImportAsMember {
+  export *
+
+  module A {
+    header "ImportAsMember.h"
+  }
+
+  module B {
+    header "ImportAsMemberB.h"
+  }
+
+  module C {
+    requires objc
+    header "ImportAsMemberC.h"
+  }
+
+  module Proto {
+    requires objc
+    header "ImportAsMemberProto.h"
+  }
+
+  module ProtoErr {
+    requires objc
+    header "ImportAsMemberProto.h"
+  }
+}
+
+module InferImportAsMember {
+  export *
+  header "InferImportAsMember.h"
+}

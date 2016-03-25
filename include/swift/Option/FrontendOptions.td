@@ -224,6 +224,10 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
+def enable_infer_import_as_member :
+  Flag<["-"], "enable-infer-import-as-member">,
+  HelpText<"Infer when a global could be imported as a member">;
+
 def enable_strip_ns_prefix :
   Flag<["-"], "enable-strip-ns-prefix">,
   HelpText<"Strip 'NS' prefix from Foundation entities">;

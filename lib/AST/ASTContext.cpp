@@ -31,6 +31,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
@@ -139,6 +140,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.UnsafePointer<T>.
   NominalTypeDecl *UnsafePointerDecl = nullptr;
   VarDecl *UnsafePointerMemoryDecl = nullptr;
+  
+  /// The declaration of Swift.OpaquePointer.
+  NominalTypeDecl *OpaquePointerDecl = nullptr;
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
@@ -754,6 +758,14 @@ NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
       *this, "UnsafeMutablePointer", 1);
   
   return Impl.UnsafeMutablePointerDecl;
+}
+
+NominalTypeDecl *ASTContext::getOpaquePointerDecl() const {
+  if (!Impl.OpaquePointerDecl)
+    Impl.OpaquePointerDecl
+    = findStdlibType(*this, "OpaquePointer", 0);
+  
+  return Impl.OpaquePointerDecl;
 }
 
 NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {

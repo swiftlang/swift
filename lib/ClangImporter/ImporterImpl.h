@@ -261,6 +261,7 @@ public:
   ASTContext &SwiftContext;
 
   const bool ImportForwardDeclarations;
+  const bool InferImportAsMember;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";
@@ -328,6 +329,11 @@ public:
   /// A mapping from module names to the prefixes placed on global names
   /// in that module, e.g., the Foundation module uses the "NS" prefix.
   llvm::StringMap<std::string> ModulePrefixes;
+
+  /// \brief Provide a single extension point for any given type per clang
+  /// submodule
+  llvm::DenseMap<std::pair<NominalTypeDecl *, const clang::Module *>,
+                 ExtensionDecl *> extensionPoints;
 
   /// Is the given identifier a reserved name in Swift?
   static bool isSwiftReservedName(StringRef name);
@@ -461,6 +467,10 @@ public:
   /// \brief Keep track of subscript declarations based on getter/setter
   /// pairs.
   llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
+
+  /// Keeps track of the Clang functions that have been turned into
+  /// properties.
+  llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
   /// Retrieve the key to use when looking for enum information.
   StringRef getEnumInfoKey(const clang::EnumDecl *decl,
@@ -763,6 +773,11 @@ public:
   static OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
                                                       clang::QualType type);
 
+  /// Whether NSUInteger can be imported as Int in certain contexts. If false,
+  /// should always be imported as UInt.
+  static bool shouldAllowNSUIntegerAsInt(bool isFromSystemModule,
+                                         const clang::NamedDecl *decl);
+
   /// Omit needless words in a function name.
   bool omitNeedlessWordsInFunctionName(
          clang::Sema &clangSema,
@@ -820,6 +835,9 @@ public:
     /// than refuse to import the initializer.
     bool DroppedVariadic = false;
 
+    /// Whether this is a global being imported as a member
+    bool ImportAsMember = false;
+
     /// What kind of accessor this name refers to, if any.
     ImportedAccessorKind AccessorKind = ImportedAccessorKind::None;
 
@@ -839,6 +857,10 @@ public:
     /// For names that map Objective-C error handling conventions into
     /// throwing Swift methods, describes how the mapping is performed.
     Optional<ImportedErrorInfo> ErrorInfo;
+
+    /// For a declaration name that makes the declaration into an
+    /// instance member, the index of the "Self" parameter.
+    Optional<unsigned> SelfIndex = None;
 
     /// Produce just the imported name, for clients that don't care
     /// about the details.
@@ -899,6 +921,11 @@ public:
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
                              const clang::MacroInfo *macro,
                              clang::ASTContext &clangCtx);
+
+  /// Retrieve the property type as determined by the given accessor.
+  static clang::QualType
+  getAccessorPropertyType(const clang::FunctionDecl *accessor, bool isSetter,
+                          Optional<unsigned> selfIndex);
 
   /// \brief Import the given Clang identifier into Swift.
   ///
@@ -1192,6 +1219,37 @@ public:
                           ParameterList *&parameterList,
                           DeclName &name);
 
+  /// \brief Import the given function return type.
+  ///
+  /// \param clangDecl The underlying declaration, if any; should only be
+  ///   considered for any attributes it might carry.
+  /// \param resultType The result type of the function.
+  /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
+  ///        in certain contexts. If false, it will always be imported as UInt.
+  ///
+  /// \returns the imported function return type, or null if the type cannot be
+  /// imported.
+  Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
+                                clang::QualType resultType,
+                                bool allowNSUIntegerAsInt);
+
+  /// \brief Import the parameter list for a function
+  ///
+  /// \param clangDecl The underlying declaration, if any; should only be
+  ///   considered for any attributes it might carry.
+  /// \param params The parameter types to the function.
+  /// \param isVariadic Whether the function is variadic.
+  /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
+  ///        in certain contexts. If false, it will always be imported as UInt.
+  /// \param argNames The argument names
+  ///
+  /// \returns The imported parameter list on success, or null on failure
+  ParameterList *
+  importFunctionParameterList(const clang::FunctionDecl *clangDecl,
+                              ArrayRef<const clang::ParmVarDecl *> params,
+                              bool isVariadic, bool allowNSUIntegerAsInt,
+                              ArrayRef<Identifier> argNames);
+
   Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                           bool isFromSystemModule);
 
@@ -1347,6 +1405,15 @@ public:
   /// about the directly-parsed headers.
   SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
 
+  /// Visit each of the lookup tables in some deterministic order.
+  ///
+  /// \param fn Invoke the given visitor for each table. If the
+  /// visitor returns true, stop early.
+  ///
+  /// \returns \c true if the \c visitor ever returns \c true, \c
+  /// false otherwise.
+  bool forEachLookupTable(llvm::function_ref<bool(SwiftLookupTable &table)> fn);
+
   /// Look for namespace-scope values with the given name in the given
   /// Swift lookup table.
   void lookupValue(SwiftLookupTable &table, DeclName name,
@@ -1364,6 +1431,9 @@ public:
   /// Look for all Objective-C members in the given Swift lookup table.
   void lookupAllObjCMembers(SwiftLookupTable &table,
                             VisibleDeclConsumer &consumer);
+
+  /// Determine the effective Clang context for the given Swift nominal type.
+  EffectiveClangContext getEffectiveClangContext(NominalTypeDecl *nominal);
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();

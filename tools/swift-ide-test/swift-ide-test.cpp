@@ -295,6 +295,11 @@ Swift3Migration("swift3-migration",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+InferImportAsMember("enable-infer-import-as-member",
+                   llvm::cl::desc("Infer when a global could be imported as a member"),
+                   llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 StripNSPrefix("enable-strip-ns-prefix",
               llvm::cl::desc("Strip the NS prefix from Foundation et al"),
               llvm::cl::init(false));
@@ -2652,10 +2657,12 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
-  InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
+  InitInvok.getLangOptions().InferImportAsMember |=
+    options::InferImportAsMember;  InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
-
+  InitInvok.getClangImporterOptions().InferImportAsMember |=
+    options::InferImportAsMember;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }

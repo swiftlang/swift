@@ -1617,6 +1617,9 @@ public:
       FurtherImported.clear();
       MD->getImportedModules(FurtherImported, Module::ImportFilter::Public);
       Imported.append(FurtherImported.begin(), FurtherImported.end());
+      for (auto SubMod : FurtherImported) {
+        Imported.push_back(SubMod);
+      }
     }
   }
 

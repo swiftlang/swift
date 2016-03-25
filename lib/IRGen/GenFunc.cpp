@@ -2902,9 +2902,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     case clang::CodeGen::ABIArgInfo::Direct: {
       auto toTy = AI.getCoerceToType();
 
-      // Mutating parameters are bridged as Clang pointer types. For now, this
-      // only ever comes up with Clang-generated accessors.
-      if (params[i - firstParam].isIndirectMutating()) {
+      // Indirect parameters are bridged as Clang pointer types.
+      if (params[i - firstParam].isIndirect()) {
         assert(paramType.isAddress() && "SIL type is not an address?");
 
         auto addr = in.claimNext();

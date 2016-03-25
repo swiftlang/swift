@@ -144,6 +144,13 @@ namespace swift {
     /// new enough?
     bool EnableTargetOSChecking = true;
 
+    /// Whether to use the import as member inference system
+    ///
+    /// When importing a global, try to infer whether we can import it as a
+    /// member of some type instead. This includes inits, computed properties,
+    /// and methods.
+    bool InferImportAsMember = false;
+
     /// Whether we are stripping the "NS" prefix from Foundation et al.
     bool StripNSPrefix = false;
 
