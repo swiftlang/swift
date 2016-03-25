@@ -130,7 +130,6 @@ MathTests.test("Unary functions") {
   expectEqual("tan 0.100334672085451 0.100335 tan", print3("tan", d1, f1, g1))
 
   (d1, f1, g1) = (acosh(dx), acosh(fx), acosh(gx))
-  expectEqual("acosh nan nan acosh", print3("acosh", d1, f1, g1))
   expectEqual("acosh true true acosh", print3("acosh", d1.isNaN, f1.isNaN, g1.isNaN))
 
   (d1, f1, g1) = (asinh(dx), asinh(fx), asinh(gx))
