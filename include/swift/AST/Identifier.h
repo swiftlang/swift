@@ -140,7 +140,7 @@ public:
   int compare(Identifier other) const;
 
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
-  bool operator!=(Identifier RHS) const { return Pointer != RHS.Pointer; }
+  bool operator!=(Identifier RHS) const { return !operator==(RHS); }
 
   bool operator<(Identifier RHS) const { return Pointer < RHS.Pointer; }
   
@@ -364,7 +364,7 @@ public:
   }
 
   friend bool operator!=(DeclName lhs, DeclName rhs) {
-    return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+    return !operator==(lhs, rhs);
   }
 
   friend bool operator<(DeclName lhs, DeclName rhs) {
@@ -478,7 +478,7 @@ public:
   }
 
   friend bool operator!=(ObjCSelector lhs, ObjCSelector rhs) {
-    return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+    return !operator==(lhs, rhs);
   }
 
   friend bool operator<(ObjCSelector lhs, ObjCSelector rhs) {
