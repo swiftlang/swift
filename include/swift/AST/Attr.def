@@ -260,6 +260,9 @@ SIMPLE_DECL_ATTR(_versioned, Versioned,
                  LongAttribute | UserInaccessible,
                  64)
 
+SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
+                 OnFunc | OnConstructor | LongAttribute, 65)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

@@ -1311,6 +1311,19 @@ public struct ArrayThingy {
     public func mineCopper() -> Int { return 0 }
 }
 
+// @discardableResult attribute
+public struct DiscardableThingy {
+    // PASS_PRINT_AST: @discardableResult
+    // PASS_PRINT_AST-NEXT: public init()
+    @discardableResult
+    public init() {}
+
+    // PASS_PRINT_AST: @discardableResult
+    // PASS_PRINT_AST-NEXT: public func useless() -> Int
+    @discardableResult
+    public func useless() -> Int { return 0 }
+}
+
 
 // Parameter Attributes.
 
