@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | FileCheck %s
 // RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
 
-// FIXME: SR-1701 test or compiler has an incorrect 64-bit dependency
+// FIXME: SR-1071 test or compiler has an incorrect 64-bit dependency
 // UNSUPPORTED: PTRSIZE=32
 
 import resilient_struct
