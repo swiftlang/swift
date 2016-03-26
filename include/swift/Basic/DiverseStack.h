@@ -106,7 +106,7 @@ public:
       return a.Depth == b.Depth;
     }
     friend bool operator!=(stable_iterator a, stable_iterator b) {
-      return a.Depth != b.Depth;
+      return !operator==(a, b);
     }
 
     static stable_iterator invalid() {
@@ -269,7 +269,7 @@ public:
     }
 
     friend bool operator==(iterator a, iterator b) { return a.Ptr == b.Ptr; }
-    friend bool operator!=(iterator a, iterator b) { return a.Ptr != b.Ptr; }
+    friend bool operator!=(iterator a, iterator b) { return !operator==(a, b); }
   };
 
   using DiverseStackBase::checkIterator;
@@ -320,7 +320,7 @@ public:
       return a.Ptr == b.Ptr;
     }
     friend bool operator!=(const_iterator a, const_iterator b) {
-      return a.Ptr != b.Ptr;
+      return !operator==(a, b);
     }
   };
   const_iterator begin() const { checkValid(); return const_iterator(Begin); }
