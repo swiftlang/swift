@@ -4,6 +4,8 @@
 import resilient_enum
 import resilient_struct
 
+// CHECK: %swift.type = type { [[INT:i32|i64]] }
+
 // CHECK: %C15enum_resilience5Class = type <{ %swift.refcounted }>
 // CHECK: %V15enum_resilience9Reference = type <{ %C15enum_resilience5Class* }>
 
@@ -229,7 +231,7 @@ public func getResilientEnumType() -> Any.Type {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK: cacheIsNull:
-// CHECK-NEXT: call void @swift_once(i64* @_TMaO15enum_resilience24EnumWithResilientPayload.once_token, i8* bitcast (void (i8*)* @initialize_metadata_EnumWithResilientPayload to i8*))
+// CHECK-NEXT: call void @swift_once([[INT]]* @_TMaO15enum_resilience24EnumWithResilientPayload.once_token, i8* bitcast (void (i8*)* @initialize_metadata_EnumWithResilientPayload to i8*))
 // CHECK-NEXT: [[METADATA2:%.*]] = load %swift.type*, %swift.type** @_TMLO15enum_resilience24EnumWithResilientPayload
 // CHECK-NEXT: br label %cont
 

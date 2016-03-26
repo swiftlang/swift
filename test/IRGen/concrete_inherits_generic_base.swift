@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -module-name foo -emit-ir %s | FileCheck %s
 
+// CHECK: %swift.type = type { [[INT:i32|i64]] }
+
 // -- Classes with generic bases can't go in the @objc_classes list, since
 //    they need runtime initialization before they're valid.
 // CHECK-NOT: @objc_classes
@@ -23,7 +25,7 @@ class Base<T> {
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     call void @swift_once(i64* @_TMaC3foo12SuperDerived.once_token, i8* bitcast (void (i8*)* @initialize_metadata_SuperDerived to i8*))
+// CHECK-NEXT:     call void @swift_once([[INT]]* @_TMaC3foo12SuperDerived.once_token, i8* bitcast (void (i8*)* @initialize_metadata_SuperDerived to i8*))
 // CHECK-NEXT:     [[METADATA:%.*]] = load %swift.type*, %swift.type** @_TMLC3foo12SuperDerived
 // CHECK-NEXT:     br label %cont
 // CHECK:       cont:
@@ -39,7 +41,7 @@ class SuperDerived: Derived {
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     call void @swift_once(i64* @_TMaC3foo7Derived.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Derived to i8*))
+// CHECK-NEXT:     call void @swift_once([[INT]]* @_TMaC3foo7Derived.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Derived to i8*))
 // CHECK-NEXT:     [[METADATA:%.*]] = load %swift.type*, %swift.type** @_TMLC3foo7Derived
 // CHECK-NEXT:     br label %cont
 // CHECK:       cont:

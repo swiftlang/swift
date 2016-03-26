@@ -119,7 +119,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:    cacheIsNull:
-// CHECK-NEXT: call void @swift_once(i64* @_TMaC16class_resilience26ClassWithResilientProperty.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientProperty to i8*))
+// CHECK-NEXT: call void @swift_once([[INT]]* @_TMaC16class_resilience26ClassWithResilientProperty.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientProperty to i8*))
 // CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** @_TMLC16class_resilience26ClassWithResilientProperty
 // CHECK-NEXT: br label %cont
 
@@ -147,7 +147,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:    cacheIsNull:
-// CHECK-NEXT: call void @swift_once(i64* @_TMaC16class_resilience33ClassWithResilientlySizedProperty.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientlySizedProperty to i8*))
+// CHECK-NEXT: call void @swift_once([[INT]]* @_TMaC16class_resilience33ClassWithResilientlySizedProperty.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientlySizedProperty to i8*))
 // CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** @_TMLC16class_resilience33ClassWithResilientlySizedProperty
 // CHECK-NEXT: br label %cont
 
