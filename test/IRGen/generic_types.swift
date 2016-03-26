@@ -10,7 +10,7 @@ import Swift
 // CHECK: [[C:%C13generic_types1C]] = type
 // CHECK: [[D:%C13generic_types1D]] = type
 
-// CHECK-LABEL: @_TMPC13generic_types1A = {{(protected )?}}global
+// CHECK-LABEL: @_TMPC13generic_types1A = hidden global
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_A,
 // CHECK-native-SAME: i32 160,
 // CHECK-objc-SAME:   i32 344,
@@ -36,7 +36,7 @@ import Swift
 // CHECK-SAME:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
 // CHECK-SAME:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcfT1ySi_GS0_x_
 // CHECK-SAME: }
-// CHECK-LABEL: @_TMPC13generic_types1B = {{(protected )?}}global
+// CHECK-LABEL: @_TMPC13generic_types1B = hidden global
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_B,
 // CHECK-native-SAME: i32 152,
 // CHECK-objc-SAME:   i32 336,
@@ -60,7 +60,7 @@ import Swift
 // CHECK-SAME:   i32 16,
 // CHECK-SAME:   %swift.type* null
 // CHECK-SAME: }
-// CHECK-LABEL: @_TMPC13generic_types1C = {{(protected )?}}global
+// CHECK-LABEL: @_TMPC13generic_types1C = hidden global
 // CHECK-SAME:   void ([[C]]*)* @_TFC13generic_types1CD,
 // CHECK-SAME:   i8** @_TWVBo,
 // CHECK-SAME:   i64 0,
@@ -71,7 +71,7 @@ import Swift
 // CHECK-SAME:   i64 1,
 // CHECK-SAME:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
 // CHECK-SAME: }
-// CHECK-LABEL: @_TMPC13generic_types1D = {{(protected )?}}global
+// CHECK-LABEL: @_TMPC13generic_types1D = hidden global
 // CHECK-SAME:   void ([[D]]*)* @_TFC13generic_types1DD,
 // CHECK-SAME:   i8** @_TWVBo,
 // CHECK-SAME:   i64 0,

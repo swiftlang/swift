@@ -43,7 +43,7 @@ public protocol ResilientProtocol {
 
 // Protocol is not public -- doesn't need default witness table
 
-// CHECK: @_TMp19protocol_resilience16InternalProtocol = {{(protected )?}}constant %swift.protocol {
+// CHECK: @_TMp19protocol_resilience16InternalProtocol = hidden constant %swift.protocol {
 // CHECK-SAME:   i32 7,
 // CHECK-SAME:   i16 0,
 // CHECK-SAME:   i16 0,

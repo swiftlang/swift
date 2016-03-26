@@ -88,8 +88,7 @@ inline FormalLinkage &operator^=(FormalLinkage &lhs, FormalLinkage rhs) {
 }
 
 FormalLinkage getTypeLinkage(CanType type);
-FormalLinkage getDeclLinkage(const ValueDecl *decl,
-                             bool treatInternalAsVersioned = true);
+FormalLinkage getDeclLinkage(const ValueDecl *decl);
 SILLinkage getSILLinkage(FormalLinkage linkage,
                          ForDefinition_t forDefinition);
 SILLinkage

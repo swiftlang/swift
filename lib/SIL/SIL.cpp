@@ -46,8 +46,7 @@ SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   return Entry;
 }
 
-FormalLinkage swift::getDeclLinkage(const ValueDecl *D,
-                                    bool treatInternalAsVersioned) {
+FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   const DeclContext *fileContext = D->getDeclContext()->getModuleScopeContext();
 
   // Clang declarations are public and can't be assured of having a
@@ -64,10 +63,10 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D,
   case Accessibility::Public:
     return FormalLinkage::PublicUnique;
   case Accessibility::Internal:
-    // FIXME: This ought to be "hidden" as well, but that causes problems when
-    // inlining code from the standard library, which may reference internal
-    // declarations.
-    if (treatInternalAsVersioned)
+    // If we're serializing all function bodies, type metadata for internal
+    // types needs to be public too.
+    if (D->getDeclContext()->getParentModule()->getResilienceStrategy()
+        == ResilienceStrategy::Fragile)
       return FormalLinkage::PublicUnique;
     return FormalLinkage::HiddenUnique;
   case Accessibility::Private:
@@ -126,13 +125,22 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
   // Behavior conformances are always private.
   if (C->isBehaviorConformance())
     return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
-  
-  // If the conformance is imported from Clang, give it shared linkage.
+
+  ModuleDecl *conformanceModule = C->getDeclContext()->getParentModule();
+
+  // If the conformance was synthesized by the ClangImporter, give it
+  // shared linkage.
   auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
   auto typeUnit = typeDecl->getModuleScopeContext();
   if (isa<ClangModuleUnit>(typeUnit)
-      && C->getDeclContext()->getParentModule() == typeUnit->getParentModule())
+      && conformanceModule == typeUnit->getParentModule())
     return SILLinkage::Shared;
+
+  // If we're bulding with -sil-serialize-all, give the conformance public
+  // linkage.
+  if (conformanceModule->getResilienceStrategy()
+      == ResilienceStrategy::Fragile)
+    return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
 
   // FIXME: This should be using std::min(protocol's access, type's access).
   switch (C->getProtocol()->getEffectiveAccess()) {

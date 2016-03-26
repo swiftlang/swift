@@ -21,7 +21,7 @@ bb0(%0 : $@thick Outer.Inner.Type):
 // CHECK:      [[T0:%.*]] = call %swift.type* @_TMaC12nested_types5Outer()
 // CHECK-NEXT: ret %swift.type* [[T0]]
 
-// CHECK-LABEL: define{{ | protected }}%swift.type* @_TMaVC12nested_types5Outer5Inner()
+// CHECK-LABEL: define hidden %swift.type* @_TMaVC12nested_types5Outer5Inner()
 // CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type** @_TMLVC12nested_types5Outer5Inner
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]

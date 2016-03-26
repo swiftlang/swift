@@ -1951,8 +1951,7 @@ public:
 
 void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
   SILLinkage linkage =
-      getSILLinkage(getDeclLinkage(protocol, /*internalAsVersioned=*/false),
-                    ForDefinition);
+      getSILLinkage(getDeclLinkage(protocol), ForDefinition);
 
   SILGenDefaultWitnessTable builder(*this, protocol, linkage);
   builder.visitProtocolDecl(protocol);

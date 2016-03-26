@@ -19,7 +19,7 @@ class Base<T> {
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaC3foo12SuperDerived()
+// CHECK-LABEL: define hidden %swift.type* @_TMaC3foo12SuperDerived()
 // CHECK:          [[CACHE:%.*]] = load %swift.type*, %swift.type** @_TMLC3foo12SuperDerived
 // CHECK-NEXT:     [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
@@ -35,7 +35,7 @@ class Base<T> {
 class SuperDerived: Derived {
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaC3foo7Derived()
+// CHECK-LABEL: define hidden %swift.type* @_TMaC3foo7Derived()
 // CHECK:          [[CACHE:%.*]] = load %swift.type*, %swift.type** @_TMLC3foo7Derived
 // CHECK-NEXT:     [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
