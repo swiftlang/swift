@@ -4692,6 +4692,7 @@ namespace {
   protected:
     using super::IGM;
     using super::Target;
+    using super::asImpl;
     using super::addConstantWord;
     using super::addWord;
     using super::addFarRelativeAddress;
@@ -4726,10 +4727,12 @@ namespace {
         emitPhysicalStructMemberFixedOffset(IGM, structType, var);
       // If we have a fixed offset, add it. Otherwise, leave zero as a
       // placeholder.
-      if (offset)
+      if (offset) {
         addWord(offset);
-      else
+      } else {
+        asImpl().flagUnfilledFieldOffset();
         addConstantWord(0);
+      }
     }
 
     void addGenericArgument(CanType type) {
@@ -4750,6 +4753,7 @@ namespace {
     public StructMetadataBuilderBase<StructMetadataBuilder> {
 
     bool HasUnfilledParent = false;
+    bool HasUnfilledFieldOffset = false;
   public:
     StructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
                           llvm::GlobalVariable *relativeAddressBase)
@@ -4759,8 +4763,12 @@ namespace {
       HasUnfilledParent = true;
     }
 
+    void flagUnfilledFieldOffset() {
+      HasUnfilledFieldOffset = true;
+    }
+
     bool canBeConstant() {
-      return !HasUnfilledParent;
+      return !HasUnfilledParent && !HasUnfilledFieldOffset;
     }
 
     void addValueWitnessTable() {
@@ -4817,6 +4825,10 @@ namespace {
       }
 
       addConstantWord(0);
+    }
+
+    void flagUnfilledFieldOffset() {
+      // We just assume this might happen.
     }
     
     void addValueWitnessTable() {
@@ -5069,8 +5081,7 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   bool isIndirect = false;
   
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
-                         /*isConstant*/!isPattern, init,
-                         std::move(tempBase));
+                         canBeConstant, init, std::move(tempBase));
 }
 
 llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
@@ -5284,6 +5295,10 @@ namespace {
 
     void flagUnfilledParent() {
       assert(HasUnfilledParent);
+    }
+
+    void flagUnfilledFieldOffset() {
+      llvm_unreachable("foreign type with non-fixed layout?");
     }
   };
   

@@ -223,7 +223,7 @@ swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
   // Call the accessor if there is one.
   if (metadata == nullptr && !ntd->GenericParams.isGeneric()) {
     if (auto accessFn = ntd->getAccessFunction())
-      accessFn();
+      metadata = accessFn();
   }
 
   return metadata;
