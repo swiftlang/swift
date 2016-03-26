@@ -1217,6 +1217,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.DisableAutolinkFrameworks.push_back(A->getValue());
   }
 
+  Opts.NoRedZone |= Args.hasArg(OPT_disable_red_zone);
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 

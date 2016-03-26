@@ -54,6 +54,9 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
   if (IGM.Opts.Sanitize == SanitizerKind::Address)
     Fn->addFnAttr(llvm::Attribute::SanitizeAddress);
 
+  if (IGM.Opts.NoRedZone)
+    Fn->addFnAttr(llvm::Attribute::NoRedZone);
+
   emitPrologue();
 }
 
