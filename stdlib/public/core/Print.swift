@@ -118,7 +118,6 @@ public func debugPrint<Target : OutputStream>(
     items, separator: separator, terminator: terminator, to: &output)
 }
 
-@_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")
 internal func _print<Target : OutputStream>(
@@ -138,7 +137,6 @@ internal func _print<Target : OutputStream>(
   output.write(terminator)
 }
 
-@_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")
 internal func _debugPrint<Target : OutputStream>(

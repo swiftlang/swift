@@ -244,7 +244,6 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
-  @_versioned
   @warn_unused_result
   func getElement(i: Int) -> Element {
     _sanityCheck(i >= startIndex, "negative slice index is out of range")
