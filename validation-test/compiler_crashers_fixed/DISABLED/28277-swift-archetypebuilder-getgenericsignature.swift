@@ -7,7 +7,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN-DISABLED: not %target-swift-frontend %s -parse
+// DISABLED: not %target-swift-frontend %s -parse
 // REQUIRES: asserts
 {
 protocol A{

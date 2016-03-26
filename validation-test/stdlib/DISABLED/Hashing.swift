@@ -9,7 +9,7 @@
 // for it to be reliable and useful.
 //
 
-// RUN-DISABLED: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
 import Swift
