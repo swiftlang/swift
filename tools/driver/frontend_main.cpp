@@ -748,10 +748,9 @@ static bool performCompile(CompilerInstance &Instance,
         PrimaryFile = Instance.getMainModule()->getFiles()[Index];
       }
       SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
-                                None, opts.SILSerializeAll);
+                                None);
     } else {
       SM = performSILGeneration(Instance.getMainModule(), Invocation.getSILOptions(),
-                                opts.SILSerializeAll,
                                 true);
     }
   }
