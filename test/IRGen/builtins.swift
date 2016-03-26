@@ -703,9 +703,9 @@ func ispod_test() {
 }
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_unsafeGuaranteed_test
-// CHECK:  call void @swift_{{.*}}etain({{.*}}* %0)
-// CHECK:  call void @swift_{{.*}}elease({{.*}}* %0)
-// CHECK:  ret %objc_object* %0
+// CHECK:  call void @{{.*}}swift_{{.*}}etain({{.*}}* %0)
+// CHECK:  call void @{{.*}}swift_{{.*}}elease({{.*}}* %0)
+// CHECK:  ret {{.*}}* %0
 func generic_unsafeGuaranteed_test<T: AnyObject>(t : T) -> T {
   let (g, _) = Builtin.unsafeGuaranteed(t)
   return g
