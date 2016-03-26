@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
 
+// FIXME: SR-1701 test or compiler has an incorrect 64-bit dependency
+// UNSUPPORTED: PTRSIZE=32
+
 sil_stage canonical
 
 import Builtin
