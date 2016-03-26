@@ -195,6 +195,6 @@ internal func donotEliminate() {
 // CHECK: aliveWitness!1: @{{.*}}aliveWitness
 // CHECK: deadWitness!1: nil
 
-// CHECK-TESTING-LABEL: sil_witness_table Adopt: Prot
+// CHECK-TESTING-LABEL: sil_witness_table [fragile] Adopt: Prot
 // CHECK-TESTING: deadWitness{{.*}}: @{{.*}}deadWitness
 

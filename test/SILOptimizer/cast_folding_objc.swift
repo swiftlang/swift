@@ -62,8 +62,8 @@ func test0() -> Bool {
 // also performs conformance checks at runtime.
 // CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc30testBridgedCastFromObjCtoSwiftFCSo8NSStringSS
 // CHECK-NOT: {{ cast}}
-// CHECK: witness_method $String, #_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
 // CHECK: metatype $@thick String.Type
+// CHECK: function_ref @_TTWSSs21_ObjectiveCBridgeable10FoundationZFS_26_forceBridgeFromObjectiveCfTwx15_ObjectiveCType6resultRGSqx__T_
 // CHECK: apply
 // CHECK: return
 @inline(never)

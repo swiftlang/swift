@@ -1442,7 +1442,21 @@ public:
     if (!Conformance)
       return nullptr;
 
-    visitProtocolDecl(Conformance->getProtocol());
+    auto *proto = Conformance->getProtocol();
+    visitProtocolDecl(proto);
+
+    // Serialize the witness table in two cases:
+    // 1) We're serializing everything
+    // 2) The type has a fixed layout in all resilience domains, and the
+    //    conformance is externally visible
+    IsFragile_t isFragile = IsNotFragile;
+    if (SGM.makeModuleFragile)
+      isFragile = IsFragile;
+    if (auto nominal = Conformance->getInterfaceType()->getAnyNominal())
+      if (nominal->hasFixedLayout() &&
+          proto->getEffectiveAccess() == Accessibility::Public &&
+          nominal->getEffectiveAccess() == Accessibility::Public)
+        isFragile = IsFragile;
 
     // Check if we already have a declaration or definition for this witness
     // table.
@@ -1456,7 +1470,7 @@ public:
 
       // If we have a declaration, convert the witness table to a definition.
       if (wt->isDeclaration()) {
-        wt->convertToDefinition(Entries, SGM.makeModuleFragile);
+        wt->convertToDefinition(Entries, isFragile);
 
         // Since we had a declaration before, its linkage should be external,
         // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
@@ -1473,7 +1487,7 @@ public:
     }
 
     // Otherwise if we have no witness table yet, create it.
-    return SILWitnessTable::create(SGM.M, Linkage, SGM.makeModuleFragile,
+    return SILWitnessTable::create(SGM.M, Linkage, isFragile,
                                    Conformance, Entries);
   }
 
@@ -1795,10 +1809,16 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   if (witness.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
+  IsFragile_t isFragile = IsNotFragile;
+  if (makeModuleFragile)
+    isFragile = IsFragile;
+  if (witness.isFragile())
+    isFragile = IsFragile;
+
   auto *f = M.getOrCreateFunction(
       linkage, nameBuffer, witnessSILFnType,
-      witnessContextParams, SILLocation(witness.getDecl()), IsNotBare,
-      IsTransparent, makeModuleFragile ? IsFragile : IsNotFragile, IsThunk,
+      witnessContextParams, SILLocation(witness.getDecl()),
+      IsNotBare, IsTransparent, isFragile, IsThunk,
       SILFunction::NotRelevant, InlineStrategy);
 
   f->setDebugScope(new (M)
