@@ -63,6 +63,7 @@ public:
   StringRef str() const { return Pointer; }
   
   unsigned getLength() const {
+    assert(Pointer != nullptr && "Tried getting length of empty identifier");
     return ::strlen(Pointer);
   }
   
