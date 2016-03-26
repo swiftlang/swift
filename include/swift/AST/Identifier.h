@@ -66,7 +66,7 @@ public:
     return ::strlen(Pointer);
   }
   
-  bool empty() const { return Pointer == 0; }
+  bool empty() const { return Pointer == nullptr; }
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
