@@ -1,4 +1,5 @@
-// DISABLED because of Address Sanitizer failure: https://bugs.swift.org/browse/SR-1070
+// NOTE: This test does NOT run under Address Sanitizer because it triggers
+// a heap use-after-free (SR-1070).
 
 // This source file is part of the Swift.org open source project
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
@@ -7,8 +8,8 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// DISABLED: not %target-swift-frontend %s -parse
-// REQUIRES: asserts
+// RUN: not %target-swift-frontend %s -parse
+// REQUIRES: asserts, no_asan
 {
 protocol A{
 func<typealias e=b
