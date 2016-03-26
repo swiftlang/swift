@@ -24,6 +24,12 @@ namespace swift {
   constexpr const T& min(const T &a, const T &b) {
     return !(b < a) ? a : b;
   }
+  
+  /// Returns the maximum of `a` and `b`, or `a` if they are equivalent.
+  template <typename T>
+  constexpr const T& max(const T &a, const T &b) {
+    return (a < b) ? b : a;
+  }
 } // end namespace swift
 
 #endif /* SWIFT_BASIC_ALGORITHM_H */
