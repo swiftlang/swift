@@ -122,9 +122,10 @@ static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
 void Demangle::mangleIdentifier(const char *data, size_t length,
                                 OperatorKind operatorKind,
                                 std::string &out, bool usePunycode) {
-  DemanglerPrinter printer(out);
-  return ::mangleIdentifier(StringRef(data, length), operatorKind,
-                            usePunycode, printer);
+  DemanglerPrinter printer;
+  ::mangleIdentifier(StringRef(data, length), operatorKind,
+                     usePunycode, printer);
+  out = std::move(printer).str();
 }
 
 namespace {
@@ -1610,8 +1611,7 @@ void Remangler::mangleTypeList(Node *node) {
 std::string Demangle::mangleNode(const NodePointer &node) {
   if (!node) return "";
 
-  std::string str;
-  DemanglerPrinter printer(str);
+  DemanglerPrinter printer;
   Remangler(printer).mangle(node.get());
-  return str;
+  return std::move(printer).str();
 }
