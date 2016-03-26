@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_versioned
 struct _StringBufferIVars {
   internal init(_elementWidth: Int) {
     _sanityCheck(_elementWidth == 1 || _elementWidth == 2)

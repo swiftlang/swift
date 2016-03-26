@@ -100,6 +100,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 }
 
 // The class that implements the storage for a ContiguousArray<Element>
+@_versioned
 final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 
   deinit {

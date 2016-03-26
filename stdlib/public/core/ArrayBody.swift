@@ -17,6 +17,7 @@
 
 import SwiftShims
 
+@_versioned
 internal struct _ArrayBody {
   var _storage: _SwiftArrayBodyStorage
 
