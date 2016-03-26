@@ -103,10 +103,6 @@ public:
   
   size_t anonymousSymbolCounter = 0;
   
-  /// If true, all functions and globals are made fragile. Currently only used
-  /// for compiling the stdlib.
-  bool makeModuleFragile;
-  
   Optional<SILDeclRef> StringToNSStringFn;
   Optional<SILDeclRef> NSStringToStringFn;
   Optional<SILDeclRef> ArrayToNSArrayFn;
@@ -130,7 +126,7 @@ public:
   Optional<AssociatedTypeDecl*> BridgedObjectiveCType;
 
 public:
-  SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile);
+  SILGenModule(SILModule &M, Module *SM);
   ~SILGenModule();
   
   SILGenModule(SILGenModule const &) = delete;

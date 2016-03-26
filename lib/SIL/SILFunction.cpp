@@ -527,13 +527,13 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
   if (hasForeignBody())
     return true;
 
-  // This handles some kind of generated functions, like constructors
-  // of clang imported types.
-  // TODO: check why those functions are not fragile anyway and make
-  // a less conservative check here.
+  // If a shared function is not [fragile] and not a Clang-emitted
+  // 'static inline' function, it can only be referenced if its a
+  // [thunk]. Thunk bodies are emitted lazily by the SIL serializer
+  // when referenced from [fragile] functions.
   SILLinkage linkage = getLinkage();
   if (hasSharedVisibility(linkage))
-    return true;
+    return isThunk();
 
   // Otherwise, only public functions can be referenced.
   return hasPublicVisibility(linkage);
