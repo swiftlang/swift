@@ -1351,7 +1351,7 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   auto layout = BasicLayout::initialForValueType();
   performBasicLayout(layout, fieldTypes, numFields,
     [&](size_t i, const TypeLayout *fieldType, size_t offset) {
-      assignUnlessEqual(fieldOffsets[i], offset);
+      fieldOffsets[i] = offset;
     });
 
   vwtable->size = layout.size;

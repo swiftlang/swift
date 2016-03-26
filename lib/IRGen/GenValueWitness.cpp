@@ -1342,17 +1342,12 @@ bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
 
 static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                  CanType abstractType,
-                                 SmallVectorImpl<llvm::Constant*> &witnesses,
-                                 bool &canBeConstant) {
+                                 SmallVectorImpl<llvm::Constant*> &witnesses) {
   CanType concreteFormalType = getFormalTypeInContext(abstractType);
 
   auto concreteLoweredType = IGM.SILMod->Types.getLoweredType(concreteFormalType);
   auto &concreteTI = IGM.getTypeInfo(concreteLoweredType);
   FixedPacking packing = concreteTI.getFixedPacking(IGM);
-
-  // For now, assume that we never have any interest in dynamically
-  // changing the value witnesses for something that's fixed-layout.
-  canBeConstant = concreteTI.isFixedSize();
 
   addValueWitnesses(IGM, packing, abstractType,
                     concreteLoweredType, concreteTI, witnesses);
@@ -1367,15 +1362,14 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
          "emitting VWT for generic instance");
 
   SmallVector<llvm::Constant*, MaxNumValueWitnesses> witnesses;
-  bool canBeConstant = false;
-  addValueWitnessesForAbstractType(IGM, abstractType, witnesses, canBeConstant);
+  addValueWitnessesForAbstractType(IGM, abstractType, witnesses);
 
   auto tableTy = llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());
   auto table = llvm::ConstantArray::get(tableTy, witnesses);
 
   auto addr = IGM.getAddrOfValueWitnessTable(abstractType, table->getType());
   auto global = cast<llvm::GlobalVariable>(addr);
-  global->setConstant(canBeConstant);
+  global->setConstant(true);
   global->setInitializer(table);
 
   return llvm::ConstantExpr::getBitCast(global, IGM.WitnessTablePtrTy);
@@ -1477,8 +1471,7 @@ void irgen::emitDependentValueWitnessTablePattern(IRGenModule &IGM,
   assert(hasDependentValueWitnessTable(IGM, abstractType) &&
          "emitting VWT pattern for fixed-layout type");
 
-  bool canBeConstant = false;
-  addValueWitnessesForAbstractType(IGM, abstractType, fields, canBeConstant);
+  addValueWitnessesForAbstractType(IGM, abstractType, fields);
 }
 
 FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
