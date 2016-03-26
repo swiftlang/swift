@@ -1066,14 +1066,42 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
         maybeAddForeignErrorArg();
 
-        SILType foreignArgTy =
-          foreignFnTy->getParameters()[foreignArgIndex++].getSILType();
-        CanType foreignArgValueTy = foreignArgTy.getSwiftRValueType();
-        foreignArgValueTy =
-            CanType(ArchetypeBuilder::mapTypeIntoContext(fd, foreignArgValueTy));
-        args.push_back(emitNativeToBridgedValue(fd, param,
-                                  SILFunctionTypeRepresentation::CFunctionPointer,
-                                  foreignArgValueTy));
+        bool isSelf = nativeParamIndex == params.size() - 1;
+
+        if (memberStatus.isInstance()) {
+          // Leave space for `self` to be filled in later.
+          if (foreignArgIndex == memberStatus.getSelfIndex()) {
+            args.push_back({});
+            foreignArgIndex++;
+          }
+          
+          // Use the `self` space we skipped earlier if it's time.
+          if (isSelf) {
+            foreignArgIndex = memberStatus.getSelfIndex();
+          }
+        } else if (memberStatus.isStatic() && isSelf) {
+          // Lose a static `self` parameter.
+          break;
+        }
+
+        auto foreignParam = foreignFnTy->getParameters()[foreignArgIndex++];
+        SILType foreignArgTy = foreignParam.getSILType();
+        auto bridged = emitNativeToBridgedValue(fd, param,
+                                SILFunctionTypeRepresentation::CFunctionPointer,
+                                foreignArgTy.getSwiftRValueType());
+        // Handle C pointer arguments imported as indirect `self` arguments.
+        if (foreignParam.getConvention() == ParameterConvention::Indirect_In) {
+          auto temp = emitTemporaryAllocation(fd, bridged.getType());
+          bridged.forwardInto(*this, fd, temp);
+          bridged = emitManagedBufferWithCleanup(temp);
+        }
+        
+        if (memberStatus.isInstance() && isSelf) {
+          // Fill in the `self` space.
+          args[memberStatus.getSelfIndex()] = bridged;
+        } else {
+          args.push_back(bridged);
+        }
       }
     }
 
