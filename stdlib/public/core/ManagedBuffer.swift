@@ -220,6 +220,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// _debugPreconditions in _checkValidBufferClass for any array. Since we know
   /// for the _ContiguousArrayBuffer that this check must always succeed we omit
   /// it in this specialized constructor.
+  @_versioned
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._sanityCheckValidBufferClass(buffer.dynamicType)
     self._nativeBuffer = Builtin.castToNativeObject(buffer)
@@ -327,6 +328,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Internal version for use by _ContiguousArrayBuffer.init where we know that
   /// we have a valid buffer class and that the capacity is >= 0.
+  @_versioned
   internal init(
     _uncheckedBufferClass: AnyClass,
     minimumCapacity: Int
