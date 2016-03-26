@@ -127,7 +127,9 @@ public:
     return !empty() && isEditorPlaceholder(str());
   }
   
-  void *getAsOpaquePointer() const { return (void *)Pointer; }
+  const void *getAsOpaquePointer() const {
+      return static_cast<const void *>(Pointer);
+  }
   
   static Identifier getFromOpaquePointer(void *P) {
     return Identifier((const char*)P);
