@@ -1841,7 +1841,7 @@ public func checkStrideable<
 }
 
 public func nthIndex<C: Collection>(x: C, _ n: Int) -> C.Index {
-  return x.advance(x.startIndex, by: numericCast(n))
+  return x.index(numericCast(n), stepsFrom: x.startIndex)
 }
 
 public func nth<C: Collection>(x: C, _ n: Int) -> C.Iterator.Element {

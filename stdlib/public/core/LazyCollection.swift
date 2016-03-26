@@ -174,13 +174,13 @@ extension LazyCollection : Collection {
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func advance(i: Index, by n: Base.IndexDistance) -> Index {
-    return _base.advance(i, by: n)
+    return _base.index(n, stepsFrom: i)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func advance(i: Index, by n: Base.IndexDistance, limit: Index) -> Index {
-    return _base.advance(i, by: n, limit: limit)
+    return _base.index(n, stepsFrom: i, limit: limit)
   }
 
   // TODO: swift-3-indexing-model - add docs

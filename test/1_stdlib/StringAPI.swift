@@ -319,8 +319,8 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
 
   expectEqual("\u{fffd}\u{1f602}\u{fffd}",
     acceptor[
-      donor.advance(donor.startIndex, by: 1) ..<
-      donor.advance(donor.startIndex, by: 5)
+      donor.index(1, stepsFrom: donor.startIndex) ..<
+      donor.index(5, stepsFrom: donor.startIndex)
     ]
   )
 }

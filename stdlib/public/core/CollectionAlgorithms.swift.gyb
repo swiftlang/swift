@@ -154,7 +154,7 @@ ${orderingRequirementForComparable}
       return unsafeBufferPivot - bufferPointer.startIndex
     }
     if let offset = maybeOffset {
-      return advance(startIndex, by: numericCast(offset))
+      return index(numericCast(offset), stepsFrom: startIndex)
     }
 
 %   if preds:

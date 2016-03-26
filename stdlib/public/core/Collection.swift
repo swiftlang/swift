@@ -613,7 +613,7 @@ extension Collection {
   @warn_unused_result
   public func dropFirst(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-    let start = advance(startIndex, by: numericCast(n), limit: endIndex)
+    let start = index(numericCast(n), stepsFrom: startIndex, limit: endIndex)
     return self[start..<endIndex]
   }
 
@@ -626,7 +626,7 @@ extension Collection {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
-    let end = advance(startIndex, by: numericCast(amount), limit: endIndex)
+    let end = index(numericCast(amount), stepsFrom: startIndex, limit: endIndex)
     return self[startIndex..<end]
   }
 
@@ -643,7 +643,7 @@ extension Collection {
     _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
-    let end = advance(startIndex, by: numericCast(maxLength), limit: endIndex)
+    let end = index(numericCast(maxLength), stepsFrom: startIndex, limit: endIndex)
     return self[startIndex..<end]
   }
 
@@ -661,7 +661,7 @@ extension Collection {
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
     let amount = Swift.max(0, numericCast(count) - maxLength)
-    let start = advance(startIndex, by: numericCast(amount), limit: endIndex)
+    let start = index(numericCast(amount), stepsFrom: startIndex, limit: endIndex)
     return self[start..<endIndex]
   }
 
@@ -808,7 +808,7 @@ extension Collection where SubSequence == Self {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
-    self = self[advance(startIndex, by: numericCast(n))..<endIndex]
+    self = self[index(numericCast(n), stepsFrom: startIndex)..<endIndex]
   }
 }
 

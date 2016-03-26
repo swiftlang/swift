@@ -634,12 +634,12 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
 
   public subscript(i: MinimalIndex) -> T {
     get {
-      _expectCompatibleIndices(advance(startIndex, by: i.position), i)
+      _expectCompatibleIndices(index(i.position, stepsFrom: startIndex), i)
       return _elements[i.position]
     }
 %     if Mutable:
     set {
-      _expectCompatibleIndices(advance(startIndex, by: i.position), i)
+      _expectCompatibleIndices(index(i.position, stepsFrom: startIndex), i)
       _elements[i.position] = newValue
     }
 %     end

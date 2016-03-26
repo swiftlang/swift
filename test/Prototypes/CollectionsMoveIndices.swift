@@ -601,7 +601,7 @@ extension MyForwardCollectionType {
   @warn_unused_result
   public func dropFirst(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-    let start = advance(startIndex, by: numericCast(n), limit: endIndex)
+    let start = index(numericCast(n), stepsFrom: startIndex, limit: endIndex)
     return self[start..<*endIndex]
   }
 
@@ -609,14 +609,14 @@ extension MyForwardCollectionType {
   public func dropLast(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = max(0, numericCast(count) - n)
-    let end = advance(startIndex, by: numericCast(amount), limit: endIndex)
+    let end = index(numericCast(amount), stepsFrom: startIndex, limit: endIndex)
     return self[startIndex..<*end]
   }
 
   @warn_unused_result
   public func prefix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a prefix of negative length from a collection")
-    let end = advance(startIndex, by: numericCast(maxLength), limit: endIndex)
+    let end = index(numericCast(maxLength), stepsFrom: startIndex, limit: endIndex)
     return self[startIndex..<*end]
   }
 
@@ -624,7 +624,7 @@ extension MyForwardCollectionType {
   public func suffix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
     let amount = max(0, numericCast(count) - maxLength)
-    let start = advance(startIndex, by: numericCast(amount), limit: endIndex)
+    let start = index(numericCast(amount), stepsFrom: startIndex, limit: endIndex)
     return self[start..<*endIndex]
   }
 }
@@ -670,7 +670,7 @@ extension MyForwardCollectionType
 
   @warn_unused_result
   public func successor(of i: Index) -> Index {
-    return advance(i, by: 1)
+    return index(1, stepsFrom: i)
   }
 
   @warn_unused_result
@@ -781,7 +781,7 @@ extension MyBidirectionalCollectionType
 
   @warn_unused_result
   public func predecessor(of i: Index) -> Index {
-    return advance(i, by: -1)
+    return index(-1, stepsFrom: i)
   }
 
   @warn_unused_result
@@ -1287,7 +1287,7 @@ extension MyRandomAccessCollectionType
     var subrangeCount = count
     while subrangeCount != 0 {
       let midOffset = subrangeCount / 2
-      let mid = advance(low, by: midOffset)
+      let mid = index(midOffset, stepsFrom: low)
       if isOrderedBefore(self[mid], element) {
         low = successor(of: mid)
         subrangeCount -= midOffset + 1

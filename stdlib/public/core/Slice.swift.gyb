@@ -137,12 +137,12 @@ public struct ${Self}<Base : ${BaseRequirements}>
 
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
-    return _base.advance(i, by: n)
+    return _base.index(n, stepsFrom: i)
   }
 
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
-    return _base.advance(i, by: n, limit: limit)
+    return _base.index(n, stepsFrom: i, limit: limit)
   }
 
   @warn_unused_result

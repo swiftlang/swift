@@ -133,7 +133,7 @@ struct InstrumentedCollection<
 
   func advance(i: Index, by n: IndexDistance) -> Index {
     callCounts["advance(_:by:)"]! += 1
-    return base.advance(i, by: n)
+    return base.index(n, stepsFrom: i)
   }
 
   func distance(from start: Index, to end: Index) -> IndexDistance {

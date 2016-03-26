@@ -420,13 +420,13 @@ public struct ${Self}<
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
     Log.advance[selfType] += 1
-    return base.advance(i, by: n)
+    return base.index(n, stepsFrom: i)
   }
 
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
     Log.advanceLimit[selfType] += 1
-    return base.advance(i, by: n, limit: limit)
+    return base.index(n, stepsFrom: i, limit: limit)
   }
 
   @warn_unused_result

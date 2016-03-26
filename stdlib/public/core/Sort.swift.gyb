@@ -227,7 +227,7 @@ func _siftDown<
   if countToIndex + 1 >= countFromIndex {
     return
   }
-  let left = elements.advance(index, by: countToIndex + 1)
+  let left = elements.index(countToIndex + 1, stepsFrom: index)
   var largest = index
   if ${cmp("elements[largest]", "elements[left]", p)} {
     largest = left
@@ -265,9 +265,9 @@ func _heapify<
   // We skip the rightmost half of the array, because these nodes don't have
   // any children.
   let root = range.lowerBound
-  var node = elements.advance(
-    root,
-    by: elements.distance(from: range.lowerBound, to: range.upperBound) / 2)
+  var node = elements.index(elements.distance(from: range.lowerBound, to: range.upperBound) / 2,
+    stepsFrom: 
+    root)
   while node != root {
     elements.formPredecessor(&node)
     _siftDown(

@@ -23,8 +23,8 @@ public struct SubscriptRangeTest {
 
   public func bounds<C : Collection>(in c: C) -> Range<C.Index> {
     let i = c.startIndex
-    return c.advance(i, by: numericCast(bounds.lowerBound)) ..<
-           c.advance(i, by: numericCast(bounds.upperBound))
+    return c.index(numericCast(bounds.lowerBound), stepsFrom: i) ..<
+           c.index(numericCast(bounds.upperBound), stepsFrom: i)
   }
 
   public init(
@@ -378,10 +378,10 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .none {
     let index = c.endIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      _blackHole(c.advance(index, by: numericCast(outOfBoundsIndexOffset)))
+      _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
     } else {
       expectFailure {
-        _blackHole(c.advance(index, by: numericCast(outOfBoundsIndexOffset)))
+        _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
       }
     }
   }
@@ -391,10 +391,10 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .none {
     let index = c.endIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      _blackHole(c.advance(index, by: numericCast(outOfBoundsIndexOffset)))
+      _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
     } else {
       expectFailure {
-        _blackHole(c.advance(index, by: numericCast(outOfBoundsIndexOffset)))
+        _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
       }
     }
   }
@@ -410,11 +410,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
         _blackHole(c[index])
       }
     }
@@ -425,11 +425,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
         _blackHole(c[index])
       }
     }
@@ -464,11 +464,11 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     var index = c.endIndex
     if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
       _blackHole(c[index..<index])
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
         _blackHole(c[index..<index])
       }
     }
@@ -479,11 +479,11 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     var index = c.endIndex
     if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
       _blackHole(c[index..<index])
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
         _blackHole(c[index..<index])
       }
     }
@@ -678,7 +678,7 @@ self.test("\(testNamePrefix).split/semantics") {
 self.test("\(testNamePrefix).prefix(through:)/semantics") {
   for test in prefixThroughTests {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    let index = c.advance(c.startIndex, by: numericCast(test.position))
+    let index = c.index(numericCast(test.position), stepsFrom: c.startIndex)
     let result = c.prefix(through: index)
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
@@ -692,7 +692,7 @@ self.test("\(testNamePrefix).prefix(through:)/semantics") {
 self.test("\(testNamePrefix).prefix(upTo:)/semantics") {
   for test in prefixUpToTests {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    let index = c.advance(c.startIndex, by: numericCast(test.end))
+    let index = c.index(numericCast(test.end), stepsFrom: c.startIndex)
     let result = c.prefix(upTo: index)
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
@@ -706,7 +706,7 @@ self.test("\(testNamePrefix).prefix(upTo:)/semantics") {
 self.test("\(testNamePrefix).suffix(from:)/semantics") {
   for test in suffixFromTests {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    let index = c.advance(c.startIndex, by: numericCast(test.start))
+    let index = c.index(numericCast(test.start), stepsFrom: c.startIndex)
     let result = c.suffix(from: index)
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
@@ -763,7 +763,7 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/slice/semantics") {
     var slice = c[c.startIndex..<c.endIndex]
     let survivingIndices = _allIndices(
       into: slice,
-      in: slice.advance(slice.startIndex, by: numericCast(test.numberToRemove)) ..<
+      in: slice.index(numericCast(test.numberToRemove), stepsFrom: slice.startIndex) ..<
         slice.endIndex
     )
     slice.removeFirst(test.numberToRemove)
@@ -945,7 +945,7 @@ self.test("\(testNamePrefix).removeLast()/slice/semantics") {
     let survivingIndices = _allIndices(
       into: slice,
       in: slice.startIndex ..<
-        slice.advance(slice.endIndex, by: numericCast(-test.numberToRemove))
+        slice.index(numericCast(-test.numberToRemove), stepsFrom: slice.endIndex)
     )
     let removedElement = slice.removeLast()
     expectEqual(
@@ -989,7 +989,7 @@ self.test("\(testNamePrefix).removeLast(n: Int)/slice/semantics") {
     let survivingIndices = _allIndices(
       into: slice,
       in: slice.startIndex ..<
-        slice.advance(slice.endIndex, by: numericCast(-test.numberToRemove))
+        slice.index(numericCast(-test.numberToRemove), stepsFrom: slice.endIndex)
     )
     slice.removeLast(test.numberToRemove)
     expectEqualSequence(
@@ -1045,7 +1045,7 @@ self.test("\(testNamePrefix).popLast()/slice/semantics") {
     let survivingIndices = _allIndices(
       into: slice,
       in: slice.startIndex ..<
-        slice.advance(slice.endIndex, by: numericCast(-test.numberToRemove))
+        slice.index(numericCast(-test.numberToRemove), stepsFrom: slice.endIndex)
     )
     let removedElement = slice.popLast()!
     expectEqual(
@@ -1088,10 +1088,10 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .none {
     let index = c.startIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      _blackHole(c.advance(index, by: numericCast(-outOfBoundsIndexOffset)))
+      _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
     } else {
       expectFailure {
-        _blackHole(c.advance(index, by: numericCast(-outOfBoundsIndexOffset)))
+        _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
       }
     }
   }
@@ -1101,10 +1101,10 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .none {
     let index = c.startIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      _blackHole(c.advance(index, by: numericCast(-outOfBoundsIndexOffset)))
+      _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
     } else {
       expectFailure {
-        _blackHole(c.advance(index, by: numericCast(-outOfBoundsIndexOffset)))
+        _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
       }
     }
   }
@@ -1120,11 +1120,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
         _blackHole(c[index])
       }
     }
@@ -1135,11 +1135,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
         _blackHole(c[index])
       }
     }
@@ -1156,11 +1156,11 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     var index = c.startIndex
     if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
       _blackHole(c[index..<index])
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
         _blackHole(c[index..<index])
       }
     }
@@ -1171,11 +1171,11 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     var index = c.startIndex
     if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
       _blackHole(c[index..<index])
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
         _blackHole(c[index..<index])
       }
     }

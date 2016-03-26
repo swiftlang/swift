@@ -446,9 +446,9 @@ extension Mirror {
         position = children.index { $0.label == label } ?? children.endIndex
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
-        position = children.advance(
+        position = children.index(offset,
+          stepsFrom: 
           children.startIndex,
-          by: offset,
           limit: children.endIndex)
       }
       else {

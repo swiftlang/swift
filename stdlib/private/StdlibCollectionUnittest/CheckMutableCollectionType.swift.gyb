@@ -153,11 +153,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }
@@ -168,11 +168,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }
@@ -517,11 +517,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }
@@ -532,11 +532,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
-      index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = c.advance(index, by: numericCast(-outOfBoundsSubscriptOffset))
+        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }

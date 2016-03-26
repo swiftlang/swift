@@ -399,13 +399,13 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
-    return _elements.advance(i, by: n)
+    return _elements.index(n, stepsFrom: i)
   }
 
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
-    return _elements.advance(i, by: n, limit: limit)
+    return _elements.index(n, stepsFrom: i, limit: limit)
   }
 
   // TODO: swift-3-indexing-model - add docs

@@ -291,7 +291,7 @@ extension RangeReplaceableCollection {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it has")
-    let end = advance(startIndex, by: numericCast(n))
+    let end = index(numericCast(n), stepsFrom: startIndex)
     removeSubrange(startIndex..<end)
   }
 
@@ -336,7 +336,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
-    self = self[advance(startIndex, by: numericCast(n))..<endIndex]
+    self = self[index(numericCast(n), stepsFrom: startIndex)..<endIndex]
   }
 }
 
@@ -386,7 +386,7 @@ extension RangeReplaceableCollection
 
   @warn_unused_result
   public mutating func _customRemoveLast(n: Int) -> Bool {
-    self = self[startIndex..<advance(endIndex, by: numericCast(-n))]
+    self = self[startIndex..<index(numericCast(-n), stepsFrom: endIndex)]
     return true
   }
 }
@@ -417,7 +417,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
       return
     }
     let end = endIndex
-    removeSubrange(advance(end, by: numericCast(-n))..<end)
+    removeSubrange(index(numericCast(-n), stepsFrom: end)..<end)
   }
 }
 
@@ -453,7 +453,7 @@ extension RangeReplaceableCollection
       return
     }
     let end = endIndex
-    removeSubrange(advance(end, by: numericCast(-n))..<end)
+    removeSubrange(index(numericCast(-n), stepsFrom: end)..<end)
   }
 }
 

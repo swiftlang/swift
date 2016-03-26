@@ -29,7 +29,7 @@ import ObjectiveC
 
 extension Collection {
   func indexAt(offset offset: Int) -> Index {
-    return self.advance(self.startIndex, by: numericCast(offset))
+    return self.index(numericCast(offset), stepsFrom: self.startIndex)
   }
 }
 
@@ -164,13 +164,13 @@ Index.test("${TraversalCollection}/distance(to:)/dispatch") {
 
 Index.test("${TraversalCollection}/advance(_:by:)/dispatch") {
   let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
-  _ = c.advance(c.startIndex, by: 10)
+  _ = c.index(10, stepsFrom: c.startIndex)
   expectCustomizable(c, c.log.advance)
 }
 
 Index.test("${TraversalCollection}/advance(_:by:limit:)/dispatch") {
   let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
-  _ = c.advance(c.startIndex, by: 10, limit: 5)
+  _ = c.index(10, stepsFrom: c.startIndex, limit: 5)
   expectCustomizable(c, c.log.advanceLimit)
 }
 
@@ -261,7 +261,7 @@ Index.test(
     let c = ${Kind}Collection(Array(0..<10))
 
     let i = c.indexAt(offset: test.startIndex)
-    let result  = c.advance(i, by: test.distance)
+    let result  = c.index(test.distance, stepsFrom: i)
     expectEqual(0, c.timesSuccessorCalled.value)
     expectEqual(0, c.timesPredecessorCalled.value)
   }
@@ -276,7 +276,7 @@ Index.test(
 
     let i = c.indexAt(offset: test.startIndex)
     let limit = c.indexAt(offset: test.limit.unsafelyUnwrapped)
-    let result  = c.advance(i, by: test.distance, limit: limit)
+    let result  = c.index(test.distance, stepsFrom: i, limit: limit)
     expectEqual(0, c.timesSuccessorCalled.value)
     expectEqual(0, c.timesPredecessorCalled.value)
   }
