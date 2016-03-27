@@ -55,33 +55,6 @@ func test0() -> Bool {
   return cast0(NSNumber(integer:1))
 }
 
-// Check that compiler understands that this cast always succeeds.
-// Since it is can be statically proven that NSString is bridgeable to String,
-// _forceBridgeFromObjectiveC from String should be invoked instead of
-// a more general, but less effective swift_bridgeNonVerbatimFromObjectiveC, which
-// also performs conformance checks at runtime.
-// CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc30testBridgedCastFromObjCtoSwiftFCSo8NSStringSS
-// CHECK-NOT: {{ cast}}
-// CHECK: witness_method $String, #_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
-// CHECK: metatype $@thick String.Type
-// CHECK: apply
-// CHECK: return
-@inline(never)
-public func testBridgedCastFromObjCtoSwift(ns: NSString) -> String {
-  return ns as String
-}
-
-// Check that compiler understands that this cast always succeeds
-// CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc30testBridgedCastFromSwiftToObjCFSSCSo8NSString
-// CHECK-NOT: {{ cast}}
-// CHECK: function_ref @_TFE10FoundationSS19_bridgeToObjectiveC
-// CHECK: apply
-// CHECK: return
-@inline(never)
-public func testBridgedCastFromSwiftToObjC(s: String) -> NSString {
-  return s as NSString
-}
-
 // Check that this cast does not get eliminated, because
 // the compiler does not statically know if this object
 // is NSNumber can be converted into Int.
@@ -103,6 +76,8 @@ public func testMayBeBridgedCastFromObjCtoSwift(o: AnyObject) -> Int {
 public func testConditionalBridgedCastFromObjCtoSwift(o: AnyObject) -> String? {
   return o as? String
 }
+
+
 
 public func castObjCToSwift<T>(t: T) -> Int {
   return t as! Int
@@ -268,5 +243,35 @@ public func testCastEveryToEveryType<T, U>(o: U) -> T.Type {
 public func testCastEveryToNonClassType<T>(o: T) -> Int.Type {
   return o as! Int.Type
 }
+
+
+// Check that compiler understands that this cast always succeeds.
+// Since it is can be statically proven that NSString is bridgeable to String,
+// _forceBridgeFromObjectiveC from String should be invoked instead of
+// a more general, but less effective swift_bridgeNonVerbatimFromObjectiveC, which
+// also performs conformance checks at runtime.
+// CHECK-LABEL: sil [noinline] @_TTSf4g___TF17cast_folding_objc30testBridgedCastFromObjCtoSwiftFCSo8NSStringSS
+// CHECK-NOT: {{ cast}}
+// CHECK: witness_method $String, #_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
+// CHECK: metatype $@thick String.Type
+// CHECK: apply
+// CHECK: return
+@inline(never)
+public func testBridgedCastFromObjCtoSwift(ns: NSString) -> String {
+  return ns as String
+}
+
+// Check that compiler understands that this cast always succeeds
+// CHECK-LABEL: sil [noinline] @_TTSf4gs___TF17cast_folding_objc30testBridgedCastFromSwiftToObjCFSSCSo8NSString
+// CHECK-NOT: {{ cast}}
+// CHECK: function_ref @_TFE10FoundationSS19_bridgeToObjectiveC
+// CHECK: apply
+// CHECK: return
+@inline(never)
+public func testBridgedCastFromSwiftToObjC(s: String) -> NSString {
+  return s as NSString
+}
+
+
 
 print("test0=\(test0())")

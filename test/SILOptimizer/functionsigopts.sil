@@ -53,6 +53,26 @@ sil @use_Int : $@convention(thin) (Int) -> ()
 sil [fragile] @user : $@convention(thin) (Builtin.NativeObject) -> ()
 sil [fragile] @create_object : $@convention(thin) () -> Builtin.NativeObject
 
+// Make sure argument is exploded and the baz part is not passed in as argument, as its only use
+// is a release.
+//
+// CHECK-LABEL: sil [thunk] [always_inline] @function_with_no_callsite  
+// CHECK: [[IN:%.*]] = function_ref @_TTSf4gs__function_with_no_callsite
+// CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $boo, #boo.a
+// CHECK: apply [[IN]]([[IN2]]) 
+sil @function_with_no_callsite : $@convention(thin) (@owned boo) -> (Int, Int) {
+bb0(%0 : $boo):
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  release_value  %1 : $baz
+  %4 = tuple (%2  : $Int, %2 : $Int)
+  return %4 : $(Int, Int)
+}
+
 
 // Make sure argument is exploded and the baz part is not passed in as argument, as its only use
 // is a release.

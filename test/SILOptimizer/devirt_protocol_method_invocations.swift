@@ -39,13 +39,36 @@ func callGetSelf(f: Foo) -> Foo {
   return f.getSelf()
 }
 
+// Check that methods returning Self are not devirtualized and do not crash the compiler.
+// CHECK-LABEL: sil [noinline] @_TF34devirt_protocol_method_invocations70test_devirt_protocol_extension_method_invocation_with_self_return_typeFCS_1CPS_3Foo_
+// CHECK: init_existential_addr
+// CHECK: open_existential_addr
+// CHECK: return
+@inline(never)
+public func test_devirt_protocol_extension_method_invocation_with_self_return_type(c: C) -> Foo {
+  return callGetSelf(c)
+}
+
+// It's not obvious why this isn't completely devirtualized.
+// CHECK: sil @_TF34devirt_protocol_method_invocations12test24114020FT_Si
+// CHECK:   [[T0:%.*]] = alloc_stack $SimpleBase
+// CHECK:   [[T1:%.*]] = witness_method $SimpleBase, #Base.x!getter.1 
+// CHECK:   [[T2:%.*]] = apply [[T1]]<SimpleBase>([[T0]])
+// CHECK:   return [[T2]]
+
+// CHECK: sil @_TF34devirt_protocol_method_invocations14testExMetatypeFT_Si
+// CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
+// CHECK:   [[T1:%.*]] = builtin {{.*}}([[T0]]
+// CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : {{.*}})
+// CHECK:   return [[T2]] : $Int
+
 // Check that calls to f.foo() get devirtualized and are not invoked
 // via the expensive witness_method instruction.
 // To achieve that the information about a concrete type C should
 // be propagated from init_existential_addr into witness_method and 
 // apply instructions.
 
-// CHECK-LABEL: sil [noinline] @_TF34devirt_protocol_method_invocations38test_devirt_protocol_method_invocationFCS_1CSi 
+// CHECK-LABEL: sil [noinline] @_TTSf4g___TF34devirt_protocol_method_invocations38test_devirt_protocol_method_invocationFCS_1CSi
 // CHECK-NOT: witness_method
 // CHECK: checked_cast
 // CHECK-NOT: checked_cast
@@ -76,7 +99,7 @@ public func test_devirt_protocol_method_invocation(c: C) -> Int {
 // In fact, the call is expected to be inlined and then constant-folded
 // into a single integer constant.
 
-// CHECK-LABEL: sil [noinline] @_TF34devirt_protocol_method_invocations48test_devirt_protocol_extension_method_invocationFCS_1CVs5Int32
+// CHECK-LABEL: sil [noinline] @_TTSf4dg___TF34devirt_protocol_method_invocations48test_devirt_protocol_extension_method_invocationFCS_1CVs5Int32
 // CHECK-NOT: checked_cast
 // CHECK-NOT: open_existential
 // CHECK-NOT: witness_method
@@ -86,16 +109,6 @@ public func test_devirt_protocol_method_invocation(c: C) -> Int {
 @inline(never)
 public func test_devirt_protocol_extension_method_invocation(c: C) -> Int32 {
   return callboo(c)
-}
-
-// Check that methods returning Self are not devirtualized and do not crash the compiler.
-// CHECK-LABEL: sil [noinline] @_TF34devirt_protocol_method_invocations70test_devirt_protocol_extension_method_invocation_with_self_return_typeFCS_1CPS_3Foo_
-// CHECK: init_existential_addr
-// CHECK: open_existential_addr
-// CHECK: return
-@inline(never)
-public func test_devirt_protocol_extension_method_invocation_with_self_return_type(c: C) -> Foo {
-  return callGetSelf(c)
 }
 
 
@@ -144,12 +157,6 @@ public func test24114020() -> Int {
   let base: Derived = SimpleBase(x: 1)
   return base.x
 }
-// It's not obvious why this isn't completely devirtualized.
-// CHECK: sil @_TF34devirt_protocol_method_invocations12test24114020FT_Si
-// CHECK:   [[T0:%.*]] = alloc_stack $SimpleBase
-// CHECK:   [[T1:%.*]] = witness_method $SimpleBase, #Base.x!getter.1 
-// CHECK:   [[T2:%.*]] = apply [[T1]]<SimpleBase>([[T0]])
-// CHECK:   return [[T2]]
 
 protocol StaticP {
   static var size: Int { get }
@@ -161,8 +168,4 @@ public func testExMetatype() -> Int {
   let type: StaticP.Type = HasStatic<Int>.self
   return type.size
 }
-// CHECK: sil @_TF34devirt_protocol_method_invocations14testExMetatypeFT_Si
-// CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
-// CHECK:   [[T1:%.*]] = builtin {{.*}}([[T0]]
-// CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : {{.*}})
-// CHECK:   return [[T2]] : $Int
+

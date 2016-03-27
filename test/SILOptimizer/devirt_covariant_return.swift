@@ -105,6 +105,37 @@ func driver() -> () {
 
 driver()
 
+public class Bear {
+  public init?(fail: Bool) {
+    if fail { return nil }
+  }
+
+  // Check that devirtualizer can handle convenience initializers, which have covariant optional
+  // return types.
+  // CHECK-LABEL: sil @_TFC23devirt_covariant_return4Bearc
+  // CHECK: checked_cast_br [exact] %{{.*}} : $Bear to $PolarBear
+  // CHECK: upcast %{{.*}} : $Optional<PolarBear> to $Optional<Bear>
+  // CHECK: }
+  public convenience init?(delegateFailure: Bool, failAfter: Bool) {
+    self.init(fail: delegateFailure)
+    if failAfter { return nil }
+  }
+}
+
+final class PolarBear: Bear {
+
+  override init?(fail: Bool) {
+    super.init(fail: fail)
+  }
+
+  init?(chainFailure: Bool, failAfter: Bool) {
+    super.init(fail: chainFailure)
+    if failAfter { return nil }
+  }
+}
+
+
+
 
 class Payload {
   let value: Int32
@@ -148,7 +179,7 @@ final class C2:C {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver1FCS_2C1Vs5Int32 :
+// CHECK-LABEL: sil hidden @_TTSf4dg___TF23devirt_covariant_return7driver1FCS_2C1Vs5Int32
 // CHECK: integer_literal $Builtin.Int32, 2
 // CHECK: struct $Int32 (%{{.*}} : $Builtin.Int32)
 // CHECK-NOT: class_method
@@ -161,7 +192,7 @@ func driver1(c: C1) -> Int32 {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver3FCS_1CVs5Int32 :
+// CHECK-LABEL: sil hidden @_TTSf4g___TF23devirt_covariant_return7driver3FCS_1CVs5Int32
 // CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : $C2):
 // CHECK-NOT: bb{{.*}}:
 // check that for C2, we convert the non-optional result into an optional and then cast.
@@ -170,35 +201,6 @@ func driver1(c: C1) -> Int32 {
 // CHECK: return
 func driver3(c: C) -> Int32 {
   return c.doSomething()!.getValue()
-}
-
-public class Bear {
-  public init?(fail: Bool) {
-    if fail { return nil }
-  }
-
-  // Check that devirtualizer can handle convenience initializers, which have covariant optional
-  // return types.
-  // CHECK-LABEL: sil @_TFC23devirt_covariant_return4Bearc
-  // CHECK: checked_cast_br [exact] %{{.*}} : $Bear to $PolarBear
-  // CHECK: upcast %{{.*}} : $Optional<PolarBear> to $Optional<Bear>
-  // CHECK: }
-  public convenience init?(delegateFailure: Bool, failAfter: Bool) {
-    self.init(fail: delegateFailure)
-    if failAfter { return nil }
-  }
-}
-
-final class PolarBear: Bear {
-
-  override init?(fail: Bool) {
-    super.init(fail: fail)
-  }
-
-  init?(chainFailure: Bool, failAfter: Bool) {
-    super.init(fail: chainFailure)
-    if failAfter { return nil }
-  }
 }
 
 public class D {
@@ -230,7 +232,7 @@ public class D2: D1 {
 
 // Check that the boo call gets properly devirtualized and that
 // that D2.foo() is inlined thanks to this.
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver2FCS_2D2Vs5Int32
+// CHECK-LABEL: sil hidden @_TTSf4g___TF23devirt_covariant_return7driver2FCS_2D2Vs5Int32
 // CHECK-NOT: class_method
 // CHECK: checked_cast_br [exact] %{{.*}} : $D1 to $D2
 // CHECK: bb2
@@ -274,7 +276,7 @@ class EEE : CCC {
 
 // Check that c.foo() is devirtualized, because the optimizer can handle the casting the return type
 // correctly, i.e. it can cast (BBB, BBB) into (AAA, AAA)
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return37testDevirtOfMethodReturningTupleTypesFTCS_3CCC1bCS_2BB_TCS_2AAS2__
+// CHECK-LABEL: sil hidden @_TTSf4g_n___TF23devirt_covariant_return37testDevirtOfMethodReturningTupleTypesFTCS_3CCC1bCS_2BB_TCS_2AAS2__
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $CCC
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $EEE
@@ -311,16 +313,18 @@ class DDDD : CCCC {
   }
 }
 
-// Check that c.foo OSX 10.9 be devirtualized, because the optimizer can handle the casting the return type
-// correctly, i.e. it cannot cast (BBBB, BBBB) into (AAAA, AAAA)
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return38testDevirtOfMethodReturningTupleTypes2FCS_4CCCCTCS_4AAAAS1__
-// CHECK: checked_cast_br [exact] %{{.*}} : $CCCC to $CCCC
-// CHECK: checked_cast_br [exact] %{{.*}} : $CCCC to $DDDD
-// CHECK: class_method
-// CHECK: }
-func testDevirtOfMethodReturningTupleTypes2(c: CCCC) -> (AAAA, AAAA) {
-  return c.foo
+// Check devirtualization of methods with optional results, where
+// optional results need to be casted.
+// CHECK-LABEL: sil @{{.*}}testOverridingMethodWithOptionalResult
+// CHECK: checked_cast_br [exact] %{{.*}} : $F to $F
+// CHECK: checked_cast_br [exact] %{{.*}} : $F to $G
+// CHECK: switch_enum
+// CHECK: checked_cast_br [exact] %{{.*}} : $F to $H
+// CHECK: switch_enum
+public func testOverridingMethodWithOptionalResult(f: F) -> (F?, Int)? {
+  return f.foo()
 }
+
 
 public class F {
   @inline(never)
@@ -342,16 +346,3 @@ public class H: F {
     return nil
   }
 }
-
-// Check devirtualization of methods with optional results, where
-// optional results need to be casted.
-// CHECK-LABEL: sil @{{.*}}testOverridingMethodWithOptionalResult
-// CHECK: checked_cast_br [exact] %{{.*}} : $F to $F
-// CHECK: checked_cast_br [exact] %{{.*}} : $F to $G
-// CHECK: switch_enum
-// CHECK: checked_cast_br [exact] %{{.*}} : $F to $H
-// CHECK: switch_enum
-public func testOverridingMethodWithOptionalResult(f: F) -> (F?, Int)? {
-  return f.foo()
-}
-
