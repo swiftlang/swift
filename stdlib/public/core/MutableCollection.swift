@@ -190,7 +190,6 @@ extension MutableCollection {
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
 internal func _writeBackMutableSlice<
   C : MutableCollection,
   Slice_ : Collection
@@ -198,9 +197,8 @@ internal func _writeBackMutableSlice<
   C._Element == Slice_.Iterator.Element,
   C.Index == Slice_.Index
 >(self_: inout C, bounds: Range<C.Index>, slice: Slice_) {
-  fatalError("FIXME: swift-3-indexing-model")
-  /*
-  C._failEarlyRangeCheck(bounds, self_.startIndex..<self_.endIndex)
+  
+  self_._failEarlyRangeCheck(bounds, bounds: self_.startIndex..<self_.endIndex)
   
   // FIXME(performance): can we use
   // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
@@ -215,8 +213,8 @@ internal func _writeBackMutableSlice<
     newElementIndex != newElementsEndIndex {
 
     self_[selfElementIndex] = slice[newElementIndex]
-    selfElementIndex._successorInPlace()
-    newElementIndex._successorInPlace()
+    self_.successor(updating: &selfElementIndex)
+    slice.successor(updating: &newElementIndex)
   }
 
   _precondition(
@@ -225,7 +223,6 @@ internal func _writeBackMutableSlice<
   _precondition(
     newElementIndex == newElementsEndIndex,
     "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
-  */
 }
 
 @available(*, unavailable, renamed: "MutableCollection")
