@@ -1336,8 +1336,40 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
   }
 
+  // Link the standard library.
   Arguments.push_back("-L");
-  Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+  if (context.Args.hasFlag(options::OPT_static_stdlib,
+                            options::OPT_no_static_stdlib,
+                            false)) {
+    SmallString<128> StaticRuntimeLibPath;
+    getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
+    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
+    // The following libraries are required to build a satisfactory
+    // static program
+    Arguments.push_back("-ldl");
+    Arguments.push_back("-lpthread");
+    Arguments.push_back("-lbsd");
+    Arguments.push_back("-licui18n");
+    Arguments.push_back("-licuuc");
+    // The runtime uses dlopen to look for the protocol conformances.
+    // Therefore, we need to ensure they appear in the dynamic table.
+    // This happens automatically for dynamically-linked programs, but
+    // in this case we have to take additional measures.
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("-export-dynamic");
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("--exclude-libs");
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("ALL");
+
+  }
+  else {
+    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+  }
+
+
+  // Explicitly pass the target to the linker
+  Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
     SmallString<128> LibProfile(RuntimeLibPath);
