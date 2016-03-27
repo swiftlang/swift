@@ -62,8 +62,6 @@ class LetPropertiesOpt {
   llvm::SmallPtrSet<VarDecl *, 16> CannotRemove;
   // Set of let properties in a given nominal type.
   llvm::MapVector<NominalTypeDecl *, Properties> NominalTypeLetProperties;
-  // Set of properties whose initializer functions were processed already.
-  llvm::SmallPtrSet<VarDecl *, 16> ProcessedPropertyInitializers;
   // Set of properties which already fulfill all conditions, except
   // the available of constant, statically known initializer.
   llvm::SmallPtrSet<VarDecl *, 16> PotentialConstantLetProperty;
