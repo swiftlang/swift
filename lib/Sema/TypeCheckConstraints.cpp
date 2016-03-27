@@ -1643,7 +1643,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   }
     
   // Type-check the initializer.
-  bool hadError =typeCheckExpression(initializer, DC, contextualType,
+  bool hadError = typeCheckExpression(initializer, DC, contextualType,
                                      contextualPurpose,
                                      TypeCheckExprFlags::ConvertTypeIsOnlyAHint,
                                      &listener);
