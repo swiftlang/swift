@@ -1734,6 +1734,22 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // Decompose the function's name into a builtin name and type list.
   const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(FnId);
 
+  if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteedEnd) {
+    // Just consume the incoming argument.
+    assert(args.size() == 1 && "Expecting one incoming argument");
+    args.claimAll();
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteed) {
+    // Just forward the incoming argument.
+    assert(args.size() == 1 && "Expecting one incoming argument");
+    out = std::move(args);
+    // This is a token.
+    out.add(llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0));
+    return;
+  }
+
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     args.claimAll();

@@ -25,4 +25,5 @@ set(TRANSFORMS_SOURCES
   Transforms/Sink.cpp
   Transforms/SpeculativeDevirtualizer.cpp
   Transforms/StackPromotion.cpp
+  Transforms/UnsafeGuaranteedPeephole.cpp
   PARENT_SCOPE)
