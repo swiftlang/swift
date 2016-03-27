@@ -101,7 +101,7 @@ public class Foo2 {
 // Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
-// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FCS_4Foo1Vs5Int32 : $@convention(thin) (@owned Foo1) -> Int32
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts13testClassLet1FCS_4Foo1Vs5Int32 : $@convention(thin) (@owned Foo1) -> Int32
 // bb0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1 
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
@@ -127,7 +127,7 @@ public func testClassLet1(f: inout Foo1) -> Int32 {
 // Check that return expressions in all subsequent functions can be constant folded, because the values of let properties
 // are known to be constants of simple types.
 
-// CHECK: sil @_TF19let_properties_opts12testClassLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
+// CHECK: sil [thunk] [always_inline] @_TF19let_properties_opts12testClassLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
 // CHECK: bb0
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
@@ -146,7 +146,7 @@ public func testClassLet(f: inout Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
 }
 
-// CHECK-LABEL: sil @_TF19let_properties_opts18testClassPublicLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts18testClassPublicLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
 // CHECK: bb0
 // CHECK: integer_literal $Builtin.Int32, 1
 // CHECK-NEXT: struct $Int32
@@ -185,7 +185,7 @@ public func testStructPublicLet(b: Boo) -> Int32 {
 
 // Check that f.x is not constant folded, because the initializer of Foo2 has multiple
 // assignments to the property x with different values.
-// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet2FCS_4Foo2Vs5Int32 : $@convention(thin) (@owned Foo2) -> Int32
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts13testClassLet2FCS_4Foo2Vs5Int32 : $@convention(thin) (@owned Foo2) -> Int32
 // bb0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x

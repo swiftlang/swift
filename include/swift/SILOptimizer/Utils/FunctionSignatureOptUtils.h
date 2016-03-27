@@ -173,6 +173,12 @@ struct ResultDescriptor {
 };
 
 class FunctionSignatureInfo {
+  /// Should this function be optimized.
+  bool ShouldOptimize;
+
+  /// Optimizing this function may lead to good performance potential.
+  bool HighlyProfitable;
+
   /// Function currently analyzing.
   SILFunction *F;
 
@@ -205,10 +211,15 @@ class FunctionSignatureInfo {
 public:
   FunctionSignatureInfo(SILFunction *F, llvm::BumpPtrAllocator &BPA,
                         AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI) :
-  F(F), Allocator(BPA), AA(AA), RCFI(RCFI),
-  MayBindDynamicSelf(computeMayBindDynamicSelf(F)) {}
+  ShouldOptimize(false), HighlyProfitable(false), F(F), Allocator(BPA),
+  AA(AA), RCFI(RCFI), MayBindDynamicSelf(computeMayBindDynamicSelf(F)) {
+    analyze();
+  }
 
-  bool analyze();
+  bool shouldOptimize() const { return ShouldOptimize; }
+  bool profitableOptimize() const { return HighlyProfitable; }
+
+  void analyze();
   bool analyzeParameters();
   bool analyzeResult();
 
