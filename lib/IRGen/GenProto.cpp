@@ -1263,8 +1263,12 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
-  case SILFunctionTypeRepresentation::ObjCMethod:
     return ty->isPolymorphic();
+
+  case SILFunctionTypeRepresentation::ObjCMethod:
+    // May be polymorphic at the SIL level, but no type metadata is actually
+    // passed.
+    return false;
 
   case SILFunctionTypeRepresentation::WitnessMethod:
     // Always carries polymorphic parameters for the Self type.
@@ -1453,8 +1457,6 @@ namespace {
 
   private:
     void initGenerics() {
-      assert(hasPolymorphicParameters(FnType));
-
       // The canonical mangling signature removes dependent types that are
       // equal to concrete types, but isn't necessarily parallel with
       // substitutions.

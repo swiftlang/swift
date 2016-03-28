@@ -1306,16 +1306,14 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   assert(params.empty() && "didn't claim all parameters!");
 
-  // Bind polymorphic arguments.  This can only be done after binding
-  // all the value parameters.
-  if (hasPolymorphicParameters(funcTy)) {
-    emitPolymorphicParameters(IGF, *IGF.CurSILFn, params,
-                              nullptr,
-      [&](unsigned paramIndex) -> llvm::Value* {
-        SILValue parameter = entry->getBBArgs()[paramIndex];
-        return IGF.getLoweredSingletonExplosion(parameter);
-      });
-  }
+  // Bind polymorphic arguments. This can only be done after binding
+  // all the value parameters, and must be done even for non-polymorphic
+  // functions because of imported Objective-C generics.
+  emitPolymorphicParameters(IGF, *IGF.CurSILFn, params, nullptr,
+                            [&](unsigned paramIndex) -> llvm::Value* {
+    SILValue parameter = entry->getBBArgs()[paramIndex];
+    return IGF.getLoweredSingletonExplosion(parameter);
+  });
 }
 
 /// Get metadata for the dynamic Self type if we have it.

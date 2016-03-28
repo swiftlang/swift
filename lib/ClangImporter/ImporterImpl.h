@@ -390,6 +390,11 @@ public:
   /// Whether we should suppress the import of the given Clang declaration.
   static bool shouldSuppressDeclImport(const clang::Decl *decl);
 
+  /// Whether we should suppress importing the Objective-C generic type params
+  /// of this class as Swift generic type params.
+  static bool shouldSuppressGenericParamsImport(
+      const clang::ObjCInterfaceDecl *decl);
+
   /// \brief Check if the declaration is one of the specially handled
   /// accessibility APIs.
   ///
@@ -1294,7 +1299,8 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  Type importMethodType(const clang::ObjCMethodDecl *clangDecl,
+  Type importMethodType(const DeclContext *dc,
+                        const clang::ObjCMethodDecl *clangDecl,
                         clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,

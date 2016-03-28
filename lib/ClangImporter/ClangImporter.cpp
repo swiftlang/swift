@@ -2856,6 +2856,20 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
 }
 
 bool
+ClangImporter::Implementation::shouldSuppressGenericParamsImport(
+    const clang::ObjCInterfaceDecl *decl) {
+  while (decl) {
+    StringRef name = decl->getName();
+    if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
+        name == "NSOrderedSet" || name == "NSEnumerator") {
+      return true;
+    }
+    decl = decl->getSuperClass();
+  }
+  return false;
+}
+
+bool
 ClangImporter::Implementation::isAccessibilityDecl(const clang::Decl *decl) {
 
   if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {

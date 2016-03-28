@@ -2270,7 +2270,6 @@ llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
-  assert(!type->hasUnboundGenericType());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
                                TypeMetadataPtrTy, DebugTypeInfo());
