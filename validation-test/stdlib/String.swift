@@ -106,13 +106,16 @@ StringTests.test("ForeignIndexes/Valid") {
     let acceptor = "uvwxyz"
     expectEqual("u", acceptor[donor.startIndex])
     expectEqual("wxy",
-      acceptor[donor.startIndex.advanced(by: 2)..<donor.startIndex.advanced(by: 5)])
+      acceptor[
+        donor.index(2, stepsFrom: donor.startIndex)
+        ..<
+        donor.index(5, stepsFrom: donor.startIndex)])
   }
   do {
     let donor = "abcdef"
     let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
     expectEqual("\u{fffd}", acceptor[donor.startIndex])
-    expectEqual("\u{fffd}", acceptor[donor.startIndex.successor()])
+    expectEqual("\u{fffd}", acceptor[donor.successor(donor.startIndex)])
     expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
       acceptor[donor.startIndex.advanced(by: 1)..<donor.startIndex.advanced(by: 5)])
     expectEqualUnicodeScalars([ 0x1f602, 0xfffd ],
@@ -169,7 +172,7 @@ StringTests.test("ForeignIndexes/replaceSubrange/OutOfBoundsTrap/1") {
   var acceptor = "uvw"
 
   acceptor.replaceSubrange(
-    donor.startIndex..<donor.startIndex.successor(), with: "u")
+    donor.startIndex..<donor.successor(donor.startIndex), with: "u")
   expectEqual("uvw", acceptor)
 
   expectCrashLater()
@@ -182,7 +185,7 @@ StringTests.test("ForeignIndexes/replaceSubrange/OutOfBoundsTrap/2") {
   var acceptor = "uvw"
 
   acceptor.replaceSubrange(
-    donor.startIndex..<donor.startIndex.successor(), with: "u")
+    donor.startIndex..<donor.successor(donor.startIndex), with: "u")
   expectEqual("uvw", acceptor)
 
   expectCrashLater()
@@ -213,7 +216,7 @@ StringTests.test("ForeignIndexes/removeSubrange/OutOfBoundsTrap/1") {
     var acceptor = "uvw"
 
     acceptor.removeSubrange(
-      donor.startIndex..<donor.startIndex.successor())
+      donor.startIndex..<donor.successor(donor.startIndex))
     expectEqual("vw", acceptor)
   }
 
@@ -1017,12 +1020,17 @@ StringTests.test("unicodeViews") {
   expectEqual(
     "\u{FFFD}", String(
       winter.utf8[
-        winter.utf8.startIndex..<winter.utf8.startIndex.successor().successor()
+        winter.utf8.startIndex
+        ..<
+        winter.utf8.successor(winter.utf8.successor(winter.utf8.startIndex))
       ]))
   
   expectEqual(
     "\u{1F3C2}", String(
-      winter.utf8[winter.utf8.startIndex..<winter.utf8.startIndex.advanced(by: 4)]))
+      winter.utf8[
+        winter.utf8.startIndex
+        ..<
+        winter.utf8.startIndex.advanced(by: 4)]))
 
   expectEqual(
     "\u{1F3C2}", String(
@@ -1034,7 +1042,7 @@ StringTests.test("unicodeViews") {
     "\u{1F3C2}", String(
       winter.unicodeScalars[
         winter.unicodeScalars.startIndex
-        ..< winter.unicodeScalars.startIndex.successor()
+        ..< winter.unicodeScalars.successor(winter.unicodeScalars.startIndex)
       ]))
 
   // views

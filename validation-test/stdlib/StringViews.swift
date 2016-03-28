@@ -99,7 +99,9 @@ tests.test("index-mapping/character-to-utf8") {
 
     winter.characters.indices.map {
       i in (0..<3).map {
-        winter.utf8[i.samePosition(in: winter.utf8).advanced(by: $0)]
+        winter.utf8[
+          winter.utf8.index(
+            $0, stepsFrom: i.samePosition(in: winter.utf8))]
       }
     }, sameValue: ==)
 
@@ -136,7 +138,8 @@ tests.test("index-mapping/unicode-scalar-to-utf8") {
     
     winter.unicodeScalars.indices.map {
       i in (0..<3).map {
-        winter.utf8[i.samePosition(in: winter.utf8).advanced(by: $0)]
+        winter.utf8[
+          winter.utf8.index($0, stepsFrom: i.samePosition(in: winter.utf8))]
       }
     }, sameValue: ==)
 
@@ -179,7 +182,9 @@ tests.test("index-mapping/utf16-to-utf8") {
     ] as [[UTF8.CodeUnit]],
     winter.utf16.indices.map {
       i16 in i16.samePosition(in: winter.utf8).map {
-        i8 in (0..<3).map { winter.utf8[i8.advanced(by: $0)] }
+        i8 in (0..<3).map {
+          winter.utf8[winter.utf8($0, stepsFrom: i8)]
+        }
       } ?? []
     }, sameValue: ==)
 
@@ -610,7 +615,7 @@ tests.test("UTF8 indexes") {
   
   expectEqual(
     String.UTF8Index(abc.startIndex, within: abc.utf8).successor(),
-    String.UTF8Index(abc.startIndex.successor(), within: abc.utf8))
+    String.UTF8Index(abc.successor(abc.startIndex), within: abc.utf8))
 
   let diverseCharacters = summer + winter + winter + summer
   let s = diverseCharacters.unicodeScalars
