@@ -91,7 +91,9 @@ uint8_t *swift::_swift_getSectionDataPE(void *handle, const char *sectionName,
   // This is relying on undocumented feature of Windows API LoadLibrary().
   unsigned char *peStart = (unsigned char *)handle;
 
-  int ntHeadersOffset = peStart[0x3C];
+  const int kLocationOfNtHeaderOffset = 0x3C;
+  int ntHeadersOffset =
+      *reinterpret_cast<int32_t *>(peStart + kLocationOfNtHeaderOffset);
 
   bool assert1 =
       peStart[ntHeadersOffset] == 'P' && peStart[ntHeadersOffset + 1] == 'E';
