@@ -2065,6 +2065,20 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- ${BUILD_ARGS} ${build_targets[@]}
             { set +x; } 2>/dev/null
         fi
+
+        # TODO: create symlink here (if we are building for LLVM)
+        if [[ "${product}" == "llvm" ]]; then
+          # Find the location of the c++ header dir.
+          HOST_CXX_DIR=$(dirname ${HOST_CXX})
+          HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
+
+          # Find the path in which the local clang build is expecting to find
+          # the c++ header files.
+          BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
+
+          echo "symlinking the system headers into the local clang build directory."
+          ln -sfv " $HOST_CXX_HEADERS_DIR $BUILT_CXX_INCLUDE_DIR/c++"
+        fi
     done
 done
 # END OF BUILD PHASE
@@ -2568,3 +2582,4 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         { set +x; } 2>/dev/null
     fi
 fi
+
