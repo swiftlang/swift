@@ -213,7 +213,7 @@ public typealias UWord = UInt${word_bits}
 /// `isEqual(to:)` and `isLess(than:)` methods are the ones responsible for
 /// `Equatable` and `Comparable` protocol conformances. In a way similar to how
 /// arithmetic operations are dispatched in `Arithmetic`, `==` and `<` operators
-/// for homogenous comparisons have default implementations that call
+/// for homogeneous comparisons have default implementations that call
 /// `isEqual(to:)` and `isLess(than:)` respectively.
 ///
 /// This protocol adds 3 new initializers to the parameterless one, inherited
