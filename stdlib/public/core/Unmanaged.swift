@@ -173,7 +173,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///        }
   ///    }
   ///
-  ///    func doSomething(u : Unmanged<Owned>) {
+  ///    func doSomething(u : Unmanaged<Owned>) {
   ///      u._withUnsafeGuaranteedRef {
   ///        $0.doSomething()
   ///      }
