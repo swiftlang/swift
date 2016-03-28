@@ -292,4 +292,11 @@ enum r19997577Type {
   }
 }
 
+// type attribute and decl attribute
+func noescapeD(@noescape f: () -> Bool) {} // ok
+func noescapeT(f: @noescape () -> Bool) {} // ok
+func autoclosureD(@autoclosure f: () -> Bool) {} // ok
+func autoclosureT(f: @autoclosure () -> Bool) {} // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@autoclosure }} {{22-35=}}
 
+func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // ok
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // ok
