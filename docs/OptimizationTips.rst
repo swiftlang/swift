@@ -2,7 +2,7 @@
 Writing High-Performance Swift Code
 ===================================
 
-.. contents::
+.. contents:: :local:
 
 The following document is a gathering of various tips and tricks for writing
 high-performance Swift code. The intended audience of this document is compiler
@@ -45,12 +45,13 @@ Whole Module Optimizations
 ==========================
 
 By default Swift compiles each file individually. This allows Xcode to
-compile multiple files in parallel very quickly. However, compiling each file
-separately prevents certain compiler optimizations. Swift can also compile
-the entire program as if it were one file and optimize the program as if it
-were a single compilation unit. This mode is enabled using the command
-line flag ``-whole-module-optimization``. Programs that are compiled in
-this mode will most likely take longer to compile, but may run faster.
+compile multiple files in parallel very quickly. However, compiling
+each file separately prevents certain compiler optimizations. Swift
+can also compile the entire program as if it were one file and
+optimize the program as if it were a single compilation unit. This
+mode is enabled using the ``swiftc`` command line flag
+``-whole-module-optimization``. Programs that are compiled in this
+mode will most likely take longer to compile, but may run faster.
 
 This mode can be enabled using the Xcode build setting 'Whole Module Optimization'.
 
@@ -331,64 +332,52 @@ generics. Some more examples of generics:
   // [Int]' types.
   myAlgorithm(arrayOfInts, arrayOfInts.length)
 
-Advice: Put generic declarations in the same file where they are used
----------------------------------------------------------------------
+Advice: Put generic declarations in the same module where they are used
+-----------------------------------------------------------------------
 
-The optimizer can only perform specializations if the definition of the generic
-declaration is visible in the current Module. This can only occur if the
-declaration is in the same file as the invocation of the generic. *NOTE* The
-standard library is a special case. Definitions in the standard library are
-visible in all modules and available for specialization.
+The optimizer can only perform specialization if the definition of
+the generic declaration is visible in the current Module. This can
+only occur if the declaration is in the same file as the invocation of
+the generic, unless the ``-whole-module-optimization`` flag is
+used. *NOTE* The standard library is a special case. Definitions in
+the standard library are visible in all modules and available for
+specialization.
 
-Advice: Allow the compiler to perform generic specialization
-------------------------------------------------------------
+Advice: Use @_specialize to direct the compiler to specialize generics
+----------------------------------------------------------------------
 
-The compiler can only specialize generic code if the call site and the callee
-function are located in the same compilation unit. One trick that we can use to
-allow compiler to optimize the callee function is to write code that performs a
-type check in the same compilation unit as the callee function. The code behind
-the type check then re-dispatches the call to the generic function - but this
-time it has the type information. In the code sample below we've inserted a type
-check into the function "play_a_game" and made the code run hundreds of times
-faster.
+The compiler only automatically specializes generic code if the call
+site and the callee function are located in the same module. However, the programmer can provide hints to the compiler in the form of @_specialize attributes. See :ref:`generics-specialization` for details.
+
+This attribute instructs the compiler to specialize on the specified concrete type list. The compiler inserts type checks and dispatches from the generic function to the specialized variant. In the following example, injecting the @_specialize attribute speeds up the code by about 10 times.
 
 ::
 
-  //Framework.swift:
+  /// --------------- 
+  /// Framework.swift
 
-  protocol Pingable { func ping() -> Self }
-  protocol Playable { func play() }
-
+  public protocol Pingable { func ping() -> Self }
+  public protocol Playable { func play() }
+   
   extension Int : Pingable {
-    func ping() -> Int { return self + 1 }
+    public func ping() -> Int { return self + 1 }
   }
-
-  class Game<T : Pingable> : Playable {
+   
+  public class Game<T : Pingable> : Playable {
     var t : T
-
-    init (_ v : T) {t = v}
-
-    func play() {
+   
+    public init (_ v : T) {t = v}
+   
+    @_specialize(Int)
+    public func play() {
       for _ in 0...100_000_000 { t = t.ping() }
     }
   }
 
-  func play_a_game(game : Playable ) {
-    // This check allows the optimizer to specialize the
-    // generic call 'play'
-    if let z = game as? Game<Int> {
-      z.play()
-    } else {
-      game.play()
-    }
-  }
+  /// -----------------
+  /// Application.swift
 
-  /// -------------- >8
-
-  // Application.swift:
-
-  play_a_game(Game(10))
-
+  Game(10).play
 
 The cost of large swift values
 ==============================
