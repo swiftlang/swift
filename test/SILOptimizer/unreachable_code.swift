@@ -416,3 +416,17 @@ func noReturnInDefer() {
 while true {
 }
  // no warning!
+
+
+// SR-1010 - rdar://25278336 - Spurious "will never be executed" warnings when building standard library
+public struct SR1010<T> {
+  var a : T
+}
+
+extension SR1010 {
+  @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
+  public init(_ base: Int) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
