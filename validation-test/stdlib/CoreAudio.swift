@@ -112,7 +112,7 @@ CoreAudioTestSuite.test(
 
   expectCrashLater()
   // An overflow happens when we try to compute the value for mDataByteSize.
-  AudioBuffer(buffer, numberOfChannels: 2)
+  _ = AudioBuffer(buffer, numberOfChannels: 2)
 }
 
 CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)") {
