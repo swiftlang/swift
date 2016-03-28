@@ -21,14 +21,14 @@ func typeInference_Comparable<C : Comparable>(v: C) {
   _ = v...v // FIXME: swift-3-indexing-model: shouldn't compile.
 }
 
-func typeInference_Strideable<S : Strideable>(v: S) {
+func typeInference_Countable<S : Strideable where S.Stride : Integer>(v: S) {
   do {
     var range = v..<v
-    expectType(RangeOfStrideable<S>.self, &range)
+    expectType(CountableRange<S>.self, &range)
   }
   do {
     var range = v...v
-    expectType(ClosedRangeOfStrideable<S>.self, &range)
+    expectType(CountableClosedRange<S>.self, &range)
   }
 }
 
@@ -51,20 +51,20 @@ do {
   r0[0]       // expected-error {{ambiguous use of 'subscript'}}
   r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
   r1[0]       // expected-error {{ambiguous use of 'subscript'}}
-  r2[0]       // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<Int>' with an index of type 'Int'}} expected-note {{overloads for 'subscript' exist}}
-  r3[0]       // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'Int'}} expected-note {{overloads for 'subscript' exist}}
+  r2[0]       // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'Int'}} expected-note {{overloads for 'subscript' exist}}
+  r3[0]       // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'Int'}} expected-note {{overloads for 'subscript' exist}}
   r0[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
   r1[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
-  r2[0..<4]   // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<Int>' with an index of type 'RangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
-  r3[0..<4]   // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'RangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  r2[0..<4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableRange<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  r3[0..<4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}} expected-note {{overloads for 'subscript' exist}}
   (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
-  (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'RangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}} expected-note {{overloads for 'subscript' exist}}
 
   r0[0...4]   // expected-error {{ambiguous use of 'subscript'}}
   r1[0...4]   // expected-error {{ambiguous use of 'subscript'}}
-  r2[0...4]   // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<Int>' with an index of type 'ClosedRangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
-  r3[0...4]   // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'ClosedRangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
-  (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'ClosedRangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  r2[0...4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  r3[0...4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}} expected-note {{overloads for 'subscript' exist}}
 }
 
 do {
@@ -82,11 +82,11 @@ do {
   r2[0..<4]   // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRangeIndex<Int>'}} expected-note {{overloads for '..<' exist}}
   r3[0..<4]   // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRangeIndex<UInt>'}} expected-note {{overloads for '..<' exist}}
   (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
-  (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'RangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}} expected-note {{overloads for 'subscript' exist}}
 
   r0[0...4]   // expected-error {{ambiguous use of 'subscript'}}
   r1[0...4]   // expected-error {{ambiguous use of 'subscript'}}
   r2[0...4]   // expected-error {{no '...' candidates produce the expected contextual result type 'ClosedRangeIndex<Int>'}} expected-note {{overloads for '...' exist}}
   r3[0...4]   // expected-error {{no '...' candidates produce the expected contextual result type 'ClosedRangeIndex<UInt>'}} expected-note {{overloads for '...' exist}}
-  (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'ClosedRangeOfStrideable<UInt>' with an index of type 'ClosedRangeOfStrideable<Int>'}} expected-note {{overloads for 'subscript' exist}}
+  (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}} expected-note {{overloads for 'subscript' exist}}
 }

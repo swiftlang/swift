@@ -9,9 +9,9 @@ func testIntSubscripting(s: String, i: Int) {
   // FIXME swift-3-indexing-model: test new overloads of ..<, ...
   _ = s[i] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
   _ = s[17] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
-  _ = s[i...i] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
-  _ = s[17..<20] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
-  _ = s[17...20] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
+  _ = s[i...i] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}}
+  _ = s[17..<20] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableRange<Int>, see the documentation comment for discussion}}
+  _ = s[17...20] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}}
 }
 
 // Common pitfall: trying to access `String.count`.
@@ -67,11 +67,11 @@ func acceptsRandomAccessCollection<I: RandomAccessCollection>(_: I) {}
 
 func testStringCollectionTypes(s: String) {
   acceptsCollection(s.utf8)
-  acceptsBidirectionalCollection(s.utf8) // expected-error{{argument type 'String.UTF8View.Collection' does not conform to expected type 'BidirectionalCollection'}}
+  acceptsBidirectionalCollection(s.utf8) // expected-error{{argument type 'String.UTF8View' does not conform to expected type 'BidirectionalCollection'}}
   acceptsBidirectionalCollection(s.unicodeScalars)
-  acceptsRandomAccessCollection(s.unicodeScalars) // expected-error{{argument type 'String.UnicodeScalarView.Collection' does not conform to expected type 'RandomAccessCollection'}}
+  acceptsRandomAccessCollection(s.unicodeScalars) // expected-error{{argument type 'String.UnicodeScalarView' does not conform to expected type 'RandomAccessCollection'}}
   acceptsBidirectionalCollection(s.characters)
-  acceptsRandomAccessCollection(s.characters) // expected-error{{argument type 'String.CharacterView.Collection' does not conform to expected type 'RandomAccessCollection'}}
+  acceptsRandomAccessCollection(s.characters) // expected-error{{argument type 'String.CharacterView' does not conform to expected type 'RandomAccessCollection'}}
   
   // UTF16View.Collection is random-access with Foundation, bidirectional without
   acceptsRandomAccessCollection(s.utf16)

@@ -24,7 +24,7 @@ extension Range where Bound : TestProtocol1 {
   }
 }
 
-extension RangeOfStrideable where Bound : TestProtocol1 {
+extension CountableRange where Bound : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -43,7 +43,7 @@ RangeTestSuite.test("TypeInference/Comparable") {
 
 % for (Self, Bound) in [
 %  ('Range', 'MinimalComparableValue'),
-%  ('RangeOfStrideable', 'MinimalStrideableValue'),
+%  ('CountableRange', 'MinimalStrideableValue'),
 % ]:
 
 RangeTestSuite.test("${Self}/Equatable") {
@@ -134,18 +134,18 @@ RangeTestSuite.test("reversed()") {
     result)
 }
 
-RangeTestSuite.test("RangeOfStrideable: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable") {
-  var r: RangeOfStrideable<CustomPrintableValue> =
+RangeTestSuite.test("CountableRange: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable") {
+  var r: CountableRange<CustomPrintableValue> =
     CustomPrintableValue(1)..<CustomPrintableValue(2)
   expectPrinted(
     "(value: 1).description..<(value: 2).description", r)
   expectDebugPrinted(
-    "RangeOfStrideable(" +
+    "CountableRange(" +
       "(value: 1).debugDescription..<(value: 2).debugDescription" +
     ")",
     r)
   expectDumped(
-    "▿ RangeOfStrideable((value: 1).debugDescription..<(value: 2).debugDescription)\n" +
+    "▿ CountableRange((value: 1).debugDescription..<(value: 2).debugDescription)\n" +
     "  ▿ lowerBound: (value: 1).debugDescription\n" +
     "    - value: 1\n" +
     "    - identity: 0\n" +
@@ -176,7 +176,7 @@ RangeTestSuite.test("Range: CustomStringConvertible, CustomDebugStringConvertibl
     r)
 }
 
-// FIXME: swift-3-indexing-model: check that RangeOfStrideable is a collection.
+// FIXME: swift-3-indexing-model: check that CountableRange is a collection.
 /*
 func assertCollection<C: Collection>(_: C) {}
 assertCollection(0..<10)

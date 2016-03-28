@@ -340,11 +340,13 @@ extension RangeReplaceableCollection where SubSequence == Self {
   }
 }
 
-extension RangeReplaceableCollection where Index : Strideable {
+extension RangeReplaceableCollection 
+  where
+Index : Strideable, Index.Stride : Integer {
   public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
-    subRange: RangeOfStrideable<Index>, with newElements: C
+    subRange: CountableRange<Index>, with newElements: C
   ) {
     self.replaceSubrange(Range(subRange), with: newElements)
   }

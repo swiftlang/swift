@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
-// [Closed]Range and [Closed]RangeOfStrideable.
+// [Closed]Range and [Closed]CountableRange.
 
 public // implementation sharing
 protocol _ClosedRange : _RangeProtocol {}
@@ -38,14 +38,16 @@ extension _ClosedRange {
 }
 
 // WORKAROUND rdar://25214598 - should be Bound : Strideable
-internal enum _ClosedRangeIndex<Bound : Comparable where Bound : _Strideable> {
+internal enum _ClosedRangeIndex<
+  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
+> {
 case pastEnd
 case inRange(Bound)
 }
 
 public struct ClosedRangeIndex<
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
-  Bound : Comparable where Bound : _Strideable
+  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : Comparable {
   internal init() { _value = .pastEnd }
   internal init(_ x: Bound) { _value = .inRange(x) }
@@ -113,7 +115,7 @@ public func < <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
 }
 
 // WORKAROUND rdar://25214598 - should be Bound : Strideable
-extension _ClosedRange where Bound : _Strideable {
+extension _ClosedRange where Bound : _Strideable, Bound.Stride : Integer {
   public var count: Bound.Stride {
     return lowerBound.distance(to: upperBound)
   }
@@ -136,13 +138,13 @@ extension _ClosedRange where Bound : _Strideable {
 }
 
 // WORKAROUND: for some reason
-// IndexingIterator<ClosedRangeOfStrideable> doesn't conform to
+// IndexingIterator<CountableClosedRange> doesn't conform to
 // IteratorProtocol?!
 public struct ClosedRangeIterator<
-  Bound : Comparable where Bound : _Strideable
+  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : IteratorProtocol, Sequence {
 
-  init(_ r: ClosedRangeOfStrideable<Bound>) {
+  init(_ r: CountableClosedRange<Bound>) {
     _nextResult = r.lowerBound
     _upperBound = r.upperBound
   }
@@ -162,9 +164,9 @@ public struct ClosedRangeIterator<
   internal let _upperBound: Bound
 }
 
-public struct ClosedRangeOfStrideable<
+public struct CountableClosedRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : Comparable where Bound : _Strideable
+  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : Equatable, RandomAccessCollection,
   CustomStringConvertible, CustomDebugStringConvertible, 
   _ClosedRange {
@@ -189,7 +191,7 @@ public struct ClosedRangeOfStrideable<
     return i._predecessor(upperBound: upperBound)
   }
 
-  public var indices: DefaultRandomAccessIndices<ClosedRangeOfStrideable<Bound>> {
+  public var indices: DefaultRandomAccessIndices<CountableClosedRange<Bound>> {
     return DefaultRandomAccessIndices(
       _elements: self,
       startIndex: self.startIndex,
@@ -220,7 +222,7 @@ public struct ClosedRangeOfStrideable<
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "ClosedRangeOfStrideable(\(String(reflecting: lowerBound))...\(String(reflecting: upperBound)))"
+    return "CountableClosedRange(\(String(reflecting: lowerBound))...\(String(reflecting: upperBound)))"
   }
 
   public // ambiguity resolution between _RangeProtocol and Collection defaults
@@ -228,12 +230,12 @@ public struct ClosedRangeOfStrideable<
     return false
   }
 
-  public subscript(bounds: Range<Index>) -> RandomAccessSlice<ClosedRangeOfStrideable> {
+  public subscript(bounds: Range<Index>) -> RandomAccessSlice<CountableClosedRange> {
     return RandomAccessSlice(base: self, bounds: bounds)
   }
 }
 
-extension ClosedRangeOfStrideable : CustomReflectable {
+extension CountableClosedRange : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -243,8 +245,8 @@ extension ClosedRangeOfStrideable : CustomReflectable {
 
 @warn_unused_result
 public func == <Bound>(
-  lhs: ClosedRangeOfStrideable<Bound>,
-  rhs: ClosedRangeOfStrideable<Bound>
+  lhs: CountableClosedRange<Bound>,
+  rhs: CountableClosedRange<Bound>
 ) -> Bool {
   return
     lhs.lowerBound == rhs.lowerBound &&
@@ -357,11 +359,13 @@ public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
 @_transparent
 @warn_unused_result
 // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-public func ... <Bound : _Strideable where Bound : Comparable> (
+public func ... <
+  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
+> (
   start: Bound, end: Bound
-) -> ClosedRangeOfStrideable<Bound> {
+) -> CountableClosedRange<Bound> {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
-  return ClosedRangeOfStrideable(_uncheckedBounds: (lower: start, upper: end))
+  return CountableClosedRange(_uncheckedBounds: (lower: start, upper: end))
 }
 

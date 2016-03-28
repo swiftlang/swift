@@ -60,7 +60,7 @@ ${stringSubscriptComment}
     fatalError("unavailable function can't be called")
   }
 
-% for Range in 'Range', 'ClosedRange', 'RangeOfStrideable', 'ClosedRangeOfStrideable':
+% for Range in 'Range', 'ClosedRange', 'CountableRange', 'CountableClosedRange':
 ${stringSubscriptComment}
   @available(
     *, unavailable,

@@ -68,9 +68,7 @@ extension BidirectionalIndexable {
       return _advanceForward(i, by: n)
     }
     var i = i
-    // FIXME: swift-3-indexing-model: There's a corner case here, -IntXX.min is
-    // not representable.
-    for _ in 0..<(-n) {
+    for _ in stride(from: 0, to: n, by: -1) {
       formPredecessor(&i)
     }
     return i
@@ -82,9 +80,7 @@ extension BidirectionalIndexable {
       return _advanceForward(i, by: n, limitedBy: limit)
     }
     var i = i
-    // FIXME: swift-3-indexing-model: There's a corner case here, -IntXX.min is
-    // not representable.
-    for _ in 0..<(-n) {
+    for _ in stride(from: 0, to: n, by: -1) {
       if (limit == i) {
         break;
       }

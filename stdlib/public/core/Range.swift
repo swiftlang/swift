@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // A dummy type that we can use when we /don't/ want to create an
-// ambiguity indexing RangeOfStrideable<T> outside a generic context.
+// ambiguity indexing CountableRange<T> outside a generic context.
 public enum _DisabledRangeIndex_ {}
 
 // FIXME swift-3-indexing-model: Decide whether to de-underscore these
@@ -102,7 +102,8 @@ extension _HalfOpenRange {
 }
 
 // WORKAROUND rdar://25214598 - should be Bound : Strideable
-extension _HalfOpenRange where Bound : _Strideable {
+extension _HalfOpenRange
+where Bound : _Strideable, Bound.Stride : Integer {
   public var count: Bound.Stride {
     return lowerBound.distance(to: upperBound)
   }
@@ -137,9 +138,9 @@ extension _HalfOpenRange where Bound : _Strideable {
   }
 }
 
-public struct RangeOfStrideable<
+public struct CountableRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : Comparable where Bound : _Strideable
+  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : Equatable, RandomAccessCollection,
   CustomStringConvertible, CustomDebugStringConvertible, 
   _HalfOpenRange {
@@ -171,15 +172,15 @@ public struct RangeOfStrideable<
   }
   
   // FIXME(compiler limitation): this typealias should be inferred.
-  public typealias SubSequence = RangeOfStrideable<Bound>
+  public typealias SubSequence = CountableRange<Bound>
 
-  public subscript(bounds: Range<Element>) -> RangeOfStrideable<Bound> {
-    return RangeOfStrideable(bounds)
+  public subscript(bounds: Range<Element>) -> CountableRange<Bound> {
+    return CountableRange(bounds)
   }
 
   public subscript(
-    bounds: RangeOfStrideable<Bound>
-  ) -> RangeOfStrideable<Bound> {
+    bounds: CountableRange<Bound>
+  ) -> CountableRange<Bound> {
     return self[Range(bounds)]
   }
   
@@ -196,7 +197,7 @@ public struct RangeOfStrideable<
   public let upperBound: Bound
   
   // FIXME(compiler limitation): this typealias should be inferred.
-  public typealias Indices = RangeOfStrideable<Bound>
+  public typealias Indices = CountableRange<Bound>
 
   @warn_unused_result
   public func _customContainsEquatableElement(element: Element) -> Bool? {
@@ -205,7 +206,7 @@ public struct RangeOfStrideable<
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "RangeOfStrideable(\(String(reflecting: lowerBound))..<\(String(reflecting: upperBound)))"
+    return "CountableRange(\(String(reflecting: lowerBound))..<\(String(reflecting: upperBound)))"
   }
 
   public // ambiguity resolution between _RangeProtocol and Collection defaults
@@ -220,7 +221,7 @@ public struct RangeOfStrideable<
 // indices for ranges, outside a generic context.  This prevents mistakes
 // such as x = r[0], which will trap unless 0 happens to be contained in the
 // range r.
-extension RangeOfStrideable {
+extension CountableRange {
   /// Access the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
@@ -235,41 +236,49 @@ extension RangeOfStrideable {
   }
 }
 
-extension RangeOfStrideable where Bound._DisabledRangeIndex : Strideable {
-  public subscript(bounds: Range<Bound._DisabledRangeIndex>) -> RangeOfStrideable<Bound> {
+extension CountableRange 
+  where
+Bound._DisabledRangeIndex : Strideable, 
+Bound._DisabledRangeIndex.Stride : Integer {
+  
+  public subscript(
+    bounds: Range<Bound._DisabledRangeIndex>
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: RangeOfStrideable<Bound._DisabledRangeIndex>
-  ) -> RangeOfStrideable<Bound> {
+    bounds: CountableRange<Bound._DisabledRangeIndex>
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
   
-  public subscript(bounds: ClosedRange<Bound._DisabledRangeIndex>) -> RangeOfStrideable<Bound> {
+  public subscript(
+    bounds: ClosedRange<Bound._DisabledRangeIndex>
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: ClosedRangeOfStrideable<Bound._DisabledRangeIndex>
-  ) -> RangeOfStrideable<Bound> {
+    bounds: CountableClosedRange<Bound._DisabledRangeIndex>
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
-  public subscript(bounds: ClosedRange<Bound>) -> RangeOfStrideable<Bound> {
+  public subscript(bounds: ClosedRange<Bound>) -> CountableRange<Bound> {
     return self[bounds.lowerBound..<(bounds.upperBound.advanced(by: 1))]
   }
 
   public subscript(
-    bounds: ClosedRangeOfStrideable<Bound>
-  ) -> RangeOfStrideable<Bound> {
+    bounds: CountableClosedRange<Bound>
+  ) -> CountableRange<Bound> {
     return self[ClosedRange(bounds)]
   }
 }
 
 //===--- End 0-based indexing protection ----------------------------------===//
 
-extension RangeOfStrideable : CustomReflectable {
+extension CountableRange : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -279,8 +288,8 @@ extension RangeOfStrideable : CustomReflectable {
 
 @warn_unused_result
 public func == <Bound>(
-  lhs: RangeOfStrideable<Bound>,
-  rhs: RangeOfStrideable<Bound>
+  lhs: CountableRange<Bound>,
+  rhs: CountableRange<Bound>
 ) -> Bool {
   return
     lhs.lowerBound == rhs.lowerBound &&
@@ -373,7 +382,7 @@ extension Range : CustomReflectable {
 // indices for ranges, outside a generic context.  This prevents mistakes
 // such as x = r[0], which will trap unless 0 happens to be contained in the
 // range r.
-extension Range where Bound : _Strideable {
+extension Range where Bound : _Strideable, Bound.Stride : Integer {
   /// Access the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
@@ -388,26 +397,31 @@ extension Range where Bound : _Strideable {
   }
 }
 
-extension Range where Bound : Strideable, Bound._DisabledRangeIndex : Strideable {
+extension Range
+  where 
+Bound : Strideable, 
+Bound.Stride : Integer, 
+Bound._DisabledRangeIndex : Strideable,
+Bound._DisabledRangeIndex.Stride : Integer {
   public subscript(bounds: Range<Bound>) -> Range {
     fatalError("uncallable")
   }
 
   public subscript(
     bounds: Range<Bound._DisabledRangeIndex>
-  ) -> RangeOfStrideable<Bound> {
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: RangeOfStrideable<Bound>
-  ) -> RangeOfStrideable<Bound> {
+    bounds: CountableRange<Bound>
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: RangeOfStrideable<Bound._DisabledRangeIndex>
-  ) -> RangeOfStrideable<Bound> {
+    bounds: CountableRange<Bound._DisabledRangeIndex>
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
@@ -417,19 +431,19 @@ extension Range where Bound : Strideable, Bound._DisabledRangeIndex : Strideable
 
   public subscript(
     bounds: ClosedRange<Bound._DisabledRangeIndex>
-  ) -> RangeOfStrideable<Bound> {
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: ClosedRangeOfStrideable<Bound>
-  ) -> RangeOfStrideable<Bound> {
+    bounds: CountableClosedRange<Bound>
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: ClosedRangeOfStrideable<Bound._DisabledRangeIndex>
-  ) -> RangeOfStrideable<Bound> {
+    bounds: CountableClosedRange<Bound._DisabledRangeIndex>
+  ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 }
@@ -458,12 +472,14 @@ public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
 @_transparent
 @warn_unused_result
 // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-public func ..< <Bound : _Strideable where Bound : Comparable> (
+public func ..< <
+  Bound : _Strideable where Bound : Comparable, Bound.Stride : Integer
+> (
   start: Bound, end: Bound
-) -> RangeOfStrideable<Bound> {
+) -> CountableRange<Bound> {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
-  return RangeOfStrideable(_uncheckedBounds: (lower: start, upper: end))
+  return CountableRange(_uncheckedBounds: (lower: start, upper: end))
 }
 
 @warn_unused_result

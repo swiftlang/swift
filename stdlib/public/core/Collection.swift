@@ -424,7 +424,7 @@ extension Indexable {
       "Only BidirectionalCollections can be advanced by a negative amount")
 
     var i = i
-    for _ in 0..<n {
+    for _ in stride(from: 0, to: n, by: 1) {
       formSuccessor(&i)
     }
     return i
@@ -439,7 +439,7 @@ extension Indexable {
       "Only BidirectionalCollections can be advanced by a negative amount")
 
     var i = i
-    for _ in 0..<n {
+    for _ in stride(from: 0, to: n, by: 1) {
       if (limit == i) {
         break;
       }

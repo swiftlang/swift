@@ -65,7 +65,7 @@ tests.test("AnyIterator") {
     // This is a really complicated type of no interest to our
     // clients.
     let iterator: LazyMapIterator<
-        IndexingIterator<RangeOfStrideable<Int>>, String
+        IndexingIterator<CountableRange<Int>>, String
       > = lazyStrings.makeIterator()
     return AnyIterator(iterator)
   }

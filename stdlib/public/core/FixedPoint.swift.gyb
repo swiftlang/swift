@@ -115,7 +115,6 @@ public protocol _DisallowMixedSignArithmetic : _Integer {
 
 /// A set of common requirements for Swift's unsigned integer types.
 public protocol UnsignedInteger : _DisallowMixedSignArithmetic, Integer {
-
   /// Represent this number using Swift's widest native unsigned
   /// integer type.
   @warn_unused_result

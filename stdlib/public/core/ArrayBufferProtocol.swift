@@ -164,7 +164,7 @@ extension _ArrayBufferProtocol where Index == Int {
 
       // Assign over the original subRange
       var i = newValues.startIndex
-      for j in RangeOfStrideable(subRange) {
+      for j in CountableRange(subRange) {
         elements[j] = newValues[i]
         newValues.formSuccessor(&i)
       }

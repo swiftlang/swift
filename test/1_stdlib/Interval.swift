@@ -46,20 +46,16 @@ tests.test("Ambiguity") {
   // compile if it's broken
   var pieToPie = -3.1415927..<3.1415927
   
-  // FIXME: the plan is for floating point numbers to no longer be
-  // strideable; then this will drop the "OfStrideable"
-  expectType(RangeOfStrideable<Double>.self, &pieToPie)
+  expectType(Range<Double>.self, &pieToPie)
 
-  // FIXME: the plan is for floating point numbers to no longer be
-  // strideable; then this will drop the "OfStrideable"
   var pieThruPie = -3.1415927...3.1415927
-  expectType(ClosedRangeOfStrideable<Double>.self, &pieThruPie)
+  expectType(ClosedRange<Double>.self, &pieThruPie)
 
   var zeroToOne = 0..<1
-  expectType(RangeOfStrideable<Int>.self, &zeroToOne)
+  expectType(CountableRange<Int>.self, &zeroToOne)
 
   var zeroThruOne = 0...1
-  expectType(ClosedRangeOfStrideable<Int>.self, &zeroThruOne)
+  expectType(CountableClosedRange<Int>.self, &zeroThruOne)
 }
 
 tests.test("PatternMatching") {

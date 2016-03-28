@@ -321,8 +321,8 @@ extension ${Self} {
 }
 
 // WORKAROUND rdar://25214066 - should be on Collection
-extension ${Self} where Index : Strideable {
-  public subscript(bounds: RangeOfStrideable<Index>) -> SubSequence {
+extension ${Self} where Index : Strideable, Index.Stride : Integer {
+  public subscript(bounds: CountableRange<Index>) -> SubSequence {
     get {
       return self[Range(bounds)]
     }
@@ -333,7 +333,7 @@ extension ${Self} where Index : Strideable {
 %   end
   }
   
-  public subscript(bounds: ClosedRangeOfStrideable<Index>) -> SubSequence {
+  public subscript(bounds: CountableClosedRange<Index>) -> SubSequence {
     get {
       return self[ClosedRange(bounds)]
     }

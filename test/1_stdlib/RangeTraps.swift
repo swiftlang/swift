@@ -36,7 +36,7 @@ RangeTraps.test("HalfOpen")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var range = 1..<1
-  expectType(RangeOfStrideable<Int>.self, &range)
+  expectType(CountableRange<Int>.self, &range)
   
   expectCrashLater()
   _ = 1..<0
@@ -48,7 +48,7 @@ RangeTraps.test("Closed")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var range = 1...1
-  expectType(ClosedRangeOfStrideable<Int>.self, &range)
+  expectType(CountableClosedRange<Int>.self, &range)
 
   expectCrashLater()
   _ = 1...0
@@ -59,7 +59,7 @@ RangeTraps.test("OutOfRange")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-  _ = 0..<Int.max // This is a RangeOfStrideable
+  _ = 0..<Int.max // This is a CountableRange
 
   // This works for Ranges now!
   expectTrue((0...Int.max).contains(Int.max))

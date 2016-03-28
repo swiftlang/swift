@@ -7,11 +7,11 @@
 
 // CHECK-LABEL: sil [noinline] @_TF13prespecialize4testFTRGSaSi_4sizeSi_T_ 
 //
-// function_ref specialized RangeOfStrideable.makeIterator() -> RangeOfStrideableIterator<A>
-// CHECK: function_ref @_TTSg5SiSis10Strideables_SiSis12SignedNumbers_SiSis33_BuiltinIntegerLiteralConvertibles___TFVs17RangeOfStrideable12makeIteratorfT_GVs25RangeOfStrideableIteratorx_
+// function_ref specialized CountableRange.makeIterator() -> CountableRangeIterator<A>
+// CHECK: function_ref @_TTSg5SiSis10Strideables_SiSis12SignedNumbers_SiSis33_BuiltinIntegerLiteralConvertibles___TFVs17CountableRange12makeIteratorfT_GVs25CountableRangeIteratorx_
 //
-// function_ref specialized RangeOfStrideableIterator.next() -> A?
-// CHECK: function_ref @_TTSg5SiSis10Strideables_SiSis12SignedNumbers_SiSis33_BuiltinIntegerLiteralConvertibles___TFVs25RangeOfStrideableIterator4nextfT_GSqx_
+// function_ref specialized CountableRangeIterator.next() -> A?
+// CHECK: function_ref @_TTSg5SiSis10Strideables_SiSis12SignedNumbers_SiSis33_BuiltinIntegerLiteralConvertibles___TFVs25CountableRangeIterator4nextfT_GSqx_
 //
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
 // CHECK: function_ref {{@_TTSg5Si___TFSag9subscriptFSix|@_TTSg5Si___TFSaap9subscriptFSix}}

@@ -193,7 +193,7 @@ extension _ArrayBuffer {
       // Could be sped up, e.g. by using
       // enumerateObjectsAtIndexes:options:usingBlock: in the
       // non-native case.
-      for i in RangeOfStrideable(subRange) {
+      for i in CountableRange(subRange) {
         _typeCheckSlowPath(i)
       }
     }
@@ -224,7 +224,7 @@ extension _ArrayBuffer {
     
     // Make another pass to retain the copied objects
     var result = target
-    for _ in RangeOfStrideable(bounds) {
+    for _ in CountableRange(bounds) {
       result.initialize(with: result.pointee)
       result += 1
     }
@@ -468,9 +468,9 @@ extension _ArrayBuffer {
     return count
   }
 
-  public typealias Indices = RangeOfStrideable<Int>
+  public typealias Indices = CountableRange<Int>
 
-  public var indices: RangeOfStrideable<Int> {
+  public var indices: CountableRange<Int> {
     return startIndex..<endIndex
   }
 

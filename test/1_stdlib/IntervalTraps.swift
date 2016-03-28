@@ -38,7 +38,7 @@ IntervalTraps.test("HalfOpen")
   var interval = 1.0..<1.0
   // FIXME: the plan is for floating point numbers to no longer be
   // strideable; then this will drop the "OfStrideable"
-  expectType(RangeOfStrideable<Double>.self, &interval)
+  expectType(Range<Double>.self, &interval)
   expectCrashLater()
   _ = 1.0..<0.0
 }
@@ -51,7 +51,7 @@ IntervalTraps.test("Closed")
   var interval = 1.0...1.0
   // FIXME: the plan is for floating point numbers to no longer be
   // strideable; then this will drop the "OfStrideable"
-  expectType(ClosedRangeOfStrideable<Double>.self, &interval)
+  expectType(ClosedRange<Double>.self, &interval)
 
   expectCrashLater()
   _ = 1.0...0.0

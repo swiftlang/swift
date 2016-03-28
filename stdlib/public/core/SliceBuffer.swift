@@ -302,9 +302,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     }
   }
 
-  public typealias Indices = RangeOfStrideable<Int>
+  public typealias Indices = CountableRange<Int>
 
-  public var indices: RangeOfStrideable<Int> {
+  public var indices: CountableRange<Int> {
     return startIndex..<endIndex
   }
 

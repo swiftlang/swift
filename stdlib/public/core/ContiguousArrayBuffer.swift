@@ -542,9 +542,9 @@ extension _ContiguousArrayBuffer : Collection {
     return count
   }
 
-  public typealias Indices = RangeOfStrideable<Int>
+  public typealias Indices = CountableRange<Int>
 
-  public var indices: RangeOfStrideable<Int> {
+  public var indices: CountableRange<Int> {
     return startIndex..<endIndex
   }
 }

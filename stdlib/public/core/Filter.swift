@@ -221,7 +221,7 @@ public struct LazyFilterCollection<
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
 
     var index = i.base
-    for _ in 0..<n {
+    for _ in stride(from: 0, to: n, by: 1) {
       if _nextFilteredInPlace(&index) {
         break
       }
@@ -237,7 +237,7 @@ public struct LazyFilterCollection<
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
 
     var index = i.base
-    for _ in 0..<n {
+    for _ in stride(from: 0, to: n, by: 1) {
       if _nextFilteredInPlace(&index, limitedBy: limit.base) {
         break
       }

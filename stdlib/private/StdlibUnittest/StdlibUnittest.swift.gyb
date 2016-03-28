@@ -1181,34 +1181,34 @@ public enum TestRunPredicate : CustomStringConvertible {
   case osxAny(/*reason:*/ String)
   case osxMajor(Int, reason: String)
   case osxMinor(Int, Int, reason: String)
-  case osxMinorRange(Int, Range<Int>, reason: String)
+  case osxMinorRange(Int, ClosedRange<Int>, reason: String)
   case osxBugFix(Int, Int, Int, reason: String)
-  case osxBugFixRange(Int, Int, Range<Int>, reason: String)
+  case osxBugFixRange(Int, Int, ClosedRange<Int>, reason: String)
 
   case iOSAny(/*reason:*/ String)
   case iOSMajor(Int, reason: String)
   case iOSMinor(Int, Int, reason: String)
-  case iOSMinorRange(Int, Range<Int>, reason: String)
+  case iOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case iOSBugFix(Int, Int, Int, reason: String)
-  case iOSBugFixRange(Int, Int, Range<Int>, reason: String)
+  case iOSBugFixRange(Int, Int, ClosedRange<Int>, reason: String)
 
   case iOSSimulatorAny(/*reason:*/ String)
 
   case tvOSAny(/*reason:*/ String)
   case tvOSMajor(Int, reason: String)
   case tvOSMinor(Int, Int, reason: String)
-  case tvOSMinorRange(Int, Range<Int>, reason: String)
+  case tvOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case tvOSBugFix(Int, Int, Int, reason: String)
-  case tvOSBugFixRange(Int, Int, Range<Int>, reason: String)
+  case tvOSBugFixRange(Int, Int, ClosedRange<Int>, reason: String)
 
   case tvOSSimulatorAny(/*reason:*/ String)
 
   case watchOSAny(/*reason:*/ String)
   case watchOSMajor(Int, reason: String)
   case watchOSMinor(Int, Int, reason: String)
-  case watchOSMinorRange(Int, Range<Int>, reason: String)
+  case watchOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case watchOSBugFix(Int, Int, Int, reason: String)
-  case watchOSBugFixRange(Int, Int, Range<Int>, reason: String)
+  case watchOSBugFixRange(Int, Int, ClosedRange<Int>, reason: String)
 
   case watchOSSimulatorAny(/*reason:*/ String)
 

@@ -819,7 +819,9 @@ UTF8Decoder.test("Internal/_isValidUTF8") {
 
   // Ensure we have no false positives
   var n = 0
-  func countValidSequences(head head: Range<UInt32>, tail: Range<UInt32>) {
+  func countValidSequences(
+    head head: CountableClosedRange<UInt32>, tail: CountableClosedRange<UInt32>
+  ) {
     for cu0 in head {
       for rest in tail {
         let data = rest << 8 | cu0
