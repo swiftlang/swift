@@ -50,7 +50,7 @@ struct DistanceToTest {
   }
 }
 
-struct AvanceByTest {
+struct AdvanceByTest {
   let startIndex: Int
   let distance: Int
   let limit: Int?
@@ -93,53 +93,53 @@ let distanceToTests = [
 ]
 
 let advancedByTests = [
-  AvanceByTest(
+  AdvanceByTest(
     startIndex: 0,
     distance: 0,
     expectedIndex: 0
   ),
-  AvanceByTest(
+  AdvanceByTest(
     startIndex: 0,
     distance: -1,
     expectedIndex: -1
   ),
-  AvanceByTest(
+  AdvanceByTest(
     startIndex: 0,
     distance: 0,
     expectedIndex: 0,
     limitedBy: 0
   ),
-  AvanceByTest(
+  AdvanceByTest(
     startIndex: 0,
     distance: 0,
     expectedIndex: 0,
     limitedBy: 10
   ),
-  AvanceByTest(
+  AdvanceByTest(
     startIndex: 0,
     distance: 10,
     expectedIndex: 0,
     limitedBy: 0
   ),
-  AvanceByTest(
+  AdvanceByTest(
     startIndex: 0,
     distance: -10,
     expectedIndex: 0,
     limitedBy: 0
   ),
-  AvanceByTest(
+  AdvanceByTest(
     startIndex: 0,
     distance: 10,
     expectedIndex: 10,
     limitedBy: 10
   ),
-  AvanceByTest(
+  AdvanceByTest(
     startIndex: 0,
     distance: 20,
     expectedIndex: 10,
     limitedBy: 10
   ),
-  AvanceByTest(
+  AdvanceByTest(
     startIndex: 10,
     distance: -20,
     expectedIndex: 0,
