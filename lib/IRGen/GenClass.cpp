@@ -169,7 +169,7 @@ namespace {
     unsigned NumInherited = 0;
 
     // Does the class metadata require dynamic initialization above and
-    // beond what the runtime can automatically achieve?
+    // beyond what the runtime can automatically achieve?
     //
     // This is true if the class or any of its ancestors:
     //   - is generic,

@@ -168,7 +168,7 @@ def main():
      normal_perf_list) = sort_ratio_list(ratio_list, args.changes_only)
 
     """
-    Create markdown formated table
+    Create markdown formatted table
     """
     test_name_width = max_width(ratio_list, title='TEST', key_len=True)
     new_time_width = max_width(new_results, title=new_branch)
@@ -245,7 +245,7 @@ def main():
     if args.format:
         if args.format.lower() == "html":
             """
-            Create HTML formated table
+            Create HTML formatted table
             """
             html_data = convert_to_html(ratio_list, old_results, new_results,
                                         delta_list, unknown_list, old_branch,
