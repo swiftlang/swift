@@ -405,7 +405,7 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
-    return _elements.index(n, stepsFrom: i, limit: limit)
+    return _elements.index(n, stepsFrom: i, limitedBy: limit)
   }
 
   // TODO: swift-3-indexing-model - add docs

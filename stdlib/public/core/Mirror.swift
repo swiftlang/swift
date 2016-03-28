@@ -120,7 +120,7 @@ public struct Mirror {
   /// might write:
   ///
   ///     if let b = AnyBidirectionalCollection(someMirror.children) {
-  ///       for i in b.endIndex.advanced(by: -20, limit: b.startIndex)..<b.endIndex {
+  ///       for i in b.endIndex.advanced(by: -20, limitedBy: b.startIndex)..<b.endIndex {
   ///          print(b[i])
   ///       }
   ///     }
@@ -413,7 +413,7 @@ extension Mirror {
   ///
   ///     var d = nil
   ///     let children = Mirror(reflecting: x).children
-  ///     let p0 = children.startIndex.advanced(by: 1, limit: children.endIndex)
+  ///     let p0 = children.startIndex.advanced(by: 1, limitedBy: children.endIndex)
   ///     if p0 != children.endIndex {
   ///       let grandChildren = Mirror(reflecting: children[p0].value).children
   ///       SeekTwo: for g in grandChildren {
@@ -421,7 +421,7 @@ extension Mirror {
   ///           let greatGrandChildren = Mirror(reflecting: g.value).children
   ///           let p1 = greatGrandChildren.startIndex.advanced(
   ///             by: 3,
-  ///             limit: greatGrandChildren.endIndex)
+  ///             limitedBy: greatGrandChildren.endIndex)
   ///           if p1 != endIndex { d = greatGrandChildren[p1].value }
   ///           break SeekTwo
   ///         }
@@ -449,7 +449,7 @@ extension Mirror {
         position = children.index(offset,
           stepsFrom: 
           children.startIndex,
-          limit: children.endIndex)
+          limitedBy: children.endIndex)
       }
       else {
         _preconditionFailure(

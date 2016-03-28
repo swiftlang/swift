@@ -553,7 +553,7 @@ extension Sequence where
   public func dropFirst(n: Int) -> AnySequence<Iterator.Element> {
     precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
-    return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: n))
+    return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limitedBy: n))
   }
 
   /// Returns a subsequence containing all but the last `n` elements.

@@ -378,7 +378,7 @@ extension Indexable {
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
-    return self._advanceForward(i, by: n, limit: limit)
+    return self._advanceForward(i, by: n, limitedBy: limit)
   }
 
   @warn_unused_result
@@ -613,7 +613,7 @@ extension Collection {
   @warn_unused_result
   public func dropFirst(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-    let start = index(numericCast(n), stepsFrom: startIndex, limit: endIndex)
+    let start = index(numericCast(n), stepsFrom: startIndex, limitedBy: endIndex)
     return self[start..<endIndex]
   }
 
@@ -626,7 +626,7 @@ extension Collection {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
-    let end = index(numericCast(amount), stepsFrom: startIndex, limit: endIndex)
+    let end = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
     return self[startIndex..<end]
   }
 
@@ -643,7 +643,7 @@ extension Collection {
     _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
-    let end = index(numericCast(maxLength), stepsFrom: startIndex, limit: endIndex)
+    let end = index(numericCast(maxLength), stepsFrom: startIndex, limitedBy: endIndex)
     return self[startIndex..<end]
   }
 
@@ -661,7 +661,7 @@ extension Collection {
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
     let amount = Swift.max(0, numericCast(count) - maxLength)
-    let start = index(numericCast(amount), stepsFrom: startIndex, limit: endIndex)
+    let start = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
     return self[start..<endIndex]
   }
 

@@ -107,7 +107,7 @@ internal func _checkIncrementalAdvance<
     for _ in 0...(d * sign).toIntMax() {
 // TODO: swift-3-indexing-model - Review what we need to do here, unittest is focusing on wrong class now
       let j = i//.advanced(by: offset)
-      let k = i//.advanced(by: offset + sign, limit: limit)
+      let k = i//.advanced(by: offset + sign, limitedBy: limit)
       let jAtLimit = offset == d
       if jAtLimit {
         expectEqual(limit, j, ${trace})

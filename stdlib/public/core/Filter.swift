@@ -238,7 +238,7 @@ public struct LazyFilterCollection<
 
     var index = i.base
     for _ in 0..<n {
-      if _nextFilteredInPlace(&index, limit: limit.base) {
+      if _nextFilteredInPlace(&index, limitedBy: limit.base) {
         break
       }
     }

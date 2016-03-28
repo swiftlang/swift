@@ -79,7 +79,7 @@ extension BidirectionalIndexable {
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     if n >= 0 {
-      return _advanceForward(i, by: n, limit: limit)
+      return _advanceForward(i, by: n, limitedBy: limit)
     }
     var i = i
     // FIXME: swift-3-indexing-model: There's a corner case here, -IntXX.min is
@@ -214,7 +214,7 @@ extension BidirectionalCollection {
   public func dropLast(n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
-    let end = index(numericCast(-n), stepsFrom: endIndex, limit: startIndex)
+    let end = index(numericCast(-n), stepsFrom: endIndex, limitedBy: startIndex)
     return self[startIndex..<end]
   }
 
@@ -231,7 +231,7 @@ extension BidirectionalCollection {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    let start = index(numericCast(-maxLength), stepsFrom: endIndex, limit: startIndex)
+    let start = index(numericCast(-maxLength), stepsFrom: endIndex, limitedBy: startIndex)
     return self[start..<endIndex]
   }
 }

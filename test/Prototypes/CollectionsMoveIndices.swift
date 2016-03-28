@@ -551,7 +551,7 @@ extension MyForwardCollectionType {
 
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
-    return self._advanceForward(i, by: n, limit: limit)
+    return self._advanceForward(i, by: n, limitedBy: limit)
   }
 
   @warn_unused_result
@@ -601,7 +601,7 @@ extension MyForwardCollectionType {
   @warn_unused_result
   public func dropFirst(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-    let start = index(numericCast(n), stepsFrom: startIndex, limit: endIndex)
+    let start = index(numericCast(n), stepsFrom: startIndex, limitedBy: endIndex)
     return self[start..<*endIndex]
   }
 
@@ -609,14 +609,14 @@ extension MyForwardCollectionType {
   public func dropLast(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = max(0, numericCast(count) - n)
-    let end = index(numericCast(amount), stepsFrom: startIndex, limit: endIndex)
+    let end = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
     return self[startIndex..<*end]
   }
 
   @warn_unused_result
   public func prefix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a prefix of negative length from a collection")
-    let end = index(numericCast(maxLength), stepsFrom: startIndex, limit: endIndex)
+    let end = index(numericCast(maxLength), stepsFrom: startIndex, limitedBy: endIndex)
     return self[startIndex..<*end]
   }
 
@@ -624,7 +624,7 @@ extension MyForwardCollectionType {
   public func suffix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
     let amount = max(0, numericCast(count) - maxLength)
-    let start = index(numericCast(amount), stepsFrom: startIndex, limit: endIndex)
+    let start = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
     return self[start..<*endIndex]
   }
 }
@@ -764,7 +764,7 @@ extension MyBidirectionalCollectionType {
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     if n >= 0 {
-      return _advanceForward(i, by: n, limit: limit)
+      return _advanceForward(i, by: n, limitedBy: limit)
     }
     var i = i
     for var offset: IndexDistance = n; offset != 0 && i != limit;
