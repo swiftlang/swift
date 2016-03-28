@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir | FileCheck %s
 
+// FIXME: SR-1071 test or compiler has an incorrect 64-bit dependency
+// UNSUPPORTED: PTRSIZE=32
+
 sil_stage canonical
 import c_layout
 
