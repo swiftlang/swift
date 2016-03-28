@@ -518,7 +518,7 @@ bool IAMInference::match(StringRef str, StringRef toMatch, NameBuffer &outStr) {
 
 // A loose type equality check that disregards all sugar, qualification, looks
 // through pointers, etc.
-static bool rouglyEqual(clang::QualType left, clang::QualType right) {
+static bool roughlyEqual(clang::QualType left, clang::QualType right) {
   auto leftPointee = left->getPointeeType();
   if (leftPointee != clang::QualType())
     left = leftPointee;
@@ -550,7 +550,7 @@ bool IAMInference::validToImportAsProperty(
     }
 
     // Setter's arg type should be same as getter's return type
-    if (!rouglyEqual(getterTy, setterDecl->getParamDecl(0)->getType())) {
+    if (!roughlyEqual(getterTy, setterDecl->getParamDecl(0)->getType())) {
       ++InvalidPropertyStaticGetterSetterType;
       return false;
     }
@@ -569,16 +569,16 @@ bool IAMInference::validToImportAsProperty(
   auto setterParam0Ty = setterDecl->getParamDecl(0)->getType();
   auto setterParam1Ty = setterDecl->getParamDecl(1)->getType();
 
-  if (rouglyEqual(setterParam0Ty, selfTy)) {
+  if (roughlyEqual(setterParam0Ty, selfTy)) {
     setterTy = setterParam1Ty;
-  } else if (rouglyEqual(setterParam1Ty, selfTy)) {
+  } else if (roughlyEqual(setterParam1Ty, selfTy)) {
     setterTy = setterParam0Ty;
   } else {
     ++InvalidPropertyInstanceNoSelf;
     return false;
   }
 
-  if (!rouglyEqual(setterTy, getterTy)) {
+  if (!roughlyEqual(setterTy, getterTy)) {
     ++InvalidPropertyInstanceGetterSetterType;
     return false;
   }
