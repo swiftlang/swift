@@ -2850,6 +2850,15 @@ namespace {
         return { false, expr };
       }
 
+      // Don't visit CoerceExpr with an empty sub expression. They may occur
+      // if the body of a closure was not visited while pre-checking because
+      // of an error in the closure's signature
+      if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
+        if (!coerceExpr->getSubExpr()) {
+          return { false, expr };
+        }
+      }
+
       return { true, expr };
     }
 
