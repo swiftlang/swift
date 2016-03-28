@@ -545,12 +545,12 @@ extension MyForwardCollectionType {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     return self._advanceForward(i, by: n)
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     return self._advanceForward(i, by: n, limitedBy: limit)
   }
 
@@ -674,14 +674,14 @@ extension MyForwardCollectionType
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     _precondition(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     return i.advancedBy(n)
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     let d = i.distanceTo(limit)
@@ -750,7 +750,7 @@ extension MyBidirectionalCollectionType {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
@@ -762,7 +762,7 @@ extension MyBidirectionalCollectionType {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n, limitedBy: limit)
     }
@@ -785,12 +785,12 @@ extension MyBidirectionalCollectionType
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     return i.advancedBy(n)
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     let d = i.distanceTo(limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit

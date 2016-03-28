@@ -124,10 +124,10 @@ public protocol Indexable : IndexableBase {
   associatedtype IndexDistance : SignedInteger = Int
 
   @warn_unused_result
-  func advance(i: Index, by n: IndexDistance) -> Index
+  func index(n: IndexDistance, stepsFrom i: Index) -> Index
 
   @warn_unused_result
-  func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index
+  func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index
 
   @warn_unused_result
   func distance(from start: Index, to end: Index) -> IndexDistance
@@ -300,7 +300,7 @@ public protocol Collection : Indexable, Sequence {
   ///   - O(1) if conforming to `RandomAccessCollection`
   ///   - O(`abs(n)`) otherwise
   @warn_unused_result
-  func advance(i: Index, by n: IndexDistance) -> Index
+  func index(n: IndexDistance, stepsFrom i: Index) -> Index
 
   /// Returns the result of advancing `self` by `n` positions, or until it
   /// equals `limit`.
@@ -318,7 +318,7 @@ public protocol Collection : Indexable, Sequence {
   ///   - O(1) if conforming to `RandomAccessCollection`
   ///   - O(`abs(n)`) otherwise
   @warn_unused_result
-  func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index
+  func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index
 
   /// Measure the distance between `start` and `end` indexes.
   ///
@@ -370,13 +370,13 @@ extension Indexable {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n)
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n, limitedBy: limit)
   }
@@ -442,7 +442,7 @@ extension Indexable where Index : Strideable {
 
   /*
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: range check i
@@ -452,7 +452,7 @@ extension Indexable where Index : Strideable {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: range check i

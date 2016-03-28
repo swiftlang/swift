@@ -131,7 +131,7 @@ struct InstrumentedCollection<
     base._previousInPlace(&i)
   }
 
-  func advance(i: Index, by n: IndexDistance) -> Index {
+  func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     callCounts["advance(_:by:)"]! += 1
     return base.index(n, stepsFrom: i)
   }

@@ -561,13 +561,13 @@ extension String {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     return characters.index(n, stepsFrom: i)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     return characters.index(n, stepsFrom: i, limitedBy: limit)
   }
 

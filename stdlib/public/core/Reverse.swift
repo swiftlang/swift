@@ -103,13 +103,13 @@ public struct ReversedCollection<
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     return ReversedIndex(_base.index(-n, stepsFrom: i.base))
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     //return ReversedIndex(_base.index(-n, stepsFrom: i.base, limitedBy: ???)
     fatalError("FIXME: swift-3-indexing-model")
@@ -216,14 +216,14 @@ public struct ReversedRandomAccessCollection<
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     // FIXME: swift-3-indexing-model: tests.
     return ReversedRandomAccessIndex(_base.index(-n, stepsFrom: i.base))
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     // FIXME: swift-3-indexing-model: tests.
     return Index(_base.index(-n, stepsFrom: i.base, limitedBy: limit.base))

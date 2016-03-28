@@ -190,10 +190,10 @@ internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element> {
   var first: Iterator.Element? { get }
 
   @warn_unused_result
-  func advance(i: Index, by n: IndexDistance) -> Index
+  func index(n: IndexDistance, stepsFrom i: Index) -> Index
 
   @warn_unused_result
-  func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index
+  func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index
 
   @warn_unused_result
   func distance(from start: Index, to end: Index) -> IndexDistance
