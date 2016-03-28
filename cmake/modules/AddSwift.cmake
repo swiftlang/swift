@@ -1847,7 +1847,7 @@ endfunction()
 function(add_swift_target_executable name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE_TARGET
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
+    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR;BUILD_WITH_STDLIB"
     ""
     "DEPENDS;COMPONENT_DEPENDS;LINK_FAT_LIBRARIES"
     ${ARGN})
@@ -1885,6 +1885,10 @@ function(add_swift_target_executable name)
         # By default, don't build executables for target SDKs to avoid building
         # target stdlibs.
         set(SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT "EXCLUDE_FROM_ALL")
+      endif()
+
+      if(SWIFTEXE_TARGET_BUILD_WITH_STDLIB)
+        add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}" ${VARIANT_NAME})
       endif()
 
       # Don't add the ${arch} to the suffix.  We want to link against fat

@@ -1,4 +1,4 @@
-//===--- swift-reflection-test.cpp - Reflection testing application -------===//
+//===--- swift-reflection-dump.cpp - Reflection testing application -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,198 +9,24 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+// This file supports performing target-specific remote reflection tests
+// on live swift executables.
+//===----------------------------------------------------------------------===//
 
-#include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Demangle.h"
-#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
-#include "llvm/Object/Archive.h"
-#include "llvm/Object/MachO.h"
-#include "llvm/Object/MachOUniversal.h"
-#include "llvm/Object/ELF.h"
-#include "llvm/Support/CommandLine.h"
-
+#include "llvm/ADT/Optional.h"
 #include "messages.h"
 
 #include <unistd.h>
-
-#include <algorithm>
-#include <iostream>
-#include <csignal>
-
-using llvm::dyn_cast;
-using llvm::StringRef;
-using llvm::ArrayRef;
-using namespace llvm::object;
 
 using namespace swift;
 using namespace reflection;
 using namespace Demangle;
 
-namespace {
-
-enum class ActionType {
-  None,
-  DumpReflectionSections,
-  DumpHeapInstance
-};
-
-} // end anonymous namespace
-
-namespace options {
-static llvm::cl::opt<ActionType>
-Action(llvm::cl::desc("Mode:"),
-       llvm::cl::values(
-         clEnumValN(ActionType::DumpReflectionSections,
-                    "dump-reflection-sections",
-                    "Dump the field reflection section"),
-         clEnumValN(ActionType::DumpHeapInstance,
-                    "dump-heap-instance",
-                    "Dump the field layout for a heap instance by running "
-                    "a Swift executable"),
-         clEnumValEnd));
-
-static llvm::cl::opt<std::string>
-BinaryFilename("binary-filename", llvm::cl::desc("Filename of the binary file"),
-               llvm::cl::Required);
-
-static llvm::cl::opt<std::string>
-Architecture("arch", llvm::cl::desc("Architecture to inspect in the binary"),
-             llvm::cl::Required);
-} // end namespace options
-
-
-static void guardError(std::error_code error) {
-  if (!error) return;
-  std::cerr << "swift-reflection-test error: " << error.message() << "\n";
-  exit(EXIT_FAILURE);
-}
-
 static void errorAndExit(const std::string &message) {
   std::cerr << message << ": " << strerror(errno) << std::endl;
   exit(EXIT_FAILURE);
-}
-
-static llvm::object::SectionRef
-getSectionRef(const ObjectFile *objectFile,
-              ArrayRef<StringRef> anySectionNames) {
-  for (auto section : objectFile->sections()) {
-    StringRef sectionName;
-    section.getName(sectionName);
-    for (auto desiredName : anySectionNames) {
-      if (sectionName.equals(desiredName)) {
-        return section;
-      }
-    }
-  }
-  return llvm::object::SectionRef();
-}
-
-static llvm::object::SectionRef
-getSectionRef(const Binary *binaryFile, StringRef arch,
-              ArrayRef<StringRef> anySectionNames) {
-  if (auto objectFile = dyn_cast<ObjectFile>(binaryFile))
-    return getSectionRef(objectFile, anySectionNames);
-  if (auto machoUniversal = dyn_cast<MachOUniversalBinary>(binaryFile)) {
-    const auto objectOrError = machoUniversal->getObjectForArch(arch);
-    guardError(objectOrError.getError());
-    return getSectionRef(objectOrError.get().get(), anySectionNames);
-  }
-  return SectionRef();
-}
-
-static int doDumpReflectionSections(std::string BinaryFilename,
-                                    StringRef arch) {
-  auto binaryOrError = llvm::object::createBinary(BinaryFilename);
-  guardError(binaryOrError.getError());
-
-  const auto binary = binaryOrError.get().getBinary();
-
-  auto FieldSectionRef = getSectionRef(binary, arch, {
-    "__swift3_fieldmd", ".swift3_fieldmd"
-  });
-
-  if (FieldSectionRef.getObject() == nullptr) {
-    std::cerr << BinaryFilename;
-    std::cerr << " doesn't have a field reflection section!\n";
-    return EXIT_FAILURE;
-  }
-
-  auto AssociatedTypeSectionRef = getSectionRef(binary, arch, {
-    "__swift3_assocty", ".swift3_assocty"
-  });
-
-  if (AssociatedTypeSectionRef.getObject() == nullptr) {
-    std::cerr << BinaryFilename;
-    std::cerr << " doesn't have an associated type reflection section!\n";
-    return EXIT_FAILURE;
-  }
-
-  auto ReflectionStringsSectionRef = getSectionRef(binary, arch, {
-    "__swift3_reflstr", ".swift3_reflstr"
-  });
-
-  if (ReflectionStringsSectionRef.getObject() == nullptr) {
-    std::cerr << BinaryFilename;
-    std::cerr << " doesn't have an associated reflection strings section!\n";
-    return EXIT_FAILURE;
-  }
-
-  auto TypeRefSectionRef = getSectionRef(binary, arch, {
-    "__swift3_typeref", ".swift3_typeref"
-  });
-
-  if (TypeRefSectionRef.getObject() == nullptr) {
-    std::cerr << BinaryFilename;
-    std::cerr << " doesn't have an associated typeref section!\n";
-    return EXIT_FAILURE;
-  }
-
-  StringRef FieldSectionContents;
-  FieldSectionRef.getContents(FieldSectionContents);
-
-  const FieldSection fieldSection {
-    reinterpret_cast<const void *>(FieldSectionContents.begin()),
-    reinterpret_cast<const void *>(FieldSectionContents.end())
-  };
-
-  StringRef AssociatedTypeSectionContents;
-  AssociatedTypeSectionRef.getContents(AssociatedTypeSectionContents);
-
-  const AssociatedTypeSection associatedTypeSection {
-    reinterpret_cast<const void *>(AssociatedTypeSectionContents.begin()),
-    reinterpret_cast<const void *>(AssociatedTypeSectionContents.end())
-  };
-
-  StringRef ReflectionStringsSectionContents;
-  ReflectionStringsSectionRef.getContents(ReflectionStringsSectionContents);
-
-  const GenericSection ReflectionStringsSection {
-    reinterpret_cast<const void *>(ReflectionStringsSectionContents.begin()),
-    reinterpret_cast<const void *>(ReflectionStringsSectionContents.end())
-  };
-
-  StringRef TypeRefSectionContents;
-  AssociatedTypeSectionRef.getContents(TypeRefSectionContents);
-
-  const GenericSection TypeRefSection {
-    reinterpret_cast<const void *>(TypeRefSectionContents.begin()),
-    reinterpret_cast<const void *>(TypeRefSectionContents.end())
-  };
-
-  InProcessMemoryReader Reader;
-  ReflectionContext<External<RuntimeTarget<8>>> RC(Reader);
-  RC.addReflectionInfo({
-    BinaryFilename,
-    fieldSection,
-    associatedTypeSection,
-    ReflectionStringsSection,
-    TypeRefSection,
-  });
-  RC.dumpAllSections(std::cout);
-
-  return EXIT_SUCCESS;
 }
 
 namespace {
@@ -255,9 +81,11 @@ struct RemoteReflectionInfo {
 };
 }
 
+
 template <typename Runtime>
 class PipeMemoryReader : public MemoryReader {
   using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSize = typename Runtime::StoredSize;
 
   static constexpr size_t ReadEnd = 0;
   static constexpr size_t WriteEnd = 1;
@@ -318,7 +146,7 @@ public:
     StoredPointer TargetAddress = (StoredPointer)Address;
     write(getParentWriteFD(), REQUEST_READ_BYTES, 2);
     write(getParentWriteFD(), &TargetAddress, sizeof(TargetAddress));
-    write(getParentWriteFD(), &Size, sizeof(Size));
+    write(getParentWriteFD(), &Size, sizeof(StoredSize));
     collectBytesFromPipe(Dest, Size);
     return true;
   }
@@ -360,16 +188,16 @@ public:
 
   std::vector<ReflectionInfo> receiveReflectionInfo() {
     write(getParentWriteFD(), REQUEST_REFLECTION_INFO, 2);
-    uint64_t NumReflectionInfos = 0;
+    StoredSize NumReflectionInfos = 0;
     collectBytesFromPipe(&NumReflectionInfos, sizeof(NumReflectionInfos));
 
     std::vector<RemoteReflectionInfo<Runtime>> RemoteInfos;
-    for (uint64_t i = 0; i < NumReflectionInfos; ++i) {
-      uint64_t ImageNameLength;
+    for (StoredSize i = 0; i < NumReflectionInfos; ++i) {
+      StoredSize ImageNameLength;
       collectBytesFromPipe(&ImageNameLength, sizeof(ImageNameLength));
       char c;
       std::string ImageName;
-      for (uint64_t i = 0; i < ImageNameLength; ++i) {
+      for (StoredSize i = 0; i < ImageNameLength; ++i) {
         collectBytesFromPipe(&c, 1);
         ImageName.push_back(c);
       }
@@ -456,6 +284,7 @@ public:
   }
 };
 
+
 template <typename Runtime>
 static int doDumpHeapInstance(std::string BinaryFilename) {
   using StoredPointer = typename Runtime::StoredPointer;
@@ -487,8 +316,8 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
 
       StoredPointer instance = Pipe.receiveInstanceAddress();
       assert(instance);
-      std::cerr << "Parent: instance pointer in child address space: 0x";
-      std::cerr << std::hex << instance << std::endl;
+      std::cout << "Parent: instance pointer in child address space: 0x";
+      std::cout << std::hex << instance << std::endl;
 
       StoredPointer isa;
       if (!Pipe.readInteger(instance, &isa))
@@ -497,17 +326,17 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
       for (auto &Info : Pipe.receiveReflectionInfo())
         RC.addReflectionInfo(Info);
 
-      std::cerr << "Parent: metadata pointer in child address space: 0x";
-      std::cerr << std::hex << isa << std::endl;
+      std::cout << "Parent: metadata pointer in child address space: 0x";
+      std::cout << std::hex << isa << std::endl;
 
-      std::cerr << "Decoding type reference ..." << std::endl;
+      std::cout << "Decoding type reference ..." << std::endl;
       auto TR = RC.getTypeRef(isa);
-      TR->dump();
+      TR->dump(std::cout, 0);
 
       auto Fields = RC.getFieldTypeRefs(isa);
       for (auto &Field : Fields) {
         std::cout << Field.first << ":\n";
-        Field.second->dump();
+        Field.second->dump(std::cout , 0);
         // TODO: Print field layout here.
         std::cout << std::endl;
       }
@@ -519,36 +348,35 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
   return EXIT_SUCCESS;
 }
 
-int main(int argc, char *argv[]) {
-  llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Test\n");
-  switch (options::Action) {
-  case ActionType::DumpReflectionSections:
-    return doDumpReflectionSections(options::BinaryFilename,
-                                    options::Architecture);
-  case ActionType::DumpHeapInstance: {
-    StringRef arch = options::Architecture;
-    unsigned PointerSize = 0;
-    if (arch == "x86_64")
-      PointerSize = 8;
-    else if (arch == "i386")
-      PointerSize = 4;
-    else if (arch == "arm64")
-      PointerSize = 8;
-    else if (arch == "arm" || arch == "armv7" || arch == "armv7s")
-      PointerSize = 4;
-    else if (arch == "armv7k")
-      PointerSize = 4;
-    else
-      errorAndExit("Unsupported architecture");
+void printUsageAndExit() {
+  std::cerr << "swift-reflection-test <arch> <binary filename>" << std::endl;
+  exit(EXIT_FAILURE);
+}
 
-    if (PointerSize == 4)
-      return doDumpHeapInstance<External<RuntimeTarget<4>>>(options::BinaryFilename);
-    else
-      return doDumpHeapInstance<External<RuntimeTarget<8>>>(options::BinaryFilename);
-  }
-  case ActionType::None:
-    llvm::cl::PrintHelpMessage();
-    return EXIT_FAILURE;
-    break;
-  }
+int main(int argc, char *argv[]) {
+
+  if (argc != 3)
+    printUsageAndExit();
+
+  std::string arch(argv[1]);
+  std::string BinaryFilename(argv[2]);
+
+  unsigned PointerSize = 0;
+  if (arch == "x86_64")
+    PointerSize = 8;
+  else if (arch == "i386")
+    PointerSize = 4;
+  else if (arch == "arm64")
+    PointerSize = 8;
+  else if (arch == "arm" || arch == "armv7" || arch == "armv7s")
+    PointerSize = 4;
+  else if (arch == "armv7k")
+    PointerSize = 4;
+  else
+    errorAndExit("Unsupported architecture");
+
+  if (PointerSize == 4)
+    return doDumpHeapInstance<External<RuntimeTarget<4>>>(BinaryFilename);
+  else
+    return doDumpHeapInstance<External<RuntimeTarget<8>>>(BinaryFilename);
 }
