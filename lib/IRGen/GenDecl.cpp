@@ -1142,25 +1142,67 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
   llvm_unreachable("bad link entity kind");
 }
 
+static bool isAvailableExternally(IRGenModule &IGM, DeclContext *dc) {
+  dc = dc->getModuleScopeContext();
+  if (isa<ClangModuleUnit>(dc) ||
+      dc == IGM.SILMod->getAssociatedContext())
+    return false;
+  return true;
+}
+
+static bool isAvailableExternally(IRGenModule &IGM, Decl *decl) {
+  return isAvailableExternally(IGM, decl->getDeclContext());
+}
+
+static bool isAvailableExternally(IRGenModule &IGM, Type type) {
+  if (auto decl = type->getAnyNominal())
+    return isAvailableExternally(IGM, decl->getDeclContext());
+  return true;
+}
+
 bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
-  // FIXME: Removing this triggers a linker bug
-  if (getKind() == Kind::ObjCClass ||
-      getKind() == Kind::ObjCMetaclass)
-    return true;
+  switch (getKind()) {
+  case Kind::ValueWitnessTable:
+  case Kind::TypeMetadata:
+    return ::isAvailableExternally(IGM, getType());
 
-  // This is a conservative estimate. For now, we say if the decl was defined
-  // in the same TU (not just the same module), it is not external.
-  if (isDeclKind(getKind())) {
-    auto *DC = getDecl()->getDeclContext()->getModuleScopeContext();
-    if (isa<ClangModuleUnit>(DC) ||
-        DC == IGM.SILMod->getAssociatedContext())
-      return false;
-  }
-
-  if (!hasPublicVisibility(getLinkage(IGM, NotForDefinition)))
+  case Kind::ForeignTypeMetadataCandidate:
+    assert(!::isAvailableExternally(IGM, getType()));
     return false;
 
-  return true;
+  case Kind::ObjCClass:
+  case Kind::ObjCMetaclass:
+    // FIXME: Removing this triggers a linker bug
+    return true;
+
+  case Kind::SwiftMetaclassStub:
+  case Kind::NominalTypeDescriptor:
+  case Kind::ProtocolDescriptor:
+    return ::isAvailableExternally(IGM, getDecl());
+
+  case Kind::DirectProtocolWitnessTable:
+    return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
+
+  case Kind::TypeMangling:
+  case Kind::ValueWitness:
+  case Kind::WitnessTableOffset:
+  case Kind::TypeMetadataAccessFunction:
+  case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::Function:
+  case Kind::Other:
+  case Kind::FieldOffset:
+  case Kind::ProtocolWitnessTableAccessFunction:
+  case Kind::ProtocolWitnessTableLazyAccessFunction:
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+  case Kind::AssociatedTypeMetadataAccessFunction:
+  case Kind::AssociatedTypeWitnessTableAccessFunction:
+  case Kind::GenericProtocolWitnessTableCache:
+  case Kind::GenericProtocolWitnessTableInstantiationFunction:
+  case Kind::SILFunction:
+  case Kind::SILGlobalVariable:
+    llvm_unreachable("Relative reference to unsupported link entity");
+  }
+  llvm_unreachable("bad link entity kind");
 }
 
 bool LinkEntity::isFragile(IRGenModule &IGM) const {
