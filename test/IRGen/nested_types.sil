@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
 
-// FIXME: SR-1071 test or compiler has an incorrect 64-bit dependency
-// UNSUPPORTED: PTRSIZE=32
-
 sil_stage canonical
 
 import Builtin
@@ -36,6 +33,6 @@ bb0(%0 : $@thick Outer.Inner.Type):
 
 // CHECK-LABEL: define private void @initialize_metadata_Inner
 // CHECK:      [[T0:%.*]] = call %swift.type* @_TMaC12nested_types5Outer()
-// CHECK-NEXT: store %swift.type* [[T0]], %swift.type** getelementptr inbounds (%swift.type*, %swift.type** bitcast ({{.*}} @_TMfVC12nested_types5Outer5Inner{{.*}}, i64 2), align
+// CHECK-NEXT: store %swift.type* [[T0]], %swift.type** getelementptr inbounds (%swift.type*, %swift.type** bitcast ({{.*}} @_TMfVC12nested_types5Outer5Inner{{.*}}, [[INT:i[0-9]+]] 2), align
 // CHECK-NEXT: store atomic %swift.type* bitcast ({{.*}} @_TMfVC12nested_types5Outer5Inner{{.*}} to %swift.type*), %swift.type** @_TMLVC12nested_types5Outer5Inner release, align
 // CHECK-NEXT: ret void

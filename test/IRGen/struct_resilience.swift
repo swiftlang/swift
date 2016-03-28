@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | FileCheck %s
 // RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
 
-// FIXME: SR-1071 test or compiler has an incorrect 64-bit dependency
-// UNSUPPORTED: PTRSIZE=32
-
 import resilient_struct
 import resilient_enum
 
@@ -151,7 +148,7 @@ public struct StructWithIndirectResilientEnum {
 
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_StructWithResilientStorage(i8*)
 // CHECK: [[FIELDS:%.*]] = alloca [4 x i8**]
-// CHECK: [[VWT:%.*]] = load i8**, i8*** getelementptr inbounds ({{.*}} @_TMfV17struct_resilience26StructWithResilientStorage{{.*}}, i64 -1)
+// CHECK: [[VWT:%.*]] = load i8**, i8*** getelementptr inbounds ({{.*}} @_TMfV17struct_resilience26StructWithResilientStorage{{.*}}, [[INT]] -1)
 
 // CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [4 x i8**], [4 x i8**]* [[FIELDS]], i32 0, i32 0
 

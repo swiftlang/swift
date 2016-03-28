@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir | FileCheck %s
 
-// FIXME: SR-1071 test or compiler has an incorrect 64-bit dependency
-// UNSUPPORTED: PTRSIZE=32
-
 sil_stage canonical
 import c_layout
 
@@ -10,9 +7,9 @@ import c_layout
 // CHECK-SAME:  void (%swift.type*)* @initialize_metadata___Unnamed_struct_s,
 // CHECK-SAME:  i8* getelementptr inbounds
 // CHECK-SAME:  %swift.type* null,
-// CHECK-SAME:  i64 1,
-// CHECK-SAME:  @_TWVVVSC14HasNestedUnion18__Unnamed_struct_s
 // CHECK-SAME:  [[INT:i[0-9]+]] 1,
+// CHECK-SAME:  @_TWVVVSC14HasNestedUnion18__Unnamed_struct_s
+// CHECK-SAME:  [[INT]] 1,
 // CHECK-SAME:  [[INT]] sub ({{.*}}),
 // CHECK-SAME:  %swift.type* null,
 // CHECK-SAME:  i64 0,
@@ -29,6 +26,6 @@ bb0:
 // CHECK-LABEL: define private void @initialize_metadata___Unnamed_struct_s
 // CHECK:       [[PARENT:%.*]] = call %swift.type* @_TMaVSC14HasNestedUnion()
 // CHECK-NEXT:  [[T0:%.]] = bitcast %swift.type* %0 to %swift.type**
-// CHECK-NEXT:  [[T1:%.]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 2
+// CHECK-NEXT:  [[T1:%.]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], [[INT]] 2
 // CHECK-NEXT:  store %swift.type* [[PARENT]], %swift.type** [[T1]],
 // CHECK-NEXT:  ret void
