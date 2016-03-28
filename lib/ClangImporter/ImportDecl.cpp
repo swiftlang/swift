@@ -2344,8 +2344,16 @@ namespace {
         return nullptr;
       }
 
+      if (!decl->hasPrototype()) {
+        // FIXME: source location...
+        Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_no_prototype);
+        Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
+                                         decl->getName());
+        return nullptr;
+      }
+
       bool allowNSUIntegerAsInt =
-        Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
+          Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
 
       auto &SwiftCtx = Impl.SwiftContext;
       SourceLoc noLoc{};
