@@ -22,6 +22,7 @@
 
 #include <dlfcn.h>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <vector>
 

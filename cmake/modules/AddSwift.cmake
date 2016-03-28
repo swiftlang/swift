@@ -1754,10 +1754,6 @@ function(_add_swift_executable_single name)
   list(APPEND link_flags
       "-L${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
 
-  foreach(FAT_LIBRARY ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
-    list(APPEND link_flags "-l${FAT_LIBRARY}")
-  endforeach()
-
   if(SWIFTEXE_SINGLE_DISABLE_ASLR)
     list(APPEND link_flags "-Wl,-no_pie")
   endif()
@@ -1830,7 +1826,7 @@ function(_add_swift_executable_single name)
       PROPERTIES
       HEADER_FILE_ONLY true)
 
-  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
+  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_COMPONENT_DEPENDS})
 
   set_target_properties(${name}
@@ -1847,7 +1843,7 @@ endfunction()
 function(add_swift_target_executable name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE_TARGET
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
+    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR;BUILD_WITH_STDLIB"
     ""
     "DEPENDS;COMPONENT_DEPENDS;LINK_FAT_LIBRARIES"
     ${ARGN})
@@ -1885,6 +1881,10 @@ function(add_swift_target_executable name)
         # By default, don't build executables for target SDKs to avoid building
         # target stdlibs.
         set(SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT "EXCLUDE_FROM_ALL")
+      endif()
+
+      if(SWIFTEXE_TARGET_BUILD_WITH_STDLIB)
+        add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}" ${VARIANT_NAME})
       endif()
 
       # Don't add the ${arch} to the suffix.  We want to link against fat

@@ -187,8 +187,8 @@ internal func sendReflectionInfos() {
   for info in infos {
     debugLog("Sending info for \(info.imageName)")
     let imageNameBytes = Array(info.imageName.utf8)
-    var imageNameLength = UInt64(imageNameBytes.count)
-    fwrite(&imageNameLength, sizeof(UInt64.self), 1, stdout)
+    var imageNameLength = UInt(imageNameBytes.count)
+    fwrite(&imageNameLength, sizeof(UInt.self), 1, stdout)
     fflush(stdout)
     fwrite(imageNameBytes, 1, imageNameBytes.count, stdout)
     fflush(stdout)
@@ -235,7 +235,7 @@ internal func sendSymbolAddress() {
   name.withCString {
     let handle = unsafeBitCast(Int(-2), to: UnsafeMutablePointer<Void>.self)
     let symbol = dlsym(handle, $0)
-    let symbolAddress = unsafeBitCast(symbol, to: UInt64.self)
+    let symbolAddress = unsafeBitCast(symbol, to: UInt.self)
     sendValue(symbolAddress)
   }
 }
