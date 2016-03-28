@@ -42,6 +42,19 @@ protected:
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,
                                      const JobContext &context) const override;
+
+  virtual std::string getDefaultLinker() const;
+
+  virtual bool shouldProvideRPathToLinker() const;
+
+  virtual bool shouldSpecifyTargetTripleToLinker() const;
+
+  virtual std::string
+  getPreInputObjectPath(StringRef RuntimeLibraryPath) const;
+
+  virtual std::string
+  getPostInputObjectPath(StringRef RuntimeLibraryPath) const;
+
   InvocationInfo constructInvocation(const LinkJobAction &job,
                                      const JobContext &context) const override;
 
@@ -50,18 +63,20 @@ public:
   ~GenericUnix() = default;
 };
 
-class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {
+class LLVM_LIBRARY_VISIBILITY Cygwin : public GenericUnix {
 protected:
-  InvocationInfo constructInvocation(const InterpretJobAction &job,
-                                     const JobContext &context) const override;
-  InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,
-                                     const JobContext &context) const override;
-  InvocationInfo constructInvocation(const LinkJobAction &job,
-                                     const JobContext &context) const override;
+  std::string getDefaultLinker() const override;
 
+  bool shouldSpecifyTargetTripleToLinker() const override;
+
+  std::string getPreInputObjectPath(
+    StringRef RuntimeLibraryPath) const override;
+
+  std::string getPostInputObjectPath(
+    StringRef RuntimeLibraryPath) const override;
 public:
-  Windows(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
-  ~Windows() = default;
+  Cygwin(const Driver &D, const llvm::Triple &Triple) : GenericUnix(D, Triple) {}
+  ~Cygwin() = default;
 };
 
 } // end namespace toolchains
