@@ -90,7 +90,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
   assert(isa<ReturnInst>(RetInst) || isa<ThrowInst>(RetInst) &&
          "expected a properly terminated return or throw block");
   assert(RetInst->getOperand(0)->getType() == NewRetVal->getType() &&
-         "Mistmatched return type");
+         "Mismatched return type");
   SILBasicBlock *MergedBB = RetBB;
 
   // Split the return block if it is nontrivial.

@@ -297,9 +297,9 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
 
   if (isPossiblyUsedExternally(linkage, Module->isWholeModule())) {
     // If at least one of the properties of the enclosing type cannot be
-    // used externally, then no intializer can be implemented externally as
-    // it wouldn't be able to intialize such a property.
-    // More over, for classes, only the class itself can intialize its
+    // used externally, then no initializer can be implemented externally as
+    // it wouldn't be able to initialize such a property.
+    // More over, for classes, only the class itself can initialize its
     // let properties. Subclasses and extensions cannot do it.
     // For structs, external extensions may initialize let properties. But to do
     // that they need to be able to initialize all properties, i.e. all
@@ -307,7 +307,7 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
 
     auto *Ty = dyn_cast<NominalTypeDecl>(Property->getDeclContext());
 
-    // Initializer for a let propety of a class cannot exist externally.
+    // Initializer for a let property of a class cannot exist externally.
     // It cannot be defined by an extension or a derived class.
     if (isa<ClassDecl>(Ty))
       return false;
@@ -378,13 +378,13 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
   // don't process it.
   if (mayHaveUnknownUses(Property, Module)) {
     DEBUG(llvm::dbgs() << "Property '" << *Property
-                       << "' may have unknwon uses\n");
+                       << "' may have unknown uses\n");
     SkipProcessing.insert(Property);
     return false;
   }
 
   DEBUG(llvm::dbgs() << "Property '" << *Property
-                      << "' has no unknwon uses\n");
+                      << "' has no unknown uses\n");
 
   // Only properties of simple types can be optimized.
   if(!isSimpleType(Module->Types.getLoweredType(Property->getType()), *Module)) {
@@ -488,7 +488,7 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
                        << "' :" << PropValue << "\n");
     if (!analyzeInitValue(SI, Prop)) {
       SkipProcessing.insert(Prop);
-      DEBUG(llvm::dbgs() << "The value of a let propertiy '" << *Prop
+      DEBUG(llvm::dbgs() << "The value of a let property '" << *Prop
                          << "' is not statically known\n");
     }
   }
@@ -496,7 +496,7 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
 
 /// Check if I is a sequence of projections followed by a load.
 /// Since it is supposed to be a load from a let property with
-/// statically known constant intializer, only struct_element_addr
+/// statically known constant initializer, only struct_element_addr
 /// and tuple_element_addr projections are considered.
 static bool isValidPropertyLoad(SILInstruction *I) {
   if (isa<LoadInst>(I))
@@ -520,7 +520,7 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
   if (!isConstantLetProperty(Property))
     return;
 
-  DEBUG(llvm::dbgs() << "Collecting propery access for property '" << *Property
+  DEBUG(llvm::dbgs() << "Collecting property access for property '" << *Property
                      << "':\n";
         llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());
 
@@ -540,7 +540,7 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
         continue;
       }
 
-      // Follow the chain of pojections and check if it ends up with a load.
+      // Follow the chain of projections and check if it ends up with a load.
       // If this is not the case, it is potentially a store into sub-property
       // of a property.
       // We cannot handle such cases yet, so bail.

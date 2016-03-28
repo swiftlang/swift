@@ -46,18 +46,19 @@ class struct(object):
     return 'struct(%r)' % self.__dict__
 
 binaryArithmetic = [
-       struct(operator='+', name='adding',      mutatingName='add',           firstArg='',           llvmName='add', kind='+'),
-       struct(operator='-', name='subtracting', mutatingName='subtract',      firstArg='',           llvmName='sub', kind='-'),
-       struct(operator='*', name='multiplied',  mutatingName='multiply',      firstArg='by',         llvmName='mul', kind='*'),
-       struct(operator='/', name='divided',     mutatingName='divide',        firstArg='by',         llvmName='div', kind='/'),
-       struct(operator='%', name='remainder',   mutatingName='formRemainder', firstArg='dividingBy', llvmName='rem', kind='/')
-  ]
+    struct(operator='+', name='adding',      mutatingName='add',           firstArg='',           llvmName='add', kind='+'),
+    struct(operator='-', name='subtracting', mutatingName='subtract',      firstArg='',           llvmName='sub', kind='-'),
+    struct(operator='*', name='multiplied',  mutatingName='multiply',      firstArg='by',         llvmName='mul', kind='*'),
+    struct(operator='/', name='divided',     mutatingName='divide',        firstArg='by',         llvmName='div', kind='/'),
+    struct(operator='%', name='remainder',   mutatingName='formRemainder', firstArg='dividingBy', llvmName='rem', kind='/'),
+]
 
 
 binaryBitwise = [
     struct(operator='&', name='and'),
     struct(operator='|', name='or'),
-    struct(operator='^', name='xor')]
+    struct(operator='^', name='xor'),
+]
 
 maskingShifts = [
     struct(
@@ -66,7 +67,7 @@ maskingShifts = [
     struct(
       operator='&<<', nonMaskingOperator='<<',
       name='maskingShiftLeft', llvmName=lambda _: 'shl'),
-  ]
+]
 }%
 
 //===--- Bits for the Stdlib ----------------------------------------------===//
@@ -212,7 +213,7 @@ public typealias UWord = UInt${word_bits}
 /// `isEqual(to:)` and `isLess(than:)` methods are the ones responsible for
 /// `Equatable` and `Comparable` protocol conformances. In a way similar to how
 /// arithmetic operations are dispatched in `Arithmetic`, `==` and `<` operators
-/// for homogenous comparisons have default implementations that call
+/// for homogeneous comparisons have default implementations that call
 /// `isEqual(to:)` and `isLess(than:)` respectively.
 ///
 /// This protocol adds 3 new initializers to the parameterless one, inherited
