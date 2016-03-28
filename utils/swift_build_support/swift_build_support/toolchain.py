@@ -1,5 +1,6 @@
 # -*- python -*-
-# swift_build_support/toolchain.py - Detect host machine's versioned executables
+# swift_build_support/toolchain.py - Detect host machine's versioned
+# executables
 #
 # This source file is part of the Swift.org open source project
 #
@@ -18,7 +19,6 @@
 
 from __future__ import absolute_import
 
-import collections
 import platform
 import subprocess
 

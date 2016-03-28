@@ -10,8 +10,8 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
-import unittest
 import platform
+import unittest
 
 from swift_build_support.toolchain import host_clang, host_toolchain
 
