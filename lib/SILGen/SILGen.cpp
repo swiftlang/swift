@@ -854,9 +854,14 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =
-      M.getOrCreateFunction(SILLinkage::Private, funcName, initSILType, nullptr,
+      M.getOrCreateFunction(makeModuleFragile
+                                ? SILLinkage::Public
+                                : SILLinkage::Private,
+                            funcName, initSILType, nullptr,
                             SILLocation(binding), IsNotBare, IsNotTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile);
+                            makeModuleFragile
+                                ? IsFragile
+                                : IsNotFragile);
   f->setDebugScope(
       new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
   f->setLocation(binding);
