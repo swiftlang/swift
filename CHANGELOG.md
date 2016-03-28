@@ -2,7 +2,7 @@
 Swift 3.0
 -------
 
-* The "none" members of imported NS_OPTIONS option sets are not marked as unavailable
+* The "none" members of imported NS_OPTIONS option sets are marked as unavailable
   when they are imported.  Use [] to make an empty option set, instead of a None member.
 
 * [SE-0043](https://github.com/apple/swift-evolution/blob/master/proposals/0043-declare-variables-in-case-labels-with-multiple-patterns.md)
