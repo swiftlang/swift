@@ -488,7 +488,7 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   func advance(i: Index, by: IndexDistance) -> Index
 
   @warn_unused_result
-  func advance(i: Index, by: IndexDistance, limit: Index) -> Index
+  func advance(i: Index, by: IndexDistance, limitedBy limit: Index) -> Index
 
   @warn_unused_result
   func distanceFrom(start: Index, to: Index) -> IndexDistance
@@ -532,7 +532,7 @@ extension MyForwardCollectionType {
   @inline(__always)
   @warn_unused_result
   internal func _advanceForward(
-    i: Index, by n: IndexDistance, limit: Index
+    i: Index, by n: IndexDistance, limitedBy limit: Index
   ) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
@@ -550,7 +550,7 @@ extension MyForwardCollectionType {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     return self._advanceForward(i, by: n, limit: limit)
   }
 
@@ -681,7 +681,7 @@ extension MyForwardCollectionType
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     let d = i.distanceTo(limit)
@@ -762,7 +762,7 @@ extension MyBidirectionalCollectionType {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n, limit: limit)
     }
@@ -790,7 +790,7 @@ extension MyBidirectionalCollectionType
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     let d = i.distanceTo(limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit
@@ -1180,7 +1180,7 @@ public protocol MyRandomAccessIndexType : MyBidirectionalIndexType, MyStrideable
   func advancedBy(n: Distance) -> Self
 
   @warn_unused_result
-  func advancedBy(n: Distance, limit: Self) -> Self
+  func advancedBy(n: Distance, limitedBy limit: Self) -> Self
 }
 
 extension MyRandomAccessIndexType {
@@ -1218,7 +1218,7 @@ extension MyRandomAccessIndexType {
 
   @transparent
   @warn_unused_result
-  public func advancedBy(n: Distance, limit: Self) -> Self {
+  public func advancedBy(n: Distance, limitedBy limit: Self) -> Self {
     let d = self.distanceTo(limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit

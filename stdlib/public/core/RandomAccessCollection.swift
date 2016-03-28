@@ -50,12 +50,12 @@ extension RandomAccessCollection {
 // TODO: swift-3-indexing-model - implement optimized version of the following
 // (also un-xfail corresponding test in validation-test/stdlib/Index.swift.gyb)
   // advance(i: Index, by n: IndexDistance) -> Index
-  // advance(i: Index, by n: IndexDistance, limit: Index) -> Index
+  // advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index
   // distance(from start: Index, to end: Index) -> IndexDistance
 
 /*
   @warn_unused_result
-  public func advanced(by n: Distance, limit: Self) -> Self {
+  public func advanced(by n: Distance, limitedBy limit: Self) -> Self {
     let d = self.distance(to: limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit

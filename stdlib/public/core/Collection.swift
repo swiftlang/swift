@@ -127,7 +127,7 @@ public protocol Indexable : IndexableBase {
   func advance(i: Index, by n: IndexDistance) -> Index
 
   @warn_unused_result
-  func advance(i: Index, by n: IndexDistance, limit: Index) -> Index
+  func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index
 
   @warn_unused_result
   func distance(from start: Index, to end: Index) -> IndexDistance
@@ -318,7 +318,7 @@ public protocol Collection : Indexable, Sequence {
   ///   - O(1) if conforming to `RandomAccessCollection`
   ///   - O(`abs(n)`) otherwise
   @warn_unused_result
-  func advance(i: Index, by n: IndexDistance, limit: Index) -> Index
+  func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index
 
   /// Measure the distance between `start` and `end` indexes.
   ///
@@ -376,7 +376,7 @@ extension Indexable {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n, limit: limit)
   }
@@ -414,7 +414,7 @@ extension Indexable {
   @inline(__always)
   @warn_unused_result
   internal
-  func _advanceForward(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  func _advanceForward(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
 
@@ -452,7 +452,7 @@ extension Indexable where Index : Strideable {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: range check i

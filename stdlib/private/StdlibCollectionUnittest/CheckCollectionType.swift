@@ -494,7 +494,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
 //          successor(of: i: Index) -> Index
 //          formSuccessor(i: inout Index)
 //          advance(i: Index, by n: IndexDistance) -> Index
-//          advance(i: Index, by n: IndexDistance, limit: Index) -> Index
+//          advance(i: Index, by n: IndexDistance, limitedBy: Index) -> Index
 //          distance(from start: Index, to end: Index) -> IndexDistance
 //          _failEarlyRangeCheck(index: Index, bounds: Range<Index>)
 //          _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
@@ -912,7 +912,7 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
 
 // FIXME: swift-3-indexing-model - enhance the following for negative direction?
 //          advance(i: Index, by n: IndexDistance) -> Index
-//          advance(i: Index, by n: IndexDistance, limit: Index) -> Index
+//          advance(i: Index, by n: IndexDistance, limitedBy: Index) -> Index
 //          distance(from start: Index, to end: Index) -> IndexDistance
 
 //===----------------------------------------------------------------------===//

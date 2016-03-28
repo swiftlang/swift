@@ -77,7 +77,7 @@ extension BidirectionalIndexable {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n, limit: limit)
     }
@@ -136,7 +136,7 @@ extension BidirectionalIndexable where Index : Strideable {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i
 
     // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'

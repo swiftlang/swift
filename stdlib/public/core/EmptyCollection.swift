@@ -110,7 +110,7 @@ public struct EmptyCollection<Element> :
   /// EmptyCollection does not have any element indices, so it is not
   /// possible to advance indices.
   @warn_unused_result
-  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     // TODO: swift-3-indexing-model: tests for traps.
     _preconditionFailure("EmptyCollection can't advance indices")
   }

@@ -193,7 +193,7 @@ internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element> {
   func advance(i: Index, by n: IndexDistance) -> Index
 
   @warn_unused_result
-  func advance(i: Index, by n: IndexDistance, limit: Index) -> Index
+  func advance(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index
 
   @warn_unused_result
   func distance(from start: Index, to end: Index) -> IndexDistance
