@@ -1,4 +1,4 @@
-//===--- CFTypeInfo.h - Information about CF types  -----------------------===//
+//===--- CFTypeInfo.h - Information about CF types  -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
