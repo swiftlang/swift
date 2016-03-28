@@ -19,6 +19,9 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
+
+enum class ResilienceStrategy : unsigned;
+
 namespace serialization {
 
   /// Describes whether a serialized module can be used by this compiler.
@@ -84,7 +87,7 @@ namespace serialization {
     struct {
       unsigned IsSIB : 1;
       unsigned IsTestable : 1;
-      unsigned IsResilient : 1;
+      unsigned ResilienceStrategy : 2;
     } Bits;
   public:
     ExtendedValidationInfo() : Bits() {}
@@ -110,9 +113,11 @@ namespace serialization {
     void setIsTestable(bool val) {
       Bits.IsTestable = val;
     }
-    bool isResilient() const { return Bits.IsResilient; }
-    void setIsResilient(bool val) {
-      Bits.IsResilient = val;
+    ResilienceStrategy getResilienceStrategy() const {
+      return ResilienceStrategy(Bits.ResilienceStrategy);
+    }
+    void setResilienceStrategy(ResilienceStrategy resilience) {
+      Bits.ResilienceStrategy = unsigned(resilience);
     }
   };
 

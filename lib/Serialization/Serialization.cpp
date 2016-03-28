@@ -438,7 +438,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, XCC);
   BLOCK_RECORD(options_block, IS_SIB);
   BLOCK_RECORD(options_block, IS_TESTABLE);
-  BLOCK_RECORD(options_block, IS_RESILIENT);
+  BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -594,9 +594,9 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         IsTestable.emit(ScratchRecord);
       }
 
-      if (M->isResilienceEnabled()) {
-        options_block::IsResilientLayout IsResilient(Out);
-        IsResilient.emit(ScratchRecord);
+      if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
+        options_block::ResilienceStrategyLayout Strategy(Out);
+        Strategy.emit(ScratchRecord, unsigned(M->getResilienceStrategy()));
       }
 
       if (options.SerializeOptionsForDebugging) {

@@ -109,8 +109,10 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::IS_TESTABLE:
       extendedInfo.setIsTestable(true);
       break;
-    case options_block::IS_RESILIENT:
-      extendedInfo.setIsResilient(true);
+    case options_block::RESILIENCE_STRATEGY:
+      unsigned Strategy;
+      options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
+      extendedInfo.setResilienceStrategy(ResilienceStrategy(Strategy));
       break;
     default:
       // Unknown options record, possibly for use by a future version of the
