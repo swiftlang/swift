@@ -15,12 +15,10 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -39,21 +37,39 @@ using namespace swift;
 
 STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 
-llvm::cl::opt<bool> PrintShortestPathInfo(
-    "print-shortest-path-info", llvm::cl::init(false),
-    llvm::cl::desc("Print shortest-path information for inlining"));
+namespace {
 
-//===----------------------------------------------------------------------===//
-//                               ConstantTracker
-//===----------------------------------------------------------------------===//
+  // Threshold for deterministic testing of the inline heuristic.
+  // It specifies an instruction cost limit where a simplified model is used
+  // for the instruction costs: only builtin instructions have a cost of exactly
+  // 1.
+  llvm::cl::opt<int> TestThreshold("sil-inline-test-threshold",
+                                        llvm::cl::init(-1), llvm::cl::Hidden);
 
-// Tracks constants in the caller and callee to get an estimation of what
-// values get constant if the callee is inlined.
-// This can be seen as a "simulation" of several optimizations: SROA, mem2reg
-// and constant propagation.
-// Note that this is only a simplified model and not correct in all cases.
-// For example aliasing information is not taken into account.
-class ConstantTracker {
+  // The following constants define the cost model for inlining.
+
+  // The base value for every call: it represents the benefit of removing the
+  // call overhead.
+  // This value can be overridden with the -sil-inline-threshold option.
+  const unsigned RemovedCallBenefit = 80;
+
+  // The benefit if the condition of a terminator instruction gets constant due
+  // to inlining.
+  const unsigned ConstTerminatorBenefit = 2;
+
+  // Benefit if the operand of an apply gets constant, e.g. if a closure is
+  // passed to an apply instruction in the callee.
+  const unsigned ConstCalleeBenefit = 150;
+
+  // Additional benefit for each loop level.
+  const unsigned LoopBenefitFactor = 40;
+
+  // Approximately up to this cost level a function can be inlined without
+  // increasing the code size.
+  const unsigned TrivialFunctionThreshold = 20;
+
+  // Configuration for the caller block limit.
+  const unsigned BlockLimitDenominator = 10000;
 
   // Represents a value in integer constant evaluation.
   struct IntConst {
@@ -61,140 +77,194 @@ class ConstantTracker {
 
     IntConst(const APInt &value, bool isFromCaller) :
     value(value), isValid(true), isFromCaller(isFromCaller) { }
-
+    
     // The actual value.
     APInt value;
-
+    
     // True if the value is valid, i.e. could be evaluated to a constant.
     bool isValid;
-
+    
     // True if the value is only valid, because a constant is passed to the
     // callee. False if constant propagation could do the same job inside the
     // callee without inlining it.
     bool isFromCaller;
   };
   
-  // Links between loaded and stored values.
-  // The key is a load instruction, the value is the corresponding store
-  // instruction which stores the loaded value. Both, key and value can also
-  // be copy_addr instructions.
-  llvm::DenseMap<SILInstruction *, SILInstruction *> links;
-  
-  // The current stored values at memory addresses.
-  // The key is the base address of the memory (after skipping address
-  // projections). The value are store (or copy_addr) instructions, which
-  // store the current value.
-  // This is only an estimation, because e.g. it does not consider potential
-  // aliasing.
-  llvm::DenseMap<SILValue, SILInstruction *> memoryContent;
-  
-  // Cache for evaluated constants.
-  llvm::SmallDenseMap<BuiltinInst *, IntConst> constCache;
+  // Tracks constants in the caller and callee to get an estimation of what
+  // values get constant if the callee is inlined.
+  // This can be seen as a "simulation" of several optimizations: SROA, mem2reg
+  // and constant propagation.
+  // Note that this is only a simplified model and not correct in all cases.
+  // For example aliasing information is not taken into account.
+  class ConstantTracker {
+    // Links between loaded and stored values.
+    // The key is a load instruction, the value is the corresponding store
+    // instruction which stores the loaded value. Both, key and value can also
+    // be copy_addr instructions.
+    llvm::DenseMap<SILInstruction *, SILInstruction *> links;
+    
+    // The current stored values at memory addresses.
+    // The key is the base address of the memory (after skipping address
+    // projections). The value are store (or copy_addr) instructions, which
+    // store the current value.
+    // This is only an estimation, because e.g. it does not consider potential
+    // aliasing.
+    llvm::DenseMap<SILValue, SILInstruction *> memoryContent;
+    
+    // Cache for evaluated constants.
+    llvm::SmallDenseMap<BuiltinInst *, IntConst> constCache;
 
-  // The caller/callee function which is tracked.
-  SILFunction *F;
-  
-  // The constant tracker of the caller function (null if this is the
-  // tracker of the callee).
-  ConstantTracker *callerTracker;
-  
-  // The apply instruction in the caller (null if this is the tracker of the
-  // callee).
-  FullApplySite AI;
-  
-  // Walks through address projections and (optionally) collects them.
-  // Returns the base address, i.e. the first address which is not a
-  // projection.
-  SILValue scanProjections(SILValue addr,
-                           SmallVectorImpl<Projection> *Result = nullptr);
-  
-  // Get the stored value for a load. The loadInst can be either a real load
-  // or a copy_addr.
-  SILValue getStoredValue(SILInstruction *loadInst,
-                          ProjectionPath &projStack);
+    // The caller/callee function which is tracked.
+    SILFunction *F;
+    
+    // The constant tracker of the caller function (null if this is the
+    // tracker of the callee).
+    ConstantTracker *callerTracker;
+    
+    // The apply instruction in the caller (null if this is the tracker of the
+    // callee).
+    FullApplySite AI;
+    
+    // Walks through address projections and (optionally) collects them.
+    // Returns the base address, i.e. the first address which is not a
+    // projection.
+    SILValue scanProjections(SILValue addr,
+                             SmallVectorImpl<Projection> *Result = nullptr);
+    
+    // Get the stored value for a load. The loadInst can be either a real load
+    // or a copy_addr.
+    SILValue getStoredValue(SILInstruction *loadInst,
+                            ProjectionPath &projStack);
 
-  // Gets the parameter in the caller for a function argument.
-  SILValue getParam(SILValue value) {
-    if (SILArgument *arg = dyn_cast<SILArgument>(value)) {
-      if (AI && arg->isFunctionArg() && arg->getFunction() == F) {
-        // Continue at the caller.
-        return AI.getArgument(arg->getIndex());
+    // Gets the parameter in the caller for a function argument.
+    SILValue getParam(SILValue value) {
+      if (SILArgument *arg = dyn_cast<SILArgument>(value)) {
+        if (AI && arg->isFunctionArg() && arg->getFunction() == F) {
+          // Continue at the caller.
+          return AI.getArgument(arg->getIndex());
+        }
+      }
+      return SILValue();
+    }
+    
+    SILInstruction *getMemoryContent(SILValue addr) {
+      // The memory content can be stored in this ConstantTracker or in the
+      // caller's ConstantTracker.
+      SILInstruction *storeInst = memoryContent[addr];
+      if (storeInst)
+        return storeInst;
+      if (callerTracker)
+        return callerTracker->getMemoryContent(addr);
+      return nullptr;
+    }
+    
+    // Gets the estimated definition of a value.
+    SILInstruction *getDef(SILValue val, ProjectionPath &projStack);
+
+    // Gets the estimated integer constant result of a builtin.
+    IntConst getBuiltinConst(BuiltinInst *BI, int depth);
+    
+  public:
+    
+    // Constructor for the caller function.
+    ConstantTracker(SILFunction *function) :
+      F(function), callerTracker(nullptr), AI()
+    { }
+    
+    // Constructor for the callee function.
+    ConstantTracker(SILFunction *function, ConstantTracker *caller,
+                    FullApplySite callerApply) :
+       F(function), callerTracker(caller), AI(callerApply)
+    { }
+    
+    void beginBlock() {
+      // Currently we don't do any sophisticated dataflow analysis, so we keep
+      // the memoryContent alive only for a single block.
+      memoryContent.clear();
+    }
+
+    // Must be called for each instruction visited in dominance order.
+    void trackInst(SILInstruction *inst);
+    
+    // Gets the estimated definition of a value.
+    SILInstruction *getDef(SILValue val) {
+      ProjectionPath projStack(val->getType());
+      return getDef(val, projStack);
+    }
+    
+    // Gets the estimated definition of a value if it is in the caller.
+    SILInstruction *getDefInCaller(SILValue val) {
+      SILInstruction *def = getDef(val);
+      if (def && def->getFunction() != F)
+        return def;
+      return nullptr;
+    }
+    
+    // Gets the estimated integer constant of a value.
+    IntConst getIntConst(SILValue val, int depth = 0);
+  };
+
+  // Controls the decision to inline functions with @_semantics, @effect and
+  // global_init attributes.
+  enum class InlineSelection {
+    Everything,
+    NoGlobalInit, // and no availability semantics calls
+    NoSemanticsAndGlobalInit
+  };
+
+  class SILPerformanceInliner {
+    /// The inline threshold.
+    const int InlineCostThreshold;
+    /// Specifies which functions not to inline, based on @_semantics and
+    /// global_init attributes.
+    InlineSelection WhatToInline;
+
+#ifndef NDEBUG
+    SILFunction *LastPrintedCaller = nullptr;
+    void dumpCaller(SILFunction *Caller) {
+      if (Caller != LastPrintedCaller) {
+        llvm::dbgs() << "\nInline into caller: " << Caller->getName() << '\n';
+        LastPrintedCaller = Caller;
       }
     }
-    return SILValue();
-  }
-  
-  SILInstruction *getMemoryContent(SILValue addr) {
-    // The memory content can be stored in this ConstantTracker or in the
-    // caller's ConstantTracker.
-    SILInstruction *storeInst = memoryContent[addr];
-    if (storeInst)
-      return storeInst;
-    if (callerTracker)
-      return callerTracker->getMemoryContent(addr);
-    return nullptr;
-  }
-  
-  // Gets the estimated definition of a value.
-  SILInstruction *getDef(SILValue val, ProjectionPath &projStack);
+#endif
 
-  // Gets the estimated integer constant result of a builtin.
-  IntConst getBuiltinConst(BuiltinInst *BI, int depth);
-  
-public:
-  
-  // Constructor for the caller function.
-  ConstantTracker(SILFunction *function) :
-    F(function), callerTracker(nullptr), AI()
-  { }
-  
-  // Constructor for the callee function.
-  ConstantTracker(SILFunction *function, ConstantTracker *caller,
-                  FullApplySite callerApply) :
-     F(function), callerTracker(caller), AI(callerApply)
-  { }
-  
-  void beginBlock() {
-    // Currently we don't do any sophisticated dataflow analysis, so we keep
-    // the memoryContent alive only for a single block.
-    memoryContent.clear();
-  }
+    SILFunction *getEligibleFunction(FullApplySite AI);
 
-  // Must be called for each instruction visited in dominance order.
-  void trackInst(SILInstruction *inst);
-  
-  // Gets the estimated definition of a value.
-  SILInstruction *getDef(SILValue val) {
-    ProjectionPath projStack(val->getType());
-    return getDef(val, projStack);
-  }
-  
-  // Gets the estimated definition of a value if it is in the caller.
-  SILInstruction *getDefInCaller(SILValue val) {
-    SILInstruction *def = getDef(val);
-    if (def && def->getFunction() != F)
-      return def;
-    return nullptr;
-  }
+    bool isProfitableToInline(FullApplySite AI, unsigned loopDepthOfAI,
+                              DominanceAnalysis *DA,
+                              SILLoopAnalysis *LA,
+                              ConstantTracker &constTracker,
+                              unsigned &NumCallerBlocks);
 
-  bool isStackAddrInCaller(SILValue val) {
-    if (SILValue Param = getParam(stripAddressProjections(val))) {
-      return isa<AllocStackInst>(stripAddressProjections(Param));
-    }
-    return false;
-  }
+    bool isProfitableInColdBlock(FullApplySite AI, SILFunction *Callee);
 
-  // Gets the estimated integer constant of a value.
-  IntConst getIntConst(SILValue val, int depth = 0);
+    void visitColdBlocks(SmallVectorImpl<FullApplySite> &AppliesToInline,
+                         SILBasicBlock *root, DominanceInfo *DT);
 
-  SILBasicBlock *getTakenBlock(TermInst *term);
-};
+    void collectAppliesToInline(SILFunction *Caller,
+                                SmallVectorImpl<FullApplySite> &Applies,
+                                DominanceAnalysis *DA, SILLoopAnalysis *LA);
+
+  public:
+    SILPerformanceInliner(int threshold, InlineSelection WhatToInline)
+        : InlineCostThreshold(threshold), WhatToInline(WhatToInline) {}
+
+    bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA,
+                                 SILLoopAnalysis *LA);
+  };
+}
+
+//===----------------------------------------------------------------------===//
+//                               ConstantTracker
+//===----------------------------------------------------------------------===//
+
 
 void ConstantTracker::trackInst(SILInstruction *inst) {
   if (auto *LI = dyn_cast<LoadInst>(inst)) {
     SILValue baseAddr = scanProjections(LI->getOperand());
     if (SILInstruction *loadLink = getMemoryContent(baseAddr))
-      links[LI] = loadLink;
+       links[LI] = loadLink;
   } else if (StoreInst *SI = dyn_cast<StoreInst>(inst)) {
     SILValue baseAddr = scanProjections(SI->getOperand(1));
     memoryContent[baseAddr] = SI;
@@ -212,7 +282,7 @@ void ConstantTracker::trackInst(SILInstruction *inst) {
 }
 
 SILValue ConstantTracker::scanProjections(SILValue addr,
-                                          SmallVectorImpl<Projection> *Result) {
+                                      SmallVectorImpl<Projection> *Result) {
   for (;;) {
     if (Projection::isAddressProjection(addr)) {
       SILInstruction *I = cast<SILInstruction>(addr);
@@ -247,7 +317,7 @@ SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
   for (const Projection &proj : loadProjections) {
     projStack.push_back(proj);
   }
-
+  
   //  Pop the address projections of the store from the stack.
   SmallVector<Projection, 4> storeProjections;
   scanProjections(store->getOperand(1), &storeProjections);
@@ -259,7 +329,7 @@ SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
       return SILValue();
     projStack.pop_back();
   }
-
+  
   if (isa<StoreInst>(store))
     return store->getOperand(0);
 
@@ -280,7 +350,7 @@ static SILValue getMember(SILInstruction *inst, ProjectionPath &projStack) {
 
 SILInstruction *ConstantTracker::getDef(SILValue val,
                                         ProjectionPath &projStack) {
-
+  
   // Track the value up the dominator tree.
   for (;;) {
     if (SILInstruction *inst = dyn_cast<SILInstruction>(val)) {
@@ -312,12 +382,12 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
   }
 }
 
-ConstantTracker::IntConst ConstantTracker::getBuiltinConst(BuiltinInst *BI, int depth) {
+IntConst ConstantTracker::getBuiltinConst(BuiltinInst *BI, int depth) {
   const BuiltinInfo &Builtin = BI->getBuiltinInfo();
   OperandValueArrayRef Args = BI->getArguments();
   switch (Builtin.ID) {
     default: break;
-
+      
       // Fold comparison predicates.
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
@@ -328,12 +398,13 @@ case BuiltinValueKind::id:
       IntConst rhs = getIntConst(Args[1], depth);
       if (lhs.isValid && rhs.isValid) {
         return IntConst(constantFoldComparison(lhs.value, rhs.value,
-                                               Builtin.ID),
+                                              Builtin.ID),
                         lhs.isFromCaller || rhs.isFromCaller);
       }
       break;
     }
-
+      
+      
     case BuiltinValueKind::SAddOver:
     case BuiltinValueKind::UAddOver:
     case BuiltinValueKind::SSubOver:
@@ -351,7 +422,7 @@ case BuiltinValueKind::id:
       }
       break;
     }
-
+      
     case BuiltinValueKind::SDiv:
     case BuiltinValueKind::SRem:
     case BuiltinValueKind::UDiv:
@@ -366,7 +437,7 @@ case BuiltinValueKind::id:
       }
       break;
     }
-
+      
     case BuiltinValueKind::And:
     case BuiltinValueKind::AShr:
     case BuiltinValueKind::LShr:
@@ -382,7 +453,7 @@ case BuiltinValueKind::id:
       }
       break;
     }
-
+      
     case BuiltinValueKind::Trunc:
     case BuiltinValueKind::ZExt:
     case BuiltinValueKind::SExt:
@@ -401,8 +472,8 @@ case BuiltinValueKind::id:
 
 // Tries to evaluate the integer constant of a value. The \p depth is used
 // to limit the complexity.
-ConstantTracker::IntConst ConstantTracker::getIntConst(SILValue val, int depth) {
-
+IntConst ConstantTracker::getIntConst(SILValue val, int depth) {
+  
   // Don't spend too much time with constant evaluation.
   if (depth >= 10)
     return IntConst();
@@ -425,650 +496,9 @@ ConstantTracker::IntConst ConstantTracker::getIntConst(SILValue val, int depth) 
   return IntConst();
 }
 
-// Returns the taken block of a terminator instruction if the condition turns
-// out to be constant.
-SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
-  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(term)) {
-    IntConst condConst = getIntConst(CBI->getCondition());
-    if (condConst.isFromCaller) {
-      return condConst.value != 0 ? CBI->getTrueBB() : CBI->getFalseBB();
-    }
-    return nullptr;
-  }
-  if (SwitchValueInst *SVI = dyn_cast<SwitchValueInst>(term)) {
-    IntConst switchConst = getIntConst(SVI->getOperand());
-    if (switchConst.isFromCaller) {
-      for (unsigned Idx = 0; Idx < SVI->getNumCases(); ++Idx) {
-        auto switchCase = SVI->getCase(Idx);
-        if (auto *IL = dyn_cast<IntegerLiteralInst>(switchCase.first)) {
-          if (switchConst.value == IL->getValue())
-            return switchCase.second;
-        } else {
-          return nullptr;
-        }
-      }
-      if (SVI->hasDefault())
-        return SVI->getDefaultBB();
-    }
-    return nullptr;
-  }
-  if (SwitchEnumInst *SEI = dyn_cast<SwitchEnumInst>(term)) {
-    if (SILInstruction *def = getDefInCaller(SEI->getOperand())) {
-      if (EnumInst *EI = dyn_cast<EnumInst>(def)) {
-        for (unsigned Idx = 0; Idx < SEI->getNumCases(); ++Idx) {
-          auto enumCase = SEI->getCase(Idx);
-          if (enumCase.first == EI->getElement())
-            return enumCase.second;
-        }
-        if (SEI->hasDefault())
-          return SEI->getDefaultBB();
-      }
-    }
-    return nullptr;
-  }
-  if (CheckedCastBranchInst *CCB = dyn_cast<CheckedCastBranchInst>(term)) {
-    if (SILInstruction *def = getDefInCaller(CCB->getOperand())) {
-      if (UpcastInst *UCI = dyn_cast<UpcastInst>(def)) {
-        SILType castType = UCI->getOperand()->getType();
-        if (CCB->getCastType().isExactSuperclassOf(castType)) {
-          return CCB->getSuccessBB();
-        }
-        if (!castType.isBindableToSuperclassOf(CCB->getCastType())) {
-          return CCB->getFailureBB();
-        }
-      }
-    }
-  }
-  return nullptr;
-}
-
-//===----------------------------------------------------------------------===//
-//                           Shortest path analysis
-//===----------------------------------------------------------------------===//
-
-/// Computes the length of the shortest path through a block in a scope.
-///
-/// A scope is either a loop or the whole function. The "length" is an
-/// estimation of the execution time. For example if the shortest path of a
-/// block B is N, it means that the execution time of the scope (either
-/// function or a single loop iteration), when execution includes the block, is
-/// at least N, regardless of what branches are taken.
-///
-/// The shortest path of a block is the sum of the shortest path from the scope
-/// entry and the shortest path to the scope exit.
-class ShortestPathAnalysis {
-public:
-  enum {
-    /// We assume that cold block take very long to execute.
-    ColdBlockLength = 1000,
-
-    /// Our assumption on how many times a loop is executed.
-    LoopCount = 10,
-
-    /// To keep things simple we only analyse up to this number of nested loops.
-    MaxNumLoopLevels = 4,
-
-    /// The "weight" for the benefit which a single loop nest gives.
-    SingleLoopWeight = 4,
-  };
-
-  /// A weight for an inlining benefit.
-  class Weight {
-    /// How long does it take to execute the scope (either loop or the whole
-    /// function) of the call to inline? The larger it is the less important it
-    /// is to inline.
-    int ScopeLength;
-
-    /// Represents the loop nest. The larger it is the more important it is to
-    /// inline
-    int LoopWeight;
-
-    friend class ShortestPathAnalysis;
-
-  public:
-    Weight(int ScopeLength, int LoopWeight) : ScopeLength(ScopeLength),
-                                              LoopWeight(LoopWeight) { }
-
-    Weight(const Weight &RHS, int AdditionalLoopWeight) :
-      Weight(RHS.ScopeLength, RHS.LoopWeight + AdditionalLoopWeight) { }
-
-    Weight() : ScopeLength(-1), LoopWeight(0) {
-      assert(!isValid());
-    }
-
-    bool isValid() const { return ScopeLength >= 0; }
-
-    /// Updates the \p Benefit by weighting the \p Importance.
-    void updateBenefit(int &Benefit, int Importance) const {
-      assert(isValid());
-      int newBenefit = 0;
-
-      // Use some heuristics. The basic idea is: length is bad, loops are good.
-      if (ScopeLength > 320) {
-        newBenefit = Importance;
-      } else if (ScopeLength > 160) {
-        newBenefit = Importance + LoopWeight * 4;
-      } else if (ScopeLength > 80) {
-        newBenefit = Importance + LoopWeight * 8;
-      } else if (ScopeLength > 40) {
-        newBenefit = Importance + LoopWeight * 12;
-      } else if (ScopeLength > 20) {
-        newBenefit = Importance + LoopWeight * 16;
-      } else {
-        newBenefit = Importance + 20 + LoopWeight * 16;
-      }
-      // We don't accumulate the benefit instead we max it.
-      if (newBenefit > Benefit)
-        Benefit = newBenefit;
-    }
-
-#ifndef NDEBUG
-    friend raw_ostream &operator<<(raw_ostream &os, const Weight &W) {
-      os << W.LoopWeight << '/' << W.ScopeLength;
-      return os;
-    }
-#endif
-  };
-
-private:
-  /// The distances for a block in it's scope (either loop or function).
-  struct Distances {
-    enum {
-      /// Pretty large but small enough to add something without overflowing.
-      InitialDist = (1 << 29)
-    };
-
-    /// The shortest distance from the scope entry to the block entry.
-    int DistFromEntry = InitialDist;
-
-    /// The shortest distance from the block entry to the scope exit.
-    int DistToExit = InitialDist;
-
-    /// Additional length to account for loop iterations. It's != 0 for loop
-    /// headers (or loop predecessors).
-    int LoopHeaderLength = 0;
-  };
-
-  /// Holds the distance information for a block in all it's scopes, i.e. in all
-  /// its containing loops and the function itself.
-  struct BlockInfo {
-  private:
-    /// Distances for all scopes. Element 0 refers to the function, elements
-    /// > 0 to loops.
-    Distances Dists[MaxNumLoopLevels];
-  public:
-    /// The length of the block itself.
-    int Length = 0;
-
-    /// Returns the distances for the loop with nesting level \p LoopDepth.
-    Distances &getDistances(int LoopDepth) {
-      assert(LoopDepth >= 0 && LoopDepth < MaxNumLoopLevels);
-      return Dists[LoopDepth];
-    }
-
-    /// Returns the length including the LoopHeaderLength for a given
-    /// \p LoopDepth.
-    int getLength(int LoopDepth) {
-      return Length + getDistances(LoopDepth).LoopHeaderLength;
-    }
-
-    /// Returns the length of the shortest path of this block in the loop with
-    /// nesting level \p LoopDepth.
-    int getScopeLength(int LoopDepth) {
-      const Distances &D = getDistances(LoopDepth);
-      return D.DistFromEntry + D.DistToExit;
-    }
-  };
-
-  SILFunction *F;
-  SILLoopInfo *LI;
-  llvm::DenseMap<const SILBasicBlock *, BlockInfo *> BlockInfos;
-  std::vector<BlockInfo> BlockInfoStorage;
-
-  BlockInfo *getBlockInfo(const SILBasicBlock *BB) {
-    BlockInfo *BI = BlockInfos[BB];
-    assert(BI);
-    return BI;
-  }
-
-  // Utility functions to make the template solveDataFlow compilable for a block
-  // list containing references _and_ a list containing pointers.
-
-  const SILBasicBlock *getBlock(const SILBasicBlock *BB) { return BB; }
-  const SILBasicBlock *getBlock(const SILBasicBlock &BB) { return &BB; }
-
-  /// Returns the minimum distance from all predecessor blocks of \p BB.
-  int getEntryDistFromPreds(const SILBasicBlock *BB, int LoopDepth);
-
-  /// Returns the minimum distance from all successor blocks of \p BB.
-  int getExitDistFromSuccs(const SILBasicBlock *BB, int LoopDepth);
-
-  /// Computes the distances by solving the dataflow problem for all \p Blocks
-  /// in a scope.
-  template <typename BlockList>
-  void solveDataFlow(const BlockList &Blocks, int LoopDepth) {
-    bool Changed = false;
-
-    // Compute the distances from the extry block.
-    do {
-      Changed = false;
-      for (auto &Block : Blocks) {
-        const SILBasicBlock *BB = getBlock(Block);
-        BlockInfo *BBInfo = getBlockInfo(BB);
-        int DistFromEntry = getEntryDistFromPreds(BB, LoopDepth);
-        Distances &BBDists = BBInfo->getDistances(LoopDepth);
-        if (DistFromEntry < BBDists.DistFromEntry) {
-          BBDists.DistFromEntry = DistFromEntry;
-          Changed = true;
-        }
-      }
-    } while (Changed);
-
-    // Compute the distances to the exit block.
-    do {
-      Changed = false;
-      for (auto &Block : reverse(Blocks)) {
-        const SILBasicBlock *BB = getBlock(Block);
-        BlockInfo *BBInfo = getBlockInfo(BB);
-        int DistToExit =
-          getExitDistFromSuccs(BB, LoopDepth) + BBInfo->getLength(LoopDepth);
-        Distances &BBDists = BBInfo->getDistances(LoopDepth);
-        if (DistToExit < BBDists.DistToExit) {
-          BBDists.DistToExit = DistToExit;
-          Changed = true;
-        }
-      }
-    } while (Changed);
-  }
-
-  /// Analyze \p Loop and all its inner loops.
-  void analyzeLoopsRecursively(SILLoop *Loop, int LoopDepth);
-
-  void printFunction(llvm::raw_ostream &OS);
-
-  void printLoop(llvm::raw_ostream &OS, SILLoop *Loop, int LoopDepth);
-
-  void printBlockInfo(llvm::raw_ostream &OS, SILBasicBlock *BB, int LoopDepth);
-
-public:
-  ShortestPathAnalysis(SILFunction *F, SILLoopInfo *LI) : F(F), LI(LI) { }
-
-  bool isValid() const { return !BlockInfos.empty(); }
-
-  /// Compute the distances. The function \p getApplyLength returns the length
-  /// of a function call.
-  template <typename Func>
-  void analyze(ColdBlockInfo &CBI, Func getApplyLength) {
-    assert(!isValid());
-
-    BlockInfoStorage.resize(F->size());
-
-    // First step: compute the length of the blocks.
-    unsigned BlockIdx = 0;
-    for (SILBasicBlock &BB : *F) {
-      int Length = 0;
-      if (CBI.isCold(&BB)) {
-        Length = ColdBlockLength;
-      } else {
-        for (SILInstruction &I : BB) {
-          if (auto FAS = FullApplySite::isa(&I)) {
-            Length += getApplyLength(FAS);
-          } else {
-            Length += (int)instructionInlineCost(I);
-          }
-        }
-      }
-      BlockInfo *BBInfo = &BlockInfoStorage[BlockIdx++];
-      BlockInfos[&BB] = BBInfo;
-      BBInfo->Length = Length;
-
-      // Initialize the distances for the entry and exit blocks, used when
-      // computing the distances for the function itself.
-      if (&BB == &F->front())
-        BBInfo->getDistances(0).DistFromEntry = 0;
-
-      if (isa<ReturnInst>(BB.getTerminator()))
-        BBInfo->getDistances(0).DistToExit = Length;
-    }
-    // Compute the distances for all loops in the function.
-    for (SILLoop *Loop : *LI) {
-      analyzeLoopsRecursively(Loop, 1);
-    }
-    // Compute the distances for the function itself.
-    solveDataFlow(F->getBlocks(), 0);
-  }
-
-  /// Returns the length of the shortest path of the block \p BB in the loop
-  /// with nesting level \p LoopDepth. If \p LoopDepth is 0 ir returns the
-  /// shortest path in the function.
-  int getScopeLength(SILBasicBlock *BB, int LoopDepth) {
-    assert(BB->getParent() == F);
-    if (LoopDepth >= MaxNumLoopLevels)
-      LoopDepth = MaxNumLoopLevels - 1;
-    return getBlockInfo(BB)->getScopeLength(LoopDepth);
-  }
-
-  /// Returns the length of the shortest path of the block \p BB in its
-  /// innermost loop.
-  int getInnerScopeLength(SILBasicBlock *BB) {
-    return getScopeLength(BB, LI->getLoopDepth(BB));
-  }
-
-  /// Returns the weight of block \p BB also considering the \p CallerWeight
-  /// which is the weigt of the call site's block in the caller.
-  Weight getWeight(SILBasicBlock *BB, Weight CallerWeight);
-
-  void dump();
-};
-
-int ShortestPathAnalysis::getEntryDistFromPreds(const SILBasicBlock *BB,
-                                                int LoopDepth) {
-  int MinDist = Distances::InitialDist;
-  for (SILBasicBlock *Pred : BB->getPreds()) {
-    BlockInfo *PredInfo = getBlockInfo(Pred);
-    Distances &PDists = PredInfo->getDistances(LoopDepth);
-    int DistFromEntry = PDists.DistFromEntry + PredInfo->Length +
-                          PDists.LoopHeaderLength;
-    if (DistFromEntry < MinDist)
-      MinDist = DistFromEntry;
-  }
-  return MinDist;
-}
-
-int ShortestPathAnalysis::getExitDistFromSuccs(const SILBasicBlock *BB,
-                                               int LoopDepth) {
-  int MinDist = Distances::InitialDist;
-  for (const SILSuccessor &Succ : BB->getSuccessors()) {
-    BlockInfo *SuccInfo = getBlockInfo(Succ);
-    Distances &SDists = SuccInfo->getDistances(LoopDepth);
-    if (SDists.DistToExit < MinDist)
-      MinDist = SDists.DistToExit;
-  }
-  return MinDist;
-}
-
-/// Detect an edge from the loop pre-header's predecessor to the loop exit
-/// block. Such an edge "short-cuts" a loop if it is never iterated. But usually
-/// it is the less frequent case and we want to ignore it.
-/// E.g. it handles the case of N==0 for
-///     for i in 0..<N { ... }
-/// If the \p Loop has such an edge the source block of this edge is returned,
-/// which is the predecessor of the loop pre-header.
-static SILBasicBlock *detectLoopBypassPreheader(SILLoop *Loop) {
-  SILBasicBlock *Pred = Loop->getLoopPreheader();
-  if (!Pred)
-    return nullptr;
-
-  SILBasicBlock *PredPred = Pred->getSinglePredecessor();
-  if (!PredPred)
-    return nullptr;
-
-  auto *CBR = dyn_cast<CondBranchInst>(PredPred->getTerminator());
-  if (!CBR)
-    return nullptr;
-
-  SILBasicBlock *Succ = (CBR->getTrueBB() == Pred ? CBR->getFalseBB() :
-                                                    CBR->getTrueBB());
-
-  for (SILBasicBlock *PredOfSucc : Succ->getPreds()) {
-    SILBasicBlock *Exiting = PredOfSucc->getSinglePredecessor();
-    if (!Exiting)
-      Exiting = PredOfSucc;
-    if (Loop->contains(Exiting))
-      return PredPred;
-  }
-  return nullptr;
-}
-
-void ShortestPathAnalysis::analyzeLoopsRecursively(SILLoop *Loop, int LoopDepth) {
-  if (LoopDepth >= MaxNumLoopLevels)
-    return;
-
-  // First dive into the inner loops.
-  for (SILLoop *SubLoop : Loop->getSubLoops()) {
-    analyzeLoopsRecursively(SubLoop, LoopDepth + 1);
-  }
-
-  BlockInfo *HeaderInfo = getBlockInfo(Loop->getHeader());
-  Distances &HeaderDists = HeaderInfo->getDistances(LoopDepth);
-
-  // Initial values for the entry (== header) and exit-predecessor (== header as
-  // well).
-  HeaderDists.DistFromEntry = 0;
-  HeaderDists.DistToExit = 0;
-
-  solveDataFlow(Loop->getBlocks(), LoopDepth);
-
-  int LoopLength = getExitDistFromSuccs(Loop->getHeader(), LoopDepth) +
-  HeaderInfo->getLength(LoopDepth);
-  HeaderDists.DistToExit = LoopLength;
-
-  // If there is a loop bypass edge, add the loop length to the loop pre-pre-
-  // header instead to the header. This actually let us ignore the loop bypass
-  // edge in the length calculation for the loop's parent scope.
-  if (SILBasicBlock *Bypass = detectLoopBypassPreheader(Loop))
-    HeaderInfo = getBlockInfo(Bypass);
-
-  // Add the full loop length (= assumed-iteration-count * length) to the loop
-  // header so that it is considered in the parent scope.
-  HeaderInfo->getDistances(LoopDepth - 1).LoopHeaderLength =
-    LoopCount * LoopLength;
-}
-
-ShortestPathAnalysis::Weight ShortestPathAnalysis::
-getWeight(SILBasicBlock *BB, Weight CallerWeight) {
-  assert(BB->getParent() == F);
-
-  SILLoop *Loop = LI->getLoopFor(BB);
-  if (!Loop) {
-    // We are not in a loop. So just account the length of our function scope
-    // in to the length of the CallerWeight.
-    return Weight(CallerWeight.ScopeLength + getScopeLength(BB, 0),
-                  CallerWeight.LoopWeight);
-  }
-  int LoopDepth = Loop->getLoopDepth();
-  // Deal with the corner case of having more than 4 nested loops.
-  while (LoopDepth >= MaxNumLoopLevels) {
-    --LoopDepth;
-    Loop = Loop->getParentLoop();
-  }
-  Weight W(getScopeLength(BB, LoopDepth), SingleLoopWeight);
-
-  // Add weights for all the loops BB is in.
-  while (Loop) {
-    assert(LoopDepth > 0);
-    BlockInfo *HeaderInfo = getBlockInfo(Loop->getHeader());
-    int InnerLoopLength = HeaderInfo->getScopeLength(LoopDepth) *
-                            ShortestPathAnalysis::LoopCount;
-    int OuterLoopWeight = SingleLoopWeight;
-    int OuterScopeLength = HeaderInfo->getScopeLength(LoopDepth - 1);
-
-    // Reaching the outermost loop, we use the CallerWeight to get the outer
-    // length+loopweight.
-    if (LoopDepth == 1) {
-      // If the apply in the caller is not in a significant loop, just stop with
-      // what we have now.
-      if (CallerWeight.LoopWeight < 4)
-        return W;
-
-      // If this function is part of the caller's scope length take the caller's
-      // scope length. Note: this is not the case e.g. if the apply is in a
-      // then-branch of an if-then-else in the caller and the else-branch is
-      // the short path.
-      if (CallerWeight.ScopeLength > OuterScopeLength)
-        OuterScopeLength = CallerWeight.ScopeLength;
-      OuterLoopWeight = CallerWeight.LoopWeight;
-    }
-    assert(OuterScopeLength >= InnerLoopLength);
-
-    // If the current loop is only a small part of its outer loop, we don't
-    // take the outer loop that much into account. Only if the current loop is
-    // actually the "main part" in the outer loop we add the full loop weight
-    // for the outer loop.
-    if (OuterScopeLength < InnerLoopLength * 2) {
-      W.LoopWeight += OuterLoopWeight - 1;
-    } else if (OuterScopeLength < InnerLoopLength * 3) {
-      W.LoopWeight += OuterLoopWeight - 2;
-    } else if (OuterScopeLength < InnerLoopLength * 4) {
-      W.LoopWeight += OuterLoopWeight - 3;
-    } else {
-      return W;
-    }
-    --LoopDepth;
-    Loop = Loop->getParentLoop();
-  }
-  assert(LoopDepth == 0);
-  return W;
-}
-
-void ShortestPathAnalysis::dump() {
-  printFunction(llvm::errs());
-}
-
-void ShortestPathAnalysis::printFunction(llvm::raw_ostream &OS) {
-  OS << "SPA @" << F->getName() << "\n";
-  for (SILBasicBlock &BB : *F) {
-    printBlockInfo(OS, &BB, 0);
-  }
-  for (SILLoop *Loop : *LI) {
-    printLoop(OS, Loop, 1);
-  }
-}
-
-void ShortestPathAnalysis::printLoop(llvm::raw_ostream &OS, SILLoop *Loop,
-                                     int LoopDepth) {
-  if (LoopDepth >= MaxNumLoopLevels)
-    return;
-  assert(LoopDepth == (int)Loop->getLoopDepth());
-
-  OS << "Loop bb" << Loop->getHeader()->getDebugID() << ":\n";
-  for (SILBasicBlock *BB : Loop->getBlocks()) {
-    printBlockInfo(OS, BB, LoopDepth);
-  }
-  for (SILLoop *SubLoop : Loop->getSubLoops()) {
-    printLoop(OS, SubLoop, LoopDepth + 1);
-  }
-}
-
-void ShortestPathAnalysis::printBlockInfo(llvm::raw_ostream &OS,
-                                          SILBasicBlock *BB, int LoopDepth) {
-  BlockInfo *BBInfo = getBlockInfo(BB);
-  Distances &D = BBInfo->getDistances(LoopDepth);
-  OS << "  bb" << BB->getDebugID() << ": length=" << BBInfo->Length << '+'
-     << D.LoopHeaderLength << ", d-entry=" << D.DistFromEntry
-     << ", d-exit=" << D.DistToExit << '\n';
-}
-
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
 //===----------------------------------------------------------------------===//
-
-namespace {
-
-// Controls the decision to inline functions with @_semantics, @effect and
-// global_init attributes.
-enum class InlineSelection {
-  Everything,
-  NoGlobalInit, // and no availability semantics calls
-  NoSemanticsAndGlobalInit
-};
-
-using Weight = ShortestPathAnalysis::Weight;
-
-class SILPerformanceInliner {
-  /// Specifies which functions not to inline, based on @_semantics and
-  /// global_init attributes.
-  InlineSelection WhatToInline;
-
-  DominanceAnalysis *DA;
-  SILLoopAnalysis *LA;
-
-  // For keys of SILFunction and SILLoop.
-  llvm::DenseMap<SILFunction *, ShortestPathAnalysis *> SPAs;
-  llvm::SpecificBumpPtrAllocator<ShortestPathAnalysis> SPAAllocator;
-
-  ColdBlockInfo CBI;
-
-  /// The following constants define the cost model for inlining. Some constants
-  /// are also defined in ShortestPathAnalysis.
-  enum {
-    /// The base value for every call: it represents the benefit of removing the
-    /// call overhead itself.
-    RemovedCallBenefit = 20,
-
-    /// The benefit if the operand of an apply gets constant, e.g. if a closure
-    /// is passed to an apply instruction in the callee.
-    RemovedClosureBenefit = RemovedCallBenefit + 50,
-
-    /// The benefit if a load can (probably) eliminated because it loads from
-    /// a stack location in the caller.
-    RemovedLoadBenefit = RemovedCallBenefit + 5,
-
-    /// The benefit if a store can (probably) eliminated because it stores to
-    /// a stack location in the caller.
-    RemovedStoreBenefit = RemovedCallBenefit + 10,
-
-    /// The benefit if the condition of a terminator instruction gets constant
-    /// due to inlining.
-    RemovedTerminatorBenefit = RemovedCallBenefit + 10,
-
-    /// The benefit if a retain/release can (probably) be eliminated after
-    /// inlining.
-    RefCountBenefit = RemovedCallBenefit + 20,
-
-    /// Approximately up to this cost level a function can be inlined without
-    /// increasing the code size.
-    TrivialFunctionThreshold = 18,
-
-    /// Configuration for the caller block limit.
-    BlockLimitDenominator = 10000,
-
-    /// The assumed execution length of a function call.
-    DefaultApplyLength = 10
-  };
-
-#ifndef NDEBUG
-  SILFunction *LastPrintedCaller = nullptr;
-  void dumpCaller(SILFunction *Caller) {
-    if (Caller != LastPrintedCaller) {
-      llvm::dbgs() << "\nInline into caller: " << Caller->getName() << '\n';
-      LastPrintedCaller = Caller;
-    }
-  }
-#endif
-
-  ShortestPathAnalysis *getSPA(SILFunction *F, SILLoopInfo *LI) {
-    ShortestPathAnalysis *&SPA = SPAs[F];
-    if (!SPA) {
-      SPA = new (SPAAllocator.Allocate()) ShortestPathAnalysis(F, LI);
-    }
-    return SPA;
-  }
-
-  SILFunction *getEligibleFunction(FullApplySite AI);
-
-  bool isProfitableToInline(FullApplySite AI,
-                            Weight CallerWeight,
-                            ConstantTracker &constTracker,
-                            int &NumCallerBlocks);
-
-  bool isProfitableInColdBlock(FullApplySite AI, SILFunction *Callee);
-
-  void visitColdBlocks(SmallVectorImpl<FullApplySite> &AppliesToInline,
-                       SILBasicBlock *root, DominanceInfo *DT);
-
-  void collectAppliesToInline(SILFunction *Caller,
-                              SmallVectorImpl<FullApplySite> &Applies);
-
-public:
-  SILPerformanceInliner(InlineSelection WhatToInline, DominanceAnalysis *DA,
-                        SILLoopAnalysis *LA)
-      : WhatToInline(WhatToInline), DA(DA), LA(LA), CBI(DA) {}
-
-  bool inlineCallsIntoFunction(SILFunction *F);
-};
-
-} // namespace
 
 // Return true if the callee has self-recursive calls.
 static bool calleeIsSelfRecursive(SILFunction *Callee) {
@@ -1154,82 +584,131 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   return Callee;
 }
 
+// Gets the cost of an instruction by using the simplified test-model: only
+// builtin instructions have a cost and that's exactly 1.
+static unsigned testCost(SILInstruction *I) {
+  switch (I->getKind()) {
+    case ValueKind::BuiltinInst:
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+// Returns the taken block of a terminator instruction if the condition turns
+// out to be constant.
+static SILBasicBlock *getTakenBlock(TermInst *term,
+                                    ConstantTracker &constTracker) {
+  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(term)) {
+    IntConst condConst = constTracker.getIntConst(CBI->getCondition());
+    if (condConst.isFromCaller) {
+      return condConst.value != 0 ? CBI->getTrueBB() : CBI->getFalseBB();
+    }
+    return nullptr;
+  }
+  if (SwitchValueInst *SVI = dyn_cast<SwitchValueInst>(term)) {
+    IntConst switchConst = constTracker.getIntConst(SVI->getOperand());
+    if (switchConst.isFromCaller) {
+      for (unsigned Idx = 0; Idx < SVI->getNumCases(); ++Idx) {
+        auto switchCase = SVI->getCase(Idx);
+        if (auto *IL = dyn_cast<IntegerLiteralInst>(switchCase.first)) {
+          if (switchConst.value == IL->getValue())
+            return switchCase.second;
+        } else {
+          return nullptr;
+        }
+      }
+      if (SVI->hasDefault())
+          return SVI->getDefaultBB();
+    }
+    return nullptr;
+  }
+  if (SwitchEnumInst *SEI = dyn_cast<SwitchEnumInst>(term)) {
+    if (SILInstruction *def = constTracker.getDefInCaller(SEI->getOperand())) {
+      if (EnumInst *EI = dyn_cast<EnumInst>(def)) {
+        for (unsigned Idx = 0; Idx < SEI->getNumCases(); ++Idx) {
+          auto enumCase = SEI->getCase(Idx);
+          if (enumCase.first == EI->getElement())
+            return enumCase.second;
+        }
+        if (SEI->hasDefault())
+          return SEI->getDefaultBB();
+      }
+    }
+    return nullptr;
+  }
+  if (CheckedCastBranchInst *CCB = dyn_cast<CheckedCastBranchInst>(term)) {
+    if (SILInstruction *def = constTracker.getDefInCaller(CCB->getOperand())) {
+      if (UpcastInst *UCI = dyn_cast<UpcastInst>(def)) {
+        SILType castType = UCI->getOperand()->getType();
+        if (CCB->getCastType().isExactSuperclassOf(castType)) {
+          return CCB->getSuccessBB();
+        }
+        if (!castType.isBindableToSuperclassOf(CCB->getCastType())) {
+          return CCB->getFailureBB();
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
 /// Return true if inlining this call site is profitable.
 bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
-                                              Weight CallerWeight,
+                                              unsigned loopDepthOfAI,
+                                              DominanceAnalysis *DA,
+                                              SILLoopAnalysis *LA,
                                               ConstantTracker &callerTracker,
-                                              int &NumCallerBlocks) {
+                                              unsigned &NumCallerBlocks) {
   SILFunction *Callee = AI.getReferencedFunction();
 
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
-
-  SILLoopInfo *LI = LA->get(Callee);
-  ShortestPathAnalysis *SPA = getSPA(Callee, LI);
-  assert(SPA->isValid());
-
+  
   ConstantTracker constTracker(Callee, &callerTracker, AI);
+  
   DominanceInfo *DT = DA->get(Callee);
-  SILBasicBlock *CalleeEntry = &Callee->front();
-  DominanceOrder domOrder(CalleeEntry, DT, Callee->size());
+  SILLoopInfo *LI = LA->get(Callee);
 
+  DominanceOrder domOrder(&Callee->front(), DT, Callee->size());
+  
   // Calculate the inlining cost of the callee.
-  int CalleeCost = 0;
-  int Benefit = 0;
-  
-  // Start with a base benefit.
-  int BaseBenefit = RemovedCallBenefit;
-  const SILOptions &Opts = Callee->getModule().getOptions();
-  
-  // For some reason -Ounchecked can accept a higher base benefit without
-  // increasing the code size too much.
-  if (Opts.Optimization == SILOptions::SILOptMode::OptimizeUnchecked)
-    BaseBenefit *= 2;
+  unsigned CalleeCost = 0;
+  unsigned Benefit = InlineCostThreshold > 0 ? InlineCostThreshold :
+                                               RemovedCallBenefit;
+  Benefit += loopDepthOfAI * LoopBenefitFactor;
+  int testThreshold = TestThreshold;
 
-  CallerWeight.updateBenefit(Benefit, BaseBenefit);
-
-  // Go through all blocks of the function, accumulate the cost and find
-  // benefits.
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
-    Weight BlockW = SPA->getWeight(block, CallerWeight);
-
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
       
-      CalleeCost += (int)instructionInlineCost(I);
-
-      if (FullApplySite AI = FullApplySite::isa(&I)) {
+      if (testThreshold >= 0) {
+        // We are in test-mode: use a simplified cost model.
+        CalleeCost += testCost(&I);
+      } else {
+        // Use the regular cost model.
+        CalleeCost += unsigned(instructionInlineCost(I));
+      }
+      
+      if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
         
         // Check if the callee is passed as an argument. If so, increase the
         // threshold, because inlining will (probably) eliminate the closure.
-        SILInstruction *def = constTracker.getDefInCaller(AI.getCallee());
-        if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def)))
-          BlockW.updateBenefit(Benefit, RemovedClosureBenefit);
-      } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
-        // Check if it's a load from a stack location in the caller. Such a load
-        // might be optimized away if inlined.
-        if (constTracker.isStackAddrInCaller(LI->getOperand()))
-          BlockW.updateBenefit(Benefit, RemovedLoadBenefit);
-      } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-        // Check if it's a store to a stack location in the caller. Such a load
-        // might be optimized away if inlined.
-        if (constTracker.isStackAddrInCaller(SI->getDest()))
-          BlockW.updateBenefit(Benefit, RemovedStoreBenefit);
-      } else if (isa<StrongReleaseInst>(&I) || isa<ReleaseValueInst>(&I)) {
-        SILValue Op = stripCasts(I.getOperand(0));
-        if (SILArgument *Arg = dyn_cast<SILArgument>(Op)) {
-          if (Arg->isFunctionArg() && Arg->getArgumentConvention() ==
-              SILArgumentConvention::Direct_Guaranteed) {
-            BlockW.updateBenefit(Benefit, RefCountBenefit);
-          }
+        SILInstruction *def = constTracker.getDefInCaller(AI->getCallee());
+        if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def))) {
+          unsigned loopDepth = LI->getLoopDepth(block);
+          Benefit += ConstCalleeBenefit + loopDepth * LoopBenefitFactor;
+          testThreshold *= 2;
         }
       }
     }
     // Don't count costs in blocks which are dead after inlining.
-    SILBasicBlock *takenBlock = constTracker.getTakenBlock(block->getTerminator());
+    SILBasicBlock *takenBlock = getTakenBlock(block->getTerminator(),
+                                              constTracker);
     if (takenBlock) {
-      BlockW.updateBenefit(Benefit, RemovedTerminatorBenefit);
+      Benefit += ConstTerminatorBenefit;
       domOrder.pushChildrenIf(block, [=] (SILBasicBlock *child) {
         return child->getSinglePredecessor() != block || child == takenBlock;
       });
@@ -1238,42 +717,38 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     }
   }
 
-  if (AI.getFunction()->isThunk()) {
+  unsigned Threshold = Benefit; // The default.
+  if (testThreshold >= 0) {
+    // We are in testing mode.
+    Threshold = testThreshold;
+  } else if (AI.getFunction()->isThunk()) {
     // Only inline trivial functions into thunks (which will not increase the
     // code size).
-    if (CalleeCost > TrivialFunctionThreshold)
-      return false;
-
-    DEBUG(
-      
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    decision {" << CalleeCost << " into thunk} " <<
-          Callee->getName() << '\n';
-    );
-    return true;
+    Threshold = TrivialFunctionThreshold;
+  } else {
+    // The default case.
+    // We reduce the benefit if the caller is too large. For this we use a
+    // cubic function on the number of caller blocks. This starts to prevent
+    // inlining at about 800 - 1000 caller blocks.
+    unsigned blockMinus =
+      (NumCallerBlocks * NumCallerBlocks) / BlockLimitDenominator *
+                          NumCallerBlocks / BlockLimitDenominator;
+    if (Threshold > blockMinus + TrivialFunctionThreshold)
+      Threshold -= blockMinus;
+    else
+      Threshold = TrivialFunctionThreshold;
   }
 
-  // We reduce the benefit if the caller is too large. For this we use a
-  // cubic function on the number of caller blocks. This starts to prevent
-  // inlining at about 800 - 1000 caller blocks.
-  int blockMinus =
-    (NumCallerBlocks * NumCallerBlocks) / BlockLimitDenominator *
-                        NumCallerBlocks / BlockLimitDenominator;
-  Benefit -= blockMinus;
-
-  // This is the final inlining decision.
-  if (CalleeCost > Benefit) {
+  if (CalleeCost > Threshold) {
     return false;
   }
-
   NumCallerBlocks += Callee->size();
 
   DEBUG(
     dumpCaller(AI.getFunction());
-    llvm::dbgs() << "    decision {c=" << CalleeCost << ", b=" << Benefit <<
-        ", l=" << SPA->getScopeLength(CalleeEntry, 0) <<
-        ", c-w=" << CallerWeight << ", bb=" << Callee->size() <<
-        ", c-bb=" << NumCallerBlocks << "} " << Callee->getName() << '\n';
+    llvm::dbgs() << "    decision {" << CalleeCost << " < " << Threshold <<
+        ", ld=" << loopDepthOfAI << ", bb=" << NumCallerBlocks << "} " <<
+        Callee->getName() << '\n';
   );
   return true;
 }
@@ -1284,13 +759,26 @@ bool SILPerformanceInliner::isProfitableInColdBlock(FullApplySite AI,
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
 
-  int CalleeCost = 0;
+  // Testing with the TestThreshold disables inlining into cold blocks.
+  if (TestThreshold >= 0)
+    return false;
+  
+  unsigned CalleeCost = 0;
+  int testThreshold = TestThreshold;
 
   for (SILBasicBlock &Block : *Callee) {
     for (SILInstruction &I : Block) {
-      CalleeCost += int(instructionInlineCost(I));
-      if (CalleeCost > TrivialFunctionThreshold)
-        return false;
+      if (testThreshold >= 0) {
+        // We are in test-mode: use a simplified cost model.
+        CalleeCost += testCost(&I);
+        if (CalleeCost > 0)
+          return false;
+      } else {
+        // Use the regular cost model.
+        CalleeCost += unsigned(instructionInlineCost(I));
+        if (CalleeCost > TrivialFunctionThreshold)
+          return false;
+      }
     }
   }
   DEBUG(
@@ -1301,76 +789,24 @@ bool SILPerformanceInliner::isProfitableInColdBlock(FullApplySite AI,
   return true;
 }
 
-/// Record additional weight increases.
-///
-/// Why can't we just add the weight when we call isProfitableToInline? Because
-/// the additional weight is for _another_ function than the current handled
-/// callee.
-static void addWeightCorrection(FullApplySite FAS,
-                        llvm::DenseMap<FullApplySite, int> &WeightCorrections) {
-  SILFunction *Callee = FAS.getReferencedFunction();
-  if (Callee && Callee->hasSemanticsAttr("array.uninitialized")) {
-    // We want to inline the argument to an array.uninitialized call, because
-    // this argument is most likely a call to a function which contains the
-    // buffer allocation for the array. It is essential to inline it for stack
-    // promotion of the array buffer.
-    SILValue BufferArg = FAS.getArgument(0);
-    SILValue Base = stripValueProjections(stripCasts(BufferArg));
-    if (auto BaseApply = FullApplySite::isa(Base))
-      WeightCorrections[BaseApply] += 6;
-  }
-}
-
 void SILPerformanceInliner::collectAppliesToInline(
-    SILFunction *Caller, SmallVectorImpl<FullApplySite> &Applies) {
+    SILFunction *Caller, SmallVectorImpl<FullApplySite> &Applies,
+    DominanceAnalysis *DA, SILLoopAnalysis *LA) {
   DominanceInfo *DT = DA->get(Caller);
   SILLoopInfo *LI = LA->get(Caller);
 
-  llvm::DenseMap<FullApplySite, int> WeightCorrections;
-
-  // Compute the shortest-path analysis for the caller.
-  ShortestPathAnalysis *SPA = getSPA(Caller, LI);
-  SPA->analyze(CBI, [&](FullApplySite FAS) -> int {
-  
-    // This closure returns the length of a called function.
-
-    // At this occasion we record additional weight increases.
-    addWeightCorrection(FAS, WeightCorrections);
-
-    if (SILFunction *Callee = getEligibleFunction(FAS)) {
-      // Compute the shortest-path analysis for the callee.
-      SILLoopInfo *CalleeLI = LA->get(Callee);
-      ShortestPathAnalysis *CalleeSPA = getSPA(Callee, CalleeLI);
-      if (!CalleeSPA->isValid()) {
-        CalleeSPA->analyze(CBI, [](FullApplySite FAS) {
-          // We don't compute SPA for another call-level. Functions called from
-          // the callee are assumed to have DefaultApplyLength.
-          return DefaultApplyLength;
-        });
-      }
-      return CalleeSPA->getScopeLength(&Callee->front(), 0);
-    }
-    // Some unknown function.
-    return DefaultApplyLength;
-  });
-
-#ifndef NDEBUG
-  if (PrintShortestPathInfo) {
-    SPA->dump();
-  }
-#endif
-
+  ColdBlockInfo ColdBlocks(DA);
   ConstantTracker constTracker(Caller);
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
-  int NumCallerBlocks = (int)Caller->size();
+
+  unsigned NumCallerBlocks = Caller->size();
 
   // Go through all instructions and find candidates for inlining.
   // We do this in dominance order for the constTracker.
   SmallVector<FullApplySite, 8> InitialCandidates;
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
-    Weight BlockWeight;
-
+    unsigned loopDepth = LI->getLoopDepth(block);
     for (auto I = block->begin(), E = block->end(); I != E; ++I) {
       constTracker.trackInst(&*I);
 
@@ -1381,18 +817,13 @@ void SILPerformanceInliner::collectAppliesToInline(
 
       auto *Callee = getEligibleFunction(AI);
       if (Callee) {
-        if (!BlockWeight.isValid())
-          BlockWeight = SPA->getWeight(block, Weight(0, 0));
-
-        // The actual weight including a possible weight correction.
-        Weight W(BlockWeight, WeightCorrections.lookup(AI));
-
-        if (isProfitableToInline(AI, W, constTracker, NumCallerBlocks))
+        if (isProfitableToInline(AI, loopDepth, DA, LA, constTracker,
+                                 NumCallerBlocks))
           InitialCandidates.push_back(AI);
       }
     }
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
-      if (CBI.isSlowPath(block, child)) {
+      if (ColdBlocks.isSlowPath(block, child)) {
         // Handle cold blocks separately.
         visitColdBlocks(InitialCandidates, child, DT);
         return false;
@@ -1423,7 +854,9 @@ void SILPerformanceInliner::collectAppliesToInline(
 
 /// \brief Attempt to inline all calls smaller than our threshold.
 /// returns True if a function was inlined.
-bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
+bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
+                                                    DominanceAnalysis *DA,
+                                                    SILLoopAnalysis *LA) {
   // Don't optimize functions that are marked with the opt.never attribute.
   if (!Caller->shouldOptimize())
     return false;
@@ -1432,7 +865,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // don't change anything yet so that the dominator information
   // remains valid.
   SmallVector<FullApplySite, 8> AppliesToInline;
-  collectAppliesToInline(Caller, AppliesToInline);
+  collectAppliesToInline(Caller, AppliesToInline, DA, LA);
 
   if (AppliesToInline.empty())
     return false;
@@ -1524,7 +957,8 @@ public:
       return;
     }
 
-    SILPerformanceInliner Inliner(WhatToInline, DA, LA);
+    SILPerformanceInliner Inliner(getOptions().InlineThreshold,
+                                  WhatToInline);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");
@@ -1533,7 +967,7 @@ public:
     // analyses for this function and restart the pipeline so that we
     // can further optimize this function before attempting to inline
     // in it again.
-    if (Inliner.inlineCallsIntoFunction(getFunction())) {
+    if (Inliner.inlineCallsIntoFunction(getFunction(), DA, LA)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       restartPassPipeline();
     }

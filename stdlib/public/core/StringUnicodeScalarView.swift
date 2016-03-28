@@ -41,7 +41,6 @@ extension String {
         self.idx = pos
         self.core = core
       }
-      @inline(__always)
       mutating func next() -> UTF16.CodeUnit? {
         if idx == core.endIndex {
           return nil
@@ -62,7 +61,6 @@ extension String {
       ///
       /// - Precondition: The next value is representable.
       @warn_unused_result
-      @inline(__always)
       public func successor() -> Index {
         var scratch = _ScratchIterator(_core, _position)
         var decoder = UTF16()

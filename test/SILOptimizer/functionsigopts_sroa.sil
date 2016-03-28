@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline -function-signature-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline -sil-inline-test-threshold=1 -function-signature-opts %s | FileCheck %s
 
 import Builtin
 
@@ -143,29 +143,9 @@ struct SingleFieldLvl3 {
 // CHECK: apply [[FN]]([[ARG]])
 sil [fragile] @single_level_dead_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
 bb0(%0 : $S1):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = struct_extract %0 : $S1, #S1.f2
   return %1 : $Builtin.Int32
@@ -190,29 +170,9 @@ bb0(%0 : $S1):
 // CHECK: apply [[FN]]([[ARG1]], [[ARG2]])
 sil [fragile] @single_level_live_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
 bb0(%0 : $S1):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = struct_extract %0 : $S1, #S1.f2
   %2 = function_ref @s1_user : $@convention(thin) (S1) -> ()
@@ -243,29 +203,9 @@ bb0(%0 : $S1):
 // CHECK: apply [[FN]]([[EXT3]], [[EXT1]])
 sil [fragile] @multiple_level_all_root_fields_used_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
 bb0(%0 : $S2):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   debug_value %0 : $S2 // debug_value should not prevent function signature optimization
   %1 = struct_extract %0 : $S2, #S2.f1
@@ -303,29 +243,9 @@ bb0(%0 : $S2):
 // CHECK: apply [[FN]]([[EXT5]], [[EXT3]])
 sil [fragile] @multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (S3) -> (Builtin.Int16, Builtin.Int64) {
 bb0(%0 : $S3):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   debug_value %0 : $S3
   %1 = struct_extract %0 : $S3, #S3.f1
@@ -365,29 +285,9 @@ bb0(%0 : $S3):
 // CHECK: apply [[FN]]([[EXT4]], [[EXT3]], [[EXT1]])
 sil [fragile] @multiple_level_root_must_be_reformed_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
 bb0(%0 : $S2):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   %2 = struct_extract %0 : $S2, #S2.f1
   %3 = struct_extract %2 : $S1, #S1.f1
@@ -408,29 +308,9 @@ bb0(%0 : $S2):
 // CHECK: apply [[FN]]([[EXT4]], [[EXT3]], [[EXT1]])
 sil [fragile] @multiple_level_root_must_be_reformed_caller : $@convention(thin) (S2) -> () {
 bb0(%0 : $S2):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = function_ref @multiple_level_root_must_be_reformed_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64)
   %2 = apply %1(%0) : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64)
@@ -450,29 +330,9 @@ bb0(%0 : $S2):
 // CHECK: release_value [[IN]] : $S5
 sil [fragile] @owned_struct_1_callee : $@convention(thin) (@owned S5, @owned S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
 bb0(%0 : $S5, %1 : $S5):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   %2 = struct_extract %0 : $S5, #S5.f2
   %3 = struct_extract %2 : $S1, #S1.f1
@@ -515,29 +375,9 @@ bb0(%0 : $S5):
 // CHECK: apply [[FN]]([[IN1]], [[EXT2]], [[EXT5]], [[EXT4]], [[IN5]]) : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
 sil [fragile] @owned_struct_2_callee : $@convention(thin) (Builtin.Int256, Builtin.Int256, @owned S5, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
 bb0(%0 : $Builtin.Int256, %1 : $Builtin.Int256, %2 : $S5, %3 : $Builtin.Int128, %4 : $Builtin.Int128):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   %5 = struct_extract %2 : $S5, #S5.f2
   %6 = struct_extract %5 : $S1, #S1.f1
@@ -575,29 +415,9 @@ bb0(%0 : $Builtin.Int256, %1 : $S5, %2 : $Builtin.Int128):
 // CHECK: apply [[FN]]([[IN1]], [[EXT1]], [[EXT2]]) : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
 sil [fragile] @ignore_ptrs_callee : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16) {
 bb0(%0 : $*S1, %1 : $S1, %2 : $S1):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   debug_value %1 : $S1
   debug_value %2 : $S1
@@ -630,29 +450,9 @@ bb0(%0 : $*S1, %1 : $S1, %2 : $S1):
 // CHECK: apply [[FN]]([[IN1]]) : $@convention(thin) (FakeStaticString) -> ()
 sil [fragile] @multiple_sroa_callee : $@convention(thin) (FakeStaticString, @owned FakeString, FakeStaticString) -> () {
 bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   %3 = function_ref @fakestaticstring_user : $@convention(thin) (FakeStaticString) -> ()
   %4 = function_ref @fakestring_user : $@convention(thin) (FakeString) -> ()
@@ -685,29 +485,9 @@ bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
 // CHECK: apply [[FN]]([[EXT2]], [[EXT1]]) : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> ()
 sil [fragile] @check_out_of_order_uses_callee : $@convention(thin) (S1) -> () {
 bb0(%0 : $S1):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   debug_value %0 : $S1
   %1 = struct_extract %0 : $S1, #S1.f2
@@ -742,29 +522,9 @@ bb0(%0 : $S1):
 // CHECK: release_value [[IN1]]
 sil [fragile] @class_callee_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $C1, %1 : $Builtin.Int32):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   // This use is needed so that we do not perform dead arg + owned -> guaranteed.
   strong_retain %0 : $C1
@@ -797,29 +557,9 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // CHECK: return
 sil [fragile] @inarg_callee : $@convention(thin) (@in S1) -> () {
 bb0(%0 : $*S1):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = function_ref @s1_ptr_user : $@convention(thin) (@in S1) -> ()
 	%2 = apply %1(%0) : $@convention(thin) (@in S1) -> ()
@@ -859,29 +599,9 @@ bb0(%0 : $ThirtySixFieldStruct):
 // CHECK-LABEL: sil [fragile] [thunk] [always_inline] @more_than_32_type_sized_callee : $@convention(thin) (ThirtySixFieldStruct) -> Builtin.Int32 {
 sil [fragile] @more_than_32_type_sized_callee : $@convention(thin) (ThirtySixFieldStruct) -> Builtin.Int32 {
 bb0(%0 : $ThirtySixFieldStruct):
-  // make it a non-trivial function
+  // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  %c4 = builtin "assert_configuration"() : $Builtin.Int32
-  %c5 = builtin "assert_configuration"() : $Builtin.Int32
-  %c6 = builtin "assert_configuration"() : $Builtin.Int32
-  %c7 = builtin "assert_configuration"() : $Builtin.Int32
-  %c8 = builtin "assert_configuration"() : $Builtin.Int32
-  %c9 = builtin "assert_configuration"() : $Builtin.Int32
-  %c10 = builtin "assert_configuration"() : $Builtin.Int32
-  %c11 = builtin "assert_configuration"() : $Builtin.Int32
-  %c12 = builtin "assert_configuration"() : $Builtin.Int32
-  %c13 = builtin "assert_configuration"() : $Builtin.Int32
-  %c14 = builtin "assert_configuration"() : $Builtin.Int32
-  %c15 = builtin "assert_configuration"() : $Builtin.Int32
-  %c16 = builtin "assert_configuration"() : $Builtin.Int32
-  %c17 = builtin "assert_configuration"() : $Builtin.Int32
-  %c18 = builtin "assert_configuration"() : $Builtin.Int32
-  %c19 = builtin "assert_configuration"() : $Builtin.Int32
-  %c20 = builtin "assert_configuration"() : $Builtin.Int32
-  %c21 = builtin "assert_configuration"() : $Builtin.Int32
-  %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = struct_extract %0 : $ThirtySixFieldStruct, #ThirtySixFieldStruct.b1
   %2 = struct_extract %1 : $EightFieldStruct, #EightFieldStruct.a1

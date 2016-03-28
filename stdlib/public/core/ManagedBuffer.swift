@@ -410,42 +410,30 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Offset from the allocated storage for `self` to the stored `Value`
   internal static var _valueOffset: Int {
-    @inline(__always)
-    get {
-      return _roundUp(
-        sizeof(_HeapObject.self),
-        toAlignment: alignof(Value.self))
-    }
+    return _roundUp(
+      sizeof(_HeapObject.self),
+      toAlignment: alignof(Value.self))
   }
 
   /// An **unmanaged** pointer to the storage for the `Value`
   /// instance.  Not safe to use without _fixLifetime calls to
   /// guarantee it doesn't dangle
   internal var _valuePointer: UnsafeMutablePointer<Value> {
-    @inline(__always)
-    get {
-      return UnsafeMutablePointer(_address + _My._valueOffset)
-    }
+    return UnsafeMutablePointer(_address + _My._valueOffset)
   }
 
   /// An **unmanaged** pointer to the storage for `Element`s.  Not
   /// safe to use without _fixLifetime calls to guarantee it doesn't
   /// dangle.
   internal var _elementPointer: UnsafeMutablePointer<Element> {
-    @inline(__always)
-    get {
-      return UnsafeMutablePointer(_address + _My._elementOffset)
-    }
+    return UnsafeMutablePointer(_address + _My._elementOffset)
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage
   internal static var _elementOffset: Int {
-    @inline(__always)
-    get {
-      return _roundUp(
-        _valueOffset + sizeof(Value.self),
-        toAlignment: alignof(Element.self))
-    }
+    return _roundUp(
+      _valueOffset + sizeof(Value.self),
+      toAlignment: alignof(Element.self))
   }
 
   internal var _nativeBuffer: Builtin.NativeObject
