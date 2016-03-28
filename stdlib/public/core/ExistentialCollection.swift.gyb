@@ -196,6 +196,12 @@ internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element> {
   func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index
 
   @warn_unused_result
+  func formIndex(n: IndexDistance, stepsFrom i: inout Index)
+
+  @warn_unused_result
+  func formIndex(n: IndexDistance, stepsFrom i: inout Index, limitedBy limit: Index)
+
+  @warn_unused_result
   func distance(from start: Index, to end: Index) -> IndexDistance
   */
 

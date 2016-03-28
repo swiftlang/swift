@@ -130,6 +130,12 @@ public protocol Indexable : IndexableBase {
   func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index
 
   @warn_unused_result
+  func formIndex(n: IndexDistance, stepsFrom i: inout Index)
+
+  @warn_unused_result
+  func formIndex(n: IndexDistance, stepsFrom i: inout Index, limitedBy limit: Index)
+
+  @warn_unused_result
   func distance(from start: Index, to end: Index) -> IndexDistance
 }
 
@@ -376,11 +382,25 @@ extension Indexable {
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(
+    n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  ) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n, limitedBy: limit)
   }
 
+  @warn_unused_result
+  public func formIndex(n: IndexDistance, stepsFrom i: inout Index) {
+    i = index(n, stepsFrom: i)
+  }
+
+  @warn_unused_result
+  public func formIndex(
+    n: IndexDistance, stepsFrom i: inout Index, limitedBy limit: Index
+  ) {
+    i = index(n, stepsFrom: i, limitedBy: limit)
+  }
+  
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // FIXME: swift-3-indexing-model: tests.
