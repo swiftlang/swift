@@ -46,18 +46,19 @@ class struct(object):
     return 'struct(%r)' % self.__dict__
 
 binaryArithmetic = [
-       struct(operator='+', name='adding',      mutatingName='add',           firstArg='',           llvmName='add', kind='+'),
-       struct(operator='-', name='subtracting', mutatingName='subtract',      firstArg='',           llvmName='sub', kind='-'),
-       struct(operator='*', name='multiplied',  mutatingName='multiply',      firstArg='by',         llvmName='mul', kind='*'),
-       struct(operator='/', name='divided',     mutatingName='divide',        firstArg='by',         llvmName='div', kind='/'),
-       struct(operator='%', name='remainder',   mutatingName='formRemainder', firstArg='dividingBy', llvmName='rem', kind='/')
-  ]
+    struct(operator='+', name='adding',      mutatingName='add',           firstArg='',           llvmName='add', kind='+'),
+    struct(operator='-', name='subtracting', mutatingName='subtract',      firstArg='',           llvmName='sub', kind='-'),
+    struct(operator='*', name='multiplied',  mutatingName='multiply',      firstArg='by',         llvmName='mul', kind='*'),
+    struct(operator='/', name='divided',     mutatingName='divide',        firstArg='by',         llvmName='div', kind='/'),
+    struct(operator='%', name='remainder',   mutatingName='formRemainder', firstArg='dividingBy', llvmName='rem', kind='/'),
+]
 
 
 binaryBitwise = [
     struct(operator='&', name='and'),
     struct(operator='|', name='or'),
-    struct(operator='^', name='xor')]
+    struct(operator='^', name='xor'),
+]
 
 maskingShifts = [
     struct(
@@ -66,7 +67,7 @@ maskingShifts = [
     struct(
       operator='&<<', nonMaskingOperator='<<',
       name='maskingShiftLeft', llvmName=lambda _: 'shl'),
-  ]
+]
 }%
 
 //===--- Bits for the Stdlib ----------------------------------------------===//
