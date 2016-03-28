@@ -2498,7 +2498,7 @@ reference-counted types, this can produce a different value from the operand
 if the block is copied from the stack to the heap.
 
 builtin "unsafeGuaranteed"
-```````````````````````````
+``````````````````````````
 
 ::
 
@@ -2516,7 +2516,7 @@ assertions holds for uses of the first tuple element of the returned value
 ``%0``.
 
 builtin "unsafeGuaranteedEnd"
-```````````````````````````
+`````````````````````````````
 
 ::
 
