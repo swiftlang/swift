@@ -1235,8 +1235,17 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
       // resiliently from the current module, we cannot do direct access.
       auto VarDC = var->getDeclContext();
       if (auto *nominal = VarDC->isNominalTypeOrNominalTypeExtensionContext())
-        if (!nominal->hasFixedLayout(UseDC->getParentModule()))
+        if (!nominal->hasFixedLayout(UseDC->getParentModule())) {
+          // FIXME: `hasFixedLayout` on this branch only returns true for
+          // classes imported from Objective-C. A static property defined
+          // in an extension in Swift should not go through accessors.
+          // This is a targeted fix for a situation that was broken in 2.2
+          // (SR-1025) but which works properly in master.
+          if (var->isStatic() && !var->hasClangNode())
+            return AccessSemantics::DirectToStorage;
+          
           return AccessSemantics::Ordinary;
+        }
 
       // We know enough about the property to perform direct access.
       return AccessSemantics::DirectToStorage;
