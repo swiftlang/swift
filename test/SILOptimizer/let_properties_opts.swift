@@ -123,7 +123,7 @@ struct Boo3 {
   }
 }
 
-// The initializer of this struct can be defined elswhere,
+// The initializer of this struct can be defined elsewhere,
 // e.g. in an extension of this struct in a different module.
 public struct StructWithOnlyPublicLetProperties {
   public let Prop0: Int32
@@ -137,7 +137,7 @@ public struct StructWithOnlyPublicLetProperties {
 
 // The initializer of this struct cannot be defined outside
 // of the current module, because it contains an internal stored
-// property, which is impossible to intialize outside of this module.
+// property, which is impossible to initialize outside of this module.
 public struct StructWithPublicAndInternalLetProperties {
   public let Prop0: Int32
   internal let Prop1: Int32
@@ -148,9 +148,9 @@ public struct StructWithPublicAndInternalLetProperties {
   }
 }
 
-// The initializer of this struct cannot be defined elswhere,
+// The initializer of this struct cannot be defined elsewhere,
 // because it contains a private stored property, which is
-// impossible to intialize outside of this file.
+// impossible to initialize outside of this file.
 public struct StructWithPublicAndInternalAndPrivateLetProperties {
   public let Prop0: Int32
   internal let Prop1: Int32
