@@ -67,9 +67,11 @@
 
 // REQUIRES: objc_interop
 
-import ImportAsMember
+import Foundation
+import ImportAsMember.A
 import ImportAsMember.B
-import ImportAsMember.ProtoErr
+import ImportAsMember.Proto
+import IAMError
 
 let iamStructFail = IAMStruct1CreateSimple()
   // expected-error@-1{{use of unresolved identifier 'IAMStruct1CreateSimple'}}
@@ -96,19 +98,25 @@ iamStruct = Struct1.zero
 // Global properties
 currentStruct1.x += 1.5
 
+ErrorStruct.hasPrototype();
+ErrorStruct.nonPrototype();
+  // expected-error@-1{{type 'ErrorStruct' has no member 'nonPrototype'}}
+
 // Protocols
-// class Foo : NSObject, IAMProto {}
+@objc class Foo : NSObject, IAMProto {}
 
 struct Bar : IAMProto {}
   // expected-error@-1{{non-class type 'Bar' cannot conform to class protocol 'IAMProto'}}
   // expected-error@-2{{non-class type 'Bar' cannot conform to class protocol 'ImportedProtocolBase'}}
   // expected-error@-3{{non-class type 'Bar' cannot conform to class protocol 'NSObjectProtocol'}}
 
+@objc class FooErr : NSObject, ErrorProto {}
 
-// let foo = Foo()
-// foo.mutateSomeState()
-// Foo.mutateSomeStaticState()
-  // expected-not-error@-1{{type 'Foo' has no member 'mutateSomeStaticState'}}
+let foo = Foo()
+foo.mutateSomeState()
 
-// TODO: error: "swift_name cannot be used to define static member on protocol"
+let fooErr = FooErr()
+fooErr.mutateSomeInstanceState()
+FooErr.mutateSomeStaticState()
+  // expected-error@-1{{type 'FooErr' has no member 'mutateSomeStaticState'}}
 

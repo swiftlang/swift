@@ -31,11 +31,12 @@ module ImportAsMember {
     requires objc
     header "ImportAsMemberProto.h"
   }
+}
 
-  module ProtoErr {
-    requires objc
-    header "ImportAsMemberProto.h"
-  }
+module IAMError {
+  export *
+  requires objc
+  header "ImportAsMemberError.h"
 }
 
 module InferImportAsMember {
