@@ -16,7 +16,7 @@
 namespace swift {
 
 class CanType;
-class ProtocolConformance;
+class NormalProtocolConformance;
 class ValueDecl;
 enum class SILLinkage : unsigned char;
 enum ForDefinition_t : bool;
@@ -92,6 +92,9 @@ FormalLinkage getDeclLinkage(const ValueDecl *decl,
                              bool treatInternalAsVersioned = true);
 SILLinkage getSILLinkage(FormalLinkage linkage,
                          ForDefinition_t forDefinition);
+SILLinkage
+getLinkageForProtocolConformance(const NormalProtocolConformance *C,
+                                 ForDefinition_t definition);
 
 } // end swift namespace
 

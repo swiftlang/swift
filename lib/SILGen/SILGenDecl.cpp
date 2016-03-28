@@ -1428,8 +1428,8 @@ public:
   SILGenConformance(SILGenModule &SGM, NormalProtocolConformance *C)
     // We only need to emit witness tables for base NormalProtocolConformances.
     : SGM(SGM), Conformance(C->getRootNormalConformance()),
-      Linkage(SGM.Types.getLinkageForProtocolConformance(Conformance,
-                                                         ForDefinition))
+      Linkage(getLinkageForProtocolConformance(Conformance,
+                                               ForDefinition))
   {
     // Not all protocols use witness tables.
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
@@ -1493,7 +1493,7 @@ public:
     });
 
     // Emit the witness table for the base conformance if it is shared.
-    if (SGM.Types.getLinkageForProtocolConformance(
+    if (getLinkageForProtocolConformance(
                                         conformance->getRootNormalConformance(),
                                         NotForDefinition)
           == SILLinkage::Shared)
