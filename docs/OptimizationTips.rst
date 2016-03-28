@@ -1,7 +1,8 @@
-:orphan:
-
+===================================
 Writing High-Performance Swift Code
 ===================================
+
+.. contents::
 
 The following document is a gathering of various tips and tricks for writing
 high-performance Swift code. The intended audience of this document is compiler
