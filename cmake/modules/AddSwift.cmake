@@ -1754,10 +1754,6 @@ function(_add_swift_executable_single name)
   list(APPEND link_flags
       "-L${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
 
-  foreach(FAT_LIBRARY ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
-    list(APPEND link_flags "-l${FAT_LIBRARY}")
-  endforeach()
-
   if(SWIFTEXE_SINGLE_DISABLE_ASLR)
     list(APPEND link_flags "-Wl,-no_pie")
   endif()
@@ -1830,7 +1826,7 @@ function(_add_swift_executable_single name)
       PROPERTIES
       HEADER_FILE_ONLY true)
 
-  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
+  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_COMPONENT_DEPENDS})
 
   set_target_properties(${name}
