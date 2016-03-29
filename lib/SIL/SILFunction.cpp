@@ -513,21 +513,13 @@ bool SILFunction::hasName(const char *Name) const {
 /// Returns true if this function can be referenced from a fragile function
 /// body.
 bool SILFunction::hasValidLinkageForFragileRef() const {
-  // Fragile functions can reference other fragile functions.
-  if (isFragile())
-    return true;
-
   // Fragile functions can reference 'static inline' functions imported
   // from C.
   if (hasForeignBody())
     return true;
 
-  // This handles some kind of generated functions, like constructors
-  // of clang imported types.
-  // TODO: check why those functions are not fragile anyway and make
-  // a less conservative check here.
-  SILLinkage linkage = getLinkage();
-  if (hasSharedVisibility(linkage))
+  // If we can inline it, we can reference it.
+  if (hasValidLinkageForFragileInline())
     return true;
 
   // Otherwise, only public functions can be referenced.
