@@ -141,7 +141,7 @@ public func spawnChild(args: [String])
 }
 
 internal func _make_posix_spawn_file_actions_t() -> posix_spawn_file_actions_t {
-#if os(Linux) || os(FreeBSD)
+#if os(Linux)
   return posix_spawn_file_actions_t()
 #else
   return nil
