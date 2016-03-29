@@ -513,22 +513,14 @@ bool SILFunction::hasName(const char *Name) const {
 /// Returns true if this function can be referenced from a fragile function
 /// body.
 bool SILFunction::hasValidLinkageForFragileRef() const {
-  // Fragile functions can reference other fragile functions.
-  if (isFragile())
-    return true;
-
   // Fragile functions can reference 'static inline' functions imported
   // from C.
   if (hasForeignBody())
     return true;
 
-  // If a shared function is not [fragile] and not a Clang-emitted
-  // 'static inline' function, it can only be referenced if its a
-  // [thunk]. Thunk bodies are emitted lazily by the SIL serializer
-  // when referenced from [fragile] functions.
-  SILLinkage linkage = getLinkage();
-  if (hasSharedVisibility(linkage))
-    return isThunk();
+  // If we can inline it, we can reference it.
+  if (hasValidLinkageForFragileInline())
+    return true;
 
   // Otherwise, only public functions can be referenced.
   return hasPublicVisibility(getLinkage());
