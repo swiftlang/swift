@@ -109,7 +109,7 @@ ImportedObjCGenerics.test("ProtocolConstraints") {
 
 ImportedObjCGenerics.test("ClassConstraints") {
   func makeContainedAnimalMakeNoise<T>(x: AnimalContainer<T>) -> NSString {
-    return x.object.noise
+    return x.object.noise as NSString
   }
   let petCarrier = AnimalContainer(object: Dog())
   expectEqual("woof", makeContainedAnimalMakeNoise(petCarrier))
