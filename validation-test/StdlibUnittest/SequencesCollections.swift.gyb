@@ -92,14 +92,14 @@ ${Self}TestSuite.test("subscript(_:Index)/InterchangeableCollections") {
   expectEqual(1010, c2[i1].value)
   expectEqual(4040, c1[i2].value)
 
-  i1 = c1.successor(of: i1)
-  i2 = c2.successor(of: i2)
+  i1 = c1.index(1, stepsFrom: i1)
+  i2 = c1.index(1, stepsFrom: i2)
   expectEqual(i1, i2)
   expectEqual(2020, c2[i1].value)
   expectEqual(2020, c1[i2].value)
 
-  i1 = c2.successor(of: i1)
-  i2 = c1.successor(of: i2)
+  i1 = c1.index(1, stepsFrom: i1)
+  i2 = c1.index(1, stepsFrom: i2)
   expectEqual(i1, i2)
   expectEqual(3030, c2[i1].value)
   expectEqual(3030, c1[i2].value)
