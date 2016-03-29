@@ -157,6 +157,12 @@ function (swift_benchmark_compile_archopts)
     get_filename_component(module_name "${module_name_path}" NAME)
 
     if(module_name)
+      set(extra_options "")
+      # For this file we disable automatic bridging between Foundation and swift.
+      if("${module_name}" STREQUAL "ObjectiveCNoBridgingStubs")
+        set(extra_options "-Xfrontend"
+                          "-disable-swift-bridge-attr")
+      endif()
       set(objfile "${objdir}/${module_name}.o")
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
       set(source "${srcdir}/${module_name_path}.swift")
@@ -168,6 +174,7 @@ function (swift_benchmark_compile_archopts)
             "${srcdir}/${module_name_path}.swift"
           COMMAND "${SWIFT_EXEC}"
           ${common_options}
+          ${extra_options}
           "-parse-as-library"
           ${bench_flags}
           "-module-name" "${module_name}"
