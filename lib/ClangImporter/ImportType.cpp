@@ -677,6 +677,8 @@ namespace {
     /// Map the Clang swift_bridge attribute to a specific type.
     Type mapSwiftBridgeAttr(const clang::NamedDecl *clangDecl) {
       // Check whether there is a swift_bridge attribute.
+      if (Impl.DisableSwiftBridgeAttr)
+        return Type();
       auto bridgeAttr = clangDecl->getAttr<clang::SwiftBridgeAttr>();
       if (!bridgeAttr) return Type();
 
