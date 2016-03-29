@@ -17,8 +17,11 @@ typedef NSObject<IAMProto> * IAMProto_t;
 void mutateSomeState(IAMProto_t)
 __attribute__((swift_name("IAMProto.mutateSomeState(self:)")));
 
-void mutateSomeStateWithOtherProto(IAMProto_t, IAMProto_t other)
-__attribute__((swift_name("IAMProto.mutateSomeState(self:otherProto:)")));
+void mutateSomeStateWithParameter(IAMProto_t, NSInteger)
+__attribute__((swift_name("IAMProto.mutateSomeState(self:withParameter:)")));
+
+void mutateSomeStateWithFirstParameter(NSInteger, IAMProto_t)
+__attribute__((swift_name("IAMProto.mutateSomeState(withFirstParameter:self:)")));
 
 int getSomeValue(IAMProto_t)
 __attribute__((swift_name("getter:IAMProto.someValue(self:)")));
