@@ -1824,7 +1824,7 @@ public func checkStrideable<
   Strides : Collection
   where
   Instances.Iterator.Element : Strideable,
-  Strides.Iterator.Element == Instances.Iterator.Element.Stride,
+  Instances.Iterator.Element.Stride == Strides.Iterator.Element,
 
   // FIXME(compiler limitation): these constraints should be applied to
   // associated types of Collection.
