@@ -2006,7 +2006,11 @@ public:
               "downcast operand must be a class type");
       require(toCanTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
-      require(SILType::getPrimitiveObjectType(fromCanTy).
+      // FIXME: "isSuperclassOf" incorrectly rejects subclasses of
+      // specializations of generics. As a spot fix for 2.2, relax the verifier
+      // here. This is fixed properly in master.
+      require(isa<BoundGenericType>(fromCanTy) ||
+              SILType::getPrimitiveObjectType(fromCanTy).
               isSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
               "downcast must convert to a subclass");
     }
