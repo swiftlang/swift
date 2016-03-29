@@ -14,15 +14,46 @@
 
 /// A type that represents a Boolean value.
 ///
-/// Types that conform to the `Boolean` protocol can be used as
-/// the condition in control statements (`if`, `while`, C-style `for`)
-/// and other logical value contexts (e.g., `case` statement guards).
+/// Types that conform to the `Boolean` protocol can be used as the condition
+/// in control statements, such as `if` and `while`, and in other contexts
+/// that require a logical value, such as the `where` clause of a `case`
+/// statement.
 ///
-/// Only three types provided by Swift, `Bool`, `DarwinBoolean`, and `ObjCBool`,
-/// conform to `Boolean`. Expanding this set to include types that
-/// represent more than simple boolean values is discouraged.
+/// Swift uses only simple Boolean values in conditional contexts to help avoid
+/// accidental programming errors and to help maintain the clarity of each
+/// control statement. Unlike other programming languages, integers or strings
+/// cannot be used where a Boolean value is expected.
+///
+/// For example, the following code sample will not compile, because it
+/// attempts to use the integer `i` in a logical context:
+///
+///     var i = 5
+///     while i {
+///         print(i)
+///         i -= 1
+///     }
+///
+/// The correct approach in Swift is to compare the `i` value with zero in the
+/// `while` statement.
+///
+///     while i != 0 {
+///         print(i)
+///         i -= 1
+///     }
+///
+/// Conforming to the Boolean Protocol
+/// ==================================
+///
+/// Only three types provided by Swift---`Bool`, `DarwinBoolean`, and
+/// `ObjCBool`---conform to the `Boolean` protocol. Expanding this set to
+/// include types that represent more than simple Boolean values is
+/// discouraged.
+///
+/// To add `Boolean` conformance to your custom type, implement a `boolValue`
+/// property that represents your type as an instance of `Bool`, the default
+/// concrete type for the `Boolean` protocol.
 public protocol Boolean {
-  /// The value of `self`, expressed as a `Bool`.
+  /// This value expressed as a `Bool` instance.
   var boolValue: Bool { get }
 }
 
@@ -96,7 +127,7 @@ public protocol Boolean {
 /// In the case of the `Directions` option set, an instance can contain zero,
 /// one, or more of the four defined directions. This example declares a
 /// constant with three currently allowed moves. The raw value of the
-/// `allowedMoves` instance is the result of the bitwise `OR` of its three
+/// `allowedMoves` instance is the result of the bitwise OR of its three
 /// members' raw values:
 ///
 ///     let allowedMoves: Directions = [.up, .down, .left]
@@ -105,8 +136,8 @@ public protocol Boolean {
 ///
 /// Option sets use bitwise operations on their associated raw values to
 /// implement their mathematical set operations. For example, the `contains()`
-/// method on `allowedMoves` performs a bitwise `AND` operation to check
-/// whether the option set contains an element.
+/// method on `allowedMoves` performs a bitwise AND operation to check whether
+/// the option set contains an element.
 ///
 ///     print(allowedMoves.contains(.right))
 ///     // Prints "false"
@@ -203,9 +234,16 @@ public func != <
   return lhs.rawValue != rhs.rawValue
 }
 
-/// Conforming types can be initialized with `nil`.
+/// A type that can be initialized using the nil literal, `nil`.
+///
+/// `nil` has a specific meaning in Swift---the absence of a value. Only the
+/// `Optional` type conforms to `NilLiteralConvertible`.
+/// `NilLiteralConvertible` conformance for types that use `nil` for other
+/// purposes is discouraged.
+///
+/// - SeeAlso: `Optional`
 public protocol NilLiteralConvertible {
-  /// Create an instance initialized with `nil`.
+  /// Creates an instance initialized with `nil`.
   init(nilLiteral: ())
 }
 
@@ -235,11 +273,32 @@ public protocol _BuiltinBooleanLiteralConvertible {
   init(_builtinBooleanLiteral value: Builtin.Int1)
 }
 
-/// Conforming types can be initialized with the Boolean literals
-/// `true` and `false`.
+/// A type that can be initialized with the Boolean literals `true` and
+/// `false`.
+///
+/// Only three types provided by Swift---`Bool`, `DarwinBoolean`, and
+/// `ObjCBool`---are treated as Boolean values. Expanding this set to include
+/// types that represent more than simple Boolean values is discouraged.
+///
+/// To add `BooleanLiteralConvertible` conformance to your custom type,
+/// implement the `init(booleanLiteral:)` initializer that creates an instance
+/// of your type with the given Boolean value.
 public protocol BooleanLiteralConvertible {
+  /// A type that can represent a Boolean literal, such as `Bool`.
   associatedtype BooleanLiteralType : _BuiltinBooleanLiteralConvertible
-  /// Create an instance initialized to `value`.
+
+  /// Creates an instance initialized to to the given Boolean value.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using one of the Boolean literals `true` and `false`. For
+  /// example:
+  ///
+  ///     let twasBrillig = true
+  ///
+  /// In this example, the assignments to the `twasBrillig` constant calls this
+  /// Boolean literal initializer behind the scenes.
+  ///
+  /// - Parameter value: The value of the new instance.
   init(booleanLiteral value: BooleanLiteralType)
 }
 

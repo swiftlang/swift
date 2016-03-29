@@ -716,10 +716,10 @@ extension PlaygroundQuickLook {
 /// `CustomPlaygroundQuickLookable` and return a custom
 /// `PlaygroundQuickLook`.
 public protocol CustomPlaygroundQuickLookable {
-  /// The `PlaygroundQuickLook` for `self`.
+  /// A custom playground quick look for this instance.
   ///
-  /// - Note: If `Self` has value semantics, the `PlaygroundQuickLook`
-  ///   should be unaffected by subsequent mutations of `self`.
+  /// If this type has value semantics, the `PlaygroundQuickLook` instance
+  /// should be unaffected by subsequent mutations.
   var customPlaygroundQuickLook: PlaygroundQuickLook { get }
 }
 

@@ -52,7 +52,7 @@ public protocol Streamable {
 ///
 /// - SeeAlso: `String.init<T>(T)`, `CustomDebugStringConvertible`
 public protocol CustomStringConvertible {
-  /// A textual representation of `self`.
+  /// A textual representation of the instance.
   var description: String { get }
 }
 
@@ -74,7 +74,7 @@ public protocol CustomStringConvertible {
 /// - SeeAlso: `String.init<T>(reflecting: T)`,
 ///   `CustomStringConvertible`
 public protocol CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
+  /// A textual representation of the instance, suitable for debugging.
   var debugDescription: String { get }
 }
 

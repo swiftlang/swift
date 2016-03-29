@@ -133,8 +133,8 @@ extension OptionSet {
   /// Returns a new option set of the elements contained in this set, in the
   /// given set, or in both.
   ///
-  /// This example uses the `union(_:)` method to add two more shipping options to
-  /// the default set.
+  /// This example uses the `union(_:)` method to add two more shipping options
+  /// to the default set.
   ///
   ///     let defaultShipping = ShippingOptions.standard
   ///     let memberShipping = defaultShipping.union([.secondDay, .priority])
@@ -321,7 +321,7 @@ extension OptionSet where RawValue : BitwiseOperations {
 
   /// Inserts the elements of another set into this option set.
   ///
-  /// This method is implemented as a bitwise `OR` (`|`) operation on the
+  /// This method is implemented as a `|` (bitwise OR) operation on the
   /// two sets' raw values.
   ///
   /// - Parameter other: An option set.
@@ -333,7 +333,7 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// Removes all elements of this option set that are not 
   /// also present in the given set.
   ///
-  /// This method is implemented as a bitwise `AND` (`&`) operation on the
+  /// This method is implemented as a `&` (bitwise AND) operation on the
   /// two sets' raw values.
   ///
   /// - Parameter other: An option set.
@@ -345,8 +345,8 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// Replaces this set with a new set containing all elements 
   /// contained in either this set or the given set, but not in both.
   ///
-  /// This method is implemented as a bitwise `XOR` (`^`)
-  /// operation on the two sets' raw values.
+  /// This method is implemented as a `^` (bitwise XOR) operation on the two
+  /// sets' raw values.
   ///
   /// - Parameter other: An option set.
   public mutating func formSymmetricDifference(_ other: Self) {

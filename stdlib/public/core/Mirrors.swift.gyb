@@ -38,7 +38,7 @@ for self_ty in all_integer_types(word_bits):
 %for Type in Types:
 
 extension ${Type[0]} : CustomReflectable {
-  /// Returns a mirror that reflects `self`.
+  /// A mirror that reflects the `${Type[0]}` instance.
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
   }
