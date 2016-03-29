@@ -24,125 +24,40 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Basic/Demangle.h"
 #include <cxxabi.h>
+
 #if !defined(__CYGWIN__)
 #include <execinfo.h>
 #endif
+
+#include <dlfcn.h>
+#include <inttypes.h>
+#include <libgen.h>
 
 #ifdef __APPLE__
 #include <asl.h>
 #endif
 
 namespace FatalErrorFlags {
-enum: uint32_t {
-  ReportBacktrace = 1 << 0
-};
+enum : uint32_t { ReportBacktrace = 1 << 0 };
 } // end namespace FatalErrorFlags
 
 #if !defined(__CYGWIN__)
-LLVM_ATTRIBUTE_ALWAYS_INLINE
-static bool
-isIdentifier(char c)
-{
-  return isalnum(c) || c == '_' || c == '$';
-}
-
-static bool
-demangledLinePrefix(std::string line, std::string prefix,
-                    std::string &out,
-                    bool (*demangle)(std::string, std::string &))
-{
-  int symbolStart = -1;
-  int symbolEnd = -1;
-  
-  for (size_t i = 0; i < line.size(); i++) {
-    char c = line[i];
-    
-    bool hasBegun = symbolStart != -1;
-    bool isIdentifierChar = isIdentifier(c);
-    bool isEndOfSymbol = hasBegun && !isIdentifierChar;
-    bool isEndOfLine = i == line.size() - 1;
-    
-    if (isEndOfLine || isEndOfSymbol) {
-      symbolEnd = i;
-      break;
-    }
-
-    bool canFindPrefix = (line.size() - 2) - i > prefix.size();
-    if (!hasBegun && canFindPrefix && !isIdentifierChar &&
-        line.substr(i + 1, prefix.size()) == prefix) {
-      symbolStart = i + 1;
-      continue;
-    }
-  }
-  
-  if (symbolStart == -1 || symbolEnd == -1) {
-    out = line;
-    return false;
-  } else {
-    auto symbol = line.substr(symbolStart, symbolEnd - symbolStart);
-    
-    std::string demangled;
-    bool success = demangle(symbol, demangled);
-    
-    if (success) {
-      line.replace(symbolStart, symbolEnd - symbolStart, demangled);
-    }
-    
-    out = line;
-    
-    return success;
-  }
-}
-
-static std::string
-demangledLine(std::string line) {
-  std::string res;
-  bool success = false;
-  auto cppPrefix = "_Z"; // not sure how to check for DARWIN's __Z here.
-  success = demangledLinePrefix(line, cppPrefix, res,
-                                [](std::string symbol, std::string &out) {
+static std::string demangledSymbol(std::string symbol) {
+  if (symbol.size() < 2)
+    return symbol;
+  auto prefix = symbol.substr(0, 2);
+  if (prefix == "_Z") {
     int status;
     auto demangled = abi::__cxa_demangle(symbol.c_str(), 0, 0, &status);
-    if (demangled == NULL || status != 0) {
-      out = symbol;
-      return false;
-    } else {
-      out = demangled;
+    if (demangled != NULL) {
+      std::string out = demangled;
       free(demangled);
-      return true;
+      return out;
     }
-  });
-  if (success) return res;
-  success = demangledLinePrefix(line, "_T", res,
-                                [](std::string symbol, std::string &out) {
-    out = swift::Demangle::demangleSymbolAsString(symbol);
-    return true;
-  });
-  if (success) return res;
-  return line;
-}
-
-const int STACK_DEPTH = 128;
-
-static char **
-reportBacktrace(int *count)
-{
-  void **addrs = (void **)malloc(sizeof(void *) * STACK_DEPTH);
-  if (addrs == NULL) {
-    if (count) *count = 0;
-    return NULL;
+  } else if (prefix == "_T") {
+    return swift::Demangle::demangleSymbolAsString(symbol);
   }
-  int symbolCount = backtrace(addrs, STACK_DEPTH);
-  if (count) *count = symbolCount;
-
-  char **symbols = backtrace_symbols(addrs, symbolCount);
-  free(addrs);
-  if (symbols == NULL) {
-    if (count) *count = 0;
-    return NULL;
-  }
-
-  return symbols;
+  return symbol;
 }
 #endif
 
@@ -162,18 +77,17 @@ struct crashreporter_annotations_t gCRAnnotations
 }
 
 // Report a message to any forthcoming crash log.
-static void
-reportOnCrash(uint32_t flags, const char *message)
-{
+static void reportOnCrash(uint32_t flags, const char *message) {
   static pthread_mutex_t crashlogLock = PTHREAD_MUTEX_INITIALIZER;
   pthread_mutex_lock(&crashlogLock);
-  
+
   char *oldMessage = (char *)CRGetCrashLogMessage();
 
   char *newMessage;
   if (oldMessage) {
     asprintf(&newMessage, "%s%s", oldMessage, message);
-    if (malloc_size(oldMessage)) free(oldMessage);
+    if (malloc_size(oldMessage))
+      free(oldMessage);
   } else {
     newMessage = strdup(message);
   }
@@ -185,49 +99,65 @@ reportOnCrash(uint32_t flags, const char *message)
 
 #else
 
-static void
-reportOnCrash(uint32_t flags, const char *message)
-{
+static void reportOnCrash(uint32_t flags, const char *message) {
   // empty
 }
 
 #endif
 
+const int STACK_DEPTH = 128;
 
 // Report a message to system console and stderr.
-static void
-reportNow(uint32_t flags, const char *message)
-{
+static void reportNow(uint32_t flags, const char *message) {
   write(STDERR_FILENO, message, strlen(message));
 #ifdef __APPLE__
   asl_log(NULL, NULL, ASL_LEVEL_ERR, "%s", message);
 #endif
 #if !defined(__CYGWIN__)
   if (flags & FatalErrorFlags::ReportBacktrace) {
+    void **addrs = (void **)malloc(sizeof(void *) * STACK_DEPTH);
+    if (addrs == NULL)
+      return;
+    int symbolCount = backtrace(addrs, STACK_DEPTH);
+    if (symbolCount == 0)
+      return;
     fputs("Current stack trace:\n", stderr);
-    int count = 0;
-    char **trace = reportBacktrace(&count);
-    for (int i = 0; i < count; i++) {
-      fprintf(stderr, "%s\n", demangledLine(trace[i]).c_str());
+    for (int i = 0; i < symbolCount; i++) {
+      Dl_info info;
+      if (dladdr(addrs[i], &info) == 0)
+        return;
+
+      auto symbol =
+          info.dli_sname ? demangledSymbol(info.dli_sname) : "<unknown>";
+
+#define SYM_COMMON "%-3d %-35s 0x%" PRIxPTR " %s"
+
+      if (info.dli_saddr == NULL) {
+        fprintf(stderr, SYM_COMMON " (0x%" PRIxPTR ")\n", i,
+                basename((char *)info.dli_fname), (uintptr_t)info.dli_saddr,
+                symbol.c_str(), (intptr_t)addrs[i]);
+      } else {
+        int offset = (int)((intptr_t)addrs[i] - (intptr_t)info.dli_saddr);
+        fprintf(stderr, SYM_COMMON " + %d\n", i,
+                basename((char *)info.dli_fname), (uintptr_t)info.dli_saddr,
+                symbol.c_str(), offset);
+      }
     }
-    free(trace);
+    free(addrs);
   }
 #endif
 }
 
 /// Report a fatal error to system console, stderr, and crash logs.
 /// Does not crash by itself.
-void swift::swift_reportError(uint32_t flags,
-                              const char *message) {
+void swift::swift_reportError(uint32_t flags, const char *message) {
   reportNow(flags, message);
   reportOnCrash(flags, message);
 }
 
 // Report a fatal error to system console, stderr, and crash logs, then abort.
 LLVM_ATTRIBUTE_NORETURN
-void
-swift::fatalError(uint32_t flags, const char *format, ...)
-{
+void swift::fatalError(uint32_t flags, const char *format, ...) {
   va_list args;
   va_start(args, format);
 
@@ -241,8 +171,6 @@ swift::fatalError(uint32_t flags, const char *format, ...)
 // Crash when a deleted method is called by accident.
 SWIFT_RUNTIME_EXPORT
 LLVM_ATTRIBUTE_NORETURN
-extern "C" void
-swift_deletedMethodError() {
-  swift::fatalError(/* flags = */ 0,
-                    "fatal error: call of deleted method\n");
+extern "C" void swift_deletedMethodError() {
+  swift::fatalError(/* flags = */ 0, "fatal error: call of deleted method\n");
 }
