@@ -184,6 +184,9 @@ def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
 def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
   HelpText<"Don't add names to local values in LLVM IR">;
 
+def disable_red_zone : Flag<["-"], "disable-red-zone">,
+  HelpText<"Do not emit code that uses the red zone">;
+
 def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
   HelpText<"Add names to local values in LLVM IR">;
 

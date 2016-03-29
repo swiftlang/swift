@@ -156,6 +156,9 @@ public:
   /// measurements on a non-clean build directory.
   unsigned UseIncrementalLLVMCodeGen : 1;
 
+  // Should red zone be disabled
+  unsigned NoRedZone : 1;
+
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    Optimize(false), Sanitize(SanitizerKind::None),
                    DebugInfoKind(IRGenDebugInfoKind::None),
@@ -166,7 +169,7 @@ public:
                    PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
                    StripReflectionNames(true), StripReflectionMetadata(true),
-                   CmdArgs(), UseIncrementalLLVMCodeGen(true)
+                   CmdArgs(), UseIncrementalLLVMCodeGen(true), NoRedZone(false)
                    {}
 
   /// Gets the name of the specified output filename.
