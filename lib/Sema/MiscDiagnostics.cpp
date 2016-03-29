@@ -23,6 +23,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -915,14 +916,12 @@ class AvailabilityWalker : public ASTWalker {
 
   TypeChecker &TC;
   DeclContext *DC;
-  const MemberAccessContext AccessContext;
+  MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
 
 public:
   AvailabilityWalker(
-      TypeChecker &TC, DeclContext *DC,
-      MemberAccessContext AccessContext = MemberAccessContext::Getter)
-      : TC(TC), DC(DC), AccessContext(AccessContext) {}
+      TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
 
   virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
@@ -974,7 +973,7 @@ private:
                                  const AvailableAttr *Attr);
 
   /// Walk an assignment expression, checking for availability.
-  void walkAssignExpr(AssignExpr *E) const {
+  void walkAssignExpr(AssignExpr *E) {
     // We take over recursive walking of assignment expressions in order to
     // walk the destination and source expressions in different member
     // access contexts.
@@ -988,20 +987,20 @@ private:
     // encountered walking (pre-order) is the Dest is the destination of the
     // write. For the moment this is fine -- but future syntax might violate
     // this assumption.
-    walkInContext(Dest, MemberAccessContext::Setter);
+    walkInContext(E, Dest, MemberAccessContext::Setter);
 
     // Check RHS in getter context
     Expr *Source = E->getSrc();
     if (!Source) {
       return;
     }
-    walkInContext(Source, MemberAccessContext::Getter);
+    walkInContext(E, Source, MemberAccessContext::Getter);
   }
   
   /// Walk a member reference expression, checking for availability.
   void walkMemberRef(MemberRefExpr *E) {
     // Walk the base in a getter context.
-    walkInContext(E->getBase(), MemberAccessContext::Getter);
+    walkInContext(E, E->getBase(), MemberAccessContext::Getter);
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
@@ -1019,12 +1018,15 @@ private:
   
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
-    walkInContext(E->getSubExpr(), MemberAccessContext::InOut);
+    walkInContext(E, E->getSubExpr(), MemberAccessContext::InOut);
   }
 
   /// Walk the given expression in the member access context.
-  void walkInContext(Expr *E, MemberAccessContext AccessContext) const {
-    E->walk(AvailabilityWalker(TC, DC, AccessContext));
+  void walkInContext(Expr *baseExpr, Expr *E,
+                     MemberAccessContext AccessContext) {
+    llvm::SaveAndRestore<MemberAccessContext>
+      C(this->AccessContext, AccessContext);
+    E->walk(*this);
   }
 
   /// Emit diagnostics, if necessary, for accesses to storage where
