@@ -17,7 +17,7 @@
 #ifndef SWIFT_RUNTIME_MUTEX_H
 #define SWIFT_RUNTIME_MUTEX_H
 
-#if (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__))
+#if (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__))
 #define SWIFT_RUNTIME_MUTEX_HAVE_PHTREADS
 #else
 #error "Must implement the following if your platform doesn't support phtreads."
