@@ -2066,11 +2066,16 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             { set +x; } 2>/dev/null
         fi
 
-        # TODO: create symlink here (if we are building for LLVM)
+        # When we are building LLVM create symlinks to the c++ headers.
         if [[ "${product}" == "llvm" ]]; then
+
           # Find the location of the c++ header dir.
-          HOST_CXX_DIR=$(dirname ${HOST_CXX})
-          HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
+          if [[ "$(uname -s)" == "Darwin" ]] ; then
+            HOST_CXX_DIR=$(dirname ${HOST_CXX})
+            HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
+          else # Linux
+            HOST_CXX_HEADERS_DIR="/usr/include/c++"
+          fi
 
           # Find the path in which the local clang build is expecting to find
           # the c++ header files.
