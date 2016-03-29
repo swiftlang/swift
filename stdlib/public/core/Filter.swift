@@ -113,11 +113,9 @@ public struct LazyFilterIndex<
   /// - Note: This operation may not satisfy the expected complexity
   ///   for models of `ForwardIndex`.
   public func successor() -> LazyFilterIndex {
-    for p in base.successor()..<_baseElements.endIndex {
-      if _include(_baseElements[p]) {
-        return LazyFilterIndex(
-          _baseElements: _baseElements, base: p, _include: _include)
-      }
+    for p in base.successor()..<_baseElements.endIndex where _include(_baseElements[p]) {
+      return LazyFilterIndex(
+        _baseElements: _baseElements, base: p, _include: _include)
     }
     return LazyFilterIndex(
       _baseElements: _baseElements, base: _baseElements.endIndex,
