@@ -29,7 +29,11 @@
 #include <link.h>
 #endif
 
+#if defined(_MSC_VER)
+#include <windows.h>
+#else
 #include <dlfcn.h>
+#endif
 
 using namespace swift;
 
@@ -144,7 +148,7 @@ const {
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION "__swift2_proto"
 #elif defined(__ELF__)
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift2_protocol_conformances_start"
-#elif defined(__CYGWIN__)
+#elif defined(__CYGWIN__) || defined(_MSC_VER)
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".sw2prtc"
 #endif
 
@@ -396,17 +400,25 @@ void swift::_swift_initializeCallbacksToInspectDylib(
   // rdar://problem/19045112
   dl_iterate_phdr(_addImageProtocolConformances, &inspectArgs);
 }
-#elif defined(__CYGWIN__)
+#elif defined(__CYGWIN__) || defined(_MSC_VER)
 static int _addImageProtocolConformances(struct dl_phdr_info *info,
                                           size_t size, void *data) {
   InspectArgs *inspectArgs = (InspectArgs *)data;
   // inspectArgs contains addImage*Block function and the section name
+#if defined(_MSC_VER)
+  HMODULE handle;
 
+  if (!info->dlpi_name || info->dlpi_name[0] == '\0')
+    handle = GetModuleHandle(nullptr);
+  else
+    handle = GetModuleHandle(info->dlpi_name);
+#else
   void *handle;
-  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
+  if (!info->dlpi_name || info->dlpi_name[0] == '\0')
     handle = dlopen(nullptr, RTLD_LAZY);
-  } else
+  else
     handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+#endif
 
   unsigned long conformancesSize;
   const uint8_t *conformances =
@@ -416,7 +428,11 @@ static int _addImageProtocolConformances(struct dl_phdr_info *info,
   if (conformances)
     inspectArgs->fnAddImageBlock(conformances, conformancesSize);
 
+#if defined(_MSC_VER)
+  FreeLibrary(handle);
+#else
   dlclose(handle);
+#endif
   return 0;
 }
 

@@ -20,16 +20,22 @@
 #define _WITH_GETLINE
 #endif
 
+#if defined(_MSC_VER)
+// Avoid defining macro max(), min() which conflict with std::max(), std::min()
+#define NOMINMAX
+#include <windows.h>
+#else
 #include <sys/resource.h>
 #include <sys/errno.h>
 #include <unistd.h>
+#endif
 #include <climits>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(_MSC_VER)
 #include <sstream>
 #include <cmath>
 #define fmodl(lhs, rhs) std::fmod(lhs, rhs)
@@ -135,7 +141,7 @@ static inline locale_t getCLocale() {
   // as C locale.
   return nullptr;
 }
-#elif defined(__CYGWIN__)
+#elif defined(__CYGWIN__) || defined(_MSC_VER)
 // In Cygwin, getCLocale() is not used.
 #else
 static locale_t makeCLocale() {
@@ -153,7 +159,7 @@ static locale_t getCLocale() {
 
 #if defined(__APPLE__)
 #define swift_snprintf_l snprintf_l
-#elif defined(__CYGWIN__)
+#elif defined(__CYGWIN__) || defined(_MSC_VER)
 // In Cygwin, swift_snprintf_l() is not used.
 #else
 static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
@@ -185,8 +191,8 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
   if (Debug) {
     Precision = std::numeric_limits<T>::max_digits10;
   }
-  
-#if defined(__CYGWIN__)
+
+#if defined(__CYGWIN__) || defined(_MSC_VER)
   // Cygwin does not support uselocale(), but we can use the locale feature 
   // in stringstream object.
   std::ostringstream ValueStream;
@@ -249,13 +255,60 @@ extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 }
 
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
-/// line.  Can be NULL if no characters were read.
+/// line.  Can be NULL if no characters were read. This buffer should be
+/// freed by the caller if this function returns a positive value.
 ///
 /// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occurred, or EOF was reached.
 ssize_t swift::swift_stdlib_readLine_stdin(char **LinePtr) {
+#if defined(_MSC_VER)
+  if (LinePtr == nullptr)
+    return -1;
+
+  int Capacity = 0;
+  ssize_t Pos = 0;
+  char *ReadBuf = nullptr;
+
+  _lock_file(stdin);
+
+  for (;;) {
+    int ch = _fgetc_nolock(stdin);
+
+    if (ferror(stdin) || (ch == EOF && Pos == 0)) {
+      if (ReadBuf)
+        free(ReadBuf);
+      _unlock_file(stdin);
+      return -1;
+    }
+
+    if (Capacity - Pos <= 1) {
+      // Capacity changes to 128, 128*2, 128*4, 128*8, ...
+      Capacity = Capacity ? Capacity * 2 : 128;
+      char *NextReadBuf = static_cast<char *>(realloc(ReadBuf, Capacity));
+      if (NextReadBuf == nullptr) {
+        if (ReadBuf)
+          free(ReadBuf);
+        _unlock_file(stdin);
+        return -1;
+      }
+      ReadBuf = NextReadBuf;
+    }
+
+    if (ch == EOF)
+      break;
+    ReadBuf[Pos++] = ch;
+    if (ch == '\n')
+      break;
+  }
+
+  ReadBuf[Pos] = '\0';
+  *LinePtr = ReadBuf;
+  _unlock_file(stdin);
+  return Pos;
+#else
   size_t Capacity = 0;
   return getline(LinePtr, &Capacity, stdin);
+#endif
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -379,7 +432,7 @@ __mulodi4(di_int a, di_int b, int* overflow)
 }
 #endif
 
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(_MSC_VER)
 // Cygwin does not support uselocale(), but we can use the locale feature 
 // in stringstream object.
 template <typename T>
@@ -453,11 +506,19 @@ const char *swift::_swift_stdlib_strtof_clocale(
 #endif
 
 void swift::_swift_stdlib_flockfile_stdout() {
+#if defined(_MSC_VER)
+  _lock_file(stdout);
+#else
   flockfile(stdout);
+#endif
 }
 
 void swift::_swift_stdlib_funlockfile_stdout() {
+#if defined(_MSC_VER)
+  _unlock_file(stdout);
+#else
   funlockfile(stdout);
+#endif
 }
 
 int swift::_swift_stdlib_putc_stderr(int C) {
@@ -465,5 +526,11 @@ int swift::_swift_stdlib_putc_stderr(int C) {
 }
 
 size_t swift::_swift_stdlib_getHardwareConcurrency() {
+#if defined(_MSC_VER)
+  SYSTEM_INFO SystemInfo;
+  GetSystemInfo(&SystemInfo);
+  return SystemInfo.dwNumberOfProcessors;
+#else
   return sysconf(_SC_NPROCESSORS_ONLN);
+#endif
 }

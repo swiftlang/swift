@@ -12,11 +12,16 @@
 
 #include <random>
 #include <type_traits>
+#if defined(_MSC_VER)
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "../SwiftShims/LibcShims.h"
+#include "llvm/Support/DataTypes.h"
 
 using namespace swift;
 
@@ -28,7 +33,11 @@ void swift::_swift_stdlib_free(void *ptr) {
 }
 
 int swift::_swift_stdlib_putchar_unlocked(int c) {
+#if defined(_MSC_VER)
+  return _putc_nolock(c, stdout);
+#else
   return putchar_unlocked(c);
+#endif
 }
 
 __swift_size_t swift::_swift_stdlib_fwrite_stdout(const void *ptr,
@@ -69,6 +78,11 @@ size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
 #include <malloc.h>
 size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
+}
+#elif defined(_MSC_VER)
+#include <malloc.h>
+size_t _swift_stdlib_malloc_size(const void *ptr) {
+  return _msize(const_cast<void *>(ptr));
 }
 #elif defined(__FreeBSD__)
 #include <malloc_np.h>

@@ -34,7 +34,9 @@
 #include "../SwiftShims/RuntimeShims.h"
 #include "Private.h"
 #include "swift/Runtime/Debug.h"
+#if !defined(_MSC_VER)
 #include <dlfcn.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
