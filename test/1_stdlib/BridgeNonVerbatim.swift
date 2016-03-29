@@ -27,6 +27,54 @@ import SwiftShims
 import ObjectiveC
 import StdlibUnittest
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
+//===--- class Tracked ----------------------------------------------------===//
+// Instead of testing with Int elements, we use this wrapper class
+// that can help us track allocations and find issues with object
+// lifetime inside Array implementations.
+var trackedCount = 0
+var nextTrackedSerialNumber = 0
+
+final class Tracked : ForwardIndex, CustomStringConvertible {
+  required init(_ value: Int) {
+    trackedCount += 1
+    nextTrackedSerialNumber += 1
+    serialNumber = nextTrackedSerialNumber
+    self.value = value
+  }
+  
+  deinit {
+    assert(serialNumber > 0, "double destruction!")
+    trackedCount -= 1
+    serialNumber = -serialNumber
+  }
+
+  var description: String {
+    assert(serialNumber > 0, "dead Tracked!")
+    return value.description
+  }
+
+  func successor() -> Self {
+    return self.dynamicType.init(self.value.successor())
+  }
+
+  var value: Int
+  var serialNumber: Int
+}
+
+func == (x: Tracked, y: Tracked) -> Bool {
+  return x.value == y.value
+}
+
 struct X : _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true

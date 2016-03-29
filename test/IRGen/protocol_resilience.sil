@@ -43,7 +43,7 @@ public protocol ResilientProtocol {
 
 // Protocol is not public -- doesn't need default witness table
 
-// CHECK: @_TMp19protocol_resilience16InternalProtocol = {{(protected )?}}constant %swift.protocol {
+// CHECK: @_TMp19protocol_resilience16InternalProtocol = hidden constant %swift.protocol {
 // CHECK-SAME:   i32 7,
 // CHECK-SAME:   i16 0,
 // CHECK-SAME:   i16 0,
@@ -276,7 +276,7 @@ bb0(%0 : $*ResilientConformingType):
 
 // CHECK:       cacheIsNull:
 // CHECK:         [[WTABLE:%.*]] = call i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
-// CHECK-NEXT:    store i8** [[WTABLE]], i8*** @_TWLV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_
+// CHECK-NEXT:    store atomic i8** [[WTABLE]], i8*** @_TWLV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_ release
 // CHECK-NEXT:    br label %cont
 
 // CHECK:       cont:

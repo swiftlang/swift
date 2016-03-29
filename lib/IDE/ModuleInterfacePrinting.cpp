@@ -46,8 +46,8 @@ public:
       ClangLoader(ClangLoader) {}
 
 private:
-  void printDeclPre(const Decl *D) override;
-  void printDeclPost(const Decl *D) override;
+  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override;
+  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override;
   void avoidPrintDeclPost(const Decl *D) override;
   // Forwarding implementations.
 
@@ -76,13 +76,15 @@ private:
     return OtherPrinter.printModuleRef(Mod, Name);
   }
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    const NominalTypeDecl *NTD) override {
-    return OtherPrinter.printSynthesizedExtensionPre(ED, NTD);
+                                    const NominalTypeDecl *NTD,
+                                    Optional<BracketOptions> Bracket) override {
+    return OtherPrinter.printSynthesizedExtensionPre(ED, NTD, Bracket);
   }
 
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                     const NominalTypeDecl *NTD) override {
-    return OtherPrinter.printSynthesizedExtensionPost(ED, NTD);
+                                     const NominalTypeDecl *NTD,
+                                     Optional<BracketOptions> Bracket) override {
+    return OtherPrinter.printSynthesizedExtensionPost(ED, NTD, Bracket);
   }
 
   void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
@@ -145,12 +147,13 @@ getUnderlyingClangModuleForImport(ImportDecl *Import) {
   return nullptr;
 }
 
-void swift::ide::printModuleInterface(Module *M,
+void swift::ide::printModuleInterface(Module *M, Optional<StringRef> Group,
                                       ModuleTraversalOptions TraversalOptions,
                                       ASTPrinter &Printer,
                                       const PrintOptions &Options,
                                       const bool PrintSynthesizedExtensions) {
-  printSubmoduleInterface(M, M->getName().str(), ArrayRef<StringRef>(),
+  printSubmoduleInterface(M, M->getName().str(),
+                          Group.hasValue() ? Group.getValue() : ArrayRef<StringRef>(),
                           TraversalOptions, Printer, Options,
                           PrintSynthesizedExtensions);
 }
@@ -177,6 +180,40 @@ swift::ide::collectModuleGroups(Module *M, std::vector<StringRef> &Scratch) {
     return L.compare_lower(R) < 0;
   });
   return llvm::makeArrayRef(Scratch);
+}
+
+/// Determine whether the given extension has a Clang node that
+/// created it (vs. being a Swift extension).
+static bool extensionHasClangNode(ExtensionDecl *ext) {
+  // If it has a Clang node (directly), 
+  if (ext->hasClangNode()) return true;
+
+  // If it has a global imported as a member.
+  auto members = ext->getMembers();
+  if (members.empty()) return false;
+  return members.front()->hasClangNode();
+}
+
+/// Retrieve the Clang node for the given extension, if it has one.
+/// created it (vs. being a Swift extension).
+static ClangNode extensionGetClangNode(ExtensionDecl *ext) {
+  // If it has a Clang node (directly), 
+  if (ext->hasClangNode()) return ext->getClangNode();
+
+  // If it has a global imported as a member.
+  auto members = ext->getMembers();
+  if (members.empty()) return ClangNode();
+  return members.front()->getClangNode();
+}
+
+Optional<StringRef>
+swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
+  for (auto File : M->getFiles()) {
+    if (auto Name = File->getGroupNameByUSR(USR)) {
+      return Name;
+    }
+  }
+  return None;
 }
 
 void swift::ide::printSubmoduleInterface(
@@ -307,9 +344,8 @@ void swift::ide::printSubmoduleInterface(
       continue;
     }
 
-    auto addToClangDecls = [&](Decl *D) {
-      assert(D->hasClangNode());
-      auto CN = D->getClangNode();
+    auto addToClangDecls = [&](Decl *D, ClangNode CN) {
+      assert(CN && "No Clang node here");
       clang::SourceLocation Loc = CN.getLocation();
 
       auto *OwningModule = Importer.getClangOwningModule(CN);
@@ -320,9 +356,19 @@ void swift::ide::printSubmoduleInterface(
     };
 
     if (D->hasClangNode()) {
-      addToClangDecls(D);
+      addToClangDecls(D, D->getClangNode());
       continue;
     }
+
+    // If we have an extension containing globals imported as members,
+    // use the first member as the Clang node.
+    if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+      if (extensionHasClangNode(Ext)) {
+        addToClangDecls(Ext, extensionGetClangNode(Ext));
+        continue;
+      }
+    }
+
     if (FullModuleName.empty()) {
       // If group name is given and the decl does not belong to the group, skip it.
       if (!GroupNames.empty()){
@@ -425,7 +471,7 @@ void swift::ide::printSubmoduleInterface(
       // Clang extensions (categories) are always printed in source order.
       // Swift extensions are printed with their associated type unless it's
       // a cross-module extension.
-      if (!Ext->hasClangNode()) {
+      if (!extensionHasClangNode(Ext)) {
         auto ExtendedNominal = Ext->getExtendedType()->getAnyNominal();
         if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
           return false;
@@ -463,7 +509,7 @@ void swift::ide::printSubmoduleInterface(
                 Printer.callAvoidPrintDeclPost(Ext);
                 continue;
               }
-              if (Ext->hasClangNode())
+              if (extensionHasClangNode(Ext))
                 continue; // will be printed in its source location, see above.
               Printer << "\n";
               Ext->print(Printer, AdjustedOptions);
@@ -534,6 +580,7 @@ void swift::ide::printSubmoduleInterface(
                   Printer << "\n";
             }
           });
+          AdjustedOptions.BracketOptions.reset();
         }
       }
       return true;
@@ -705,7 +752,8 @@ void ClangCommentPrinter::avoidPrintDeclPost(const Decl *D) {
     setResumeOffset(FID, SM.getFileOffset(Loc));
 }
 
-void ClangCommentPrinter::printDeclPre(const Decl *D) {
+void ClangCommentPrinter::printDeclPre(const Decl *D,
+                                       Optional<BracketOptions> Bracket) {
   // Skip parameters, since we do not gracefully handle nested declarations on a
   // single line.
   // FIXME: we should fix that, since it also affects struct members, etc.
@@ -719,11 +767,12 @@ void ClangCommentPrinter::printDeclPre(const Decl *D) {
       updateLastEntityLine(ClangN.getSourceRange().getBegin());
     }
   }
-  return OtherPrinter.printDeclPre(D);
+  return OtherPrinter.printDeclPre(D, Bracket);
 }
 
-void ClangCommentPrinter::printDeclPost(const Decl *D) {
-  OtherPrinter.printDeclPost(D);
+void ClangCommentPrinter::printDeclPost(const Decl *D,
+                                        Optional<BracketOptions> Bracket) {
+  OtherPrinter.printDeclPost(D, Bracket);
 
   // Skip parameters; see printDeclPre().
   if (isa<ParamDecl>(D))

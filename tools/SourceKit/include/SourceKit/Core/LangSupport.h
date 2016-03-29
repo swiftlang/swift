@@ -40,6 +40,7 @@ struct EntityInfo {
   UIdent Kind;
   llvm::SmallString<32> Name;
   llvm::SmallString<64> USR;
+  llvm::SmallString<16> Group;
   unsigned Line = 0;
   unsigned Column = 0;
 
@@ -294,6 +295,8 @@ struct CursorInfo {
   ArrayRef<StringRef> OverrideUSRs;
   /// Related declarations, overloaded functions etc., in annotated XML form.
   ArrayRef<StringRef> AnnotatedRelatedDeclarations;
+  /// All groups of the module name under cursor.
+  ArrayRef<StringRef> ModuleGroupArray;
   bool IsSystem = false;
 };
 
@@ -325,6 +328,7 @@ struct DocEntityInfo {
   llvm::SmallString<32> Name;
   llvm::SmallString<32> Argument;
   llvm::SmallString<64> USR;
+  llvm::SmallString<64> OriginalUSR;
   llvm::SmallString<64> DocComment;
   llvm::SmallString<64> FullyAnnotatedDecl;
   std::vector<DocGenericParam> GenericParams;
@@ -422,7 +426,8 @@ public:
                                    StringRef ModuleName,
                                    Optional<StringRef> Group,
                                    ArrayRef<const char *> Args,
-                                   bool SynthesizedExtensions) = 0;
+                                   bool SynthesizedExtensions,
+                                   Optional<StringRef> InterestedUSR) = 0;
 
   virtual void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                          StringRef Name,

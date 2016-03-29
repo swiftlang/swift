@@ -241,10 +241,12 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addARCSequenceOpts();
 
   PM.addSimplifyCFG();
-  // Only hoist releases very late.
-  if (OpLevel == OptimizationLevelKind::LowLevel)
+  if (OpLevel == OptimizationLevelKind::LowLevel) {
+    // Remove retain/releases based on Builtin.unsafeGuaranteed
+    PM.addUnsafeGuaranteedPeephole();
+    // Only hoist releases very late.
     PM.addLateCodeMotion();
-  else
+  } else
     PM.addEarlyCodeMotion();
 
   PM.addARCSequenceOpts();
@@ -276,6 +278,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Run an iteration of the high-level SSA passes.
   PM.setStageName("HighLevel+EarlyLoopOpt");
+  // FIXME: update this to be a function pass.
+  PM.addEagerSpecializer();
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
   AddHighLevelLoopOptPasses(PM);
   PM.runOneIteration();
@@ -338,11 +342,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.setStageName("LowLevel");
 
-  // Rewrite to get the benefit of release devirtualizer.
-  // Also, Make sure the run the rewriter to create the optimized functions before
-  // the cloner on the current function is run !.
-  PM.addFunctionSignatureOptRewriter();
-
   // Should be after FunctionSignatureOpts and before the last inliner.
   PM.addReleaseDevirtualizer();
 
@@ -350,7 +349,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addDeadStoreElimination();
 
   // We've done a lot of optimizations on this function, attempt to FSO.
-  PM.addFunctionSignatureOptCloner();
+  PM.addFunctionSignatureOpts();
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
@@ -372,6 +371,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Remove dead code.
   PM.addDCE();
   PM.addSimplifyCFG();
+
   PM.runOneIteration();
 
   PM.resetAndRemoveTransformations();

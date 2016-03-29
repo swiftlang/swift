@@ -754,5 +754,15 @@ func r24251022() {
     b // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
 }
 
+func overloadSetResultType(a : Int, b : Int) -> Int {
+  // https://twitter.com/_jlfischer/status/712337382175952896
+  return a == b && 1 == 2  // expected-error {{'&&' produces 'Bool', not the expected contextual result type 'Int'}}
+}
+
+// <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
+func r21523291(bytes : UnsafeMutablePointer<UInt8>) {
+  let i = 42   // expected-note {{change 'let' to 'var' to make it mutable}}
+  let r = bytes[i++]  // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
+}
 
 

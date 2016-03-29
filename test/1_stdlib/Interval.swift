@@ -190,11 +190,11 @@ tests.test("CustomStringConvertible/CustomDebugStringConvertible") {
 }
 
 tests.test("rdar12016900") {
-  if true {
+  do {
     let wc = 0
     expectFalse((0x00D800 ..< 0x00E000).contains(wc))
   }
-  if true {
+  do {
     let wc = 0x00D800
     expectTrue((0x00D800 ..< 0x00E000).contains(wc))
   }

@@ -33,4 +33,11 @@ extension NSRange : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
   }
+
+  public static func _unconditionallyBridgeFromObjectiveC(source: NSValue?)
+      -> NSRange {
+    var result: NSRange?
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
 }

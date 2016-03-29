@@ -170,14 +170,14 @@ FileUnit *SerializedModuleLoader::loadAST(
   if (err == serialization::Status::Valid) {
     Ctx.bumpGeneration();
 
+    M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
+
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
                                                 extendedInfo.isSIB());
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
-    if (extendedInfo.isResilient())
-      M.setResilienceEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     err = loadedModuleFile->associateWithFileContext(fileUnit,
@@ -510,6 +510,11 @@ void
 SerializedASTFile::collectAllGroups(std::vector<StringRef> &Names) const {
   File.collectAllGroups(Names);
 };
+
+Optional<StringRef>
+SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
+  return File.getGroupNameByUSR(USR);
+}
 
 void
 SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {

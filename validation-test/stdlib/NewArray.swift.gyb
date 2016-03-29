@@ -423,7 +423,7 @@ func testInoutViolation() {
   ]
 
 %for A in arrayTypes:
-  if true {
+  do {
     var b = ${A}(a)
     _ = b.sorted { x, y in
       b.removeAll()

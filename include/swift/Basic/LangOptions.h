@@ -144,22 +144,25 @@ namespace swift {
     /// new enough?
     bool EnableTargetOSChecking = true;
 
-    /// Whether we're omitting needless words when importing Objective-C APIs.
+    /// Whether to use the import as member inference system
     ///
-    /// The vast majority of the logic for omitting needless words is
-    /// centralized in the Clang importer. However, there are a few
-    /// places elsewhere in the compiler that specifically reference
-    /// Objective-C entities whose names are affected by
-    /// omit-needless-words.
-    bool OmitNeedlessWords = true;
+    /// When importing a global, try to infer whether we can import it as a
+    /// member of some type instead. This includes inits, computed properties,
+    /// and methods.
+    bool InferImportAsMember = false;
 
     /// Whether we are stripping the "NS" prefix from Foundation et al.
-    ///
-    /// This is only queried when \c OmitNeedlessWords is true.
     bool StripNSPrefix = false;
+
+    /// Whether classes with Objective-C lightweight generic type parameters
+    /// should be imported into Swift as generic classes.
+    bool ImportObjCGenerics = false;
 
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
+
+    /// Allow IUO types to be inferred for otherwise untyped variables.
+    bool InferIUOs = true;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

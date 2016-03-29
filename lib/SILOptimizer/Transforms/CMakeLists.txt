@@ -8,10 +8,10 @@ set(TRANSFORMS_SOURCES
   Transforms/DeadObjectElimination.cpp
   Transforms/DeadStoreElimination.cpp
   Transforms/Devirtualizer.cpp
-  Transforms/FunctionSignatureOptCloner.cpp
-  Transforms/FunctionSignatureOptRewriter.cpp
+  Transforms/FunctionSignatureOpts.cpp
   Transforms/GenericSpecializer.cpp
   Transforms/MergeCondFail.cpp
+  Transforms/PerformanceInliner.cpp
   Transforms/RedundantLoadElimination.cpp
   Transforms/RedundantOverflowCheckRemoval.cpp
   Transforms/ReleaseDevirtualizer.cpp
@@ -25,4 +25,5 @@ set(TRANSFORMS_SOURCES
   Transforms/Sink.cpp
   Transforms/SpeculativeDevirtualizer.cpp
   Transforms/StackPromotion.cpp
+  Transforms/UnsafeGuaranteedPeephole.cpp
   PARENT_SCOPE)

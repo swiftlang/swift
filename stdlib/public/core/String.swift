@@ -314,6 +314,11 @@ extension String {
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   lhs: AnyObject, _ rhs: AnyObject
 ) -> Int32
+
+@_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr")
+public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
+  lhs: OpaquePointer, _ rhs: OpaquePointer
+) -> Int32
 #endif
 
 extension String : Equatable {
@@ -372,6 +377,15 @@ extension String {
     // Note: this operation should be consistent with equality comparison of
     // Character.
 #if _runtime(_ObjC)
+    if self._core.hasContiguousStorage && rhs._core.hasContiguousStorage {
+      let lhsStr = _NSContiguousString(self._core)
+      let rhsStr = _NSContiguousString(rhs._core)
+      let res = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+        return Int(
+            _stdlib_compareNSStringDeterministicUnicodeCollationPointer($0, $1))
+      }
+      return res
+    }
     return Int(_stdlib_compareNSStringDeterministicUnicodeCollation(
       _bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()))
 #else
@@ -445,12 +459,12 @@ extension String {
 
 #if _runtime(_ObjC)
 @warn_unused_result
-@_silgen_name("swift_stdlib_NSStringNFDHashValue")
-func _stdlib_NSStringNFDHashValue(str: AnyObject) -> Int
+@_silgen_name("swift_stdlib_NSStringHashValue")
+func _stdlib_NSStringHashValue(str: AnyObject, _ isASCII: Bool) -> Int
 
 @warn_unused_result
-@_silgen_name("swift_stdlib_NSStringASCIIHashValue")
-func _stdlib_NSStringASCIIHashValue(str: AnyObject) -> Int
+@_silgen_name("swift_stdlib_NSStringHashValuePointer")
+func _stdlib_NSStringHashValuePointer(str: OpaquePointer, _ isASCII: Bool) -> Int
 #endif
 
 extension String : Hashable {
@@ -470,16 +484,18 @@ extension String : Hashable {
 #else
     let hashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
 #endif
-    // FIXME(performance): constructing a temporary NSString is extremely
-    // wasteful and inefficient.
-    let cocoaString = unsafeBitCast(
-      self._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
-
-    // If we have an ASCII string, we do not need to normalize.
-    if self._core.isASCII {
-      return hashOffset ^ _stdlib_NSStringASCIIHashValue(cocoaString)
+    // If we have a contiguous string then we can use the stack optimization.
+    let core = self._core
+    let isASCII = core.isASCII
+    if core.hasContiguousStorage {
+      let stackAllocated = _NSContiguousString(core)
+      return hashOffset ^ stackAllocated._unsafeWithNotEscapedSelfPointer {
+        return _stdlib_NSStringHashValuePointer($0, isASCII )
+      }
     } else {
-      return hashOffset ^ _stdlib_NSStringNFDHashValue(cocoaString)
+      let cocoaString = unsafeBitCast(
+        self._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
+      return hashOffset ^ _stdlib_NSStringHashValue(cocoaString, isASCII)
     }
 #else
     if self._core.isASCII {

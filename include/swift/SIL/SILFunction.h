@@ -38,6 +38,24 @@ enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
 enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
 
+class SILSpecializeAttr final :
+    private llvm::TrailingObjects<SILSpecializeAttr, Substitution> {
+  friend TrailingObjects;
+
+  unsigned numSubs;
+  
+  SILSpecializeAttr(ArrayRef<Substitution> subs);
+
+public:
+  static SILSpecializeAttr *create(SILModule &M, ArrayRef<Substitution> subs);
+
+  ArrayRef<Substitution> getSubstitutions() const {
+    return { getTrailingObjects<Substitution>(), numSubs };
+  }
+  
+  void print(llvm::raw_ostream &OS) const;
+};
+
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
@@ -140,6 +158,9 @@ private:
   /// TODO: Why is this using a std::string? Why don't we use uniqued
   /// StringRefs?
   llvm::SmallVector<std::string, 1> SemanticsAttrSet;
+
+  /// The function's remaining set of specialize attributes.
+  std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
@@ -304,6 +325,10 @@ public:
   /// Set the function's linkage attribute.
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
+  /// Returns true if this function can be referenced from a fragile function
+  /// body.
+  bool hasValidLinkageForFragileRef() const;
+
   /// Get's the effective linkage which is used to derive the llvm linkage.
   /// Usually this is the same as getLinkage(), except in one case: if this
   /// function is a method in a class which has higher visibility than the
@@ -383,6 +408,18 @@ public:
     auto Iter =
         std::remove(SemanticsAttrSet.begin(), SemanticsAttrSet.end(), Ref);
     SemanticsAttrSet.erase(Iter);
+  }
+
+  /// \returns the range of specialize attributes.
+  ArrayRef<SILSpecializeAttr*> getSpecializeAttrs() const {
+    return SpecializeAttrSet;
+  }
+
+  /// Removes all specialize attributes from this function.
+  void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
+
+  void addSpecializeAttr(SILSpecializeAttr *attr) {
+    SpecializeAttrSet.push_back(attr);
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),

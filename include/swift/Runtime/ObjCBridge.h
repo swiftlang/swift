@@ -33,6 +33,7 @@ struct HeapObject;
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/objc.h>
+#include <objc/runtime.h>
 
 // Redeclare APIs from the Objective-C runtime.
 // These functions are not available through public headers, but are guaranteed
@@ -44,10 +45,8 @@ extern "C" id _objc_rootAutorelease(id);
 extern "C" void objc_moveWeak(id*, id*);
 extern "C" void objc_copyWeak(id*, id*);
 extern "C" id objc_initWeak(id*, id);
-extern "C" id objc_storeWeak(id*, id);
 extern "C" void objc_destroyWeak(id*);
 extern "C" id objc_loadWeakRetained(id*);
-extern "C" Class object_setClass(id, Class);
 
 // Description of an Objective-C image.
 // __DATA,__objc_imageinfo stores one of these.

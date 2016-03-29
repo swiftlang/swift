@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-// CHECK-LABEL: sil hidden @pear : $@convention(c)
+// CHECK-LABEL: sil hidden [thunk] @pear : $@convention(c)
 // CHECK:         function_ref @_TF5cdecl5apple
 // CHECK-LABEL: sil hidden @_TF5cdecl5apple
 @_cdecl("pear")
@@ -13,7 +13,7 @@ func forceCEntryPoint() {
   apple(orange)
 }
 
-// CHECK-LABEL: sil hidden @grapefruit : $@convention(c)
+// CHECK-LABEL: sil hidden [thunk] @grapefruit : $@convention(c)
 // CHECK:         function_ref @_TF5cdecl6orange
 // CHECK-LABEL: sil hidden @_TF5cdecl6orange
 @_cdecl("grapefruit")
@@ -21,7 +21,7 @@ func orange(x: Int) -> Int {
   return x
 }
 
-// CHECK-LABEL: sil @cauliflower : $@convention(c)
+// CHECK-LABEL: sil [thunk] @cauliflower : $@convention(c)
 // CHECK:         function_ref @_TF5cdecl8broccoli
 // CHECK-LABEL: sil @_TF5cdecl8broccoli
 @_cdecl("cauliflower")
@@ -29,7 +29,7 @@ public func broccoli(x: Int) -> Int {
   return x
 }
 
-// CHECK-LABEL: sil private @collard_greens : $@convention(c)
+// CHECK-LABEL: sil private [thunk] @collard_greens : $@convention(c)
 // CHECK:         function_ref @_TF5cdeclP[[PRIVATE:.*]]4kale
 // CHECK:       sil private @_TF5cdeclP[[PRIVATE:.*]]4kale
 @_cdecl("collard_greens")

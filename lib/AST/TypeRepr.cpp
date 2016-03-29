@@ -391,6 +391,9 @@ TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,
 
 void TupleTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
+  Printer.callPrintStructurePre(PrintStructureKind::TupleType);
+  defer { Printer.printStructurePost(PrintStructureKind::TupleType); };
+
   Printer << "(";
 
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {

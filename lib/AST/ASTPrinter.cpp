@@ -40,12 +40,14 @@
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
+#include <queue>
 
 using namespace swift;
 namespace swift {
@@ -206,6 +208,24 @@ public:
 };
 
 struct SynthesizedExtensionAnalyzer::Implementation {
+  static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
+    DeclContext* DC = Target->getDeclContext();
+    Type BaseTy = Target->getDeclaredTypeInContext();
+    const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    if (!FD)
+      return true;
+    ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
+                                                    FD->getEffectiveFullName());
+    return !(Result && Result.Favored != D);
+  }
+
+  static bool isExtensionFavored(const NominalTypeDecl* Target,
+                                 const ExtensionDecl *ED) {
+    return std::find_if(ED->getMembers().begin(), ED->getMembers().end(),
+      [&](DeclIterator It) { return isMemberFavored(Target, *It);}) !=
+        ED->getMembers().end();
+  }
+
   struct SynthesizedExtensionInfo {
     ExtensionDecl *Ext = nullptr;
     std::vector<StringRef> KnownSatisfiedRequirements;
@@ -292,6 +312,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       Kind(MergeableWithType ? MergeGroupKind::MergeableWithTypeDef :
                                MergeGroupKind::UnmergeableWithTypeDef) {
       Members.push_back(Info);
+    }
+
+    void removeUnfavored(const NominalTypeDecl *Target) {
+      Members.erase(std::remove_if(Members.begin(), Members.end(),
+        [&](SynthesizedExtensionInfo *Info){
+          return !isExtensionFavored(Target, Info->Ext);}), Members.end());
     }
 
     void sortMembers() {
@@ -525,8 +551,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups);
     std::sort(AllGroups.begin(), AllGroups.end());
     for (auto &Group : AllGroups) {
+      Group.removeUnfavored(Target);
       Group.sortMembers();
     }
+    AllGroups.erase(std::remove_if(AllGroups.begin(), AllGroups.end(),
+      [](ExtensionMergeGroup &Group) { return Group.Members.empty(); }),
+      AllGroups.end());
     return InfoMap;
   }
 };
@@ -708,6 +738,24 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   return Builder.str();
 }
 
+ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
+  assert(VD->getRawComment().isEmpty());
+  std::queue<ValueDecl*> AllConformances;
+  AllConformances.push(VD);
+  while(!AllConformances.empty()) {
+    auto *VD = AllConformances.front();
+    AllConformances.pop();
+    if (VD->getRawComment().isEmpty()) {
+      for (auto *Req : VD->getSatisfiedProtocolRequirements()) {
+        AllConformances.push(Req);
+      }
+    } else {
+      return VD;
+    }
+  }
+  return nullptr;
+}
+
 bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
                                     llvm::raw_ostream &OS) {
   if (!Ty)
@@ -791,13 +839,14 @@ void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
 }
 
-void ASTPrinter::callPrintDeclPre(const Decl *D) {
+void ASTPrinter::callPrintDeclPre(const Decl *D,
+                                  Optional<BracketOptions> Bracket) {
   forceNewlines();
 
   if (SynthesizeTarget && D->getKind() == DeclKind::Extension)
-    printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget);
+    printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget, Bracket);
   else
-    printDeclPre(D);
+    printDeclPre(D, Bracket);
 }
 
 ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
@@ -969,11 +1018,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printSwiftDocumentationComment(const Decl *D) {
-    auto RC = D->getRawComment();
-    if (RC.isEmpty())
-      return;
-
+  void printRawComment(RawComment RC) {
     indent();
 
     SmallVector<StringRef, 8> Lines;
@@ -988,6 +1033,23 @@ class PrintAST : public ASTVisitor<PrintAST> {
         Printer << Line;
         Printer.printNewline();
       }
+    }
+  }
+
+  void printSwiftDocumentationComment(const Decl *D) {
+    auto RC = D->getRawComment();
+    if (RC.isEmpty() && !Options.ElevateDocCommentFromConformance)
+      return;
+
+    if (RC.isEmpty()) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (auto *Req = ASTPrinter::findConformancesWithDocComment(
+            const_cast<ValueDecl*>(VD))) {
+          printRawComment(Req->getRawComment());
+        }
+      }
+    } else {
+      printRawComment(RC);
     }
   }
 
@@ -1166,14 +1228,15 @@ public:
       }
     }
 
-    Printer.callPrintDeclPre(D);
+    Printer.callPrintDeclPre(D, Options.BracketOptions);
     ASTVisitor::visit(D);
     if (Synthesize) {
       Printer.setSynthesizedTarget(nullptr);
       Printer.printSynthesizedExtensionPost(
-          cast<ExtensionDecl>(D), Options.TransformContext->getNominal());
+          cast<ExtensionDecl>(D), Options.TransformContext->getNominal(),
+          Options.BracketOptions);
     } else {
-      Printer.callPrintDeclPost(D);
+      Printer.callPrintDeclPost(D, Options.BracketOptions);
     }
     return true;
   }
@@ -1450,7 +1513,23 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
+static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
+  if (!Options.TransformContext || !D->getDeclContext()->isExtensionContext() ||
+      !Options.TransformContext->isPrintingSynthesizedExtension())
+    return true;
+  NominalTypeDecl *Target = Options.TransformContext->getNominal();
+  Type BaseTy = Target->getDeclaredTypeInContext();
+  const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+  if (!FD)
+    return true;
+  ResolveMemberResult Result = resolveValueMember(*Target->getDeclContext(),
+                                                  BaseTy, FD->getEffectiveFullName());
+  return !(Result && Result.Favored != D);
+}
+
 bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
+  if (!shouldPrintAsFavorable(D, Options))
+    return false;
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -1517,6 +1596,28 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->getOverriddenDecl()) return false;
       if (!VD->getSatisfiedProtocolRequirements().empty()) return false;
+
+      if (auto clangDecl = VD->getClangDecl()) {
+        // If the Clang declaration is from a protocol but was mirrored into
+        // class or extension thereof, treat it as an override.
+        if (isa<clang::ObjCProtocolDecl>(clangDecl->getDeclContext()) &&
+            VD->getDeclContext()->getAsClassOrClassExtensionContext())
+          return false;
+
+        // Check whether Clang considers it an override.
+        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+          SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+          objcMethod->getOverriddenMethods(overriddenMethods);
+          if (!overriddenMethods.empty()) return false;
+        } else if (auto objcProperty
+                     = dyn_cast<clang::ObjCPropertyDecl>(clangDecl)) {
+          if (auto getter = objcProperty->getGetterMethodDecl()) {
+            SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+            getter->getOverriddenMethods(overriddenMethods);
+            if (!overriddenMethods.empty()) return false;
+          }
+        }
+      }
     }
   }
 
@@ -2470,14 +2571,15 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
     RemoveFunc(DAK_AutoClosure);
 
 
-  if (Options.PrintDefaultParameterPlaceholder &&
-      param->isDefaultArgument()) {
-    Printer << " = ";
+  if (param->isDefaultArgument()) {
     auto defaultArgStr
       = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
     if (defaultArgStr.empty()) {
-      Printer << tok::kw_default;
+      if (Options.PrintDefaultParameterPlaceholder)
+        Printer << " = " << tok::kw_default;
     } else {
+      Printer << " = ";
+
       switch (param->getDefaultArgumentKind()) {
       case DefaultArgumentKind::File:
       case DefaultArgumentKind::Line:
@@ -2490,7 +2592,6 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
         Printer << defaultArgStr;
         break;
       }
-
     }
   }
 }
@@ -3413,6 +3514,9 @@ public:
   }
 
   void visitTupleType(TupleType *T) {
+    Printer.callPrintStructurePre(PrintStructureKind::TupleType);
+    defer { Printer.printStructurePost(PrintStructureKind::TupleType); };
+
     Printer << "(";
 
     auto Fields = T->getElements();

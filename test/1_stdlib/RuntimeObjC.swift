@@ -22,6 +22,16 @@ import CoreGraphics
 import SwiftShims
 import MirrorObjC
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 var nsObjectCanaryCount = 0
 @objc class NSObjectCanary : NSObject {
   override init() {
@@ -543,22 +553,59 @@ RuntimeFoundationWrappers.test(
   expectEqual(0, nsStringCanaryCount)
 }
 
-RuntimeFoundationWrappers.test("_stdlib_NSStringNFDHashValue/NoLeak") {
+RuntimeFoundationWrappers.test(
+  "_stdlib_compareNSStringDeterministicUnicodeCollationPtr/NoLeak"
+) {
   nsStringCanaryCount = 0
   autoreleasepool {
     let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringNFDHashValue(a)
+    let b = NSStringCanary()
+    expectEqual(2, nsStringCanaryCount)
+    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
+    let ptrB = unsafeBitCast(b, to: OpaquePointer.self)
+    _stdlib_compareNSStringDeterministicUnicodeCollationPointer(ptrA, ptrB)
   }
   expectEqual(0, nsStringCanaryCount)
 }
 
-RuntimeFoundationWrappers.test("_stdlib_NSStringASCIIHashValue/NoLeak") {
+RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {
     let a = NSStringCanary()
     expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringASCIIHashValue(a)
+    _stdlib_NSStringHashValue(a, true)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringHashValueNonASCII/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringHashValue(a, false)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointer/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
+    _stdlib_NSStringHashValuePointer(ptrA, true)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointerNonASCII/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
+    _stdlib_NSStringHashValuePointer(ptrA, false)
   }
   expectEqual(0, nsStringCanaryCount)
 }

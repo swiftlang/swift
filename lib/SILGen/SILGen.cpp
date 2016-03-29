@@ -585,6 +585,8 @@ void SILGenModule::emitCurryThunk(ValueDecl *fd,
                                   SILDeclRef nextEntryPoint) {
   // Thunks are always emitted by need, so don't need delayed emission.
   SILFunction *f = getFunction(entryPoint, ForDefinition);
+  f->setThunk(IsThunk);
+
   preEmitFunction(entryPoint, fd, f, fd);
   PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
 
@@ -597,6 +599,7 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(!thunk.isForeign && "foreign-to-native thunks only");
   SILFunction *f = getFunction(thunk, ForDefinition);
+  f->setThunk(IsThunk);
   preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
   SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
@@ -615,6 +618,7 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
                     thunk.getAbstractClosureExpr());
   PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
   f->setBare(IsBare);
+  f->setThunk(IsThunk);
   SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
   postEmitFunction(thunk, f);
 }
@@ -850,9 +854,14 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =
-      M.getOrCreateFunction(SILLinkage::Private, funcName, initSILType, nullptr,
+      M.getOrCreateFunction(makeModuleFragile
+                                ? SILLinkage::Public
+                                : SILLinkage::Private,
+                            funcName, initSILType, nullptr,
                             SILLocation(binding), IsNotBare, IsNotTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile);
+                            makeModuleFragile
+                                ? IsFragile
+                                : IsNotFragile);
   f->setDebugScope(
       new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
   f->setLocation(binding);

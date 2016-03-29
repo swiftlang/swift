@@ -587,3 +587,8 @@ func testNSUInteger(obj: NSUIntegerTests, uint: UInt, int: Int) {
   let num = NSNumber(unsignedInteger: uint)
   let _: String = num.unsignedIntegerValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
 }
+
+
+// <rdar://problem/25168818> Don't import None members in NS_OPTIONS types
+let _ = NSRuncingOptions.none // expected-error {{'none' is unavailable: use [] to construct an empty option set}}
+

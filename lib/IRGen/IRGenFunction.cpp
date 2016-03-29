@@ -204,6 +204,73 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
                               {pointer, size, alignMask});
 }
 
+/// Initialize a relative indirectable pointer to the given value.
+/// This always leaves the value in the direct state; if it's not a
+/// far reference, it's the caller's responsibility to ensure that the
+/// pointer ranges are sufficient.
+void IRGenFunction::emitStoreOfRelativeIndirectablePointer(llvm::Value *value,
+                                                           Address addr,
+                                                           bool isFar) {
+  value = Builder.CreatePtrToInt(value, IGM.IntPtrTy);
+  auto addrAsInt =
+    Builder.CreatePtrToInt(addr.getAddress(), IGM.IntPtrTy);
+
+  auto difference = Builder.CreateSub(value, addrAsInt);
+  if (!isFar) {
+    difference = Builder.CreateTrunc(difference, IGM.RelativeAddressTy);
+  }
+
+  Builder.CreateStore(difference, addr);
+}
+
+llvm::Value *
+IRGenFunction::emitLoadOfRelativeIndirectablePointer(Address addr,
+                                                bool isFar,
+                                                llvm::PointerType *expectedType,
+                                                const llvm::Twine &name) {
+  // Load the pointer and turn it back into a pointer.
+  llvm::Value *value = Builder.CreateLoad(addr);
+  assert(value->getType() == (isFar ? IGM.FarRelativeAddressTy
+                                    : IGM.RelativeAddressTy));
+  if (!isFar) {
+    value = Builder.CreateSExt(value, IGM.IntPtrTy);
+  }
+  assert(value->getType() == IGM.IntPtrTy);
+
+  llvm::BasicBlock *origBB = Builder.GetInsertBlock();
+  llvm::Value *directResult = Builder.CreateIntToPtr(value, expectedType);
+
+  // Check whether the low bit is set.
+  llvm::Constant *one = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+  llvm::BasicBlock *indirectBB = createBasicBlock("relptr.indirect");
+  llvm::BasicBlock *contBB = createBasicBlock("relptr.cont");
+  llvm::Value *isIndirect = Builder.CreateAnd(value, one);
+  isIndirect = Builder.CreateIsNotNull(isIndirect);
+  Builder.CreateCondBr(isIndirect, indirectBB, contBB);
+
+  // In the indirect block, clear the low bit and perform an additional load.
+  llvm::Value *indirectResult; {
+    Builder.emitBlock(indirectBB);
+
+    // Clear the low bit.
+    llvm::Value *ptr = Builder.CreateSub(value, one);
+    ptr = Builder.CreateIntToPtr(ptr, expectedType->getPointerTo());
+
+    // Load.
+    Address indirectAddr(ptr, IGM.getPointerAlignment());
+    indirectResult = Builder.CreateLoad(indirectAddr);
+
+    Builder.CreateBr(contBB);
+  }
+
+  Builder.emitBlock(contBB);
+  auto phi = Builder.CreatePHI(expectedType, 2, name);
+  phi->addIncoming(directResult, origBB);
+  phi->addIncoming(indirectResult, indirectBB);
+
+  return phi;
+}
+
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
                                       Explosion &explosion) {
   if (!isa<LoadableTypeInfo>(type)) {

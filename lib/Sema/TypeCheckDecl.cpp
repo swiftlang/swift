@@ -3830,6 +3830,11 @@ public:
                       Super->getName());
           return;
         }
+
+        if (Super->hasClangNode() && Super->getGenericParams()) {
+          TC.diagnose(CD, diag::inheritance_from_objc_generic_class,
+                      Super->getName());
+        }
       }
 
       checkAccessibility(TC, CD);
@@ -5084,10 +5089,12 @@ public:
     UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(SetterAccessibility)
     UNINTERESTING_ATTR(UIApplicationMain)
+    UNINTERESTING_ATTR(Versioned)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
+    UNINTERESTING_ATTR(Specialize)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(AutoClosure)
@@ -5587,8 +5594,17 @@ public:
       }
 
       TC.checkInheritanceClause(ED);
-      if (auto nominal = ExtendedTy->getAnyNominal())
+      if (auto nominal = ExtendedTy->getAnyNominal()) {
         TC.validateDecl(nominal);
+
+        if (auto extendedClass = dyn_cast<ClassDecl>(nominal)) {
+          if (extendedClass->hasClangNode() &&
+              extendedClass->getGenericParams()) {
+            TC.diagnose(ED, diag::extension_of_objc_generic_class,
+                        extendedClass->getName());
+          }
+        }
+      }
 
       validateAttributes(TC, ED);
     }
@@ -5868,15 +5884,18 @@ public:
       DD->setInvalid();
     }
 
-    Type FnTy;
-    if (DD->getDeclContext()->isGenericTypeContext())
-      FnTy = PolymorphicFunctionType::get(SelfTy,
-                                          TupleType::getEmpty(TC.Context),
-                             DD->getDeclContext()->getGenericParamsOfContext());
-    else
-      FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context));
+    if (!DD->hasType()) {
+      Type FnTy;
+      if (DD->getDeclContext()->isGenericTypeContext()) {
+        FnTy = PolymorphicFunctionType::get(SelfTy,
+                                            TupleType::getEmpty(TC.Context),
+                            DD->getDeclContext()->getGenericParamsOfContext());
+      } else {
+        FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context));
+      }
 
-    DD->setType(FnTy);
+      DD->setType(FnTy);
+    }
 
     // Do this before markAsObjC() to diagnose @nonobjc better
     validateAttributes(TC, DD);

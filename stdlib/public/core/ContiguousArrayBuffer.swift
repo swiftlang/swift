@@ -100,6 +100,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 }
 
 // The class that implements the storage for a ContiguousArray<Element>
+@_versioned
 final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 
   deinit {
@@ -320,6 +321,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return self
   }
 
+  @_versioned
   @warn_unused_result
   func getElement(i: Int) -> Element {
     _sanityCheck(i >= 0 && i < count, "Array index out of range")

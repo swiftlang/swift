@@ -61,18 +61,12 @@ public:
   /// instead of dropped altogether when possible.
   bool ImportForwardDeclarations = false;
 
-  /// If true, remove words from imported names that are redundant
-  /// with the type information of the corresponding parameter or
-  /// property.
-  bool OmitNeedlessWords = true;
-
-  // If true, infer default arguments for nullable pointers (nil) and
-  // option sets ([]).
-  bool InferDefaultArguments = true;
-
-  /// If true, we should use the Swift name lookup tables rather than
-  /// Clang's name lookup facilities.
-  bool UseSwiftLookupTables = true;
+  /// Whether to use the import as member inference system
+  ///
+  /// When importing a global, try to infer whether we can import it as a
+  /// member of some type instead. This includes inits, computed properties,
+  /// and methods.
+  bool InferImportAsMember = false;
 };
 
 } // end namespace swift

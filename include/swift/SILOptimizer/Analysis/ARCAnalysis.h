@@ -134,6 +134,12 @@ private:
   // and handle exploded retain_value later.
   RetainList EpilogueRetainInsts;
 
+  /// Return true if all the successors of the EpilogueRetainInsts do not have
+  /// a retain. 
+  bool isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
+
+  /// Finds matching releases in the provided block \p BB.
+  RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V);
 public:
   /// Finds matching releases in the return block of the function \p F.
   ConsumedResultToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
@@ -165,11 +171,6 @@ public:
   unsigned size() const { return EpilogueRetainInsts.size(); }
 
   iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
-
-
-private:
-  /// Finds matching releases in the provided block \p BB.
-  RetainKindValue findMatchingRetainsInner(SILBasicBlock *BB, SILValue V);
 };
 
 /// A class that attempts to match owned arguments and corresponding epilogue
@@ -197,8 +198,17 @@ private:
   bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
 
   /// Return true if we have a release instruction for all the reference
-  /// semantics part of \p Base.
-  bool releaseAllNonTrivials(ReleaseList Insts, SILValue Base);
+  /// semantics part of \p Argument.
+  bool releaseArgument(ReleaseList Insts, SILValue Argument);
+
+  /// Walk the basic block and find all the releases that match to function
+  /// arguments. 
+  void collectMatchingReleases(SILBasicBlock *BB);
+
+  /// For every argument in the function, check to see whether all epilogue
+  /// releases are found. Clear all releases for the argument if not all 
+  /// epilogue releases are found.
+  void processMatchingReleases();
 
 public:
   /// Finds matching releases in the return block of the function \p F.
@@ -211,11 +221,17 @@ public:
 
   bool hasBlock() const { return HasBlock; }
 
+  bool isSingleRelease(SILArgument *Arg) const {
+    auto Iter = ArgInstMap.find(Arg);
+    assert(Iter != ArgInstMap.end() && "Failed to get release list for argument");
+    return Iter->second.size() == 1;
+  }
+
   SILInstruction *getSingleReleaseForArgument(SILArgument *Arg) {
     auto I = ArgInstMap.find(Arg);
     if (I == ArgInstMap.end())
       return nullptr;
-    if (I->second.size() > 1)
+    if (!isSingleRelease(Arg))
       return nullptr;
     return *I->second.begin();
   }

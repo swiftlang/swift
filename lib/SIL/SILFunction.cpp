@@ -25,6 +25,19 @@
 using namespace swift;
 using namespace Lowering;
 
+SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Substitution> subs)
+  : numSubs(subs.size()) {
+  std::copy(subs.begin(), subs.end(), getTrailingObjects<Substitution>());
+}
+
+SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
+                                             ArrayRef<Substitution> subs) {
+  unsigned size =
+    sizeof(SILSpecializeAttr) + (subs.size() * sizeof(Substitution));
+  void *buf = M.allocate(size, alignof(SILSpecializeAttr));
+  return ::new (buf) SILSpecializeAttr(subs);
+}
+
 SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  StringRef name,
                                  CanSILFunctionType loweredType,
@@ -497,9 +510,38 @@ bool SILFunction::hasName(const char *Name) const {
   return getName() == Name;
 }
 
-  /// Helper method which returns true if the linkage of the SILFunction
-  /// indicates that the objects definition might be required outside the
-  /// current SILModule.
+/// Returns true if this function can be referenced from a fragile function
+/// body.
+bool SILFunction::hasValidLinkageForFragileRef() const {
+  // Fragile functions can reference other fragile functions.
+  if (isFragile())
+    return true;
+
+  // If the function is a forward declaration, we may have not deserialized
+  // the body yet.
+  if (isExternalDeclaration())
+    return true;
+
+  // Fragile functions can reference 'static inline' functions imported
+  // from C.
+  if (hasForeignBody())
+    return true;
+
+  // This handles some kind of generated functions, like constructors
+  // of clang imported types.
+  // TODO: check why those functions are not fragile anyway and make
+  // a less conservative check here.
+  SILLinkage linkage = getLinkage();
+  if (hasSharedVisibility(linkage))
+    return true;
+
+  // Otherwise, only public functions can be referenced.
+  return hasPublicVisibility(linkage);
+}
+
+/// Helper method which returns true if the linkage of the SILFunction
+/// indicates that the objects definition might be required outside the
+/// current SILModule.
 bool
 SILFunction::isPossiblyUsedExternally() const {
   return swift::isPossiblyUsedExternally(getLinkage(),

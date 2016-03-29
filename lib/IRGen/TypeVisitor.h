@@ -19,7 +19,6 @@
 #define SWIFT_IRGEN_TYPEVISITOR_H
 
 #include "swift/AST/CanTypeVisitor.h"
-#include "swift/AST/SubstTypeVisitor.h"
 
 namespace swift {
 namespace irgen {

@@ -182,6 +182,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ModuleGroupName = InputArg->getValue();
       break;
 
+    case OPT_interested_usr:
+      InterestedUSR = InputArg->getValue();
+      break;
+
     case OPT_header:
       HeaderPath = InputArg->getValue();
       break;

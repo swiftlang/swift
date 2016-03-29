@@ -3,7 +3,8 @@ set(swift_stdlib_unittest_module_depends
   SwiftPrivate SwiftPrivatePthreadExtras SwiftPrivateLibcExtras)
 set(swift_stdlib_unittest_framework_depends)
 set(swift_stdlib_unittest_private_link_libraries)
-set(swift_stdlib_unittest_compile_flags)
+set(swift_stdlib_unittest_compile_flags
+  "-Xfrontend" "-disable-objc-attr-requires-foundation-module")
 
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   list(APPEND swift_stdlib_unittest_platform_sources

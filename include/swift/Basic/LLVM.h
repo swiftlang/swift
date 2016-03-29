@@ -28,7 +28,7 @@
 
 // Forward declarations.
 namespace llvm {
-  // Containers
+  // Containers.
   class StringRef;
   class Twine;
   template <typename T> class SmallPtrSetImpl;
@@ -46,7 +46,7 @@ namespace llvm {
   class raw_ostream;
   class APInt;
   class APFloat;
-} // end namespace llvm;
+} // end namespace llvm
 
 
 namespace swift {
@@ -57,7 +57,7 @@ namespace swift {
   using llvm::dyn_cast_or_null;
   using llvm::cast_or_null;
 
-  // Containers
+  // Containers.
   using llvm::None;
   using llvm::Optional;
   using llvm::SmallPtrSetImpl;

@@ -195,8 +195,7 @@ SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
   if (found == DefaultWitnessTableMap.end()) {
     if (deserializeLazily) {
       SILLinkage linkage =
-        getSILLinkage(getDeclLinkage(Protocol, /*internalAsVersioned=*/ false),
-                      ForDefinition);
+        getSILLinkage(getDeclLinkage(Protocol), ForDefinition);
       SILDefaultWitnessTable *wtable =
         SILDefaultWitnessTable::create(*this, linkage, Protocol);
       wtable = getSILLoader()->lookupDefaultWitnessTable(wtable);
@@ -328,16 +327,16 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     return fn;
   }
 
-  IsTransparent_t IsTrans = constant.isTransparent()?
-                              IsTransparent : IsNotTransparent;
-  IsFragile_t IsFrag = IsNotFragile;
-  if (IsTrans == IsTransparent && (linkage == SILLinkage::Public
-                                   || linkage == SILLinkage::PublicExternal)) {
-    IsFrag = IsFragile;
-  }
+  IsTransparent_t IsTrans = constant.isTransparent()
+                            ? IsTransparent
+                            : IsNotTransparent;
+  IsFragile_t IsFrag = constant.isFragile()
+                       ? IsFragile
+                       : IsNotFragile;
 
-  EffectsKind EK = constant.hasEffectsAttribute() ?
-  constant.getEffectsAttribute() : EffectsKind::Unspecified;
+  EffectsKind EK = constant.hasEffectsAttribute()
+                   ? constant.getEffectsAttribute()
+                   : EffectsKind::Unspecified;
 
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())
@@ -360,8 +359,15 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
       F->setForeignBody(HasForeignBody);
 
     auto Attrs = constant.getDecl()->getAttrs();
-    for (auto A : Attrs.getAttributes<SemanticsAttr, false /*AllowInvalid*/>())
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false /*AllowInvalid*/>())
       F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
+
+    for (auto *A :
+           Attrs.getAttributes<SpecializeAttr, false /*AllowInvalid*/>()) {
+      auto *SA = cast<SpecializeAttr>(A);
+      auto subs = SA->getConcreteDecl().getSubstitutions();
+      F->addSpecializeAttr(SILSpecializeAttr::create(*this, subs));
+    }
   }
 
   F->setDeclContext(constant.hasDecl() ? constant.getDecl() : nullptr);

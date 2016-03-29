@@ -15,14 +15,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/AST/AST.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/Basic/AssertImplements.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILVisitor.h"
-#include "swift/AST/AST.h"
-#include "swift/Basic/AssertImplements.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -139,9 +140,8 @@ static void declareWitnessTable(SILModule &Mod,
   auto C = conformanceRef.getConcrete();
   if (!Mod.lookUpWitnessTable(C, false))
     Mod.createWitnessTableDeclaration(C,
-        TypeConverter::getLinkageForProtocolConformance(
-                                                  C->getRootNormalConformance(),
-                                                  NotForDefinition));
+        getLinkageForProtocolConformance(C->getRootNormalConformance(),
+                                         NotForDefinition));
 }
 
 AllocExistentialBoxInst *AllocExistentialBoxInst::create(

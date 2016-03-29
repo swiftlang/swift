@@ -1604,10 +1604,23 @@ public:
     }
   }
 
-  bool isModuleLoaded(ASTContext &Ctx, clang::Module *M) {
-    return Ctx.getLoadedModule(llvm::makeArrayRef(
-      std::make_pair(Ctx.getIdentifier(M->getTopLevelModuleName()),
-                     SourceLoc())));
+  void collectImportedModules(llvm::StringSet<> &ImportedModules) {
+    SmallVector<Module::ImportedModule, 16> Imported;
+    SmallVector<Module::ImportedModule, 16> FurtherImported;
+    CurrDeclContext->getParentSourceFile()->getImportedModules(Imported,
+      Module::ImportFilter::All);
+    while(!Imported.empty()) {
+      ModuleDecl *MD = Imported.back().second;
+      Imported.pop_back();
+      if (!ImportedModules.insert(MD->getNameStr()).second)
+        continue;
+      FurtherImported.clear();
+      MD->getImportedModules(FurtherImported, Module::ImportFilter::Public);
+      Imported.append(FurtherImported.begin(), FurtherImported.end());
+      for (auto SubMod : FurtherImported) {
+        Imported.push_back(SubMod);
+      }
+    }
   }
 
   void addImportModuleNames() {
@@ -1619,6 +1632,8 @@ public:
                 return LHS->getTopLevelModuleName().compare_lower(
                   RHS->getTopLevelModuleName()) < 0;
               });
+    llvm::StringSet<> ImportedModules;
+    collectImportedModules(ImportedModules);
     for (auto *M : Modules) {
       if (M->isAvailable() &&
           !M->getTopLevelModuleName().startswith("_") &&
@@ -1636,8 +1651,7 @@ public:
         Builder.addTypeAnnotation("Module");
 
         // Imported modules are not recommended.
-        Builder.setNotRecommended(isModuleLoaded(CurrDeclContext->
-          getASTContext(), M));
+        Builder.setNotRecommended(ImportedModules.count(MD->getNameStr()) != 0);
       }
     }
   }
@@ -2492,7 +2506,7 @@ public:
           addCompoundFunctionName(CD, Reason);
           return;
         }
-        
+
         if (auto MT = ExprType->getRValueType()->getAs<AnyMetatypeType>()) {
           if (HaveDot) {
             Type Ty;

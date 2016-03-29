@@ -634,6 +634,7 @@ public:
   void collectAllGroups(std::vector<StringRef> &Names) const;
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
   Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
+  Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
 

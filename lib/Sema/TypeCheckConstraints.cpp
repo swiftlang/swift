@@ -474,7 +474,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       assert(D->getDeclContext()->isLocalContext());
       if (!D->isInvalid()) {
         diagnose(Loc, diag::use_local_before_declaration, Name);
-        diagnose(D->getLoc(), diag::decl_declared_here, Name);
+        diagnose(D, diag::decl_declared_here, Name);
       }
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
@@ -1643,7 +1643,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   }
     
   // Type-check the initializer.
-  bool hadError =typeCheckExpression(initializer, DC, contextualType,
+  bool hadError = typeCheckExpression(initializer, DC, contextualType,
                                      contextualPurpose,
                                      TypeCheckExprFlags::ConvertTypeIsOnlyAHint,
                                      &listener);

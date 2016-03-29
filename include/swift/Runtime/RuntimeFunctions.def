@@ -568,12 +568,6 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, DefaultCC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// Metadata *swift_getResilientMetadata(GenericMetadata *pattern);
-FUNCTION(GetResilientMetadata, swift_getResilientMetadata, DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy),
-         ATTRS(NoUnwind, ReadOnly))
-
 // Metadata *swift_getGenericMetadata(GenericMetadata *pattern,
 //                                    const void *arguments);
 FUNCTION(GetGenericMetadata, swift_getGenericMetadata, RegisterPreservingCC,
@@ -664,13 +658,13 @@ FUNCTION(GetExistentialMetadata,
          ATTRS(NoUnwind, ReadOnly))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };
-// void swift_initClassMetadata_UniversalStrategy(Metadata *self,
-//                                                size_t numFields,
-//                                                const FieldInfo *fields,
-//                                                size_t *fieldOffsets);
+// Metadata *swift_initClassMetadata_UniversalStrategy(Metadata *self,
+//                                                     size_t numFields,
+//                                                     const FieldInfo *fields,
+//                                                     size_t *fieldOffsets);
 FUNCTION(InitClassMetadataUniversal,
          swift_initClassMetadata_UniversalStrategy, DefaultCC,
-         RETURNS(VoidTy),
+         RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, SizeTy,
               SizeTy->getPointerTo(),
               SizeTy->getPointerTo()),
@@ -934,10 +928,6 @@ FUNCTION(RegisterTypeMetadataRecords,
          ARGS(TypeMetadataRecordPtrTy, TypeMetadataRecordPtrTy),
          ATTRS(NoUnwind))
 
-FUNCTION(InitializeSuperclass, swift_initializeSuperclass, DefaultCC,
-         RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, Int1Ty),
-         ATTRS(NoUnwind))
 FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, DefaultCC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy),

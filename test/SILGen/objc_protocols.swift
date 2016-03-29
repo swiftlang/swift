@@ -58,24 +58,24 @@ func objc_generic_partial_apply<T : NSRuncing>(x: T) {
   _ = T.mince
 }
 
-// CHECK-LABEL: sil shared @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
+// CHECK-LABEL: sil shared [thunk] @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
 // CHECK:      [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runcefT_CSo8NSObject
 // CHECK-NEXT: [[METHOD:%.*]] = partial_apply [[FN]]<Self>(%0)
 // CHECK-NEXT: return [[METHOD]]
 
-// CHECK-LABEL: sil shared @_TTOFP14objc_protocols9NSRuncing5runcefT_CSo8NSObject
+// CHECK-LABEL: sil shared [thunk] @_TTOFP14objc_protocols9NSRuncing5runcefT_CSo8NSObject
 // CHECK:      strong_retain %0
 // CHECK-NEXT: [[FN:%.*]] = witness_method $Self, #NSRuncing.runce!1.foreign
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>(%0)
 // CHECK-NEXT: strong_release %0
 // CHECK-NEXT: return [[RESULT]]
 
-// CHECK-LABEL: sil shared @_TTOZFP14objc_protocols9NSRuncing5minceFT_CSo8NSObject
+// CHECK-LABEL: sil shared [thunk] @_TTOZFP14objc_protocols9NSRuncing5minceFT_CSo8NSObject
 // CHECK:      [[FN:%.*]] = function_ref @_TTOZFP14objc_protocols9NSRuncing5mincefT_CSo8NSObject
 // CHECK-NEXT: [[METHOD:%.*]] = partial_apply [[FN]]<Self>(%0)
 // CHECK-NEXT: return [[METHOD]]
 
-// CHECK-LABEL: sil shared @_TTOZFP14objc_protocols9NSRuncing5mincefT_CSo8NSObject
+// CHECK-LABEL: sil shared [thunk] @_TTOZFP14objc_protocols9NSRuncing5mincefT_CSo8NSObject
 // CHECK:      [[FN:%.*]] = witness_method $Self, #NSRuncing.mince!1.foreign
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>(%0)
 // CHECK-NEXT: return [[RESULT]]

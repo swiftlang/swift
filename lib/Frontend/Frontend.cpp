@@ -229,8 +229,11 @@ Module *CompilerInstance::getMainModule() {
     MainModule = Module::create(ID, *Context);
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
+
     if (Invocation.getFrontendOptions().EnableResilience)
-      MainModule->setResilienceEnabled();
+      MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
+    else if (Invocation.getFrontendOptions().SILSerializeAll)
+      MainModule->setResilienceStrategy(ResilienceStrategy::Fragile);
   }
   return MainModule;
 }

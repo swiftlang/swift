@@ -73,33 +73,35 @@ func _fatalErrorFlags() -> UInt32 {
 #endif
 }
 
-// FIXME(ABI): add argument labels to conform to API guidelines.
 @_silgen_name("_swift_stdlib_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
+  // FIXME(ABI): add argument labels to conform to API guidelines.
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt, flags: UInt32)
 
-// FIXME(ABI): add argument labels to conform to API guidelines.
 @_silgen_name("_swift_stdlib_reportFatalError")
 func _reportFatalError(
+  // FIXME(ABI): add argument labels to conform to API guidelines.
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
   flags: UInt32)
 
-// FIXME(ABI): add argument labels to conform to API guidelines.
+@_versioned
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
+  // FIXME(ABI): add argument labels to conform to API guidelines.
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt, _ column: UInt,
   flags: UInt32)
 
-// FIXME(ABI): add argument labels to conform to API guidelines.
+@_versioned
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
+  // FIXME(ABI): add argument labels to conform to API guidelines.
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
   flags: UInt32)
@@ -109,10 +111,11 @@ func _reportUnimplementedInitializer(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-// FIXME(ABI): add argument labels to conform to API guidelines.
+@_versioned
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
+  // FIXME(ABI): add argument labels to conform to API guidelines.
   prefix: StaticString, _ message: StaticString,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
@@ -140,10 +143,11 @@ func _assertionFailed(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-// FIXME(ABI): add argument labels to conform to API guidelines.
+@_versioned
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
+  // FIXME(ABI): add argument labels to conform to API guidelines.
   prefix: StaticString, _ message: String,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
@@ -171,11 +175,12 @@ func _assertionFailed(
 ///
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
-// FIXME(ABI): add argument labels to conform to API guidelines.
+@_versioned
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")
 func _fatalErrorMessage(
+  // FIXME(ABI): add argument labels to conform to API guidelines.
   prefix: StaticString, _ message: StaticString,
   _ file: StaticString, _ line: UInt,
   flags: UInt32

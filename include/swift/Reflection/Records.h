@@ -57,7 +57,9 @@ public:
   }
 
   std::string getFieldName()  const {
-    return FieldName.get();
+    if (FieldName)
+      return FieldName.get();
+    return "";
   }
 
   bool isObjC() const {

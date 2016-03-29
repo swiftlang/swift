@@ -209,6 +209,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"));
 
+static llvm::cl::opt<std::string>
+SecondSourceFilename("second-source-filename", llvm::cl::desc("Name of the second source file"));
+
 static llvm::cl::list<std::string>
 InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"),
                llvm::cl::ZeroOrMore);
@@ -287,25 +290,13 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-InferDefaultArguments(
-  "enable-infer-default-arguments",
-  llvm::cl::desc("Infer default arguments for imported parameters"),
-  llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-UseSwiftLookupTables(
-  "enable-swift-name-lookup-tables",
-  llvm::cl::desc("Use Swift-specific name lookup tables in the importer"),
-  llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 Swift3Migration("swift3-migration",
                    llvm::cl::desc("Enable Fix-It based migration aids for Swift 3"),
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-OmitNeedlessWords("enable-omit-needless-words",
-                   llvm::cl::desc("Omit needless words when importing Objective-C names"),
+InferImportAsMember("enable-infer-import-as-member",
+                   llvm::cl::desc("Infer when a global could be imported as a member"),
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
@@ -549,6 +540,7 @@ removeCodeCompletionTokens(llvm::MemoryBuffer *Input,
 
 static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef SourceFilename,
+                            StringRef SecondSourceFileName,
                             StringRef CodeCompletionToken,
                             bool CodeCompletionDiagnostics,
                             bool CodeCompletionKeywords) {
@@ -579,6 +571,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
 
+
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = llvm::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -599,7 +592,9 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                                               *Consumer.get()));
 
   Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
-
+  if (!SecondSourceFileName.empty()) {
+    Invocation.addInputFilename(SecondSourceFileName);
+  }
   CompilerInstance CI;
 
   PrintingDiagnosticConsumer PrintDiags;
@@ -867,9 +862,6 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
-
-  // We must use the Swift lookup tables.
-  Invocation.getClangImporterOptions().UseSwiftLookupTables = true;
 
   CompilerInstance CI;
 
@@ -1585,7 +1577,7 @@ class AnnotatingPrinter : public StreamPrinter {
 public:
   using StreamPrinter::StreamPrinter;
 
-  void printDeclPre(const Decl *D) override {
+  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
     OS << "<decl:" << Decl::getKindName(D->getKind()) << '>';
   }
   void printDeclLoc(const Decl *D) override {
@@ -1594,26 +1586,32 @@ public:
   void printDeclNameOrSignatureEndLoc(const Decl *D) override {
     OS << "</loc>";
   }
-  void printDeclPost(const Decl *D) override {
+  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
     OS << "</decl>";
   }
   void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
     if (D)
-      printDeclPre(D);
+      printDeclPre(D, None);
   }
   void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
     if (D)
-      printDeclPost(D);
+      printDeclPost(D, None);
   }
 
 
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    const NominalTypeDecl *NTD) override {
+                                    const NominalTypeDecl *NTD,
+                                    Optional<BracketOptions> Bracket) override {
+    if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension)
+      return;
     OS << "<synthesized>";
   }
 
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                     const NominalTypeDecl *NTD) override {
+                                     const NominalTypeDecl *NTD,
+                                     Optional<BracketOptions> Bracket) override {
+    if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension)
+      return;
     OS << "</synthesized>";
   }
 
@@ -2659,18 +2657,12 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
-  InitInvok.getLangOptions().OmitNeedlessWords |=
-    options::OmitNeedlessWords;
-  InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
+  InitInvok.getLangOptions().InferImportAsMember |=
+    options::InferImportAsMember;  InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
-  InitInvok.getClangImporterOptions().OmitNeedlessWords |=
-    options::OmitNeedlessWords;
-  InitInvok.getClangImporterOptions().InferDefaultArguments |=
-    options::InferDefaultArguments;
-  InitInvok.getClangImporterOptions().UseSwiftLookupTables |=
-    options::UseSwiftLookupTables;
-
+  InitInvok.getClangImporterOptions().InferImportAsMember |=
+    options::InferImportAsMember;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
@@ -2737,9 +2729,6 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  if (InitInvok.getClangImporterOptions().InferDefaultArguments)
-    PrintOpts.PrintDefaultParameterPlaceholder = true;
-
   int ExitCode;
 
   switch (options::Action) {
@@ -2758,6 +2747,7 @@ int main(int argc, char *argv[]) {
     }
     ExitCode = doCodeCompletion(InitInvok,
                                 options::SourceFilename,
+                                options::SecondSourceFilename,
                                 options::CodeCompletionToken,
                                 options::CodeCompletionDiagnostics,
                                 options::CodeCompletionKeywords);

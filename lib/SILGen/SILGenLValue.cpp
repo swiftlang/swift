@@ -730,8 +730,8 @@ namespace {
     AccessKind getBaseAccessKind(SILGenFunction &gen,
                                  AccessKind kind) const override {
       SILDeclRef accessor = getAccessor(gen, kind);
-      auto accessorType = gen.SGM.Types.getConstantFunctionType(accessor);
-      if (accessorType->getSelfParameter().isIndirectMutating()) {
+      auto accessorSelf = gen.SGM.Types.getConstantSelfParameter(accessor);
+      if (accessorSelf.getType() && accessorSelf.isIndirectMutating()) {
         return AccessKind::ReadWrite;
       } else {
         return AccessKind::Read;

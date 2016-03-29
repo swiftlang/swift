@@ -83,6 +83,17 @@ public:
   bool hasMergeGroup(MergeGroupKind Kind);
 };
 
+struct BracketOptions {
+  bool shouldOpenExtension = true;
+  bool shouldCloseExtension = true;
+  bool shouldCloseNominal = true;
+  void reset() {
+    shouldOpenExtension = true;
+    shouldCloseExtension = true;
+    shouldCloseNominal = true;
+  }
+};
+
 /// Options for printing AST nodes.
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;
@@ -243,6 +254,10 @@ struct PrintOptions {
     BothAlways,
   };
 
+  /// Whether to print the doc-comment from the conformance if a member decl
+  /// has no associated doc-comment by itself.
+  bool ElevateDocCommentFromConformance = false;
+
   /// Whether to print the content of an extension decl inside the type decl where it
   /// extends from.
   std::function<bool(const ExtensionDecl *)> printExtensionContentAsMembers =
@@ -275,11 +290,7 @@ struct PrintOptions {
   /// \brief The information for converting archetypes to specialized types.
   std::shared_ptr<ArchetypeTransformContext> TransformContext;
 
-  struct BracketOptions {
-    bool shouldOpenExtension = true;
-    bool shouldCloseExtension = true;
-    bool shouldCloseNominal = true;
-  } BracketOptions;
+  BracketOptions BracketOptions;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
@@ -322,6 +333,7 @@ struct PrintOptions {
     result.SkipDeinit = true;
     result.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
     result.EmptyLineBetweenMembers = true;
+    result.ElevateDocCommentFromConformance = true;
     return result;
   }
 

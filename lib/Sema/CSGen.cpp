@@ -1773,8 +1773,6 @@ namespace {
     }
     
     Type visitArrayExpr(ArrayExpr *expr) {
-      ASTContext &C = CS.getASTContext();
-      
       // An array expression can be of a type T that conforms to the
       // ArrayLiteralConvertible protocol.
       auto &tc = CS.getTypeChecker();
@@ -1785,10 +1783,14 @@ namespace {
         return Type();
       }
 
-      // FIXME: Protect against broken standard library.
-      auto elementAssocTy = cast<AssociatedTypeDecl>(
-                              arrayProto->lookupDirect(
-                                C.getIdentifier("Element")).front());
+      // Assume that ArrayLiteralConvertible contains a single associated type.
+      AssociatedTypeDecl *elementAssocTy = nullptr;
+      for (auto decl : arrayProto->getMembers()) {
+        if ((elementAssocTy = dyn_cast<AssociatedTypeDecl>(decl)))
+          break;
+      }
+      if (!elementAssocTy)
+        return Type();
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
@@ -2848,6 +2850,15 @@ namespace {
         return { false, expr };
       }
 
+      // Don't visit CoerceExpr with an empty sub expression. They may occur
+      // if the body of a closure was not visited while pre-checking because
+      // of an error in the closure's signature
+      if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
+        if (!coerceExpr->getSubExpr()) {
+          return { false, expr };
+        }
+      }
+
       return { true, expr };
     }
 
@@ -3248,4 +3259,35 @@ bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
 
 bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
   return canSatisfy(T1, T2, DC, ConstraintKind::Equal, false, false);
+}
+
+ResolveMemberResult
+swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
+  ResolveMemberResult Result;
+  std::unique_ptr<TypeChecker> CreatedTC;
+  // If the current ast context has no type checker, create one for it.
+  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
+  if (!TC) {
+    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
+    TC = CreatedTC.get();
+  }
+  ConstraintSystem CS(*TC, &DC, None);
+  MemberLookupResult LookupResult = CS.performMemberLookup(
+    ConstraintKind::ValueMember, Name, BaseTy, nullptr, false);
+  if (LookupResult.ViableCandidates.empty())
+    return Result;
+  ConstraintLocator *Locator = CS.getConstraintLocator(nullptr);
+  TypeVariableType *TV = CS.createTypeVariable(Locator, TVO_CanBindToLValue);
+  CS.addOverloadSet(TV, LookupResult.ViableCandidates, Locator);
+  Optional<Solution> OpSolution = CS.solveSingle();
+  if (!OpSolution.hasValue())
+    return Result;
+  SelectedOverload Selected =  OpSolution.getValue().overloadChoices[Locator];
+  Result.Favored = Selected.choice.getDecl();
+  for (OverloadChoice& Choice : LookupResult.ViableCandidates) {
+    ValueDecl *VD = Choice.getDecl();
+    if (VD != Result.Favored)
+      Result.OtherViables.push_back(VD);
+  }
+  return Result;
 }

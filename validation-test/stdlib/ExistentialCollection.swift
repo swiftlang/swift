@@ -168,13 +168,13 @@ struct InstrumentedCollection<
 }
 
 tests.test("AnySequence.init(Sequence)") {
-  if true {
+  do {
     let base = MinimalSequence<OpaqueValue<Int>>(elements: [])
     var s = AnySequence(base)
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
   }
-  if true {
+  do {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
     let data = intData.map(OpaqueValue.init)
     let base = MinimalSequence(elements: data)
@@ -185,14 +185,14 @@ tests.test("AnySequence.init(Sequence)") {
 }
 
 tests.test("AnySequence.init(() -> Generator)") {
-  if true {
+  do {
     var s = AnySequence {
       return MinimalIterator<OpaqueValue<Int>>([])
     }
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
   }
-  if true {
+  do {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
     let data = intData.map(OpaqueValue.init)
     var s = AnySequence {

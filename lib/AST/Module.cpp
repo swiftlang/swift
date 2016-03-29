@@ -1649,3 +1649,10 @@ bool ModuleEntity::isBuiltinModule() const {
     return SwiftMod->isBuiltinModule();
   return false;
 }
+
+const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod;
+  return nullptr;
+}

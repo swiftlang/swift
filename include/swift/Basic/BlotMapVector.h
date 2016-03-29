@@ -28,18 +28,18 @@ bool compareKeyAgainstDefaultKey(const std::pair<KeyT, ValueT> &Pair) {
 /// \brief An associative container with fast insertion-order (deterministic)
 /// iteration over its elements. Plus the special blot operation.
 template <typename KeyT, typename ValueT,
-          typename MapTy = llvm::DenseMap<KeyT, size_t>,
-          typename VectorTy = std::vector<Optional<std::pair<KeyT, ValueT>>>>
+          typename MapT = llvm::DenseMap<KeyT, size_t>,
+          typename VectorT = std::vector<Optional<std::pair<KeyT, ValueT>>>>
 class BlotMapVector {
     /// Map keys to indices in Vector.
-    MapTy Map;
+    MapT Map;
 
     /// Keys and values.
-    VectorTy Vector;
+    VectorT Vector;
 
   public:
-    using iterator = typename VectorTy::iterator;
-    using const_iterator = typename VectorTy::const_iterator;
+    using iterator = typename VectorT::iterator;
+    using const_iterator = typename VectorT::const_iterator;
     using key_type = KeyT;
     using mapped_type = ValueT;
 
@@ -76,7 +76,7 @@ class BlotMapVector {
     }
 
     iterator find(const KeyT &Key) {
-      typename MapTy::iterator It = Map.find(Key);
+      typename MapT::iterator It = Map.find(Key);
       if (It == Map.end()) return Vector.end();
       auto Iter = Vector.begin() + It->second;
       if (!Iter->hasValue())
@@ -102,7 +102,7 @@ class BlotMapVector {
     /// vector, it just zeros out the key in the vector. This leaves iterators
     /// intact, but clients must be prepared for zeroed-out keys when iterating.
     void blot(const KeyT &Key) {
-      typename MapTy::iterator It = Map.find(Key);
+      typename MapT::iterator It = Map.find(Key);
       if (It == Map.end()) return;
       Vector[It->second] = None;
       Map.erase(It);
@@ -141,4 +141,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_BLOTMAPVECTOR_H

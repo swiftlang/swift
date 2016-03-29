@@ -17,6 +17,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "swift/SIL/FormalLinkage.h"
 #include <functional>
 
 using namespace swift;
@@ -83,10 +84,7 @@ bool SILLinkerVisitor::processDeclRef(SILDeclRef Decl) {
     return false;
 
   // If F is a declaration, first deserialize it.
-  auto *NewFn =
-      isAvailableExternally(Decl.getLinkage(ForDefinition_t::NotForDefinition))
-          ? Loader->lookupSILFunction(Decl)
-          : nullptr;
+  auto *NewFn = Loader->lookupSILFunction(Decl);
   if (!NewFn || NewFn->isExternalDeclaration())
     return false;
 
@@ -253,7 +251,7 @@ bool SILLinkerVisitor::visitProtocolConformance(
   // false.
   if (!WT) {
     Mod.createWitnessTableDeclaration(
-        C, TypeConverter::getLinkageForProtocolConformance(
+        C, getLinkageForProtocolConformance(
                C->getRootNormalConformance(), NotForDefinition));
     return false;
   }

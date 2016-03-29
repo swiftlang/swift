@@ -31,6 +31,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
@@ -139,6 +140,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.UnsafePointer<T>.
   NominalTypeDecl *UnsafePointerDecl = nullptr;
   VarDecl *UnsafePointerMemoryDecl = nullptr;
+  
+  /// The declaration of Swift.OpaquePointer.
+  NominalTypeDecl *OpaquePointerDecl = nullptr;
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
@@ -754,6 +758,14 @@ NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
       *this, "UnsafeMutablePointer", 1);
   
   return Impl.UnsafeMutablePointerDecl;
+}
+
+NominalTypeDecl *ASTContext::getOpaquePointerDecl() const {
+  if (!Impl.OpaquePointerDecl)
+    Impl.OpaquePointerDecl
+    = findStdlibType(*this, "OpaquePointer", 0);
+  
+  return Impl.OpaquePointerDecl;
 }
 
 NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
@@ -2403,7 +2415,7 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
   // If we're omitting needless words and the name won't conflict with
   // something in the standard library, strip the prefix off the Swift
   // name.
-  if (LangOpts.OmitNeedlessWords && LangOpts.StripNSPrefix &&
+  if (LangOpts.StripNSPrefix &&
       !nameConflictsWithStandardLibrary(kind))
     return objcName.substr(2);
 
@@ -3705,7 +3717,7 @@ ASTContext::getForeignRepresentable(NominalTypeDecl *nominal,
     // FIXME: Layering violation to use the ClangImporter's define.
     const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
     if (auto simd = getLoadedModule(Id_simd)) {
-#define MAP_SIMD_TYPE(BASENAME, __)                                     \
+#define MAP_SIMD_TYPE(BASENAME, _, __)                                  \
       {                                                                 \
         char name[] = #BASENAME "0";                                    \
         for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) { \

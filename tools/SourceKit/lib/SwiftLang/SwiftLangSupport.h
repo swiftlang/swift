@@ -313,7 +313,8 @@ public:
                            StringRef ModuleName,
                            Optional<StringRef> Group,
                            ArrayRef<const char *> Args,
-                           bool SynthesizedExtensions) override;
+                           bool SynthesizedExtensions,
+                           Optional<StringRef> InterestedUSR) override;
 
   void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                  StringRef Name,

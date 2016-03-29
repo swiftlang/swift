@@ -62,6 +62,11 @@ extension String : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSString?
+  ) -> String {
+    return String()
+  }
 }
 
 extension Int : _ObjectiveCBridgeable {
@@ -82,6 +87,11 @@ extension Int : _ObjectiveCBridgeable {
     result: inout Int?
   ) -> Bool {
     return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: Number?
+  ) -> Int {
+    return Int()
   }
 }
 
@@ -104,6 +114,11 @@ extension Array : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSArray?
+  ) -> Array {
+    return Array()
+  }
 }
 
 extension Dictionary : _ObjectiveCBridgeable {
@@ -124,6 +139,11 @@ extension Dictionary : _ObjectiveCBridgeable {
     result: inout Dictionary?
   ) -> Bool {
     return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSDictionary?
+  ) -> Dictionary {
+    return Dictionary()
   }
 }
 
@@ -146,6 +166,11 @@ extension Set : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: NSSet?
+  ) -> Set {
+    return Set()
+  }
 }
 
 extension CGFloat : _ObjectiveCBridgeable {
@@ -166,6 +191,11 @@ extension CGFloat : _ObjectiveCBridgeable {
     result: inout CGFloat?
   ) -> Bool {
     return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: Number?
+  ) -> CGFloat {
+    return CGFloat()
   }
 }
 
@@ -192,15 +222,20 @@ extension NSRange : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
   }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    x: Value?
+  ) -> NSRange {
+    return NSRange()
+  }
 }
 
-extension NSError : ErrorProtocol {
+extension Error : ErrorProtocol {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
 
 @_silgen_name("swift_convertNSErrorToErrorProtocol")
-func _convertNSErrorToErrorProtocol(string: NSError?) -> ErrorProtocol
+func _convertNSErrorToErrorProtocol(string: Error?) -> ErrorProtocol
 
 @_silgen_name("swift_convertErrorProtocolToNSError")
-func _convertErrorProtocolToNSError(string: ErrorProtocol) -> NSError
+func _convertErrorProtocolToNSError(string: ErrorProtocol) -> Error

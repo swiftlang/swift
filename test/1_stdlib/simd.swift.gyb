@@ -19,9 +19,9 @@ import SwiftPrivate
 import ObjectiveC
 #endif
 
-% scalar_types = ['Float', 'Double', 'Int32']
+% scalar_types = ['Float', 'Double', 'Int32', 'UInt32']
 % float_types = ['Float', 'Double']
-% ctype = { 'Float':'float', 'Double':'double', 'Int32':'int' }
+% ctype = { 'Float':'float', 'Double':'double', 'Int32':'int', 'UInt32':'uint'}
 % component = ['.x','.y','.z','.w']
 
 % for type in scalar_types:
@@ -146,12 +146,12 @@ simdTestSuite.test("vector elements") {
 
   //  Check getting and setting .xyzw
 % for i in range(size):
-  ${vec + component[i]} = ${-i}
-  expectEqual(${vec + component[i]}, ${-i})
+  ${vec + component[i]} = ${2*i}
+  expectEqual(${vec + component[i]}, ${2*i})
 % end
 
   //  Check getting and setting [i]
-  for i in 0..<${size} { ${vec}[i] = -${vec}[i] }
+  for i in 0..<${size} { ${vec}[i] = ${vec}[i]/2 }
   expectEqual(${vec}, ${range(size)}, sameValue: same)
 
 %   end # for size in [2,3,4]

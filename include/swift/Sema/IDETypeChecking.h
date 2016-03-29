@@ -58,6 +58,14 @@ namespace swift {
   /// \returns Resolved type on success, nullptr on error.
   Type checkMemberType(DeclContext &DC, Type BaseTy, ArrayRef<Identifier> Names);
 
+  struct ResolveMemberResult {
+    ValueDecl *Favored = nullptr;
+    std::vector<ValueDecl*> OtherViables;
+    operator bool() const { return Favored; }
+  };
+
+  ResolveMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
+                                         DeclName Name);
 
   /// \brief Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the

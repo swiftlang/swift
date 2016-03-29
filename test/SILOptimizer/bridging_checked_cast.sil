@@ -3,6 +3,12 @@
 
 import Swift
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self
+}
+
 @objc class NSCloud {}
 
 struct Butt: _ObjectiveCBridgeable {

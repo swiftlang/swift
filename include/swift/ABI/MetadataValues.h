@@ -549,4 +549,4 @@ public:
 
 }
 
-#endif
+#endif /* SWIFT_ABI_METADATAVALUES_H */

@@ -140,6 +140,16 @@ public:
                             const TypeInfo &type,
                             const llvm::Twine &name = "");
 
+  void emitStoreOfRelativeIndirectablePointer(llvm::Value *value,
+                                              Address addr,
+                                              bool isFar);
+
+  llvm::Value *
+  emitLoadOfRelativeIndirectablePointer(Address addr, bool isFar,
+                                        llvm::PointerType *expectedType,
+                                        const llvm::Twine &name = "");
+
+
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *alignMask,
                                    const llvm::Twine &name = "");

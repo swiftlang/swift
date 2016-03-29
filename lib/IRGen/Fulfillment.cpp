@@ -203,12 +203,17 @@ bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
 }
 
 
-bool FulfillmentMap::searchParentTypeMetadata(IRGenModule &IGM, CanType parent,
+bool FulfillmentMap::searchParentTypeMetadata(IRGenModule &IGM,
+                                              NominalTypeDecl *decl,
+                                              CanType parent,
                                               unsigned source,
                                               MetadataPath &&path,
                                         const InterestingKeysCallback &keys) {
   // We might not have a parent type.
   if (!parent) return false;
+
+  // Only class types properly initialize their parent type.
+  if (!isa<ClassDecl>(decl)) return false;
 
   // If we do, it has to be nominal one way or another.
   path.addNominalParentComponent();
@@ -222,7 +227,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
                                          const InterestingKeysCallback &keys) {
   // Nominal types add no generic arguments themselves, but they
   // may have the arguments of their parents.
-  return searchParentTypeMetadata(IGM, type.getParent(),
+  return searchParentTypeMetadata(IGM, type->getDecl(), type.getParent(),
                                   source, std::move(path), keys);
 }
 
@@ -231,6 +236,9 @@ bool FulfillmentMap::searchBoundGenericTypeMetadata(IRGenModule &IGM,
                                                     unsigned source,
                                                     MetadataPath &&path,
                                          const InterestingKeysCallback &keys) {
+  if (type->getDecl()->hasClangNode())
+    return false;
+
   bool hadFulfillment = false;
 
   GenericTypeRequirements requirements(IGM, type->getDecl());
@@ -283,7 +291,8 @@ bool FulfillmentMap::searchBoundGenericTypeMetadata(IRGenModule &IGM,
 
   // Also match against the parent.  The polymorphic type
   // will start with any arguments from the parent.
-  hadFulfillment |= searchParentTypeMetadata(IGM, type.getParent(),
+  hadFulfillment |= searchParentTypeMetadata(IGM, type->getDecl(),
+                                             type.getParent(),
                                              source, std::move(path), keys);
   return hadFulfillment;
 }

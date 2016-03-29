@@ -1185,7 +1185,7 @@ static RValue emitCFunctionPointer(SILGenFunction &gen,
                          /*foreign*/ true);
   SILValue cRef = gen.emitGlobalFunctionRef(expr, cEntryPoint);
   ManagedValue result = convertCFunctionSignature(gen, conversionExpr,
-                                                  ManagedValue::forUnmanaged(cRef));
+                                              ManagedValue::forUnmanaged(cRef));
   return RValue(gen, conversionExpr, result);
 }
 

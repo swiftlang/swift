@@ -919,7 +919,7 @@ namespace {
           apply->setImplicit();
         }
       }
-      return finishApply(apply, openedType, nullptr);
+      return finishApply(apply, openedType, locator);
     }
     
     /// \brief Describes either a type or the name of a type to be resolved.

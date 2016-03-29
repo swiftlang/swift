@@ -1,5 +1,3 @@
-import Foundation
-
 @_exported import ProtoWithInitializer
 @_exported import TypeAndValue
 

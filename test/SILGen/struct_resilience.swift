@@ -167,6 +167,17 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
   return s.w
 }
 
+// CHECK-LABEL: sil [transparent] [fragile] @_TF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_Si : $@convention(thin) (@in MySize) -> @owned @callee_owned () -> Int
+@_transparent public func publicTransparentLocalFunction(s: MySize) -> () -> Int {
+
+// CHECK-LABEL: sil shared [fragile] @_TFF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_SiU_FT_Si : $@convention(thin) (@owned @box MySize) -> Int
+// CHECK: function_ref @_TFV17struct_resilience6MySizeg1wSi : $@convention(method) (@in_guaranteed MySize) -> Int
+// CHECK: return {{.*}} : $Int
+
+  return { s.w }
+
+}
+
 // CHECK-LABEL: sil hidden [transparent] @_TF17struct_resilience27internalTransparentFunctionFVS_6MySizeSi : $@convention(thin) (@in MySize) -> Int
 @_transparent func internalTransparentFunction(s: MySize) -> Int {
 
@@ -178,4 +189,23 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
 // CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
+}
+
+// CHECK-LABEL: sil [fragile] [always_inline] @_TF17struct_resilience26publicInlineAlwaysFunctionFVS_6MySizeSi : $@convention(thin) (@in MySize) -> Int
+@inline(__always) public func publicInlineAlwaysFunction(s: MySize) -> Int {
+
+  // Since the body of a public transparent function might be inlined into
+  // other resilience domains, we have to use accessors
+
+// CHECK:         [[SELF:%.*]] = alloc_stack $MySize
+// CHECK-NEXT:    copy_addr %0 to [initialization] [[SELF]]
+
+// CHECK:         [[GETTER:%.*]] = function_ref @_TFV17struct_resilience6MySizeg1wSi
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
+// CHECK-NEXT:    destroy_addr [[SELF]]
+// CHECK-NEXT:    dealloc_stack [[SELF]]
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    return [[RESULT]]
+  return s.w
+
 }

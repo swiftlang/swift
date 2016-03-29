@@ -34,11 +34,11 @@ func class_init_partial_apply(c: C.Type) {
   let requiredM: Double -> C = c.init
 }
 
-// CHECK-LABEL: sil shared @_TTdFC18partial_apply_init1CC
+// CHECK-LABEL: sil shared [thunk] @_TTdFC18partial_apply_init1CC
 // CHECK:         function_ref @_TFC18partial_apply_init1CC
-// CHECK-LABEL: sil shared @_TTdFC18partial_apply_init1CC
+// CHECK-LABEL: sil shared [thunk] @_TTdFC18partial_apply_init1CC
 // CHECK:         function_ref @_TFC18partial_apply_init1CC
-// CHECK-LABEL: sil shared @_TFC18partial_apply_init1CC
+// CHECK-LABEL: sil shared [thunk] @_TFC18partial_apply_init1CC
 // CHECK:         class_method %0 : $@thick C.Type, #C.init!allocator.1
 
 // CHECK-LABEL: sil hidden @_TF18partial_apply_init28archetype_init_partial_apply
@@ -59,8 +59,8 @@ func archetype_init_partial_apply<T: C where T: P>(t: T.Type) {
   let protoExtM: Float -> T = t.init
 }
 
-// CHECK-LABEL: sil shared @_TFP18partial_apply_init1PC
+// CHECK-LABEL: sil shared [thunk] @_TFP18partial_apply_init1PC
 // CHECK:         witness_method $Self, #P.init!allocator.1
-// CHECK-LABEL: sil shared @_TFE18partial_apply_initPS_1PC
+// CHECK-LABEL: sil shared [thunk] @_TFE18partial_apply_initPS_1PC
 // CHECK:         function_ref @_TFE18partial_apply_initPS_1PC
 
