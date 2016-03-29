@@ -495,6 +495,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
       if (rules.hideCompletion(completion))
         continue;
 
+      if (options.hideLowPriority && completion->isNotRecommended())
+        continue;
+
       NameStyle style(completion->getName());
       bool hideUnderscore = options.hideUnderscores && style.leadingUnderscores;
       if (hideUnderscore && options.reallyHideAllUnderscores)
@@ -656,6 +659,7 @@ static int compareResultName(Item &a, Item &b) {
 
 namespace {
 enum class ResultBucket {
+  NotRecommended,
   Normal,
   Literal,
   NormalTypeMatch,
@@ -673,6 +677,9 @@ static ResultBucket getResultBucket(Item &item, bool hasExpectedTypes) {
   if (isa<Group>(item))
     return ResultBucket::Normal; // FIXME: take best contained result.
   auto *completion = cast<Result>(item).value;
+
+  if (completion->isNotRecommended())
+    return ResultBucket::NotRecommended;
 
   if (completion->getSemanticContext() ==
       SemanticContextKind::ExpressionSpecific)
