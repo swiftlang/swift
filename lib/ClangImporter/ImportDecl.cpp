@@ -5462,8 +5462,10 @@ void ClangImporter::Implementation::finishPendingActions() {
 /// by filling in any missing witnesses.
 void ClangImporter::Implementation::finishProtocolConformance(
     NormalProtocolConformance *conformance) {
+  const ProtocolDecl *proto = conformance->getProtocol();
+
   // Create witnesses for requirements not already met.
-  for (auto req : conformance->getProtocol()->getMembers()) {
+  for (auto req : proto->getMembers()) {
     auto valueReq = dyn_cast<ValueDecl>(req);
     if (!valueReq)
       continue;
@@ -5490,6 +5492,34 @@ void ClangImporter::Implementation::finishProtocolConformance(
         }
       }
     }
+  }
+
+  // And make sure any inherited conformances also get completed, if necessary.
+  SmallVector<ProtocolDecl *, 8> inheritedProtos;
+  for (auto *inherited : proto->getInheritedProtocols(/*resolver=*/nullptr)) {
+    inheritedProtos.push_back(inherited);
+  }
+  // Sort for deterministic import.
+  llvm::array_pod_sort(inheritedProtos.begin(),
+                       inheritedProtos.end(),
+                       [](ProtocolDecl * const *left,
+                          ProtocolDecl * const *right) -> int {
+    // We know all Objective-C protocols have unique names.
+    auto getDeclName = [](const ProtocolDecl *proto) -> StringRef {
+      return cast<clang::ObjCProtocolDecl>(proto->getClangDecl())->getName();
+    };
+    return getDeclName(*left).compare(getDeclName(*right));
+  });
+  // Schedule any that aren't complete.
+  for (auto *inherited : inheritedProtos) {
+    Module *M = conformance->getDeclContext()->getParentModule();
+    auto inheritedConformance = M->lookupConformance(conformance->getType(),
+                                                     inherited,
+                                                     /*resolver=*/nullptr);
+    assert(inheritedConformance.getInt() == ConformanceKind::Conforms && inheritedConformance.getPointer() &&
+           "inherited conformance not found");
+    conformance->setInheritedConformance(inherited,
+                                         inheritedConformance.getPointer());
   }
 
   conformance->setState(ProtocolConformanceState::Complete);
