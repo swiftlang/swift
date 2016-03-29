@@ -170,3 +170,23 @@ print((b as Bank).transferMoney(Account(owner: "A"), to: Account(owner: "B")))
 print((b as Bank).transferMoney(nil, to: nil))
 print((b as Bank).deposit(Account(owner: "Cyberdyne Systems")))
 print((b as Bank).deposit(Account(owner: "A")))
+
+// rdar://25412647
+
+private class Parent <T> {
+    func doSomething() {
+        overriddenMethod()
+    }
+
+    func overriddenMethod() {
+        fatalError("You should override this method in child class")
+    }
+}
+
+private class Child: Parent<String> {
+    override func overriddenMethod() {
+        print("Heaven!")
+    }
+}
+
+Child().doSomething() // CHECK: Heaven!
