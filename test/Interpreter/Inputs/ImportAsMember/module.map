@@ -1,3 +1,0 @@
-module ImportAsMember {
-	header "IAMVec.h"
-}
