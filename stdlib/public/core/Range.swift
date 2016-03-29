@@ -163,10 +163,8 @@ extension Range where Element : Comparable {
       return result
     }
 
-    for e in self {
-      if e == element {
-        return true
-      }
+    for e in self where e == element {
+      return true
     }
     return false
   }

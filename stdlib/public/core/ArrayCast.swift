@@ -126,10 +126,8 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
     
     // We can skip the check if TargetElement happens to be AnyObject
     if !(AnyObject.self is TargetElement.Type) {
-      for element in a {
-        if !(element is TargetElement) {
-          return nil
-        }
+      for element in a where !(element is TargetElement) {
+        return nil
       }
     }
     return Array(a._buffer.cast(toBufferOf: TargetElement.self))

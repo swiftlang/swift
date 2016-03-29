@@ -711,9 +711,7 @@ extension _StringCore : RangeReplaceableCollection {
       }
     }
     // Append any remaining elements
-    for u in IteratorSequence(iter) {
-      self.append(u)
-    }
+    IteratorSequence(iter).forEach { self.append($0) }
   }
 }
 

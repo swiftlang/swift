@@ -193,9 +193,7 @@ extension _ArrayBuffer {
       // Could be sped up, e.g. by using
       // enumerateObjectsAtIndexes:options:usingBlock: in the
       // non-native case.
-      for i in subRange {
-        _typeCheckSlowPath(i)
-      }
+      subRange.forEach { _typeCheckSlowPath($0) }
     }
   }
 
