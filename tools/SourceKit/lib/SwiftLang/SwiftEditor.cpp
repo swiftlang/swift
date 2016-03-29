@@ -1822,6 +1822,13 @@ public:
         if (Loc.isValid() && SM.getLineNumber(Loc) == Line) {
           return false;
         }
+      } else if (auto *Seq = dyn_cast_or_null<SequenceExpr>(Cursor->getAsExpr())) {
+        ArrayRef<Expr*> Elements = Seq->getElements();
+        if (Elements.size() == 3 &&
+            Elements[1]->getKind() == ExprKind::Assign &&
+            SM.getLineAndColumn(Elements[2]->getEndLoc()).first == Line) {
+          return false;
+        }
       }
     }
 
