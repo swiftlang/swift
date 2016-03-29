@@ -262,6 +262,7 @@ public:
 
   const bool ImportForwardDeclarations;
   const bool InferImportAsMember;
+  const bool DisableSwiftBridgeAttr;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";

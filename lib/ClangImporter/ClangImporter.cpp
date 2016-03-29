@@ -1183,6 +1183,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   : SwiftContext(ctx),
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
     InferImportAsMember(opts.InferImportAsMember),
+    DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
     BridgingHeaderLookupTable(nullptr)
 {
   // Add filters to determine if a Clang availability attribute
@@ -1957,7 +1958,11 @@ namespace {
 /// Determine whether the given Objective-C class, or any of its
 /// superclasses, either has or inherits a swift_bridge attribute.
 static bool hasOrInheritsSwiftBridgeAttr(
-    const clang::ObjCInterfaceDecl *objcClass) {
+    const clang::ObjCInterfaceDecl *objcClass,
+    bool DisableSwiftBridgeAttr) {
+  // If we have disabled the attribute just return that there is none.
+  if (DisableSwiftBridgeAttr)
+    return false;
   do {
     // Look at the definition, if there is one.
     if (auto def = objcClass->getDefinition())
@@ -2481,7 +2486,8 @@ auto ClangImporter::Implementation::importFullName(
     if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
         (isa<clang::TypeDecl>(D) ||
          (isa<clang::ObjCInterfaceDecl>(D) &&
-          !hasOrInheritsSwiftBridgeAttr(cast<clang::ObjCInterfaceDecl>(D))) ||
+          !hasOrInheritsSwiftBridgeAttr(cast<clang::ObjCInterfaceDecl>(D),
+                                        DisableSwiftBridgeAttr)) ||
          isa<clang::ObjCProtocolDecl>(D))) {
       // Find the original declaration, from which we can determine
       // the owning module.
