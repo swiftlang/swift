@@ -1,10 +1,11 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %clang %S/Inputs/ImportAsMember/IAMVec.c -c -o %t/IAMVec.o
+// RUN: %clang -isysroot %sdk %S/Inputs/ImportAsMember/IAMVec.c -c -o %t/IAMVec.o
 // RUN: %target-build-swift -I %S/Inputs/ImportAsMember/ -Xlinker %t/IAMVec.o %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
 // REQUIRES: swift_interpreter
+// REQUIRES: macosx
 
 import ImportAsMember
 
