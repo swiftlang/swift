@@ -400,7 +400,7 @@ Example:::
 
 When the optimizer optimizes a loop:::
 
-  func memset(inout A: [Int], value: Int) {
+  func memset(A: inout [Int], value: Int) {
     for i in 0 .. A.size {
       A[i] = value
       f()
@@ -409,7 +409,7 @@ When the optimizer optimizes a loop:::
 
 It will see the following calls because methods with attributes are not inlined.::
 
-  func memset(inout A: [Int], value: Int) {
+  func memset(A: inout [Int], value: Int) {
     for i in 0 .. A.size {
       makeUnique(&A)
       addr = getElementAddr(i, &A)
@@ -768,7 +768,8 @@ after the mutating function. This lets the second ``getElement`` function get
 another array parameter which prevents CSE of the two ``getElement`` calls.
 Shown in this swift-SIL pseudo code::
 
-    func add(var arr: Array<Int>, i: Int) -> Int {
+    func add(arr: Array<Int>, i: Int) -> Int {
+      var arr = arr
       let e1 = getElement(i, arr)
       store arr to stack_array
       setElement(i, 0, &stack_array)
@@ -782,7 +783,8 @@ which directly access the storage, are not inlined during high-level SIL.
 Optimizations like code motion could move a store to the storage over a
 ``readnone getElement``.::
 
-    func add(var arr: Array<Int>, i: Int) -> Int {
+    func add(arr: Array<Int>, i: Int) -> Int {
+      var arr = arr
       let e1 = getElement(i, arr)
       store arr to stack_array
       stack_array.storage[i] = 0          // (1)
