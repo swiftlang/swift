@@ -1470,4 +1470,25 @@ bb0(%0 : $*S9):
   return %9 : $()                                 // id: %11
 }
 
+// CHECK-LABEL: dont_remove_store_to_stack_used_as_partial_apply_indirect_parameter
+// CHECK:      [[S:%[0-9]+]] = alloc_stack
+// CHECK-NEXT: store %0 to [[S]]
+sil @dont_remove_store_to_stack_used_as_partial_apply_indirect_parameter : $@convention(thin) (Int) ->  @owned @callee_owned (Bool) -> Int {
+bb0(%0 : $Int):
+  %s = alloc_stack $Int
+  store %0 to %s : $*Int
+  %f = function_ref @callee : $@convention(thin) (@in Int) ->  @owned @callee_owned (Bool) -> Int
+  %a = apply %f(%s) : $@convention(thin) (@in Int) ->  @owned @callee_owned (Bool) -> Int
+  dealloc_stack %s : $*Int
+  return %a : $@callee_owned (Bool) -> Int
+}
+
+sil @callee : $@convention(thin) (@in Int) ->  @owned @callee_owned (Bool) -> Int {
+bb0(%0 : $*Int):
+  %2 = function_ref @closure : $@convention(thin) (Bool, @in Int) -> Int
+  %3 = partial_apply %2(%0) : $@convention(thin) (Bool, @in Int) -> Int
+  return %3 : $@callee_owned (Bool) -> Int
+}
+
+sil @closure : $@convention(thin) (Bool, @in Int) -> Int
 
