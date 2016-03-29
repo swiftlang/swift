@@ -11,16 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 %{
-from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
-
-def defaultIndicesForTraversal(traversal):
-    if traversal == 'Forward':
-        return 'DefaultIndices'
-    if traversal == 'Bidirectional':
-        return 'DefaultBidirectionalIndices'
-    if traversal == 'RandomAccess':
-        return 'DefaultRandomAccessIndices'
-    assert False, 'unknown traversal'
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    defaultIndicesForTraversal
+)
 }%
 
 % for Traversal in TRAVERSALS:

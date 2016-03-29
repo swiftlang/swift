@@ -35,3 +35,12 @@ def protocolsForCollectionFeatures(traversal, mutable, rangeReplaceable):
         protocols.append('RangeReplaceableCollection')
     return protocols
 
+def defaultIndicesForTraversal(traversal):
+    if traversal == 'Forward':
+        return 'DefaultIndices'
+    if traversal == 'Bidirectional':
+        return 'DefaultBidirectionalIndices'
+    if traversal == 'RandomAccess':
+        return 'DefaultRandomAccessIndices'
+    assert False, 'unknown traversal'
+
