@@ -4,10 +4,13 @@
 // RUN: %target-run %t/main.out
 // RUN: %target-run %t/main.out --locale ru_RU.UTF-8
 // REQUIRES: executable_test
-// XFAIL: linux
 
 import StdlibUnittest
-import Darwin
+#if os(Linux) || os(FreeBSD)
+  import Glibc
+#else
+  import Darwin
+#endif
 import PrintTestTypes
 
 // Also import modules which are used by StdlibUnittest internally. This
@@ -58,6 +61,7 @@ PrintTests.test("Printable") {
   expectPrinted("inf", Float.infinity)
   expectPrinted("-inf", -Float.infinity)
   expectPrinted("nan", Float.nan)
+  expectPrinted("nan", -Float.nan)
   expectPrinted("0.0", asFloat32(0.0))
   expectPrinted("1.0", asFloat32(1.0))
   expectPrinted("-1.0", asFloat32(-1.0))
@@ -67,6 +71,7 @@ PrintTests.test("Printable") {
   expectPrinted("inf", Double.infinity)
   expectPrinted("-inf", -Double.infinity)
   expectPrinted("nan", Double.nan)
+  expectPrinted("nan", -Double.nan)
   expectPrinted("0.0", asFloat64(0.0))
   expectPrinted("1.0", asFloat64(1.0))
   expectPrinted("-1.0", asFloat64(-1.0))
