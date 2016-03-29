@@ -167,6 +167,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
   list(APPEND swift_core_link_flags "${ENV_SYSTEMROOT}/system32/psapi.dll")
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+  find_library(EXECINFO_LIBRARY execinfo)
+  list(APPEND swift_core_private_link_libraries
+      ${EXECINFO_LIBRARY})
+endif()
+
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
     "Check core standard library layering by linking its essential subset"
     FALSE)
