@@ -42,12 +42,9 @@ public struct CollectionMisuseResiliencyChecks {
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
-#if false
-
 % for inc, protocol, successor, end in (
-%  ('inc', '_Incrementable', 'successor', 'end'),
-%  ('dec', 'BidirectionalIndex', 'predecessor', 'start')):
+%  ('inc', 'Indexable', 'successor', 'end'),
+%  ('dec', 'BidirectionalIndexable', 'predecessor', 'start')):
 
 /// Test that the elements of `instances` satisfy
 /// ${'some of ' if inc == 'dec' else ''}the semantic
@@ -59,65 +56,73 @@ public struct CollectionMisuseResiliencyChecks {
 ///   elements of `instances`.''' if inc == 'inc' else '''all
 ///   elements of `instances` are reachable from `startIndex`.'''}
 public func check${inc.capitalize()}rementable<
-  Instances : Collection
-  where Instances.Iterator.Element : ${protocol}
+  Instances : Collection,
+  BaseCollection : ${protocol}
+  where
+  Instances.Iterator.Element == BaseCollection.Index,
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index
 >(
   instances: Instances,
+  of baseCollection: BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   ${end}Index: Instances.Iterator.Element, ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   for i in instances {
     if i != ${end}Index {
-      let next = i.${successor}()
+      let next = baseCollection.${successor}(of: i)
       // ${successor} gets us a new index value
       expectNotEqual(i, next, ${trace})
 
-      // Which is the same as if we apply _${successor}InPlace
+      // Which is the same as if we apply form${successor}
       var j = i
-      j._${successor}InPlace()
+      baseCollection.form${successor.capitalize()}(&j)
       expectEqual(j, next, ${trace})
     }
   }
 }
 %end
 
-#endif
-
-// TODO: swift-3-indexing-model - review the following
-#if false
-
 internal func _checkIncrementalAdvance<
-  Instances : Collection
+  Instances : Collection,
+  BaseCollection : Indexable
   where
-  Instances.Iterator.Element : ForwardIndex
+  Instances.Iterator.Element == BaseCollection.Index,
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index
 >(
   instances: Instances,
+  of baseCollection : BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   limit: Instances.Iterator.Element,
-  sign: Instances.Iterator.Element.Distance, // 1 or -1
+  sign: BaseCollection.IndexDistance, // 1 or -1
   next: (Instances.Iterator.Element) -> Instances.Iterator.Element,
   ${TRACE}
 ) {
   for i in instances {
-// TODO: swift-3-indexing-model - Review what we need to do here, unittest is focusing on wrong class now
-    let d: Instances.Iterator.Element.Distance = 0 //sign > 0 ? i.distance(to: limit) : -limit.distance(to: i)
+    let d: BaseCollection.IndexDistance = sign > 0 ?
+      baseCollection.distance(from: i, to: limit) :
+      -baseCollection.distance(from: limit, to: i)
 
-    var offset: Instances.Iterator.Element.Distance = 0
+    var offset: BaseCollection.IndexDistance = 0
     for _ in 0...(d * sign).toIntMax() {
-// TODO: swift-3-indexing-model - Review what we need to do here, unittest is focusing on wrong class now
-      let j = i//.advanced(by: offset)
-      let k = i//.advanced(by: offset + sign, limitedBy: limit)
+      let j = baseCollection.index(offset, stepsFrom: i)
+      let k = baseCollection.index(offset + sign, stepsFrom: i, limitedBy: limit)
       let jAtLimit = offset == d
       if jAtLimit {
         expectEqual(limit, j, ${trace})
       }
-      expectEqual(jAtLimit ? j : successor(of: j), k, ${trace})
+      expectEqual(jAtLimit ? j : next(j), k, ${trace})
       offset += sign
     }
   }
 }
 
+// FIXME: [swift-3-indexing-model] rephrase the comment, as it
+// refers to `ForwardIndex` that does not exist any more.
 /// Test that the elements of `instances` satisfy the semantic
 /// requirements of `ForwardIndex`, using `equalityOracle` to
 /// generate equality expectations from pairs of positions in
@@ -126,24 +131,29 @@ internal func _checkIncrementalAdvance<
 /// - Precondition: `endIndex` is reachable from all elements of
 ///   `instances`
 public func checkForwardIndex<
-  Instances : Collection
+  Instances : Collection,
+  BaseCollection : Indexable
   where
-  Instances.Iterator.Element : ForwardIndex
+  Instances.Iterator.Element == BaseCollection.Index,
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index
 >(
   instances: Instances,
+  of baseCollection: BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   endIndex: Instances.Iterator.Element, ${TRACE}
 ) {
-  typealias Index = Instances.Iterator.Element
+  checkIncrementable(instances, of: baseCollection,
+    equalityOracle: equalityOracle, endIndex: endIndex, ${trace})
 
-  checkIncrementable(
-    instances, equalityOracle: equalityOracle, endIndex: endIndex, ${trace})
-
-  _checkIncrementalAdvance(
-    instances, equalityOracle: equalityOracle, limit: endIndex,
-    sign: 1, next: { $0.successor() }, ${trace})
+  _checkIncrementalAdvance(instances, of: baseCollection,
+    equalityOracle: equalityOracle, limit: endIndex,
+    sign: 1, next: { baseCollection.successor(of: $0) }, ${trace})
 }
 
+// FIXME: [swift-3-indexing-model] rephrase the comment, as it
+// refers to `BidirectionalIndex` that does not exist any more.
 /// Test that the elements of `instances` satisfy the semantic
 /// requirements of `BidirectionalIndex`, using `equalityOracle`
 /// to generate equality expectations from pairs of positions in
@@ -153,29 +163,34 @@ public func checkForwardIndex<
 ///   - all elements of `instances` are reachable from `startIndex`.
 ///   - `endIndex` is reachable from all elements of `instances`.
 public func checkBidirectionalIndex<
-  Instances: Collection
+  Instances: Collection,
+  BaseCollection : BidirectionalIndexable
   where
-  Instances.Iterator.Element : BidirectionalIndex
+  Instances.Iterator.Element == BaseCollection.Index,
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index
 >(
   instances: Instances,
+  of baseCollection: BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   startIndex: Instances.Iterator.Element,
   endIndex: Instances.Iterator.Element,
   ${TRACE}
 ) {
-  typealias Index = Instances.Iterator.Element
+  checkForwardIndex(instances, of: baseCollection,
+    equalityOracle: equalityOracle, endIndex: endIndex)
 
-  checkForwardIndex(
-    instances, equalityOracle: equalityOracle, endIndex: endIndex)
+  checkDecrementable(instances, of: baseCollection,
+    equalityOracle: equalityOracle, startIndex: startIndex, ${trace})
 
-  checkDecrementable(
-    instances, equalityOracle: equalityOracle, startIndex: startIndex, ${trace})
-
-  _checkIncrementalAdvance(
-    instances, equalityOracle: equalityOracle, limit: startIndex,
-    sign: -1, next: { $0.predecessor() }, ${trace})
+  _checkIncrementalAdvance(instances, of: baseCollection,
+    equalityOracle: equalityOracle, limit: startIndex,
+    sign: -1, next: { baseCollection.predecessor(of: $0) }, ${trace})
 }
 
+// FIXME: [swift-3-indexing-model] rephrase the comment, as it
+// refers to `BidirectionalIndex` that does not exist any more.
 /// Test that the elements of `instances` satisfy the semantic
 /// requirements of `RandomAccessIndex`, using
 /// `advanceOracle` and 'distanceOracle' to generate expectations
@@ -186,13 +201,22 @@ public func checkBidirectionalIndex<
 ///   - all elements of `instances` are reachable from `startIndex`.
 ///   - `endIndex` is reachable from all elements of `instances`.
 public func checkRandomAccessIndex<
-  Instances : Collection, Distances : Collection
+  Instances : Collection,
+  Distances : Collection,
+  BaseCollection : RandomAccessIndexable
   where
-  Instances.Iterator.Element : RandomAccessIndex,
-  Distances.Iterator.Element == Instances.Iterator.Element.Distance,
-  Instances.Iterator.Element.Distance == Instances.Iterator.Element.Stride
+  Instances.Iterator.Element == BaseCollection.Index,
+  Distances.Iterator.Element == BaseCollection.IndexDistance,
+  Instances.Iterator.Element : Strideable,
+  Instances.Iterator.Element.Stride == BaseCollection.IndexDistance,
+
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index,
+  Distances.Indices.Iterator.Element == Distances.Index
 >(
   instances: Instances, distances: Distances,
+  of baseCollection: BaseCollection,
   distanceOracle:
     (Instances.Index, Instances.Index) -> Distances.Iterator.Element,
   advanceOracle:
@@ -201,8 +225,8 @@ public func checkRandomAccessIndex<
   endIndex: Instances.Iterator.Element,
   ${TRACE}
 ) {
-  checkBidirectionalIndex(
-    instances, equalityOracle: { distanceOracle($0, $1) == 0 },
+  checkBidirectionalIndex(instances, of: baseCollection,
+    equalityOracle: { distanceOracle($0, $1) == 0 },
     startIndex: startIndex, endIndex: endIndex, ${trace})
 
   checkStrideable(
@@ -214,21 +238,22 @@ public func checkRandomAccessIndex<
 // Generate two overloads: one for Array (which will get
 // picked up when the caller passes a literal), and another that
 // accepts any appropriate Collection type.
-% for genericParam, Element, Expected in zip(
-%   ('Expected: Collection', 'Element'),
-%   ('Expected.Iterator.Element', 'Element'),
-%   ('Expected', 'Array<Element>')):
+% for genericParam, Element, Expected in [
+%   ('Expected: Collection',  'Expected.Iterator.Element',  'Expected'),
+%   ('Element'             ,  'Element'                  ,  'Array<Element>')]:
 
-%for Traversal in TRAVERSALS:
+%   for Traversal in TRAVERSALS:
+%     TraversalCollection = collectionForTraversal(Traversal)
 
 public func check${Traversal}Collection<
-  ${genericParam}, C : Collection
+  ${genericParam}, C : ${TraversalCollection}
   where
   C.Iterator.Element == ${Element},
-  C.Index : ${Traversal}Index
-%  if Traversal == 'RandomAccess':
-  , C.Index.Stride == C.Index.Distance
-%  end
+  C.Indices.Iterator.Element == C.Index
+%     if Traversal == 'RandomAccess':
+  , C.Index : Strideable
+  , C.Index.Stride == C.IndexDistance
+%     end
 >(
   expected: ${Expected}, _ collection: C,
   ${TRACE},
@@ -242,30 +267,41 @@ public func check${Traversal}Collection<
       resiliencyChecks: resiliencyChecks, sameValue: sameValue)
   }
 
+  let succ = { collection.successor(of: $0) }
+%     if Traversal != 'Forward':
+  let pred = { collection.predecessor(of: $0) }
+%     end
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
-  let next = { $0 == collection.endIndex ? $0 : $0.successor() }
+  let next = { $0 == collection.endIndex ? $0 : succ($0) }
 
   // advances up to 5 positions without passing endIndex.  Picking a
   // small constant to avoid complexity explosion on large input
   // collections.
-  let next5 = { successor(of: next(successor(of: next(successor(of: $0))))) }
+  let next5 = { next(next(next(next(next($0))))) }
 
   let partWay0 = next5(collection.startIndex)
   let partWay1 = next5(partWay0)
-% if Traversal == 'Forward':
-  checkForwardIndex(
-    collection.startIndex..<partWay0, equalityOracle: { $0 == $1 },
-    endIndex: partWay1, ${trace})
-% elif Traversal == 'Bidirectional':
-  checkBidirectionalIndex(
-    partWay0..<partWay1, equalityOracle: { $0 == $1 },
+
+%     if Traversal == 'Forward':
+
+  let instances = _allIndices(into: collection,
+    in: collection.startIndex..<partWay0)
+  checkForwardIndex(instances, of: collection,
+    equalityOracle: { $0 == $1 }, endIndex: partWay1, ${trace})
+
+%     elif Traversal == 'Bidirectional':
+
+  let instances = _allIndices(into: collection, in: partWay0..<partWay1)
+  checkBidirectionalIndex(instances, of: collection,
+    equalityOracle: { $0 == $1 },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), ${trace})
-% else:
 
-%   assert(Traversal == 'RandomAccess')
-  typealias Distance = C.Index.Distance
+%     else:
+%       assert(Traversal == 'RandomAccess')
+  typealias Distance = C.IndexDistance
+
   let count: Distance  = collection.count
   let offset0 = min(5, count)
   let offset1 = min(10, count)
@@ -278,7 +314,7 @@ public func check${Traversal}Collection<
     x + offset0 >= 0 && x + offset1 <= count
   }
 
-  func nextN(n: C.Index.Distance, _ i: C.Index) -> C.Index {
+  func nextN(n: Distance, _ i: C.Index) -> C.Index {
     var i = i
     if n < 0 {
       for _ in 0 ..< -(n.toIntMax()) {
@@ -293,16 +329,18 @@ public func check${Traversal}Collection<
     return i
   }
 
-  let instances = Array(partWay0..<partWay1)
-  typealias Distances = [Distance]
+  let instances = _allIndices(into: collection, in: partWay0..<partWay1)
+
   checkRandomAccessIndex(
     instances,
     distances: distances,
-    distanceOracle: { (x:Int,y:Int) in Distance(IntMax(y - x)) },
+    of: collection,
+    distanceOracle: { (x:Int,y:Int) in numericCast(y - x) },
     advanceOracle: { x,y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), ${trace})
-% end
+
+%     end
 
   let expectedArray = Array(expected)
 
@@ -310,7 +348,7 @@ public func check${Traversal}Collection<
     expectedArray.count.toIntMax(), collection.count.toIntMax(), ${trace})
 
   for _ in 0..<3 {
-    if true {
+    do {
       let startIndex = collection.startIndex
       let endIndex = collection.endIndex
 
@@ -331,24 +369,26 @@ public func check${Traversal}Collection<
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
-        let successor1 = allIndices[i].successor()
+        let successor1 = succ(allIndices[i])
         var successor2 = allIndices[i]
-        successor2 = successor2.successor()
+        successor2 = succ(successor2)
         var successor3 = allIndices[i]
-        successor3 = successor3.successor()
+        successor3 = succ(successor3)
         for s in [ successor1, successor2, successor3 ] {
           expectEqual(allIndices[i + 1], s, ${trace})
           expectEqual(
             expectedArray[i + 1], collection[s], ${trace}, sameValue: sameValue)
         }
       }
-%   if Traversal == "Bidirectional":
+
+%       if Traversal == "Bidirectional":
+
       for i in 1..<allIndices.count {
-        let predecessor1 = allIndices[i].predecessor()
+        let predecessor1 = pred(allIndices[i])
         var predecessor2 = allIndices[i]
-        predecessor2 = predecessor2.predecessor()
+        predecessor2 = pred(predecessor2)
         var predecessor3 = allIndices[i]
-        predecessor3 = predecessor3.predecessor()
+        predecessor3 = pred(predecessor3)
         for p in [ predecessor1, predecessor2, predecessor3 ] {
           expectEqual(allIndices[i - 1], p, ${trace})
           expectEqual(
@@ -356,17 +396,17 @@ public func check${Traversal}Collection<
         }
       }
       for i in 1..<allIndices.count {
-        var index = allIndices[i]
-        index = index.predecessor()
-        index = index.successor()
+        let index = succ(pred(allIndices[i]))
         expectEqual(allIndices[i], index, ${trace})
         expectEqual(
           expectedArray[i], collection[index], ${trace}, sameValue: sameValue)
       }
-%   end
-    }
 
-    if true {
+%       end
+
+    } // end of `if expectedArray.count >= 2`
+
+    do {
       var allIndices2: [C.Index] = []
       for i in collection.indices {
         allIndices2.append(i)
@@ -383,20 +423,21 @@ public func check${Traversal}Collection<
         expectedArray, allIndices2.map { collection[$0] },
         stackTrace: ${stackTrace}, sameValue: sameValue)
     }
-  }
+  } // end of `for _ in 0..<3`
 
   // FIXME: more checks for bidirectional and random access collections.
 }
 
 public func check${Traversal}Collection<
-  ${genericParam}, C : Collection
+  ${genericParam}, C : ${TraversalCollection}
   where
   C.Iterator.Element == ${Element},
-  C.Index : ${Traversal}Index,
+  C.Indices.Iterator.Element == C.Index,
   ${Element} : Equatable
-%  if Traversal == 'RandomAccess':
-  , C.Index.Stride == C.Index.Distance
-% end
+%     if Traversal == 'RandomAccess':
+  , C.Index : Strideable
+  , C.Index.Stride == C.IndexDistance
+%     end
 >(
   expected: ${Expected}, _ collection: C,
   ${TRACE},
@@ -406,7 +447,10 @@ public func check${Traversal}Collection<
     expected, collection, ${trace},
     resiliencyChecks: resiliencyChecks) { $0 == $1 }
 }
-% end
+
+%   end
+
+#if false
 
 // FIXME: merge into checkCollection()
 public func checkSliceableWithBidirectionalIndex<
@@ -456,9 +500,10 @@ public func checkSliceableWithBidirectionalIndex<
   }
 }
 
+#endif
+
 % end
 
-#endif
 
 public func checkRangeReplaceable<
   C : RangeReplaceableCollection,
