@@ -234,7 +234,7 @@ clonable classes:
  func cycle_length<State>(
    s : State, 
    **next : (x : State) -> State,**
-   **equal : ([inout] x : State, [inout] y : State) -> Bool**
+   **equal : (x : [inout] State, y : [inout] State) -> Bool**
  ) -> Int
    requires State : EqualityComparable
  {

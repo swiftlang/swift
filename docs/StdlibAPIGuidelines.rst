@@ -183,7 +183,7 @@ Acceptable Short or Non-Descriptive Names
 
   .. parsed-literal::
 
-    func swap<**T**>(inout lhs: T, inout rhs: T)
+    func swap<**T**>(lhs: inout T, rhs: inout T)
 
 * `lhs` and `rhs` are acceptable names for binary operator or
   symmetric binary function parameters:
@@ -192,7 +192,7 @@ Acceptable Short or Non-Descriptive Names
 
     func + (**lhs**: Int, **rhs**: Int) -> Int
 
-    func swap<T>(inout **lhs**: T, inout **rhs**: T)
+    func swap<T>(**lhs**: inout T, **rhs**: inout T)
 
 * `body` is an acceptable name for a trailing closure argument when
   the resulting construct is supposed to act like a language extension

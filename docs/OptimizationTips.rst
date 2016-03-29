@@ -253,7 +253,7 @@ through the usage of ``inout`` parameters:
 
 ::
 
-  func append_one_in_place(inout a: [Int]) {
+  func append_one_in_place(a: inout [Int]) {
     a.append(1)
   }
 

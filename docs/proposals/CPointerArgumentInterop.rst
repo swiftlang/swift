@@ -316,7 +316,7 @@ An example of a conformance for ``ObjCInOut``::
     typealias WritebackType = Builtin.RawPointer
 
     @_transparent
-    static func _createWriteback(inout ref: T!)
+    static func _createWriteback(ref: inout T!)
     -> Builtin.RawPointer {
       // The initial object reference is passed into the callee effectively
       // __unsafe_unretained, so pass it as a RawPointer.
@@ -324,7 +324,7 @@ An example of a conformance for ``ObjCInOut``::
     }
 
     @_transparent
-    static func _commitWriteback(inout ref: T!,
+    static func _commitWriteback(ref: inout T!,
                                  value: Builtin.RawPointer) {
       // The reference is autoreleased on return from the caller, so retain it
       // by loading it back as a T?.

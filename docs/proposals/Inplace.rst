@@ -92,7 +92,7 @@ We see at least four problems with this kind of API:
    mutating version of ``op(x: T, y: U) -> T`` can always be defined
    as ::
 
-     func opInPlace(inout x: T, y: U) {
+     func opInPlace(x: inout T, y: U) {
        x = op(x, y)
      }
 
@@ -361,7 +361,7 @@ An assignment operator for an immutable class ``X`` always has the form:
 
 .. parsed-literal::
 
-  func *op*\ **=** (**inout** lhs: X, rhs: Y) {
+  func *op*\ **=** (lhs: **inout** X, rhs: Y) {
     lhs = *expression creating a new X object*
   }
 
@@ -369,7 +369,7 @@ or, with COW optimization:
 
 .. parsed-literal::
 
-  func *op*\ **=** (**inout** lhs: X, rhs: Y) {
+  func *op*\ **=** (lhs: **inout** X, rhs: Y) {
     if isUniquelyReferenced(&lhs) {
       lhs.\ *mutateInPlace*\ (rhs)
     }
