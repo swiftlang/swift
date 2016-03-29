@@ -600,6 +600,8 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   assert(!thunk.isForeign && "foreign-to-native thunks only");
   SILFunction *f = getFunction(thunk, ForDefinition);
   f->setThunk(IsThunk);
+  if (thunk.asForeign().isClangGenerated())
+    f->setFragile(IsFragile);
   preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
   SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
