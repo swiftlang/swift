@@ -373,8 +373,7 @@ public:
         if (SubExpr && SubExpr == AtExprEnd &&
             SM.getLineAndColumn(Paren->getEndLoc()).first == Line)
           return false;
-      }
-      else if (auto *Tuple = dyn_cast_or_null<TupleExpr>(Cursor->getAsExpr())) {
+      } else if (auto *Tuple = dyn_cast_or_null<TupleExpr>(Cursor->getAsExpr())) {
         auto SubExprs = Tuple->getElements();
         if (!SubExprs.empty() && SubExprs.back() == AtExprEnd &&
             SM.getLineAndColumn(Tuple->getEndLoc()).first == Line) {
@@ -384,6 +383,13 @@ public:
         SourceLoc Loc = getVarDeclInitEnd(VD);
         if (Loc.isValid() && SM.getLineNumber(Loc) == Line) {
           return false;
+        }
+      } else if(auto *Seq = dyn_cast_or_null<SequenceExpr>(Cursor->getAsExpr())) {
+        ArrayRef<Expr*> Elements = Seq->getElements();
+        if (Elements.size() == 3 &&
+            Elements[1]->getKind() == ExprKind::Assign &&
+            SM.getLineAndColumn(Elements[2]->getEndLoc()).first == Line) {
+              return false;
         }
       }
     }
