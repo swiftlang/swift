@@ -25,7 +25,7 @@ let testLetString = "testString"
 
 func testLetParam(arg1 : Int) {
 }
-func testVarParam(var arg1 : Int) {
+func testInoutParam(arg1 : inout Int) {
 }
 
 func testDefaultParam(arg1: Int = 0) {
@@ -292,9 +292,9 @@ typealias MyVoid = ()
 // CHECK11: <decl.var.parameter><syntaxtype.keyword>let</syntaxtype.keyword> <decl.var.parameter.name>arg1</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
 // RUN: %sourcekitd-test -req=cursor -pos=28:24 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK12 %s
-// CHECK12: source.lang.swift.decl.var.parameter (28:23-28:27)
-// CHECK12: <Declaration>var arg1: <Type usr="s:Si">Int</Type></Declaration>
-// CHECK12: <decl.var.parameter><syntaxtype.keyword>var</syntaxtype.keyword> <decl.var.parameter.name>arg1</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
+// CHECK12: source.lang.swift.decl.var.parameter (28:21-28:25)
+// CHECK12: <Declaration>var arg1: inout <Type usr="s:Si">Int</Type></Declaration>
+// CHECK12: <decl.var.parameter><syntaxtype.keyword>var</syntaxtype.keyword> <decl.var.parameter.name>arg1</decl.var.parameter.name>: <decl.var.parameter.type><syntaxtype.keyword>inout</syntaxtype.keyword> <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)

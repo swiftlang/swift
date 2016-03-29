@@ -31,14 +31,28 @@ func supported() -> MyMask {
   return MyMask.Bingo
 }
 
-func foo() -> Int {
-  do {
-  } catch let err {
-    goo(err)
+func goo(e : ErrorProtocol) {
+    var e = e
+}
+func goo2(e: ErrorProtocol) { var e = e }
+func goo3(e: Int) { var e = e; e = 3 }
+protocol A {
+  func bar(s: Int)
+}
+extension A {
+  func bar(s: Int) {
+    var s = s
+    s += 5
   }
 }
 
-func goo(e : ErrorProtocol) {}
+func baz(x: Int) {
+  var x = x
+  x += 10
+}
+func foo(y: String, x: inout Int) {
+  
+}
 
 struct Test1 : OptionSet {
   init(rawValue: Int) {}

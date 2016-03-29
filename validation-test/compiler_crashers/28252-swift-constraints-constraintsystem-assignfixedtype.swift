@@ -9,7 +9,7 @@
 // REQUIRES: asserts
 public protocol P {}
 public func foo<T, TargetStream : P>(
-  value: T, inout _ target: TargetStream
+  value: T, _ target: inout TargetStream
 ) {
   fatalError()
 }

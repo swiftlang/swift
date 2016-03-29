@@ -246,7 +246,7 @@
     {
       key.kind: source.lang.swift.decl.function.free,
       key.name: "foo(_:b:)",
-      key.usr: "s:F5index3fooFTCS_2CC1bOS_1E_T_",
+      key.usr: "s:F5index3fooFTCS_2CC1bROS_1E_T_",
       key.line: 36,
       key.column: 6,
       key.entities: [
@@ -262,7 +262,7 @@
           key.name: "E",
           key.usr: "s:O5index1E",
           key.line: 36,
-          key.column: 24
+          key.column: 26
         },
         {
           key.kind: source.lang.swift.ref.var.global,

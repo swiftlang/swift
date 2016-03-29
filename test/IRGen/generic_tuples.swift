@@ -38,7 +38,7 @@ func dup<T>(x: T) -> (T, T) { var x = x; return (x,x) }
 struct S {}
 
 
-func callDup(let s: S) { _ = dup(s) }
+func callDup(s: S) { _ = dup(s) }
 // CHECK-LABEL: define hidden void @_TF14generic_tuples7callDupFVS_1ST_()
 // CHECK-NEXT: entry:
 // CHECK-NEXT: call void @_TF14generic_tuples3dupurFxTxx_({{.*}} undef, {{.*}} undef, %swift.type* {{.*}} @_TMfV14generic_tuples1S, {{.*}})
@@ -46,7 +46,7 @@ func callDup(let s: S) { _ = dup(s) }
 
 class C {}
 
-func dupC<T : C>(let x: T) -> (T, T) { return (x, x) }
+func dupC<T : C>(x: T) -> (T, T) { return (x, x) }
 // CHECK-LABEL: define hidden { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuRxCS_1CrFxTxx_(%C14generic_tuples1C*, %swift.type* %T)
 // CHECK-NEXT: entry:
 // CHECK:      [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*
@@ -55,7 +55,7 @@ func dupC<T : C>(let x: T) -> (T, T) { return (x, x) }
 // CHECK-NEXT: [[TUP2:%.*]] = insertvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUP1:%.*]], %C14generic_tuples1C* %0, 1
 // CHECK-NEXT: ret { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUP2]]
 
-func callDupC(let c: C) { _ = dupC(c) }
+func callDupC(c: C) { _ = dupC(c) }
 // CHECK-LABEL: define hidden void @_TF14generic_tuples8callDupCFCS_1CT_(%C14generic_tuples1C*)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*

@@ -222,11 +222,10 @@ func test_mutability() {
 
 func test_arguments(a : Int,
                     b : Int,
-                    let c : Int) {
+                    let c : Int) { // expected-error {{'let' as a parameter attribute is not allowed}} {{21-25=}}
   var b = b
   a = 1  // expected-error {{cannot assign to value: 'a' is a 'let' constant}}
   b = 2  // ok.
-  c = 3  // expected-error {{cannot assign to value: 'c' is a 'let' constant}}
   _ = b
 }
 
@@ -323,7 +322,7 @@ protocol SubscriptNoGetter {
   subscript (i: Int) -> Int { get }
 }
 
-func testSubscriptNoGetter(let iis: SubscriptNoGetter) {
+func testSubscriptNoGetter(let iis: SubscriptNoGetter) { // expected-error {{'let' as a parameter attribute is not allowed}}{{28-31=}}
   var _: Int = iis[17]
 }
 
@@ -336,16 +335,22 @@ func testSelectorStyleArguments1(x: Int, bar y: Int) {
   _ = y
 }
 
-func testSelectorStyleArguments2(let x: Int,
-                                 let bar y: Int) {
+func testSelectorStyleArguments2(let x: Int, // expected-error {{'let' as a parameter attribute is not allowed}}{{34-37=}}
+                                 let bar y: Int) { // expected-error {{'let' as a parameter attribute is not allowed}}{{34-38=}}
+                                 
+  
+}
+func testSelectorStyleArguments3(x: Int, bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
-// expected-warning@-1 {{'inout' before a parameter name is deprecated, place it before the parameter type instead}}
+// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{20-25=}}{{34-34=inout }}
 }
-
+func invalid_var(var x: Int) { // expected-error {{parameters may not have the 'var' specifier}}{{18-21=}} {{1-1=    var x = x\n}}
+  
+}
 
 
 func updateInt(x : inout Int) {}
@@ -444,7 +449,8 @@ struct StructWithDelegatingInit {
   init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
 }
 
-func test_recovery_missing_name_2(let: Int) {} // expected-error 2{{expected ',' separator}} {{38-38=,}} expected-error 2 {{expected parameter name followed by ':'}}
+func test_recovery_missing_name_2(let: Int) {} // expected-error {{'let' as a parameter attribute is not allowed}}{{35-38=}} 
+// expected-error @-1 2{{expected ',' separator}} {{38-38=,}} expected-error @-1 2 {{expected parameter name followed by ':'}}
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
 struct F { // expected-note 2 {{in declaration of 'F'}}
