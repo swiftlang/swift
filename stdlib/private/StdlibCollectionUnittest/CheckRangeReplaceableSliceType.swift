@@ -149,7 +149,7 @@ extension TestSuite {
 
   } // addRangeReplaceableSliceTests
 
-  public func addBidirectionalRangeReplaceableSliceTests<
+  public func addRangeReplaceableBidirectionalSliceTests<
     C : protocol<BidirectionalCollection, RangeReplaceableCollection>,
     CollectionWithEquatableElement : protocol<BidirectionalCollection, RangeReplaceableCollection>
     where
@@ -295,9 +295,9 @@ extension TestSuite {
 
     //===----------------------------------------------------------------------===//
 
-  } // addBidirectionalRangeReplaceableSliceTests
+  } // addRangeReplaceableBidirectionalSliceTests
 
-  public func addRandomAccessRangeReplaceableSliceTests<
+  public func addRangeReplaceableRandomAccessSliceTests<
     C : protocol<RandomAccessCollection, RangeReplaceableCollection>,
     CollectionWithEquatableElement : protocol<RandomAccessCollection, RangeReplaceableCollection>
     where
@@ -330,7 +330,7 @@ extension TestSuite {
     }
     checksAdded.value.insert(#function)
 
-    addBidirectionalRangeReplaceableSliceTests(
+    addRangeReplaceableBidirectionalSliceTests(
       testNamePrefix,
       makeCollection: makeCollection,
       wrapValue: wrapValue,
@@ -357,5 +357,5 @@ extension TestSuite {
     testNamePrefix += String(C.Type)
 
     // No tests yet.
-  } // addRandomAccessRangeReplaceableCollectionTests
+  } // addRangeReplaceableRandomAccessSliceTests
 }
