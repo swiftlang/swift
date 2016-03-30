@@ -12,6 +12,8 @@ class C1 : Prot {
     subscript(index i: Float) -> Int { get }
 
     func extfoo()
+
+    func foo1()
 }
 
 enum MyEnum : Int {
@@ -114,6 +116,13 @@ protocol Prot {
     var p: Int { get }
 
     func foo()
+
+    func foo1()
+}
+
+extension Prot {
+
+    func foo1()
 }
 
 extension Prot where Self.Element == Int {
@@ -281,87 +290,68 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 192,
+    key.offset: 194,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 197,
+    key.offset: 199,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 209,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 214,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 206,
+    key.offset: 223,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 217,
+    key.offset: 234,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 222,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 232,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 239,
     key.length: 4
   },
   {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 249,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 256,
+    key.length: 4
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 244,
+    key.offset: 261,
     key.length: 15
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 260,
+    key.offset: 277,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 262,
+    key.offset: 279,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 262,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
-    key.offset: 267,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 272,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 274,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 274,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
     key.offset: 279,
     key.length: 3
   },
@@ -369,77 +359,77 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 288,
+    key.offset: 284,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 289,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 291,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 293,
+    key.offset: 291,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 296,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 305,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 310,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Bool",
     key.usr: "s:Sb",
-    key.offset: 303,
+    key.offset: 320,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 314,
+    key.offset: 331,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 321,
+    key.offset: 338,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 326,
+    key.offset: 343,
     key.length: 20
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 347,
+    key.offset: 364,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 349,
+    key.offset: 366,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 349,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
-    key.offset: 354,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 359,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 361,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 361,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
     key.offset: 366,
     key.length: 3
   },
@@ -447,77 +437,77 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 375,
+    key.offset: 371,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 376,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 378,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 380,
+    key.offset: 378,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 383,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 392,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 397,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Bool",
     key.usr: "s:Sb",
-    key.offset: 390,
+    key.offset: 407,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 401,
+    key.offset: 418,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 408,
+    key.offset: 425,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 413,
+    key.offset: 430,
     key.length: 20
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 434,
+    key.offset: 451,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 436,
+    key.offset: 453,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 436,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
-    key.offset: 441,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 446,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 448,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 448,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
     key.offset: 453,
     key.length: 3
   },
@@ -525,77 +515,77 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 462,
+    key.offset: 458,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 463,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 465,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 467,
+    key.offset: 465,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 470,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 479,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 484,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Bool",
     key.usr: "s:Sb",
-    key.offset: 477,
+    key.offset: 494,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 488,
+    key.offset: 505,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 495,
+    key.offset: 512,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 500,
+    key.offset: 517,
     key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 519,
+    key.offset: 536,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 521,
+    key.offset: 538,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 521,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
-    key.offset: 526,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 531,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 533,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 533,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
     key.offset: 538,
     key.length: 3
   },
@@ -603,77 +593,77 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 547,
+    key.offset: 543,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 548,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 550,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 552,
+    key.offset: 550,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 555,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 564,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 569,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Bool",
     key.usr: "s:Sb",
-    key.offset: 562,
+    key.offset: 579,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 573,
+    key.offset: 590,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 580,
+    key.offset: 597,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 585,
+    key.offset: 602,
     key.length: 21
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 607,
+    key.offset: 624,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 609,
+    key.offset: 626,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 609,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
-    key.offset: 614,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 619,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 621,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 621,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
     key.offset: 626,
     key.length: 3
   },
@@ -681,1154 +671,1215 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 635,
+    key.offset: 631,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 636,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 638,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 640,
+    key.offset: 638,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 643,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 652,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 657,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Bool",
     key.usr: "s:Sb",
-    key.offset: 650,
+    key.offset: 667,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 661,
+    key.offset: 678,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 666,
+    key.offset: 683,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.typealias,
     key.name: "IntMax",
     key.usr: "s:s6IntMax",
-    key.offset: 680,
+    key.offset: 697,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 692,
+    key.offset: 709,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 697,
+    key.offset: 714,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 699,
+    key.offset: 716,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 699,
+    key.offset: 716,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt8",
     key.usr: "s:Vs5UInt8",
-    key.offset: 702,
+    key.offset: 719,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 714,
+    key.offset: 731,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 719,
+    key.offset: 736,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 721,
+    key.offset: 738,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 721,
+    key.offset: 738,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int8",
     key.usr: "s:Vs4Int8",
-    key.offset: 724,
+    key.offset: 741,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 735,
+    key.offset: 752,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 740,
+    key.offset: 757,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 742,
+    key.offset: 759,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 742,
+    key.offset: 759,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt16",
     key.usr: "s:Vs6UInt16",
-    key.offset: 745,
+    key.offset: 762,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 758,
+    key.offset: 775,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 763,
+    key.offset: 780,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 765,
+    key.offset: 782,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 765,
+    key.offset: 782,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int16",
     key.usr: "s:Vs5Int16",
-    key.offset: 768,
+    key.offset: 785,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 780,
+    key.offset: 797,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 785,
+    key.offset: 802,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 787,
+    key.offset: 804,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 787,
+    key.offset: 804,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
     key.usr: "s:Vs6UInt32",
-    key.offset: 790,
+    key.offset: 807,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 803,
+    key.offset: 820,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 808,
+    key.offset: 825,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 810,
+    key.offset: 827,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 810,
+    key.offset: 827,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:Vs5Int32",
-    key.offset: 813,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 825,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 830,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 832,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 832,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "UInt64",
-    key.usr: "s:Vs6UInt64",
-    key.offset: 835,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 848,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 853,
-    key.length: 20
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 874,
-    key.length: 20
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 853,
-    key.length: 20
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 874,
-    key.length: 20
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "UInt64",
-    key.usr: "s:Vs6UInt64",
-    key.offset: 896,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 909,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 914,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 916,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 916,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int64",
-    key.usr: "s:Vs5Int64",
-    key.offset: 919,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 842,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 847,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 849,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 849,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "UInt64",
+    key.usr: "s:Vs6UInt64",
+    key.offset: 852,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 865,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 870,
+    key.length: 20
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 891,
+    key.length: 20
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 870,
+    key.length: 20
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 891,
+    key.length: 20
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "UInt64",
+    key.usr: "s:Vs6UInt64",
+    key.offset: 913,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 926,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 931,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 933,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 933,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int64",
+    key.usr: "s:Vs5Int64",
+    key.offset: 936,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 948,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 936,
+    key.offset: 953,
     key.length: 20
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 957,
+    key.offset: 974,
     key.length: 20
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 936,
+    key.offset: 953,
     key.length: 20
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 957,
+    key.offset: 974,
     key.length: 20
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int64",
     key.usr: "s:Vs5Int64",
-    key.offset: 979,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 991,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 996,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1008,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 1013,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 998,
+    key.offset: 1015,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 998,
+    key.offset: 1015,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt",
     key.usr: "s:Su",
-    key.offset: 1001,
+    key.offset: 1018,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1012,
+    key.offset: 1029,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1017,
+    key.offset: 1034,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1028,
+    key.offset: 1045,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1017,
+    key.offset: 1034,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1028,
+    key.offset: 1045,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt",
     key.usr: "s:Su",
-    key.offset: 1040,
+    key.offset: 1057,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1051,
+    key.offset: 1068,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1056,
+    key.offset: 1073,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1058,
+    key.offset: 1075,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1058,
+    key.offset: 1075,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Float",
     key.usr: "s:Sf",
-    key.offset: 1065,
+    key.offset: 1082,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1077,
+    key.offset: 1094,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1082,
+    key.offset: 1099,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1084,
+    key.offset: 1101,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1084,
+    key.offset: 1101,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Double",
     key.usr: "s:Sd",
-    key.offset: 1091,
+    key.offset: 1108,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1104,
+    key.offset: 1121,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1109,
+    key.offset: 1126,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1111,
+    key.offset: 1128,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1111,
+    key.offset: 1128,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Float80",
     key.usr: "s:Vs7Float80",
-    key.offset: 1118,
+    key.offset: 1135,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1132,
+    key.offset: 1149,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1138,
+    key.offset: 1155,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1140,
+    key.offset: 1157,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1140,
+    key.offset: 1157,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "String",
     key.usr: "s:SS",
-    key.offset: 1146,
+    key.offset: 1163,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1154,
+    key.offset: 1171,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1160,
+    key.offset: 1177,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1154,
+    key.offset: 1171,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1160,
+    key.offset: 1177,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 1167,
+    key.offset: 1184,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1173,
+    key.offset: 1190,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1187,
+    key.offset: 1204,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1192,
+    key.offset: 1209,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1194,
+    key.offset: 1211,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1194,
+    key.offset: 1211,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "ObjectIdentifier",
     key.usr: "s:Vs16ObjectIdentifier",
-    key.offset: 1204,
+    key.offset: 1221,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1225,
+    key.offset: 1242,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 1235,
+    key.offset: 1252,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "CustomStringConvertible",
     key.usr: "s:Ps23CustomStringConvertible",
-    key.offset: 1244,
+    key.offset: 1261,
     key.length: 23
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1275,
+    key.offset: 1292,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1279,
+    key.offset: 1296,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "String",
     key.usr: "s:SS",
-    key.offset: 1292,
+    key.offset: 1309,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1301,
+    key.offset: 1318,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1310,
+    key.offset: 1327,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 1320,
+    key.offset: 1337,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RandomAccessIndex",
     key.usr: "s:Ps17RandomAccessIndex",
-    key.offset: 1329,
+    key.offset: 1346,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1354,
+    key.offset: 1371,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1359,
+    key.offset: 1376,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 1374,
+    key.offset: 1391,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1383,
+    key.offset: 1400,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1388,
+    key.offset: 1405,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 1405,
+    key.offset: 1422,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1414,
+    key.offset: 1431,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1419,
+    key.offset: 1436,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1428,
+    key.offset: 1445,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1431,
+    key.offset: 1448,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1428,
+    key.offset: 1445,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1431,
+    key.offset: 1448,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 1438,
+    key.offset: 1455,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.typealias,
     key.name: "Distance",
     key.usr: "s:Si8Distance",
-    key.offset: 1446,
+    key.offset: 1463,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1460,
+    key.offset: 1477,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1465,
+    key.offset: 1482,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1474,
+    key.offset: 1491,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1477,
+    key.offset: 1494,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1474,
+    key.offset: 1491,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1477,
+    key.offset: 1494,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.typealias,
     key.name: "Distance",
     key.usr: "s:Si8Distance",
-    key.offset: 1480,
+    key.offset: 1497,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 1493,
+    key.offset: 1510,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1500,
+    key.offset: 1517,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 1510,
+    key.offset: 1527,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Hashable",
     key.usr: "s:Ps8Hashable",
-    key.offset: 1519,
+    key.offset: 1536,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1535,
+    key.offset: 1552,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1539,
+    key.offset: 1556,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 1550,
+    key.offset: 1567,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1556,
+    key.offset: 1573,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1565,
+    key.offset: 1582,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 1575,
+    key.offset: 1592,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "SignedNumber",
     key.usr: "s:Ps12SignedNumber",
-    key.offset: 1584,
+    key.offset: 1601,
     key.length: 12
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1602,
+    key.offset: 1619,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 1612,
+    key.offset: 1629,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "BitwiseOperations",
     key.usr: "s:Ps17BitwiseOperations",
-    key.offset: 1621,
+    key.offset: 1638,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1646,
+    key.offset: 1663,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1653,
+    key.offset: 1670,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1657,
+    key.offset: 1674,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 1667,
+    key.offset: 1684,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1673,
+    key.offset: 1690,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1682,
+    key.offset: 1699,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 1692,
+    key.offset: 1709,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "CustomReflectable",
     key.usr: "s:Ps17CustomReflectable",
-    key.offset: 1701,
+    key.offset: 1718,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1726,
+    key.offset: 1743,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1730,
+    key.offset: 1747,
     key.length: 12
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Mirror",
     key.usr: "s:Vs6Mirror",
-    key.offset: 1744,
+    key.offset: 1761,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1753,
+    key.offset: 1770,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1762,
+    key.offset: 1779,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 1772,
+    key.offset: 1789,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "CustomPlaygroundQuickLookable",
     key.usr: "s:Ps29CustomPlaygroundQuickLookable",
-    key.offset: 1781,
+    key.offset: 1798,
     key.length: 29
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1818,
+    key.offset: 1835,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1822,
+    key.offset: 1839,
     key.length: 25
   },
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "PlaygroundQuickLook",
     key.usr: "s:Os19PlaygroundQuickLook",
-    key.offset: 1849,
+    key.offset: 1866,
     key.length: 19
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1871,
+    key.offset: 1888,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1880,
+    key.offset: 1897,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 1890,
+    key.offset: 1907,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "CVarArg",
     key.usr: "s:Ps7CVarArg",
-    key.offset: 1899,
+    key.offset: 1916,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1912,
+    key.offset: 1929,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1921,
+    key.offset: 1938,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1933,
+    key.offset: 1950,
     key.length: 14
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1948,
+    key.offset: 1965,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1961,
+    key.offset: 1978,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1965,
+    key.offset: 1982,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 1968,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1974,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1985,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1991,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2002,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1990,
+    key.offset: 2007,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1999,
+    key.offset: 2018,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2023,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2033,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Prot",
     key.usr: "s:P4cake4Prot",
-    key.offset: 2009,
+    key.offset: 2043,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2014,
+    key.offset: 2055,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2060,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2070,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "Prot",
+    key.usr: "s:P4cake4Prot",
+    key.offset: 2080,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2085,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2020,
+    key.offset: 2091,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2025,
+    key.offset: 2096,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2036,
+    key.offset: 2107,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2047,
+    key.offset: 2118,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2052,
+    key.offset: 2123,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2064,
+    key.offset: 2135,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2069,
+    key.offset: 2140,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2076,
+    key.offset: 2147,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Prot",
     key.usr: "s:P4cake4Prot",
-    key.offset: 2081,
+    key.offset: 2152,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2087,
+    key.offset: 2158,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2092,
+    key.offset: 2163,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.ref.class,
     key.name: "C1",
     key.usr: "s:C4cake2C1",
-    key.offset: 2097,
+    key.offset: 2168,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2100,
+    key.offset: 2171,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2106,
+    key.offset: 2177,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2109,
+    key.offset: 2180,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2120,
+    key.offset: 2191,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2125,
+    key.offset: 2196,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2128,
+    key.offset: 2199,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2139,
+    key.offset: 2210,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2142,
+    key.offset: 2213,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2151,
+    key.offset: 2222,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2153,
+    key.offset: 2224,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2151,
+    key.offset: 2222,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2153,
+    key.offset: 2224,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2157,
+    key.offset: 2228,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2161,
+    key.offset: 2232,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2163,
+    key.offset: 2234,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2161,
+    key.offset: 2232,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2163,
+    key.offset: 2234,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2167,
+    key.offset: 2238,
     key.length: 2
   }
 ]
@@ -1838,7 +1889,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.name: "C1",
     key.usr: "s:C4cake2C1",
     key.offset: 1,
-    key.length: 189,
+    key.length: 206,
     key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>C1</decl.name> : <ref.protocol usr=\"s:P4cake4Prot\">Prot</ref.protocol></decl.class>",
     key.conforms: [
       {
@@ -1950,6 +2001,15 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.offset: 175,
         key.length: 13,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "foo1()",
+        key.usr: "s:FE4cakePS_4Prot4foo1FT_T_::SYNTHESIZED::s:C4cake2C1",
+        key.original_usr: "s:FE4cakePS_4Prot4foo1FT_T_",
+        key.offset: 194,
+        key.length: 11,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>()</decl.function.method.instance>"
       }
     ]
   },
@@ -1957,7 +2017,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.kind: source.lang.swift.decl.enum,
     key.name: "MyEnum",
     key.usr: "s:O4cake6MyEnum",
-    key.offset: 192,
+    key.offset: 209,
     key.length: 1031,
     key.fully_annotated_decl: "<decl.enum><syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>MyEnum</decl.name> : <ref.struct usr=\"s:Si\">Int</ref.struct></decl.enum>",
     key.inherits: [
@@ -1972,7 +2032,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.kind: source.lang.swift.decl.enumelement,
         key.name: "Blah",
         key.usr: "s:FO4cake6MyEnum4BlahFMS0_S0_",
-        key.offset: 217,
+        key.offset: 234,
         key.length: 9,
         key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>Blah</decl.name></decl.enumelement>"
       },
@@ -1982,7 +2042,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:ZFSi15addWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:ZFSi15addWithOverflowFTSiSi_TSi8overflowSb_",
         key.doc.full_as_xml: "<Function><Name>addWithOverflow(_:_:)</Name><USR>s:ZFSi15addWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func addWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Add <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
-        key.offset: 232,
+        key.offset: 249,
         key.length: 76,
         key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>addWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
@@ -1997,14 +2057,14 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "lhs",
-            key.offset: 267,
+            key.offset: 284,
             key.length: 3
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "rhs",
-            key.offset: 279,
+            key.offset: 296,
             key.length: 3
           }
         ]
@@ -2015,7 +2075,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:ZFSi20subtractWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:ZFSi20subtractWithOverflowFTSiSi_TSi8overflowSb_",
         key.doc.full_as_xml: "<Function><Name>subtractWithOverflow(_:_:)</Name><USR>s:ZFSi20subtractWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func subtractWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Subtract <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
-        key.offset: 314,
+        key.offset: 331,
         key.length: 81,
         key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtractWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
@@ -2030,14 +2090,14 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "lhs",
-            key.offset: 354,
+            key.offset: 371,
             key.length: 3
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "rhs",
-            key.offset: 366,
+            key.offset: 383,
             key.length: 3
           }
         ]
@@ -2048,7 +2108,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:ZFSi20multiplyWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:ZFSi20multiplyWithOverflowFTSiSi_TSi8overflowSb_",
         key.doc.full_as_xml: "<Function><Name>multiplyWithOverflow(_:_:)</Name><USR>s:ZFSi20multiplyWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func multiplyWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Multiply <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
-        key.offset: 401,
+        key.offset: 418,
         key.length: 81,
         key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>multiplyWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
@@ -2063,14 +2123,14 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "lhs",
-            key.offset: 441,
+            key.offset: 458,
             key.length: 3
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "rhs",
-            key.offset: 453,
+            key.offset: 470,
             key.length: 3
           }
         ]
@@ -2081,7 +2141,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:ZFSi18divideWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:ZFSi18divideWithOverflowFTSiSi_TSi8overflowSb_",
         key.doc.full_as_xml: "<Function><Name>divideWithOverflow(_:_:)</Name><USR>s:ZFSi18divideWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func divideWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Divide <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
-        key.offset: 488,
+        key.offset: 505,
         key.length: 79,
         key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>divideWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
@@ -2096,14 +2156,14 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "lhs",
-            key.offset: 526,
+            key.offset: 543,
             key.length: 3
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "rhs",
-            key.offset: 538,
+            key.offset: 555,
             key.length: 3
           }
         ]
@@ -2114,7 +2174,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:ZFSi21remainderWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:ZFSi21remainderWithOverflowFTSiSi_TSi8overflowSb_",
         key.doc.full_as_xml: "<Function><Name>remainderWithOverflow(_:_:)</Name><USR>s:ZFSi21remainderWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func remainderWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Divide <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning the remainder and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
-        key.offset: 573,
+        key.offset: 590,
         key.length: 82,
         key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>remainderWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
@@ -2129,14 +2189,14 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "lhs",
-            key.offset: 614,
+            key.offset: 631,
             key.length: 3
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "rhs",
-            key.offset: 626,
+            key.offset: 643,
             key.length: 3
           }
         ]
@@ -2147,7 +2207,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSi8toIntMaxFT_Vs5Int64::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSi8toIntMaxFT_Vs5Int64",
         key.doc.full_as_xml: "<Function><Name>toIntMax()</Name><USR>s:FSi8toIntMaxFT_Vs5Int64</USR><Declaration>func toIntMax() -&gt; IntMax</Declaration><Abstract><Para>Represent this number using Swift&apos;s widest native signed integer type.</Para></Abstract></Function>",
-        key.offset: 661,
+        key.offset: 678,
         key.length: 25,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>toIntMax</decl.name>() -&gt; <decl.function.returntype><ref.typealias usr=\"s:s6IntMax\">IntMax</ref.typealias></decl.function.returntype></decl.function.method.instance>",
         key.conforms: [
@@ -2173,7 +2233,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "init(_:)",
         key.usr: "s:FSicFVs5UInt8Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs5UInt8Si",
-        key.offset: 692,
+        key.offset: 709,
         key.length: 16,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>v</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5UInt8\">UInt8</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2181,7 +2241,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "v",
-            key.offset: 702,
+            key.offset: 719,
             key.length: 5
           }
         ]
@@ -2191,7 +2251,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "init(_:)",
         key.usr: "s:FSicFVs4Int8Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs4Int8Si",
-        key.offset: 714,
+        key.offset: 731,
         key.length: 15,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>v</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs4Int8\">Int8</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2199,7 +2259,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "v",
-            key.offset: 724,
+            key.offset: 741,
             key.length: 4
           }
         ]
@@ -2209,7 +2269,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "init(_:)",
         key.usr: "s:FSicFVs6UInt16Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs6UInt16Si",
-        key.offset: 735,
+        key.offset: 752,
         key.length: 17,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>v</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt16\">UInt16</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2217,7 +2277,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "v",
-            key.offset: 745,
+            key.offset: 762,
             key.length: 6
           }
         ]
@@ -2227,7 +2287,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "init(_:)",
         key.usr: "s:FSicFVs5Int16Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs5Int16Si",
-        key.offset: 758,
+        key.offset: 775,
         key.length: 16,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>v</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int16\">Int16</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2235,7 +2295,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "v",
-            key.offset: 768,
+            key.offset: 785,
             key.length: 5
           }
         ]
@@ -2245,7 +2305,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "init(_:)",
         key.usr: "s:FSicFVs6UInt32Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs6UInt32Si",
-        key.offset: 780,
+        key.offset: 797,
         key.length: 17,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>v</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2253,7 +2313,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "v",
-            key.offset: 790,
+            key.offset: 807,
             key.length: 6
           }
         ]
@@ -2263,7 +2323,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "init(_:)",
         key.usr: "s:FSicFVs5Int32Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs5Int32Si",
-        key.offset: 803,
+        key.offset: 820,
         key.length: 16,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>v</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2271,7 +2331,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "v",
-            key.offset: 813,
+            key.offset: 830,
             key.length: 5
           }
         ]
@@ -2281,7 +2341,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "init(_:)",
         key.usr: "s:FSicFVs6UInt64Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs6UInt64Si",
-        key.offset: 825,
+        key.offset: 842,
         key.length: 17,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>v</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt64\">UInt64</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2289,7 +2349,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "v",
-            key.offset: 835,
+            key.offset: 852,
             key.length: 6
           }
         ]
@@ -2300,7 +2360,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSicFT20truncatingBitPatternVs6UInt64_Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFT20truncatingBitPatternVs6UInt64_Si",
         key.doc.full_as_xml: "<Function><Name>init(truncatingBitPattern:)</Name><USR>s:FSicFT20truncatingBitPatternVs6UInt64_Si</USR><Declaration>init(truncatingBitPattern: UInt64)</Declaration><Abstract><Para>Construct a <codeVoice>Int</codeVoice> having the same bitwise representation as the least significant bits of the provided bit pattern.</Para></Abstract><Discussion><Para>No range or overflow checking occurs.</Para></Discussion></Function>",
-        key.offset: 848,
+        key.offset: 865,
         key.length: 55,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>truncatingBitPattern</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt64\">UInt64</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2308,7 +2368,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "truncatingBitPattern",
             key.name: "truncatingBitPattern",
-            key.offset: 896,
+            key.offset: 913,
             key.length: 6
           }
         ]
@@ -2318,7 +2378,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "init(_:)",
         key.usr: "s:FSicFVs5Int64Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs5Int64Si",
-        key.offset: 909,
+        key.offset: 926,
         key.length: 16,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>v</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int64\">Int64</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
@@ -2338,7 +2398,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "v",
-            key.offset: 919,
+            key.offset: 936,
             key.length: 5
           }
         ]
@@ -2349,7 +2409,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSicFT20truncatingBitPatternVs5Int64_Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFT20truncatingBitPatternVs5Int64_Si",
         key.doc.full_as_xml: "<Function><Name>init(truncatingBitPattern:)</Name><USR>s:FSicFT20truncatingBitPatternVs5Int64_Si</USR><Declaration>init(truncatingBitPattern: Int64)</Declaration><Abstract><Para>Construct a <codeVoice>Int</codeVoice> having the same bitwise representation as the least significant bits of the provided bit pattern.</Para></Abstract><Discussion><Para>No range or overflow checking occurs.</Para></Discussion></Function>",
-        key.offset: 931,
+        key.offset: 948,
         key.length: 54,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>truncatingBitPattern</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int64\">Int64</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2357,7 +2417,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "truncatingBitPattern",
             key.name: "truncatingBitPattern",
-            key.offset: 979,
+            key.offset: 996,
             key.length: 5
           }
         ]
@@ -2367,7 +2427,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "init(_:)",
         key.usr: "s:FSicFSuSi::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFSuSi",
-        key.offset: 991,
+        key.offset: 1008,
         key.length: 15,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>v</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Su\">UInt</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2375,7 +2435,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "v",
-            key.offset: 1001,
+            key.offset: 1018,
             key.length: 4
           }
         ]
@@ -2386,7 +2446,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSicFT10bitPatternSu_Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFT10bitPatternSu_Si",
         key.doc.full_as_xml: "<Function><Name>init(bitPattern:)</Name><USR>s:FSicFT10bitPatternSu_Si</USR><Declaration>init(bitPattern: UInt)</Declaration><Abstract><Para>Construct a <codeVoice>Int</codeVoice> having the same memory representation as the <codeVoice>UInt</codeVoice> <codeVoice>bitPattern</codeVoice>.  No range or overflow checking occurs, and the resulting <codeVoice>Int</codeVoice> may not have the same numeric value as <codeVoice>bitPattern</codeVoice>--it is only guaranteed to use the same pattern of bits.</Para></Abstract></Function>",
-        key.offset: 1012,
+        key.offset: 1029,
         key.length: 33,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>bitPattern</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Su\">UInt</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2394,7 +2454,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "bitPattern",
             key.name: "bitPattern",
-            key.offset: 1040,
+            key.offset: 1057,
             key.length: 4
           }
         ]
@@ -2405,7 +2465,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSicFSfSi::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFSfSi",
         key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:FSicFSfSi</USR><Declaration>init(_ other: Float)</Declaration><Abstract><Para>Construct an instance that approximates <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
-        key.offset: 1051,
+        key.offset: 1068,
         key.length: 20,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2413,7 +2473,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "other",
-            key.offset: 1065,
+            key.offset: 1082,
             key.length: 5
           }
         ]
@@ -2424,7 +2484,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSicFSdSi::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFSdSi",
         key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:FSicFSdSi</USR><Declaration>init(_ other: Double)</Declaration><Abstract><Para>Construct an instance that approximates <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
-        key.offset: 1077,
+        key.offset: 1094,
         key.length: 21,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2432,7 +2492,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "other",
-            key.offset: 1091,
+            key.offset: 1108,
             key.length: 6
           }
         ]
@@ -2443,7 +2503,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSicFVs7Float80Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs7Float80Si",
         key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:FSicFVs7Float80Si</USR><Declaration>init(_ other: Float80)</Declaration><Abstract><Para>Construct an instance that approximates <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
-        key.offset: 1104,
+        key.offset: 1121,
         key.length: 22,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs7Float80\">Float80</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2451,7 +2511,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "other",
-            key.offset: 1118,
+            key.offset: 1135,
             key.length: 7
           }
         ]
@@ -2462,7 +2522,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSicFTSS5radixSi_GSqSi_::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFTSS5radixSi_GSqSi_",
         key.doc.full_as_xml: "<Function><Name>init(_:radix:)</Name><USR>s:FSicFTSS5radixSi_GSqSi_</USR><Declaration>init?(_ text: String, radix: Int = default)</Declaration><Abstract><Para>Construct from an ASCII representation in the given <codeVoice>radix</codeVoice>.</Para></Abstract><Discussion><Para>If <codeVoice>text</codeVoice> does not match the regular expression &quot;[+-]?[0-9a-zA-Z]+&quot;, or the value it denotes in the given <codeVoice>radix</codeVoice> is not representable, the result is <codeVoice>nil</codeVoice>.</Para></Discussion></Function>",
-        key.offset: 1132,
+        key.offset: 1149,
         key.length: 49,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>?(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>text</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:SS\">String</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>radix</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type> = <syntaxtype.keyword>default</syntaxtype.keyword></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2470,14 +2530,14 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "text",
-            key.offset: 1146,
+            key.offset: 1163,
             key.length: 6
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "radix",
             key.name: "radix",
-            key.offset: 1167,
+            key.offset: 1184,
             key.length: 3
           }
         ]
@@ -2488,7 +2548,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSicFVs16ObjectIdentifierSi::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSicFVs16ObjectIdentifierSi",
         key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:FSicFVs16ObjectIdentifierSi</USR><Declaration>init(_ objectID: ObjectIdentifier)</Declaration><Abstract><Para>Create an <codeVoice>Int</codeVoice> that captures the full value of <codeVoice>objectID</codeVoice>.</Para></Abstract></Function>",
-        key.offset: 1187,
+        key.offset: 1204,
         key.length: 34,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>objectID</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs16ObjectIdentifier\">ObjectIdentifier</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -2496,7 +2556,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "objectID",
-            key.offset: 1204,
+            key.offset: 1221,
             key.length: 16
           }
         ]
@@ -2505,7 +2565,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
-    key.offset: 1225,
+    key.offset: 1242,
     key.length: 83,
     key.conforms: [
       {
@@ -2526,7 +2586,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:vSi11descriptionSS::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:vSi11descriptionSS",
         key.doc.full_as_xml: "<Other><Name>description</Name><USR>s:vSi11descriptionSS</USR><Declaration>var description: String { get }</Declaration><Abstract><Para>A textual representation of <codeVoice>self</codeVoice>.</Para></Abstract></Other>",
-        key.offset: 1275,
+        key.offset: 1292,
         key.length: 31,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>description</decl.name>: <decl.var.type><ref.struct usr=\"s:SS\">String</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>",
         key.conforms: [
@@ -2541,7 +2601,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
-    key.offset: 1310,
+    key.offset: 1327,
     key.length: 188,
     key.conforms: [
       {
@@ -2562,7 +2622,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSi9successorFT_Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSi9successorFT_Si",
         key.doc.full_as_xml: "<Function><Name>successor()</Name><USR>s:FSi9successorFT_Si</USR><Declaration>func successor() -&gt; Int</Declaration><Abstract><Para>Returns the next consecutive value after <codeVoice>self</codeVoice>.</Para></Abstract><Discussion><Precondition><Para>The next value is representable.</Para></Precondition></Discussion></Function>",
-        key.offset: 1354,
+        key.offset: 1371,
         key.length: 23,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>successor</decl.name>() -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.conforms: [
@@ -2579,7 +2639,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:FSi11predecessorFT_Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSi11predecessorFT_Si",
         key.doc.full_as_xml: "<Function><Name>predecessor()</Name><USR>s:FSi11predecessorFT_Si</USR><Declaration>func predecessor() -&gt; Int</Declaration><Abstract><Para>Returns the previous consecutive value before <codeVoice>self</codeVoice>.</Para></Abstract><Discussion><Precondition><Para>The previous value is representable.</Para></Precondition></Discussion></Function>",
-        key.offset: 1383,
+        key.offset: 1400,
         key.length: 25,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>predecessor</decl.name>() -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.conforms: [
@@ -2595,7 +2655,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "distance(to:)",
         key.usr: "s:FSi8distanceFT2toSi_Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSi8distanceFT2toSi_Si",
-        key.offset: 1414,
+        key.offset: 1431,
         key.length: 40,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>distance</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>to</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.typealias usr=\"s:Si8Distance\">Distance</ref.typealias></decl.function.returntype></decl.function.method.instance>",
         key.conforms: [
@@ -2620,7 +2680,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "to",
             key.name: "other",
-            key.offset: 1438,
+            key.offset: 1455,
             key.length: 3
           }
         ]
@@ -2630,7 +2690,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "advanced(by:)",
         key.usr: "s:FSi8advancedFT2bySi_Si::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:FSi8advancedFT2bySi_Si",
-        key.offset: 1460,
+        key.offset: 1477,
         key.length: 36,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>advanced</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>by</decl.var.parameter.argument_label> <decl.var.parameter.name>n</decl.var.parameter.name>: <decl.var.parameter.type><ref.typealias usr=\"s:Si8Distance\">Distance</ref.typealias></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.conforms: [
@@ -2655,7 +2715,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "by",
             key.name: "n",
-            key.offset: 1480,
+            key.offset: 1497,
             key.length: 8
           }
         ]
@@ -2664,7 +2724,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
-    key.offset: 1500,
+    key.offset: 1517,
     key.length: 63,
     key.conforms: [
       {
@@ -2685,7 +2745,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:vSi9hashValueSi::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:vSi9hashValueSi",
         key.doc.full_as_xml: "<Other><Name>hashValue</Name><USR>s:vSi9hashValueSi</USR><Declaration>var hashValue: Int { get }</Declaration><Abstract><Para>The hash value.</Para></Abstract><Discussion><Para><bold>Axiom:</bold> <codeVoice>x == y</codeVoice> implies <codeVoice>x.hashValue == y.hashValue</codeVoice>.</Para><Note><Para>The hash value is not guaranteed to be stable across different invocations of the same program.  Do not persist the hash value across program runs.</Para></Note></Discussion></Other>",
-        key.offset: 1535,
+        key.offset: 1552,
         key.length: 26,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>hashValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>",
         key.conforms: [
@@ -2700,7 +2760,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
-    key.offset: 1565,
+    key.offset: 1582,
     key.length: 35,
     key.conforms: [
       {
@@ -2717,7 +2777,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
-    key.offset: 1602,
+    key.offset: 1619,
     key.length: 78,
     key.conforms: [
       {
@@ -2738,7 +2798,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:ZvSi8allZerosSi::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:ZvSi8allZerosSi",
         key.doc.full_as_xml: "<Other><Name>allZeros</Name><USR>s:ZvSi8allZerosSi</USR><Declaration>static var allZeros: Int { get }</Declaration><Abstract><Para>The empty bitset of type Int.</Para></Abstract></Other>",
-        key.offset: 1646,
+        key.offset: 1663,
         key.length: 32,
         key.fully_annotated_decl: "<decl.var.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>allZeros</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.static>",
         key.conforms: [
@@ -2753,7 +2813,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
-    key.offset: 1682,
+    key.offset: 1699,
     key.length: 78,
     key.conforms: [
       {
@@ -2774,7 +2834,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:vSi12customMirrorVs6Mirror::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:vSi12customMirrorVs6Mirror",
         key.doc.full_as_xml: "<Other><Name>customMirror</Name><USR>s:vSi12customMirrorVs6Mirror</USR><Declaration>var customMirror: Mirror { get }</Declaration><Abstract><Para>Returns a mirror that reflects <codeVoice>self</codeVoice>.</Para></Abstract></Other>",
-        key.offset: 1726,
+        key.offset: 1743,
         key.length: 32,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>customMirror</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6Mirror\">Mirror</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>",
         key.conforms: [
@@ -2789,7 +2849,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
-    key.offset: 1762,
+    key.offset: 1779,
     key.length: 116,
     key.conforms: [
       {
@@ -2809,7 +2869,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.name: "customPlaygroundQuickLook",
         key.usr: "s:vSi25customPlaygroundQuickLookOs19PlaygroundQuickLook::SYNTHESIZED::s:O4cake6MyEnum",
         key.original_usr: "s:vSi25customPlaygroundQuickLookOs19PlaygroundQuickLook",
-        key.offset: 1818,
+        key.offset: 1835,
         key.length: 58,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>customPlaygroundQuickLook</decl.name>: <decl.var.type><ref.enum usr=\"s:Os19PlaygroundQuickLook\">PlaygroundQuickLook</ref.enum></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>",
         key.conforms: [
@@ -2824,7 +2884,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
-    key.offset: 1880,
+    key.offset: 1897,
     key.length: 30,
     key.conforms: [
       {
@@ -2843,15 +2903,15 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.kind: source.lang.swift.decl.protocol,
     key.name: "Prot",
     key.usr: "s:P4cake4Prot",
-    key.offset: 1912,
-    key.length: 85,
+    key.offset: 1929,
+    key.length: 102,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>Prot</decl.name></decl.protocol>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.associatedtype,
         key.name: "Element",
         key.usr: "s:P4cake4Prot7Element",
-        key.offset: 1933,
+        key.offset: 1950,
         key.length: 22,
         key.fully_annotated_decl: "<decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>Element</decl.name></decl.associatedtype>"
       },
@@ -2859,7 +2919,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "p",
         key.usr: "s:vP4cake4Prot1pSi",
-        key.offset: 1961,
+        key.offset: 1978,
         key.length: 18,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>p</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
       },
@@ -2867,9 +2927,38 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo()",
         key.usr: "s:FP4cake4Prot3fooFT_T_",
-        key.offset: 1985,
+        key.offset: 2002,
         key.length: 10,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>"
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "foo1()",
+        key.usr: "s:FP4cake4Prot4foo1FT_T_",
+        key.offset: 2018,
+        key.length: 11,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>()</decl.function.method.instance>"
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.extension.protocol,
+    key.offset: 2033,
+    key.length: 35,
+    key.extends: {
+      key.kind: source.lang.swift.ref.protocol,
+      key.name: "Prot",
+      key.usr: "s:P4cake4Prot"
+    },
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "foo1()",
+        key.usr: "s:FE4cakePS_4Prot4foo1FT_T_",
+        key.default_implementation_of: "s:FP4cake4Prot4foo1FT_T_",
+        key.offset: 2055,
+        key.length: 11,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>()</decl.function.method.instance>"
       }
     ]
   },
@@ -2880,7 +2969,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.description: "Self.Element == Int"
       }
     ],
-    key.offset: 1999,
+    key.offset: 2070,
     key.length: 63,
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
@@ -2892,7 +2981,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "extfoo()",
         key.usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_",
-        key.offset: 2047,
+        key.offset: 2118,
         key.length: 13,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
       }
@@ -2920,7 +3009,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.description: "T2.Element == T1.Element"
       }
     ],
-    key.offset: 2064,
+    key.offset: 2135,
     key.length: 106,
     key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>genfoo</decl.name>&lt;<decl.generic_type_param usr=\"s:tF4cake6genfoou0_RxS_4Prot_CS_2C1wx7ElementzSirFT1xx1yq__T_L_2T1Mx\"><decl.generic_type_param.name>T1</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr=\"s:P4cake4Prot\">Prot</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param>, <decl.generic_type_param usr=\"s:tF4cake6genfoou0_RxS_4Prot_CS_2C1wx7ElementzSirFT1xx1yq__T_L_2T2Mq_\"><decl.generic_type_param.name>T2</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.class usr=\"s:C4cake2C1\">C1</ref.class></decl.generic_type_param.constraint></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>T1.Element == Int</decl.generic_type_requirement>, <decl.generic_type_requirement>T2.Element == T1.Element</decl.generic_type_requirement>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label> <decl.var.parameter.name>ix</decl.var.parameter.name>: <decl.var.parameter.type>T1</decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label> <decl.var.parameter.name>iy</decl.var.parameter.name>: <decl.var.parameter.type>T2</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
@@ -2928,14 +3017,14 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "x",
         key.name: "ix",
-        key.offset: 2157,
+        key.offset: 2228,
         key.length: 2
       },
       {
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "y",
         key.name: "iy",
-        key.offset: 2167,
+        key.offset: 2238,
         key.length: 2
       }
     ]

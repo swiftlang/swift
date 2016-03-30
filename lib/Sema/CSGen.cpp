@@ -3308,9 +3308,12 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                                                     VD->getFullName());
     if (Result.OtherViables.empty())
       continue;
-    for(ValueDecl *Other : Result.OtherViables) {
-      if (Other->getDeclContext()->isExtensionContext())
-        DefaultMap.insert({VD, Other});
+    if (!Result.Favored->getDeclContext()->isGenericTypeContext())
+      continue;
+    for (ValueDecl *Default : Result.OtherViables) {
+      if (Default->getDeclContext()->isExtensionContext()) {
+        DefaultMap.insert({Default, VD});
+      }
     }
   }
 }

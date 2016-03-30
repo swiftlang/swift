@@ -1591,8 +1591,9 @@ public:
     }
     if (InProtocol) {
       if (auto *VD = const_cast<ValueDecl*>(dyn_cast<ValueDecl>(D))) {
-        if (DefaultImplementationMap.count(VD) != 0) {
-          HasDefault = "(HasDefault)";
+        for (auto Pair : DefaultImplementationMap) {
+          if (Pair.getSecond() == VD)
+             HasDefault = "(HasDefault)";
         }
       }
     }

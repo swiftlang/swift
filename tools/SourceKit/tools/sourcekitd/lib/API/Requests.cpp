@@ -1103,6 +1103,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyUSR, Info.USR);
   if (!Info.OriginalUSR.empty())
     Elem.set(KeyOriginalUSR, Info.OriginalUSR);
+  if (!Info.ProvideImplementationOfUSR.empty())
+    Elem.set(KeyDefaultImplementationOf, Info.ProvideImplementationOfUSR);
   if (Info.Length > 0) {
     Elem.set(KeyOffset, Info.Offset);
     Elem.set(KeyLength, Info.Length);
