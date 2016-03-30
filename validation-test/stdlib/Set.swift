@@ -105,7 +105,7 @@ func helperDeleteThree(k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
 }
 
 func uniformRandom(max: Int) -> Int {
-  return Int(arc4random_uniform(UInt32(max)))
+  return Int(rand32(exclusiveUpperBound: UInt32(max)))
 }
 
 func pickRandom<T>(a: [T]) -> T {
