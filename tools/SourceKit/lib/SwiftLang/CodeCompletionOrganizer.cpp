@@ -1159,6 +1159,7 @@ Completion *CompletionBuilder::finish() {
       base = SwiftResult(semanticContext, current.getNumBytesToErase(),
                          completionString, current.getAssociatedDeclKind(),
                          current.getModuleName(), current.isNotRecommended(),
+                         current.getNotRecommendedReason(),
                          current.getBriefDocComment(),
                          current.getAssociatedUSRs(),
                          current.getDeclKeywords());
