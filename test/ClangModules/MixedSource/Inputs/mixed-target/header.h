@@ -57,3 +57,15 @@ typedef NS_ENUM(short, AALevel) {
 @end
 @interface ConflictingName2
 @end
+
+@interface WrapperInterface
+typedef int NameInInterface;
+@end
+
+@protocol WrapperProto
+typedef int NameInProtocol;
+@end
+
+@interface WrapperInterface (Category)
+typedef int NameInCategory;
+@end

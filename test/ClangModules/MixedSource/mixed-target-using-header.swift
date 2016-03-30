@@ -69,3 +69,9 @@ func testProtocolNamingConflict() {
   d = c // expected-error {{cannot assign value of type 'ConflictingName2?' to type 'ConflictingName2Protocol?'}}
   _ = d
 }
+
+func testDeclsNestedInObjCContainers() {
+  let _: NameInInterface = 0
+  let _: NameInProtocol = 0
+  let _: NameInCategory = 0
+}
