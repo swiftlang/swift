@@ -197,73 +197,87 @@ internal enum _CollectionOperation : Equatable {
   case removeAll(keepCapacity: Bool)
 
   internal func _applyTo(
-    elementsLastMutatedStateIds: [Int], nextStateId: Int) -> [Int] {
-    var result = elementsLastMutatedStateIds
+    elementsLastMutatedStateIds: [Int],
+    endIndexLastMutatedStateId: Int,
+    nextStateId: Int
+  ) -> ([Int], Int) {
+    var newElementsIds = elementsLastMutatedStateIds
+    var newEndIndexId = endIndexLastMutatedStateId
     switch self {
     case reserveCapacity:
-      let invalidIndices = result.indices
-      result.replaceSubrange(
+      let invalidIndices = newElementsIds.indices
+      newElementsIds.replaceSubrange(
         Range(invalidIndices),
         with: repeatElement(nextStateId, count: invalidIndices.count))
+      newEndIndexId = nextStateId
 
     case append:
-      result.append(nextStateId)
+      newElementsIds.append(nextStateId)
+      newEndIndexId = nextStateId
 
     case appendContentsOf(let count):
-      result.append(contentsOf:
+      newElementsIds.append(contentsOf:
         repeatElement(nextStateId, count: count))
+      newEndIndexId = nextStateId
 
     case replaceRange(let subRange, let replacementCount):
-      result.replaceSubrange(
+      newElementsIds.replaceSubrange(
         subRange,
         with: repeatElement(nextStateId, count: replacementCount))
 
-      let invalidIndices = subRange.lowerBound..<result.endIndex
-      result.replaceSubrange(
+      let invalidIndices = subRange.lowerBound..<newElementsIds.endIndex
+      newElementsIds.replaceSubrange(
         Range(invalidIndices),
         with: repeatElement(nextStateId, count: invalidIndices.count))
+      newEndIndexId = nextStateId
 
     case insert(let atIndex):
-      result.insert(nextStateId, at: atIndex)
+      newElementsIds.insert(nextStateId, at: atIndex)
 
-      let invalidIndices = atIndex..<result.endIndex
-      result.replaceSubrange(
+      let invalidIndices = atIndex..<newElementsIds.endIndex
+      newElementsIds.replaceSubrange(
         Range(invalidIndices),
         with: repeatElement(nextStateId, count: invalidIndices.count))
+      newEndIndexId = nextStateId
 
     case insertContentsOf(let atIndex, let count):
-      result.insert(
+      newElementsIds.insert(
         contentsOf: repeatElement(nextStateId, count: count),
         at: atIndex)
 
-      let invalidIndices = atIndex..<result.endIndex
-      result.replaceSubrange(
+      let invalidIndices = atIndex..<newElementsIds.endIndex
+      newElementsIds.replaceSubrange(
         Range(invalidIndices),
         with: repeatElement(nextStateId, count: invalidIndices.count))
+      newEndIndexId = nextStateId
 
     case removeAtIndex(let index):
-      result.remove(at: index)
+      newElementsIds.remove(at: index)
 
-      let invalidIndices = index..<result.endIndex
-      result.replaceSubrange(
+      let invalidIndices = index..<newElementsIds.endIndex
+      newElementsIds.replaceSubrange(
         Range(invalidIndices),
         with: repeatElement(nextStateId, count: invalidIndices.count))
+      newEndIndexId = nextStateId
 
     case removeLast:
-      result.removeLast()
+      newElementsIds.removeLast()
+      newEndIndexId = nextStateId
 
     case removeRange(let subRange):
-      result.removeSubrange(subRange)
+      newElementsIds.removeSubrange(subRange)
 
-      let invalidIndices = subRange.lowerBound..<result.endIndex
-      result.replaceSubrange(
+      let invalidIndices = subRange.lowerBound..<newElementsIds.endIndex
+      newElementsIds.replaceSubrange(
         Range(invalidIndices),
         with: repeatElement(nextStateId, count: invalidIndices.count))
+      newEndIndexId = nextStateId
 
     case removeAll(let keepCapacity):
-      result.removeAll(keepingCapacity: keepCapacity)
+      newElementsIds.removeAll(keepingCapacity: keepCapacity)
+      newEndIndexId = nextStateId
     }
-    return result
+    return (newElementsIds, newEndIndexId)
   }
 }
 
@@ -320,10 +334,15 @@ public struct _CollectionState : Equatable, Hashable {
 
   internal let _id: Int
   internal let _elementsLastMutatedStateIds: [Int]
+  internal let _endIndexLastMutatedStateId: Int
 
-  internal init(id: Int, elementsLastMutatedStateIds: [Int]) {
+  internal init(
+    id: Int,
+    elementsLastMutatedStateIds: [Int],
+    endIndexLastMutatedStateId: Int) {
     self._id = id
     self._elementsLastMutatedStateIds = elementsLastMutatedStateIds
+    self._endIndexLastMutatedStateId = endIndexLastMutatedStateId
   }
 
   internal init(newRootStateForElementCount count: Int) {
@@ -331,6 +350,7 @@ public struct _CollectionState : Equatable, Hashable {
     _CollectionState._nextUnusedState += 1
     self._elementsLastMutatedStateIds =
       Array(repeatElement(self._id, count: count))
+    self._endIndexLastMutatedStateId = self._id
   }
 
   internal init(name: String, elementCount: Int) {
@@ -386,10 +406,14 @@ internal struct _CollectionStateTransition {
   ) {
     let nextStateId = _CollectionState._nextUnusedState
     _CollectionState._nextUnusedState += 1
-    let newElementStates = operation._applyTo(
-      previousState._elementsLastMutatedStateIds, nextStateId: nextStateId)
+    let (newElementStates, newEndIndexState) = operation._applyTo(
+      previousState._elementsLastMutatedStateIds,
+      endIndexLastMutatedStateId: previousState._endIndexLastMutatedStateId,
+      nextStateId: nextStateId)
     let nextState = _CollectionState(
-      id: nextStateId, elementsLastMutatedStateIds: newElementStates)
+      id: nextStateId,
+      elementsLastMutatedStateIds: newElementStates,
+      endIndexLastMutatedStateId: newEndIndexState)
     self = _CollectionStateTransition(
       previousState: previousState,
       operation: operation,
@@ -408,19 +432,21 @@ internal func _expectCompatibleIndices(
   _ second: MinimalIndex,
   ${TRACE}
 ) {
-  if let firstStateId = first._collectionState?._id,
-    let secondStateId = second._collectionState?._id
-    where firstStateId == secondStateId {
-
-    // The indices are derived from the same state.
+  if first._collectionState._id == second._collectionState._id {
+    // Fast path: the indices are derived from the same state.
     return
   }
 
   // The indices are derived from different states.  Check that they point
-  // to elements that persisted from the same state.
+  // to a self-consistent view of the collection.
+  if first._collectionState._id > second._collectionState._id {
+    return _expectCompatibleIndices(second, first)
+  }
 
-  func getLastMutatedStateId(i: MinimalIndex) -> Int? {
-    guard let state = i._collectionState else { return nil }
+  func lastMutatedStateId(
+    of i: MinimalIndex,
+    in state: _CollectionState
+  ) -> Int {
     let offset = i.position
     if offset == state._elementsLastMutatedStateIds.endIndex {
       return state._id
@@ -428,28 +454,30 @@ internal func _expectCompatibleIndices(
     return state._elementsLastMutatedStateIds[offset]
   }
 
-  let firstElementLastMutatedStateId = getLastMutatedStateId(first)
-  let secondElementLastMutatedStateId = getLastMutatedStateId(second)
+  let newestCollectionState = second._collectionState
+  let expectedFirstIndexLastMutatedStateId =
+    lastMutatedStateId(of: first, in: newestCollectionState)
 
   expectEqual(
-    firstElementLastMutatedStateId,
-    secondElementLastMutatedStateId,
+    expectedFirstIndexLastMutatedStateId,
+    first._collectionState._id,
     "Indices are not compatible:\n" +
     "first: \(first)\n" +
     "second: \(second)\n" +
-    "first element last mutated in state id: \(firstElementLastMutatedStateId)\n" +
-    "second element last mutated in state id: \(secondElementLastMutatedStateId)\n",
+    "first element last mutated in state id: \(first._collectionState._id)\n" +
+    "expected state id: \(expectedFirstIndexLastMutatedStateId)\n" +
+    "newest collection state: \(newestCollectionState)",
     stackTrace: ${stackTrace})
 
   // To make writing assertions easier, perform a trap.
-  if firstElementLastMutatedStateId != secondElementLastMutatedStateId {
+  if expectedFirstIndexLastMutatedStateId != first._collectionState._id {
     fatalError("Indices are not compatible")
   }
 }
 
 public struct MinimalIndex : Comparable {
   internal init(
-    collectionState: _CollectionState?,
+    collectionState: _CollectionState,
     position: Int,
     startIndex: Int,
     endIndex: Int
@@ -462,7 +490,7 @@ public struct MinimalIndex : Comparable {
     self.position = position
   }
 
-  public let _collectionState: _CollectionState?
+  public let _collectionState: _CollectionState
   public let position: Int
 
   public static var trapOnRangeCheckFailure = ResettableValue(true)
@@ -597,16 +625,20 @@ public struct ${Self}<T> : ${SelfProtocols} {
 
   @warn_unused_result
   public func successor(of i: MinimalIndex) -> MinimalIndex {
-    expectLE(_elements.startIndex, i.position)
-    expectGT(_elements.endIndex, i.position)
+    expectLE(_elements.startIndex, i.position,
+      "position=\(i.position) startIndex=\(_elements.startIndex) endIndex=\(_elements.endIndex)")
+    expectGT(_elements.endIndex, i.position,
+      "position=\(i.position) startIndex=\(_elements.startIndex) endIndex=\(_elements.endIndex)")
     return _index(forPosition: i.position + 1)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
   public func predecessor(of i: MinimalIndex) -> MinimalIndex {
-    expectLT(_elements.startIndex, i.position)
-    expectGE(_elements.endIndex, i.position)
+    expectLT(_elements.startIndex, i.position,
+      "position=\(i.position) startIndex=\(_elements.startIndex) endIndex=\(_elements.endIndex)")
+    expectGE(_elements.endIndex, i.position,
+      "position=\(i.position) startIndex=\(_elements.startIndex) endIndex=\(_elements.endIndex)")
     return _index(forPosition: i.position - 1)
   }
 %     end
@@ -647,6 +679,14 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
 
   public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<T>> {
     get {
+      _expectCompatibleIndices(
+        index(bounds.lowerBound.position, stepsFrom: startIndex),
+        bounds.lowerBound)
+      _expectCompatibleIndices(
+        index(bounds.upperBound.position, stepsFrom: startIndex),
+        bounds.upperBound)
+
+      // FIXME: swift-3-indexing-model: check that the index is valid.
       return ${SelfSlice}(base: self, bounds: bounds)
     }
 %     if Mutable:
@@ -691,7 +731,8 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
     _willMutate(.replaceRange(
       subRange: subRange.lowerBound.position..<subRange.upperBound.position,
       replacementCount:
-        distance(from: subRange.lowerBound, to: subRange.upperBound) + newCount - oldCount))
+        subRange.upperBound.position - subRange.lowerBound.position
+        + newCount - oldCount))
   }
 
   public mutating func insert(newElement: T, at i: MinimalIndex) {
@@ -852,12 +893,10 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 
   public subscript(i: MinimalIndex) -> Element {
     get {
-      _expectCompatibleIndices(self.startIndex, i)
       return base[i]
     }
 %     if Mutable:
     set {
-      _expectCompatibleIndices(self.startIndex, i)
       base[i] = newValue
     }
 %     end

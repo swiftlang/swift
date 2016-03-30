@@ -19,6 +19,7 @@ internal enum RangeSelection {
   case middle
   case leftHalf
   case rightHalf
+  case offsets(Range<Int>)
 
   internal func range<C : Collection>(in c: C) -> Range<C.Index> {
     switch self {
@@ -36,6 +37,10 @@ internal enum RangeSelection {
       case .rightHalf:
         let start = c.index(c.count / 2, stepsFrom: c.startIndex)
         let end = c.endIndex
+        return start..<end
+      case .offsets(let offsets):
+        let start = c.index(numericCast(offsets.lowerBound), stepsFrom: c.startIndex)
+        let end = c.index(numericCast(offsets.upperBound), stepsFrom: c.startIndex)
         return start..<end
     }
   }
@@ -339,6 +344,12 @@ let replaceRangeTests: [ReplaceRangeTest] = [
 
   ReplaceRangeTest(
     collection: [],
+    newElements: [1010],
+    rangeSelection: .emptyRange,
+    expected: [1010]),
+
+  ReplaceRangeTest(
+    collection: [],
     newElements: [1010, 2020, 3030],
     rangeSelection: .emptyRange,
     expected: [1010, 2020, 3030]),
@@ -364,8 +375,38 @@ let replaceRangeTests: [ReplaceRangeTest] = [
   ReplaceRangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
-    rangeSelection: .middle,
+    rangeSelection: .offsets(1..<1),
+    expected: [1010, 9090, 2020, 3030, 4040, 5050]),
+
+  ReplaceRangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    newElements: [9090],
+    rangeSelection: .offsets(1..<2),
+    expected: [1010, 9090, 3030, 4040, 5050]),
+
+  ReplaceRangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    newElements: [9090],
+    rangeSelection: .offsets(1..<3),
+    expected: [1010, 9090, 4040, 5050]),
+
+  ReplaceRangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    newElements: [9090],
+    rangeSelection: .offsets(1..<4),
     expected: [1010, 9090, 5050]),
+
+  ReplaceRangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    newElements: [9090],
+    rangeSelection: .offsets(1..<5),
+    expected: [1010, 9090]),
+
+  ReplaceRangeTest(
+    collection: [1010, 2020, 3030],
+    newElements: [8080, 9090],
+    rangeSelection: .offsets(1..<2),
+    expected: [1010, 8080, 9090, 3030]),
 ]
 
 extension TestSuite {

@@ -290,6 +290,24 @@ internal func _allIndices<C : Collection>(
   return result
 }
 
+internal enum _SubSequenceSubscriptMode {
+  case inRange
+  case outOfRangeToTheLeft
+  case outOfRangeToTheRight
+  case baseEndIndex
+  case sliceEndIndex
+
+  static var all: [_SubSequenceSubscriptMode] {
+    return [
+      .inRange,
+      .outOfRangeToTheLeft,
+      .outOfRangeToTheRight,
+      .baseEndIndex,
+      .sliceEndIndex
+    ]
+  }
+}
+
 extension TestSuite {
   public func addCollectionTests<
     C : Collection,
@@ -434,6 +452,101 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       }
     }
   }
+
+  func testSubSequenceSubscriptOnIndex(
+    elements: [Int],
+    sliceFromLeft: Int,
+    sliceFromRight: Int
+  ) {
+    for mode in _SubSequenceSubscriptMode.all {
+      self.test("\(testNamePrefix).SubSequence.subscript(_: Index)/Get/\(mode)/\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)") {
+        let base = makeWrappedCollection(elements.map(OpaqueValue.init))
+        let sliceStartIndex =
+          base.index(numericCast(sliceFromLeft), stepsFrom: base.startIndex)
+        let sliceEndIndex = base.index(
+          numericCast(elements.count - sliceFromRight),
+          stepsFrom: base.startIndex)
+        var slice = base[sliceStartIndex..<sliceEndIndex]
+        expectType(C.SubSequence.self, &slice)
+
+        var index: C.Index = base.startIndex
+        switch mode {
+        case .inRange:
+          let sliceNumericIndices = sliceFromLeft..<(elements.count - sliceFromRight)
+          for (i, index) in base.indices.enumerated() {
+            if sliceNumericIndices.contains(i) {
+              expectEqual(elements[i], extractValue(slice[index]).value)
+              expectEqual(
+                extractValue(base[index]).value,
+                extractValue(slice[index]).value)
+            }
+          }
+          return
+        case .outOfRangeToTheLeft:
+          if sliceFromLeft == 0 { return }
+          index = base.index(numericCast(sliceFromLeft - 1), stepsFrom: base.startIndex)
+        case .outOfRangeToTheRight:
+          if sliceFromRight == 0 { return }
+          index = base.index(
+            numericCast(elements.count - sliceFromRight),
+            stepsFrom: base.startIndex)
+        case .baseEndIndex:
+          index = base.endIndex
+        case .sliceEndIndex:
+          index = sliceEndIndex
+        }
+
+        if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
+          expectCrashLater()
+          _blackHole(slice[index])
+        } else {
+          expectFailure {
+            _blackHole(slice[index])
+          }
+        }
+      }
+    }
+  }
+
+  testSubSequenceSubscriptOnIndex(
+    [],
+    sliceFromLeft: 0,
+    sliceFromRight: 0)
+
+  testSubSequenceSubscriptOnIndex(
+    [ 1010, 2020, 3030 ],
+    sliceFromLeft: 0,
+    sliceFromRight: 0)
+
+  testSubSequenceSubscriptOnIndex(
+    [ 1010, 2020, 3030 ],
+    sliceFromLeft: 1,
+    sliceFromRight: 1)
+
+  testSubSequenceSubscriptOnIndex(
+    [ 1010, 2020, 3030 ],
+    sliceFromLeft: 1,
+    sliceFromRight: 2)
+
+  testSubSequenceSubscriptOnIndex(
+    [ 1010, 2020, 3030, 4040, 5050 ],
+    sliceFromLeft: 0,
+    sliceFromRight: 0)
+
+  testSubSequenceSubscriptOnIndex(
+    [ 1010, 2020, 3030, 4040, 5050 ],
+    sliceFromLeft: 2,
+    sliceFromRight: 2)
+
+  testSubSequenceSubscriptOnIndex(
+    [ 1010, 2020, 3030, 4040, 5050 ],
+    sliceFromLeft: 0,
+    sliceFromRight: 2)
+
+  testSubSequenceSubscriptOnIndex(
+    [ 1010, 2020, 3030, 4040, 5050 ],
+    sliceFromLeft: 2,
+    sliceFromRight: 0)
 }
 
 //===----------------------------------------------------------------------===//
@@ -441,21 +554,24 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).subscript(_: Range)/Get/semantics") {
-  /*
-  // TODO: swift-3-indexing-model: uncomment the following.
   for test in subscriptRangeTests {
-    let c = makeWrappedCollection(test.collection)
-    let result = c[test.bounds(in: c)]
+    let base = makeWrappedCollection(test.collection)
+    let sliceBounds = test.bounds(in: base)
+    let slice = base[sliceBounds]
 
+    expectEqual(sliceBounds.lowerBound, slice.startIndex)
+    expectEqual(sliceBounds.upperBound, slice.endIndex)
+    /*
+    // TODO: swift-3-indexing-model: uncomment the following.
     // FIXME: improve checkForwardCollection to check the SubSequence type.
-    checkForwardCollection(
-      test.expected.map(wrapValue),
-      result,
+    checkCollection(
+      slice,
+      expected: test.expected.map(wrapValue),
       resiliencyChecks: .none) {
       extractValue($0).value == extractValue($1).value
     }
+    */
   }
-  */
 }
 
 if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
