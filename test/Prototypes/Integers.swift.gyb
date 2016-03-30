@@ -17,7 +17,7 @@
 // REQUIRES: executable_test
 
 // FIXME: this test runs forever on iOS arm64
-// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 import Swift
 
