@@ -13,8 +13,9 @@
 // RUN: FileCheck %s -check-prefix=CHECK10 < %t.syn.txt
 // RUN: FileCheck %s -check-prefix=CHECK11 < %t.syn.txt
 // RUN: FileCheck %s -check-prefix=CHECK12 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK13 < %t.syn.txt
 
-public protocol P1{
+public protocol P1 {
   associatedtype T1
   associatedtype T2
   func f1(t : T1) -> T1
@@ -212,6 +213,16 @@ public extension P6 {
   public func foo1() {}
 }
 
+public protocol P7 {
+  associatedtype T1
+  func f1(t: T1)
+}
+
+public extension P7 {
+  public func nomergeFunc(t: T1) -> T1 { return t }
+  public func f1(t: T1) -> T1 { return t }
+}
+
 // CHECK1: <synthesized>extension <ref:Struct>S1</ref> where T : P2 {
 // CHECK1-NEXT:     <decl:Func>public func <loc>p2member()</loc></decl>
 // CHECK1-NEXT:     <decl:Func>public func <loc>ef1(<decl:Param>t: T</decl>)</loc></decl>
@@ -290,3 +301,13 @@ public extension P6 {
 // CHECK12-NEXT:    <decl:Func(HasDefault)>public func <loc>foo1()</loc></decl>
 // CHECK12-NEXT:    <decl:Func>public func <loc>foo2()</loc></decl>
 // CHECK12-NEXT:  }</decl>
+
+// CHECK13:       <decl:Protocol>public protocol <loc>P7</loc> {
+// CHECK13-NEXT:   <decl:AssociatedType>associatedtype <loc>T1</loc></decl>
+// CHECK13-NEXT:   <decl:Func>public func <loc>f1(<decl:Param>t: <ref:GenericTypeParam>Self</ref>.T1</decl>)</loc></decl>
+// CHECK13-NEXT:  }</decl>
+
+// CHECK13:       <decl:Extension>extension <loc><ref:Protocol>P7</ref></loc> {
+// CHECK13-NEXT:   <decl:Func>public func <loc>nomergeFunc(<decl:Param>t: <ref:GenericTypeParam>Self</ref>.T1</decl>)</loc> -> <ref:GenericTypeParam>Self</ref>.T1</decl>
+// CHECK13-NEXT:   <decl:Func>public func <loc>f1(<decl:Param>t: <ref:GenericTypeParam>Self</ref>.T1</decl>)</loc> -> <ref:GenericTypeParam>Self</ref>.T1</decl>
+// CHECK13-NEXT:  }</decl>
