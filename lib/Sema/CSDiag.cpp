@@ -4454,32 +4454,20 @@ static bool isKnownToBeArrayType(Type ty) {
   return bgt->getDecl() == ctx.getArrayDecl();
 }
 
-/// If the specific type is UnsafePointer<T>, UnsafeMutablePointer<T>, or
-/// AutoreleasingUnsafeMutablePointer<T>, return the BoundGenericType for it.
-static BoundGenericType *getKnownUnsafePointerType(Type ty) {
-  // Must be a generic type.
-  auto bgt = ty->getAs<BoundGenericType>();
-  if (!bgt) return nullptr;
-  
-  // Must be UnsafeMutablePointer or UnsafePointer.
-  auto &ctx = bgt->getASTContext();
-  if (bgt->getDecl() != ctx.getUnsafeMutablePointerDecl() &&
-      bgt->getDecl() != ctx.getUnsafePointerDecl() &&
-      bgt->getDecl() != ctx.getAutoreleasingUnsafeMutablePointerDecl())
-    return nullptr;
-
-  return bgt;
-}
-
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
   // If we have a contextual type, it must be an inout type.
   auto contextualType = CS->getContextualType();
   if (contextualType) {
     // If the contextual type is one of the UnsafePointer<T> types, then the
     // contextual type of the subexpression must be T.
-    if (auto pointerType = getKnownUnsafePointerType(contextualType)) {
-      auto pointerEltType = pointerType->getGenericArgs()[0];
-      
+    Type unwrappedType = contextualType;
+    if (auto unwrapped = contextualType->getAnyOptionalObjectType())
+      unwrappedType = unwrapped;
+
+    PointerTypeKind pointerKind;
+    if (auto pointerEltType =
+          unwrappedType->getAnyPointerElementType(pointerKind)) {
+
       // If the element type is Void, then we allow any input type, since
       // everything is convertible to UnsafePointer<Void>
       if (pointerEltType->isVoid())
@@ -4493,16 +4481,13 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
         // If we're converting to an UnsafeMutablePointer, then the pointer to
         // the first element is being passed in.  The array is ok, so long as
         // it is mutable.
-        if (pointerType->getDecl() ==
-            CS->getASTContext().getUnsafeMutablePointerDecl()) {
-          if (contextualType)
-            contextualType = ArraySliceType::get(contextualType);
-        } else if (pointerType->getDecl() ==
-                   CS->getASTContext().getUnsafePointerDecl()) {
+        if (pointerKind == PTK_UnsafeMutablePointer) {
+          contextualType = ArraySliceType::get(contextualType);
+        } else if (pointerKind == PTK_UnsafePointer) {
           // If we're converting to an UnsafePointer, then the programmer
           // specified an & unnecessarily.  Produce a fixit hint to remove it.
           diagnose(IOE->getLoc(), diag::extra_address_of_unsafepointer,
-                   pointerType)
+                   unwrappedType)
             .highlight(IOE->getSourceRange())
             .fixItRemove(IOE->getStartLoc());
           return true;
@@ -4803,15 +4788,20 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     // what is happening.
     if (!foundConformance) {
       // TODO: Not handling various string conversions or void conversions.
-      auto cBGT = contextualType->getAs<BoundGenericType>();
-      if (cBGT && cBGT->getDecl() == CS->TC.Context.getUnsafePointerDecl()) {
-        auto arrayTy = ArraySliceType::get(cBGT->getGenericArgs()[0]);
-        foundConformance =
-          CS->TC.conformsToProtocol(arrayTy, ALC, CS->DC,
-                                    ConformanceCheckFlags::InExpression,
-                                    &Conformance);
-        if (foundConformance)
-          contextualType = arrayTy;
+      Type unwrappedTy = contextualType;
+      if (Type unwrapped = contextualType->getAnyOptionalObjectType())
+        unwrappedTy = unwrapped;
+      PointerTypeKind pointerKind;
+      if (Type pointeeTy = unwrappedTy->getAnyPointerElementType(pointerKind)) {
+        if (pointerKind == PTK_UnsafePointer) {
+          auto arrayTy = ArraySliceType::get(pointeeTy);
+          foundConformance =
+            CS->TC.conformsToProtocol(arrayTy, ALC, CS->DC,
+                                      ConformanceCheckFlags::InExpression,
+                                      &Conformance);
+          if (foundConformance)
+            contextualType = arrayTy;
+        }
       }
     }
     

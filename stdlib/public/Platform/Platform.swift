@@ -335,7 +335,7 @@ internal var _ignore = _UnsupportedPlatformError()
 //===----------------------------------------------------------------------===//
 
 /// The value returned by `sem_open()` in the case of failure.
-public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
+public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
@@ -352,7 +352,7 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
 internal func _swift_Platform_sem_open2(
   _ name: UnsafePointer<CChar>,
   _ oflag: CInt
-) -> UnsafeMutablePointer<sem_t>
+) -> UnsafeMutablePointer<sem_t>?
 
 @warn_unused_result
 @_silgen_name("_swift_Platform_sem_open4")
@@ -361,13 +361,13 @@ internal func _swift_Platform_sem_open4(
   _ oflag: CInt,
   _ mode: mode_t,
   _ value: CUnsignedInt
-) -> UnsafeMutablePointer<sem_t>
+) -> UnsafeMutablePointer<sem_t>?
 
 @warn_unused_result
 public func sem_open(
   _ name: UnsafePointer<CChar>,
   _ oflag: CInt
-) -> UnsafeMutablePointer<sem_t> {
+) -> UnsafeMutablePointer<sem_t>? {
   return _swift_Platform_sem_open2(name, oflag)
 }
 
@@ -377,7 +377,7 @@ public func sem_open(
   _ oflag: CInt,
   _ mode: mode_t,
   _ value: CUnsignedInt
-) -> UnsafeMutablePointer<sem_t> {
+) -> UnsafeMutablePointer<sem_t>? {
   return _swift_Platform_sem_open4(name, oflag, mode, value)
 }
 
@@ -390,9 +390,9 @@ public func sem_open(
 @warn_unused_result
 @_silgen_name("_swift_FreeBSD_getEnv")
 func _swift_FreeBSD_getEnv(
-) -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+) -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>>
 
-public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
+public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
   return _swift_FreeBSD_getEnv().pointee
 }
 #endif

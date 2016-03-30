@@ -58,29 +58,24 @@ var OpaquePointerTestSuite = TestSuite("OpaquePointer")
 %         ('OpaquePointer', 'OpaquePointer')]:
 
 ${SelfName}TestSuite.test("convertFromNil") {
-  let ptr: ${SelfType} = nil
-  expectEqual(0, unsafeBitCast(ptr, to: Int.self))
-}
-
-${SelfName}TestSuite.test("initNoArgs") {
-  let ptr: ${SelfType} = nil
+  let ptr: ${SelfType}? = nil
   expectEqual(0, unsafeBitCast(ptr, to: Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromOpaquePointer") {
-  let other = OpaquePointer(bitPattern: 0x12345678)
+  let other = OpaquePointer(bitPattern: 0x12345678)!
   let ptr = UnsafePointer<Float>(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromUnsafePointer") {
-  let other = UnsafePointer<Double>(bitPattern: 0x12345678)
+  let other = UnsafePointer<Double>(bitPattern: 0x12345678)!
   let ptr = ${SelfType}(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
-  let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)
+  let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)!
   let ptr = ${SelfType}(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
 }
@@ -100,9 +95,8 @@ ${SelfName}TestSuite.test("initFromInteger") {
 
 ${SelfName}TestSuite.test("Hashable") {
   let ptrs = [
-    ${SelfType}(bitPattern: 0x0),
-    ${SelfType}(bitPattern: 0x12345678),
-    ${SelfType}(bitPattern: 0x87654321 as UInt),
+    ${SelfType}(bitPattern: 0x12345678)!,
+    ${SelfType}(bitPattern: 0x87654321 as UInt)!,
   ]
   for i in ptrs.indices {
     for j in ptrs.indices {
@@ -267,7 +261,7 @@ UnsafePointerTestSuite.test("customMirror") {
   // Ensure that the custom mirror works properly, including when the raw value
   // is greater than Int.max
   let reallyBigInt: UInt = UInt(Int.max) + 1
-  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)
+  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)!
   let mirror = ptr.customMirror
   expectEqual(1, mirror.children.count)
 #if arch(i386) || arch(arm)
@@ -283,7 +277,7 @@ UnsafePointerTestSuite.test("customPlaygroundQuickLook") {
   // Ensure that the custom playground quicklook works properly, including when
   // the raw value is greater than Int.max
   let reallyBigInt: UInt = UInt(Int.max) + 1
-  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)
+  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)!
   if case let .text(desc) = ptr.customPlaygroundQuickLook {
 #if arch(i386) || arch(arm)
     expectEqual("UnsafePointer(0xFFFFFFFF80000000)", desc)
@@ -299,7 +293,7 @@ UnsafePointerTestSuite.test("customPlaygroundQuickLook") {
 
 UnsafeMutablePointerTestSuite.test("customMirror") {
   let reallyBigInt: UInt = UInt(Int.max) + 1
-  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)
+  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)!
   let mirror = ptr.customMirror
   expectEqual(1, mirror.children.count)
 #if arch(i386) || arch(arm)
@@ -313,7 +307,7 @@ UnsafeMutablePointerTestSuite.test("customMirror") {
 
 UnsafeMutablePointerTestSuite.test("customPlaygroundQuickLook") {
   let reallyBigInt: UInt = UInt(Int.max) + 1
-  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)
+  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)!
   let isProperDisposition : Bool
   if case let .text(desc) = ptr.customPlaygroundQuickLook {
 #if arch(i386) || arch(arm)

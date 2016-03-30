@@ -107,7 +107,7 @@ public struct Character :
     }
     else {
       if let native = s._core.nativeBuffer
-              where native.start == UnsafeMutablePointer(s._core._baseAddress) {
+              where native.start == UnsafeMutablePointer(s._core._baseAddress!){
         _representation = .large(native._storage)
         return
       }

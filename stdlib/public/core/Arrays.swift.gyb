@@ -410,7 +410,7 @@ public struct ${Self}<Element>
   @warn_unused_result
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
-    return _buffer._unconditionalMutableSubscriptBaseAddress + index
+    return _buffer.subscriptBaseAddress + index
   }
 
 %if Self == 'Array':
@@ -581,7 +581,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     
     return (
       Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
-      innerBuffer.firstElementAddress)
+        innerBuffer.firstElementAddress)
   }
 
   /// Entry point for aborting literal construction: deallocates
@@ -611,8 +611,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  public var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {
-    return _buffer.firstElementAddress
+  public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    return _buffer.firstElementAddressIfContiguous
   }
 
 %if Self != 'Array': # // Array does not necessarily have contiguous storage
@@ -776,7 +776,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      let r = try body(bufferPointer.baseAddress, bufferPointer.count)
+      let r = try body(bufferPointer.baseAddress!, bufferPointer.count)
       return r
     }
   }
@@ -836,13 +836,13 @@ extension ${Self} {
   @_versioned
   @_transparent
   @warn_unused_result
-  internal func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
+  internal func _cPointerArgs() -> (AnyObject?, UnsafePointer<Void>?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
-      return (_owner, p._rawValue)
+      return (_owner, UnsafePointer(p))
     }
     let n = _extractOrCopyToNativeArrayBuffer(self._buffer)
-    return (n.owner, n.firstElementAddress._rawValue)
+    return (n.owner, UnsafePointer(n.firstElementAddress))
   }
 
 }

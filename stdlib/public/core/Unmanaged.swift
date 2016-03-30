@@ -31,12 +31,6 @@ public struct Unmanaged<Instance : AnyObject> {
   @_transparent
   @warn_unused_result
   public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
-    // Null pointer check is a debug check, because it guards only against one
-    // specific bad pointer value.
-    _debugPrecondition(
-      value != nil,
-      "attempt to create an Unmanaged instance from a null pointer")
-
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
   }
 

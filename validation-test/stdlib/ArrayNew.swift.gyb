@@ -282,7 +282,7 @@ class CustomImmutableNSArray : NSArray {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     CustomImmutableNSArray.timesCopyWithZoneWasCalled += 1
     return self
   }

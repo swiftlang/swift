@@ -242,9 +242,6 @@ ArrayTestSuite.test("${array_type}/emptyAllocation") {
   // Empty arrays all use the same buffer
   expectEqual(arr0._buffer.identity, arr1._buffer.identity)
 
-  let hasNilBuffer = arr1.identity == nil
-  expectFalse(hasNilBuffer)
-
   let arr2: ${array_type}<LifetimeTracked> = []
   let emptyLiteralsShareBuffer = arr0._buffer.identity == arr2._buffer.identity
   expectTrue(emptyLiteralsShareBuffer)

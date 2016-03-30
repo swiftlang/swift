@@ -8,7 +8,7 @@
 
 import def_transparent
 
-// SIL-LABEL: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> Int32 {
+// SIL-LABEL: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 // SIL: [[RAW:%.+]] = global_addr @_Tv11transparent3rawSb : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_TF15def_transparent15testTransparentFT1xSb_Sb : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool

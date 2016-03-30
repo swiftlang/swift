@@ -292,7 +292,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
               AcceptableInOutExprs.insert(IOE);
           }
           // InOutExprs can be wrapped in some implicit casts.
-          if (auto *ICO = dyn_cast<ImplicitConversionExpr>(arg)) {
+          Expr *unwrapped = arg;
+          if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(arg))
+            unwrapped = IIO->getSubExpr();
+          if (auto *ICO = dyn_cast<ImplicitConversionExpr>(unwrapped)) {
             if (isa<InOutToPointerExpr>(ICO) ||
                 isa<ArrayToPointerExpr>(ICO) ||
                 isa<ErasureExpr>(ICO))

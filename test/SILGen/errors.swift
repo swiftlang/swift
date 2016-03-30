@@ -10,6 +10,9 @@ enum HomeworkError : ErrorProtocol {
   case CatAteIt(Cat)
 }
 
+func someValidPointer<T>() -> UnsafePointer<T> { fatalError() }
+func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
+
 // CHECK: sil hidden @_TF6errors10make_a_cat{{.*}} : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol) {
 // CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type 
@@ -610,8 +613,8 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 struct OwnedBridge {
   var owner : Builtin.UnknownObject
   subscript(name: String) -> Pylon {
-    addressWithOwner { return (nil, owner) }
-    mutableAddressWithOwner { return (nil, owner) }
+    addressWithOwner { return (someValidPointer(), owner) }
+    mutableAddressWithOwner { return (someValidPointer(), owner) }
   }
 }
 func supportStructure(_ b: inout OwnedBridge, name: String) throws {
@@ -646,8 +649,8 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 struct PinnedBridge {
   var owner : Builtin.NativeObject
   subscript(name: String) -> Pylon {
-    addressWithPinnedNativeOwner { return (nil, owner) }
-    mutableAddressWithPinnedNativeOwner { return (nil, owner) }
+    addressWithPinnedNativeOwner { return (someValidPointer(), owner) }
+    mutableAddressWithPinnedNativeOwner { return (someValidPointer(), owner) }
   }
 }
 func supportStructure(_ b: inout PinnedBridge, name: String) throws {

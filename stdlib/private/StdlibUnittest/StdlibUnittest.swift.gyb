@@ -1152,11 +1152,11 @@ public final class TestSuite {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 @_silgen_name("swift_stdlib_getSystemVersionPlistProperty")
 func _stdlib_getSystemVersionPlistPropertyImpl(
-  _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>
+  _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>?
 
 func _stdlib_getSystemVersionPlistProperty(_ propertyName: String) -> String? {
   let cs = _stdlib_getSystemVersionPlistPropertyImpl(propertyName)
-  return (cs != nil) ? String(cString: cs) : nil
+  return cs.map(String.init(cString:))
 }
 #endif
 

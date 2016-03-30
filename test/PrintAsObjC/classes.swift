@@ -128,9 +128,9 @@ class NotObjC {}
 // CHECK-LABEL: @interface Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: - (void * _Null_unspecified)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
+// CHECK-NEXT: - (void * _Nonnull)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
 // CHECK-NEXT: - (void)testString:(NSString * _Nonnull)s;
-// CHECK-NEXT: - (void)testSelector:(SEL _Null_unspecified)sel boolean:(BOOL)b;
+// CHECK-NEXT: - (void)testSelector:(SEL _Nonnull)sel boolean:(BOOL)b;
 // CHECK-NEXT: - (void)testCSignedTypes:(signed char)a b:(short)b c:(int)c d:(long)d e:(long long)e;
 // CHECK-NEXT: - (void)testCUnsignedTypes:(unsigned char)a b:(unsigned short)b c:(unsigned int)c d:(unsigned long)d e:(unsigned long long)e;
 // CHECK-NEXT: - (void)testCChars:(char)basic wchar:(wchar_t)wide char16:(char16_t)char16 char32:(char32_t)char32;
@@ -167,7 +167,7 @@ class NotObjC {}
   class func test2() {}
 
   func testPrimitives(_ b: Bool, i: Int, f: Float, d: Double, u: UInt)
-    -> OpaquePointer { return nil }
+    -> OpaquePointer { return OpaquePointer(bitPattern: -1)! }
   func testString(_ s: String) {}
   func testSelector(_ sel: Selector, boolean b: ObjCBool) {}
 
@@ -228,7 +228,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSArray * _Nonnull)emptyArray;
 // CHECK-NEXT: - (NSArray * _Nullable)maybeArray;
 // CHECK-NEXT: - (NSRuncingMode)someEnum;
-// CHECK-NEXT: - (struct _NSZone * _Null_unspecified)zone;
+// CHECK-NEXT: - (struct _NSZone * _Nullable)zone;
 // CHECK-NEXT: - (CFTypeRef _Nullable)cf:(CFTreeRef _Nonnull)x str:(CFStringRef _Nonnull)str str2:(CFMutableStringRef _Nonnull)str2 obj:(CFAliasForTypeRef _Nonnull)obj;
 // CHECK-NEXT: - (void)appKitInImplementation;
 // CHECK-NEXT: - (NSURL * _Nullable)returnsURL;
@@ -244,7 +244,7 @@ typealias AliasForNSRect = NSRect
 
   func someEnum() -> NSRuncingMode { return .mince }
 
-  func zone() -> NSZone { return nil }
+  func zone() -> NSZone? { return nil }
 
   func cf(_ x: CFTree, str: CFString, str2: CFMutableString, obj: CFAliasForType) -> CFTypeRef? { return nil }
 
@@ -256,14 +256,16 @@ typealias AliasForNSRect = NSRect
 }
 
 // CHECK-LABEL: @interface MethodsWithPointers
-// CHECK-NEXT: - (id _Nonnull * _Null_unspecified)test:(NSInteger * _Null_unspecified)a;
-// CHECK-NEXT: - (void)testNested:(NSInteger * _Null_unspecified * _Null_unspecified)a;
-// CHECK-NEXT: - (void)testBridging:(NSInteger const * _Null_unspecified)a b:(NSInteger * _Null_unspecified)b c:(Methods * _Nonnull * _Null_unspecified)c;
-// CHECK-NEXT: - (void)testBridgingVoid:(void * _Null_unspecified)a b:(void const * _Null_unspecified)b;
+// CHECK-NEXT: - (id _Nonnull * _Nonnull)test:(NSInteger * _Nonnull)a;
+// CHECK-NEXT: - (void)testNested:(NSInteger * _Nonnull * _Nonnull)a;
+// CHECK-NEXT: - (void)testBridging:(NSInteger const * _Nonnull)a b:(NSInteger * _Nonnull)b c:(Methods * _Nonnull * _Nonnull)c;
+// CHECK-NEXT: - (void)testBridgingVoid:(void * _Nonnull)a b:(void const * _Nonnull)b;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
-  func test(_ a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> { return nil }
+  func test(_ a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> {
+    return UnsafeMutablePointer(bitPattern: -1)!
+  }
 
   func testNested(_ a: UnsafeMutablePointer<UnsafeMutablePointer<Int>>) {}
 
@@ -572,13 +574,13 @@ public class NonObjCClass { }
 }
 
 // CHECK-LABEL: @interface Throwing1
-// CHECK-NEXT: - (BOOL)method1AndReturnError:(NSError * _Nullable * _Null_unspecified)error;
-// CHECK-NEXT: - (Throwing1 * _Nullable)method2AndReturnError:(NSError * _Nullable * _Null_unspecified)error;
-// CHECK-NEXT: - (NSArray<NSString *> * _Nullable)method3:(NSInteger)x error:(NSError * _Nullable * _Null_unspecified)error;
-// CHECK-NEXT: - (nullable instancetype)method4AndReturnError:(NSError * _Nullable * _Null_unspecified)error;
-// CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * _Nullable * _Null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (nullable instancetype)initWithString:(NSString * _Nonnull)string error:(NSError * _Nullable * _Null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * _Nullable * _Null_unspecified)error fn:(NSInteger (^ _Nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (BOOL)method1AndReturnError:(NSError * _Nullable * _Nullable)error;
+// CHECK-NEXT: - (Throwing1 * _Nullable)method2AndReturnError:(NSError * _Nullable * _Nullable)error;
+// CHECK-NEXT: - (NSArray<NSString *> * _Nullable)method3:(NSInteger)x error:(NSError * _Nullable * _Nullable)error;
+// CHECK-NEXT: - (nullable instancetype)method4AndReturnError:(NSError * _Nullable * _Nullable)error;
+// CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * _Nullable * _Nullable)error OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nullable instancetype)initWithString:(NSString * _Nonnull)string error:(NSError * _Nullable * _Nullable)error OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * _Nullable * _Nullable)error fn:(NSInteger (^ _Nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class Throwing1 {
   func method1() throws { }

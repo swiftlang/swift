@@ -17,6 +17,9 @@ class A { var array = OrdinarySub() }
 func index0() -> Int { return 0 }
 func index1() -> Int { return 1 }
 
+func someValidPointer<T>() -> UnsafePointer<T> { fatalError() }
+func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
+
 // Verify that there is no unnecessary extra retain of ref.array.
 // rdar://19002913
 func test0(_ ref: A) {
@@ -163,8 +166,8 @@ struct RecInner {
 }
 struct RecOuter {
   var inner : RecInner {
-    unsafeAddress { return nil }
-    unsafeMutableAddress { return nil }
+    unsafeAddress { return someValidPointer() }
+    unsafeMutableAddress { return someValidPointer() }
   }
 }
 func test_rec(_ outer: inout RecOuter) -> Int {
@@ -181,8 +184,8 @@ struct Rec2Inner {
 }
 struct Rec2Outer {
   var inner : Rec2Inner {
-    unsafeAddress { return nil }
-    unsafeMutableAddress { return nil }
+    unsafeAddress { return someValidPointer() }
+    unsafeMutableAddress { return someValidPointer() }
   }
 }
 func test_rec2(_ outer: inout Rec2Outer) -> Int {

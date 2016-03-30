@@ -30,7 +30,7 @@ protocol _ArrayProtocol
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  var _baseAddressIfContiguous: UnsafeMutablePointer<Element> { get }
+  var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? { get }
 
   subscript(index: Int) -> Iterator.Element { get set }
 
