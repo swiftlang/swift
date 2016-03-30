@@ -693,7 +693,8 @@ func testForcePeephole(f: () throws -> Int?) -> Int {
 // CHECK-NEXT: release_value [[RESULT]] : $Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<Cat>, #Optional.None!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<Cat>)
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorType):
@@ -717,7 +718,8 @@ func testOptionalTry() {
 // CHECK-NEXT: strong_release [[BOX]]#0 : $@box Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[BOX]]#1 : $*Optional<Cat>, #Optional.None!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorType):
@@ -745,7 +747,8 @@ func testOptionalTryVar() {
 // CHECK-NEXT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.None!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorType):
@@ -773,7 +776,8 @@ func testOptionalTryAddressOnly<T>(obj: T) {
 // CHECK-NEXT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[BOX]]#1 : $*Optional<T>, #Optional.None!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorType):
@@ -799,7 +803,8 @@ func testOptionalTryAddressOnlyVar<T>(obj: T) {
 // CHECK-NEXT: release_value [[RESULT]] : $Optional<(Cat, Cat)>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT: strong_release [[ERROR]]
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.None!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<(Cat, Cat)>)
 // CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : $ErrorType):
