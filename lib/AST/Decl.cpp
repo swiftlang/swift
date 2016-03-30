@@ -991,14 +991,10 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
 bool PatternBindingDecl::hasStorage() const {
   // Walk the pattern, to check to see if any of the VarDecls included in it
   // have storage.
-  bool HasStorage = false;
   for (auto entry : getPatternList())
-    entry.getPattern()->forEachVariable([&](VarDecl *VD) {
-      if (VD->hasStorage())
-        HasStorage = true;
-    });
-
-  return HasStorage;
+    if (entry.getPattern()->hasStorage())
+      return true;
+  return false;
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P) {
