@@ -208,7 +208,7 @@ namespace swift {
 class DeclName {
   friend class ASTContext;
 
-  /// Represents a compound
+  /// Represents a compound declaration name.
   struct alignas(Identifier) CompoundDeclName final : llvm::FoldingSetNode,
       private llvm::TrailingObjects<CompoundDeclName, Identifier> {
     friend TrailingObjects;
