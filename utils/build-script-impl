@@ -2083,7 +2083,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
 
             echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
-            ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR/c++"
+            ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
 
             { set +x; } 2>/dev/null
         fi
