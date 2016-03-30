@@ -1018,7 +1018,9 @@ namespace {
             || Layout->getElements().size() == FirstFieldIndex) {
           instanceStart = instanceSize;
         } else if (Layout->getElement(FirstFieldIndex).getKind()
-                     == ElementLayout::Kind::Fixed) {
+                     == ElementLayout::Kind::Fixed ||
+                   Layout->getElement(FirstFieldIndex).getKind()
+                     == ElementLayout::Kind::Empty) {
           // FIXME: assumes layout is always sequential!
           instanceStart = Layout->getElement(FirstFieldIndex).getByteOffset();
         } else {

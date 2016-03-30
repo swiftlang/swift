@@ -143,7 +143,7 @@ public:
   int compare(Identifier other) const;
 
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
-  bool operator!=(Identifier RHS) const { return !operator==(RHS); }
+  bool operator!=(Identifier RHS) const { return !(*this==RHS); }
 
   bool operator<(Identifier RHS) const { return Pointer < RHS.Pointer; }
   
@@ -208,7 +208,7 @@ namespace swift {
 class DeclName {
   friend class ASTContext;
 
-  /// Represents a compound
+  /// Represents a compound declaration name.
   struct alignas(Identifier) CompoundDeclName final : llvm::FoldingSetNode,
       private llvm::TrailingObjects<CompoundDeclName, Identifier> {
     friend TrailingObjects;
@@ -367,7 +367,7 @@ public:
   }
 
   friend bool operator!=(DeclName lhs, DeclName rhs) {
-    return !operator==(lhs, rhs);
+    return !(lhs == rhs);
   }
 
   friend bool operator<(DeclName lhs, DeclName rhs) {
@@ -481,7 +481,7 @@ public:
   }
 
   friend bool operator!=(ObjCSelector lhs, ObjCSelector rhs) {
-    return !operator==(lhs, rhs);
+    return !(lhs == rhs);
   }
 
   friend bool operator<(ObjCSelector lhs, ObjCSelector rhs) {

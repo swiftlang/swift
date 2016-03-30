@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_DEFER_H
-#define __SWIFT_DEFER_H
+#ifndef SWIFT_BASIC_DEFER_H
+#define SWIFT_BASIC_DEFER_H
 
 #include <type_traits>
 
@@ -39,7 +39,7 @@ namespace swift {
       return DoAtScopeExit<typename std::decay<F>::type>(fn);
     }
   }
-}
+} // end namespace swift
 
 
 #define DEFER_CONCAT_IMPL(x, y) x##y
@@ -57,5 +57,5 @@ namespace swift {
 ///   };
 ///
 #define defer defer_impl
-#endif
 
+#endif // SWIFT_BASIC_DEFER_H

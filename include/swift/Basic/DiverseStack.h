@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_DIVERSESTACK_H
-#define SWIFT_IRGEN_DIVERSESTACK_H
+#ifndef SWIFT_BASIC_DIVERSESTACK_H
+#define SWIFT_BASIC_DIVERSESTACK_H
 
 #include "swift/Basic/Malloc.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
@@ -380,4 +380,4 @@ namespace llvm {
   };
 }
 
-#endif
+#endif // SWIFT_BASIC_DIVERSESTACK_H

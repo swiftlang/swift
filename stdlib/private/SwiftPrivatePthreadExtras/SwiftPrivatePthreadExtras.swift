@@ -82,7 +82,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
 }
 
 internal func _make_pthread_t() -> pthread_t {
-#if os(Linux) || os(FreeBSD)
+#if os(Linux)
   return pthread_t()
 #else
   return nil

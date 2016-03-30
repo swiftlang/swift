@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SOURCELOC_H
-#define SWIFT_SOURCELOC_H
+#ifndef SWIFT_BASIC_SOURCELOC_H
+#define SWIFT_BASIC_SOURCELOC_H
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
@@ -197,4 +197,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_SOURCELOC_H

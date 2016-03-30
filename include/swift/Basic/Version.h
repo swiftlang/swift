@@ -126,4 +126,4 @@ std::string getSwiftFullVersion();
 } // end namespace version
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_VERSION_H

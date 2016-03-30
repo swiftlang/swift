@@ -224,10 +224,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
 
   // TODO: include the module in the onceToken's name mangling.
   // Then we can make it fragile.
-  auto onceToken = SILGlobalVariable::create(M,
-                                             makeModuleFragile
-                                                ? SILLinkage::Public
-                                                : SILLinkage::Private,
+  auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
                                              makeModuleFragile,
                                              onceTokenBuffer, onceSILTy);
   onceToken->setDeclaration(false);

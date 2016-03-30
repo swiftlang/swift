@@ -193,7 +193,7 @@ Swift method name for that Objective-C API. For example, by default,
 the ``NSURL`` method ``+bookmarkDataWithContentsOfURL:error:`` will
 come into Swift as::
 
-  class func bookmarkDataWithContents(ofURL bookmarkFileURL: NSURL, inout error: NSError) -> NSData
+  class func bookmarkDataWithContents(ofURL bookmarkFileURL: NSURL, error: inout NSError) -> NSData
 
 However, one can provide a different mapping with the ``method_name``
 attribute::

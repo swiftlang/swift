@@ -884,6 +884,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.Mode = ClangImporterOptions::Modes::EmbedBitcode;
 
+  Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
+
   return false;
 }
 

@@ -3,6 +3,31 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 -------
 
+* [SE-0031](https://github.com/apple/swift-evolution/blob/master/proposals/0031-adjusting-inout-declarations.md) The location of the inout attribtue has been moved to after the `:` and before the parameter type.
+```swift
+  func foo(inout x: Int) {
+  }
+```
+  will now be written as:
+```swift
+  func foo(x: inout Int) {
+  }
+```
+
+* [SE-0053](https://github.com/apple/swift-evolution/blob/master/proposals/0053-remove-let-from-function-parameters.md) `let` is no longer accepted as a parameter attribute for functions. The compiler provides a fixit to remove it from the function declaration.
+
+* [SE-0003](https://github.com/apple/swift-evolution/blob/master/proposals/0003-remove-var-parameters.md) `var` is no longer accepted as a parameter attribute for functions. The compiler provides a fixit to create a shadow copy in the function body.
+```swift
+  func foo(var x: Int) {
+  }
+```
+  will now be written as:
+```swift
+  func foo(x: Int) {
+    var x = x
+  }
+```
+
 * The "none" members of imported NS_OPTIONS option sets are marked as unavailable
   when they are imported.  Use [] to make an empty option set, instead of a None member.
 

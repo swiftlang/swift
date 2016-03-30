@@ -672,4 +672,4 @@ private:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_CLUSTEREDBITVECTOR_H

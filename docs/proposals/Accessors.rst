@@ -434,7 +434,7 @@ completing the operation.  This can present the opportunity for
 corruption if the interleaved code modifies the original value.
 Consider the following code::
 
-  func operate(inout value: Int, count: Int) { ... }
+  func operate(value: inout Int, count: Int) { ... }
 
   var array: [Int] = [1,2,3,4]
   operate(&array[0], { array = []; return 0 }())
@@ -454,7 +454,7 @@ Nor can this be fixed with a purely local analysis; consider::
   class C { var array: [Int] }
   let global_C = C()
 
-  func assign(inout value: Int) {
+  func assign(value: inout Int) {
     C.array = []
     value = 0
   }
@@ -706,7 +706,7 @@ that was technically copied beforehand.  For example::
   // This function copies array before modifying it, but because that
   // copy is of a value undergoing modification, the copy will use
   // the same buffer and therefore observe updates to the element.
-  func foo(inout element: Int) {
+  func foo(element: inout Int) {
     oldArray = array
     element = 4
   }
@@ -781,7 +781,7 @@ depend on how the l-value is used:
 
   Example::
 
-    func swap<T>(inout lhs: T, inout rhs: T) {}
+    func swap<T>(lhs: inout T, rhs: inout T) {}
 
     // object is a variable of class type
     swap(&leftObject.array, &rightObject.array)

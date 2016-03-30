@@ -501,7 +501,7 @@ public func _deallocateUninitialized${Self}<Element>(
 }
 %end
 
-extension ${Self} : _ArrayProtocol {
+extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// Construct an empty ${Self}.
   @_semantics("array.init")
   public init() {

@@ -315,8 +315,8 @@ has the following lowered type::
   @callee_owned () -> @owned @callee_owned (@in (Int,Int)) -> @out Float.
 
 As another example, suppose that ``h`` has type
-``Generator<(Int, @inout Int) -> Float>``.  Neither ``(Int, @inout Int)``
-nor ``@inout Int`` are potential results of substitution because they
+``Generator<(Int, inout Int) -> Float>``.  Neither ``(Int, inout Int)``
+nor ``inout Int`` are potential results of substitution because they
 aren't materializable, so ``h.fn`` has the following lowered type::
 
   @callee_owned () -> @owned @callee_owned (@in Int, @inout Int) -> @out Float
@@ -1447,7 +1447,7 @@ getter prior to calling the function and to write back to the property
 on return by loading from the buffer and invoking the setter with the final
 value. This Swift function::
 
-  func inout(x:@inout Int) {
+  func inout(x: inout Int) {
     x = 1
   }
 

@@ -20,5 +20,6 @@ enum class SanitizerKind : unsigned {
   Address,
 };
 
-}
+} // end namespace swift
+
 #endif // SWIFT_BASIC_SANITIZERS_H

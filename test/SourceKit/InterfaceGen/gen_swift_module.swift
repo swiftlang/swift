@@ -1,6 +1,6 @@
 import swift_mod_syn
 
-func f(var s : [Int]) {
+func f(s : inout [Int]) {
   s.sort()
 }
 
