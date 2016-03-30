@@ -48,7 +48,7 @@ class GenericSpecializer : public SILFunctionTransform {
 } // end anonymous namespace
 
 bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
-  llvm::SmallVector<SILInstruction *, 8> DeadApplies;
+  DeadInstructionSet DeadApplies;
 
   for (auto &BB : F) {
     for (auto It = BB.begin(), End = BB.end(); It != End;) {
