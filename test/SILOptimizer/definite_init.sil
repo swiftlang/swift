@@ -4,6 +4,7 @@ import Builtin
 import Swift
 
 
+
 sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 sil @makesInt : $@convention(thin) () -> Int
 
@@ -221,8 +222,8 @@ bb0:
 
   assign %8 to %c : $*SomeClass
   // CHECK-NEXT: load
-  // CHECK-NEXT: store [[C2]]
   // CHECK-NEXT: strong_release
+  // CHECK-NEXT: store [[C2]]
 
   destroy_addr %c : $*SomeClass
   // CHECK-NEXT: destroy_addr

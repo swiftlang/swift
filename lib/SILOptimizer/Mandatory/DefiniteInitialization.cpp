@@ -65,9 +65,11 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     // This is basically TypeLowering::emitStoreOfCopy, except that if we have
     // a known incoming value, we can avoid the load.
     SILValue IncomingVal = B.createLoad(Inst->getLoc(), Inst->getDest());
-    B.createStore(Inst->getLoc(), Src, Inst->getDest());
-
     B.emitReleaseValueOperation(Inst->getLoc(), IncomingVal);
+
+    // Place the store after the release so that its easier for it to be
+    // forwarded.
+    B.createStore(Inst->getLoc(), Src, Inst->getDest());
   }
 
   Inst->eraseFromParent();
