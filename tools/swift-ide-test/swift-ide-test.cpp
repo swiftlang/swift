@@ -201,6 +201,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"));
 
+static llvm::cl::opt<std::string>
+SecondSourceFilename("second-source-filename", llvm::cl::desc("Name of the second source file"));
+
 static llvm::cl::list<std::string>
 InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"),
                llvm::cl::ZeroOrMore);
@@ -507,6 +510,7 @@ removeCodeCompletionTokens(llvm::MemoryBuffer *Input,
 
 static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef SourceFilename,
+                            StringRef SecondSourceFileName,
                             StringRef CodeCompletionToken,
                             bool CodeCompletionDiagnostics,
                             bool CodeCompletionKeywords) {
@@ -537,6 +541,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
 
+
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = llvm::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -557,7 +562,9 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                                               *Consumer.get()));
 
   Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
-
+  if (!SecondSourceFileName.empty()) {
+    Invocation.addInputFilename(SecondSourceFileName);
+  }
   CompilerInstance CI;
 
   PrintingDiagnosticConsumer PrintDiags;
@@ -2503,6 +2510,7 @@ int main(int argc, char *argv[]) {
     }
     ExitCode = doCodeCompletion(InitInvok,
                                 options::SourceFilename,
+                                options::SecondSourceFilename,
                                 options::CodeCompletionToken,
                                 options::CodeCompletionDiagnostics,
                                 options::CodeCompletionKeywords);
