@@ -53,7 +53,6 @@ sil @use_Int : $@convention(thin) (Int) -> ()
 sil [fragile] @user : $@convention(thin) (Builtin.NativeObject) -> ()
 sil [fragile] @create_object : $@convention(thin) () -> Builtin.NativeObject
 
-
 // Make sure argument is exploded and the baz part is not passed in as argument, as its only use
 // is a release.
 //
