@@ -371,4 +371,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_ENCODEDSEQUENCE_H

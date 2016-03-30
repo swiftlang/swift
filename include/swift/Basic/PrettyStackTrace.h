@@ -31,6 +31,6 @@ public:
   void print(llvm::raw_ostream &OS) const override;
 };
 
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_PRETTYSTACKTRACE_H

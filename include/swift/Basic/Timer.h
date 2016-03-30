@@ -45,6 +45,6 @@ namespace swift {
       CompilationTimersEnabled = State::Enabled;
     }
   };
-}
+} // end namespace swift
 
 #endif // SWIFT_BASIC_TIMER_H

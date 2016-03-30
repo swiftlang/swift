@@ -441,6 +441,6 @@ using FarRelativeIndirectablePointer =
 template<typename T, bool Nullable = false>
 using FarRelativeDirectPointer = RelativeDirectPointer<T, Nullable, intptr_t>;
 
-}
+} // end namespace swift
 
 #endif // SWIFT_BASIC_RELATIVEPOINTER_H

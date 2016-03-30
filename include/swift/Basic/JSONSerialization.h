@@ -626,4 +626,4 @@ operator<<(Output &yout, T &seq) {
 } // end namespace json
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_JSONSERIALIZATION_H

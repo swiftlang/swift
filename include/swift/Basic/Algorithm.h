@@ -32,4 +32,4 @@ namespace swift {
   }
 } // end namespace swift
 
-#endif /* SWIFT_BASIC_ALGORITHM_H */
+#endif // SWIFT_BASIC_ALGORITHM_H

@@ -478,6 +478,7 @@ bool omitNeedlessWords(StringRef &baseName,
                        bool isProperty,
                        const InheritedNameSet *allPropertyNames,
                        StringScratchSpace &scratch);
-}
 
-#endif // LLVM_SWIFT_BASIC_STRINGEXTRAS_HPP
+} // end namespace swift
+
+#endif // SWIFT_BASIC_STRINGEXTRAS_H
