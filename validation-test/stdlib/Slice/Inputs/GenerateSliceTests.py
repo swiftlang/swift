@@ -1,73 +1,37 @@
 #!/usr/bin/env python
 
-import itertools
+from __future__ import print_function
 
-traversal_options = ['Forward', 'Bidirectional', 'RandomAccess']
-base_kind_options = ['Defaulted', 'Minimal']
-mutable_options = [False, True]
-for traversal, base_kind, mutable in itertools.product(traversal_options,
-                                                       base_kind_options,
-                                                       mutable_options):
-    # Test Slice<Base> and MutableSlice<Base> of various collections using
-    # value types as elements.
-    wrapper_types = ['Slice', 'MutableSlice'] if mutable else ['Slice']
-    for Wrapper in wrapper_types:
-        for name, prefix, suffix in [
-                ('FullWidth', '[]', '[]'),
-                ('WithPrefix', '[-9999, -9998, -9997]', '[]'),
-                ('WithSuffix', '[]', '[ -9999, -9998, -9997]'),
-                ('WithPrefixAndSuffix', '[-9999, -9998, -9997, -9996, -9995]',
-                 '[-9994, -9993, -9992]')
-        ]:
-            Base = '%s%s%sCollection' % (
-                base_kind, traversal, 'Mutable' if mutable else '')
-            testFilename = Wrapper + '_Of_' + Base + '_' + name + '.swift'
-            with open(testFilename + '.gyb', 'w') as testFile:
-                testFile.write("""
-//// Automatically Generated From \
-validation-test/stdlib/Inputs/GenerateSliceTests.py
-//////// Do Not Edit Directly!
-// -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../../utils/gyb %s -o %t/{testFilename} -D test_path="%S"
-// RUN: %S/../../../utils/line-directive %t/{testFilename} -- \
-%target-build-swift %t/{testFilename} -o %t/{testFilename}.a.out
-// RUN: %S/../../../utils/line-directive %t/{testFilename} -- \
-%target-run %t/{testFilename}.a.out
-// REQUIRES: executable_test
+import sys
 
-// FIXME: the test is too slow when the standard library is not optimized.
-// REQUIRES: optimized_stdlib
+def main():
+    with open(sys.argv[1], 'r') as f:
+        content = f.readlines()
 
-import StdlibUnittest
-import StdlibCollectionUnittest
+    while len(content) != 0:
+        startIndex = -1
+        endIndex = -1
+        testFilename = ''
+        for i, line in enumerate(content):
+            if line.startswith('// Start of file: '):
+                testFilename = line[18:].strip()
+                startIndex = i
+                break
+        if startIndex == -1:
+            return 0
+        for i, line in enumerate(content):
+            if line.startswith('// End of file: '):
+                assert line[16:].strip() == testFilename
+                endIndex = i
+                break
+        testContent = content[startIndex+1:endIndex]
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
+        with open(testFilename, 'w') as testFile:
+            for line in testContent:
+                testFile.write(line)
 
-var SliceTests = TestSuite("Collection")
+        content = content[endIndex+1:]
 
-% import gyb
-% TSliceTest = gyb.parse_template("{{}}/Inputs/slice.gyb".format(test_path))
-% SliceTest = gyb.execute_template(
-%   TSliceTest,
-%   traversal='{traversal}',
-%   base_kind='{base_kind}',
-%   mutable={mutable},
-%   Wrapper='{Wrapper}',
-%   name='{name}',
-%   prefix={prefix},
-%   suffix={suffix})
-${{SliceTest}}
+if __name__ == "__main__":
+    sys.exit(main())
 
-runAllTests()
-""".format(
-                    testFilename=testFilename, traversal=traversal,
-                    base_kind=base_kind, mutable=mutable,
-                    Wrapper=Wrapper, name=name, prefix=prefix,
-                    suffix=suffix))
