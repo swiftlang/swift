@@ -12,6 +12,7 @@
 // RUN: FileCheck %s -check-prefix=CHECK9 < %t.syn.txt
 // RUN: FileCheck %s -check-prefix=CHECK10 < %t.syn.txt
 // RUN: FileCheck %s -check-prefix=CHECK11 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK12 < %t.syn.txt
 
 public protocol P1{
   associatedtype T1
@@ -197,9 +198,17 @@ public extension P5 {
   public func foo4() {}
 }
 
-
 public struct S12 : P5{
   public typealias T1 = Int
+  public func foo1() {}
+}
+
+public protocol P6 {
+  func foo1()
+  func foo2()
+}
+
+public extension P6 {
   public func foo1() {}
 }
 
@@ -276,3 +285,8 @@ public struct S12 : P5{
 // CHECK11-NEXT:  <decl:Func>/// This is picked
 // CHECK11-NEXT:    public func <loc>foo4()</loc></decl>
 // CHECK11-NEXT: }</synthesized>
+
+// CHECK12:       <decl:Protocol>public protocol <loc>P6</loc> {
+// CHECK12-NEXT:    <decl:Func(HasDefault)>public func <loc>foo1()</loc></decl>
+// CHECK12-NEXT:    <decl:Func>public func <loc>foo2()</loc></decl>
+// CHECK12-NEXT:  }</decl>
