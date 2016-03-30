@@ -5,6 +5,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This
 // workaround is needed to link all required libraries in case we compile
@@ -48,24 +49,7 @@ public struct PermutationGenerator<
   }
 }
 
-struct X : BidirectionalCollection {
-  typealias Element = String.CharacterView.Iterator.Element
-  typealias Index = String.Index
-  var msg: String
-
-  init(_ msg: String) { self.msg = msg }
-  var startIndex: Index {
-    return msg.startIndex
-  }
-  var endIndex: Index {
-    return msg.endIndex
-  }
-  subscript(i: Index) -> Element { return msg[i] }
-  func successor(of i: Index) -> Index { return msg.successor(of: i) }
-  func predecessor(of i: Index) -> Index { return msg.predecessor(of: i) }
-}
-
-var foobar = X("foobar")
+var foobar = MinimalCollection(elements: "foobar".characters)
 
 // CHECK: foobar
 for a in foobar {
@@ -105,9 +89,9 @@ func isPalindrome0<
 }
 
 // CHECK: false
-print(isPalindrome0(X("GoHangaSalamiImaLasagneHoG")))
+print(isPalindrome0(MinimalBidirectionalCollection(elements: "GoHangaSalamiImaLasagneHoG".characters)))
 // CHECK: true
-print(isPalindrome0(X("GoHangaSalamiimalaSagnaHoG")))
+print(isPalindrome0(MinimalBidirectionalCollection(elements: "GoHangaSalamiimalaSagnaHoG".characters)))
 
 func isPalindrome1<
   S : BidirectionalCollection
@@ -143,14 +127,14 @@ func isPalindrome1_5<
 }
 
 // CHECK: false
-print(isPalindrome1(X("MADAMINEDENIMWILLIAM")))
+print(isPalindrome1(MinimalBidirectionalCollection(elements: "MADAMINEDENIMWILLIAM".characters)))
 // CHECK: true
-print(isPalindrome1(X("MadamInEdEnImadaM")))
+print(isPalindrome1(MinimalBidirectionalCollection(elements: "MadamInEdEnImadaM".characters)))
 
 // CHECK: false
-print(isPalindrome1_5(X("FleetoMeRemoteelF")))
+print(isPalindrome1_5(MinimalBidirectionalCollection(elements: "FleetoMeRemoteelF".characters)))
 // CHECK: true
-print(isPalindrome1_5(X("FleetoMeReMoteelF")))
+print(isPalindrome1_5(MinimalBidirectionalCollection(elements: "FleetoMeReMoteelF".characters)))
 
 // Finally, one that actually uses indexing to do half as much work.
 // BidirectionalCollection traversal finally pays off!
@@ -177,15 +161,15 @@ func isPalindrome2<
 
 // Test even length
 // CHECK: false
-print(isPalindrome2(X("ZerimarRamireZ")))
+print(isPalindrome2(MinimalBidirectionalCollection(elements: "ZerimarRamireZ".characters)))
 // CHECK: true
-print(isPalindrome2(X("ZerimaRRamireZ")))
+print(isPalindrome2(MinimalBidirectionalCollection(elements: "ZerimaRRamireZ".characters)))
 
 // Test odd length
 // CHECK: false
-print(isPalindrome2(X("ZerimarORamireZ")))
+print(isPalindrome2(MinimalBidirectionalCollection(elements: "ZerimarORamireZ".characters)))
 // CHECK: true
-print(isPalindrome2(X("Zerimar-O-ramireZ")))
+print(isPalindrome2(MinimalBidirectionalCollection(elements: "Zerimar-O-ramireZ".characters)))
 
 func isPalindrome4<
   S: BidirectionalCollection
