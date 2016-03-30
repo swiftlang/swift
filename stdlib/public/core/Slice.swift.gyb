@@ -78,8 +78,16 @@ public struct ${Self}<Base : ${BaseRequirements}>
   public typealias Index = Base.Index
   public typealias IndexDistance = Base.IndexDistance
 
-  public let startIndex: Index
-  public let endIndex: Index
+  public var _startIndex: Index
+  public var _endIndex: Index
+
+  public var startIndex: Index {
+    return _startIndex
+  }
+
+  public var endIndex: Index {
+    return _endIndex
+  }
 
   public subscript(index: Index) -> Base._Element {
     get {
@@ -137,38 +145,41 @@ public struct ${Self}<Base : ${BaseRequirements}>
 
   @warn_unused_result
   public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
     return _base.index(n, stepsFrom: i)
   }
 
   @warn_unused_result
   public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
     return _base.index(n, stepsFrom: i, limitedBy: limit)
   }
 
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
+    // FIXME: swift-3-indexing-model: range check.
     return _base.distance(from: start, to: end)
   }
 
 %     if RangeReplaceable:
   public init() {
     self._base = Base()
-    self.startIndex = _base.startIndex
-    self.endIndex = _base.endIndex
+    self._startIndex = _base.startIndex
+    self._endIndex = _base.endIndex
   }
 
   public init(repeating repeatedValue: Base._Element, count: Int) {
     self._base = Base(repeating: repeatedValue, count: count)
-    self.startIndex = _base.startIndex
-    self.endIndex = _base.endIndex
+    self._startIndex = _base.startIndex
+    self._endIndex = _base.endIndex
   }
 
   public init<
     S : Sequence where S.Iterator.Element == Base._Element
   >(_ elements: S) {
     self._base = Base(elements)
-    self.startIndex = _base.startIndex
-    self.endIndex = _base.endIndex
+    self._startIndex = _base.startIndex
+    self._endIndex = _base.endIndex
   }
 
   public mutating func replaceSubrange<
@@ -176,37 +187,176 @@ public struct ${Self}<Base : ${BaseRequirements}>
   >(
     subRange: Range<Index>, with newElements: C
   ) {
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance =
+      _base.distance(from: _startIndex, to: subRange.lowerBound)
+      + _base.distance(from: subRange.upperBound, to: _endIndex)
+      + numericCast(newElements.count)
     _base.replaceSubrange(subRange, with: newElements)
+    _startIndex = _base.index(sliceOffset, stepsFrom: _base.startIndex)
+    _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+%     else:
+    if subRange.lowerBound == _base.startIndex {
+      let newSliceCount: IndexDistance =
+        _base.distance(from: _startIndex, to: subRange.lowerBound)
+        + _base.distance(from: subRange.upperBound, to: _endIndex)
+        + numericCast(newElements.count)
+      _base.replaceSubrange(subRange, with: newElements)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+    } else {
+      let shouldUpdateStartIndex = subRange.lowerBound == _startIndex
+      let lastValidIndex = _base.predecessor(of: subRange.lowerBound)
+      let newEndIndexOffset =
+        _base.distance(from: subRange.upperBound, to: _endIndex)
+        + numericCast(newElements.count) + 1
+      _base.replaceSubrange(subRange, with: newElements)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.successor(of: lastValidIndex)
+      }
+      _endIndex = _base.index(newEndIndexOffset, stepsFrom: lastValidIndex)
+    }
+%     end
   }
 
   public mutating func insert(newElement: Base._Element, at i: Index) {
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance = count + 1
     _base.insert(newElement, at: i)
+    _startIndex = _base.index(sliceOffset, stepsFrom: _base.startIndex)
+    _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+%     else:
+    if i == _base.startIndex {
+      let newSliceCount: IndexDistance = count + 1
+      _base.insert(newElement, at: i)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+    } else {
+      let shouldUpdateStartIndex = i == _startIndex
+      let lastValidIndex = _base.predecessor(of: i)
+      let newEndIndexOffset = _base.distance(from: i, to: _endIndex) + 2
+      _base.insert(newElement, at: i)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.successor(of: lastValidIndex)
+      }
+      _endIndex = _base.index(newEndIndexOffset, stepsFrom: lastValidIndex)
+    }
+%     end
   }
 
   public mutating func insert<
     S : Collection where S.Iterator.Element == Base._Element
   >(contentsOf newElements: S, at i: Index) {
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance =
+      count + numericCast(newElements.count)
     _base.insert(contentsOf: newElements, at: i)
+    _startIndex = _base.index(sliceOffset, stepsFrom: _base.startIndex)
+    _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+%     else:
+    if i == _base.startIndex {
+      let newSliceCount: IndexDistance =
+        count + numericCast(newElements.count)
+      _base.insert(contentsOf: newElements, at: i)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+    } else {
+      let shouldUpdateStartIndex = i == _startIndex
+      let lastValidIndex = _base.predecessor(of: i)
+      let newEndIndexOffset =
+        _base.distance(from: i, to: _endIndex)
+        + numericCast(newElements.count) + 1
+      _base.insert(contentsOf: newElements, at: i)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.successor(of: lastValidIndex)
+      }
+      _endIndex = _base.index(newEndIndexOffset, stepsFrom: lastValidIndex)
+    }
+%     end
   }
 
   public mutating func remove(at i: Index) -> Base._Element {
-    return _base.remove(at: i)
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance = count - 1
+    let result = _base.remove(at: i)
+    _startIndex = _base.index(sliceOffset, stepsFrom: _base.startIndex)
+    _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+    return result
+%     else:
+    if i == _base.startIndex {
+      let newSliceCount: IndexDistance = count - 1
+      let result = _base.remove(at: i)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+      return result
+    } else {
+      let shouldUpdateStartIndex = i == _startIndex
+      let lastValidIndex = _base.predecessor(of: i)
+      let newEndIndexOffset = _base.distance(from: i, to: _endIndex)
+      let result = _base.remove(at: i)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.successor(of: lastValidIndex)
+      }
+      _endIndex = _base.index(newEndIndexOffset, stepsFrom: lastValidIndex)
+      return result
+    }
+%     end
   }
 
   public mutating func removeSubrange(bounds: Range<Index>) {
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance =
+      count - distance(from: bounds.lowerBound, to: bounds.upperBound)
     _base.removeSubrange(bounds)
+    _startIndex = _base.index(sliceOffset, stepsFrom: _base.startIndex)
+    _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+%     else:
+    if bounds.lowerBound == _base.startIndex {
+      let newSliceCount: IndexDistance =
+        count
+        - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
+      _base.removeSubrange(bounds)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(newSliceCount, stepsFrom: _startIndex)
+    } else {
+      let shouldUpdateStartIndex = bounds.lowerBound == _startIndex
+      let lastValidIndex = _base.predecessor(of: bounds.lowerBound)
+      let newEndIndexOffset =
+        _base.distance(from: bounds.lowerBound, to: _endIndex)
+        - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
+        + 1
+      _base.removeSubrange(bounds)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.successor(of: lastValidIndex)
+      }
+      _endIndex = _base.index(newEndIndexOffset, stepsFrom: lastValidIndex)
+    }
+%     end
   }
 %     end
-
-  // FIXME: swift-3-indexing-model: forward advance() and distance().
 
   /// Create a view into collection `base` that allows access within `bounds`.
   ///
   /// - Complexity: O(1).
   public init(base: Base, bounds: Range<Index>) {
     self._base = base
-    self.startIndex = bounds.lowerBound
-    self.endIndex = bounds.upperBound
+    self._startIndex = bounds.lowerBound
+    self._endIndex = bounds.upperBound
   }
 
 %     if Mutable or RangeReplaceable:
