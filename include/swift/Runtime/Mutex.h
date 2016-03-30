@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Mutex, Condition, and Scoped lock abstactions for use in Swift runtime.
+// Mutex, Condition, and Scoped lock abstractions for use in Swift runtime.
 //
 //===----------------------------------------------------------------------===//
 
@@ -29,7 +29,7 @@
 
 namespace swift {
 
-/// A Condition that works with Mutex to allow – as an example – multi-threaded
+/// A Condition that works with Mutex to allow -- as an example -- multi-threaded
 /// producers and consumers to signal each other in a safe way.
 class Condition {
   friend class MutexImpl;

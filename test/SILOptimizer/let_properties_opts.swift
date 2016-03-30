@@ -344,14 +344,14 @@ public func testStructPropertyAccessibility(b: StructWithPublicAndInternalAndPri
 
 // Force use of initializers, otherwise they got removed by the dead-function-elimination pass
 // and the values of let properties cannot be determined.
-public func useIntiializers() -> StructWithOnlyPublicLetProperties {
+public func useInitializers() -> StructWithOnlyPublicLetProperties {
   return StructWithOnlyPublicLetProperties(1, 1)
 }
 
-public func useIntiializers() -> StructWithPublicAndInternalLetProperties {
+public func useInitializers() -> StructWithPublicAndInternalLetProperties {
   return StructWithPublicAndInternalLetProperties(1, 1)
 }
 
-public func useIntiializers() -> StructWithPublicAndInternalAndPrivateLetProperties {
+public func useInitializers() -> StructWithPublicAndInternalAndPrivateLetProperties {
   return StructWithPublicAndInternalAndPrivateLetProperties(1, 1)
 }

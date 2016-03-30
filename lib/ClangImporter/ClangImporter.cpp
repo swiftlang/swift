@@ -2026,7 +2026,7 @@ auto ClangImporter::Implementation::importFullName(
   }
 
   // Find the original method/property declaration and retrieve the
-  // name from thre.
+  // name from there.
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
     // Inherit the name from the "originating" declarations, if
     // there are any.
@@ -3560,7 +3560,7 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
           // side effect of creating instantiations.
           (void)Impl.importDeclContextOf(decl, effectiveClangContext);
         } else {
-          llvm_unreachable("Macros cannoted be imported as members.");
+          llvm_unreachable("Macros cannot be imported as members.");
         }
       }
 
