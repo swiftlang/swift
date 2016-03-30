@@ -33,7 +33,7 @@ extension Collection {
   }
 }
 
-struct DistanceToTest {
+struct DistanceFromToTest {
   let startIndex: Int
   let endIndex: Int
   let expectedDistance: Int
@@ -50,7 +50,7 @@ struct DistanceToTest {
   }
 }
 
-struct AdvanceByTest {
+struct IndexStepsFromTest {
   let startIndex: Int
   let distance: Int
   let limit: Int?
@@ -65,81 +65,81 @@ struct AdvanceByTest {
     self.distance = distance
     self.expectedIndex = expectedIndex
     self.limit = limit
-    self.loc = SourceLoc(file, line, comment: "advance(_:by:) test data")
+    self.loc = SourceLoc(file, line, comment: "index(_:stepsFrom:) test data")
   }
 }
 
-let distanceToTests = [
-  DistanceToTest(
+let distanceFromToTests = [
+  DistanceFromToTest(
     startIndex: 0,
     endIndex: 0,
     expectedDistance: 0
   ),
-  DistanceToTest(
+  DistanceFromToTest(
     startIndex: 10,
     endIndex: 10,
     expectedDistance: 0
   ),
-  DistanceToTest(
+  DistanceFromToTest(
     startIndex: 10,
     endIndex: 13,
     expectedDistance: 3
   ),
-  DistanceToTest(
+  DistanceFromToTest(
     startIndex: 7,
     endIndex: 10,
     expectedDistance: 3
   ),
 ]
 
-let advancedByTests = [
-  AdvanceByTest(
+let indexStepsFromTests = [
+  IndexStepsFromTest(
     startIndex: 0,
     distance: 0,
     expectedIndex: 0
   ),
-  AdvanceByTest(
+  IndexStepsFromTest(
     startIndex: 0,
     distance: -1,
     expectedIndex: -1
   ),
-  AdvanceByTest(
+  IndexStepsFromTest(
     startIndex: 0,
     distance: 0,
     expectedIndex: 0,
     limitedBy: 0
   ),
-  AdvanceByTest(
+  IndexStepsFromTest(
     startIndex: 0,
     distance: 0,
     expectedIndex: 0,
     limitedBy: 10
   ),
-  AdvanceByTest(
+  IndexStepsFromTest(
     startIndex: 0,
     distance: 10,
     expectedIndex: 0,
     limitedBy: 0
   ),
-  AdvanceByTest(
+  IndexStepsFromTest(
     startIndex: 0,
     distance: -10,
     expectedIndex: 0,
     limitedBy: 0
   ),
-  AdvanceByTest(
+  IndexStepsFromTest(
     startIndex: 0,
     distance: 10,
     expectedIndex: 10,
     limitedBy: 10
   ),
-  AdvanceByTest(
+  IndexStepsFromTest(
     startIndex: 0,
     distance: 20,
     expectedIndex: 10,
     limitedBy: 10
   ),
-  AdvanceByTest(
+  IndexStepsFromTest(
     startIndex: 10,
     distance: -20,
     expectedIndex: 0,
@@ -162,13 +162,13 @@ Index.test("${TraversalCollection}/distance(to:)/dispatch") {
   expectCustomizable(c, c.log.distance)
 }
 
-Index.test("${TraversalCollection}/advance(_:by:)/dispatch") {
+Index.test("${TraversalCollection}/index(_:stepsFrom:)/dispatch") {
   let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
   _ = c.index(10, stepsFrom: c.startIndex)
   expectCustomizable(c, c.log.advance)
 }
 
-Index.test("${TraversalCollection}/advance(_:by:limit:)/dispatch") {
+Index.test("${TraversalCollection}/index(_:stepsFrom:limitedBy:)/dispatch") {
   let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
   _ = c.index(10, stepsFrom: c.startIndex, limitedBy: 5)
   expectCustomizable(c, c.log.advanceLimit)
@@ -183,7 +183,7 @@ Index.test("${TraversalCollection}/advance(_:by:limit:)/dispatch") {
 
 Index.test("${Kind}Collection/distance(from:to:)/semantics") {
   let c = ${Kind}Collection(elements: Array(0..<20))
-  for test in distanceToTests {
+  for test in distanceFromToTests {
     let d = c.distance(
       from: c.indexAt(offset: test.startIndex),
       to: c.indexAt(offset: test.endIndex))
@@ -192,11 +192,11 @@ Index.test("${Kind}Collection/distance(from:to:)/semantics") {
   }
 }
 
-Index.test("${Kind}Collection/advance(_:by: n)/semantics") {
-  for test in advancedByTests.filter({$0.limit == nil && $0.distance >= 0}) {
+Index.test("${Kind}Collection/index(_:stepsFrom: n)/semantics") {
+  for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
 
-    let new = c.advance(c.indexAt(offset: test.startIndex), by: test.distance)
+    let new = c.index(test.distance, stepsFrom: c.indexAt(offset: test.startIndex))
     // Since the `indexAt(offset:)` method performs the same operation
     // (i.e. adavances `c.startIndex` by `test.distance`, it would be
     // silly to compare index values. Luckily the underlying collection
@@ -207,30 +207,32 @@ Index.test("${Kind}Collection/advance(_:by: n)/semantics") {
 }
 
 %     if Traversal == 'Forward':
-Index.test("${Kind}Collection/advance(_:by: -n)/semantics") {
-  for test in advancedByTests.filter({$0.limit == nil && $0.distance < 0}) {
+Index.test("${Kind}Collection/index(_:stepsFrom: -n)/semantics") {
+  for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance < 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
     expectCrashLater()
-    _ = c.advance(c.indexAt(offset: test.startIndex), by: test.distance)
+    _ = c.index(test.distance, stepsFrom: c.indexAt(offset: test.startIndex))
   }
 }
 %     end
 
 %     if Traversal == 'Forward':
-Index.test("${Kind}Collection/advance(by: -n, limit:)/semantics") {
-  for test in advancedByTests.filter({$0.limit != nil && $0.distance < 0}) {
+Index.test("${Kind}Collection/advance(by: -n, limitedBy:)/semantics") {
+  for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance < 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
     let limit = c.indexAt(offset: test.limit.unsafelyUnwrapped)
 
     expectCrashLater()
-    _ = c.advance(c.indexAt(offset: test.startIndex),
-      by: test.distance, limit: limit)
+    _ = c.index(
+      test.distance,
+      stepsFrom: c.indexAt(offset: test.startIndex),
+      limitedBy: limit)
   }
 }
 %     end
 
-Index.test("${Kind}Collection/advance(by: n, limit:)/semantics") {
-  for test in advancedByTests.filter({$0.limit != nil && $0.distance >= 0}) {
+Index.test("${Kind}Collection/advance(by: n, limitedBy:)/semantics") {
+  for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
     let limit = c.indexAt(offset: test.limit.unsafelyUnwrapped)
 
@@ -242,8 +244,10 @@ Index.test("${Kind}Collection/advance(by: n, limit:)/semantics") {
 
 %     end
 
-    let new = c.advance(c.indexAt(offset: test.startIndex),
-      by: test.distance, limit: limit)
+    let new = c.index(
+      test.distance,
+      stepsFrom: c.indexAt(offset: test.startIndex),
+      limitedBy: limit)
     expectEqual(c.indexAt(offset: test.expectedIndex), new,
       stackTrace: SourceLocStack().with(test.loc))
   }
@@ -255,9 +259,9 @@ Index.test("${Kind}Collection/advance(by: n, limit:)/semantics") {
 %     if Traversal == 'RandomAccess' and Base == 'Defaulted':
 
 Index.test(
-  "${Kind}Collection/advance(_:by:)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Collection/index(_:stepsFrom:)/avoidsSuccessorAndPredecessor/dispatch"
 ) {
-  for test in advancedByTests.filter({$0.limit == nil && $0.distance >= 0}) {
+  for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(Array(0..<10))
 
     let i = c.indexAt(offset: test.startIndex)
@@ -268,15 +272,15 @@ Index.test(
 }
 
 Index.test(
-  "${Kind}Index/advance(_:by:limit:)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Index/index(_:stepsFrom:limitedBy:)/avoidsSuccessorAndPredecessor/dispatch"
 ).xfail(.custom({ true }, reason: "Implementation missing in new indexing model"))
 .code {
-  for test in advancedByTests.filter({$0.limit != nil && $0.distance >= 0}) {
+  for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(Array(0..<10))
 
     let i = c.indexAt(offset: test.startIndex)
     let limit = c.indexAt(offset: test.limit.unsafelyUnwrapped)
-    let result  = c.index(test.distance, stepsFrom: i, limit: limit)
+    let result  = c.index(test.distance, stepsFrom: i, limitedBy: limit)
     expectEqual(0, c.timesSuccessorCalled.value)
     expectEqual(0, c.timesPredecessorCalled.value)
   }
