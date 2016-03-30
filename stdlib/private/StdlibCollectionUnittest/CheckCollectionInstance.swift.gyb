@@ -207,9 +207,6 @@ public func checkRandomAccessIndex<
   where
   Instances.Iterator.Element == BaseCollection.Index,
   Distances.Iterator.Element == BaseCollection.IndexDistance,
-  Instances.Iterator.Element : Strideable,
-  Instances.Iterator.Element.Stride == BaseCollection.IndexDistance,
-
   // FIXME(compiler limitation): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index,
@@ -229,10 +226,58 @@ public func checkRandomAccessIndex<
     equalityOracle: { distanceOracle($0, $1) == 0 },
     startIndex: startIndex, endIndex: endIndex, ${trace})
 
-  checkStrideable(
-    instances, strides: distances,
+  checkAdvancesAndDistances(
+    instances, distances: distances,
+    of: baseCollection,
     distanceOracle: distanceOracle,
     advanceOracle: advanceOracle, ${trace})
+}
+
+// Copies what checkStrideable is doing, but instead of calling
+// advanced(by:) and distance(to:) on an Strideable's,
+// calls corresponding methods on a base collection.
+public func checkAdvancesAndDistances<
+  Instances : Collection,
+  Distances : Collection,
+  BaseCollection : Indexable
+  where
+  Instances.Iterator.Element == BaseCollection.Index,
+  Distances.Iterator.Element == BaseCollection.IndexDistance,
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index,
+  Distances.Indices.Iterator.Element == Distances.Index
+>(
+  instances: Instances, distances: Distances,
+  of baseCollection: BaseCollection,
+  distanceOracle:
+    (Instances.Index, Instances.Index) -> Distances.Iterator.Element,
+  advanceOracle:
+    (Instances.Index, Distances.Index) -> Instances.Iterator.Element,
+  ${TRACE}
+) {
+  checkComparable(
+    instances,
+    oracle: {
+      let d = distanceOracle($1, $0);
+      return d < 0 ? .lt : d == 0 ? .eq : .gt
+    },
+    ${trace})
+
+  for i in instances.indices {
+    let x = instances[i]
+    expectEqual(x, baseCollection.index(0, stepsFrom: x))
+
+    for j in distances.indices {
+      let y = distances[j]
+      expectEqual(advanceOracle(i, j), baseCollection.index(y, stepsFrom: x))
+    }
+
+    for j in instances.indices {
+      let y = instances[j]
+      expectEqual(distanceOracle(i, j), baseCollection.distance(from: x, to: y))
+    }
+  }
 }
 
 // Generate two overloads: one for Array (which will get
@@ -250,10 +295,6 @@ public func check${Traversal}Collection<
   where
   C.Iterator.Element == ${Element},
   C.Indices.Iterator.Element == C.Index
-%     if Traversal == 'RandomAccess':
-  , C.Index : Strideable
-  , C.Index.Stride == C.IndexDistance
-%     end
 >(
   expected: ${Expected}, _ collection: C,
   ${TRACE},
@@ -315,18 +356,7 @@ public func check${Traversal}Collection<
   }
 
   func nextN(n: Distance, _ i: C.Index) -> C.Index {
-    var i = i
-    if n < 0 {
-      for _ in 0 ..< -(n.toIntMax()) {
-        i -= 1
-      }
-    }
-    else {
-      for _ in 0..<n.toIntMax() {
-        i += 1
-      }
-    }
-    return i
+    return collection.index(n, stepsFrom: i)
   }
 
   let instances = _allIndices(into: collection, in: partWay0..<partWay1)
