@@ -2068,21 +2068,24 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
 
         # When we are building LLVM create symlinks to the c++ headers.
         if [[ "${product}" == "llvm" ]]; then
+            set -x
 
-          # Find the location of the c++ header dir.
-          if [[ "$(uname -s)" == "Darwin" ]] ; then
-            HOST_CXX_DIR=$(dirname ${HOST_CXX})
-            HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
-          else # Linux
-            HOST_CXX_HEADERS_DIR="/usr/include/c++"
-          fi
+            # Find the location of the c++ header dir.
+            if [[ "$(uname -s)" == "Darwin" ]] ; then
+              HOST_CXX_DIR=$(dirname ${HOST_CXX})
+              HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
+            else # Linux
+              HOST_CXX_HEADERS_DIR="/usr/include/c++"
+            fi
 
-          # Find the path in which the local clang build is expecting to find
-          # the c++ header files.
-          BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
+            # Find the path in which the local clang build is expecting to find
+            # the c++ header files.
+            BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
 
-          echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
-          ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR/c++"
+            echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
+            ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR/c++"
+
+            { set +x; } 2>/dev/null
         fi
     done
 done
