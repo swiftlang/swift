@@ -196,7 +196,7 @@ static void deriveBodyBridgedNSError_enum_NSErrorDomain(
   auto M = domainDecl->getParentModule();
   auto &C = M->getASTContext();
   auto TC = domainDecl->getInnermostTypeContext();
-  auto ED = TC->getAsEnumOrEnumExtensionContext();
+  auto ED = TC->isNominalTypeOrNominalTypeExtensionContext();
 
   std::string buffer = M->getNameStr();
   buffer += ".";
