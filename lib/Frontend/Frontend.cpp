@@ -430,6 +430,10 @@ void CompilerInstance::performSema() {
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);
 
+    auto &Diags = NextInput->getASTContext().Diags;
+    auto DidSuppressWarnings = Diags.getSuppressWarnings();
+    Diags.setSuppressWarnings(DidSuppressWarnings || BufferID != PrimaryBufferID);
+
     bool Done;
     do {
       // Parser may stop at some erroneous constructions like #else, #endif
@@ -437,6 +441,8 @@ void CompilerInstance::performSema() {
       parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
                           &PersistentState, DelayedCB.get());
     } while (!Done);
+
+    Diags.setSuppressWarnings(DidSuppressWarnings);
 
     performNameBinding(*NextInput);
   }
@@ -471,6 +477,11 @@ void CompilerInstance::performSema() {
 
     SourceFile &MainFile =
       MainModule->getMainSourceFile(Invocation.getSourceFileKind());
+
+    auto &Diags = MainFile.getASTContext().Diags;
+    auto DidSuppressWarnings = Diags.getSuppressWarnings();
+    Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
+
     SILParserState SILContext(TheSILModule.get());
     unsigned CurTUElem = 0;
     bool Done;
@@ -488,6 +499,8 @@ void CompilerInstance::performSema() {
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
+
+    Diags.setSuppressWarnings(DidSuppressWarnings);
     
     if (mainIsPrimary && !Context->hadError() &&
         Invocation.getFrontendOptions().PlaygroundTransform)
