@@ -60,24 +60,24 @@ extension OptionSet {
   @warn_unused_result
   public func union(other: Self) -> Self {
     var r: Self = Self(rawValue: self.rawValue)
-    r.unionInPlace(other)
+    r.formUnion(other)
     return r
   }
   
   /// Returns the set of elements contained in both `self` and `other`.
   @warn_unused_result
-  public func intersect(other: Self) -> Self {
+  public func intersection(other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
-    r.intersectInPlace(other)
+    r.formIntersection(other)
     return r
   }
   
   /// Returns the set of elements contained in `self` or in `other`,
   /// but not in both `self` and `other`.
   @warn_unused_result
-  public func exclusiveOr(other: Self) -> Self {
+  public func symmetricDifference(other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
-    r.exclusiveOrInPlace(other)
+    r.formSymmetricDifference(other)
     return r
   }
 }
@@ -91,28 +91,54 @@ extension OptionSet {
 extension OptionSet where Element == Self {
   /// Returns `true` if `self` contains `member`.
   ///
-  /// - Equivalent to `self.intersect([member]) == [member]`
+  /// - Equivalent to `self.intersection([member]) == [member]`
   @warn_unused_result
   public func contains(member: Self) -> Bool {
-    return self.isSupersetOf(member)
+    return self.isSuperset(of: member)
   }
   
-  /// If `member` is not already contained in `self`, insert it.
+  /// If `newMember` is not already contained in `self`, inserts it.
   ///
-  /// - Equivalent to `self.unionInPlace([member])`
-  /// - Postcondition: `self.contains(member)`
-  public mutating func insert(member: Element) {
-    self.unionInPlace(member)
+  /// - Returns: `(true, newMember)` if `e` was not contained in `self`.
+  ///   Otherwise, returns `(false, oldMember)`, where `oldMember` is the
+  ///   member of `self` equal to `newMember`.
+  ///
+  /// - Postcondition: `self.contains(newMember)`.
+  public mutating func insert(
+    newMember: Element
+  ) -> (inserted: Bool, memberAfterInsert: Element) {
+    let oldMember = self.intersection(newMember)
+    let shouldInsert = oldMember != newMember
+    let result = (
+      inserted: shouldInsert,
+      memberAfterInsert: shouldInsert ? newMember : oldMember)
+    if shouldInsert {
+      self.formUnion(newMember)
+    }
+    return result
   }
   
   /// If `member` is contained in `self`, remove and return it.
   /// Otherwise, return `nil`.
   ///
-  /// - Postcondition: `self.intersect([member]).isEmpty`
+  /// - Postcondition: `self.intersection([member]).isEmpty`
   public mutating func remove(member: Element) -> Element? {
-    let r = isSupersetOf(member) ? Optional(member) : nil
-    self.subtractInPlace(member)
+    let r = isSuperset(of: member) ? Optional(member) : nil
+    self.subtract(member)
     return r
+  }
+
+  /// Inserts `e` unconditionally.
+  ///
+  /// - Returns: a former member `r` of `self` such that
+  ///   `self.intersection([e]) == [r]` if `self.intersection([e])` was
+  ///   non-empty.  Returns `nil` otherwise.
+  ///
+  /// - Postcondition: `self.contains(e)`
+  public mutating func update(with e: Element) -> Element? {
+    let r = self.intersection(e)
+    self.formUnion(e)
+    return r.isEmpty ? nil : r
   }
 }
 
@@ -123,7 +149,7 @@ extension OptionSet where Element == Self {
 ///
 /// - `union` is implemented as a bitwise "or" (`|`) of `rawValue`s
 /// - `intersection` is implemented as a bitwise "and" (`|`) of `rawValue`s
-/// - `exclusiveOr` is implemented as a bitwise "exclusive or" (`^`) of `rawValue`s
+/// - `symmetricDifference` is implemented as a bitwise "exclusive or" (`^`) of `rawValue`s
 ///
 /// - Note: A type conforming to `OptionSet` can implement any of
 ///   these initializers or methods, and those implementations will be
@@ -139,25 +165,25 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// Insert all elements of `other` into `self`.
   ///
   /// - Equivalent to replacing `self` with `self.union(other)`.
-  /// - Postcondition: `self.isSupersetOf(other)`
-  public mutating func unionInPlace(other: Self) {
+  /// - Postcondition: `self.isSuperset(of: other)`
+  public mutating func formUnion(other: Self) {
     self = Self(rawValue: self.rawValue | other.rawValue)
   }
   
   /// Remove all elements of `self` that are not also present in
   /// `other`.
   ///
-  /// - Equivalent to replacing `self` with `self.intersect(other)`
-  /// - Postcondition: `self.isSubsetOf(other)`
-  public mutating func intersectInPlace(other: Self) {
+  /// - Equivalent to replacing `self` with `self.intersection(other)`
+  /// - Postcondition: `self.isSubset(of: other)`
+  public mutating func formIntersection(other: Self) {
     self = Self(rawValue: self.rawValue & other.rawValue)
   }
   
   /// Replace `self` with a set containing all elements contained in
   /// either `self` or `other`, but not both.
   ///
-  /// - Equivalent to replacing `self` with `self.exclusiveOr(other)`
-  public mutating func exclusiveOrInPlace(other: Self) {
+  /// - Equivalent to replacing `self` with `self.symmetricDifference(other)`
+  public mutating func formSymmetricDifference(other: Self) {
     self = Self(rawValue: self.rawValue ^ other.rawValue)
   }
 }

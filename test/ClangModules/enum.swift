@@ -143,10 +143,10 @@ var withQuince: NSRuncingOptions = .enableQuince
 var singleValue: NSSingleOptions = .value
 
 // Check OptionSet conformance.
-var minceAndQuince: NSRuncingOptions = NSRuncingOptions.enableMince.intersect(NSRuncingOptions.enableQuince)
+var minceAndQuince: NSRuncingOptions = NSRuncingOptions.enableMince.intersection(NSRuncingOptions.enableQuince)
 var minceOrQuince: NSRuncingOptions = [.enableMince, .enableQuince]
-minceOrQuince.intersectInPlace(minceAndQuince)
-minceOrQuince.unionInPlace(minceAndQuince)
+minceOrQuince.formIntersection(minceAndQuince)
+minceOrQuince.formUnion(minceAndQuince)
 
 var minceValue: UInt = minceAndQuince.rawValue
 var minceFromMask: NSRuncingOptions = []

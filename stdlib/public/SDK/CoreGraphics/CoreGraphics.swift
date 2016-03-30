@@ -245,25 +245,25 @@ public extension CGRect {
   }
 
   @_transparent // @fragile
-  @warn_unused_result(mutable_variant: "unionInPlace")
+  @warn_unused_result(mutable_variant: "formUnion")
   func union(rect: CGRect) -> CGRect {
     return CGRectUnion(self, rect)
   }
 
   @_transparent // @fragile
-  mutating func unionInPlace(rect: CGRect) {
+  mutating func formUnion(rect: CGRect) {
     self = union(rect)
   }
 
   @_transparent // @fragile
-  @warn_unused_result(mutable_variant: "intersectInPlace")
-  func intersect(rect: CGRect) -> CGRect {
+  @warn_unused_result(mutable_variant: "formIntersection")
+  func intersection(rect: CGRect) -> CGRect {
     return CGRectIntersection(self, rect)
   }
 
   @_transparent // @fragile
-  mutating func intersectInPlace(rect: CGRect) {
-    self = intersect(rect)
+  mutating func formIntersection(rect: CGRect) {
+    self = intersection(rect)
   }
 
   @_transparent // @fragile

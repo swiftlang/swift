@@ -66,14 +66,14 @@ infix operator ⊉ { associativity left precedence 130 }
 public func ∖ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
-  return lhs.subtract(rhs)
+  return lhs.subtracting(rhs)
 }
 
 /// Assigns the relative complement between `lhs` and `rhs` to `lhs`.
 public func ∖= <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: inout Set<T>, rhs: S) {
-  lhs.subtractInPlace(rhs)
+  lhs.subtract(rhs)
 }
 
 /// - Returns: The union of `lhs` and `rhs`.
@@ -87,35 +87,35 @@ public func ∪ <
 public func ∪= <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: inout Set<T>, rhs: S) {
-  lhs.unionInPlace(rhs)
+  lhs.formUnion(rhs)
 }
 
 /// - Returns: The intersection of `lhs` and `rhs`.
 public func ∩ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
-  return lhs.intersect(rhs)
+  return lhs.intersection(rhs)
 }
 
 /// Assigns the intersection of `lhs` and `rhs` to `lhs`.
 public func ∩= <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: inout Set<T>, rhs: S) {
-  lhs.intersectInPlace(rhs)
+  lhs.formIntersection(rhs)
 }
 
 /// - Returns: A set with elements in `lhs` or `rhs` but not in both.
 public func ⨁ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
-  return lhs.exclusiveOr(rhs)
+  return lhs.symmetricDifference(rhs)
 }
 
 /// Assigns to `lhs` the set with elements in `lhs` or `rhs` but not in both.
 public func ⨁= <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: inout Set<T>, rhs: S) {
-  lhs.exclusiveOrInPlace(rhs)
+  lhs.formSymmetricDifference(rhs)
 }
 
 /// - Returns: True if `x` is in the set.
@@ -132,54 +132,54 @@ public func ∉ <T>(x: T, rhs: Set<T>) -> Bool {
 public func ⊂ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
-  return lhs.isStrictSubsetOf(rhs)
+  return lhs.isStrictSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a strict subset of `rhs`.
 public func ⊄ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
-  return !lhs.isStrictSubsetOf(rhs)
+  return !lhs.isStrictSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is a subset of `rhs`.
 public func ⊆ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
-  return lhs.isSubsetOf(rhs)
+  return lhs.isSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a subset of `rhs`.
 public func ⊈ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
-  return !lhs.isSubsetOf(rhs)
+  return !lhs.isSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is a strict superset of `rhs`.
 public func ⊃ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
-  return lhs.isStrictSupersetOf(rhs)
+  return lhs.isStrictSuperset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a strict superset of `rhs`.
 public func ⊅ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
-  return !lhs.isStrictSupersetOf(rhs)
+  return !lhs.isStrictSuperset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is a superset of `rhs`.
 public func ⊇ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
-  return lhs.isSupersetOf(rhs)
+  return lhs.isSuperset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a superset of `rhs`.
 public func ⊉ <
   T, S: Sequence where S.Iterator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
-  return !lhs.isSupersetOf(rhs)
+  return !lhs.isSuperset(of: rhs)
 }
