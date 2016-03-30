@@ -29,6 +29,8 @@ var CollectionTypeTests = TestSuite("Collection")
 struct CollectionWithDefaultUnderestimatedCount : Collection {
   init(count: Int) {
     self._count = count
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: count)
   }
 
   func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
@@ -37,17 +39,21 @@ struct CollectionWithDefaultUnderestimatedCount : Collection {
   }
 
   var startIndex: MinimalIndex {
-    return MinimalIndex(position: 0, startIndex: 0, endIndex: _count)
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: 0, startIndex: 0, endIndex: _count)
   }
 
   var endIndex: MinimalIndex {
     return MinimalIndex(
+      collectionState: _collectionState,
       position: _count, startIndex: 0, endIndex: _count)
   }
 
   @warn_unused_result
   func successor(of i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
+      collectionState: _collectionState,
       position: i.position + 1, startIndex: 0, endIndex: _count)
   }
 
@@ -57,8 +63,8 @@ struct CollectionWithDefaultUnderestimatedCount : Collection {
   }
 
   var _count: Int
+  var _collectionState: _CollectionState
 }
-
 
 //===----------------------------------------------------------------------===//
 // filter()
@@ -367,6 +373,8 @@ CollectionTypeTests.test("underestimatedCount/Collection/DefaultImplementation")
 struct CollectionWithCustomUnderestimatedCount : Collection {
   init(underestimatedCount: Int) {
     self._underestimatedCount = underestimatedCount
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: 0xffff)
   }
 
   func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
@@ -376,18 +384,22 @@ struct CollectionWithCustomUnderestimatedCount : Collection {
 
   var startIndex: MinimalIndex {
     expectUnreachable()
-    return MinimalIndex(position: 0, startIndex: 0, endIndex: 0xffff)
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: 0, startIndex: 0, endIndex: 0xffff)
   }
 
   var endIndex: MinimalIndex {
     expectUnreachable()
     return MinimalIndex(
+      collectionState: _collectionState,
       position: 0xffff, startIndex: 0, endIndex: 0xffff)
   }
 
   @warn_unused_result
   func successor(of i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
+      collectionState: _collectionState,
       position: i.position + 1, startIndex: 0, endIndex: 0xffff)
   }
 
@@ -401,6 +413,7 @@ struct CollectionWithCustomUnderestimatedCount : Collection {
   }
 
   let _underestimatedCount: Int
+  var _collectionState: _CollectionState
 }
 
 CollectionTypeTests.test("underestimatedCount/Collection/CustomImplementation") {
@@ -421,20 +434,26 @@ CollectionTypeTests.test("underestimatedCount/Collection/CustomImplementation") 
 struct MinimalCollectionWithDefaultIterator : Collection {
   init(count: Int) {
     self._count = count
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: count)
   }
 
   var startIndex: MinimalIndex {
-    return MinimalIndex(position: 0, startIndex: 0, endIndex: _count)
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: 0, startIndex: 0, endIndex: _count)
   }
 
   var endIndex: MinimalIndex {
     return MinimalIndex(
+      collectionState: _collectionState,
       position: _count, startIndex: 0, endIndex: _count)
   }
 
   @warn_unused_result
   func successor(of i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
+      collectionState: _collectionState,
       position: i.position + 1, startIndex: 0, endIndex: _count)
   }
 
@@ -443,6 +462,7 @@ struct MinimalCollectionWithDefaultIterator : Collection {
   }
 
   var _count: Int
+  var _collectionState: _CollectionState
 }
 
 func callGenericIterator<S : Sequence>(sequence: S) -> S.Iterator {
@@ -479,6 +499,8 @@ CollectionTypeTests.test("Collection.makeIterator()/DefaultImplementation") {
 struct MinimalCollectionWithCustomIterator : Collection {
   init(count: Int) {
     self._count = count
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: count)
   }
 
   static var timesIteratorWasCalled: Int = 0
@@ -491,17 +513,21 @@ struct MinimalCollectionWithCustomIterator : Collection {
   }
 
   var startIndex: MinimalIndex {
-    return MinimalIndex(position: 0, startIndex: 0, endIndex: _count)
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: 0, startIndex: 0, endIndex: _count)
   }
 
   var endIndex: MinimalIndex {
     return MinimalIndex(
+      collectionState: _collectionState,
       position: _count, startIndex: 0, endIndex: _count)
   }
 
   @warn_unused_result
   func successor(of i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
+      collectionState: _collectionState,
       position: i.position + 1, startIndex: 0, endIndex: _count)
   }
 
@@ -510,6 +536,7 @@ struct MinimalCollectionWithCustomIterator : Collection {
   }
 
   var _count: Int
+  var _collectionState: _CollectionState
 }
 
 CollectionTypeTests.test("Collection.makeIterator()/CustomImplementation") {

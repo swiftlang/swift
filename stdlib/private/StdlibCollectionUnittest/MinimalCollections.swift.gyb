@@ -345,7 +345,7 @@ public struct _CollectionState : Equatable, Hashable {
     self._endIndexLastMutatedStateId = endIndexLastMutatedStateId
   }
 
-  internal init(newRootStateForElementCount count: Int) {
+  public init(newRootStateForElementCount count: Int) {
     self._id = _CollectionState._nextUnusedState
     _CollectionState._nextUnusedState += 1
     self._elementsLastMutatedStateIds =
@@ -476,7 +476,7 @@ internal func _expectCompatibleIndices(
 }
 
 public struct MinimalIndex : Comparable {
-  internal init(
+  public init(
     collectionState: _CollectionState,
     position: Int,
     startIndex: Int,
