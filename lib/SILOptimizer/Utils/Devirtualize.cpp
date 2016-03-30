@@ -73,16 +73,8 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
             return false;
           // Handle the usual case here: the class in question
           // should be a real subclass of a bound generic class.
-          // FIXME: `isSuperclassOf` is the wrong check for a generic class,
-          // since a subclass may inherit a more specific instantiation of the
-          // generic, as in:
-          //   class Base<T> {}
-          //   class Sub: Base<Int> {}
-          //   class Sub2<U: Foo>: Base<U> {}
-          // This is more comprehensively fixed in Swift 3. As a spot fix for
-          // Swift 2.2, avoid filtering subclasses of generic bases.
-          return !ClassType.is<BoundGenericType>() &&
-            !ClassType.isSuperclassOf(SILType::getPrimitiveObjectType(SubCanTy));
+          return !ClassType.isSuperclassOf(
+              SILType::getPrimitiveObjectType(SubCanTy));
         });
     Subs.erase(RemovedIt, Subs.end());
   }
