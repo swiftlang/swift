@@ -1,8 +1,4 @@
 # Create convenience targets for the Swift standard library.
-
-set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang++")
-set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
-
 add_custom_target(swift-stdlib-all)
 foreach(SDK ${SWIFT_SDKS})
   add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
