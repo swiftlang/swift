@@ -40,6 +40,8 @@ inline ValueBaseUserRange makeUserRange(
                             UserTransform(toUser));
 }
 
+using DeadInstructionSet = llvm::SmallSetVector<SILInstruction *, 8>;
+
 /// \brief For each of the given instructions, if they are dead delete them
 /// along with their dead operands.
 ///

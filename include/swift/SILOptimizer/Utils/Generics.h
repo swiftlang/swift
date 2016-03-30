@@ -36,9 +36,8 @@ namespace swift {
 ///
 /// This is the top-level entry point for specializing an existing call site.
 void trySpecializeApplyOfGeneric(
-  ApplySite Apply,
-  llvm::SmallVectorImpl<SILInstruction *> &DeadApplies,
-  llvm::SmallVectorImpl<SILFunction *> &NewFunctions);
+    ApplySite Apply, DeadInstructionSet &DeadApplies,
+    llvm::SmallVectorImpl<SILFunction *> &NewFunctions);
 
 /// Helper class to describe re-abstraction of function parameters done during
 /// specialization.
