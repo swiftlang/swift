@@ -260,6 +260,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (void)testNested:(NSInteger * _Nonnull * _Nonnull)a;
 // CHECK-NEXT: - (void)testBridging:(NSInteger const * _Nonnull)a b:(NSInteger * _Nonnull)b c:(Methods * _Nonnull * _Nonnull)c;
 // CHECK-NEXT: - (void)testBridgingVoid:(void * _Nonnull)a b:(void const * _Nonnull)b;
+// CHECK-NEXT: - (void)testBridgingOptionality:(NSInteger const * _Nullable)a b:(NSInteger * _Null_unspecified)b c:(Methods * _Nullable * _Nullable)c;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
@@ -271,6 +272,8 @@ typealias AliasForNSRect = NSRect
 
   func testBridging(_ a: UnsafePointer<Int>, b: UnsafeMutablePointer<Int>, c: AutoreleasingUnsafeMutablePointer<Methods>) {}
   func testBridgingVoid(_ a: UnsafeMutablePointer<Void>, b: UnsafePointer<Void>) {}
+
+  func testBridgingOptionality(_ a: UnsafePointer<Int>?, b: UnsafeMutablePointer<Int>!, c: AutoreleasingUnsafeMutablePointer<Methods?>?) {}
 }
 
 // CHECK-LABEL: @interface MyObject : NSObject

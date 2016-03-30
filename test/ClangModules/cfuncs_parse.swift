@@ -107,6 +107,32 @@ func test_pointer() {
   opaque_pointer_param(op)
 }
 
+func test_pointer_nonnull() {
+  var i: CInt = 0
+  var ia: [CInt] = [1, 2, 3]
+  var f: CFloat = 0
+  var fa: [CFloat] = [1, 2, 3]
+
+  nonnull_param_pointer(&i)
+  nonnull_param_pointer(&ia)
+
+  nonnull_param_const_pointer(&i)
+  nonnull_param_const_pointer(ia)
+  nonnull_param_const_pointer([1, 2, 3])
+
+  nonnull_param_void_pointer(&i)
+  nonnull_param_void_pointer(&ia)
+  nonnull_param_void_pointer(&f)
+  nonnull_param_void_pointer(&fa)
+
+  nonnull_param_const_void_pointer(&i)
+  nonnull_param_const_void_pointer(ia)
+  // FIXME: nonnull_param_const_void_pointer([1, 2, 3])
+  nonnull_param_const_void_pointer(&f)
+  nonnull_param_const_void_pointer(fa)
+  // FIXME: nonnull_param_const_void_pointer([1.0, 2.0, 3.0])
+}
+
 func test_decay() {
   decay_param_array(nil as UnsafeMutablePointer<CInt>?)
   var i: CInt = 0
