@@ -136,7 +136,7 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
       && conformanceModule == typeUnit->getParentModule())
     return SILLinkage::Shared;
 
-  // If we're bulding with -sil-serialize-all, give the conformance public
+  // If we're building with -sil-serialize-all, give the conformance public
   // linkage.
   if (conformanceModule->getResilienceStrategy()
       == ResilienceStrategy::Fragile)

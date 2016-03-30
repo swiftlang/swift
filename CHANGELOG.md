@@ -3,7 +3,7 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 -------
 
-* [SE-0031](https://github.com/apple/swift-evolution/blob/master/proposals/0031-adjusting-inout-declarations.md) The location of the inout attribtue has been moved to after the `:` and before the parameter type.
+* [SE-0031](https://github.com/apple/swift-evolution/blob/master/proposals/0031-adjusting-inout-declarations.md) The location of the inout attribute has been moved to after the `:` and before the parameter type.
 ```swift
   func foo(inout x: Int) {
   }

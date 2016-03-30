@@ -3481,7 +3481,7 @@ namespace {
                                                       llvm::Value *metadata) {
       // We assume that we've already filled in the class's generic arguments.
       // We need to:
-      //   - relocate the metadata to accomodate the superclass,
+      //   - relocate the metadata to accommodate the superclass,
       //     if something in our hierarchy is resilient to us;
       //   - fill out the subclass's field offset vector, if its layout
       //     wasn't fixed;

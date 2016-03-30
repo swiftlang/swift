@@ -2508,7 +2508,7 @@ builtin "unsafeGuaranteed"
   // $T must be of AnyObject type.
 
 Asserts that there exists another reference of the value ``%0`` for the scope
-delinated by the call of this builtin up to the first call of a ``builtin
+delineated by the call of this builtin up to the first call of a ``builtin
 "unsafeGuaranteedEnd"`` instruction that uses the second element ``%1.1`` of the
 returned value. If no such instruction can be found nothing can be assumed. This
 assertions holds for uses of the first tuple element of the returned value
