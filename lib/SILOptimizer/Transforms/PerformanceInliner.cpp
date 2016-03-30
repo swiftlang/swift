@@ -748,14 +748,8 @@ public:
     return getBlockInfo(BB)->getScopeLength(LoopDepth);
   }
 
-  /// Returns the length of the shortest path of the block \p BB in its
-  /// innermost loop.
-  int getInnerScopeLength(SILBasicBlock *BB) {
-    return getScopeLength(BB, LI->getLoopDepth(BB));
-  }
-
   /// Returns the weight of block \p BB also considering the \p CallerWeight
-  /// which is the weigt of the call site's block in the caller.
+  /// which is the weight of the call site's block in the caller.
   Weight getWeight(SILBasicBlock *BB, Weight CallerWeight);
 
   void dump();
