@@ -531,7 +531,8 @@ void CompilerInstance::performParseOnly() {
   Module *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
-  assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_Swift_Library);
+  assert((Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_Swift_Library) &&
+    "only supports parsing a single .swift file");
   assert(BufferIDs.size() == 1 && "only supports parsing a single file");
 
   if (Kind == InputFileKind::IFK_Swift)
