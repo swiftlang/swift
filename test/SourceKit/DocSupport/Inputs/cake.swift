@@ -33,3 +33,17 @@ extension C1Alias : Prot1 {}
 public extension Prot {
   public func foo1() {}
 }
+
+public struct S1 {
+  public enum SE {
+  case a
+  case b
+  case c
+  }
+}
+public extension S1 {
+  public func foo1() {}
+  public struct S2 {
+    public let b = 1
+  }
+}

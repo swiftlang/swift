@@ -1624,7 +1624,7 @@ public:
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     const NominalTypeDecl *NTD,
                                     Optional<BracketOptions> Bracket) override {
-    if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension)
+    if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension(ED))
       return;
     OS << "<synthesized>";
   }
@@ -1632,7 +1632,7 @@ public:
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                      const NominalTypeDecl *NTD,
                                      Optional<BracketOptions> Bracket) override {
-    if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension)
+    if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension(ED))
       return;
     OS << "</synthesized>";
   }

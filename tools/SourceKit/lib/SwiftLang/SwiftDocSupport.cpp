@@ -148,7 +148,7 @@ public:
 
   bool shouldContinuePre(const Decl *D, Optional<BracketOptions> Bracket) {
     assert(Bracket.hasValue());
-    if (!Bracket.getValue().shouldOpenExtension &&
+    if (!Bracket.getValue().shouldOpenExtension(D) &&
         D->getKind() == DeclKind::Extension)
       return false;
     return true;
@@ -156,9 +156,9 @@ public:
 
   bool shouldContinuePost(const Decl *D, Optional<BracketOptions> Bracket) {
     assert(Bracket.hasValue());
-    if (!Bracket.getValue().shouldCloseNominal && dyn_cast<NominalTypeDecl>(D))
+    if (!Bracket.getValue().shouldCloseNominal(D) && dyn_cast<NominalTypeDecl>(D))
       return false;
-    if (!Bracket.getValue().shouldCloseExtension &&
+    if (!Bracket.getValue().shouldCloseExtension(D) &&
         D->getKind() == DeclKind::Extension)
       return false;
     return true;
@@ -186,10 +186,7 @@ public:
     EntitiesStack.pop_back();
     unsigned EndOffset = OS.tell();
     Entity.Range.Length = EndOffset - Entity.Range.Offset;
-    if (EntitiesStack.empty())
-      TopEntities.push_back(std::move(Entity));
-    else
-      EntitiesStack.back().SubEntities.push_back(std::move(Entity));
+    TopEntities.push_back(std::move(Entity));
   }
 
   void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
@@ -220,10 +217,13 @@ public:
     EntitiesStack.pop_back();
     unsigned EndOffset = OS.tell();
     Entity.Range.Length = EndOffset - Entity.Range.Offset;
-    if (EntitiesStack.empty())
+    if (EntitiesStack.empty()) {
+      assert (D->getDeclContext()->isModuleScopeContext());
       TopEntities.push_back(std::move(Entity));
-    else
+    } else {
+      assert (!D->getDeclContext()->isModuleScopeContext());
       EntitiesStack.back().SubEntities.push_back(std::move(Entity));
+    }
     deinitDefaultMapToUse(D);
   }
 
