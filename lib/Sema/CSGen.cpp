@@ -3282,7 +3282,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   Optional<Solution> OpSolution = CS.solveSingle();
   if (!OpSolution.hasValue())
     return Result;
-  SelectedOverload Selected =  OpSolution.getValue().overloadChoices[Locator];
+  SelectedOverload Selected = OpSolution.getValue().overloadChoices[Locator];
   Result.Favored = Selected.choice.getDecl();
   for (OverloadChoice& Choice : LookupResult.ViableCandidates) {
     ValueDecl *VD = Choice.getDecl();
@@ -3290,4 +3290,30 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
       Result.OtherViables.push_back(VD);
   }
   return Result;
+}
+
+void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
+                    llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
+  Type BaseTy = PD->getDeclaredTypeInContext();
+  DeclContext *DC = PD->getDeclContext();
+  auto *TC = static_cast<TypeChecker*>(DC->getASTContext().getLazyResolver());
+  if (!TC) {
+    TC = new TypeChecker(DC->getASTContext());
+  }
+  for (Decl *D : PD->getMembers()) {
+    ValueDecl *VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      continue;
+    ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
+                                                    VD->getFullName());
+    if (Result.OtherViables.empty())
+      continue;
+    if (!Result.Favored->getDeclContext()->isGenericTypeContext())
+      continue;
+    for (ValueDecl *Default : Result.OtherViables) {
+      if (Default->getDeclContext()->isExtensionContext()) {
+        DefaultMap.insert({Default, VD});
+      }
+    }
+  }
 }

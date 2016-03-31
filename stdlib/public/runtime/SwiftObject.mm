@@ -47,7 +47,7 @@
 using namespace swift;
 
 #if SWIFT_HAS_ISA_MASKING
-extern "C" __attribute__((weak_import))
+OBJC_EXPORT __attribute__((weak_import))
 const uintptr_t objc_debug_isa_class_mask;
 
 static uintptr_t computeISAMask() {

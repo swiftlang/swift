@@ -69,10 +69,13 @@ int _swift_stdlib_close(int fd);
 __attribute__((const))
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_size_t _swift_stdlib_malloc_size(const void *ptr);
+
+// Random number <random>
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_uint32_t _swift_stdlib_arc4random(void);
+__swift_uint32_t _swift_stdlib_cxx11_mt19937(void);
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_uint32_t _swift_stdlib_arc4random_uniform(__swift_uint32_t upper_bound);
+__swift_uint32_t
+_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

@@ -15,11 +15,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/StringExtras.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace constraints;
@@ -1147,7 +1148,7 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
 
       TypeSubstitutionMap archetypesMap;
       bool matched;
-      if (paramType->is<UnresolvedType>() || rArgType->hasTypeVariable())
+      if (paramType->hasUnresolvedType() || rArgType->hasTypeVariable())
         matched = false;
       else {
         auto matchType = paramType;
@@ -2543,6 +2544,7 @@ namespace {
     llvm::DenseMap<Pattern*, Type> PatternTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
     llvm::DenseMap<CollectionExpr*, Expr*> CollectionSemanticExprs;
+    llvm::DenseSet<Decl*> InvalidDecls;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
     void operator=(const ExprTypeSaverAndEraser&) = delete;
   public:
@@ -2587,6 +2589,11 @@ namespace {
               if (P->hasType()) {
                 TS->ParamDeclTypes[P] = P->getType();
                 P->overwriteType(Type());
+                
+                if (P->isInvalid()) {
+                  P->setInvalid(false);
+                  TS->InvalidDecls.insert(P);
+                }
               }
           
           // If we have a CollectionExpr with a type checked SemanticExpr,
@@ -2648,10 +2655,15 @@ namespace {
       for (auto CSE : CollectionSemanticExprs)
         CSE.first->setSemanticExpr(CSE.second);
       
+      if (!InvalidDecls.empty())
+        for (auto D : InvalidDecls)
+          D->setInvalid();
+      
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
       TypeLocTypes.clear();
       PatternTypes.clear();
+      InvalidDecls.clear();
     }
     
     // On destruction, if a type got wiped out, reset it from null to its
@@ -2682,6 +2694,10 @@ namespace {
       for (auto paramDeclElt : ParamDeclTypes)
         if (!paramDeclElt.first->hasType())
           paramDeclElt.first->setType(paramDeclElt.second);
+
+      if (!InvalidDecls.empty())
+        for (auto D : InvalidDecls)
+          D->setInvalid();
     }
   };
 }

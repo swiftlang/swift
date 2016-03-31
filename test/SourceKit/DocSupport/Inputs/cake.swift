@@ -2,6 +2,7 @@ public protocol Prot {
   associatedtype Element
   var p : Int { get }
   func foo()
+  func foo1()
 }
 
 public class C1 : Prot {
@@ -28,3 +29,7 @@ protocol Prot1 {}
 typealias C1Alias = C1
 
 extension C1Alias : Prot1 {}
+
+public extension Prot {
+  public func foo1() {}
+}

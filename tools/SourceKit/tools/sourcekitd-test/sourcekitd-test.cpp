@@ -92,6 +92,7 @@ static sourcekitd_uid_t KeyLength;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyUSR;
 static sourcekitd_uid_t KeyOriginalUSR;
+static sourcekitd_uid_t KeyDefaultImplementationOf;
 static sourcekitd_uid_t KeyInterestedUSR;
 static sourcekitd_uid_t KeyTypename;
 static sourcekitd_uid_t KeyOverrides;
@@ -187,6 +188,7 @@ static int skt_main(int argc, const char **argv) {
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyUSR = sourcekitd_uid_get_from_cstr("key.usr");
   KeyOriginalUSR = sourcekitd_uid_get_from_cstr("key.original_usr");
+  KeyDefaultImplementationOf = sourcekitd_uid_get_from_cstr("key.default_implementation_of");
   KeyInterestedUSR = sourcekitd_uid_get_from_cstr("key.interested_usr");
   KeyTypename = sourcekitd_uid_get_from_cstr("key.typename");
   KeyOverrides = sourcekitd_uid_get_from_cstr("key.overrides");

@@ -27,6 +27,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -4311,3 +4312,4 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   // If we can solve the solution, the protocol extension is usable.
   return cs.solveSingle().hasValue();
 }
+

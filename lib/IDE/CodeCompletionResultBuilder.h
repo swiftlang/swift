@@ -47,6 +47,8 @@ class CodeCompletionResultBuilder {
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   bool IsNotRecommended = false;
+  CodeCompletionResult::NotRecommendedReason NotRecReason =
+    CodeCompletionResult::NotRecommendedReason::NoReason;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -94,8 +96,9 @@ public:
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
-  void setNotRecommended(bool NotRecommended = true) {
-    IsNotRecommended = NotRecommended;
+  void setNotRecommended(CodeCompletionResult::NotRecommendedReason Reason) {
+    IsNotRecommended = true;
+    NotRecReason = Reason;
   }
 
   void

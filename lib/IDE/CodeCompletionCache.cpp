@@ -234,7 +234,9 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     if (kind == CodeCompletionResult::Declaration) {
       result = new (*V.Sink.Allocator)
           CodeCompletionResult(context, numBytesToErase, string, declKind,
-                               moduleName, notRecommended, briefDocComment,
+                               moduleName, notRecommended,
+                               CodeCompletionResult::NotRecommendedReason::NoReason,
+                               briefDocComment,
                                copyStringArray(*V.Sink.Allocator, assocUSRs),
                                copyStringPairArray(*V.Sink.Allocator, declKeywords));
     } else {

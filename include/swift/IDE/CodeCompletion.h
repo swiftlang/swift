@@ -495,11 +495,21 @@ public:
     Identical,
   };
 
+  enum NotRecommendedReason {
+
+    Redundant,
+
+    TypeMismatch,
+
+    NoReason,
+  };
+
 private:
   unsigned Kind : 2;
   unsigned AssociatedKind : 8;
   unsigned SemanticContext : 3;
   unsigned NotRecommended : 1;
+  unsigned NotRecReason : 3;
 
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
@@ -527,8 +537,9 @@ public:
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance = Unrelated)
       : Kind(Kind), SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(false), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), TypeDistance(TypeDistance) {
+        NotRecommended(false), NotRecReason(NotRecommendedReason::NoReason),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        TypeDistance(TypeDistance) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
     AssociatedKind = 0;
@@ -543,8 +554,9 @@ public:
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance = Unrelated)
       : Kind(Keyword), SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(false), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), TypeDistance(TypeDistance) {
+        NotRecommended(false), NotRecReason(NotRecommendedReason::NoReason),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        TypeDistance(TypeDistance) {
     assert(CompletionString);
     AssociatedKind = static_cast<unsigned>(Kind);
   }
@@ -558,8 +570,9 @@ public:
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance)
       : Kind(Literal), SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(false), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), TypeDistance(TypeDistance) {
+        NotRecommended(false), NotRecReason(NotRecommendedReason::NoReason),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(LiteralKind);
     assert(CompletionString);
   }
@@ -573,13 +586,16 @@ public:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl, StringRef ModuleName,
-                       bool NotRecommended, StringRef BriefDocComment,
+                       bool NotRecommended,
+                       CodeCompletionResult::NotRecommendedReason NotRecReason,
+                       StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ArrayRef<std::pair<StringRef, StringRef>> DocWords,
                        enum ExpectedTypeRelation TypeDistance)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
+        NotRecommended(NotRecommended), NotRecReason(NotRecReason),
+        NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         DocWords(DocWords), TypeDistance(TypeDistance) {
@@ -593,12 +609,15 @@ public:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        CodeCompletionDeclKind DeclKind, StringRef ModuleName,
-                       bool NotRecommended, StringRef BriefDocComment,
+                       bool NotRecommended,
+                       CodeCompletionResult::NotRecommendedReason NotRecReason,
+                       StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ArrayRef<std::pair<StringRef, StringRef>> DocWords)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
+        NotRecommended(NotRecommended), NotRecReason(NotRecReason),
+        NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         DocWords(DocWords) {
@@ -639,6 +658,10 @@ public:
 
   ExpectedTypeRelation getExpectedTypeRelation() const {
     return static_cast<ExpectedTypeRelation>(TypeDistance);
+  }
+
+  NotRecommendedReason getNotRecommendedReason() const {
+    return static_cast<NotRecommendedReason>(NotRecReason);
   }
 
   SemanticContextKind getSemanticContext() const {
