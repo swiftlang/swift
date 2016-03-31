@@ -208,5 +208,15 @@ ClassProperties.test("namingConflict/protocol") {
   expectEmpty(type.protoProp)
 }
 
+ClassProperties.test("runtime") {
+  let theClass: AnyObject = SwiftClass.self
+  let prop = class_getProperty(object_getClass(theClass), "value")
+  expectTrue(prop != nil)
+
+  let nameAsCString = property_getName(prop)
+  expectTrue(nameAsCString != nil)
+  expectEqual("value", String(cString: nameAsCString))
+}
+
 runAllTests()
 
