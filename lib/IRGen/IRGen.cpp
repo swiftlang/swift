@@ -90,17 +90,6 @@ static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
   PM.add(createAddressSanitizerModulePass());
 }
 
-// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp.
-// These should be moved to a single definition shared by clang and swift.
-enum ImageInfoFlags {
-  eImageInfo_FixAndContinue      = (1 << 0),
-  eImageInfo_GarbageCollected    = (1 << 1),
-  eImageInfo_GCOnly              = (1 << 2),
-  eImageInfo_OptimizedByDyld     = (1 << 3),
-  eImageInfo_CorrectedSynthesize = (1 << 4),
-  eImageInfo_ImageIsSimulated    = (1 << 5)
-};
-
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
 swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
