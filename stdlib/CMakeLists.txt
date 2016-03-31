@@ -2,6 +2,8 @@
 
 set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang++")
 set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
+set(CMAKE_CXX_COMPILER_ARG1 "")
+set(CMAKE_C_COMPILER_ARG1 "")
 
 add_custom_target(swift-stdlib-all)
 foreach(SDK ${SWIFT_SDKS})
