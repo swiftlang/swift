@@ -2268,7 +2268,6 @@ static inline bool swift_isClassOrObjCExistentialTypeImpl(const Metadata *T) {
   return false;
 }
 
-#if SWIFT_OBJC_INTEROP
 //===----------------------------------------------------------------------===//
 // Bridging to and from Objective-C
 //===----------------------------------------------------------------------===//
@@ -2316,6 +2315,7 @@ struct _ObjectiveCBridgeableWitnessTable {
 
 extern "C" const ProtocolDescriptor _TMps21_ObjectiveCBridgeable;
 
+#if SWIFT_OBJC_INTEROP
 /// Dynamic cast from a value type that conforms to the _ObjectiveCBridgeable
 /// protocol to a class type, first by bridging the value to its Objective-C
 /// object representation and then by dynamic casting that object to the
@@ -2491,6 +2491,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
 
   return success;
 }
+#endif
 
 //===--- Bridging helpers for the Swift stdlib ----------------------------===//
 // Functions that must discover and possibly use an arbitrary type's
@@ -2498,8 +2499,10 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
 // documentation.
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_OBJC_INTEROP
 extern "C" const _ObjectiveCBridgeableWitnessTable
 _TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables;
+#endif
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
@@ -2511,16 +2514,20 @@ findBridgeWitness(const Metadata *T) {
   // that looks like a metatype value if the metatype can be bridged.
   switch (T->getKind()) {
   case MetadataKind::Metatype: {
+#if SWIFT_OBJC_INTEROP
     auto metaTy = static_cast<const MetatypeMetadata *>(T);
     if (metaTy->InstanceType->isAnyClass())
       return &_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables;
+#endif
     break;
   }
   case MetadataKind::ExistentialMetatype: {
+#if SWIFT_OBJC_INTEROP
     auto existentialMetaTy =
       static_cast<const ExistentialMetatypeMetadata *>(T);
     if (existentialMetaTy->isObjC())
       return &_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables;
+#endif
     break;
   }
 
@@ -2682,7 +2689,6 @@ extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
   return bridgeWitness && bridgeWitness->isBridgedToObjectiveC(value, T,
                                                                bridgeWitness);
 }
-#endif
 
 // func isClassOrObjCExistential<T>(x: T.Type) -> Bool
 SWIFT_RUNTIME_EXPORT
