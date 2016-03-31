@@ -397,7 +397,7 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
   return Result;
 }
 
-static void printAnnotatedDeclaration(const ValueDecl *VD, const Type Ty,
+static void printAnnotatedDeclaration(const ValueDecl *VD,
                                       const Type BaseTy,
                                       raw_ostream &OS) {
   AnnotatedDeclarationPrinter Printer(OS);
@@ -658,7 +658,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned DeclBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
-    printAnnotatedDeclaration(VD, Ty, BaseType, OS);
+    printAnnotatedDeclaration(VD, BaseType, OS);
   }
   unsigned DeclEnd = SS.size();
 
