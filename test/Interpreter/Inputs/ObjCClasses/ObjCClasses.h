@@ -58,6 +58,35 @@ NS_ASSUME_NONNULL_BEGIN
 @interface AnimalContainer<C: Animal *> : Container<C>
 @end
 
+#if __has_feature(objc_class_property)
+@protocol ProtoWithClassProperty
++ (void)reset;
+@property (class) int value;
+
+@optional
+@property (class, readonly) BOOL optionalClassProp;
+@end
+
+@interface ClassWithClassProperty : NSObject <ProtoWithClassProperty>
+@end
+
+@interface ObjCSubclassWithClassProperty : ClassWithClassProperty
+// Deliberately redeclared.
+@property (class) int value;
+@end
+
+@protocol PropertyNamingConflictProto
+@property (nullable) id protoProp;
+@property (class, nullable) id protoProp;
+@end
+
+@interface PropertyNamingConflict : NSObject
+@property (readonly, nullable) id prop;
+@property (class, readonly, nullable) id prop;
+@end
+
+#endif // __has_feature(objc_class_property)
+
 NS_ASSUME_NONNULL_END
 
 #endif

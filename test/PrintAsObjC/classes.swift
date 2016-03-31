@@ -364,8 +364,8 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, readonly, strong) Properties * _Nonnull mySelf;
 // CHECK-NEXT: @property (nonatomic, readonly) double pi;
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
-// CHECK-NEXT: + (Properties * _Nonnull)shared;
-// CHECK-NEXT: + (void)setShared:(Properties * _Nonnull)newValue;
+// CHECK-NEXT: @property (nonatomic, class, strong) Properties * _Nonnull shared;
+// CHECK-NEXT: @property (nonatomic, class, readonly, strong) Properties * _Nonnull sharedRO;
 // CHECK-NEXT: @property (nonatomic, weak) Properties * _Nullable weakOther;
 // CHECK-NEXT: @property (nonatomic, assign) Properties * _Nonnull unownedOther;
 // CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * _Nonnull unmanagedOther;
@@ -394,10 +394,9 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(CustomName) NSArray<CustomName *> *  _Nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * _Nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray<id <NSObject>> * _Nullable outletCollectionProto;
-// CHECK-NEXT: + (NSInteger)staticInt;
-// CHECK-NEXT: + (NSString * _Nonnull)staticString;
-// CHECK-NEXT: + (void)setStaticString:(NSString * _Nonnull)value;
-// CHECK-NEXT: + (double)staticDouble;
+// CHECK-NEXT: @property (nonatomic, class, readonly) NSInteger staticInt;
+// CHECK-NEXT: @property (nonatomic, class, copy) NSString * _Nonnull staticString;
+// CHECK-NEXT: @property (nonatomic, class, readonly) double staticDouble;
 // CHECK-NEXT: @property (nonatomic, strong) Properties * _Nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
 // CHECK-NEXT: @property (nonatomic, getter=isAnimated) BOOL animated;
@@ -423,6 +422,10 @@ public class NonObjCClass { }
   class var shared: Properties {
     get { return Properties() }
     set { }
+  }
+
+  class var sharedRO: Properties {
+    get { return Properties() }
   }
 
   weak var weakOther: Properties?
