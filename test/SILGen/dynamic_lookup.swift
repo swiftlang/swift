@@ -240,7 +240,7 @@ func downcast(obj: AnyObject) -> X {
 // CHECK: bb1([[FN:%.*]] : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice):
 // CHECK:        [[METHOD:%.*]] = partial_apply [[FN]]([[SELF]]) : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice
 // CHECK:        [[RESULT:%.*]] = apply [[METHOD]]() : $@callee_owned () -> @owned Juice
-// CHECK:        [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.Some!enumelt.1
+// CHECK:        [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
 // CHECK:        store [[RESULT]] to [[PAYLOAD]]
 // CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.Some!enumelt.1
 // CHECK:        br bb3
