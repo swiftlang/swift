@@ -363,6 +363,9 @@ BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 /// Fence has type () -> ().
 BUILTIN_MISC_OPERATION(Fence, "fence", "", None)
 
+/// onFastPath has type () -> ().
+BUILTIN_MISC_OPERATION(OnFastPath, "onFastPath", "n", None)
+
 /// CmpXChg has type (Builtin.RawPointer, T, T) -> (T, Bool).
 BUILTIN_MISC_OPERATION(CmpXChg, "cmpxchg", "", Special)
 
