@@ -190,41 +190,6 @@ extension MutableCollection {
   }
 }
 
-internal func _writeBackMutableSlice<
-  C : MutableCollection,
-  Slice_ : Collection
-  where
-  C._Element == Slice_.Iterator.Element,
-  C.Index == Slice_.Index
->(self_: inout C, bounds: Range<C.Index>, slice: Slice_) {
-  
-  self_._failEarlyRangeCheck(bounds, bounds: self_.startIndex..<self_.endIndex)
-  
-  // FIXME(performance): can we use
-  // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
-  // aliasing violations if the newValue points to the same buffer?
-
-  var selfElementIndex = bounds.lowerBound
-  let selfElementsEndIndex = bounds.upperBound
-  var newElementIndex = slice.startIndex
-  let newElementsEndIndex = slice.endIndex
-
-  while selfElementIndex != selfElementsEndIndex &&
-    newElementIndex != newElementsEndIndex {
-
-    self_[selfElementIndex] = slice[newElementIndex]
-    self_.formSuccessor(&selfElementIndex)
-    slice.formSuccessor(&newElementIndex)
-  }
-
-  _precondition(
-    selfElementIndex == selfElementsEndIndex,
-    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
-  _precondition(
-    newElementIndex == newElementsEndIndex,
-    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
-}
-
 @available(*, unavailable, renamed: "MutableCollection")
 public typealias MutableCollectionType = MutableCollection
 

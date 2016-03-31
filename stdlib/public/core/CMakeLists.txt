@@ -113,6 +113,7 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
+  WriteBackMutableSlice.swift
   )
 
 # The complete list of sources in the core standard library.  Includes

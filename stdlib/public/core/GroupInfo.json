@@ -46,6 +46,7 @@
     "Index.swift",
     "Indices.swift",
     "Existential.swift",
+    "WriteBackMutableSlice.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
