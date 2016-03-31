@@ -6982,7 +6982,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.decl.extension.protocol,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension OptionSet</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
     key.offset: 2710,
     key.length: 158,
     key.extends: {
@@ -7057,7 +7057,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.description: "Element == Self"
       }
     ],
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension OptionSet where Element == Self</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>Element == Self</codeVoice>, which is the default.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions where Element == Self</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>Element == Self</codeVoice>, which is the default.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
     key.offset: 2870,
     key.length: 167,
     key.extends: {
@@ -7132,7 +7132,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.description: "RawValue : BitwiseOperations"
       }
     ],
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension OptionSet where RawValue : BitwiseOperations</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>RawValue</codeVoice> conforms to <codeVoice>BitwiseOperations</codeVoice>, which is the usual case.  Each distinct bit of an option set&apos;s <codeVoice>.rawValue</codeVoice> corresponds to a disjoint element of the option set.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note><List-Bullet><Item><Para><codeVoice>union</codeVoice> is implemented as a bitwise &quot;or&quot; (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>intersection</codeVoice> is implemented as a bitwise &quot;and&quot; (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>exclusiveOr</codeVoice> is implemented as a bitwise &quot;exclusive or&quot; (<codeVoice>^</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item></List-Bullet></Discussion></Other>",
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions where RawValue : BitwiseOperations</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>RawValue</codeVoice> conforms to <codeVoice>BitwiseOperations</codeVoice>, which is the usual case.  Each distinct bit of an option set&apos;s <codeVoice>.rawValue</codeVoice> corresponds to a disjoint element of the option set.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note><List-Bullet><Item><Para><codeVoice>union</codeVoice> is implemented as a bitwise &quot;or&quot; (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>intersection</codeVoice> is implemented as a bitwise &quot;and&quot; (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>exclusiveOr</codeVoice> is implemented as a bitwise &quot;exclusive or&quot; (<codeVoice>^</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item></List-Bullet></Discussion></Other>",
     key.offset: 3039,
     key.length: 206,
     key.extends: {
@@ -7212,7 +7212,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.decl.extension.protocol,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension SetAlgebra</Declaration><Abstract><Para><codeVoice>SetAlgebra</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>SetAlgebra</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><Abstract><Para><codeVoice>SetAlgebra</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>SetAlgebra</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
     key.offset: 3247,
     key.length: 744,
     key.extends: {

@@ -63,25 +63,28 @@ struct TextEntity {
   TextRange Range;
   unsigned LocOffset = 0;
   std::vector<TextEntity> SubEntities;
+  const bool IsSynthesizedExtension;
 
   TextEntity(const Decl *D, const Decl *SynthesizeTarget,
              const Decl* DefaultImplementationOf,
-             unsigned StartOffset)
+             unsigned StartOffset, bool IsSynthesizedExtension)
     : Dcl(D), SynthesizeTarget(SynthesizeTarget),
-      DefaultImplementationOf(DefaultImplementationOf), Range{StartOffset, 0} {}
+      DefaultImplementationOf(DefaultImplementationOf), Range{StartOffset, 0},
+      IsSynthesizedExtension(IsSynthesizedExtension) {}
 
   TextEntity(const Decl *D, const Decl *SynthesizeTarget,
              const Decl* DefaultImplementationOf, TextRange TR,
-             unsigned LocOffset) : Dcl(D), SynthesizeTarget(SynthesizeTarget),
-             DefaultImplementationOf(DefaultImplementationOf),
-                                   Range(TR), LocOffset(LocOffset) {}
+             unsigned LocOffset, bool IsSynthesizedExtension) : Dcl(D),
+             DefaultImplementationOf(DefaultImplementationOf), Range(TR),
+              LocOffset(LocOffset),
+              IsSynthesizedExtension(IsSynthesizedExtension) {}
 
   TextEntity(const Decl *D, const Decl *SynthesizeTarget,
              const Decl* DefaultImplementationOf, StringRef Arg,
-             TextRange TR, unsigned LocOffset)
+             TextRange TR, unsigned LocOffset, bool IsSynthesizedExtension)
     : Dcl(D), SynthesizeTarget(SynthesizeTarget),
       DefaultImplementationOf(DefaultImplementationOf), Argument(Arg), Range(TR),
-      LocOffset(LocOffset) {}
+      LocOffset(LocOffset), IsSynthesizedExtension(IsSynthesizedExtension) {}
 };
 
 struct TextReference {
@@ -172,7 +175,7 @@ public:
     if (!shouldContinuePre(ED, Bracket))
       return;
     unsigned StartOffset = OS.tell();
-    EntitiesStack.emplace_back(ED, SynthesizeTarget, nullptr, StartOffset);
+    EntitiesStack.emplace_back(ED, SynthesizeTarget, nullptr, StartOffset, true);
   }
 
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
@@ -197,7 +200,7 @@ public:
     unsigned StartOffset = OS.tell();
     initDefaultMapToUse(D);
     EntitiesStack.emplace_back(D, SynthesizeTarget, getDefaultImplementation(D),
-                               StartOffset);
+                               StartOffset, false);
   }
 
   void printDeclLoc(const Decl *D) override {
@@ -278,7 +281,8 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
 
 static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
                               const Decl *DefaultImplementationOf,
-                              bool IsRef, DocEntityInfo &Info,
+                              bool IsRef, bool IsSynthesizedExtension,
+                              DocEntityInfo &Info,
                               StringRef Arg = StringRef()) {
   if (!D || isa<ParamDecl>(D) ||
       (isa<VarDecl>(D) && D->getDeclContext()->isLocalContext())) {
@@ -326,7 +330,33 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
 
   if (!IsRef) {
     llvm::raw_svector_ostream OS(Info.DocComment);
-    ide::getDocumentationCommentAsXML(D, OS);
+
+    {
+      llvm::SmallString<128> DocBuffer;
+      {
+        llvm::raw_svector_ostream OSS(DocBuffer);
+        ide::getDocumentationCommentAsXML(D, OSS);
+      }
+      StringRef DocRef = (StringRef)DocBuffer;
+      if (IsSynthesizedExtension &&
+          DocRef.find("<Declaration>") != StringRef::npos) {
+        StringRef Open = "<Declaration>extension ";
+        assert(DocRef.find(Open) != StringRef::npos);
+        auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
+        auto SecondPart = DocRef.substr(FirstPart.size());
+        auto ExtendedName = ((ExtensionDecl*)D)->getExtendedType()->
+          getAnyNominal()->getName().str();
+        assert(SecondPart.startswith(ExtendedName));
+        SecondPart = SecondPart.substr(ExtendedName.size());
+        llvm::SmallString<128> UpdatedDocBuffer;
+        UpdatedDocBuffer.append(FirstPart);
+        UpdatedDocBuffer.append(((NominalTypeDecl*)SynthesizedTarget)->getName().
+                                str());
+        UpdatedDocBuffer.append(SecondPart);
+        OS << UpdatedDocBuffer;
+      } else
+        OS << DocBuffer;
+    }
 
     initDocGenericParams(D, Info);
 
@@ -343,7 +373,8 @@ static bool initDocEntityInfo(const TextEntity &Entity,
                               DocEntityInfo &Info) {
   if (initDocEntityInfo(Entity.Dcl, Entity.SynthesizeTarget,
                         Entity.DefaultImplementationOf,
-                        /*IsRef=*/false, Info, Entity.Argument))
+                        /*IsRef=*/false, Entity.IsSynthesizedExtension,
+                        Info, Entity.Argument))
     return true;
   Info.Offset = Entity.Range.Offset;
   Info.Length = Entity.Range.Length;
@@ -358,13 +389,13 @@ static const TypeDecl *getTypeDeclFromType(Type Ty) {
 
 static void passInherits(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, EntInfo))
+  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, false, EntInfo))
     return;
   Consumer.handleInheritsEntity(EntInfo);
 }
 static void passConforms(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, EntInfo))
+  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, false, EntInfo))
     return;
   Consumer.handleConformsToEntity(EntInfo);
 }
@@ -400,7 +431,7 @@ static void passConforms(ArrayRef<ValueDecl *> Dcls,
 }
 static void passExtends(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, EntInfo))
+  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, false, EntInfo))
     return;
   Consumer.handleExtendsEntity(EntInfo);
 }
@@ -607,7 +638,8 @@ private:
       const TextReference &Ref = References.front();
       References = References.slice(1);
       DocEntityInfo Info;
-      if (initDocEntityInfo(Ref.Dcl, nullptr, nullptr, /*IsRef=*/true, Info))
+      if (initDocEntityInfo(Ref.Dcl, nullptr, nullptr, /*IsRef=*/true, false,
+                            Info))
         continue;
       Info.Offset = Ref.Range.Offset;
       Info.Length = Ref.Range.Length;
@@ -671,7 +703,7 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
         SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
                                 BufferID);
       TextRange TR{ StartOffs, EndOffs-StartOffs };
-      TextEntity Param(param, nullptr, nullptr, Arg, TR, StartOffs);
+      TextEntity Param(param, nullptr, nullptr, Arg, TR, StartOffs, false);
       Ent.SubEntities.push_back(std::move(Param));
     }
   }
@@ -865,7 +897,7 @@ public:
       return true;
     TextRange TR = getTextRange(D->getSourceRange());
     unsigned LocOffset = getOffset(Range.getStart());
-    EntitiesStack.emplace_back(D, nullptr, nullptr, TR, LocOffset);
+    EntitiesStack.emplace_back(D, nullptr, nullptr, TR, LocOffset, false);
     return true;
   }
 

@@ -155,7 +155,7 @@ namespace {
 
 class UIdentVisitor : public ASTVisitor<UIdentVisitor,
                                         UIdent, UIdent, UIdent, UIdent > {
-  bool IsRef;
+  const bool IsRef;
 
 public:
   explicit UIdentVisitor(bool IsRef) : IsRef(IsRef) { }

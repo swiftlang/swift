@@ -434,6 +434,18 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   VD->print(Printer, PO);
 }
 
+
+void SwiftLangSupport::
+printFullyAnnotatedSynthesizedExtension(swift::ExtensionDecl * Extension,
+                                        swift::NominalTypeDecl *Target,
+                                        llvm::raw_ostream &OS) {
+  FullyAnnotatedDeclarationPrinter Printer(OS);
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  SynthesizedExtensionAnalyzer Analyzer(Target, PO);
+  PO.initArchetypeTransformerForSynthesizedExtensions(Target, &Analyzer);
+  Extension->print(Printer, PO);
+}
+
 template <typename FnTy>
 void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
