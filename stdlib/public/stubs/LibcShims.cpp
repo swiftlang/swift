@@ -18,10 +18,6 @@
 #include <string.h>
 #include "../SwiftShims/LibcShims.h"
 
-#if defined(__linux__)
-#include <bsd/stdlib.h>
-#endif
-
 static_assert(std::is_same<ssize_t, swift::__swift_ssize_t>::value,
               "__swift_ssize_t is wrong");
 
