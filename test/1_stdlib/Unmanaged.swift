@@ -64,5 +64,16 @@ UnmanagedTests.test("_withUnsafeGuaranteedRef") {
   }
 }
 
+UnmanagedTests.test("_withUnsafeGuaranteedRef/return") {
+  var ref = Foobar()
+  var unmanaged = Unmanaged.passUnretained(ref)
+  withExtendedLifetime(ref) {
+    expectEqual(1, unmanaged._withUnsafeGuaranteedRef {
+      return $0.foo()
+    })
+  }
+}
+
+
 runAllTests()
 
