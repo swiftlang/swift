@@ -3787,6 +3787,12 @@ public:
 
   bool isBranch() const { return !getSuccessors().empty(); }
 
+  /// Returns true if this terminator exits the function.
+  bool isFunctionExiting() const {
+    return getKind() == ValueKind::ThrowInst ||
+           getKind() == ValueKind::ReturnInst;
+  }
+
   TermKind getTermKind() const { return ValueKindAsTermKind(getKind()); }
 };
 

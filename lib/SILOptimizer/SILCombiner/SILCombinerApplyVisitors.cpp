@@ -219,10 +219,10 @@ bool PartialApplyCombiner::allocateTemporaries() {
 
 /// Emit dealloc_stack for all temporaries.
 void PartialApplyCombiner::deallocateTemporaries() {
-  // Insert dealloc_stack instructions.
+  // Insert dealloc_stack instructions at all function exit points.
   for (SILBasicBlock &BB : *PAI->getFunction()) {
     TermInst *Term = BB.getTerminator();
-    if (!isa<ReturnInst>(Term) && !isa<ThrowInst>(Term))
+    if (!Term->isFunctionExiting())
       continue;
 
     for (auto Op : Tmps) {
