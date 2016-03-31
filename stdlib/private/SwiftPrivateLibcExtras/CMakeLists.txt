@@ -13,6 +13,7 @@ add_swift_library(swiftSwiftPrivateLibcExtras SHARED IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   SwiftPrivateLibcExtras.swift
+  Subprocess.c
   Subprocess.swift
 
   SWIFT_MODULE_DEPENDS ${swift_private_darwin_extras_module_depends}
