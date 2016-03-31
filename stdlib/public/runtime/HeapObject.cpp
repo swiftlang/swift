@@ -290,6 +290,33 @@ void swift::swift_retain(HeapObject *object)
   SWIFT_RT_ENTRY_REF(swift_retain)(object);
 }
 
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
+void swift::swift_nonatomic_retain(HeapObject *object) {
+  SWIFT_RT_ENTRY_REF(swift_nonatomic_retain)(object);
+}
+
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
+extern "C"
+void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain)(HeapObject *object) {
+  _swift_nonatomic_retain_inlined(object);
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
+void swift::swift_nonatomic_release(HeapObject *object) {
+  return SWIFT_RT_ENTRY_REF(swift_nonatomic_release)(object);
+}
+
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
+extern "C"
+void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_release)(HeapObject *object) {
+  if (object  &&  object->refCount.decrementShouldDeallocateNonAtomic()) {
+    // TODO: Use non-atomic _swift_release_dealloc?
+    _swift_release_dealloc(object);
+  }
+}
+
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 void SWIFT_RT_ENTRY_IMPL(swift_retain)(HeapObject *object)
@@ -310,6 +337,22 @@ void SWIFT_RT_ENTRY_IMPL(swift_retain_n)(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (object) {
     object->refCount.increment(n);
+  }
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
+void swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  SWIFT_RT_ENTRY_REF(swift_nonatomic_retain_n)(object, n);
+}
+
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
+extern "C"
+void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain_n)(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (object) {
+    object->refCount.incrementNonAtomic(n);
   }
 }
 
@@ -346,6 +389,21 @@ void SWIFT_RT_ENTRY_IMPL(swift_release_n)(HeapObject *object, uint32_t n)
 
 void swift::swift_setDeallocating(HeapObject *object) {
   object->refCount.decrementFromOneAndDeallocateNonAtomic();
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  return SWIFT_RT_ENTRY_REF(swift_nonatomic_release_n)(object, n);
+}
+
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
+extern "C"
+void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_release_n)(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (object && object->refCount.decrementShouldDeallocateNNonAtomic(n)) {
+    _swift_release_dealloc(object);
+  }
 }
 
 size_t swift::swift_retainCount(HeapObject *object) {
@@ -440,6 +498,30 @@ SWIFT_RT_ENTRY_VISIBILITY
 HeapObject *swift::swift_tryRetain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   return SWIFT_RT_ENTRY_REF(swift_tryRetain)(object);
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+HeapObject *swift::swift_nonatomic_tryPin(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  assert(object);
+
+  // Try to set the flag.  If this succeeds, the caller will be
+  // responsible for clearing it.
+  if (object->refCount.tryIncrementAndPinNonAtomic()) {
+    return object;
+  }
+
+  // If setting the flag failed, it's because it was already set.
+  // Return nil so that the object will be deallocated later.
+  return nullptr;
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+void swift::swift_nonatomic_unpin(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (object && object->refCount.decrementAndUnpinShouldDeallocateNonAtomic()) {
+    _swift_release_dealloc(object);
+  }
 }
 
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
