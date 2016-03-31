@@ -154,7 +154,7 @@ func makeCollectionOfComparable(elements: [MinimalComparableValue])
 
 var checksAdded: Box<Set<String>> = Box([])
 var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .expectationFailure
+resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
 resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior = .trap
 resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior = .trap
 
