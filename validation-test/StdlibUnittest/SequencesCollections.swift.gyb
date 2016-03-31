@@ -260,7 +260,7 @@ ${Self}TestSuite.test("insert(contentsOf:at:)/IndexInvalidation") {
 
 ${Self}TestSuite.test("remove(at:)/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
-  let i1 = c1.startIndex
+  let i1 = c1.index(1, stepsFrom: c1.startIndex)
   c1.remove(at: c1.index(1, stepsFrom: c1.startIndex))
   let i2 = c1.index(1, stepsFrom: c1.startIndex)
 
@@ -271,7 +271,7 @@ ${Self}TestSuite.test("remove(at:)/IndexInvalidation") {
 
 ${Self}TestSuite.test("removeLast()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
-  let i2 = c2.startIndex
+  let i2 = c2.endIndex
   c1.removeLast()
   let i1 = c1.endIndex
 
