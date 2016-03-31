@@ -837,7 +837,7 @@ class AllocBoxToStack : public SILFunctionTransform {
 
     for (auto &BB : *getFunction()) {
       auto *Term = BB.getTerminator();
-      if (isa<ReturnInst>(Term) || isa<ThrowInst>(Term))
+      if (Term->isFunctionExiting())
         Returns.push_back(Term);
 
       for (auto &I : BB)
