@@ -12,7 +12,7 @@ class B: A {
   override class func foo() {}
 }
 
-// CHECK-LABEL: sil @_TF22devirt_value_metatypes17testValueMetatypeFCS_1AT_ 
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF22devirt_value_metatypes17testValueMetatypeFCS_1AT_ 
 // CHECK: value_metatype $@thick A.Type
 // CHECK: checked_cast_br
 // CHECK: checked_cast_br
@@ -32,7 +32,7 @@ public class D : C {
   override class func foo() -> Int { return 1 }
 }
 
-// CHECK-LABEL: sil @_TF22devirt_value_metatypes5testDFCS_1DSi
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF22devirt_value_metatypes5testDFCS_1DSi
 // CHECK-NOT: value_metatype %
 // D.foo is an internal method, D has no subclasses and it is a wmo compilation,
 // therefore D.foo method invocation can be devirtualized.
@@ -51,7 +51,7 @@ public final class E : C {
   override class func foo() -> Int { return 1 }
 }
 
-// CHECK-LABEL: sil @_TF22devirt_value_metatypes5testEFCS_1ESi
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF22devirt_value_metatypes5testEFCS_1ESi
 // CHECK-NOT: value_metatype $@thick E.Type
 // CHECK_NOT: checked_cast_br
 // CHECK: function_ref

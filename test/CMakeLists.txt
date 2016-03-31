@@ -41,7 +41,7 @@ function(get_test_dependencies SDK result_var_name)
 
   set(deps_binaries
       swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract
-      lldb-moduleimport-test swift-reflection-test)
+      lldb-moduleimport-test swift-reflection-dump)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries llc)
   endif()
@@ -183,6 +183,9 @@ if(PYTHONINTERP_FOUND)
         get_test_dependencies("${SDK}" test_dependencies)
         list(APPEND test_dependencies
             "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+
+        list(APPEND test_dependencies
+            "swift-reflection-test${VARIANT_SUFFIX}")
 
         set(validation_test_dependencies
             "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")

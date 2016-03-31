@@ -158,7 +158,7 @@ else:
     raise ValueError('Unhandled float type.')
 }%
 % if bits == 80:
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
 ${SelfDocComment}
@@ -369,7 +369,7 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
   }
 }
 
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 
 % builtinFloatLiteralBits = 80
 @_transparent
@@ -538,7 +538,7 @@ extension ${Self} {
 %   if Self != That:
 
 %     if srcBits == 80:
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
   /// Construct an instance that approximates `other`.
@@ -645,7 +645,7 @@ extension ${Self} {
 %     That = floatName(srcBits)
 
 %     if srcBits == 80:
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
   /// Construct an instance that approximates `other`.

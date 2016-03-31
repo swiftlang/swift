@@ -181,7 +181,7 @@ enum class SymbolReferenceKind : unsigned char {
   /// function (due to the THUMB bit) or unaligned data (such as a C string).
   ///
   /// Generally well-suited for when the reference is always statically
-  /// initialized but may refer to soemthing outside of the linkage unit.
+  /// initialized but may refer to something outside of the linkage unit.
   Relative_Indirectable,
 
   /// An indirectable reference to the object; guaranteed to be as wide

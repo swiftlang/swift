@@ -385,9 +385,9 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
   return Thunk;
 }
 
-void swift::trySpecializeApplyOfGeneric(ApplySite Apply,
-                        llvm::SmallVectorImpl<SILInstruction *> &DeadApplies,
-                        llvm::SmallVectorImpl<SILFunction *> &NewFunctions) {
+void swift::trySpecializeApplyOfGeneric(
+    ApplySite Apply, DeadInstructionSet &DeadApplies,
+    llvm::SmallVectorImpl<SILFunction *> &NewFunctions) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
 
   auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
@@ -450,7 +450,7 @@ void swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     NewFunctions.push_back(SpecializedF);
   }
 
-  DeadApplies.push_back(Apply.getInstruction());
+  DeadApplies.insert(Apply.getInstruction());
 
   if (replacePartialApplyWithoutReabstraction) {
     // There are some unknown users of the partial_apply. Therefore we need a
@@ -471,6 +471,7 @@ void swift::trySpecializeApplyOfGeneric(ApplySite Apply,
                                       Arguments,
                                       PAI->getType());
     PAI->replaceAllUsesWith(NewPAI);
+    DeadApplies.insert(PAI);
     return;
   }
   // Make the required changes to the call site.
@@ -486,14 +487,14 @@ void swift::trySpecializeApplyOfGeneric(ApplySite Apply,
       if (auto FAS = FullApplySite::isa(User)) {
         SILBuilder Builder(User);
         replaceWithSpecializedCallee(FAS, NewPAI, Builder, ReInfo);
-        DeadApplies.push_back(User);
+        DeadApplies.insert(FAS.getInstruction());
         continue;
       }
       if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
         // This is a partial_apply of a re-abstraction thunk. Just skip this.
         assert(PAI->getType() == NewPAI->getType());
         PAI->replaceAllUsesWith(NewPAI);
-        DeadApplies.push_back(PAI);
+        DeadApplies.insert(PAI);
       }
     }
   }

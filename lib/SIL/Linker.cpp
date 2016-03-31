@@ -17,6 +17,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "swift/SIL/FormalLinkage.h"
 #include <functional>
 
 using namespace swift;
@@ -250,7 +251,7 @@ bool SILLinkerVisitor::visitProtocolConformance(
   // false.
   if (!WT) {
     Mod.createWitnessTableDeclaration(
-        C, TypeConverter::getLinkageForProtocolConformance(
+        C, getLinkageForProtocolConformance(
                C->getRootNormalConformance(), NotForDefinition));
     return false;
   }

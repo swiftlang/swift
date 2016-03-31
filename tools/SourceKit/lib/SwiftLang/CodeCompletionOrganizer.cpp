@@ -100,8 +100,23 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
   std::vector<Completion *> results;
   for (auto *result : swiftResults) {
     CompletionBuilder builder(sink, *result);
-    if (result->getSemanticContext() == SemanticContextKind::OtherModule)
+    if (result->getSemanticContext() == SemanticContextKind::OtherModule) {
       builder.setModuleImportDepth(depth.lookup(result->getModuleName()));
+
+      if (info.completionContext->HasExpectedTypeRelation &&
+          result->getKind() == Completion::Declaration) {
+        // FIXME: because other-module results are cached, they will not be
+        // given a type-relation of invalid.  As a hack, we look at the text of
+        // the result type and look for 'Void'.
+        for (auto &chunk : result->getCompletionString()->getChunks()) {
+          using ChunkKind = ide::CodeCompletionString::Chunk::ChunkKind;
+          if (chunk.is(ChunkKind::TypeAnnotation) && chunk.hasText() &&
+              chunk.getText() == "Void") {
+            builder.setNotRecommended(Completion::TypeMismatch);
+          }
+        }
+      }
+    }
 
     if (prefix) {
       builder.setPrefix(prefix->getCompletionString());
@@ -495,6 +510,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
       if (rules.hideCompletion(completion))
         continue;
 
+      if (options.hideLowPriority && completion->isNotRecommended())
+        continue;
+
       NameStyle style(completion->getName());
       bool hideUnderscore = options.hideUnderscores && style.leadingUnderscores;
       if (hideUnderscore && options.reallyHideAllUnderscores)
@@ -656,6 +674,7 @@ static int compareResultName(Item &a, Item &b) {
 
 namespace {
 enum class ResultBucket {
+  NotRecommended,
   Normal,
   Literal,
   NormalTypeMatch,
@@ -673,6 +692,9 @@ static ResultBucket getResultBucket(Item &item, bool hasExpectedTypes) {
   if (isa<Group>(item))
     return ResultBucket::Normal; // FIXME: take best contained result.
   auto *completion = cast<Result>(item).value;
+
+  if (completion->isNotRecommended())
+    return ResultBucket::NotRecommended;
 
   if (completion->getSemanticContext() ==
       SemanticContextKind::ExpressionSpecific)
@@ -1109,6 +1131,8 @@ void CompletionBuilder::getDescription(SwiftResult *result, raw_ostream &OS,
 
 CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
     : sink(sink), current(base) {
+  isNotRecommended = current.isNotRecommended();
+  notRecommendedReason = current.getNotRecommendedReason();
   semanticContext = current.getSemanticContext();
   completionString =
       const_cast<CodeCompletionString *>(current.getCompletionString());
@@ -1151,7 +1175,8 @@ Completion *CompletionBuilder::finish() {
     if (current.getKind() == SwiftResult::Declaration) {
       base = SwiftResult(semanticContext, current.getNumBytesToErase(),
                          completionString, current.getAssociatedDeclKind(),
-                         current.getModuleName(), current.isNotRecommended(),
+                         current.getModuleName(), isNotRecommended,
+                         notRecommendedReason,
                          current.getBriefDocComment(),
                          current.getAssociatedUSRs(),
                          current.getDeclKeywords());

@@ -1,4 +1,4 @@
-//===--- FunctionSignatureOpts.cpp - Optimizes function signatures -------===//
+//===--- FunctionSignatureOpts.cpp - Optimizes function signatures --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -486,10 +486,6 @@ static SILFunction*
 createOptimizedFunction(RCIdentityFunctionInfo *RCIA,
                         FunctionSignatureInfo *FSI,
                         AliasAnalysis *AA, SILFunction *F) {
-  // Analyze function arguments. If there is no work to be done, exit early.
-  if (!FSI->analyze()) 
-    return nullptr;
-
   // This is the new function name.
   auto NewFName = FSI->getOptimizedName();
 
@@ -551,10 +547,21 @@ public:
     if (!F->shouldOptimize())
       return;
 
-    // If this function does not have a caller in the current module. We do not
-    // function signature specialize it.
-    if (!CA->hasCaller(F))
-      return;
+    // If there is no opportunity on the signature, simply return.
+    if (!FSI.shouldOptimize())
+     return;
+
+    // If this function does not have a caller in the current module.
+    if (!CA->hasCaller(F)) {
+      // If this function maybe called indirectly, e.g. from virtual table
+      // do not function signature specialize it, as this will introduce a thunk.
+      if (canBeCalledIndirectly(F->getRepresentation()))
+        return;
+      // if its not highly profitable to optimize this function. We do not
+      // function signature specialize it.
+      if (!FSI.profitableOptimize())
+        return;
+    }
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.

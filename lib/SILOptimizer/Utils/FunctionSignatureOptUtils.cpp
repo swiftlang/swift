@@ -345,11 +345,19 @@ bool FunctionSignatureInfo::analyzeResult() {
 /// This function goes through the arguments of F and sees if we have anything
 /// to optimize in which case it returns true. If we have nothing to optimize,
 /// it returns false.
-bool FunctionSignatureInfo::analyze() {
+void FunctionSignatureInfo::analyze() {
   // Compute the signature optimization.
   bool OptimizedParams = analyzeParameters();
   bool OptimizedResult = analyzeResult();
-  return OptimizedParams || OptimizedResult;
+  ShouldOptimize = OptimizedParams || OptimizedResult;
+  // We set this function to highly profitable if we have a O2G on one of its
+  // parameters or results.
+  for (auto &X : ArgDescList) {
+    HighlyProfitable |= !X.CalleeRelease.empty();
+  }
+  for (auto &X : ResultDescList) {
+    HighlyProfitable |= !X.CalleeRetain.empty();
+  }
 }
 
 //===----------------------------------------------------------------------===//

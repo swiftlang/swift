@@ -1820,9 +1820,9 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
       writeSILVTable(vt);
   }
 
-  // Write out WitnessTables. For now, write out only if EnableSerializeAll.
+  // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if (ShouldSerializeAll &&
+    if ((ShouldSerializeAll || wt.isFragile()) &&
         wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
       writeSILWitnessTable(wt);
   }

@@ -1,4 +1,4 @@
-//===--- IAMInference.h - Import as member inference system ---------------===//
+//===--- IAMInference.h - Import as member inference system -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

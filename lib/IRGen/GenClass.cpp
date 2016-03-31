@@ -169,7 +169,7 @@ namespace {
     unsigned NumInherited = 0;
 
     // Does the class metadata require dynamic initialization above and
-    // beond what the runtime can automatically achieve?
+    // beyond what the runtime can automatically achieve?
     //
     // This is true if the class or any of its ancestors:
     //   - is generic,
@@ -1018,7 +1018,9 @@ namespace {
             || Layout->getElements().size() == FirstFieldIndex) {
           instanceStart = instanceSize;
         } else if (Layout->getElement(FirstFieldIndex).getKind()
-                     == ElementLayout::Kind::Fixed) {
+                     == ElementLayout::Kind::Fixed ||
+                   Layout->getElement(FirstFieldIndex).getKind()
+                     == ElementLayout::Kind::Empty) {
           // FIXME: assumes layout is always sequential!
           instanceStart = Layout->getElement(FirstFieldIndex).getByteOffset();
         } else {

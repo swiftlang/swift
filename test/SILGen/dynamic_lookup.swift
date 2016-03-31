@@ -225,3 +225,33 @@ func downcast(obj: AnyObject) -> X {
   // CHECK-NEXT: return [[X]] : $X
   return obj as! X
 }
+
+@objc class Juice { }
+
+@objc protocol Fruit {
+  optional var juice: Juice { get }
+}
+
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup7consumeFPS_5Fruit_T_
+// CHECK: bb0(%0 : $Fruit):
+// CHECK:        [[BOX:%.*]] = alloc_stack $Optional<Juice>
+// CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}") Fruit, #Fruit.juice!getter.1.foreign, bb1, bb2
+
+// CHECK: bb1([[FN:%.*]] : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice):
+// CHECK:        [[METHOD:%.*]] = partial_apply [[FN]]([[SELF]]) : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice
+// CHECK:        [[RESULT:%.*]] = apply [[METHOD]]() : $@callee_owned () -> @owned Juice
+// CHECK:        [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
+// CHECK:        store [[RESULT]] to [[PAYLOAD]]
+// CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
+// CHECK:        br bb3
+
+// CHECK: bb2:
+// CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.none!enumelt
+// CHECK:        br bb3
+
+// CHECK: bb3:
+// CHECK:        return
+
+func consume(fruit: Fruit) {
+  _ = fruit.juice
+}

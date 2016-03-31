@@ -104,7 +104,7 @@ import Swift
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[DYNAMICSINGLETON_FIELD_NAMES:@.*]] = private constant [7 x i8] c"value\00\00"
 // CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private constant [25 x i8] c"O4enum16DynamicSingleton\00"
-// CHECK: @_TMnO4enum16DynamicSingleton = {{(protected )?}}constant <{ {{.*}} i32 }> <{
+// CHECK: @_TMnO4enum16DynamicSingleton = hidden constant <{ {{.*}} i32 }> <{
 // CHECK:   [25 x i8]* [[DYNAMICSINGLETON_NAME]]
 // --       One payload
 // CHECK:   i32 1,
@@ -120,7 +120,7 @@ import Swift
 // CHECK:   i32 1, i32 0
 // CHECK: }>
 
-// CHECK: @_TMPO4enum16DynamicSingleton = {{(protected )?}}global <{ {{.*}}* }> <{
+// CHECK: @_TMPO4enum16DynamicSingleton = hidden global <{ {{.*}}* }> <{
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSingleton
 // CHECK:   @_TMnO4enum16DynamicSingleton
 // CHECK:   i8* null
@@ -129,7 +129,7 @@ import Swift
 
 // -- No-payload enums have extra inhabitants in
 //    their value witness table.
-// CHECK: @_TWVO4enum10NoPayloads = {{(protected )?}}constant [26 x i8*] [
+// CHECK: @_TWVO4enum10NoPayloads = hidden constant [26 x i8*] [
 // -- ...
 // -- size
 // CHECK:   i8* inttoptr ([[WORD:i32|i64]] 1 to i8*),
@@ -147,7 +147,7 @@ import Swift
 
 // -- Single-payload enums take unused extra inhabitants from their payload
 //    as their own.
-// CHECK: @_TWVO4enum19SinglePayloadNested = {{(protected )?}}constant [26 x i8*] [
+// CHECK: @_TWVO4enum19SinglePayloadNested = hidden constant [26 x i8*] [
 // -- ...
 // -- size
 // CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
@@ -164,13 +164,13 @@ import Swift
 // CHECK: ] 
 
 
-// CHECK: @_TMPO4enum20DynamicSinglePayload = {{(protected )?}}global <{ {{.*}}* }> <{
+// CHECK: @_TMPO4enum20DynamicSinglePayload = hidden global <{ {{.*}}* }> <{
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSinglePayload
 // CHECK:   i8* null
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum20DynamicSinglePayload to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum20DynamicSinglePayload to i8*)
 
-// CHECK: @_TWVO4enum18MultiPayloadNested = {{(protected )?}}constant [26 x i8*] [
+// CHECK: @_TWVO4enum18MultiPayloadNested = hidden constant [26 x i8*] [
 // CHECK:   i8* inttoptr ([[WORD]] 9 to i8*),
 // CHECK:   i8* inttoptr ([[WORD]] 16 to i8*)
 // CHECK: ]

@@ -71,6 +71,6 @@ public:
   }
 };
 
-} // end namespace swift.
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_THREADSAFEREFCOUNTED_H

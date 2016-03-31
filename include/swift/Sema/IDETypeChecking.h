@@ -28,6 +28,7 @@ namespace swift {
   class Expr;
   class LazyResolver;
   class ExtensionDecl;
+  class ProtocolDecl;
 
   /// \brief Typecheck a declaration parsed during code completion.
   ///
@@ -46,6 +47,9 @@ namespace swift {
   bool canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC);
 
   Type lookUpTypeInContext(DeclContext *DC, StringRef Name);
+
+  void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
+                        llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
 
   /// \brief Given an unresolved member E and its parent P, this function tries
   /// to infer the type of E.

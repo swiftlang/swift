@@ -267,6 +267,10 @@ code for the target that is not the build machine:
 * ``%target-sdk-name``: only for Apple platforms: ``xcrun``-style SDK name
   (``macosx``, ``iphoneos``, ``iphonesimulator``).
 
+* ``%target-static-stdlib-path``: the path to the static standard library.
+
+  Add ``REQUIRES: static_stdlib`` to the test.
+
 Always use ``%target-*`` substitutions unless you have a good reason.  For
 example, an exception would be a test that checks how the compiler handles
 mixing module files for incompatible platforms (that test would need to compile

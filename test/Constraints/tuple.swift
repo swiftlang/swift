@@ -103,7 +103,7 @@ func testLValue(c: C) {
 
 
 // <rdar://problem/21444509> Crash in TypeChecker::coercePatternToType
-func invalidPatternCrash(let k : Int) {
+func invalidPatternCrash(k : Int) {
   switch k {
   case (k, cph_: k) as UInt8:  // expected-error {{tuple pattern cannot match values of the non-tuple type 'UInt8'}} expected-warning {{cast from 'Int' to unrelated type 'UInt8' always fails}}
     break

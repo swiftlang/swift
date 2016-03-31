@@ -1306,16 +1306,14 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   assert(params.empty() && "didn't claim all parameters!");
 
-  // Bind polymorphic arguments.  This can only be done after binding
-  // all the value parameters.
-  if (hasPolymorphicParameters(funcTy)) {
-    emitPolymorphicParameters(IGF, *IGF.CurSILFn, params,
-                              nullptr,
-      [&](unsigned paramIndex) -> llvm::Value* {
-        SILValue parameter = entry->getBBArgs()[paramIndex];
-        return IGF.getLoweredSingletonExplosion(parameter);
-      });
-  }
+  // Bind polymorphic arguments. This can only be done after binding
+  // all the value parameters, and must be done even for non-polymorphic
+  // functions because of imported Objective-C generics.
+  emitPolymorphicParameters(IGF, *IGF.CurSILFn, params, nullptr,
+                            [&](unsigned paramIndex) -> llvm::Value* {
+    SILValue parameter = entry->getBBArgs()[paramIndex];
+    return IGF.getLoweredSingletonExplosion(parameter);
+  });
 }
 
 /// Get metadata for the dynamic Self type if we have it.
@@ -3413,26 +3411,27 @@ void IRGenSILFunction::visitStoreUnownedInst(swift::StoreUnownedInst *i) {
   }
 }
 
-static void requireRefCountedType(IRGenSILFunction &IGF,
-                                  SourceLoc loc,
+static bool hasReferenceSemantics(IRGenSILFunction &IGF,
                                   SILType silType) {
   auto operType = silType.getSwiftRValueType();
   auto valueType = operType->getAnyOptionalObjectType();
   auto objType = valueType ? valueType : operType;
-  if (objType->mayHaveSuperclass()
-      || objType->isClassExistentialType()
-      || objType->is<BuiltinNativeObjectType>()
-      || objType->is<BuiltinBridgeObjectType>()
-      || objType->is<BuiltinUnknownObjectType>()) {
-    return;
-  }
-  IGF.IGM.error(loc, "isUnique operand type (" + Twine(operType.getString())
-                + ") is not a refcounted class");
+  return (objType->mayHaveSuperclass()
+          || objType->isClassExistentialType()
+          || objType->is<BuiltinNativeObjectType>()
+          || objType->is<BuiltinBridgeObjectType>()
+          || objType->is<BuiltinUnknownObjectType>());
 }
 
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
                                  SourceLoc loc, bool checkPinned) {
-  requireRefCountedType(IGF, loc, operand->getType());
+  if (!hasReferenceSemantics(IGF, operand->getType())) {
+    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(
+      &IGF.IGM.Module, llvm::Intrinsic::ID::trap);
+    IGF.Builder.CreateCall(trapIntrinsic, {});
+    return llvm::UndefValue::get(IGF.IGM.Int1Ty);
+  }
+
   auto &operTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(operand->getType()));
   LoadedRef ref =
     operTI.loadRefcountedPtr(IGF, loc, IGF.getLoweredAddress(operand));

@@ -212,6 +212,9 @@ PASS(StripDebugInfo, "strip-debug-info",
      "Strip debug info")
 PASS(SwiftArrayOpts, "array-specialize",
      "Specialize arrays")
+PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
+     "Peephole retain/release removal for regions denoted by "
+     "Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
 PASS_RANGE(AllPasses, AADumper, UsePrespecialized)

@@ -702,6 +702,34 @@ func ispod_test() {
   var f = Builtin.ispod(Builtin.NativeObject)
 }
 
+// CHECK-LABEL: define {{.*}} @{{.*}}generic_unsafeGuaranteed_test
+// CHECK:  call void @{{.*}}swift_{{.*}}etain({{.*}}* %0)
+// CHECK:  call void @{{.*}}swift_{{.*}}elease({{.*}}* %0)
+// CHECK:  ret {{.*}}* %0
+func generic_unsafeGuaranteed_test<T: AnyObject>(t : T) -> T {
+  let (g, _) = Builtin.unsafeGuaranteed(t)
+  return g
+}
+
+// CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteed_test
+// CHECK:  [[LOCAL:%.*]] = alloca %swift.refcounted*
+// CHECK:  call void @rt_swift_retain(%swift.refcounted* %0)
+// CHECK:  store %swift.refcounted* %0, %swift.refcounted** [[LOCAL]]
+// CHECK:  call void @rt_swift_release(%swift.refcounted* %0)
+// CHECK:  ret %swift.refcounted* %0
+func unsafeGuaranteed_test(x: Builtin.NativeObject) -> Builtin.NativeObject {
+  var (g,t) = Builtin.unsafeGuaranteed(x)
+  Builtin.unsafeGuaranteedEnd(t)
+  return g
+}
+
+// CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteedEnd_test
+// CHECK-NEXT: {{.*}}:
+// CHECK-NEXT: ret void
+func unsafeGuaranteedEnd_test(x: Builtin.Int8) {
+  Builtin.unsafeGuaranteedEnd(x)
+}
+
 // CHECK-LABEL: define {{.*}} @{{.*}}atomicload
 func atomicload(p: Builtin.RawPointer) {
   // CHECK: [[A:%.*]] = load atomic i8*, i8** {{%.*}} unordered, align 8

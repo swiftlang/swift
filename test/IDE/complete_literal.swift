@@ -57,6 +57,6 @@ func giveMeAString() -> Int {
 
 // LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#Index#]{{; name=.+$}}
-// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
-// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
-// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: append({#contentsOf: S#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: S#})[#Void#]{{; name=.+$}}

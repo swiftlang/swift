@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/custom-modules %s 2>&1 | FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend -emit-sil -I %S/../IDE/Inputs/custom-modules %s 2>&1 | FileCheck --check-prefix=SIL %s
 // REQUIRES: objc_interop
-import ImportAsMember
+import ImportAsMember.A
 import ImportAsMember.Proto
 
 public func returnGlobalVar() -> Double {
@@ -13,7 +13,7 @@ public func returnGlobalVar() -> Double {
 // SIL-NEXT: }
 
 // SIL-LABEL: sil {{.*}}useProto{{.*}} (@owned IAMProto) -> () {
-// TODO: Move this test case into test/SILGen, then add in body checks
+// TODO: Add in body checks
 public func useProto(p: IAMProto) {
 	p.mutateSomeState()
 	let v = p.someValue

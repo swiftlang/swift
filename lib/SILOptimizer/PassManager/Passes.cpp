@@ -241,10 +241,12 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addARCSequenceOpts();
 
   PM.addSimplifyCFG();
-  // Only hoist releases very late.
-  if (OpLevel == OptimizationLevelKind::LowLevel)
+  if (OpLevel == OptimizationLevelKind::LowLevel) {
+    // Remove retain/releases based on Builtin.unsafeGuaranteed
+    PM.addUnsafeGuaranteedPeephole();
+    // Only hoist releases very late.
     PM.addLateCodeMotion();
-  else
+  } else
     PM.addEarlyCodeMotion();
 
   PM.addARCSequenceOpts();
@@ -369,6 +371,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Remove dead code.
   PM.addDCE();
   PM.addSimplifyCFG();
+
   PM.runOneIteration();
 
   PM.resetAndRemoveTransformations();

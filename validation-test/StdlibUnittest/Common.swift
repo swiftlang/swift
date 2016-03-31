@@ -19,40 +19,104 @@ _setTestSuiteFailedCallback() { print("abort()") }
 //
 
 var TestSuitePasses = TestSuite("TestSuitePasses")
+
+// CHECK: {{^}}[ RUN      ] TestSuitePasses.passes{{$}}
+// CHECK: {{^}}[       OK ] TestSuitePasses.passes{{$}}
 TestSuitePasses.test("passes") {
   expectEqual(1, 1)
 }
-// CHECK: [       OK ] TestSuitePasses.passes{{$}}
+
+// CHECK: {{^}}[ RUN      ] TestSuitePasses.passes/parameterized/0{{$}}
+// CHECK: {{^}}stdout>>> 1010{{$}}
+// CHECK: {{^}}[       OK ] TestSuitePasses.passes/parameterized/0{{$}}
+// CHECK: {{^}}[ RUN      ] TestSuitePasses.passes/parameterized/1{{$}}
+// CHECK: {{^}}stdout>>> 2020{{$}}
+// CHECK: {{^}}[       OK ] TestSuitePasses.passes/parameterized/1{{$}}
+TestSuitePasses.test("passes/parameterized").forEach(in: [1010, 2020]) {
+  (parameter) in
+
+  print(parameter)
+  expectEqual(1, 1)
+}
 // CHECK: TestSuitePasses: All tests passed
 
 var TestSuiteUXPasses = TestSuite("TestSuiteUXPasses")
+
+// CHECK: {{^}}[   UXPASS ] TestSuiteUXPasses.uxpasses{{$}}
 TestSuiteUXPasses.test("uxpasses").xfail(.osxAny("")).code {
   expectEqual(1, 1)
 }
-// CHECK: [   UXPASS ] TestSuiteUXPasses.uxpasses{{$}}
+
+// CHECK: {{^}}[   UXPASS ] TestSuiteUXPasses.uxpasses/parameterized/0{{$}}
+// CHECK: {{^}}[    XFAIL ] TestSuiteUXPasses.uxpasses/parameterized/1{{$}}
+TestSuiteUXPasses.test("uxpasses/parameterized")
+  .xfail(.osxAny(""))
+  .forEach(in: [1010, 2020]) {
+  (parameter) in
+
+  if parameter == 1010 {
+    expectEqual(1, 1)
+  } else {
+    expectEqual(1, 2)
+  }
+}
+
 // CHECK: TestSuiteUXPasses: Some tests failed, aborting
-// CHECK: UXPASS: ["uxpasses"]
+// CHECK: UXPASS: ["uxpasses", "uxpasses/parameterized/0"]
 // CHECK: FAIL: []
 // CHECK: SKIP: []
 // CHECK: abort()
 
 var TestSuiteFails = TestSuite("TestSuiteFails")
+
+// CHECK: {{^}}[     FAIL ] TestSuiteFails.fails{{$}}
 TestSuiteFails.test("fails") {
   expectEqual(1, 2)
 }
-// CHECK: [     FAIL ] TestSuiteFails.fails{{$}}
+
+// CHECK: {{^}}[       OK ] TestSuiteFails.fails/parameterized/0{{$}}
+// CHECK: {{^}}[     FAIL ] TestSuiteFails.fails/parameterized/1{{$}}
+TestSuiteFails.test("fails/parameterized").forEach(in: [1010, 2020]) {
+  (parameter) in
+
+  if parameter == 1010 {
+    expectEqual(1, 1)
+  } else {
+    expectEqual(1, 2)
+  }
+}
+
 // CHECK: TestSuiteFails: Some tests failed, aborting
 // CHECK: UXPASS: []
-// CHECK: FAIL: ["fails"]
+// CHECK: FAIL: ["fails", "fails/parameterized/1"]
 // CHECK: SKIP: []
 // CHECK: abort()
 
 var TestSuiteXFails = TestSuite("TestSuiteXFails")
+
+// CHECK: {{^}}[    XFAIL ] TestSuiteXFails.xfails{{$}}
 TestSuiteXFails.test("xfails").xfail(.osxAny("")).code {
   expectEqual(1, 2)
 }
-// CHECK: [    XFAIL ] TestSuiteXFails.xfails{{$}}
-// CHECK: TestSuiteXFails: All tests passed
+
+// CHECK: {{^}}[   UXPASS ] TestSuiteXFails.xfails/parameterized/0{{$}}
+// CHECK: {{^}}[    XFAIL ] TestSuiteXFails.xfails/parameterized/1{{$}}
+TestSuiteXFails.test("xfails/parameterized")
+  .xfail(.osxAny(""))
+  .forEach(in: [1010, 2020]) {
+  (parameter) in
+
+  if parameter == 1010 {
+    expectEqual(1, 1)
+  } else {
+    expectEqual(1, 2)
+  }
+}
+
+// CHECK: TestSuiteXFails: Some tests failed, aborting
+// CHECK: UXPASS: ["xfails/parameterized/0"]
+// CHECK: FAIL: []
+// CHECK: SKIP: []
 
 //
 // Test 'xfail:' and 'skip:' annotations
@@ -272,69 +336,97 @@ PassThroughStdoutStderr.test("noNewline") {
 // Test 'setUp' and 'tearDown'
 //
 
-var TestSuiteWithSetUpPasses = TestSuite("TestSuiteWithSetUpPasses")
+var TestSuiteWithSetUp = TestSuite("TestSuiteWithSetUp")
+var TestSuiteWithSetUpTimesCalled = 0
 
-TestSuiteWithSetUpPasses.test("passes") {
-  print("test body")
-}
-
-TestSuiteWithSetUpPasses.setUp {
+TestSuiteWithSetUp.setUp {
   print("setUp")
+  if TestSuiteWithSetUpTimesCalled == 1 || TestSuiteWithSetUpTimesCalled == 3 {
+    expectEqual(1, 2)
+  }
+  TestSuiteWithSetUpTimesCalled += 1
 }
-// CHECK: [ RUN      ] TestSuiteWithSetUpPasses.passes
+
+// CHECK: [ RUN      ] TestSuiteWithSetUp.passes
 // CHECK: stdout>>> setUp
 // CHECK: stdout>>> test body
-// CHECK: [       OK ] TestSuiteWithSetUpPasses.passes
-// CHECK: TestSuiteWithSetUpPasses: All tests passed
-
-var TestSuiteWithSetUpFails = TestSuite("TestSuiteWithSetUpFails")
-
-TestSuiteWithSetUpFails.test("fails") {
+// CHECK: [       OK ] TestSuiteWithSetUp.passes
+TestSuiteWithSetUp.test("passes") {
   print("test body")
 }
 
-TestSuiteWithSetUpFails.setUp {
-  print("setUp")
-  expectEqual(1, 2)
-}
-// CHECK: [ RUN      ] TestSuiteWithSetUpFails.fails
+// CHECK: [ RUN      ] TestSuiteWithSetUp.fails
 // CHECK: stdout>>> setUp
 // CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
 // CHECK: stdout>>> test body
-// CHECK: [     FAIL ] TestSuiteWithSetUpFails.fails
-// CHECK: TestSuiteWithSetUpFails: Some tests failed, aborting
-
-var TestSuiteWithTearDownPasses = TestSuite("TestSuiteWithTearDownPasses")
-
-TestSuiteWithTearDownPasses.test("passes") {
+// CHECK: [     FAIL ] TestSuiteWithSetUp.fails
+TestSuiteWithSetUp.test("fails") {
   print("test body")
 }
 
-TestSuiteWithTearDownPasses.tearDown {
-  print("tearDown")
+// CHECK: [ RUN      ] TestSuiteWithSetUp.passesFails/parameterized/0
+// CHECK: stdout>>> setUp
+// CHECK: stdout>>> test body
+// CHECK: [       OK ] TestSuiteWithSetUp.passesFails/parameterized/0
+// CHECK: [ RUN      ] TestSuiteWithSetUp.passesFails/parameterized/1
+// CHECK: stdout>>> setUp
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: stdout>>> test body
+// CHECK: [     FAIL ] TestSuiteWithSetUp.passesFails/parameterized/1
+TestSuiteWithSetUp.test("passesFails/parameterized")
+  .forEach(in: [1010, 2020]) {
+  (parameter) in
+
+  print("test body")
 }
-// CHECK: [ RUN      ] TestSuiteWithTearDownPasses.passes
+
+var TestSuiteWithTearDown = TestSuite("TestSuiteWithTearDown")
+var TestSuiteWithTearDownShouldFail = false
+
+TestSuiteWithTearDown.tearDown {
+  print("tearDown")
+  if TestSuiteWithTearDownShouldFail {
+    expectEqual(1, 2)
+    TestSuiteWithTearDownShouldFail = false
+  }
+}
+
+// CHECK: [ RUN      ] TestSuiteWithTearDown.passes
 // CHECK: stdout>>> test body
 // CHECK: stdout>>> tearDown
-// CHECK: [       OK ] TestSuiteWithTearDownPasses.passes
-
-var TestSuiteWithTearDownFails = TestSuite("TestSuiteWithTearDownFails")
-
-TestSuiteWithTearDownFails.test("fails") {
+// CHECK: [       OK ] TestSuiteWithTearDown.passes
+TestSuiteWithTearDown.test("passes") {
   print("test body")
 }
 
-TestSuiteWithTearDownFails.tearDown {
-  print("tearDown")
-  expectEqual(1, 2)
-}
-// CHECK: TestSuiteWithTearDownPasses: All tests passed
-// CHECK: [ RUN      ] TestSuiteWithTearDownFails.fails
+// CHECK: [ RUN      ] TestSuiteWithTearDown.fails
 // CHECK: stdout>>> test body
 // CHECK: stdout>>> tearDown
 // CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
-// CHECK: [     FAIL ] TestSuiteWithTearDownFails.fails
-// CHECK: TestSuiteWithTearDownFails: Some tests failed, aborting
+// CHECK: [     FAIL ] TestSuiteWithTearDown.fails
+TestSuiteWithTearDown.test("fails") {
+  print("test body")
+  TestSuiteWithTearDownShouldFail = true
+}
+
+// CHECK: [ RUN      ] TestSuiteWithTearDown.passesFails/parameterized/0
+// CHECK: stdout>>> test body
+// CHECK: stdout>>> tearDown
+// CHECK: [       OK ] TestSuiteWithTearDown.passesFails/parameterized/0
+// CHECK: [ RUN      ] TestSuiteWithTearDown.passesFails/parameterized/1
+// CHECK: stdout>>> test body
+// CHECK: stdout>>> tearDown
+// CHECK-NEXT: stdout>>> check failed at {{.*}}/StdlibUnittest/Common.swift, line
+// CHECK: [     FAIL ] TestSuiteWithTearDown.passesFails/parameterized/1
+TestSuiteWithTearDown.test("passesFails/parameterized")
+  .forEach(in: [1010, 2020]) {
+  (parameter) in
+
+  print("test body")
+  if parameter != 1010 {
+    TestSuiteWithTearDownShouldFail = true
+  }
+}
 
 //
 // Test assertions

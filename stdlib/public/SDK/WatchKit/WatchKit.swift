@@ -18,7 +18,7 @@ extension WatchKitErrorCode : _BridgedNSError {
   public static var _nsErrorDomain: String { return WatchKitErrorDomain }
 }
 
-@available(iOS, introduced=8.2)
+@available(iOS, introduced: 8.2)
 extension WKInterfaceController {
   // Swift convenience type (class) method for
   // reloadRootControllersWithNames:contexts: that takes an array of tuples

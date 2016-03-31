@@ -218,6 +218,10 @@ def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
 
+def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Disable using the swift bridge attribute">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,

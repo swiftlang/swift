@@ -4,14 +4,14 @@ var x = NSUTF8StringEncoding
 
 var d : AnyIterator<Int>
 
-func foo1(var a : [Int]) {
+func foo1(a : inout [Int]) {
   a = a.sorted()
   a.append(1)
 }
 
 struct S1 {}
 
-func foo2(var a : [S1]) {
+func foo2(a : inout [S1]) {
   a = a.sorted(isOrderedBefore: { (a, b) -> Bool in
     return false
   })
@@ -62,9 +62,6 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-MODULE-GROUP1-DAG: Collection
 // CHECK-MODULE-GROUP1-DAG: Collection/Array
 // CHECK-MODULE-GROUP1: MODULE GROUPS END
-
-// RUN: %sourcekitd-test -req=cursor -pos=7:21 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-INT1 %s
-// CHECK-INT1: s:Si
 
 // RUN: %sourcekitd-test -req=cursor -pos=22:17 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-FLOAT1 %s
 // CHECK-FLOAT1: s:Sf

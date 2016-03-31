@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 246; // Last change: @_specialize attribute
+const uint16_t VERSION_MINOR = 247; // Last change: ResilienceStrategy
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -441,7 +441,7 @@ namespace options_block {
     XCC,
     IS_SIB,
     IS_TESTABLE,
-    IS_RESILIENT
+    RESILIENCE_STRATEGY
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -463,8 +463,9 @@ namespace options_block {
     IS_TESTABLE
   >;
 
-  using IsResilientLayout = BCRecordLayout<
-    IS_RESILIENT
+  using ResilienceStrategyLayout = BCRecordLayout<
+    RESILIENCE_STRATEGY,
+    BCFixed<2>
   >;
 }
 

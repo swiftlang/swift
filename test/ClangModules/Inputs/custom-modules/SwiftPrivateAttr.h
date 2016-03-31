@@ -8,6 +8,7 @@ NS_REFINED_FOR_SWIFT
   
 @interface Foo : NSObject <PrivProto>
 @property id privValue NS_REFINED_FOR_SWIFT;
+@property (class) id privClassValue NS_REFINED_FOR_SWIFT;
 
 - (void)noArgs NS_REFINED_FOR_SWIFT;
 - (void)oneArg:(int)arg NS_REFINED_FOR_SWIFT;

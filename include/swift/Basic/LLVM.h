@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_LLVM_H
-#define SWIFT_AST_LLVM_H
+#ifndef SWIFT_BASIC_LLVM_H
+#define SWIFT_BASIC_LLVM_H
 
 // Do not proliferate #includes here, require clients to #include their
 // dependencies.
@@ -79,4 +79,4 @@ namespace swift {
   using llvm::NoneType;
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_LLVM_H

@@ -18,7 +18,6 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
-#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 using namespace reflection;
@@ -396,7 +395,7 @@ static unsigned _getDepth(TypeRef *TR) {
     break;
   }
   default:
-    llvm_unreachable("Unexpected type ref kind asked for parent type");
+    assert(false && "Asked for depth on non-nominal typeref");
   }
 }
 

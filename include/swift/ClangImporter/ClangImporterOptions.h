@@ -67,6 +67,9 @@ public:
   /// member of some type instead. This includes inits, computed properties,
   /// and methods.
   bool InferImportAsMember = false;
+
+  /// If true ignore the swift bridged attribute.
+  bool DisableSwiftBridgeAttr = false;
 };
 
 } // end namespace swift

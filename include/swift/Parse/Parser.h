@@ -933,7 +933,6 @@ public:
     DeclAttributes Attrs;
 
     /// The location of the 'let', 'var', or 'inout' keyword, if present.
-    ///
     SourceLoc LetVarInOutLoc;
 
     enum SpecifierKindTy {

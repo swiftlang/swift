@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_versioned
 struct _StringBufferIVars {
   internal init(_elementWidth: Int) {
     _sanityCheck(_elementWidth == 1 || _elementWidth == 2)
@@ -200,6 +201,7 @@ public struct _StringBuffer {
   /// - parameter bounds: Range of the substring that the caller tries
   ///   to extend.
   /// - parameter newUsedCount: The desired size of the substring.
+  @inline(__always)
   mutating func grow(
     oldBounds bounds: Range<UnsafePointer<_RawByte>>, newUsedCount: Int
   ) -> Bool {

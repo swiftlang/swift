@@ -5,7 +5,7 @@ func takeClosure(a : () -> Int) {}
 // Let decls don't get boxes for trivial types.
 //
 // CHECK-LABEL: sil hidden @{{.*}}test1
-func test1(let a : Int) -> Int {
+func test1(a : Int) -> Int {
   // CHECK-NOT: alloc_box
   // CHECK-NOT: alloc_stack
 
@@ -204,7 +204,7 @@ func produceNMSubscriptableRValue() -> NonMutableSubscriptable {}
 // CHECK: [[GETFN:%[0-9]+]] = function_ref @_TFV9let_decls23NonMutableSubscriptableg9subscript
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[GETFN]](%0, [[RES]])
 // CHECK-NEXT: return [[RES2]]
-func test_nm_subscript_get(let a : Int) -> Int {
+func test_nm_subscript_get(a : Int) -> Int {
   return produceNMSubscriptableRValue()[a]
 }
 
@@ -214,7 +214,7 @@ func test_nm_subscript_get(let a : Int) -> Int {
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
 // CHECK: [[SETFN:%[0-9]+]] = function_ref @_TFV9let_decls23NonMutableSubscriptables9subscript
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[SETFN]](%0, %0, [[RES]])
-func test_nm_subscript_set(let a : Int) {
+func test_nm_subscript_set(a : Int) {
   produceNMSubscriptableRValue()[a] = a
 }
 
@@ -229,7 +229,7 @@ struct WeirdPropertyTest {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}test_weird_property
-func test_weird_property(v : WeirdPropertyTest, let i : Int) -> Int {
+func test_weird_property(v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box $WeirdPropertyTest
   // CHECK: [[PB:%.*]] = project_box [[VBOX]]
@@ -255,7 +255,7 @@ func test_weird_property(v : WeirdPropertyTest, let i : Int) -> Int {
 // CHECK-NEXT: copy_addr [take] %1 to [initialization] %0 : $*T
 // CHECK-NEXT: %4 = tuple ()
 // CHECK-NEXT: return %4
-func generic_identity<T>(let a : T) -> T {
+func generic_identity<T>(a : T) -> T {
   // Should be a single copy_addr, with no temporary.
   return a
 }
@@ -282,7 +282,7 @@ protocol SimpleProtocol {
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetProtocolBases
 // CHECK: bb0(%0 : $*SimpleProtocol):
-func testLetProtocolBases(let p : SimpleProtocol) {
+func testLetProtocolBases(p : SimpleProtocol) {
   // CHECK-NEXT: debug_value_addr
   // CHECK-NEXT: open_existential_addr
   // CHECK-NEXT: witness_method
@@ -301,7 +301,7 @@ func testLetProtocolBases(let p : SimpleProtocol) {
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetArchetypeBases
 // CHECK: bb0(%0 : $*T):
-func testLetArchetypeBases<T : SimpleProtocol>(let p : T) {
+func testLetArchetypeBases<T : SimpleProtocol>(p : T) {
   // CHECK-NEXT: debug_value_addr
   // CHECK-NEXT: witness_method $T
   // CHECK-NEXT: apply
@@ -319,7 +319,7 @@ func testLetArchetypeBases<T : SimpleProtocol>(let p : T) {
 // CHECK: bb0(%0 : $Int, %1 : $*SimpleProtocol):
 // CHECK-NEXT: debug_value %0 : $Int, let, name "a"
 // CHECK-NEXT: debug_value_addr %1 : $*SimpleProtocol, let, name "b"
-func testDebugValue(let a : Int, let b : SimpleProtocol) -> Int {
+func testDebugValue(a : Int, b : SimpleProtocol) -> Int {
 
   // CHECK-NEXT: debug_value %0 : $Int, let, name "x"
   let x = a
@@ -335,7 +335,7 @@ func testDebugValue(let a : Int, let b : SimpleProtocol) -> Int {
 
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
-func testAddressOnlyTupleArgument(let bounds: (start: SimpleProtocol, pastEnd: Int)) {
+func testAddressOnlyTupleArgument(bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
@@ -348,7 +348,7 @@ func testAddressOnlyTupleArgument(let bounds: (start: SimpleProtocol, pastEnd: I
 }
 
 
-func address_only_let_closure<T>(let x:T) -> T {
+func address_only_let_closure<T>(x:T) -> T {
   return { { x }() }()
 }
 
@@ -360,13 +360,13 @@ struct GenericFunctionStruct<T, U> {
 // CHECK-LABEL: sil hidden @{{.*}}member_ref_abstraction_change
 // CHECK: function_ref reabstraction thunk helper
 // CHECK: return
-func member_ref_abstraction_change(let x: GenericFunctionStruct<Int, Int>) -> Int -> Int {
+func member_ref_abstraction_change(x: GenericFunctionStruct<Int, Int>) -> Int -> Int {
   return x.f
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
 // CHECK: apply %0()
-func call_auto_closure(@autoclosure let x: () -> Bool) -> Bool {
+func call_auto_closure(@autoclosure x: () -> Bool) -> Bool {
   return x()  // Calls of autoclosures should be marked transparent.
 }
 

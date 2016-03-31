@@ -55,4 +55,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_VALUEENUMERATOR_H

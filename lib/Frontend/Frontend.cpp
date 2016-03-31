@@ -229,8 +229,11 @@ Module *CompilerInstance::getMainModule() {
     MainModule = Module::create(ID, *Context);
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
+
     if (Invocation.getFrontendOptions().EnableResilience)
-      MainModule->setResilienceEnabled();
+      MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
+    else if (Invocation.getFrontendOptions().SILSerializeAll)
+      MainModule->setResilienceStrategy(ResilienceStrategy::Fragile);
   }
   return MainModule;
 }
@@ -427,6 +430,12 @@ void CompilerInstance::performSema() {
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);
 
+    auto &Diags = NextInput->getASTContext().Diags;
+    auto DidSuppressWarnings = Diags.getSuppressWarnings();
+    auto IsPrimary
+      = PrimaryBufferID == NO_SUCH_BUFFER || BufferID == PrimaryBufferID;
+    Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
+
     bool Done;
     do {
       // Parser may stop at some erroneous constructions like #else, #endif
@@ -434,6 +443,8 @@ void CompilerInstance::performSema() {
       parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
                           &PersistentState, DelayedCB.get());
     } while (!Done);
+
+    Diags.setSuppressWarnings(DidSuppressWarnings);
 
     performNameBinding(*NextInput);
   }
@@ -468,6 +479,11 @@ void CompilerInstance::performSema() {
 
     SourceFile &MainFile =
       MainModule->getMainSourceFile(Invocation.getSourceFileKind());
+
+    auto &Diags = MainFile.getASTContext().Diags;
+    auto DidSuppressWarnings = Diags.getSuppressWarnings();
+    Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
+
     SILParserState SILContext(TheSILModule.get());
     unsigned CurTUElem = 0;
     bool Done;
@@ -485,6 +501,8 @@ void CompilerInstance::performSema() {
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
+
+    Diags.setSuppressWarnings(DidSuppressWarnings);
     
     if (mainIsPrimary && !Context->hadError() &&
         Invocation.getFrontendOptions().PlaygroundTransform)
@@ -528,7 +546,8 @@ void CompilerInstance::performParseOnly() {
   Module *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
-  assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_Swift_Library);
+  assert((Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_Swift_Library) &&
+    "only supports parsing a single .swift file");
   assert(BufferIDs.size() == 1 && "only supports parsing a single file");
 
   if (Kind == InputFileKind::IFK_Swift)

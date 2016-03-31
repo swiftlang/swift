@@ -95,8 +95,9 @@ def create_parser():
                         help='Add additional framework directories')
     parser.add_argument('-I', '--include-dir', action='append',
                         help='Add additional include directories')
-    parser.add_argument('--enable-infer-import-as-member', action='store_true', 
-                        help='Infer when a global could be imported as a member.')
+    parser.add_argument('--enable-infer-import-as-member', action='store_true',
+                        help='Infer when a global could be imported as a ' +
+                        'member.')
     return parser
 
 

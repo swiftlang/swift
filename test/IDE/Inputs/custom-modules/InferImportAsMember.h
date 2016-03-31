@@ -51,38 +51,38 @@ extern void IAMStruct1SetNonPropertyNoGet(struct IAMStruct1 s, double x);
 
 /// Various static functions that can't quite be imported as properties.
 // Too many parameters
-extern float IAMStruct1StaticGetNonPropertyNumParams();
+extern float IAMStruct1StaticGetNonPropertyNumParams(void);
 extern void IAMStruct1StaticSetNonPropertyNumParams(float a,
                                               float b);
 extern void IAMStruct1StaticGetNonPropertyNumParamsGetter(double d);
 
 // Set type doesn't match get type
-extern float IAMStruct1StaticGetNonPropertyType();
+extern float IAMStruct1StaticGetNonPropertyType(void);
 extern void IAMStruct1StaticSetNonPropertyType(double x);
 
 // Didn't find self on setter
-extern float IAMStruct1StaticGetNonPropertyNoSelf();
+extern float IAMStruct1StaticGetNonPropertyNoSelf(void);
 extern void IAMStruct1StaticSetNonPropertyNoSelf(double x, double y);
 
 // No set only properties
 extern void IAMStruct1StaticSetNonPropertyNoGet(double x);
 
 /// Static method
-extern double IAMStruct1StaticMethod();
-extern double IAMStruct1TLAThreeLetterAcronym();
+extern double IAMStruct1StaticMethod(void);
+extern double IAMStruct1TLAThreeLetterAcronym(void);
 
 /// Static computed properties
-extern double IAMStruct1StaticGetProperty();
+extern double IAMStruct1StaticGetProperty(void);
 extern double IAMStruct1StaticSetProperty(double);
-extern double IAMStruct1StaticGetOnlyProperty();
+extern double IAMStruct1StaticGetOnlyProperty(void);
 
 /// Omit needless words
 extern double IAMStruct1ONWNeedlessTypeArgLabel(double Double);
 
 /// Fuzzy
-extern struct IAMStruct1 IAMFuzzyStruct1Create();
-extern struct IAMStruct1 IAMFuzzyStruct1CreateWithFuzzyName();
-extern struct IAMStruct1 IAMFuzzyStruct1CreateFuzzyName();
+extern struct IAMStruct1 IAMFuzzyStruct1Create(void);
+extern struct IAMStruct1 IAMFuzzyStruct1CreateWithFuzzyName(void);
+extern struct IAMStruct1 IAMFuzzyStruct1CreateFuzzyName(void);
 
 extern double __IAMStruct1IgnoreMe(struct IAMStruct1 s);
 
@@ -104,7 +104,7 @@ const TDStruct TDStructCreateWithFloat(float Float);
 typedef const struct __attribute__((objc_bridge(id))) __IAMClass *IAMClassRef;
 typedef IAMClassRef IAMOtherName;
 
-extern unsigned IAMClassGetTypeID();
+extern unsigned IAMClassGetTypeID(void);
 extern IAMClassRef IAMClassCreate(double i);
 extern void IAMClassInvert(IAMOtherName iamOtherName);
 

@@ -219,13 +219,13 @@ bool PartialApplyCombiner::allocateTemporaries() {
 
 /// Emit dealloc_stack for all temporaries.
 void PartialApplyCombiner::deallocateTemporaries() {
-  // Insert dealloc_stack instructions.
-  TinyPtrVector<SILBasicBlock *> ExitBBs;
-  findAllNonFailureExitBBs(PAI->getFunction(), ExitBBs);
+  // Insert dealloc_stack instructions at all function exit points.
+  for (SILBasicBlock &BB : *PAI->getFunction()) {
+    TermInst *Term = BB.getTerminator();
+    if (!Term->isFunctionExiting())
+      continue;
 
-  for (auto Op : Tmps) {
-    for (auto *ExitBB : ExitBBs) {
-      auto *Term = ExitBB->getTerminator();
+    for (auto Op : Tmps) {
       Builder.setInsertionPoint(Term);
       Builder.createDeallocStack(PAI->getLoc(), Op);
     }

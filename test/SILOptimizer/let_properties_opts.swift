@@ -123,7 +123,7 @@ struct Boo3 {
   }
 }
 
-// The initializer of this struct can be defined elswhere,
+// The initializer of this struct can be defined elsewhere,
 // e.g. in an extension of this struct in a different module.
 public struct StructWithOnlyPublicLetProperties {
   public let Prop0: Int32
@@ -137,7 +137,7 @@ public struct StructWithOnlyPublicLetProperties {
 
 // The initializer of this struct cannot be defined outside
 // of the current module, because it contains an internal stored
-// property, which is impossible to intialize outside of this module.
+// property, which is impossible to initialize outside of this module.
 public struct StructWithPublicAndInternalLetProperties {
   public let Prop0: Int32
   internal let Prop1: Int32
@@ -148,9 +148,9 @@ public struct StructWithPublicAndInternalLetProperties {
   }
 }
 
-// The initializer of this struct cannot be defined elswhere,
+// The initializer of this struct cannot be defined elsewhere,
 // because it contains a private stored property, which is
-// impossible to intialize outside of this file.
+// impossible to initialize outside of this file.
 public struct StructWithPublicAndInternalAndPrivateLetProperties {
   public let Prop0: Int32
   internal let Prop1: Int32
@@ -167,7 +167,7 @@ public struct StructWithPublicAndInternalAndPrivateLetProperties {
 // Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
-// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FCS_4Foo1Vs5Int32 : $@convention(thin) (@owned Foo1) -> Int32
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts13testClassLet1FCS_4Foo1Vs5Int32 : $@convention(thin) (@owned Foo1) -> Int32
 // bb0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1 
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
@@ -193,7 +193,7 @@ public func testClassLet1(f: inout Foo1) -> Int32 {
 // Check that return expressions in all subsequent functions can be constant folded, because the values of let properties
 // are known to be constants of simple types.
 
-// CHECK: sil @_TF19let_properties_opts12testClassLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
+// CHECK: sil [thunk] [always_inline] @_TF19let_properties_opts12testClassLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
 // CHECK: bb0
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
@@ -212,7 +212,7 @@ public func testClassLet(f: inout Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
 }
 
-// CHECK-LABEL: sil @_TF19let_properties_opts18testClassPublicLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts18testClassPublicLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
 // CHECK: bb0
 // CHECK: integer_literal $Builtin.Int32, 1
 // CHECK-NEXT: struct $Int32
@@ -251,7 +251,7 @@ public func testStructPublicLet(b: Boo) -> Int32 {
 
 // Check that f.x is not constant folded, because the initializer of Foo2 has multiple
 // assignments to the property x with different values.
-// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet2FCS_4Foo2Vs5Int32 : $@convention(thin) (@owned Foo2) -> Int32
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts13testClassLet2FCS_4Foo2Vs5Int32 : $@convention(thin) (@owned Foo2) -> Int32
 // bb0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
@@ -344,14 +344,14 @@ public func testStructPropertyAccessibility(b: StructWithPublicAndInternalAndPri
 
 // Force use of initializers, otherwise they got removed by the dead-function-elimination pass
 // and the values of let properties cannot be determined.
-public func useIntiializers() -> StructWithOnlyPublicLetProperties {
+public func useInitializers() -> StructWithOnlyPublicLetProperties {
   return StructWithOnlyPublicLetProperties(1, 1)
 }
 
-public func useIntiializers() -> StructWithPublicAndInternalLetProperties {
+public func useInitializers() -> StructWithPublicAndInternalLetProperties {
   return StructWithPublicAndInternalLetProperties(1, 1)
 }
 
-public func useIntiializers() -> StructWithPublicAndInternalAndPrivateLetProperties {
+public func useInitializers() -> StructWithPublicAndInternalAndPrivateLetProperties {
   return StructWithPublicAndInternalAndPrivateLetProperties(1, 1)
 }

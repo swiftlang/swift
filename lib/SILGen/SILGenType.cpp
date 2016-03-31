@@ -38,7 +38,8 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
                             IsBare, IsTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile);
+                            makeModuleFragile ? IsFragile : IsNotFragile,
+                            IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -46,7 +47,6 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
     // an ObjC method. This would change if we introduced a native
     // runtime-hookable mechanism.
     SILGenFunction SGF(*this, *F);
-    F->setThunk(IsThunk);
     SGF.emitForeignToNativeThunk(constant);
   }
 

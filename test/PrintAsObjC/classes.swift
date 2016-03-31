@@ -7,29 +7,32 @@
 // RUN: mkdir %t
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -enable-import-objc-generics -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -enable-import-objc-generics -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -enable-import-objc-generics -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -enable-import-objc-generics -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 // FIXME: END -enable-source-import hackaround
 
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -enable-import-objc-generics -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -enable-import-objc-generics -parse-as-library %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: FileCheck %s < %t/classes.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang %t/classes.h
 // RUN: not %check-in-clang -fno-modules %t/classes.h
-// RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h
+// RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
 // CHECK-NOT: Swift;
 // CHECK-LABEL: @import Foundation;
 // CHECK-NEXT: @import CoreGraphics;
+// CHECK-NEXT: @import CoreFoundation;
+// CHECK-NEXT: @import objc_generics;
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Swift;
 import Foundation
+import objc_generics
 import AppKit // only used in implementations
 import CoreFoundation
 
@@ -362,8 +365,8 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, readonly, strong) Properties * _Nonnull mySelf;
 // CHECK-NEXT: @property (nonatomic, readonly) double pi;
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
-// CHECK-NEXT: + (Properties * _Nonnull)shared;
-// CHECK-NEXT: + (void)setShared:(Properties * _Nonnull)newValue;
+// CHECK-NEXT: @property (nonatomic, class, strong) Properties * _Nonnull shared;
+// CHECK-NEXT: @property (nonatomic, class, readonly, strong) Properties * _Nonnull sharedRO;
 // CHECK-NEXT: @property (nonatomic, weak) Properties * _Nullable weakOther;
 // CHECK-NEXT: @property (nonatomic, assign) Properties * _Nonnull unownedOther;
 // CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * _Nonnull unmanagedOther;
@@ -392,10 +395,9 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(CustomName) NSArray<CustomName *> *  _Nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * _Nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray<id <NSObject>> * _Nullable outletCollectionProto;
-// CHECK-NEXT: + (NSInteger)staticInt;
-// CHECK-NEXT: + (NSString * _Nonnull)staticString;
-// CHECK-NEXT: + (void)setStaticString:(NSString * _Nonnull)value;
-// CHECK-NEXT: + (double)staticDouble;
+// CHECK-NEXT: @property (nonatomic, class, readonly) NSInteger staticInt;
+// CHECK-NEXT: @property (nonatomic, class, copy) NSString * _Nonnull staticString;
+// CHECK-NEXT: @property (nonatomic, class, readonly) double staticDouble;
 // CHECK-NEXT: @property (nonatomic, strong) Properties * _Nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
 // CHECK-NEXT: @property (nonatomic, getter=isAnimated) BOOL animated;
@@ -421,6 +423,10 @@ public class NonObjCClass { }
   class var shared: Properties {
     get { return Properties() }
     set { }
+  }
+
+  class var sharedRO: Properties {
+    get { return Properties() }
   }
 
   weak var weakOther: Properties?
@@ -585,3 +591,16 @@ public class NonObjCClass { }
   init(string: String) throws { }
   init(fn: Int -> Int) throws { }
 }
+
+@objc class Pet: Pettable {}
+@objc protocol Runcible {}
+
+// CHECK-LABEL: @interface UsesImportedGenerics
+@objc class UsesImportedGenerics {
+  // CHECK: - (GenericClass<id> * _Nonnull)takeAndReturnGenericClass:(GenericClass<NSString *> * _Nullable)x;
+  @objc func takeAndReturnGenericClass(x: GenericClass<NSString>?) -> GenericClass<AnyObject> { fatalError("") }
+  // CHECK: - (PettableContainer<id <Pettable>> * _Null_unspecified)takeAndReturnPettableContainer:(PettableContainer<Pet *> * _Nonnull)x;
+  @objc func takeAndReturnPettableContainer(x: PettableContainer<Pet>) -> PettableContainer<Pettable>! { fatalError("") }
+}
+// CHECK: @end
+

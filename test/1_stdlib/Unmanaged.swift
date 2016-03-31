@@ -47,5 +47,22 @@ UnmanagedTests.test("unsafeBitCast(Unmanaged, Int)") {
   _fixLifetime(ref)
 }
 
+class Foobar {
+  func foo() -> Int { return 1 }
+}
+
+UnmanagedTests.test("_withUnsafeGuaranteedRef") {
+  var ref = Foobar()
+  var unmanaged = Unmanaged.passUnretained(ref)
+  withExtendedLifetime(ref) {
+    unmanaged._withUnsafeGuaranteedRef {
+      expectTrue(ref === $0)
+    }
+    unmanaged._withUnsafeGuaranteedRef {
+      expectEqual(1, $0.foo())
+    }
+  }
+}
+
 runAllTests()
 

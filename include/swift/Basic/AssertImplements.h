@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_ASSERT_IMPLEMENTS_H
-#define SWIFT_BASIC_ASSERT_IMPLEMENTS_H
+#ifndef SWIFT_BASIC_ASSERTIMPLEMENTS_H
+#define SWIFT_BASIC_ASSERTIMPLEMENTS_H
 
 #include <type_traits>
 
@@ -61,4 +61,4 @@ namespace swift {
 
 } // end namespace swift
 
-#endif // SWIFT_BASIC_ASSERT_IMPLEMENTS_H
+#endif // SWIFT_BASIC_ASSERTIMPLEMENTS_H

@@ -46,7 +46,7 @@ extern int IAMStruct1StaticGetProperty(void)
     __attribute__((swift_name("getter:Struct1.property()")));
 extern int IAMStruct1StaticSetProperty(int i)
     __attribute__((swift_name("setter:Struct1.property(i:)")));
-extern int IAMStruct1StaticGetOnlyProperty()
+extern int IAMStruct1StaticGetOnlyProperty(void)
     __attribute__((swift_name("getter:Struct1.getOnlyProperty()")));
 
 extern void IAMStruct1SelfComesLast(double x, struct IAMStruct1 s)

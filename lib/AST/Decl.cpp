@@ -991,14 +991,10 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
 bool PatternBindingDecl::hasStorage() const {
   // Walk the pattern, to check to see if any of the VarDecls included in it
   // have storage.
-  bool HasStorage = false;
   for (auto entry : getPatternList())
-    entry.getPattern()->forEachVariable([&](VarDecl *VD) {
-      if (VD->hasStorage())
-        HasStorage = true;
-    });
-
-  return HasStorage;
+    if (entry.getPattern()->hasStorage())
+      return true;
+  return false;
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P) {
@@ -1235,7 +1231,13 @@ bool AbstractStorageDecl::hasFixedLayout() const {
 
   // Must use resilient access patterns.
   assert(getDeclContext()->isModuleScopeContext());
-  return !getDeclContext()->getParentModule()->isResilienceEnabled();
+  switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
+  case ResilienceStrategy::Resilient:
+    return false;
+  case ResilienceStrategy::Fragile:
+  case ResilienceStrategy::Default:
+    return true;
+  }
 }
 
 bool AbstractStorageDecl::hasFixedLayout(ModuleDecl *M,
@@ -1770,7 +1772,13 @@ bool NominalTypeDecl::hasFixedLayout() const {
     return true;
 
   // Otherwise, access via indirect "resilient" interfaces.
-  return !getParentModule()->isResilienceEnabled();
+  switch (getParentModule()->getResilienceStrategy()) {
+  case ResilienceStrategy::Resilient:
+    return false;
+  case ResilienceStrategy::Fragile:
+  case ResilienceStrategy::Default:
+    return true;
+  }
 }
 
 bool NominalTypeDecl::hasFixedLayout(ModuleDecl *M,

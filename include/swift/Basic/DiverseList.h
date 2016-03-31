@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_DIVERSELIST_H
-#define SWIFT_IRGEN_DIVERSELIST_H
+#ifndef SWIFT_BASIC_DIVERSELIST_H
+#define SWIFT_BASIC_DIVERSELIST_H
 
 #include "swift/Basic/Malloc.h"
 #include <cassert>
@@ -284,4 +284,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_DIVERSELIST_H

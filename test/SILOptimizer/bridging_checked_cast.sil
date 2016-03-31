@@ -16,9 +16,9 @@ struct Butt: _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool
   func _bridgeToObjectiveC() -> NSCloud
   static func _forceBridgeFromObjectiveC(source: NSCloud,
-                                         inout result: Butt?)
+                                         result: inout Butt?)
   static func _conditionallyBridgeFromObjectiveC(source: NSCloud,
-                                         inout result: Butt?) -> Bool
+                                         result: inout Butt?) -> Bool
 }
 
 sil @checked_cast_object_to_value : $@convention(thin) () -> () {

@@ -220,6 +220,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// _debugPreconditions in _checkValidBufferClass for any array. Since we know
   /// for the _ContiguousArrayBuffer that this check must always succeed we omit
   /// it in this specialized constructor.
+  @_versioned
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._sanityCheckValidBufferClass(buffer.dynamicType)
     self._nativeBuffer = Builtin.castToNativeObject(buffer)
@@ -255,7 +256,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid
   ///   for the duration of the call to `body`.
   public func withUnsafeMutablePointerToValue<R>(
-    body: (UnsafeMutablePointer<Value>) -> R
+    body: @noescape (UnsafeMutablePointer<Value>) -> R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
@@ -327,6 +328,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Internal version for use by _ContiguousArrayBuffer.init where we know that
   /// we have a valid buffer class and that the capacity is >= 0.
+  @_versioned
   internal init(
     _uncheckedBufferClass: AnyClass,
     minimumCapacity: Int
@@ -410,30 +412,42 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Offset from the allocated storage for `self` to the stored `Value`
   internal static var _valueOffset: Int {
-    return _roundUp(
-      sizeof(_HeapObject.self),
-      toAlignment: alignof(Value.self))
+    @inline(__always)
+    get {
+      return _roundUp(
+        sizeof(_HeapObject.self),
+        toAlignment: alignof(Value.self))
+    }
   }
 
   /// An **unmanaged** pointer to the storage for the `Value`
   /// instance.  Not safe to use without _fixLifetime calls to
   /// guarantee it doesn't dangle
   internal var _valuePointer: UnsafeMutablePointer<Value> {
-    return UnsafeMutablePointer(_address + _My._valueOffset)
+    @inline(__always)
+    get {
+      return UnsafeMutablePointer(_address + _My._valueOffset)
+    }
   }
 
   /// An **unmanaged** pointer to the storage for `Element`s.  Not
   /// safe to use without _fixLifetime calls to guarantee it doesn't
   /// dangle.
   internal var _elementPointer: UnsafeMutablePointer<Element> {
-    return UnsafeMutablePointer(_address + _My._elementOffset)
+    @inline(__always)
+    get {
+      return UnsafeMutablePointer(_address + _My._elementOffset)
+    }
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage
   internal static var _elementOffset: Int {
-    return _roundUp(
-      _valueOffset + sizeof(Value.self),
-      toAlignment: alignof(Element.self))
+    @inline(__always)
+    get {
+      return _roundUp(
+        _valueOffset + sizeof(Value.self),
+        toAlignment: alignof(Element.self))
+    }
   }
 
   internal var _nativeBuffer: Builtin.NativeObject

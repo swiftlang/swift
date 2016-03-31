@@ -701,6 +701,8 @@ on Int), to an operation within a protocol (which requires indirection through
 the corresponding vtable), or to an operation on a generic type definition, all
 of which can be emitted as object code.
 
+.. _generics-specialization:
+
 Specialization
 --------------
 

@@ -153,3 +153,33 @@ func test4(x: Int) {
 // EXPR_TOP_3_TYPE_MATCH: 0
 // EXPR_TOP_3_TYPE_MATCH: y
 // EXPR_TOP_3_TYPE_MATCH: z
+
+// RUN: %complete-test -tok=VOID_1 %s | FileCheck %s -check-prefix=VOID_1
+// RUN: %complete-test -tok=VOID_1 %s -raw | FileCheck %s -check-prefix=VOID_1_RAW
+func test6() {
+  func foo1() {}
+  func foo2() -> Int {}
+  func foo3() -> String {}
+  let x: Int
+  x = #^VOID_1,,foo^#
+}
+// VOID_1-LABEL: Results for filterText:  [
+// VOID_1-NOT: foo1
+// VOID_1: foo2()
+// VOID_1-NOT: foo1
+// VOID_1: foo3()
+// VOID_1-NOT: foo1
+// VOID_1: ]
+// VOID_1-LABEL: Results for filterText: foo [
+// VOID_1: foo2()
+// VOID_1: foo3()
+// VOID_1: foo1()
+// VOID_1: ]
+
+// VOID_1_RAW: key.name: "foo1()",
+// VOID_1_RAW-NEXT: key.sourcetext: "foo1()",
+// VOID_1_RAW-NEXT: key.description: "foo1()",
+// VOID_1_RAW-NEXT: key.typename: "Void",
+// VOID_1_RAW-NEXT: key.context: source.codecompletion.context.thismodule,
+// VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
+// VOID_1_RAW-NEXT: key.not_recommended: 1,

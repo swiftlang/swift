@@ -503,6 +503,11 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
       // content nodes.
       if (DestReachable) {
         DestFrom = defer(DestFrom, DestReachable, Changed);
+      } else if (SourceReachable->getEscapeState() >= EscapeState::Global) {
+        // If we don't have a mapped node in the destination graph we still have
+        // to honor its escaping state. We do that simply by setting the source
+        // node of the defer-edge to escaping.
+        Changed |= DestFrom->mergeEscapeState(EscapeState::Global);
       }
 
       for (auto *Deferred : SourceReachable->defersTo) {

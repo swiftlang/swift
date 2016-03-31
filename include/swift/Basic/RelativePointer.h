@@ -115,7 +115,7 @@
 //
 // Symbolic references are an interesting idea that we have not yet made
 // use of.  They may be acceptable in reflective metadata cases where it
-// is desireable to heavily bias towards never using the metadata.  However,
+// is desirable to heavily bias towards never using the metadata.  However,
 // they're only profitable if there wasn't any other indirect reference
 // to the target, and it is likely that their optimal use requires a more
 // intelligent toolchain from top to bottom.
@@ -441,6 +441,6 @@ using FarRelativeIndirectablePointer =
 template<typename T, bool Nullable = false>
 using FarRelativeDirectPointer = RelativeDirectPointer<T, Nullable, intptr_t>;
 
-}
+} // end namespace swift
 
 #endif // SWIFT_BASIC_RELATIVEPOINTER_H

@@ -767,6 +767,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_infer_iuos)) {
     Opts.InferIUOs = false;
   }
+  Opts.ImportObjCGenerics = Args.hasArg(OPT_enable_import_objc_generics);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 
@@ -882,6 +883,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.Mode = ClangImporterOptions::Modes::EmbedBitcode;
+
+  Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   return false;
 }

@@ -38,6 +38,7 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Config.h"
 #include "clang/APINotes/APINotesReader.h"
@@ -1574,11 +1575,29 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
 namespace {
 class AnnotatingPrinter : public StreamPrinter {
+  llvm::SmallDenseMap<ValueDecl*, ValueDecl*> DefaultImplementationMap;
+  bool InProtocol = false;
 public:
   using StreamPrinter::StreamPrinter;
 
   void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
-    OS << "<decl:" << Decl::getKindName(D->getKind()) << '>';
+    StringRef HasDefault = "";
+    if (D->getKind() == DeclKind::Protocol) {
+      InProtocol = true;
+      DefaultImplementationMap.clear();
+      ProtocolDecl *PD = const_cast<ProtocolDecl*>(dyn_cast<ProtocolDecl>(D));
+      collectDefaultImplementationForProtocolMembers(PD,
+                                                     DefaultImplementationMap);
+    }
+    if (InProtocol) {
+      if (auto *VD = const_cast<ValueDecl*>(dyn_cast<ValueDecl>(D))) {
+        for (auto Pair : DefaultImplementationMap) {
+          if (Pair.getSecond() == VD)
+             HasDefault = "(HasDefault)";
+        }
+      }
+    }
+    OS << "<decl:" << Decl::getKindName(D->getKind()) << HasDefault << '>';
   }
   void printDeclLoc(const Decl *D) override {
     OS << "<loc>";
@@ -1587,6 +1606,9 @@ public:
     OS << "</loc>";
   }
   void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
+    if (D->getKind() == DeclKind::Protocol) {
+      InProtocol = false;
+    }
     OS << "</decl>";
   }
   void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
@@ -1602,7 +1624,7 @@ public:
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     const NominalTypeDecl *NTD,
                                     Optional<BracketOptions> Bracket) override {
-    if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension)
+    if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension(ED))
       return;
     OS << "<synthesized>";
   }
@@ -1610,7 +1632,7 @@ public:
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                      const NominalTypeDecl *NTD,
                                      Optional<BracketOptions> Bracket) override {
-    if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension)
+    if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension(ED))
       return;
     OS << "</synthesized>";
   }

@@ -195,8 +195,7 @@ SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
   if (found == DefaultWitnessTableMap.end()) {
     if (deserializeLazily) {
       SILLinkage linkage =
-        getSILLinkage(getDeclLinkage(Protocol, /*internalAsVersioned=*/ false),
-                      ForDefinition);
+        getSILLinkage(getDeclLinkage(Protocol), ForDefinition);
       SILDefaultWitnessTable *wtable =
         SILDefaultWitnessTable::create(*this, linkage, Protocol);
       wtable = getSILLoader()->lookupDefaultWitnessTable(wtable);

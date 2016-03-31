@@ -16,7 +16,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
-#include <mutex>
+#include "swift/Runtime/Mutex.h"
 #include <condition_variable>
 #include <thread>
 
@@ -278,8 +278,8 @@ template <class ValueTy> class MetadataCache {
   const ValueTy *Head;
 
   struct ConcurrencyControl {
-    std::mutex Lock;
-    std::condition_variable Queue;
+    Mutex Lock;
+    Condition Queue;
   };
   std::unique_ptr<ConcurrencyControl> Concurrency;
 
@@ -328,17 +328,19 @@ public:
     if (!insertResult.second) {
 
       // If the entry is already initialized, great.
-      if (auto value = entry->getValue())
+      auto value = entry->getValue();
+      if (value) {
         return value;
+      }
 
       // Otherwise, we have to grab the lock and wait for the value to
       // appear there.  Note that we have to check again immediately
       // after acquiring the lock to prevent a race.
       auto concurrency = Concurrency.get();
-      std::unique_lock<std::mutex> guard(concurrency->Lock);
-      while (true) {
-        if (auto value = entry->getValue())
-          return value;
+      concurrency->Lock.lockOrWait(concurrency->Queue, [&value, &entry, this] {
+        if ((value = entry->getValue())) {
+          return false; // found a value, done waiting
+        }
 
         // As a QoI safe-guard against the simplest form of cyclic
         // dependency, check whether this thread is the one responsible
@@ -350,8 +352,10 @@ public:
           abort();
         }
 
-        concurrency->Queue.wait(guard);
-      }
+        return true; // don't have a value, continue waiting
+      });
+
+      return value;
     }
 
     // Otherwise, we created the entry and are responsible for
@@ -368,12 +372,10 @@ public:
 #endif
 
     // Acquire the lock, set the value, and notify any waiters.
-    {
-      auto concurrency = Concurrency.get();
-      std::unique_lock<std::mutex> guard(concurrency->Lock);
+    auto concurrency = Concurrency.get();
+    concurrency->Lock.lockAndNotifyAll(concurrency->Queue, [&entry, &value] {
       entry->setValue(value);
-      concurrency->Queue.notify_all();
-    }
+    });
 
     return value;
   }

@@ -126,6 +126,9 @@ for it. In the debugger and profiler you can then see the SIL code instead of
 the swift source code.
 For details see the SILDebugInfoGenerator pass.
 
+To enable SIL debugging and profiling for the Swift standard library, use
+the build-script-impl option ``--build-sil-debugging-stdlib``.
+
 Other Utilities
 ```````````````
 

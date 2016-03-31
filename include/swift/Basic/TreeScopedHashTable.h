@@ -400,4 +400,4 @@ TreeScopedHashTableScopeImpl<K, V, Allocator>::~TreeScopedHashTableScopeImpl() {
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_TREESCOPEDHASHTABLE_H

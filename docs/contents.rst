@@ -21,4 +21,4 @@ Contents
    SIL
    TypeChecker
    DebuggingTheCompiler
-
+   OptimizationTips

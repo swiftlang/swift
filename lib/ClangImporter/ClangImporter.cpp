@@ -1183,6 +1183,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   : SwiftContext(ctx),
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
     InferImportAsMember(opts.InferImportAsMember),
+    DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
     BridgingHeaderLookupTable(nullptr)
 {
   // Add filters to determine if a Clang availability attribute
@@ -1956,8 +1957,8 @@ namespace {
 
 /// Determine whether the given Objective-C class, or any of its
 /// superclasses, either has or inherits a swift_bridge attribute.
-static bool hasOrInheritsSwiftBridgeAttr(
-    const clang::ObjCInterfaceDecl *objcClass) {
+static bool
+hasOrInheritsSwiftBridgeAttr(const clang::ObjCInterfaceDecl *objcClass) {
   do {
     // Look at the definition, if there is one.
     if (auto def = objcClass->getDefinition())
@@ -2021,7 +2022,7 @@ auto ClangImporter::Implementation::importFullName(
   }
 
   // Find the original method/property declaration and retrieve the
-  // name from thre.
+  // name from there.
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
     // Inherit the name from the "originating" declarations, if
     // there are any.
@@ -2856,6 +2857,20 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
 }
 
 bool
+ClangImporter::Implementation::shouldSuppressGenericParamsImport(
+    const clang::ObjCInterfaceDecl *decl) {
+  while (decl) {
+    StringRef name = decl->getName();
+    if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
+        name == "NSOrderedSet" || name == "NSEnumerator") {
+      return true;
+    }
+    decl = decl->getSuperClass();
+  }
+  return false;
+}
+
+bool
 ClangImporter::Implementation::isAccessibilityDecl(const clang::Decl *decl) {
 
   if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
@@ -3540,7 +3555,7 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
           // side effect of creating instantiations.
           (void)Impl.importDeclContextOf(decl, effectiveClangContext);
         } else {
-          llvm_unreachable("Macros cannoted be imported as members.");
+          llvm_unreachable("Macros cannot be imported as members.");
         }
       }
 

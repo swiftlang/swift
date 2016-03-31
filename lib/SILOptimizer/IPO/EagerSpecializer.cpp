@@ -44,7 +44,7 @@ llvm::cl::opt<bool> EagerSpecializeFlag(
 /// for new return or error values.
 static bool isTrivialReturnBlock(SILBasicBlock *RetBB) {
   auto *RetInst = RetBB->getTerminator();
-  assert(isa<ReturnInst>(RetInst) || isa<ThrowInst>(RetInst) &&
+  assert(RetInst->isFunctionExiting() &&
          "expected a properly terminated return or throw block");
 
   auto RetOperand = RetInst->getOperand(0);
@@ -87,10 +87,10 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
   SILLocation Loc = F->getLocation();
   
   auto *RetInst = RetBB->getTerminator();
-  assert(isa<ReturnInst>(RetInst) || isa<ThrowInst>(RetInst) &&
+  assert(RetInst->isFunctionExiting() &&
          "expected a properly terminated return or throw block");
   assert(RetInst->getOperand(0)->getType() == NewRetVal->getType() &&
-         "Mistmatched return type");
+         "Mismatched return type");
   SILBasicBlock *MergedBB = RetBB;
 
   // Split the return block if it is nontrivial.
