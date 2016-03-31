@@ -596,14 +596,14 @@ public struct ${Self}<T> : ${SelfProtocols} {
     bounds: Range<MinimalIndex>
   ) {
     _expectCompatibleIndices(
-      self.index(index.position, stepsFrom: startIndex),
+      _index(forPosition: index.position),
       index)
 
     _expectCompatibleIndices(
-      self.index(bounds.lowerBound.position, stepsFrom: startIndex),
+      _index(forPosition: bounds.lowerBound.position),
       bounds.lowerBound)
     _expectCompatibleIndices(
-      self.index(bounds.upperBound.position, stepsFrom: startIndex),
+      _index(forPosition: bounds.upperBound.position),
       bounds.upperBound)
 
     expectTrapping(
@@ -616,17 +616,17 @@ public struct ${Self}<T> : ${SelfProtocols} {
     bounds: Range<MinimalIndex>
   ) {
     _expectCompatibleIndices(
-      index(range.lowerBound.position, stepsFrom: startIndex),
+      _index(forPosition: range.lowerBound.position),
       range.lowerBound)
     _expectCompatibleIndices(
-      index(range.upperBound.position, stepsFrom: startIndex),
+      _index(forPosition: range.upperBound.position),
       range.upperBound)
 
     _expectCompatibleIndices(
-      index(bounds.lowerBound.position, stepsFrom: startIndex),
+      _index(forPosition: bounds.lowerBound.position),
       bounds.lowerBound)
     _expectCompatibleIndices(
-      index(bounds.upperBound.position, stepsFrom: startIndex),
+      _index(forPosition: bounds.upperBound.position),
       bounds.upperBound)
 
     expectTrapping(
