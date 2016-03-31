@@ -353,12 +353,6 @@ enum class SemanticContextKind {
   ///     }
   ///   }
   /// \endcode
-  ///
-  /// In C-style for loop headers the iteration variable has ExpressionSpecific
-  /// context:
-  /// \code
-  ///   for var foo = 0; #^A^# // foo -- ExpressionSpecific
-  /// \endcode
   ExpressionSpecific,
 
   /// A declaration from the same function.
