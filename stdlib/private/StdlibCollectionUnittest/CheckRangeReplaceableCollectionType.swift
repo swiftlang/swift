@@ -1144,7 +1144,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
 
   } // addRangeReplaceableCollectionTests
 
-  public func addBidirectionalRangeReplaceableCollectionTests<
+  public func addRangeReplaceableBidirectionalCollectionTests<
     C : protocol<BidirectionalCollection, RangeReplaceableCollection>,
     CollectionWithEquatableElement : protocol<BidirectionalCollection, RangeReplaceableCollection>
     where
@@ -1271,9 +1271,9 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
 
 //===----------------------------------------------------------------------===//
 
-  } // addBidirectionalRangeReplaceableCollectionTests
+  } // addRangeReplaceableBidirectionalCollectionTests
 
-  public func addRandomAccessRangeReplaceableCollectionTests<
+  public func addRangeReplaceableRandomAccessCollectionTests<
     C : protocol<RandomAccessCollection, RangeReplaceableCollection>,
     CollectionWithEquatableElement : protocol<RandomAccessCollection, RangeReplaceableCollection>
     where
@@ -1308,7 +1308,7 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     }
     checksAdded.value.insert(#function)
 
-    addBidirectionalRangeReplaceableCollectionTests(
+    addRangeReplaceableBidirectionalCollectionTests(
       testNamePrefix,
       makeCollection: makeCollection,
       wrapValue: wrapValue,
@@ -1335,5 +1335,5 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     testNamePrefix += String(C.Type)
 
     // No extra checks for collections with random access traversal so far.
-  } // addRandomAccessRangeReplaceableCollectionTests
+  } // addRangeReplaceableRandomAccessCollectionTests
 }
