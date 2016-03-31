@@ -77,6 +77,11 @@
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
+// Skip through unavailable typedefs when importing types.
+// TAG_DECLS_AND_TYPEDEFS: @available(*, unavailable, message: "use double")
+// TAG_DECLS_AND_TYPEDEFS-NEXT: typealias real_t = Double
+// TAG_DECLS_AND_TYPEDEFS-NEXT: func realSin(value: Double) -> Double
+
 // NEGATIVE-NOT: typealias FooStructTypedef2
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}

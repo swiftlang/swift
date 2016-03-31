@@ -601,6 +601,11 @@ namespace {
         }
 #endif
         hint = underlyingResult.Hint;
+
+        // If the imported typealias is unavailable, return the
+        // underlying type.
+        if (decl->getAttrs().isUnavailable(Impl.SwiftContext))
+          mappedType = underlyingResult.AbstractType;
       }
 
       return { mappedType, hint };
