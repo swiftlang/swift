@@ -2961,7 +2961,7 @@ Identifier DependentMemberType::getName() const {
 }
 
 static bool transformSILResult(SILResultInfo &result, bool &changed,
-                               const std::function<Type(Type)> &fn) {
+                               llvm::function_ref<Type(Type)> fn) {
   Type transType = result.getType().transform(fn);
   if (!transType) return true;
 
@@ -2974,7 +2974,7 @@ static bool transformSILResult(SILResultInfo &result, bool &changed,
 }
 
 static bool transformSILParameter(SILParameterInfo &param, bool &changed,
-                                  const std::function<Type(Type)> &fn) {
+                                  llvm::function_ref<Type(Type)> fn) {
   Type transType = param.getType().transform(fn);
   if (!transType) return true;
 
@@ -2986,7 +2986,7 @@ static bool transformSILParameter(SILParameterInfo &param, bool &changed,
   return false;
 }
 
-Type Type::transform(const std::function<Type(Type)> &fn) const {
+Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
   // Transform this type node.
   Type transformed = fn(*this);
 
@@ -3495,11 +3495,11 @@ case TypeKind::Id:
 }
 
 
-bool Type::findIf(const std::function<bool(Type)> &pred) const {
+bool Type::findIf(llvm::function_ref<bool(Type)> pred) const {
   class Walker : public TypeWalker {
-    const std::function<bool(Type)> &Pred;
+    llvm::function_ref<bool(Type)> Pred;
   public:
-    explicit Walker(const std::function<bool(Type)> &pred) : Pred(pred) {}
+    explicit Walker(llvm::function_ref<bool(Type)> pred) : Pred(pred) {}
 
     virtual Action walkToTypePre(Type ty) override {
       if (Pred(ty))
