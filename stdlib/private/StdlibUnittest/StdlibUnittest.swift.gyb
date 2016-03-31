@@ -683,7 +683,7 @@ struct _ParentProcess {
 
         let activeSkips = t.getActiveSkipPredicates()
         if !activeSkips.isEmpty {
-          skippedTests += [ t.name ]
+          skippedTests.append(t.name)
           print("[ SKIP     ] \(fullTestName) (skip: \(activeSkips))")
           continue
         }
@@ -753,11 +753,11 @@ struct _ParentProcess {
           print("[       OK ] \(fullTestName)")
 
         case (true, true):
-          uxpassedTests += [ t.name ]
+          uxpassedTests.append(t.name)
           print("[   UXPASS ] \(fullTestName)")
 
         case (false, false):
-          failedTests += [ t.name ]
+          failedTests.append(t.name)
           print("[     FAIL ] \(fullTestName)")
 
         case (false, true):
