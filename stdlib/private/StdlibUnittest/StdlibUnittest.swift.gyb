@@ -1000,7 +1000,7 @@ public class TestSuite {
     case .single(let code):
       precondition(
         parameter == nil,
-        "can't pass parameters to parameterized tests")
+        "can't pass parameters to non-parameterized tests")
       code()
     case .parameterized(code: let code, _):
       code(parameter!)
