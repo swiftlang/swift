@@ -242,11 +242,11 @@ func downcast(obj: AnyObject) -> X {
 // CHECK:        [[RESULT:%.*]] = apply [[METHOD]]() : $@callee_owned () -> @owned Juice
 // CHECK:        [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
 // CHECK:        store [[RESULT]] to [[PAYLOAD]]
-// CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.Some!enumelt.1
+// CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
 // CHECK:        br bb3
 
 // CHECK: bb2:
-// CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.None!enumelt
+// CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.none!enumelt
 // CHECK:        br bb3
 
 // CHECK: bb3:
