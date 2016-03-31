@@ -2036,16 +2036,10 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
       _fail(src, srcType, targetType, flags);
       return {false, nullptr};
     }
-
-    // Get the destination payload type
-    const Metadata *targetPayloadType =
-      cast<EnumMetadata>(targetType)->getGenericArgs()[0];
-
     // Inject the .none tag
-    swift_storeEnumTagSinglePayload(dest, targetPayloadType, enumCase,
+    swift_storeEnumTagSinglePayload(dest, payloadType, enumCase,
                                     1 /*emptyCases=*/);
-
-    // We don't have to destroy the source, because it was nil.
+    _succeed(dest, src, srcType, flags);
     return {true, nullptr};
   }
   // .Some
