@@ -432,7 +432,9 @@ void CompilerInstance::performSema() {
 
     auto &Diags = NextInput->getASTContext().Diags;
     auto DidSuppressWarnings = Diags.getSuppressWarnings();
-    Diags.setSuppressWarnings(DidSuppressWarnings || BufferID != PrimaryBufferID);
+    auto IsPrimary
+      = PrimaryBufferID == NO_SUCH_BUFFER || BufferID == PrimaryBufferID;
+    Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
     bool Done;
     do {
