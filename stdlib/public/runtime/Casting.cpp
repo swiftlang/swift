@@ -2027,10 +2027,16 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
       _fail(src, srcType, targetType, flags);
       return {false, nullptr};
     }
+
+    // Get the destination payload type
+    const Metadata *targetPayloadType =
+      cast<EnumMetadata>(targetType)->getGenericArgs()[0];
+
     // Inject the .None tag
-    swift_storeEnumTagSinglePayload(dest, payloadType, enumCase,
+    swift_storeEnumTagSinglePayload(dest, targetPayloadType, enumCase,
                                     1 /*emptyCases=*/);
-    _succeed(dest, src, srcType, flags);
+
+    // We don't have to destroy the source, because it was nil.
     return {true, nullptr};
   }
   // .Some
@@ -2054,6 +2060,13 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
   switch (targetType->getKind()) {
   // Handle wrapping an Optional target.
   case MetadataKind::Optional: {
+    // If the source is an existential, attempt to cast it first without
+    // unwrapping the target. This handles an optional source wrapped within an
+    // existential that Optional conforms to (Any).
+    if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
+      return _dynamicCastFromExistential(dest, src, srcExistentialType,
+                                         targetType, flags);
+    }
     // Recursively cast into the layout compatible payload area.
     const Metadata *payloadType =
       cast<EnumMetadata>(targetType)->getGenericArgs()[0];
