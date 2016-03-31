@@ -186,6 +186,10 @@ private:
   RCIdentityFunctionInfo *RCFI;
   ExitKind Kind;
   llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
+
+  /// Set to true if we found some releases but not all for the argument.
+  llvm::DenseSet<SILArgument *> FoundSomeReleases;
+
   bool HasBlock = false;
 
   /// Return true if we have seen releases to part or all of \p Derived in
@@ -220,6 +224,12 @@ public:
   void findMatchingReleases(SILBasicBlock *BB);
 
   bool hasBlock() const { return HasBlock; }
+
+  /// Return true if we've found some epilgoue releases for the argument
+  /// but not all.
+  bool hasSomeReleasesForArgument(SILArgument *Arg) {
+    return FoundSomeReleases.find(Arg) != FoundSomeReleases.end();
+  }
 
   bool isSingleRelease(SILArgument *Arg) const {
     auto Iter = ArgInstMap.find(Arg);
