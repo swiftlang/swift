@@ -693,8 +693,7 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
 %     if Mutable:
     set {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      // _writeBackMutableSlice() is not accessible here :(
-      fatalError("FIXME: swift-3-indexing-model")
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
 %     end
   }
@@ -910,12 +909,11 @@ public struct ${Self}<Element> : ${SelfProtocols} {
   public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<Base._Element>> {
     get {
       return ${SelfSlice}(base: self, bounds: bounds)
-      fatalError("FIXME: swift-3-indexing-model")
+      fatalError("FIXME: swift-3-indexing-model: range check")
     }
 %     if Mutable:
     set {
-      // _writeBackMutableSlice() is not accessible here :(
-      fatalError("FIXME: swift-3-indexing-model")
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
 %     end
   }
