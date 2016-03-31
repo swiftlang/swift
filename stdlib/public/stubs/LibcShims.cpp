@@ -66,8 +66,7 @@ size_t _swift_stdlib_malloc_size(const void *ptr) {
 #error No malloc_size analog known for this platform/libc.
 #endif
 
-static std::random_device RandomeDevice;
-static std::mt19937 MersenneRandom(RandomeDevice());
+static std::mt19937 MersenneRandom;
 
 __swift_uint32_t _swift_stdlib_cxx11_mt19937(void) {
   return MersenneRandom();
