@@ -14,13 +14,6 @@ import StdlibUnittest
 import Foundation
 import SlurpFastEnumeration
 
-// Also import modules which are used by StdlibUnittest internally. This is
-// needed to link all required libraries in case we serialize StdlibUnittest.
-import SwiftPrivate
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
   class RaceData {

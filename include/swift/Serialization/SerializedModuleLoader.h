@@ -106,6 +106,9 @@ class SerializedASTFile final : public LoadedFile {
   SerializedASTFile(Module &M, ModuleFile &file, bool isSIB = false)
     : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
 
+  void
+  collectLinkLibrariesFromImports(Module::LinkLibraryCallback callback) const;
+
 public:
   bool isSIB() const { return IsSIB; }
 

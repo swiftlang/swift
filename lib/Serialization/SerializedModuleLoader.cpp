@@ -423,15 +423,24 @@ void SerializedASTFile::getImportedModules(
   File.getImportedModules(imports, filter);
 }
 
+void SerializedASTFile::collectLinkLibrariesFromImports(
+    Module::LinkLibraryCallback callback) const {
+  llvm::SmallVector<Module::ImportedModule, 8> Imports;
+  File.getImportedModules(Imports, Module::ImportFilter::All);
+
+  for (auto Import : Imports)
+    Import.second->collectLinkLibraries(callback);
+}
+
 void SerializedASTFile::collectLinkLibraries(
     Module::LinkLibraryCallback callback) const {
   if (isSIB()) {
-    llvm::SmallVector<Module::ImportedModule, 8> Imports;
-    File.getImportedModules(Imports, Module::ImportFilter::All);
-
-    for (auto Import : Imports)
-      Import.second->collectLinkLibraries(callback);
+    collectLinkLibrariesFromImports(callback);
   } else {
+    if (File.getAssociatedModule()->getResilienceStrategy()
+        == ResilienceStrategy::Fragile) {
+      collectLinkLibrariesFromImports(callback);
+    }
     File.collectLinkLibraries(callback);
   }
 }
