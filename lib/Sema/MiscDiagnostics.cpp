@@ -1460,9 +1460,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
             if (auto LP = dyn_cast<VarPattern>(OSP->getSubPattern()))
               if (isa<NamedPattern>(LP->getSubPattern())) {
                 auto initExpr = SC->getCond()[0].getInitializer();
-                auto beforeExprLoc =
-                  initExpr->getStartLoc().getAdvancedLocOrInvalid(-1);
-                if (beforeExprLoc.isValid()) {
+                if (initExpr->getStartLoc().isValid()) {
                   unsigned noParens = initExpr->canAppendCallParentheses();
                   
                   // If the subexpr is an "as?" cast, we can rewrite it to
@@ -1477,8 +1475,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                                             diag::pbd_never_used_stmtcond,
                                             var->getName());
                   auto introducerLoc = SC->getCond()[0].getIntroducerLoc();
-                  diagIF.fixItReplace(SourceRange(introducerLoc, beforeExprLoc),
-                                      &"("[noParens]);
+                  diagIF.fixItReplaceChars(introducerLoc,
+                                           initExpr->getStartLoc(),
+                                           &"("[noParens]);
                   
                   if (isIsTest) {
                     // If this was an "x as? T" check, rewrite it to "x is T".
