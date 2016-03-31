@@ -647,7 +647,7 @@ private:
   void solveDataFlow(const BlockList &Blocks, int LoopDepth) {
     bool Changed = false;
 
-    // Compute the distances from the extry block.
+    // Compute the distances from the entry block.
     do {
       Changed = false;
       for (auto &Block : Blocks) {
