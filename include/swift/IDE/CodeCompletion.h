@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IDE_CODE_COMPLETION_H
-#define SWIFT_IDE_CODE_COMPLETION_H
+#ifndef SWIFT_IDE_CODECOMPLETION_H
+#define SWIFT_IDE_CODECOMPLETION_H
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
@@ -46,11 +46,11 @@ struct RequestedCachedModule;
 ///     '#^' identifier '^#'
 /// \endcode
 ///
-/// \param Input test source code
-/// \param TokenName names the token which position should be returned in
+/// \param Input test source code.
+/// \param TokenName names the token whose position should be returned in
 /// \p CompletionOffset.
 /// \param CompletionOffset set to ~0U on error, or to a 0-based byte offset on
-/// success
+/// success.
 ///
 /// \returns test source code without any code completion tokens.
 std::string removeCodeCompletionTokens(StringRef Input,
@@ -66,10 +66,10 @@ public:
     /// "internal", "private" or "public".
     AccessControlKeyword,
 
-    /// such as @"availability"
+    /// such as @"availability".
     DeclAttrKeyword,
 
-    /// such as "unavailable" etc. for @available
+    /// such as "unavailable" etc. for @available.
     DeclAttrParamKeyword,
 
     /// The "override" keyword.
@@ -91,7 +91,7 @@ public:
     /// \c NestingLevel decreases.
     OptionalBegin,
 
-    // Punctuation.
+    /// Punctuation.
     LeftParen,
     RightParen,
     LeftBracket,
@@ -118,7 +118,7 @@ public:
     CallParameterBegin,
     /// Function call parameter name.
     CallParameterName,
-    /// Function call parameter internal / local name. If the parameter has no
+    /// Function call parameter internal / local name.  If the parameter has no
     /// formal API name, it can still have a local name which can be useful
     /// for display purposes.
     ///
@@ -161,11 +161,9 @@ public:
     /// position to put the cursor after the completion result is inserted
     /// into the editor buffer is between the braces.
     ///
-    /// The spelling as always "{}", but clients may choose to insert newline
+    /// The spelling is always "{}", but clients may choose to insert newline
     /// and indentation in between.
     BraceStmtWithCursor,
-
-    ///
   };
 
   static bool chunkStartsNestedGroup(ChunkKind Kind) {
@@ -477,7 +475,7 @@ public:
     Literal,
   };
 
-  /// Describing the relationship between the type of the completion results and
+  /// Describes the relationship between the type of the completion results and
   /// the expected type at the code completion position.
   enum ExpectedTypeRelation {
 
@@ -788,10 +786,12 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
 
 /// Copy code completion results from \p sourceSink to \p targetSink, possibly
 /// restricting by \p onlyTypes.
-void copyCodeCompletionResults(CodeCompletionResultSink &targetSink, CodeCompletionResultSink &sourceSink, bool onlyTypes);
+void copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
+                               CodeCompletionResultSink &sourceSink,
+                               bool onlyTypes);
 
-} // namespace ide
-} // namespace swift
+} // end namespace ide
+} // end namespace swift
 
 template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionKeywordKind> {
   using Kind = swift::ide::CodeCompletionKeywordKind;
@@ -815,5 +815,4 @@ template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionDeclKind> {
   static bool isEqual(const Kind &LHS, const Kind &RHS) { return LHS == RHS; }
 };
 
-#endif // SWIFT_IDE_CODE_COMPLETION_H
-
+#endif // SWIFT_IDE_CODECOMPLETION_H
