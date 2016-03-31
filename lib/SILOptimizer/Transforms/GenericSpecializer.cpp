@@ -67,6 +67,19 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       if (!Callee || !Callee->isDefinition())
         continue;
 
+      // Do not attempt to specialize known dead instructions. Doing
+      // so would be a waste of time (since they are unused), and can
+      // also lead to verification errors on the newly created
+      // apply. This can happen in the case of a partial application
+      // of a reabstraction thunk where we have done an RAUW on the
+      // reabstracted function (which is an argument of the partial
+      // apply). In this case we add the partial apply of the
+      // reabstraction thunk to the set of dead applies, but its
+      // arguments types do not match the expected types of the
+      // argument that has been RAUWed into it.
+      if (DeadApplies.count(Apply.getInstruction()))
+        continue;
+
       // We have a call that can potentially be specialized, so
       // attempt to do so.
 

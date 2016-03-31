@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | FileCheck %s
-// REQUIRES: rdar://25447450
 
 
 sil_stage canonical
@@ -39,7 +38,6 @@ public struct Val<T> : ValProto {
 sil @coerce : $@convention(thin) <T, U, V> (@owned @callee_owned (@owned Ref<T>) -> @owned @callee_owned (@owned Ref<U>) -> @owned Ref<V>) -> @owned @callee_owned (Val<U>) -> Val<V>
 
 sil @merge : $@convention(method) <Self where Self : RefProto><U> (@owned Ref<U>, @in_guaranteed Self) -> @owned Ref<(Self.T, U)> {
-
 bb0(%0 : $Ref<U>, %1 : $*Self):
   %2 = alloc_ref $Ref<(Self.T, U)>
   strong_release %0 : $Ref<U>
@@ -62,16 +60,22 @@ bb0(%0 : $Ref<Self.T>, %1 : $@callee_owned (@in Ref<Self.T>) -> @owned @callee_o
   return %4 : $@callee_owned (@owned Ref<U>) -> @owned Ref<(Self.T, U)>
 }
 
+// CHECK-LABEL: sil @test
 sil @test : $@convention(thin) (Val<Bool>, Val<Int>) -> Val<(Bool, Int)> {
-
+// CHECK: bb0
 bb0(%0 : $Val<Bool>, %1 : $Val<Int>):
-  %4 = function_ref @coerce : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@owned @callee_owned (@owned Ref<τ_0_0>) -> @owned @callee_owned (@owned Ref<τ_0_1>) -> @owned Ref<τ_0_2>) -> @owned @callee_owned (Val<τ_0_1>) -> Val<τ_0_2>
-  %5 = metatype $@thick Ref<Bool>.Type
-  %6 = function_ref @merge_curried : $@convention(thin) <τ_0_0 where τ_0_0 : RefProto><τ_1_0> (@in τ_0_0) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>
-  %7 = partial_apply %6<Ref<Bool>, Bool, Int>() : $@convention(thin) <τ_0_0 where τ_0_0 : RefProto><τ_1_0> (@in τ_0_0) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>
-  %8 = function_ref @reabstract : $@convention(thin) <τ_0_0 where τ_0_0 : ValProto><τ_1_0> (@owned Ref<τ_0_0.T>, @owned @callee_owned (@in Ref<τ_0_0.T>) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>
-  %9 = partial_apply %8<Val<Bool>, Bool, Int>(%7) : $@convention(thin) <τ_0_0 where τ_0_0 : ValProto><τ_1_0> (@owned Ref<τ_0_0.T>, @owned @callee_owned (@in Ref<τ_0_0.T>) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>
-  %10 = apply %4<Bool, Int, (Bool, Int)>(%9) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@owned @callee_owned (@owned Ref<τ_0_0>) -> @owned @callee_owned (@owned Ref<τ_0_1>) -> @owned Ref<τ_0_2>) -> @owned @callee_owned (Val<τ_0_1>) -> Val<τ_0_2>
-  %11 = apply %10(%1) : $@callee_owned (Val<Int>) -> Val<(Bool, Int)>
-  return %11 : $Val<(Bool, Int)>
+  // CHECK: [[COERCE:%.*]] = function_ref @coerce
+  %2 = function_ref @coerce : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@owned @callee_owned (@owned Ref<τ_0_0>) -> @owned @callee_owned (@owned Ref<τ_0_1>) -> @owned Ref<τ_0_2>) -> @owned @callee_owned (Val<τ_0_1>) -> Val<τ_0_2>
+  // CHECK: [[MERGE:%.*]] = function_ref @_TTSg5GC4main3RefSb_GS0_Sb_S_8RefProtoS__Sb_Si__merge_curried
+  %3 = function_ref @merge_curried : $@convention(thin) <τ_0_0 where τ_0_0 : RefProto><τ_1_0> (@in τ_0_0) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>
+  // CHECK: [[PARTIAL:%.*]] = partial_apply [[MERGE]]()
+  %4 = partial_apply %3<Ref<Bool>, Bool, Int>() : $@convention(thin) <τ_0_0 where τ_0_0 : RefProto><τ_1_0> (@in τ_0_0) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>
+  // CHECK-NOT: function_ref @reabstract
+  %5 = function_ref @reabstract : $@convention(thin) <τ_0_0 where τ_0_0 : ValProto><τ_1_0> (@owned Ref<τ_0_0.T>, @owned @callee_owned (@in Ref<τ_0_0.T>) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>
+  // CHECK-NOT: partial_apply
+  %6 = partial_apply %5<Val<Bool>, Bool, Int>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : ValProto><τ_1_0> (@owned Ref<τ_0_0.T>, @owned @callee_owned (@in Ref<τ_0_0.T>) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>
+  // CHECK: apply [[COERCE]]<Bool, Int, (Bool, Int)>([[PARTIAL]])
+  %7 = apply %2<Bool, Int, (Bool, Int)>(%6) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@owned @callee_owned (@owned Ref<τ_0_0>) -> @owned @callee_owned (@owned Ref<τ_0_1>) -> @owned Ref<τ_0_2>) -> @owned @callee_owned (Val<τ_0_1>) -> Val<τ_0_2>
+  %8 = apply %7(%1) : $@callee_owned (Val<Int>) -> Val<(Bool, Int)>
+  return %8 : $Val<(Bool, Int)>
 }
