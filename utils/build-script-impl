@@ -86,6 +86,7 @@ KNOWN_SETTINGS=(
     enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
+    host-compiler-only          ""               "use the host c++ compiler to build everything"
     user-config-args            ""               "User-supplied arguments to cmake when used to do configuration"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
@@ -1752,6 +1753,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
                     -DSWIFT_ENABLE_LTO:BOOL=$(true_false "${SWIFT_ENABLE_LTO}")
+                    -DSWIFT_HOST_COMPILER_ONLY:BOOL=$(true_false "${HOST_COMPILER_ONLY}")
                     "${swift_cmake_options[@]}"
                     "${SWIFT_SOURCE_DIR}"
                 )
@@ -2082,9 +2084,12 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             # the c++ header files.
             BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
 
-            echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
-            ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
-
+            if [[ "${HOST_COMPILER_ONLY}" ]]; then
+                echo "Using the host compiler to build Swift."
+            else
+                echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
+                ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
+            fi
             { set +x; } 2>/dev/null
         fi
     done

@@ -1,7 +1,11 @@
 # Create convenience targets for the Swift standard library.
 
-set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang++")
-set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
+if(SWIFT_HOST_COMPILER_ONLY)
+  message(WARNING "Building swift using the host compiler, and not the just-built clang.")
+else()
+  set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang++")
+  set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
+endif()
 
 add_custom_target(swift-stdlib-all)
 foreach(SDK ${SWIFT_SDKS})
