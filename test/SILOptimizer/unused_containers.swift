@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | grep -v 'builtin "onFastPath"' | FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
 

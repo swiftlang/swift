@@ -286,6 +286,13 @@ public func _slowPath<C : Boolean>(x: C) -> Bool {
   return _branchHint(x.boolValue, expected: false)
 }
 
+/// Optimizer hint that the code where this function is called is on the fast
+/// path.
+@_transparent
+public func _onFastPath() -> () {
+  Builtin.onFastPath()
+}
+
 //===--- Runtime shim wrappers --------------------------------------------===//
 
 /// Returns `true` iff the class indicated by `theClass` uses native

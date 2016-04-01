@@ -392,12 +392,16 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::SelectValueInst:
       return InlineCost::Expensive;
 
-    case ValueKind::BuiltinInst:
+    case ValueKind::BuiltinInst: {
+      auto *BI = cast<BuiltinInst>(&I);
       // Expect intrinsics are 'free' instructions.
-      if (cast<BuiltinInst>(I).getIntrinsicInfo().ID == llvm::Intrinsic::expect)
+      if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
         return InlineCost::Free;
-      return InlineCost::Expensive;
+      if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
+        return InlineCost::Free;
 
+      return InlineCost::Expensive;
+    }
     case ValueKind::SILArgument:
     case ValueKind::SILUndef:
       llvm_unreachable("Only instructions should be passed into this "
