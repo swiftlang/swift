@@ -1174,6 +1174,13 @@ if [[ "${ENABLE_UBSAN}" ]] ; then
     )
 fi
 
+if [[ -n "${SANITIZERS[@]}" ]] ; then
+    COMMON_CMAKE_OPTIONS=(
+        "${COMMON_CMAKE_OPTIONS[@]}"
+        -DLLVM_USE_SANITIZER=$(join_array_with_delimiter ";" "${SANITIZERS[@]}")
+    )
+fi
+
 if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
     COMMON_CMAKE_OPTIONS=(
         "${COMMON_CMAKE_OPTIONS[@]}"
@@ -1669,13 +1676,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ENABLE_GOLD_LINKER=TRUE
-                    )
-                fi
-
-                if [[ -n "${SANITIZERS[@]}" ]] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DLLVM_USE_SANITIZER=$(join_array_with_delimiter ";" "${SANITIZERS[@]}")
                     )
                 fi
 
