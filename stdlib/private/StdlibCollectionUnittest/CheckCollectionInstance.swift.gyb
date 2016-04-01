@@ -480,17 +480,15 @@ public func check${Traversal}Collection<
 
 %   end
 
-#if false
-
 // FIXME: merge into checkCollection()
 public func checkSliceableWithBidirectionalIndex<
-  ${genericParam}, S : Collection
+  ${genericParam}, S : BidirectionalCollection
   where
   S.Iterator.Element == ${Element},
+  S.Indices.Iterator.Element == S.Index,
+  S.SubSequence : BidirectionalCollection,
   S.SubSequence.Iterator.Element == ${Element},
-  S.Index : BidirectionalIndex,
-  S.SubSequence : Collection,
-  S.SubSequence.Index : BidirectionalIndex,
+  S.SubSequence.Indices.Iterator.Element == S.SubSequence.Index,
   ${Element} : Equatable
 >(
   expected: ${Expected}, _ sliceable: S, ${TRACE}
@@ -500,37 +498,39 @@ public func checkSliceableWithBidirectionalIndex<
 
   let expectedArray = Array(expected)
 
+  let succ = { sliceable.successor(of: $0) }
+  let pred = { sliceable.predecessor(of: $0) }
+
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
     if start != sliceable.endIndex {
-      start = start.successor()
-      start = start.predecessor()
-      start = start.successor()
-      start = start.predecessor()
+      start = succ(start)
+      start = pred(start)
+      start = succ(start)
+      start = pred(start)
     }
     var end = start
     for endNumericIndex in startNumericIndex...expectedArray.count {
       if end != sliceable.endIndex {
-        end = end.successor()
-        end = end.predecessor()
-        end = end.successor()
-        end = end.predecessor()
+        end = succ(end)
+        end = pred(end)
+        end = succ(end)
+        end = pred(end)
       }
       let expectedSlice = expectedArray[startNumericIndex..<endNumericIndex]
       let slice = sliceable[start..<end]
+
       checkBidirectionalCollection(expectedSlice, slice, ${trace})
 
       if end != sliceable.endIndex {
-        end = end.successor()
+        end = succ(end)
       }
     }
     if start != sliceable.endIndex {
-      start = start.successor()
+      start = succ(start)
     }
   }
 }
-
-#endif
 
 % end
 

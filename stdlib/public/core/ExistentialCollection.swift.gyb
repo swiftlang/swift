@@ -372,9 +372,6 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
 ///
 /// - SeeAlso: `AnyIterator<Element>`.
 public struct AnySequence<Element> : Sequence {
-  @available(*, unavailable, renamed: "Element")
-  public typealias T = Element
-
   /// Wrap and forward operations to `base`.
   public init<
     S : Sequence

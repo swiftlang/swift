@@ -566,6 +566,13 @@ final class EvilCollection : Collection {
     }
     return LifetimeTracked(i)
   }
+
+  // Default implementation will call _failEarlyRangeCheck,
+  // passing in a startIndex that will grow _count faster than
+  // necessary.
+  func formSuccessor(i: inout Int) {
+    i += 1
+  }
 }
 
 for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
@@ -734,7 +741,7 @@ do {
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .none
 
   // Test MutableCollectionType conformance with value type elements.
-  ArrayTestSuite.addRandomAccessMutableCollectionTests(
+  ArrayTestSuite.addMutableRandomAccessCollectionTests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
       return ${array_type}(elements)
     },
@@ -756,7 +763,7 @@ do {
 
 
   // Test MutableCollectionType conformance with reference type elements.
-  ArrayTestSuite.addRandomAccessMutableCollectionTests(
+  ArrayTestSuite.addMutableRandomAccessCollectionTests(
     makeCollection: { (elements: [LifetimeTracked]) in
       return ${array_type}(elements)
     },
@@ -784,7 +791,7 @@ do {
 
 
   // Test RangeReplaceableCollectionType conformance with value type elements.
-  ArrayTestSuite.addRandomAccessRangeReplaceable${collection_or_slice}Tests(
+  ArrayTestSuite.addRangeReplaceableRandomAccess${collection_or_slice}Tests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
       return ${array_type}(elements)
     },
@@ -799,7 +806,7 @@ do {
 
 
   // Test RangeReplaceableCollectionType conformance with reference type elements.
-  ArrayTestSuite.addRandomAccessRangeReplaceable${collection_or_slice}Tests(
+  ArrayTestSuite.addRangeReplaceableRandomAccess${collection_or_slice}Tests(
     makeCollection: { (elements: [LifetimeTracked]) in
       return ${array_type}(elements)
     },
