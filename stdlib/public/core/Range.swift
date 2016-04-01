@@ -34,10 +34,12 @@ public struct RangeIterator<
   }
 
   /// The lower bound of the remaining range.
+  @_versioned
   internal var startIndex: Element
 
   /// The upper bound of the remaining range; not included in the
   /// generated sequence.
+  @_versioned
   internal let endIndex: Element
 }
 

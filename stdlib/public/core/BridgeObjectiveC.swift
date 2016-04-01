@@ -369,6 +369,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     self._rawValue = _rawValue
   }
 
+  @_versioned
   @_transparent
   var _isNull : Bool {
     return UnsafeMutablePointer<Pointee>(self)._isNull

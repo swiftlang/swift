@@ -436,6 +436,7 @@ public struct UTF16 : UnicodeCodec {
   /// Try to decode one Unicode scalar, and return the actual number of code
   /// units it spanned in the input.  This function may consume more code
   /// units than required for this scalar.
+  @_versioned
   internal mutating func _decodeOne<
     I : IteratorProtocol where I.Element == CodeUnit
   >(input: inout I) -> (UnicodeDecodingResult, Int) {

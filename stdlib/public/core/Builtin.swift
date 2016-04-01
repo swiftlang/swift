@@ -16,6 +16,7 @@ import SwiftShims
 // without gobs of boilerplate.
 
 /// An initialized raw pointer to use as a NULL value.
+@_versioned
 @_transparent
 internal var _nilRawPointer: Builtin.RawPointer {
   let zero: Int8 = 0
@@ -170,7 +171,7 @@ internal func _unreachable(condition: Bool = true) {
 
 /// Tell the optimizer that this code is unreachable if this builtin is
 /// reachable after constant folding build configuration builtins.
-@_transparent @noreturn internal
+@_versioned @_transparent @noreturn internal
 func _conditionallyUnreachable() {
   Builtin.conditionallyUnreachable()
 }
@@ -262,6 +263,7 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
 // semantics of these function calls. This won't be necessary with
 // mandatory generic inlining.
 
+@_versioned
 @_transparent
 @_semantics("branchhint")
 @warn_unused_result
@@ -516,6 +518,7 @@ func _getSuperclass(t: Any.Type) -> AnyClass? {
 // and type checking will fail.
 
 /// Returns `true` if `object` is uniquely referenced.
+@_versioned
 @_transparent
 @warn_unused_result
 internal func _isUnique<T>(object: inout T) -> Bool {
@@ -523,6 +526,7 @@ internal func _isUnique<T>(object: inout T) -> Bool {
 }
 
 /// Returns `true` if `object` is uniquely referenced or pinned.
+@_versioned
 @_transparent
 @warn_unused_result
 internal func _isUniqueOrPinned<T>(object: inout T) -> Bool {

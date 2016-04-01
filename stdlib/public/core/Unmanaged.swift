@@ -17,6 +17,7 @@
 public struct Unmanaged<Instance : AnyObject> {
   internal unowned(unsafe) var _value: Instance
 
+  @_versioned
   @_transparent
   internal init(_private: Instance) { _value = _private }
 

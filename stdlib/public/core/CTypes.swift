@@ -85,6 +85,7 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
     self._rawValue = _nilRawPointer
   }
 
+  @_versioned
   @_transparent
   internal init(_ v: Builtin.RawPointer) {
     self._rawValue = v

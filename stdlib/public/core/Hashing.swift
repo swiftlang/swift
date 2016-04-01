@@ -39,6 +39,7 @@ struct _HashingDetail {
     }
   }
 
+  @_versioned
   @_transparent
   @warn_unused_result
   static func getExecutionSeed() -> UInt64 {
@@ -48,6 +49,7 @@ struct _HashingDetail {
     return _HashingDetail.fixedSeedOverride == 0 ? seed : fixedSeedOverride
   }
 
+  @_versioned
   @_transparent
   @warn_unused_result
   static func hash16Bytes(low: UInt64, _ high: UInt64) -> UInt64 {
