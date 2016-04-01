@@ -237,6 +237,16 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   }
 }
 
+bool Pattern::hasStorage() const {
+  bool HasStorage = false;
+  forEachVariable([&](VarDecl *VD) {
+    if (VD->hasStorage())
+      HasStorage = true;
+  });
+
+  return HasStorage;
+}
+
 /// Return true if this is a non-resolved ExprPattern which is syntactically
 /// irrefutable.
 static bool isIrrefutableExprPattern(const ExprPattern *EP) {
