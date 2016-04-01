@@ -128,9 +128,9 @@ def main():
     for row in old_data:
         if (len(row) > 7 and row[MIN].isdigit()):
             if row[TESTNAME] in old_results:
-                if old_results[row[TESTNAME]] > row[MIN]:
+                if old_results[row[TESTNAME]] > int(row[MIN]):
                     old_results[row[TESTNAME]] = int(row[MIN])
-                if old_max_results[row[TESTNAME]] < row[MAX]:
+                if old_max_results[row[TESTNAME]] < int(row[MAX]):
                     old_max_results[row[TESTNAME]] = int(row[MAX])
             else:
                 old_results[row[TESTNAME]] = int(row[MIN])
@@ -139,12 +139,13 @@ def main():
     for row in new_data:
         if (len(row) > 7 and row[MIN].isdigit()):
             if row[TESTNAME] in new_results:
-                if new_results[row[TESTNAME]] > row[MIN]:
+                if int(new_results[row[TESTNAME]]) > int(row[MIN]):
                     new_results[row[TESTNAME]] = int(row[MIN])
-                if new_max_results[row[TESTNAME]] < row[MAX]:
+                if new_max_results[row[TESTNAME]] < int(row[MAX]):
                     new_max_results[row[TESTNAME]] = int(row[MAX])
-            new_results[row[TESTNAME]] = int(row[MIN])
-            new_max_results[row[TESTNAME]] = int(row[MAX])
+            else:
+                new_results[row[TESTNAME]] = int(row[MIN])
+                new_max_results[row[TESTNAME]] = int(row[MAX])
 
     ratio_total = 0
     for key in new_results.keys():
