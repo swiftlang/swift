@@ -482,10 +482,9 @@ public struct MinimalIndex : Comparable {
     startIndex: Int,
     endIndex: Int
   ) {
-    expectLE(startIndex, position,
-      "position=\(position) startIndex=\(startIndex) endIndex=\(endIndex)")
-    expectGE(endIndex, position,
-      "position=\(position) startIndex=\(startIndex) endIndex=\(endIndex)")
+    expectTrapping(
+      position,
+      in: startIndex...endIndex)
     self._collectionState = collectionState
     self.position = position
   }
@@ -596,39 +595,48 @@ public struct ${Self}<T> : ${SelfProtocols} {
     index: MinimalIndex,
     bounds: Range<MinimalIndex>
   ) {
-    expectLE(bounds.lowerBound.position, index.position)
-    expectGT(bounds.upperBound.position, index.position)
+    _expectCompatibleIndices(
+      self.index(index.position, stepsFrom: startIndex),
+      index)
 
-    if MinimalIndex.trapOnRangeCheckFailure.value {
-      Array<Int>()._failEarlyRangeCheck(
-        index.position,
-        bounds: bounds.lowerBound.position..<bounds.upperBound.position)
-    }
+    _expectCompatibleIndices(
+      self.index(bounds.lowerBound.position, stepsFrom: startIndex),
+      bounds.lowerBound)
+    _expectCompatibleIndices(
+      self.index(bounds.upperBound.position, stepsFrom: startIndex),
+      bounds.upperBound)
+
+    expectTrapping(
+      index.position,
+      in: bounds.lowerBound.position..<bounds.upperBound.position)
   }
 
   public func _failEarlyRangeCheck(
     range: Range<MinimalIndex>,
     bounds: Range<MinimalIndex>
   ) {
-    expectLE(bounds.lowerBound.position, range.lowerBound.position)
-    expectGE(bounds.upperBound.position, range.lowerBound.position)
-    expectLE(bounds.lowerBound.position, range.upperBound.position)
-    expectGE(bounds.upperBound.position, range.upperBound.position)
+    _expectCompatibleIndices(
+      index(range.lowerBound.position, stepsFrom: startIndex),
+      range.lowerBound)
+    _expectCompatibleIndices(
+      index(range.upperBound.position, stepsFrom: startIndex),
+      range.upperBound)
 
-    if MinimalIndex.trapOnRangeCheckFailure.value {
-      let a: [Int] = []
-      a._failEarlyRangeCheck(
-        range.lowerBound.position..<range.upperBound.position,
-        bounds: bounds.lowerBound.position..<bounds.upperBound.position)
-    }
+    _expectCompatibleIndices(
+      index(bounds.lowerBound.position, stepsFrom: startIndex),
+      bounds.lowerBound)
+    _expectCompatibleIndices(
+      index(bounds.upperBound.position, stepsFrom: startIndex),
+      bounds.upperBound)
+
+    expectTrapping(
+      range.lowerBound.position..<range.upperBound.position,
+      in: bounds.lowerBound.position..<bounds.upperBound.position)
   }
 
   @warn_unused_result
   public func successor(of i: MinimalIndex) -> MinimalIndex {
-    expectLE(_elements.startIndex, i.position,
-      "position=\(i.position) startIndex=\(_elements.startIndex) endIndex=\(_elements.endIndex)")
-    expectGT(_elements.endIndex, i.position,
-      "position=\(i.position) startIndex=\(_elements.startIndex) endIndex=\(_elements.endIndex)")
+    _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
     return _index(forPosition: i.position + 1)
   }
 
@@ -666,12 +674,12 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
 
   public subscript(i: MinimalIndex) -> T {
     get {
-      _expectCompatibleIndices(index(i.position, stepsFrom: startIndex), i)
+      _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
       return _elements[i.position]
     }
 %     if Mutable:
     set {
-      _expectCompatibleIndices(index(i.position, stepsFrom: startIndex), i)
+      _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
       _elements[i.position] = newValue
     }
 %     end
@@ -679,18 +687,12 @@ FIXME: swift-3-indexing-model: move this code to an appropriate place.
 
   public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<T>> {
     get {
-      _expectCompatibleIndices(
-        index(bounds.lowerBound.position, stepsFrom: startIndex),
-        bounds.lowerBound)
-      _expectCompatibleIndices(
-        index(bounds.upperBound.position, stepsFrom: startIndex),
-        bounds.upperBound)
-
-      // FIXME: swift-3-indexing-model: check that the index is valid.
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
       return ${SelfSlice}(base: self, bounds: bounds)
     }
 %     if Mutable:
     set {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
       // _writeBackMutableSlice() is not accessible here :(
       fatalError("FIXME: swift-3-indexing-model")
     }
