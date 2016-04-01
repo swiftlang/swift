@@ -28,7 +28,7 @@ public func f(i : Int) -> Int { // 301
 // CHECK-SIL-NOT: return
 // CHECK-SIL: debug_value %0 : $Int, let, name "k", argno 1
 // CHECK-SIL-SAME: line:101:8:in_prologue
-// CHECK-SIL-SAME: perf_inlined_at line:202:10
+// CHECK-SIL-SAME: perf_inlined_at line:203:10
 // CHECK-SIL-SAME: perf_inlined_at line:302:10
 
 // CHECK: define {{.*}}@_TF9inlinedAt1fFSiSi
