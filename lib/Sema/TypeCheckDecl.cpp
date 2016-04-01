@@ -2866,7 +2866,7 @@ public:
         // default-initializable. If so, do it.
         if (PBD->getPattern(i)->hasType() &&
             !PBD->getInit(i) &&
-            PBD->getPattern(i)->hasStorage() &&
+            PBD->hasStorage() &&
             !PBD->getPattern(i)->getType()->is<ErrorType>()) {
 
           // If we have a type-adjusting attribute (like ownership), apply it now.

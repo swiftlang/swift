@@ -163,9 +163,6 @@ public:
     });
   }
 
-  /// Does this binding declare something that requires storage?
-  bool hasStorage() const;
-
   static bool classof(const Pattern *P) { return true; }
   
   //*** Allocation Routines ************************************************/
