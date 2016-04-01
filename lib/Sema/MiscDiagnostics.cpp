@@ -507,7 +507,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       if (auto *parentExpr = Parent.getAsExpr()) {
-        if (auto *ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(parentExpr)){
+        if (auto *ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(parentExpr)) {
           if (!ignoredBase->isImplicit())
             return;
         }
@@ -2091,7 +2091,7 @@ public:
       if (auto ctorRefCall =
             dyn_cast<ConstructorRefCallExpr>(argCall->getFn())) {
         if (auto argCtor =
-              dyn_cast_or_null<ConstructorDecl>(ctorRefCall->getCalledValue())){
+              dyn_cast_or_null<ConstructorDecl>(ctorRefCall->getCalledValue())) {
           auto argArgumentNames = argCtor->getFullName().getArgumentNames();
           if (argArgumentNames.size() == 3 &&
               argArgumentNames[0] == TC.Context.Id_builtinStringLiteral)

@@ -762,7 +762,7 @@ public:
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(*RE)) {
       VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   
-      if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")){
+      if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")) {
         // Don't log "self" in a constructor
         return nullptr;
       }
