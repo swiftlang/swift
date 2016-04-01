@@ -26,8 +26,11 @@
 ///     }
 ///
 /// In the example above, `PackagingOptions.Element` is the same type
-/// as `PackagingOptions`, and instance `a` subsumes instance `b` if
-/// and only if `a.rawValue & b.rawValue == b.rawValue`.
+/// as `PackagingOptions`, and `Elements` whose `rawValue`s have bits
+/// in common have a non-empty intersection when treated as sets.  For
+/// example,
+///
+///     PackagingOptions.boxOrBag.intersection(.bag).rawValue // 4
 public protocol OptionSet : SetAlgebra, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a
@@ -145,11 +148,13 @@ extension OptionSet where Element == Self {
 /// `OptionSet` requirements for which default implementations are
 /// supplied when `RawValue` conforms to `BitwiseOperations`,
 /// which is the usual case.  Each distinct bit of an option set's
-/// `.rawValue` corresponds to a disjoint element of the option set.
+/// `.rawValue` corresponds to a disjoint value of the `OptionSet`.
 ///
 /// - `union` is implemented as a bitwise "or" (`|`) of `rawValue`s
-/// - `intersection` is implemented as a bitwise "and" (`|`) of `rawValue`s
-/// - `symmetricDifference` is implemented as a bitwise "exclusive or" (`^`) of `rawValue`s
+/// - `intersection` is implemented as a bitwise "and" (`&`) of
+///   `rawValue`s
+/// - `symmetricDifference` is implemented as a bitwise "exclusive or"
+///    (`^`) of `rawValue`s
 ///
 /// - Note: A type conforming to `OptionSet` can implement any of
 ///   these initializers or methods, and those implementations will be
