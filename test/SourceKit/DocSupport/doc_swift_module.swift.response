@@ -2681,9 +2681,9 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "MyEnum",
+      key.usr: "s:O4cake6MyEnum"
     },
     key.entities: [
       {
@@ -2717,9 +2717,9 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "MyEnum",
+      key.usr: "s:O4cake6MyEnum"
     },
     key.entities: [
       {
@@ -2840,9 +2840,9 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "MyEnum",
+      key.usr: "s:O4cake6MyEnum"
     },
     key.entities: [
       {
@@ -2876,9 +2876,9 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "MyEnum",
+      key.usr: "s:O4cake6MyEnum"
     }
   },
   {
@@ -2893,9 +2893,9 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "MyEnum",
+      key.usr: "s:O4cake6MyEnum"
     },
     key.entities: [
       {
@@ -2929,9 +2929,9 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "MyEnum",
+      key.usr: "s:O4cake6MyEnum"
     },
     key.entities: [
       {
@@ -2965,9 +2965,9 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "MyEnum",
+      key.usr: "s:O4cake6MyEnum"
     },
     key.entities: [
       {
@@ -3000,9 +3000,9 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "MyEnum",
+      key.usr: "s:O4cake6MyEnum"
     }
   },
   {

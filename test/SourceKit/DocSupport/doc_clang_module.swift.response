@@ -6593,9 +6593,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6629,9 +6629,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6665,9 +6665,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6701,9 +6701,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6824,9 +6824,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     }
   },
   {
@@ -6841,9 +6841,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6877,9 +6877,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6912,9 +6912,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     }
   },
   {
@@ -6986,9 +6986,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.offset: 2710,
     key.length: 158,
     key.extends: {
-      key.kind: source.lang.swift.ref.protocol,
-      key.name: "OptionSet",
-      key.usr: "s:Ps9OptionSet"
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
     },
     key.entities: [
       {
@@ -7061,9 +7061,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.offset: 2870,
     key.length: 167,
     key.extends: {
-      key.kind: source.lang.swift.ref.protocol,
-      key.name: "OptionSet",
-      key.usr: "s:Ps9OptionSet"
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
     },
     key.entities: [
       {
@@ -7136,9 +7136,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.offset: 3039,
     key.length: 206,
     key.extends: {
-      key.kind: source.lang.swift.ref.protocol,
-      key.name: "OptionSet",
-      key.usr: "s:Ps9OptionSet"
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
     },
     key.entities: [
       {
@@ -7216,9 +7216,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.offset: 3247,
     key.length: 744,
     key.extends: {
-      key.kind: source.lang.swift.ref.protocol,
-      key.name: "SetAlgebra",
-      key.usr: "s:Ps10SetAlgebra"
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
     },
     key.entities: [
       {

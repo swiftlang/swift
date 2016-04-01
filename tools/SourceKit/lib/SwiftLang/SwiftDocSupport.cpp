@@ -438,13 +438,17 @@ static void passExtends(const ValueDecl *D, DocInfoConsumer &Consumer) {
 
 static void reportRelated(ASTContext &Ctx,
                           const Decl *D,
+                          const Decl* SynthesizedTarget,
                           DocInfoConsumer &Consumer) {
   if (!D || isa<ParamDecl>(D))
     return;
   if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (Type T = ED->getExtendedType())
+    if (SynthesizedTarget) {
+      passExtends((ValueDecl*)SynthesizedTarget, Consumer);
+    } else if (Type T = ED->getExtendedType()) {
       if (auto TD = getTypeDeclFromType(T))
         passExtends(TD, Consumer);
+    }
 
     passInherits(ED->getInherited(), Consumer);
 
@@ -525,7 +529,9 @@ static void reportDocEntities(ASTContext &Ctx,
     if (initDocEntityInfo(Entity, EntInfo))
       continue;
     Consumer.startSourceEntity(EntInfo);
-    reportRelated(Ctx, Entity.Dcl, Consumer);
+    reportRelated(Ctx, Entity.Dcl,
+          Entity.IsSynthesizedExtension ? Entity.SynthesizeTarget : nullptr,
+                  Consumer);
     reportDocEntities(Ctx, Entity.SubEntities, Consumer);
     reportAttributes(Ctx, Entity.Dcl, Consumer);
     Consumer.finishSourceEntity(EntInfo.Kind);
