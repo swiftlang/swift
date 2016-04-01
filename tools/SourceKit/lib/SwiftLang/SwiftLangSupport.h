@@ -269,9 +269,10 @@ public:
                                              swift::Type BaseTy,
                                              llvm::raw_ostream &OS);
 
-  static void printFullyAnnotatedSynthesizedExtension(swift::ExtensionDecl * Extension,
-                                                      swift::NominalTypeDecl *Target,
-                                                      llvm::raw_ostream &OS);
+  static void printFullyAnnotatedSynthesizedDeclaration(
+                                            const swift::ValueDecl *VD,
+                                            swift::NominalTypeDecl *Target,
+                                            llvm::raw_ostream &OS);
 
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;

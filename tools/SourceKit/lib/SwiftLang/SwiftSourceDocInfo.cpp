@@ -434,16 +434,22 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   VD->print(Printer, PO);
 }
 
-
 void SwiftLangSupport::
-printFullyAnnotatedSynthesizedExtension(swift::ExtensionDecl * Extension,
-                                        swift::NominalTypeDecl *Target,
-                                        llvm::raw_ostream &OS) {
+printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
+                                          swift::NominalTypeDecl *Target,
+                                          llvm::raw_ostream &OS) {
+  static llvm::SmallDenseMap<swift::ValueDecl*,
+    std::unique_ptr<swift::SynthesizedExtensionAnalyzer>> TargetToAnalyzerMap;
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
-  SynthesizedExtensionAnalyzer Analyzer(Target, PO);
-  PO.initArchetypeTransformerForSynthesizedExtensions(Target, &Analyzer);
-  Extension->print(Printer, PO);
+  if (TargetToAnalyzerMap.count(Target) == 0) {
+    std::unique_ptr<SynthesizedExtensionAnalyzer> Analyzer(
+      new SynthesizedExtensionAnalyzer(Target, PO));
+    TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
+  }
+  auto *Analyzer = TargetToAnalyzerMap.find(Target)->getSecond().get();
+  PO.initArchetypeTransformerForSynthesizedExtensions(Target, Analyzer);
+  VD->print(Printer, PO);
 }
 
 template <typename FnTy>
