@@ -161,6 +161,14 @@ public struct ${Self}<Base : ${BaseRequirements}>
     return _base.distance(from: start, to: end)
   }
 
+  public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
+    _base._failEarlyRangeCheck(index, bounds: bounds)
+  }
+
+  public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
+    _base._failEarlyRangeCheck(range, bounds: bounds)
+  }
+
 %     if RangeReplaceable:
   public init() {
     self._base = Base()
