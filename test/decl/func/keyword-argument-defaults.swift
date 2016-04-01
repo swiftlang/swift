@@ -113,7 +113,7 @@ func testSubscripts(i: Int, s: String, x: Y) {
 }
 
 // Operators
-func +(_ a: String,  // expected-warning{{extraneous '_' in parameter: 'a' has no keyword argument name}}{{8-10=}}
+func +(_ a: String,
        b b: Double) { } // expected-error{{operator cannot have keyword arguments}} {{8-10=}}
 
 func +(a: Double, b: String) -> (Int) -> (d: Int) -> () {

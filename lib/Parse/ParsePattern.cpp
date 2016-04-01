@@ -447,17 +447,6 @@ mapParsedParameters(Parser &parser,
       result = createParam(param, argName, param.FirstNameLoc,
                            paramName, param.SecondNameLoc);
 
-      // If the first name is empty and this parameter would not have been
-      // an API name by default, complain.
-      if (param.FirstName.empty() && !isKeywordArgumentByDefault) {
-        parser.diagnose(param.FirstNameLoc,
-                        diag::parameter_extraneous_empty_name,
-                        param.SecondName)
-          .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
-
-        param.FirstNameLoc = SourceLoc();
-      }
-
       // If the first and second names are equivalent and non-empty, and we
       // would have an argument label by default, complain.
       if (isKeywordArgumentByDefault && param.FirstName == param.SecondName

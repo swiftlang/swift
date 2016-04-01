@@ -74,3 +74,46 @@ func testImportedTypeParamRequirements() {
   let _ = PettableAnimalContainer<Cat>()
 }
 
+extension GenericClass {
+  func doesntUseGenericParam() {}
+
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamA(_ x: T) {}
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamB(_ x: Int) -> T {}
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamC(_ x: [(T, T)]?) {}
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamD(_ x: Int) {
+    _ = T.self
+  }
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamE(_ x: Int) {
+    _ = x as? T
+  }
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamF(_ x: Int) {
+    _ = x is T
+  }
+
+  static func doesntUseGenericParam() {}
+
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  static func usesGenericParamA(_ x: T) {}
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  static func usesGenericParamB(_ x: Int) -> T {}
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  static func usesGenericParamC(_ x: [(T, T)]?) {}
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  static func usesGenericParamD(_ x: Int) {
+    _ = T.self
+  }
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  static func usesGenericParamE(_ x: Int) {
+    _ = x as? T
+  }
+  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  static func usesGenericParamF(_ x: Int) {
+    _ = x is T
+  }
+}

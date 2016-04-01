@@ -5596,14 +5596,6 @@ public:
       TC.checkInheritanceClause(ED);
       if (auto nominal = ExtendedTy->getAnyNominal()) {
         TC.validateDecl(nominal);
-
-        if (auto extendedClass = dyn_cast<ClassDecl>(nominal)) {
-          if (extendedClass->hasClangNode() &&
-              extendedClass->getGenericParams()) {
-            TC.diagnose(ED, diag::extension_of_objc_generic_class,
-                        extendedClass->getName());
-          }
-        }
       }
 
       validateAttributes(TC, ED);
