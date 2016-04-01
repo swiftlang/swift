@@ -277,7 +277,7 @@ extension LazyFilterSequence {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }
@@ -292,7 +292,7 @@ extension LazyFilterCollection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }

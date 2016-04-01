@@ -4238,7 +4238,7 @@ extension Set {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> SetIterator<Element> {
     fatalError("unavailable function can't be called")
   }
@@ -4265,7 +4265,7 @@ extension Dictionary {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> DictionaryIterator<Key, Value> {
     fatalError("unavailable function can't be called")
   }

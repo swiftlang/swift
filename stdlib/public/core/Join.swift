@@ -181,7 +181,7 @@ public struct JoinGenerator<
 > {}
 
 extension JoinedSequence {
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> JoinedIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }
