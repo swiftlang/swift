@@ -205,11 +205,10 @@ DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl |
 // Also handles unowned and unowned(weak).
 DECL_ATTR(weak,    Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
           /* Not serialized */49)
+DECL_ATTR_ALIAS(unowned, Ownership)
 
 DECL_ATTR(effects, Effects, OnFunc | OnConstructor | OnDestructor |
           UserInaccessible, 50)
-
-DECL_ATTR_ALIAS(unowned, Ownership)
 
 DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized | RejectByParser,
           /* Not serialized */51)
