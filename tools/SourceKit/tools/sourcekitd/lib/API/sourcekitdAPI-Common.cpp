@@ -122,6 +122,7 @@ UIdent sourcekitd::KeySimplified("key.simplified");
 
 UIdent sourcekitd::KeyIsDeprecated("key.is_deprecated");
 UIdent sourcekitd::KeyIsUnavailable("key.is_unavailable");
+UIdent sourcekitd::KeyIsOptional("key.is_optional");
 UIdent sourcekitd::KeyPlatform("key.platform");
 UIdent sourcekitd::KeyMessage("key.message");
 UIdent sourcekitd::KeyIntroduced("key.introduced");
@@ -213,6 +214,7 @@ static UIdent *OrderedKeys[] = {
   &KeyPlatform,
   &KeyIsDeprecated,
   &KeyIsUnavailable,
+  &KeyIsOptional,
   &KeyMessage,
   &KeyIntroduced,
   &KeyDeprecated,

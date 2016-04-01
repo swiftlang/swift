@@ -338,6 +338,7 @@ struct DocEntityInfo {
   unsigned Length = 0;
   bool IsUnavailable = false;
   bool IsDeprecated = false;
+  bool IsOptional = false;
   swift::Type Ty;
 };
 

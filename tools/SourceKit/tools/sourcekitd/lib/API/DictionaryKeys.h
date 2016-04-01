@@ -109,6 +109,7 @@ extern SourceKit::UIdent KeySimplified;
 
 extern SourceKit::UIdent KeyIsUnavailable;
 extern SourceKit::UIdent KeyIsDeprecated;
+extern SourceKit::UIdent KeyIsOptional;
 extern SourceKit::UIdent KeyPlatform;
 extern SourceKit::UIdent KeyMessage;
 extern SourceKit::UIdent KeyIntroduced;
