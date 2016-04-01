@@ -231,6 +231,7 @@ public:
 
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);
+  static SourceKit::UIdent getUIDForExtensionOfDecl(const swift::Decl *D);
   static SourceKit::UIdent getUIDForLocalVar(bool IsRef = false);
   static SourceKit::UIdent getUIDForCodeCompletionDeclKind(
       swift::ide::CodeCompletionDeclKind Kind, bool IsRef = false);

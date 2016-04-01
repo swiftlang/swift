@@ -300,7 +300,11 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
     return false;
   }
 
-  Info.Kind = SwiftLangSupport::getUIDForDecl(D, IsRef);
+  if (IsSynthesizedExtension)
+    Info.Kind = SwiftLangSupport::getUIDForExtensionOfDecl(SynthesizedTarget);
+  else
+    Info.Kind = SwiftLangSupport::getUIDForDecl(D, IsRef);
+
   if (Info.Kind.isInvalid())
     return true;
   if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {

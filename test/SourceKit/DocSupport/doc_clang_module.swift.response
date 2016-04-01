@@ -6582,7 +6582,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1733,
     key.length: 91,
     key.conforms: [
@@ -6618,7 +6618,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1826,
     key.length: 96,
     key.conforms: [
@@ -6654,7 +6654,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1924,
     key.length: 76,
     key.conforms: [
@@ -6690,7 +6690,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2002,
     key.length: 201,
     key.conforms: [
@@ -6813,7 +6813,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2205,
     key.length: 48,
     key.conforms: [
@@ -6830,7 +6830,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     }
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2255,
     key.length: 91,
     key.conforms: [
@@ -6866,7 +6866,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2348,
     key.length: 129,
     key.conforms: [
@@ -6901,7 +6901,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2479,
     key.length: 43,
     key.conforms: [
@@ -6981,7 +6981,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.protocol,
+    key.kind: source.lang.swift.decl.extension.struct,
     key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
     key.offset: 2710,
     key.length: 158,
@@ -7051,7 +7051,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.protocol,
+    key.kind: source.lang.swift.decl.extension.struct,
     key.generic_requirements: [
       {
         key.description: "Element == Self"
@@ -7126,7 +7126,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.protocol,
+    key.kind: source.lang.swift.decl.extension.struct,
     key.generic_requirements: [
       {
         key.description: "RawValue : BitwiseOperations"
@@ -7211,7 +7211,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.protocol,
+    key.kind: source.lang.swift.decl.extension.struct,
     key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><Abstract><Para><codeVoice>SetAlgebra</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>SetAlgebra</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
     key.offset: 3247,
     key.length: 744,

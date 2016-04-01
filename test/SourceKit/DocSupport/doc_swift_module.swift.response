@@ -2670,7 +2670,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1242,
     key.length: 83,
     key.conforms: [
@@ -2706,7 +2706,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1327,
     key.length: 188,
     key.conforms: [
@@ -2829,7 +2829,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1517,
     key.length: 63,
     key.conforms: [
@@ -2865,7 +2865,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1582,
     key.length: 35,
     key.conforms: [
@@ -2882,7 +2882,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     }
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1619,
     key.length: 78,
     key.conforms: [
@@ -2918,7 +2918,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1699,
     key.length: 78,
     key.conforms: [
@@ -2954,7 +2954,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1779,
     key.length: 116,
     key.conforms: [
@@ -2989,7 +2989,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1897,
     key.length: 30,
     key.conforms: [
