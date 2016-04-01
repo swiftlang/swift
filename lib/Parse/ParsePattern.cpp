@@ -410,7 +410,6 @@ mapParsedParameters(Parser &parser,
   // parameters.
   SmallVector<ParamDecl*, 4> elements;
   SourceLoc ellipsisLoc;
-  bool isFirstParameter = true;
   for (auto &param : params) {
     // Whether the provided name is API by default depends on the parameter
     // context.
@@ -427,7 +426,7 @@ mapParsedParameters(Parser &parser,
       break;
 
     case Parser::ParameterContextKind::Function:
-      isKeywordArgumentByDefault = !isFirstParameterClause || !isFirstParameter;
+      isKeywordArgumentByDefault = true;
       break;
 
     case Parser::ParameterContextKind::Curried:
@@ -506,8 +505,6 @@ mapParsedParameters(Parser &parser,
 
     if (argNames)
       argNames->push_back(argName);
-
-    isFirstParameter = false;
   }
 
   return ParameterList::create(ctx, leftParenLoc, elements, rightParenLoc);
@@ -562,7 +559,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
     // Turn the parameter clause into argument and body patterns.
     auto pattern = mapParsedParameters(*this, leftParenLoc, params,
-                                       rightParenLoc, 
+                                       rightParenLoc,
                                        isFirstParameterClause,
                                        isFirstParameterClause ? &NamePieces
                                                               : nullptr,
