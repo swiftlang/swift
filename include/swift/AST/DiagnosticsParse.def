@@ -706,9 +706,6 @@ ERROR(expected_behavior_name,none,
 WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
-WARNING(parameter_extraneous_empty_name,none,
-        "extraneous '_' in parameter: %0 has no keyword argument name",
-        (Identifier))
 ERROR(parameter_operator_keyword_argument,none,
       "%select{operator|closure}0 cannot have keyword arguments", (bool))
 

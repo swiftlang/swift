@@ -1029,8 +1029,6 @@ WARNING(non_trailing_closure_before_default_args,none,
 // Extensions
 ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))
-ERROR(extension_of_objc_generic_class,none,
-      "generic Objective-C class %0 cannot be extended", (Identifier))
 ERROR(extension_access_with_conformances,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))
@@ -1055,6 +1053,9 @@ ERROR(extension_protocol_via_typealias,none,
       "typealias", (Type))
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
+ERROR(objc_generic_extension_using_type_parameter,none,
+      "Extension of a generic Objective-C class cannot access the class's "
+      "generic parameters", ())
 
 // Protocols
 ERROR(type_does_not_conform,none,
