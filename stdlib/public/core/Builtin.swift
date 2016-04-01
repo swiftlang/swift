@@ -289,7 +289,7 @@ public func _slowPath<C : Boolean>(x: C) -> Bool {
 /// Optimizer hint that the code where this function is called is on the fast
 /// path.
 @_transparent
-public func _onFastPath() -> () {
+public func _onFastPath() {
   Builtin.onFastPath()
 }
 
