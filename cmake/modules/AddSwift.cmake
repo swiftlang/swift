@@ -801,6 +801,19 @@ function(_add_swift_library_single target name)
     list(APPEND link_flags "-fuse-ld=gold")
   endif()
 
+  CMAKE_MINIMUM_REQUIRED(VERSION 2.8 FATAL_ERROR)
+  INCLUDE(CheckCXXCompilerFlag)
+  SET(CMAKE_REQUIRED_FLAGS "-Wl,-z,nocopyreloc")
+  CHECK_CXX_COMPILER_FLAG("" LINKER_SUPPORTS_NOCOPYRELOC)
+  IF(LINKER_SUPPORTS_NOCOPYRELOC)
+      list(APPEND link_flags ${CMAKE_REQUIRED_FLAGS})
+  ENDIF()
+  SET(CMAKE_REQUIRED_FLAGS "-Wl,-z,noextern-protected-data")
+  CHECK_CXX_COMPILER_FLAG("" LINKER_SUPPORTS_NOEXTERN_PROTECTED_DATA)
+  IF(LINKER_SUPPORTS_NOEXTERN_PROTECTED_DATA)
+      list(APPEND link_flags ${CMAKE_REQUIRED_FLAGS})
+  ENDIF()
+
   # Configure plist creation for OS X.
   set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
   if(APPLE AND SWIFTLIB_SINGLE_IS_STDLIB)
@@ -1415,6 +1428,18 @@ function(_add_swift_executable_single name)
     # Extend the link_flags for the gold linker.
     list(APPEND link_flags "-fuse-ld=gold")
   endif()
+
+  INCLUDE(CheckCXXCompilerFlag)
+  SET(CMAKE_REQUIRED_FLAGS "-Wl,-z,nocopyreloc")
+  CHECK_CXX_COMPILER_FLAG("" LINKER_SUPPORTS_NOCOPYRELOC)
+  IF(LINKER_SUPPORTS_NOCOPYRELOC)
+      list(APPEND link_flags ${CMAKE_REQUIRED_FLAGS})
+  ENDIF()
+  SET(CMAKE_REQUIRED_FLAGS "-Wl,-z,noextern-protected-data")
+  CHECK_CXX_COMPILER_FLAG("" LINKER_SUPPORTS_NOEXTERN_PROTECTED_DATA)
+  IF(LINKER_SUPPORTS_NOEXTERN_PROTECTED_DATA)
+      list(APPEND link_flags ${CMAKE_REQUIRED_FLAGS})
+  ENDIF()
 
   # Find the names of dependency library targets.
   #
