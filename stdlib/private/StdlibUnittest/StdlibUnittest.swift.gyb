@@ -253,6 +253,75 @@ public func expectGE(lhs: Int, _ rhs: Int, ${TRACE}) {
   }
 }
 
+public func expectTrapping<R : _RangeProtocol>(
+  point: R.Bound, in range: R, ${TRACE}
+) {
+  if !range.contains(point) {
+    expectationFailure("\(point) in \(range)", trace: ${trace})
+    _trappingExpectationFailedCallback()
+  }
+}
+
+extension _RangeProtocol {
+  internal var _isHalfOpen: Bool {
+    return !self.contains(self.upperBound)
+  }
+}
+
+extension _HalfOpenRange {
+  internal func _contains<
+    Other : _RangeProtocol
+    where
+    Other.Bound == Bound
+  >(other: Other) -> Bool {
+    if other.lowerBound < lowerBound { return false }
+    if other._isHalfOpen {
+      if upperBound < other.upperBound { return false }
+    } else {
+      if upperBound <= other.upperBound { return false }
+    }
+    return true
+  }
+}
+
+extension _ClosedRange {
+  internal func _contains<
+    Other : _ClosedRange
+    where
+    Other.Bound == Bound
+  >(other: Other) -> Bool {
+    if other.lowerBound < lowerBound { return false }
+    if upperBound < other.upperBound { return false }
+    return true
+  }
+}
+
+public func expectTrapping<
+  R1 : _RangeProtocol, R2 : _HalfOpenRange
+  where
+  R1.Bound == R2.Bound
+>(
+  subRange: R1, in range: R2, ${TRACE}
+) {
+  if !range._contains(subRange) {
+    expectationFailure("\(subRange) in \(range)", trace: ${trace})
+    _trappingExpectationFailedCallback()
+  }
+}
+
+public func expectTrapping<
+  R1 : _ClosedRange, R2 : _ClosedRange
+  where
+  R1.Bound == R2.Bound
+>(
+  subRange: R1, in range: R2, ${TRACE}
+) {
+  if !range._contains(subRange) {
+    expectationFailure("\(subRange) in \(range)", trace: ${trace})
+    _trappingExpectationFailedCallback()
+  }
+}
+
 public func expectType<T>(_: T.Type, _ x: inout T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
@@ -450,6 +519,17 @@ var _testSuiteFailedCallback: () -> Void = _defaultTestSuiteFailedCallback
 
 public func _setTestSuiteFailedCallback(callback: () -> Void) {
   _testSuiteFailedCallback = callback
+}
+
+func _defaultTrappingExpectationFailedCallback() {
+  abort()
+}
+
+var _trappingExpectationFailedCallback: () -> Void
+  = _defaultTrappingExpectationFailedCallback
+
+public func _setTrappingExpectationFailedCallback(callback: () -> Void) {
+  _trappingExpectationFailedCallback = callback
 }
 
 extension ProcessTerminationStatus {
