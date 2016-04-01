@@ -172,10 +172,10 @@ bb0(%0 : $Int64):
 // CHECK: cond_br
 // CHECK: {{^bb}}
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: {{^bb}}
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 sil @do_not_fold_integer_literal : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
@@ -199,10 +199,10 @@ enum BoolLike { case true_, false_ }
 // CHECK: switch_enum
 // CHECK: {{^bb}}
 // CHECK-NOT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: {{^bb}}
 // CHECK-NOT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 sil @fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -224,10 +224,10 @@ bb3(%3 : $BoolLike):
 // CHECK: switch_enum
 // CHECK: {{^bb}}
 // CHECK-NEXT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: {{^bb}}
 // CHECK-NEXT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 sil @do_not_fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
