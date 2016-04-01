@@ -46,8 +46,6 @@ public let partitionExhaustiveTests = [
   PartitionExhaustiveTest([ 10, 10, 20, 30, 40 ]),
   PartitionExhaustiveTest([ 10, 20, 30, 40, 50 ]),
   PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60 ]),
-  PartitionExhaustiveTest([ 10, 10, 10, 10, 10, 20, 20 ]),
-  PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60, 70 ]),
 ]
 
 public func withInvalidOrderings(body: ((Int,Int) -> Bool) -> Void) {
