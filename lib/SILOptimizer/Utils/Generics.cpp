@@ -390,15 +390,27 @@ void swift::trySpecializeApplyOfGeneric(
     llvm::SmallVectorImpl<SILFunction *> &NewFunctions) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
 
-  auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
+  auto *F = Apply.getInstruction()->getFunction();
+  auto *RefF = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
 
   DEBUG(llvm::dbgs() << "  ApplyInst: " << *Apply.getInstruction());
 
-  ReabstractionInfo ReInfo(F, Apply.getSubstitutions());
+  // If the caller is fragile but the callee is not, bail out.
+  // Specializations have shared linkage, which means they do
+  // not have an external entry point, Since the callee is not
+  // fragile we cannot serialize the body of the specialized
+  // callee either.
+  if (F->isFragile())
+    // Note we cannot use RefF->hasValidLinkageForFragileRef(),
+    // because our condition is even more restrictive.
+    if (!RefF->isFragile() && !RefF->isThunk())
+      return;
+
+  ReabstractionInfo ReInfo(RefF, Apply.getSubstitutions());
   if (!ReInfo.getSpecializedType())
     return;
 
-  SILModule &M = Apply.getInstruction()->getModule();
+  SILModule &M = F->getModule();
 
   bool needAdaptUsers = false;
   bool replacePartialApplyWithoutReabstraction = false;
@@ -436,7 +448,7 @@ void swift::trySpecializeApplyOfGeneric(
     }
   }
 
-  GenericFuncSpecializer FuncSpecializer(F, Apply.getSubstitutions(), ReInfo);
+  GenericFuncSpecializer FuncSpecializer(RefF, Apply.getSubstitutions(), ReInfo);
   SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
   if (SpecializedF) {
     assert(ReInfo.getSpecializedType()
