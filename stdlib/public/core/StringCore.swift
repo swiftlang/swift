@@ -294,6 +294,7 @@ public struct _StringCore {
   }
 
   /// Get the Nth UTF-16 Code Unit stored.
+  @_versioned
   @warn_unused_result
   func _nthContiguous(position: Int) -> UTF16.CodeUnit {
     let p =

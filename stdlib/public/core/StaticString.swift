@@ -135,6 +135,7 @@ public struct StaticString
     self = ""
   }
 
+  @_versioned
   @_transparent
   internal init(
     _start: Builtin.RawPointer,
@@ -146,6 +147,7 @@ public struct StaticString
     self._flags = Bool(isASCII) ? (0x2 as UInt8)._value : (0x0 as UInt8)._value
   }
 
+  @_versioned
   @_transparent
   internal init(
     unicodeScalar: Builtin.Int32

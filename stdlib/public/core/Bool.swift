@@ -23,6 +23,7 @@ public struct Bool {
     self._value = Builtin.trunc_Int8_Int1(zero._value)
   }
 
+  @_versioned
   @_transparent
   internal init(_ v: Builtin.Int1) { self._value = v }
 }

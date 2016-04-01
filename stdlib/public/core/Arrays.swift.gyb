@@ -829,6 +829,7 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 extension ${Self} {
+  @_versioned
   @_transparent
   @warn_unused_result
   internal func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
