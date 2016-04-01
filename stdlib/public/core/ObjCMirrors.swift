@@ -42,7 +42,9 @@ struct _ObjCMirror : _Mirror {
     return _getObjCSummary(data)
   }
   public var quickLookObject: PlaygroundQuickLook? {
-    return _getClassPlaygroundQuickLook(data)
+    var result: PlaygroundQuickLook? = nil
+    _getClassPlaygroundQuickLook(&result, data)
+    return result
   }
   public var disposition: _MirrorDisposition { return .objCObject }
 }
@@ -68,7 +70,9 @@ struct _ObjCSuperMirror : _Mirror {
     return _getObjCSummary(data)
   }
   public var quickLookObject: PlaygroundQuickLook? {
-    return _getClassPlaygroundQuickLook(data)
+    var result: PlaygroundQuickLook? = nil
+    _getClassPlaygroundQuickLook(&result, data)
+    return result
   }
   public var disposition: _MirrorDisposition { return .objCObject }
 }
