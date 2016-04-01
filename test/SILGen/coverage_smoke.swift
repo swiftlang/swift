@@ -7,6 +7,7 @@
 // RUN: rm -rf %t
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx
+// REQUIRES: rdar://problem/25493310
 
 func main() {
 // CHECK-PROF: Counters: 2

@@ -1,3 +1,4 @@
+// REQUIRES: rdar://problem/25497665
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
