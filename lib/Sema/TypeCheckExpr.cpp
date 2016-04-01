@@ -812,6 +812,13 @@ namespace {
         captureList[entryNumber-1] = capture;
       }
 
+      // Visit the type of the capture. If we capture 'self' via a 'super' call,
+      // and the superclass is not generic, there might not be any generic
+      // parameter types in the closure body, so we have to account for them
+      // here.
+      if (VD->hasType())
+        checkType(VD->getType());
+
       // If VD is a noescape decl, then the closure we're computing this for
       // must also be noescape.
       if (VD->getAttrs().hasAttribute<NoEscapeAttr>() &&
