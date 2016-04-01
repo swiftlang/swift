@@ -2,21 +2,26 @@
 // RUN:    | FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | FileCheck %s
 
+import StdlibUnittest
+@inline(never) func hold(n : Int) { _blackHole(n) }
+
 #sourceLocation(file: "abc.swift", line: 100)
 @inline(__always)
 func h(k : Int) -> Int {        // 101
-  return k                      // 102
+  hold(k)                       // 102
+  return k                      // 103
 }
 
 #sourceLocation(file: "abc.swift", line: 200)
 @inline(__always)
 func g(j : Int) -> Int {        // 201
-  return h(j)                   // 202
+  hold(j)                       // 202
+  return h(j)                   // 203
 }
 
 #sourceLocation(file: "abc.swift", line: 301)
 public func f(i : Int) -> Int { // 301
-  return g(i)                   // 302
+  return g(i)                   // 303
 }
 
 // CHECK-SIL: sil {{.*}}@_TF9inlinedAt1fFSiSi :
@@ -40,9 +45,9 @@ public func f(i : Int) -> Int { // 301
 // CHECK-SAME:                     scope: ![[F_SCOPE:.*]])
 // CHECK: ![[F_SCOPE]] = distinct !DILexicalBlock(scope: ![[F]],
 // CHECK-SAME:                                    line: 301, column: 31)
+// CHECK: ![[G_SCOPE:.*]] = distinct !DILexicalBlock(scope: ![[G]],
+// CHECK-SAME:                                    line: 201, column: 24)
 // CHECK: ![[L1]] = !DILocation(line: 101, column: 8, scope: ![[H]],
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
-// CHECK: ![[L2]] = !DILocation(line: 202, column: 13, scope: ![[G_SCOPE:.*]],
+// CHECK: ![[L2]] = !DILocation(line: 203, column: 13, scope: ![[G_SCOPE]],
 // CHECK-SAME:                  inlinedAt: ![[L3]])
-// CHECK: ![[G_SCOPE]] = distinct !DILexicalBlock(scope: ![[G]],
-// CHECK-SAME:                                    line: 201, column: 24)
