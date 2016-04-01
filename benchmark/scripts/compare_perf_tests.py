@@ -68,11 +68,8 @@ MARKDOWN_DETAIL = """
 </details>
 """
 
-PAIN_FORMAT = """
-Regression: {0}
-Improvement: {1}
-No Changes: {2}
-"""
+PAIN_DETAIL = """
+{0}: {1}"""
 
 
 def main():
@@ -230,15 +227,18 @@ def main():
     markdown_data += MARKDOWN_DETAIL.format("Improvement",
                                             len(increased_perf_list),
                                             markdown_improvement, "")
-    markdown_data += MARKDOWN_DETAIL.format("No Changes",
-                                            len(normal_perf_list),
-                                            markdown_normal, "")
+    if not args.changes_only:
+        markdown_data += MARKDOWN_DETAIL.format("No Changes",
+                                                len(normal_perf_list),
+                                                markdown_normal, "")
 
     if args.format:
         if args.format.lower() != "markdown":
-            pain_data = PAIN_FORMAT.format(markdown_regression,
-                                           markdown_improvement,
-                                           markdown_normal)
+            pain_data = PAIN_DETAIL.format("Regression" ,markdown_regression)
+            pain_data += PAIN_DETAIL.format("Improvement" ,markdown_improvement)
+            if not args.changes_only:
+                pain_data += PAIN_DETAIL.format("No Changes" ,markdown_normal)
+
             print(pain_data.replace("|", " ").replace("-", " "))
         else:
             print(markdown_data)
@@ -257,9 +257,10 @@ def main():
             else:
                 print("Error: missing --output flag.")
                 sys.exit(1)
-        elif args.format.lower() == "markdown" and args.output:
-            write_to_file(args.output, markdown_data)
-        elif args.format.lower() != "markdown":
+        elif args.format.lower() == "markdown":
+            if args.output:
+                write_to_file(args.output, markdown_data)
+        elif args.format.lower() != "git":
             print("{0} is unknown format.".format(args.format))
             sys.exit(1)
 
