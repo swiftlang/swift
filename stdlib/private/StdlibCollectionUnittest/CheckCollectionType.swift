@@ -333,6 +333,28 @@ internal enum _SubSequenceSubscriptOnIndexMode {
   }
 }
 
+internal enum _SubSequenceSubscriptOnRangeMode {
+  case inRange
+  case outOfRangeToTheLeftEmpty
+  case outOfRangeToTheLeftNonEmpty
+  case outOfRangeToTheRightEmpty
+  case outOfRangeToTheRightNonEmpty
+  case outOfRangeBothSides
+  case baseEndIndex
+
+  static var all: [_SubSequenceSubscriptOnRangeMode] {
+    return [
+      .inRange,
+      .outOfRangeToTheLeftEmpty,
+      .outOfRangeToTheLeftNonEmpty,
+      .outOfRangeToTheRightEmpty,
+      .outOfRangeToTheRightNonEmpty,
+      .outOfRangeBothSides,
+      .baseEndIndex,
+    ]
+  }
+}
+
 extension TestSuite {
   public func addCollectionTests<
     C : Collection,
@@ -598,6 +620,111 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
         _blackHole(c[index..<index])
       }
     }
+  }
+
+  func testSubSequenceSubscriptOnRange(
+    elements: [OpaqueValue<Int>], bounds: Range<Int>
+  ) {
+    let sliceFromLeft = bounds.lowerBound
+    let sliceFromRight = elements.count - bounds.upperBound
+
+    for mode in _SubSequenceSubscriptOnRangeMode.all {
+      self.test("\(testNamePrefix).SubSequence.subscript(_: Range)/Get/\(mode)/\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)") {
+        let base = makeWrappedCollection(elements)
+        let sliceStartIndex =
+          base.index(numericCast(sliceFromLeft), stepsFrom: base.startIndex)
+        let sliceEndIndex = base.index(
+          numericCast(elements.count - sliceFromRight),
+          stepsFrom: base.startIndex)
+        var slice = base[sliceStartIndex..<sliceEndIndex]
+        expectType(C.SubSequence.self, &slice)
+
+        var bounds: Range<C.Index> = base.startIndex..<base.startIndex
+        switch mode {
+        case .inRange:
+          let sliceNumericIndices =
+            sliceFromLeft..<(elements.count - sliceFromRight + 1)
+          for (i, subSliceStartIndex) in base.indices.enumerated() {
+            for (j, subSliceEndIndex) in base.indices.enumerated() {
+              if i <= j &&
+                sliceNumericIndices.contains(i) &&
+                sliceNumericIndices.contains(j) {
+                let subSlice = slice[subSliceStartIndex..<subSliceEndIndex]
+                for (k, index) in subSlice.indices.enumerated() {
+                  expectEqual(
+                    elements[i + k].value,
+                    extractValue(subSlice[index]).value)
+                  expectEqual(
+                    extractValue(base[index]).value,
+                    extractValue(subSlice[index]).value)
+                  expectEqual(
+                    extractValue(slice[index]).value,
+                    extractValue(subSlice[index]).value)
+                }
+              }
+            }
+          }
+          return
+        case .outOfRangeToTheLeftEmpty:
+          if sliceFromLeft == 0 { return }
+          let index = base.index(
+            numericCast(sliceFromLeft - 1),
+            stepsFrom: base.startIndex)
+          bounds = index..<index
+          break
+        case .outOfRangeToTheLeftNonEmpty:
+          if sliceFromLeft == 0 { return }
+          let index = base.index(
+            numericCast(sliceFromLeft - 1),
+            stepsFrom: base.startIndex)
+          bounds = index..<sliceStartIndex
+          break
+        case .outOfRangeToTheRightEmpty:
+          if sliceFromRight == 0 { return }
+          let index = base.index(
+            numericCast(elements.count - sliceFromRight + 1),
+            stepsFrom: base.startIndex)
+          bounds = index..<index
+          break
+        case .outOfRangeToTheRightNonEmpty:
+          if sliceFromRight == 0 { return }
+          let index = base.index(
+            numericCast(elements.count - sliceFromRight + 1),
+            stepsFrom: base.startIndex)
+          bounds = sliceEndIndex..<index
+          break
+        case .outOfRangeBothSides:
+          if sliceFromLeft == 0 { return }
+          if sliceFromRight == 0 { return }
+          bounds =
+            base.index(
+              numericCast(sliceFromLeft - 1),
+              stepsFrom: base.startIndex)
+            ..<
+            base.index(
+              numericCast(elements.count - sliceFromRight + 1),
+              stepsFrom: base.startIndex)
+          break
+        case .baseEndIndex:
+          if sliceFromRight == 0 { return }
+          bounds = sliceEndIndex..<base.endIndex
+          break
+        }
+
+        if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
+          expectCrashLater()
+          _blackHole(slice[bounds])
+        } else {
+          expectFailure {
+            _blackHole(slice[bounds])
+          }
+        }
+      }
+    }
+  }
+
+  for test in subscriptRangeTests {
+    testSubSequenceSubscriptOnRange(test.collection, bounds: test.bounds)
   }
 }
 
