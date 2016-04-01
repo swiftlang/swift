@@ -46,7 +46,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
     return false;
 
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
-    // Althouth the onFastPath builtin has no side-effects we don't want to
+    // Although the onFastPath builtin has no side-effects we don't want to
     // remove it.
     if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
       return false;
