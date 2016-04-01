@@ -354,42 +354,43 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << "#}";
     }
     switch (C.getKind()) {
-    case Chunk::ChunkKind::AccessControlKeyword:
-    case Chunk::ChunkKind::DeclAttrKeyword:
-    case Chunk::ChunkKind::DeclAttrParamKeyword:
-    case Chunk::ChunkKind::OverrideKeyword:
-    case Chunk::ChunkKind::ThrowsKeyword:
-    case Chunk::ChunkKind::RethrowsKeyword:
-    case Chunk::ChunkKind::DeclIntroducer:
-    case Chunk::ChunkKind::Text:
-    case Chunk::ChunkKind::LeftParen:
-    case Chunk::ChunkKind::RightParen:
-    case Chunk::ChunkKind::LeftBracket:
-    case Chunk::ChunkKind::RightBracket:
-    case Chunk::ChunkKind::LeftAngle:
-    case Chunk::ChunkKind::RightAngle:
-    case Chunk::ChunkKind::Dot:
-    case Chunk::ChunkKind::Ellipsis:
-    case Chunk::ChunkKind::Comma:
-    case Chunk::ChunkKind::ExclamationMark:
-    case Chunk::ChunkKind::QuestionMark:
-    case Chunk::ChunkKind::Ampersand:
-    case Chunk::ChunkKind::Equal:
-    case Chunk::ChunkKind::Whitespace:
+    using ChunkKind = Chunk::ChunkKind;
+    case ChunkKind::AccessControlKeyword:
+    case ChunkKind::DeclAttrKeyword:
+    case ChunkKind::DeclAttrParamKeyword:
+    case ChunkKind::OverrideKeyword:
+    case ChunkKind::ThrowsKeyword:
+    case ChunkKind::RethrowsKeyword:
+    case ChunkKind::DeclIntroducer:
+    case ChunkKind::Text:
+    case ChunkKind::LeftParen:
+    case ChunkKind::RightParen:
+    case ChunkKind::LeftBracket:
+    case ChunkKind::RightBracket:
+    case ChunkKind::LeftAngle:
+    case ChunkKind::RightAngle:
+    case ChunkKind::Dot:
+    case ChunkKind::Ellipsis:
+    case ChunkKind::Comma:
+    case ChunkKind::ExclamationMark:
+    case ChunkKind::QuestionMark:
+    case ChunkKind::Ampersand:
+    case ChunkKind::Equal:
+    case ChunkKind::Whitespace:
       AnnotatedTextChunk = C.isAnnotation();
       SWIFT_FALLTHROUGH;
-    case Chunk::ChunkKind::CallParameterName:
-    case Chunk::ChunkKind::CallParameterInternalName:
-    case Chunk::ChunkKind::CallParameterColon:
-    case Chunk::ChunkKind::DeclAttrParamEqual:
-    case Chunk::ChunkKind::CallParameterType:
-    case Chunk::ChunkKind::CallParameterClosureType:
-    case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
+    case ChunkKind::CallParameterName:
+    case ChunkKind::CallParameterInternalName:
+    case ChunkKind::CallParameterColon:
+    case ChunkKind::DeclAttrParamEqual:
+    case ChunkKind::CallParameterType:
+    case ChunkKind::CallParameterClosureType:
+    case ChunkKind::GenericParameterName:
       if (AnnotatedTextChunk)
         OS << "['";
-      else if (C.getKind() == Chunk::ChunkKind::CallParameterInternalName)
+      else if (C.getKind() == ChunkKind::CallParameterInternalName)
         OS << "(";
-      else if (C.getKind() == Chunk::ChunkKind::CallParameterClosureType)
+      else if (C.getKind() == ChunkKind::CallParameterClosureType)
         OS << "##";
       for (char Ch : C.getText()) {
         if (Ch == '\n')
@@ -399,24 +400,24 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       }
       if (AnnotatedTextChunk)
         OS << "']";
-      else if (C.getKind() == Chunk::ChunkKind::CallParameterInternalName)
+      else if (C.getKind() == ChunkKind::CallParameterInternalName)
         OS << ")";
       break;
-    case Chunk::ChunkKind::OptionalBegin:
-    case Chunk::ChunkKind::CallParameterBegin:
-    case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
+    case ChunkKind::OptionalBegin:
+    case ChunkKind::CallParameterBegin:
+    case ChunkKind::GenericParameterBegin:
       OS << "{#";
       break;
-    case Chunk::ChunkKind::DynamicLookupMethodCallTail:
-    case Chunk::ChunkKind::OptionalMethodCallTail:
+    case ChunkKind::DynamicLookupMethodCallTail:
+    case ChunkKind::OptionalMethodCallTail:
       OS << C.getText();
       break;
-    case Chunk::ChunkKind::TypeAnnotation:
+    case ChunkKind::TypeAnnotation:
       OS << "[#";
       OS << C.getText();
       OS << "#]";
       break;
-    case Chunk::ChunkKind::BraceStmtWithCursor:
+    case ChunkKind::BraceStmtWithCursor:
       OS << " {|}";
       break;
     }
@@ -951,48 +952,49 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
   for (auto i : indices(getChunks())) {
     auto &C = getChunks()[i];
     switch (C.getKind()) {
-    case CodeCompletionString::Chunk::ChunkKind::Text:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
-    case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
-    case CodeCompletionString::Chunk::ChunkKind::LeftParen:
-    case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
-    case CodeCompletionString::Chunk::ChunkKind::Equal:
-    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
+    using ChunkKind = Chunk::ChunkKind;
+    case ChunkKind::Text:
+    case ChunkKind::CallParameterName:
+    case ChunkKind::CallParameterInternalName:
+    case ChunkKind::GenericParameterName:
+    case ChunkKind::LeftParen:
+    case ChunkKind::LeftBracket:
+    case ChunkKind::Equal:
+    case ChunkKind::DeclAttrParamKeyword:
+    case ChunkKind::DeclAttrKeyword:
       return i;
-    case CodeCompletionString::Chunk::ChunkKind::Dot:
-    case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
-    case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
+    case ChunkKind::Dot:
+    case ChunkKind::ExclamationMark:
+    case ChunkKind::QuestionMark:
       if (includeLeadingPunctuation)
         return i;
       continue;
-    case CodeCompletionString::Chunk::ChunkKind::RightParen:
-    case CodeCompletionString::Chunk::ChunkKind::RightBracket:
-    case CodeCompletionString::Chunk::ChunkKind::LeftAngle:
-    case CodeCompletionString::Chunk::ChunkKind::RightAngle:
-    case CodeCompletionString::Chunk::ChunkKind::Ellipsis:
-    case CodeCompletionString::Chunk::ChunkKind::Comma:
-    case CodeCompletionString::Chunk::ChunkKind::Ampersand:
-    case CodeCompletionString::Chunk::ChunkKind::Whitespace:
-    case CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
-    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamEqual:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
-    case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
-    case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
-    case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
-    case CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail:
-    case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
+    case ChunkKind::RightParen:
+    case ChunkKind::RightBracket:
+    case ChunkKind::LeftAngle:
+    case ChunkKind::RightAngle:
+    case ChunkKind::Ellipsis:
+    case ChunkKind::Comma:
+    case ChunkKind::Ampersand:
+    case ChunkKind::Whitespace:
+    case ChunkKind::AccessControlKeyword:
+    case ChunkKind::OverrideKeyword:
+    case ChunkKind::ThrowsKeyword:
+    case ChunkKind::RethrowsKeyword:
+    case ChunkKind::DeclIntroducer:
+    case ChunkKind::CallParameterColon:
+    case ChunkKind::DeclAttrParamEqual:
+    case ChunkKind::CallParameterType:
+    case ChunkKind::CallParameterClosureType:
+    case ChunkKind::OptionalBegin:
+    case ChunkKind::CallParameterBegin:
+    case ChunkKind::GenericParameterBegin:
+    case ChunkKind::DynamicLookupMethodCallTail:
+    case ChunkKind::OptionalMethodCallTail:
+    case ChunkKind::TypeAnnotation:
       continue;
 
-    case CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor:
+    case ChunkKind::BraceStmtWithCursor:
       llvm_unreachable("should have already extracted the text");
     }
   }
@@ -1011,7 +1013,7 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
   int TextSize = 0;
   if (FirstTextChunk.hasValue()) {
     for (auto C : getChunks().slice(*FirstTextChunk)) {
-      using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
+      using ChunkKind = Chunk::ChunkKind;
       if (C.getKind() == ChunkKind::BraceStmtWithCursor)
         break;
 
