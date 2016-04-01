@@ -16,10 +16,10 @@
 #include "SourceKit/Support/Tracing.h"
 #include "SourceKit/Support/UIdent.h"
 
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
@@ -84,7 +84,7 @@ public:
   }
 };
 
-class IndexSwiftASTWalker : public ide::SourceEntityWalker {
+class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexingConsumer &IdxConsumer;
   SourceManager &SrcMgr;
   unsigned BufferID;

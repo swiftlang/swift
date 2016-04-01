@@ -35,6 +35,7 @@ add_swift_library(swiftAST
   ProtocolConformance.cpp
   RawComment.cpp
   Stmt.cpp
+  SourceEntityWalker.cpp
   Substitution.cpp
   Type.cpp
   TypeRefinementContext.cpp

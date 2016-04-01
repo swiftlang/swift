@@ -23,6 +23,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/SourceManager.h"
@@ -32,7 +33,6 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Formatting.h"
 #include "swift/IDE/SyntaxModel.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Subsystems.h"
 
 #include "llvm/Support/MemoryBuffer.h"
@@ -1520,7 +1520,7 @@ private:
   /// closure should not be applied to the inner call.
   std::pair<CallExpr *, bool> enclosingCallExpr(SourceFile &SF, SourceLoc SL) {
 
-    class CallExprFinder: public ide::SourceEntityWalker {
+    class CallExprFinder : public SourceEntityWalker {
     public:
       const SourceManager &SM;
       SourceLoc TargetLoc;

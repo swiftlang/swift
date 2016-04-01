@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IDE_SEMANTIC_SOURCE_ENTITY_WALKER_H
-#define SWIFT_IDE_SEMANTIC_SOURCE_ENTITY_WALKER_H
+#ifndef SWIFT_AST_SOURCE_ENTITY_WALKER_H
+#define SWIFT_AST_SOURCE_ENTITY_WALKER_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -34,8 +34,6 @@ namespace swift {
   class Stmt;
   class Expr;
   class Type;
-
-namespace ide {
 
 /// An abstract class used to traverse the AST and provide source information.
 /// Visitation happens in source-order and compiler-generated semantic info,
@@ -130,7 +128,6 @@ protected:
   virtual void anchor();
 };
 
-} // namespace ide
 } // namespace swift
 
 #endif

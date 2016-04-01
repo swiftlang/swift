@@ -19,10 +19,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
@@ -1192,7 +1192,7 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-class RelatedIdScanner : public ide::SourceEntityWalker {
+class RelatedIdScanner : public SourceEntityWalker {
   ValueDecl *Dcl;
   llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges;
   SourceManager &SourceMgr;

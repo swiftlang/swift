@@ -12,10 +12,10 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IDE/Formatting.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
@@ -399,7 +399,7 @@ public:
   }
 };
 
-class FormatWalker: public ide::SourceEntityWalker {
+class FormatWalker : public SourceEntityWalker {
   typedef std::vector<Token>::iterator TokenIt;
   class SiblingCollector {
     SourceLoc FoundSibling;

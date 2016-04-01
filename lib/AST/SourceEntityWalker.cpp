@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/SourceEntityWalker.h"
-#include "swift/IDE/Utils.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -26,7 +25,6 @@
 #include "clang/Basic/Module.h"
 
 using namespace swift;
-using namespace ide;
 
 namespace {
 
