@@ -549,7 +549,8 @@ build the Debug variant of the Swift standard library and SDK overlay""",
         action="store_true")
     parser.add_argument(
         "--build-runtime-with-host-compiler",
-        help="Use the host compiler, not the self-built one to compile the swift runtime",
+        help="Use the host compiler, not the self-built one to compile the " +
+        "Swift runtime",
         action="store_true")
 
     parser.add_argument(
