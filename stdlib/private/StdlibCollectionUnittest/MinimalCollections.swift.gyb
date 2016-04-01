@@ -485,8 +485,17 @@ public struct MinimalIndex : Comparable {
     expectTrapping(
       position,
       in: startIndex...endIndex)
-    self._collectionState = collectionState
-    self.position = position
+    self = MinimalIndex(
+      _collectionState: collectionState,
+      uncheckedPosition: position)
+  }
+
+  internal init(
+    _collectionState: _CollectionState,
+    uncheckedPosition: Int
+  ) {
+    self._collectionState = _collectionState
+    self.position = uncheckedPosition
   }
 
   public let _collectionState: _CollectionState
@@ -583,12 +592,18 @@ public struct ${Self}<T> : ${SelfProtocols} {
       endIndex: _elements.endIndex)
   }
 
+  internal func _uncheckedIndex(forPosition i: Int) -> MinimalIndex {
+    return MinimalIndex(
+      _collectionState: _collectionState,
+      uncheckedPosition: i)
+  }
+
   public var startIndex: MinimalIndex {
-    return _index(forPosition: _elements.startIndex)
+    return _uncheckedIndex(forPosition: _elements.startIndex)
   }
 
   public var endIndex: MinimalIndex {
-    return _index(forPosition: _elements.endIndex)
+    return _uncheckedIndex(forPosition: _elements.endIndex)
   }
 
   public func _failEarlyRangeCheck(
@@ -596,14 +611,14 @@ public struct ${Self}<T> : ${SelfProtocols} {
     bounds: Range<MinimalIndex>
   ) {
     _expectCompatibleIndices(
-      _index(forPosition: index.position),
+      _uncheckedIndex(forPosition: index.position),
       index)
 
     _expectCompatibleIndices(
-      _index(forPosition: bounds.lowerBound.position),
+      _uncheckedIndex(forPosition: bounds.lowerBound.position),
       bounds.lowerBound)
     _expectCompatibleIndices(
-      _index(forPosition: bounds.upperBound.position),
+      _uncheckedIndex(forPosition: bounds.upperBound.position),
       bounds.upperBound)
 
     expectTrapping(
@@ -616,17 +631,17 @@ public struct ${Self}<T> : ${SelfProtocols} {
     bounds: Range<MinimalIndex>
   ) {
     _expectCompatibleIndices(
-      _index(forPosition: range.lowerBound.position),
+      _uncheckedIndex(forPosition: range.lowerBound.position),
       range.lowerBound)
     _expectCompatibleIndices(
-      _index(forPosition: range.upperBound.position),
+      _uncheckedIndex(forPosition: range.upperBound.position),
       range.upperBound)
 
     _expectCompatibleIndices(
-      _index(forPosition: bounds.lowerBound.position),
+      _uncheckedIndex(forPosition: bounds.lowerBound.position),
       bounds.lowerBound)
     _expectCompatibleIndices(
-      _index(forPosition: bounds.upperBound.position),
+      _uncheckedIndex(forPosition: bounds.upperBound.position),
       bounds.upperBound)
 
     expectTrapping(
@@ -637,16 +652,14 @@ public struct ${Self}<T> : ${SelfProtocols} {
   @warn_unused_result
   public func successor(of i: MinimalIndex) -> MinimalIndex {
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
-    return _index(forPosition: i.position + 1)
+    return _uncheckedIndex(forPosition: i.position + 1)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
   public func predecessor(of i: MinimalIndex) -> MinimalIndex {
-    expectLT(_elements.startIndex, i.position,
-      "position=\(i.position) startIndex=\(_elements.startIndex) endIndex=\(_elements.endIndex)")
-    expectGE(_elements.endIndex, i.position,
-      "position=\(i.position) startIndex=\(_elements.startIndex) endIndex=\(_elements.endIndex)")
+    // FIXME: perform a range check and use
+    // return _uncheckedIndex(forPosition: i.position - 1)
     return _index(forPosition: i.position - 1)
   }
 %     end
