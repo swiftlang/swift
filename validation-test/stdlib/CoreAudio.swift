@@ -5,6 +5,7 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 
 import CoreAudio
@@ -272,7 +273,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/Collection") {
   }
 
   // FIXME: use checkMutableRandomAccessCollection, when we have that function.
-  checkRandomAccessCollection(expected, ablPtrWrapper)
+  checkForwardCollection(expected, ablPtrWrapper)
   free(ablPtrWrapper.unsafeMutablePointer)
 }
 
