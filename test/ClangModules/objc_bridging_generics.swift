@@ -76,6 +76,9 @@ func testImportedTypeParamRequirements() {
 
 extension GenericClass {
   func doesntUseGenericParam() {}
+  @objc func doesntUseGenericParam2() -> Self {}
+  // Doesn't technically use 'T', since it's type-erased at runtime
+  func doesntUseGenericParam3() -> GenericClass<T> {}
 
   // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamA(_ x: T) {}
@@ -97,6 +100,9 @@ extension GenericClass {
   }
 
   static func doesntUseGenericParam() {}
+  static func doesntUseGenericParam2() -> Self {}
+  // Doesn't technically use 'T', since it's type-erased at runtime
+  static func doesntUseGenericParam3() -> GenericClass<T> {}
 
   // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
   static func usesGenericParamA(_ x: T) {}
@@ -115,5 +121,11 @@ extension GenericClass {
   // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
   static func usesGenericParamF(_ x: Int) {
     _ = x is T
+  }
+
+  func checkThatMethodsAreObjC() {
+    _ = #selector(GenericClass.doesntUseGenericParam)
+    _ = #selector(GenericClass.doesntUseGenericParam2)
+    _ = #selector(GenericClass.doesntUseGenericParam3)
   }
 }
