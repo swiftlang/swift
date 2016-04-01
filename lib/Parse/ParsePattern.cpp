@@ -422,13 +422,7 @@ mapParsedParameters(Parser &parser,
       break;
 
     case Parser::ParameterContextKind::Initializer:
-      isKeywordArgumentByDefault = true;
-      break;
-
     case Parser::ParameterContextKind::Function:
-      isKeywordArgumentByDefault = true;
-      break;
-
     case Parser::ParameterContextKind::Curried:
       isKeywordArgumentByDefault = true;
       break;
