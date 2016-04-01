@@ -1,3 +1,0 @@
-// RUN: not --crash %target-sil-opt %s
-// REQUIRES: asserts
-sil shared_external@a:$()->()

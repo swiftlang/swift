@@ -1,4 +1,0 @@
-// RUN: not --crash %target-sil-opt %s
-// REQUIRES: asserts
-class C
-struct e{weak var x:C

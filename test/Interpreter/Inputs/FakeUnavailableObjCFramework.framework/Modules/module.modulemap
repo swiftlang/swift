@@ -1,3 +1,0 @@
-framework module FakeUnavailableObjCFramework {
-  umbrella header "FakeUnavailableObjCFramework.h"
-}

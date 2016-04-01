@@ -1,6 +1,0 @@
-framework module Another {
-  umbrella header "Another.h"
-  module * {
-    export *
-  }
-}

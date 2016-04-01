@@ -1,3 +1,0 @@
-framework module Mixed {
-  umbrella header "Mixed.h"
-}

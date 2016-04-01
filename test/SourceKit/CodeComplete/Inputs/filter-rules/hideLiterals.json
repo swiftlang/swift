@@ -1,9 +1,0 @@
-[
-  {
-    key.kind: source.codecompletion.literal,
-    key.hide: 1,
-    key.uids: [
-      source.lang.swift.literal.nil
-    ]
-  }
-]

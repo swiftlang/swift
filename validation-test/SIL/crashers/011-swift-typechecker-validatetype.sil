@@ -1,2 +1,0 @@
-// RUN: not %target-sil-opt %s
-sil@s:$()->(@owned T c:t
