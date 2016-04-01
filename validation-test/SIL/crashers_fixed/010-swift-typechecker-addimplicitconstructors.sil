@@ -1,3 +1,0 @@
-// RUN: not %target-sil-opt %s
-class C{@NSManaged var S
-var h

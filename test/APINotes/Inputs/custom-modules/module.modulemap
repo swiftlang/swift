@@ -1,3 +1,0 @@
-module APINotesTest {
-  header "APINotesTest.h"
-}

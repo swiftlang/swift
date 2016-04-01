@@ -1,1 +1,0 @@
-#define MACRO_FROM_PRIVATE_IMPL 42

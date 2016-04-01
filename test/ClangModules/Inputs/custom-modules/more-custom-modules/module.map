@@ -1,5 +1,0 @@
-// It is important that this test uses a second module.map file.
-module ImportsMissingHeaderIndirect {
-  header "ImportsMissingHeaderIndirect.h"
-  export *
-}

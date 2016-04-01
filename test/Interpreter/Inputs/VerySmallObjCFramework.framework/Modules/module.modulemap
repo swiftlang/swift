@@ -1,3 +1,0 @@
-framework module VerySmallObjCFramework {
-  umbrella header "VerySmallObjCFramework.h"
-}

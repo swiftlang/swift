@@ -1,2 +1,0 @@
-
-func fooHelperExplicitFrameworkFunc1(a: Int32) -> Int32

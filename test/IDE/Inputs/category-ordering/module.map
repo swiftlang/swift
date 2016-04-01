@@ -1,2 +1,0 @@
-module PropertyThenProtocol { header "PropertyThenProtocol.h" }
-module ProtocolThenProperty { header "ProtocolThenProperty.h" }

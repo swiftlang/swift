@@ -1,3 +1,0 @@
-
-public struct EmptyStruct {}
-

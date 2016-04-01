@@ -1,5 +1,0 @@
----
-Name: Appliances
-Classes:
-- Name: APPRefrigerator
-  SwiftBridge: Refrigerator

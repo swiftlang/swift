@@ -1,5 +1,0 @@
-framework module BoolBridgingTests {
-  umbrella header "BoolBridgingTests.h"
-  export *
-}
-

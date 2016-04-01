@@ -1,3 +1,0 @@
-module People {
-  header "people.h"
-}

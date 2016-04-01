@@ -1,2 +1,0 @@
-// RUN: not --crash %target-sil-opt %s
-func n->a{return:}class a

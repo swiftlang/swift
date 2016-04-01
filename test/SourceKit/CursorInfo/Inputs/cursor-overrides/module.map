@@ -1,1 +1,0 @@
-module FooClangModule { header "foo_clang_module.h" }

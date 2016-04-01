@@ -1,5 +1,0 @@
-framework module Bar {
-  umbrella header "Bar.h"
-  export *
-}
-

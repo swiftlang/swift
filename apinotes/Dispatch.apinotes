@@ -1,6 +1,0 @@
-Name:            Dispatch
-Functions:
-- Name: dispatch_release
-  Availability: nonswift
-- Name: dispatch_retain
-  Availability: nonswift
