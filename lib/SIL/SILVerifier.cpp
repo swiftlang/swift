@@ -2641,7 +2641,7 @@ public:
               "switch_enum default destination must take no arguments");
   }
 
-  void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
+  void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
     require(SOI->getOperand()->getType().isAddress(),
             "switch_enum_addr operand must be an address");
 

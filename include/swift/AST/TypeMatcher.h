@@ -186,7 +186,7 @@ class TypeMatcher {
 
     template<typename FirstMetatypeType>
     bool handleAnyMetatypeType(CanTypeWrapper<FirstMetatypeType> firstMeta,
-                               Type secondType){
+                               Type secondType) {
       if (auto secondMeta = secondType->getAs<FirstMetatypeType>()) {
         if (firstMeta->getKind() != secondMeta->getKind())
           return mismatch(firstMeta.getPointer(), secondMeta);

@@ -615,7 +615,7 @@ findMatchingRetains(SILBasicBlock *BB) {
       if (SA && SA->getParent() != R.first)
         SA = nullptr;
 
-      for (auto X : R.first->getPreds()){
+      for (auto X : R.first->getPreds()) {
         if (HandledBBs.find(X) != HandledBBs.end())
           continue;
         // Try to use the predecessor edge-value.

@@ -4,7 +4,7 @@
 
 
 // Listen to the load event for the document.
-if (window.addEventListener){
+if (window.addEventListener) {
   window.addEventListener('load', onload_handler, false);
 } else if (window.attachEvent) {
   window.attachEvent('onload', onload_handler);
