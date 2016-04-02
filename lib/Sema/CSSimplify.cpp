@@ -516,7 +516,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
     // If the param type is an empty existential composition, the function can
     // only have one argument. Check if exactly one argument was passed to this
     // function, otherwise we obviously have a mismatch
-    if (auto tupleArgType = argType->getAs<TupleType>()) {
+    if (auto tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
       if (tupleArgType->getNumElements() != 1) {
         return ConstraintSystem::SolutionKind::Error;
       }

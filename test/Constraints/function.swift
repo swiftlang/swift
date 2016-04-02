@@ -80,3 +80,6 @@ print(r22451001(5))  // expected-error {{argument passed to call that takes no a
 func sr590(x: Any) {}
 sr590(3,4) // expected-error {{extra argument in call}}
 sr590() // expected-error {{missing argument for parameter #1 in call}}
+// Make sure calling with structural tuples still works.
+sr590(())
+sr590((1, 2))
