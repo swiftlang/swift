@@ -234,10 +234,11 @@ def main():
 
     if args.format:
         if args.format.lower() != "markdown":
-            pain_data = PAIN_DETAIL.format("Regression" ,markdown_regression)
-            pain_data += PAIN_DETAIL.format("Improvement" ,markdown_improvement)
+            pain_data = PAIN_DETAIL.format("Regression", markdown_regression)
+            pain_data += PAIN_DETAIL.format("Improvement",
+                                            markdown_improvement)
             if not args.changes_only:
-                pain_data += PAIN_DETAIL.format("No Changes" ,markdown_normal)
+                pain_data += PAIN_DETAIL.format("No Changes", markdown_normal)
 
             print(pain_data.replace("|", " ").replace("-", " "))
         else:
