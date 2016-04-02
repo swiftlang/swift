@@ -36,7 +36,8 @@ def main():
 
         with open(testFilename, 'w') as testFile:
             for line in testContent:
-                testFile.write(line)
+                if not '###sourceLocation' in line:
+                    testFile.write(line)
 
         content = content[endIndex+1:]
 
