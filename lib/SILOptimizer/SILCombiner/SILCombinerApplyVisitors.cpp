@@ -748,7 +748,7 @@ getConformanceAndConcreteType(FullApplySite AI,
     Conformances = IER->getConformances();
     ConcreteType = IER->getFormalConcreteType();
     NewSelf = IER->getOperand();
-  } else if (auto IEM = dyn_cast<InitExistentialMetatypeInst>(InitExistential)) {
+  } else if (auto IEM = dyn_cast<InitExistentialMetatypeInst>(InitExistential)){
     Conformances = IEM->getConformances();
     NewSelf = IEM->getOperand();
     ConcreteType = NewSelf->getType().getSwiftRValueType();

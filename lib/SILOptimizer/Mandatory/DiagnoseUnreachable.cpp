@@ -530,7 +530,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
   
   // Record the diagnostic info.
   if (!DiagnosedUnreachableCode &&
-      NoReturnCall->getLoc().is<RegularLocation>() && State) {
+      NoReturnCall->getLoc().is<RegularLocation>() && State){
     for (auto SI = BB.succ_begin(), SE = BB.succ_end(); SI != SE; ++SI) {
       SILBasicBlock *UnreachableBlock = *SI;
       if (!State->PossiblyUnreachableBlocks.count(UnreachableBlock)) {
