@@ -30,14 +30,14 @@ func _toNSArray<T, U : AnyObject>(a: [T], @noescape f: (T) -> U) -> NSArray {
 }
 
 @warn_unused_result
-func _toNSRange(r: Range<String.Index>) -> NSRange {
+func _toNSRange(_ r: Range<String.Index>) -> NSRange {
   return NSRange(
     location: r.startIndex._utf16Index,
     length: r.endIndex._utf16Index - r.startIndex._utf16Index)
 }
 
 @warn_unused_result
-func _countFormatSpecifiers(a: String) -> Int {
+func _countFormatSpecifiers(_ a: String) -> Int {
   // The implementation takes advantage of the fact that internal
   // representation of String is UTF-16.  Because we only care about the ASCII
   // percent character, we don't need to decode UTF-16.
@@ -77,21 +77,21 @@ extension String {
   /// Return an `Index` corresponding to the given offset in our UTF-16
   /// representation.
   @warn_unused_result
-  func _index(utf16Index: Int) -> Index {
+  func _index(_ utf16Index: Int) -> Index {
     return Index(_base: String.UnicodeScalarView.Index(utf16Index, _core))
   }
 
   /// Return a `Range<Index>` corresponding to the given `NSRange` of
   /// our UTF-16 representation.
   @warn_unused_result
-  func _range(r: NSRange) -> Range<Index> {
+  func _range(_ r: NSRange) -> Range<Index> {
     return _index(r.location)..<_index(r.location + r.length)
   }
 
   /// Return a `Range<Index>?` corresponding to the given `NSRange` of
   /// our UTF-16 representation.
   @warn_unused_result
-  func _optionalRange(r: NSRange) -> Range<Index>? {
+  func _optionalRange(_ r: NSRange) -> Range<Index>? {
     if r.location == NSNotFound {
       return nil
     }
@@ -286,7 +286,7 @@ extension String {
   /// Returns the result of invoking `compare:options:` with
   /// `NSCaseInsensitiveSearch` as the only option.
   @warn_unused_result
-  public func caseInsensitiveCompare(aString: String) -> NSComparisonResult {
+  public func caseInsensitiveCompare(_ aString: String) -> NSComparisonResult {
     return _ns.caseInsensitiveCompare(aString)
   }
 
@@ -480,7 +480,7 @@ extension String {
   //     enumerateLinesUsing:(void (^)(NSString *line, BOOL *stop))block
 
   /// Enumerates all the lines in a string.
-  public func enumerateLines(body: (line: String, stop: inout Bool) -> ()) {
+  public func enumerateLines(_ body: (line: String, stop: inout Bool) -> ()) {
     _ns.enumerateLines {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
@@ -1049,7 +1049,7 @@ extension String {
   /// case-insensitive, localized, comparison.
   @warn_unused_result
   public
-  func localizedCaseInsensitiveCompare(aString: String) -> NSComparisonResult {
+  func localizedCaseInsensitiveCompare(_ aString: String) -> NSComparisonResult {
     return _ns.localizedCaseInsensitiveCompare(aString)
   }
 
@@ -1058,13 +1058,13 @@ extension String {
   /// Compares the string and a given string using a localized
   /// comparison.
   @warn_unused_result
-  public func localizedCompare(aString: String) -> NSComparisonResult {
+  public func localizedCompare(_ aString: String) -> NSComparisonResult {
     return _ns.localizedCompare(aString)
   }
 
   /// Compares strings as sorted by the Finder.
   @warn_unused_result
-  public func localizedStandardCompare(string: String) -> NSComparisonResult {
+  public func localizedStandardCompare(_ string: String) -> NSComparisonResult {
     return _ns.localizedStandardCompare(string)
   }
 
@@ -1267,7 +1267,7 @@ extension String {
   /// options applied may change over time.
   @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
-  public func localizedStandardContains(string: String) -> Bool {
+  public func localizedStandardContains(_ string: String) -> Bool {
     return _ns.localizedStandardContains(string)
   }
 
@@ -1360,7 +1360,7 @@ extension String {
 
   /// Returns a new string made by appending to the `String` a given string.
   @available(*, unavailable, message: "Use appendingPathComponent on NSURL instead.")
-  public func appendingPathComponent(aString: String) -> String {
+  public func appendingPathComponent(_ aString: String) -> String {
     return _ns.appendingPathComponent(aString)
   }
 
@@ -1369,7 +1369,7 @@ extension String {
   /// Returns a new string made by appending to the `String` an
   /// extension separator followed by a given extension.
   @available(*, unavailable, message: "Use appendingPathExtension on NSURL instead.")
-  public func appendingPathExtension(ext: String) -> String? {
+  public func appendingPathExtension(_ ext: String) -> String? {
     // FIXME: This method can return nil in practice, for example when self is
     // an empty string.  OTOH, this is not documented, documentation says that
     // it always returns a string.
@@ -1384,7 +1384,7 @@ extension String {
   /// Returns a new string made by appending a given string to
   /// the `String`.
   @warn_unused_result
-  public func appending(aString: String) -> String {
+  public func appending(_ aString: String) -> String {
     return _ns.appending(aString)
   }
 
@@ -1648,7 +1648,7 @@ extension String {
   ///
   /// Equivalent to `self.rangeOfString(other) != nil`
   @warn_unused_result
-  public func contains(other: String) -> Bool {
+  public func contains(_ other: String) -> Bool {
     let r = self.range(of: other) != nil
     if #available(OSX 10.10, iOS 8.0, *) {
       _sanityCheck(r == _ns.contains(other))
@@ -1670,7 +1670,7 @@ extension String {
   ///       other, options: .CaseInsensitiveSearch,
   ///       locale: NSLocale.current()) != nil
   @warn_unused_result
-  public func localizedCaseInsensitiveContains(other: String) -> Bool {
+  public func localizedCaseInsensitiveContains(_ other: String) -> Bool {
     let r = self.range(
       of: other, options: .caseInsensitiveSearch, locale: NSLocale.current()
     ) != nil
@@ -1692,17 +1692,17 @@ extension String {
   }
 
   @available(*, unavailable, message: "Use fileURL(withPathComponents:) on NSURL instead.")
-  public static func pathWithComponents(components: [String]) -> String {
+  public static func pathWithComponents(_ components: [String]) -> String {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "canBeConverted(toEncoding:)")
-  public func canBeConvertedToEncoding(encoding: NSStringEncoding) -> Bool {
+  public func canBeConvertedToEncoding(_ encoding: NSStringEncoding) -> Bool {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "capitalizedString(with:)")
-  public func capitalizedStringWith(locale: NSLocale?) -> String {
+  public func capitalizedStringWith(_ locale: NSLocale?) -> String {
     fatalError("unavailable function can't be called")
   }
 
@@ -1730,12 +1730,12 @@ extension String {
   }
 
   @available(*, unavailable, renamed: "componentsSeparated(by:)")
-  public func componentsSeparatedBy(separator: String) -> [String] {
+  public func componentsSeparatedBy(_ separator: String) -> [String] {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "cString(usingEncoding:)")
-  public func cStringUsingEncoding(encoding: NSStringEncoding) -> [CChar]? {
+  public func cStringUsingEncoding(_ encoding: NSStringEncoding) -> [CChar]? {
     fatalError("unavailable function can't be called")
   }
 
@@ -1805,12 +1805,12 @@ extension String {
   }
 
   @available(*, unavailable, renamed: "lengthOfBytes(usingEncoding:)")
-  public func lengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
+  public func lengthOfBytesUsingEncoding(_ encoding: NSStringEncoding) -> Int {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "lineRange(for:)")
-  public func lineRangeFor(aRange: Range<Index>) -> Range<Index> {
+  public func lineRangeFor(_ aRange: Range<Index>) -> Range<Index> {
     fatalError("unavailable function can't be called")
   }
 
@@ -1826,18 +1826,18 @@ extension String {
   }
 
   @available(*, unavailable, renamed: "lowercaseString(with:)")
-  public func lowercaseStringWith(locale: NSLocale?) -> String {
+  public func lowercaseStringWith(_ locale: NSLocale?) -> String {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "maximumLengthOfBytes(usingEncoding:)")
   public
-  func maximumLengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
+  func maximumLengthOfBytesUsingEncoding(_ encoding: NSStringEncoding) -> Int {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "paragraphRange(for:)")
-  public func paragraphRangeFor(aRange: Range<Index>) -> Range<Index> {
+  public func paragraphRangeFor(_ aRange: Range<Index>) -> Range<Index> {
     fatalError("unavailable function can't be called")
   }
 
@@ -1852,7 +1852,7 @@ extension String {
 
   @available(*, unavailable, renamed: "rangeOfComposedCharacterSequence(at:)")
   public
-  func rangeOfComposedCharacterSequenceAt(anIndex: Index) -> Range<Index> {
+  func rangeOfComposedCharacterSequenceAt(_ anIndex: Index) -> Range<Index> {
     fatalError("unavailable function can't be called")
   }
 
@@ -1874,7 +1874,7 @@ extension String {
   }
 
   @available(*, unavailable, renamed: "localizedStandardRange(of:)")
-  public func localizedStandardRangeOf(string: String) -> Range<Index>? {
+  public func localizedStandardRangeOf(_ string: String) -> Range<Index>? {
     fatalError("unavailable function can't be called")
   }
 
@@ -1938,32 +1938,32 @@ extension String {
   }
 
   @available(*, unavailable, renamed: "trimmingCharacters(in:)")
-  public func byTrimmingCharactersIn(set: NSCharacterSet) -> String {
+  public func byTrimmingCharactersIn(_ set: NSCharacterSet) -> String {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "strings(byAppendingPaths:)")
-  public func stringsByAppendingPaths(paths: [String]) -> [String] {
+  public func stringsByAppendingPaths(_ paths: [String]) -> [String] {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "substring(from:)")
-  public func substringFrom(index: Index) -> String {
+  public func substringFrom(_ index: Index) -> String {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "substring(to:)")
-  public func substringTo(index: Index) -> String {
+  public func substringTo(_ index: Index) -> String {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "substring(with:)")
-  public func substringWith(aRange: Range<Index>) -> String {
+  public func substringWith(_ aRange: Range<Index>) -> String {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "uppercaseString(with:)")
-  public func uppercaseStringWith(locale: NSLocale?) -> String {
+  public func uppercaseStringWith(_ locale: NSLocale?) -> String {
     fatalError("unavailable function can't be called")
   }
 
