@@ -75,3 +75,9 @@ A().a(text:"sometext") // expected-error {{argument labels '(text:)' do not matc
 func r22451001() -> AnyObject {}
 print(r22451001(5))  // expected-error {{argument passed to call that takes no arguments}}
 
+
+// SR-590 Passing two parameters to a function that takes one argument of type Any crashes the compiler
+// SR-1028: Segmentation Fault: 11 when superclass init takes parameter of type 'Any'
+func sr590(x: Any) {}
+sr590(3,4) // expected-error {{extra argument in call}}
+sr590() // expected-error {{missing argument for parameter #1 in call}}
