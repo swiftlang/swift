@@ -617,7 +617,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return false;
   }
   if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
-    // Althouth the onFastPath builtin has no side-effects we don't want to
+    // Although the onFastPath builtin has no side-effects we don't want to
     // (re-)move it.
     if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
       return false;
