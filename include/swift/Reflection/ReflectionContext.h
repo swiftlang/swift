@@ -372,7 +372,7 @@ public:
     return 0;
   }
 
-  TypeRefVector getGenericSubst(StoredPointer MetadataAddress){
+  TypeRefVector getGenericSubst(StoredPointer MetadataAddress) {
     StoredPointer DescriptorAddress;
     SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
     std::tie(Descriptor, DescriptorAddress)

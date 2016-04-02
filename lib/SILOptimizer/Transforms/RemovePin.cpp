@@ -103,7 +103,7 @@ public:
           SILValue RCId = RCIA->getRCIdentityRoot(Unpin->getOperand());
           DEBUG(llvm::dbgs() << "        RCID Source: " << *RCId);
           auto *PinDef = dyn_cast<StrongPinInst>(RCId);
-          if (PinDef && AvailablePins.count(PinDef)){
+          if (PinDef && AvailablePins.count(PinDef)) {
             DEBUG(llvm::dbgs() << "        Found matching pin: " << *PinDef);
             SmallVector<MarkDependenceInst *, 8> MarkDependentInsts;
             if (areSafePinUsers(PinDef, Unpin, MarkDependentInsts)) {

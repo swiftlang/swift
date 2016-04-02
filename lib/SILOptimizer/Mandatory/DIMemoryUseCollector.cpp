@@ -311,7 +311,7 @@ bool DIMemoryUse::
 onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
   auto &Module = Inst->getModule();
   
-  for (unsigned i = FirstElement, e = i+NumElements; i != e; ++i){
+  for (unsigned i = FirstElement, e = i+NumElements; i != e; ++i) {
     // Skip 'super.init' bit
     if (i == MI.getNumMemoryElements())
       return false;

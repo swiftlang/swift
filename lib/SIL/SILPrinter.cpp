@@ -1491,7 +1491,7 @@ public:
     *this << "switch_enum ";
     printSwitchEnumInst(SOI);
   }
-  void visitSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
+  void visitSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
     *this << "switch_enum_addr ";
     printSwitchEnumInst(SOI);
   }

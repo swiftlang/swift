@@ -308,7 +308,7 @@ void Decl::setDeclContext(DeclContext *DC) {
 }
 
 bool Decl::isUserAccessible() const {
-  if (auto VD = dyn_cast<VarDecl>(this)){
+  if (auto VD = dyn_cast<VarDecl>(this)) {
     return VD->isUserAccessible();
   }
   return true;

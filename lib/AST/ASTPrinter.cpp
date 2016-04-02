@@ -442,7 +442,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       return {Result, MergeInfo};
     }
     assert(Ext->getGenericParams() && "No generic params.");
-    for (auto Req : Ext->getGenericParams()->getRequirements()){
+    for (auto Req : Ext->getGenericParams()->getRequirements()) {
       auto TupleOp = Req.getAsAnalyzedWrittenString();
       if (!TupleOp)
         continue;
@@ -536,7 +536,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
     ExtensionMergeInfoMap MergeInfoMap;
     std::vector<NominalTypeDecl*> Unhandled;
-    auto addTypeLocNominal = [&](TypeLoc TL){
+    auto addTypeLocNominal = [&](TypeLoc TL) {
       if (TL.getType()) {
         if (auto D = TL.getType()->getAnyNominal()) {
           Unhandled.push_back(D);
