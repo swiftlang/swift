@@ -12,14 +12,16 @@ let a = /* */!foo
 1 +/*hi*/2
 
 // Used to work, should now be errors
-foo/* */?.description  // expected-error * {{}}
-foo/* */!              // expected-error * {{}}
-1/**/+2                // expected-error * {{}}
-1+/**/2                // expected-error * {{}}
+// The actual error produced is probably not important.
+// These are wrapped in functions to allow the parser to recover before the next test case.
+func test1() { _ = foo/* */?.description }    // expected-error {{expected ':' after '? ...' in ternary expression}}
+func test2() { _ = foo/* */! }                // expected-error {{expected expression after operator}}
+func test3() { _ = 1/**/+2 }                  // expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{ambiguous use of operator '+'}}
+func test4() { _ = 1+/**/2 }                  // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}}
 
 // Continue to be errors
-!/* */foo              // expected-error * {{}}
-1+/* */2               // expected-error * {{}}
+func test5() { _ = !/* */foo }                // expected-error {{unary operator cannot be separated from its operand}}
+func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}}
 
 // Continue to work
 foo!// this is dangerous

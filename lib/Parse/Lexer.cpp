@@ -622,19 +622,18 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
   // The first character in the file is not left-bound.
   if (tokBegin == bufferBegin) return false;
 
-  if (tokBegin - 1 != bufferBegin) {
-    if (tokBegin[-2] == '*' && tokBegin[-1] == '/') {
-      // End of a slash-star comment, which we treat as whitespace.
-      return false;
-    }
-  }
-
   switch (tokBegin[-1]) {
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case '(': case '[': case '{':              // opening delimiters
   case ',': case ';': case ':':              // expression separators
   case '\0':                                 // whitespace / last char in file
     return false;
+
+  case '/':
+    if (tokBegin - 1 != bufferBegin && tokBegin[-2] == '*')
+      return false; // End of a slash-star comment, so whitespace.
+    else
+      return true;
 
   default:
     return true;
@@ -664,7 +663,7 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
     return !isLeftBound;
 
   case '/':
-    // The start of a comment counts as whitespace, so it's not right bound.
+    // A following comment counts as whitespace, so this token is not right bound.
     if (tokEnd[1] == '/' || tokEnd[1] == '*')
       return false;
     else
