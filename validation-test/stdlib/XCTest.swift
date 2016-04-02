@@ -228,8 +228,6 @@ XCTestTestSuite.test("XCTAsserts with throwing expressions") {
     
 }
 
-/* Disabling these tests for now: <rdar://problem/25034414> Enable unit tests for test methods that throw once the open source CI is on 7.3
-
 XCTestTestSuite.test("Test methods that wind up throwing") {
     class ErrorTestCase: XCTestCase {
         var doThrow = true
@@ -276,7 +274,6 @@ XCTestTestSuite.test("Test methods that wind up throwing") {
     }
     
 }
-*/
 
 runAllTests()
 
