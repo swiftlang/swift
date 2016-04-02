@@ -9,7 +9,7 @@ func closure(a: Int, b: Int) -> Bool {
 
 // CHECK-LABEL: sil shared [noinline] @_TTSf1n_n_cl27_TF4test7closureFTSi1bSi_Sb___TF4test12call_closureFTSiSiFTSiSi_Sb_Sb
 // CHECK-NOT: apply
-// CHECK: builtin "cmp_slt_Int64"
+// CHECK: builtin "cmp_slt_Int
 // CHECK-NOT: apply
 // CHECK: return
 @inline(never)
