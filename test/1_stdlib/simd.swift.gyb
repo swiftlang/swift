@@ -28,7 +28,7 @@ import ObjectiveC
 %   for cols in [2,3,4]:
 //    Workaround <rdar://problem/18900352>
 %     vectype = ctype[type] + str(cols)
-func same(x: ${vectype}, _ y: ${vectype}) -> Bool {
+func same(_ x: ${vectype}, _ y: ${vectype}) -> Bool {
   for i in 0..<${cols} {
 //    Workaround <rdar://problem/18900352>
 %   if type in float_types:
@@ -44,7 +44,7 @@ func same(x: ${vectype}, _ y: ${vectype}) -> Bool {
 %       for rows in [2,3,4]:
 //        Workaround <rdar://problem/18900352>
 %         mattype = ctype[type] + str(cols) + 'x' + str(rows)
-func same(x: ${mattype}, _ y: ${mattype}) -> Bool {
+func same(_ x: ${mattype}, _ y: ${mattype}) -> Bool {
   for i in 0..<${cols} {
     if !same(x[i], y[i]) { return false }
   }

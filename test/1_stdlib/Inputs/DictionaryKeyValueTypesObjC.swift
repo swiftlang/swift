@@ -5,7 +5,7 @@ import Foundation
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
     var result: Self? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -43,18 +43,18 @@ func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
   return !isNativeDictionary(d)
 }
 
-func isNativeNSDictionary(d: NSDictionary) -> Bool {
+func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
   return className.range(of: "_NativeDictionaryStorageOwner").length > 0
 }
 
-func isCocoaNSDictionary(d: NSDictionary) -> Bool {
+func isCocoaNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
   return className.range(of: "NSDictionary").length > 0 ||
     className.range(of: "NSCFDictionary").length > 0
 }
 
-func isNativeNSArray(d: NSArray) -> Bool {
+func isNativeNSArray(_ d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
   return className.range(of: "_SwiftDeferredNSArray").length > 0
 }
@@ -101,7 +101,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
     return value.description
   }
 
-  override func isEqual(object: AnyObject!) -> Bool {
+  override func isEqual(_ object: AnyObject!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
@@ -182,7 +182,7 @@ class TestObjCEquatableValueTy : NSObject {
     serial = -serial
   }
 
-  override func isEqual(object: AnyObject!) -> Bool {
+  override func isEqual(_ object: AnyObject!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCEquatableValueTy {
         return self.value == otherObjcKey.value

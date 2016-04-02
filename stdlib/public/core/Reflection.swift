@@ -137,7 +137,7 @@ public protocol _Mirror {
 @warn_unused_result
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
-func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
+func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
   out.initialize(with: String(reflecting: x))
 }
 
@@ -147,11 +147,11 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
 /// of any type.
 @warn_unused_result
 @_silgen_name("swift_reflectAny")
-public func _reflect<T>(x: T) -> _Mirror
+public func _reflect<T>(_ x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStream>(
-  value: T,
+  _ value: T,
   to target: inout TargetStream,
   name: String? = nil,
   indent: Int = 0,
@@ -175,7 +175,7 @@ public func dump<T, TargetStream : OutputStream>(
 
 /// Dump an object's contents using its mirror to standard output.
 public func dump<T>(
-  value: T,
+  _ value: T,
   name: String? = nil,
   indent: Int = 0,
   maxDepth: Int = .max,
@@ -193,7 +193,7 @@ public func dump<T>(
 
 /// Dump an object's contents. User code should use dump().
 internal func _dump_unlocked<TargetStream : OutputStream>(
-  value: Any,
+  _ value: Any,
   to target: inout TargetStream,
   name: String?,
   indent: Int,
@@ -291,7 +291,7 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
 internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
-  mirror mirror: Mirror,
+  mirror: Mirror,
   to target: inout TargetStream,
   indent: Int,
   maxDepth: Int,
@@ -358,7 +358,7 @@ internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
 
 @_silgen_name("swift_MagicMirrorData_summary")
 func _swift_MagicMirrorData_summaryImpl(
-  metadata: Any.Type, _ result: UnsafeMutablePointer<String>
+  _ metadata: Any.Type, _ result: UnsafeMutablePointer<String>
 )
 
 public struct _MagicMirrorData {
@@ -420,7 +420,7 @@ internal struct _TupleMirror : _Mirror {
     return _subscript_get(i)
   }
   @_silgen_name("swift_TupleMirror_subscript")
-  func _subscript_get<T>(i: Int) -> (T, _Mirror)
+  func _subscript_get<T>(_ i: Int) -> (T, _Mirror)
 
   var summary: String { return "(\(count) elements)" }
   var quickLookObject: PlaygroundQuickLook? { return nil }
@@ -440,7 +440,7 @@ struct _StructMirror : _Mirror {
     return _subscript_get(i)
   }
   @_silgen_name("swift_StructMirror_subscript")
-  func _subscript_get<T>(i: Int) -> (T, _Mirror)
+  func _subscript_get<T>(_ i: Int) -> (T, _Mirror)
 
   var summary: String {
     return _typeName(valueType)
@@ -465,7 +465,7 @@ struct _EnumMirror : _Mirror {
     return _subscript_get(i)
   }
   @_silgen_name("swift_EnumMirror_subscript")
-  func _subscript_get<T>(i: Int) -> (T, _Mirror)
+  func _subscript_get<T>(_ i: Int) -> (T, _Mirror)
 
   var summary: String {
     let maybeCaseName = String(validatingUTF8: self.caseName)
@@ -481,7 +481,7 @@ struct _EnumMirror : _Mirror {
 
 @warn_unused_result
 @_silgen_name("swift_ClassMirror_count")
-func _getClassCount(_: _MagicMirrorData) -> Int
+func _getClassCount(_ _: _MagicMirrorData) -> Int
 
 // Like the other swift_*Mirror_subscript functions declared here and
 // elsewhere, this is implemented in the runtime.  The Swift CC would
@@ -499,7 +499,7 @@ func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 @warn_unused_result
 @_silgen_name("swift_ClassMirror_quickLookObject")
 public func _getClassPlaygroundQuickLook(
-  data: _MagicMirrorData
+  _ data: _MagicMirrorData
 ) -> PlaygroundQuickLook?
 #endif
 

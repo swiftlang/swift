@@ -56,7 +56,7 @@ mirrors.test("RandomAccessStructure") {
 
 let letters = "abcdefghijklmnopqrstuvwxyz "
 
-func find(substring: String, within domain: String) -> String.Index? {
+func find(_ substring: String, within domain: String) -> String.Index? {
   let domainCount = domain.characters.count
   let substringCount = substring.characters.count
 

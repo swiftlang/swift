@@ -1425,7 +1425,7 @@ Reflection.test("SetIterator/Mirror") {
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
-func computeCountLeadingZeroes(x: Int64) -> Int64 {
+func computeCountLeadingZeroes(_ x: Int64) -> Int64 {
   var x = x
   var r: Int64 = 64
   while x != 0 {
@@ -1453,7 +1453,7 @@ BitTwiddlingTestSuite.test("_countLeadingZeros") {
 }
 
 BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
-  func asInt(a: Int) -> Int { return a }
+  func asInt(_ a: Int) -> Int { return a }
 
   expectFalse(_isPowerOf2(asInt(-1025)))
   expectFalse(_isPowerOf2(asInt(-1024)))
@@ -1479,7 +1479,7 @@ BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
 }
 
 BitTwiddlingTestSuite.test("_isPowerOf2/UInt") {
-  func asUInt(a: UInt) -> UInt { return a }
+  func asUInt(_ a: UInt) -> UInt { return a }
 
   expectFalse(_isPowerOf2(asUInt(0)))
   expectTrue(_isPowerOf2(asUInt(1)))
@@ -1538,7 +1538,7 @@ AvailabilityVersionsTestSuite.test("lexicographic_compare") {
 }
 
 AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
-  func isAtLeastOS(major: Int, _ minor: Int, _ patch: Int) -> Bool {
+  func isAtLeastOS(_ major: Int, _ minor: Int, _ patch: Int) -> Bool {
     return _getBool(_stdlib_isOSVersionAtLeast(major._builtinWordValue,
                                                minor._builtinWordValue,
                                                patch._builtinWordValue))

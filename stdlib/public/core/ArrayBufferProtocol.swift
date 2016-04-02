@@ -46,7 +46,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   ///   unnecessary reallocation.
   @warn_unused_result
   mutating func requestUniqueMutableBackingBuffer(
-    minimumCapacity minimumCapacity: Int
+    minimumCapacity: Int
   ) -> _ContiguousArrayBuffer<Element>?
 
   /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
@@ -70,7 +70,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// - Precondition: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
   mutating func replace<C : Collection where C.Iterator.Element == Element>(
-    subRange subRange: Range<Int>,
+    subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   )
@@ -82,7 +82,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<Element>) throws -> R
+    @noescape _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -90,7 +90,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
   mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
+    @noescape _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// The number of elements the buffer stores.
@@ -137,7 +137,7 @@ extension _ArrayBufferProtocol {
   public mutating func replace<
     C : Collection where C.Iterator.Element == Element
   >(
-    subRange subRange: Range<Int>,
+    subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   ) {

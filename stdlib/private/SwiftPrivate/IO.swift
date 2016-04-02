@@ -84,7 +84,7 @@ public struct _FDInputStream {
 public struct _Stderr : OutputStream {
   public init() {}
 
-  public mutating func write(string: String) {
+  public mutating func write(_ string: String) {
     for c in string.utf8 {
       _swift_stdlib_putc_stderr(CInt(c))
     }
@@ -99,7 +99,7 @@ public struct _FDOutputStream : OutputStream {
     self.fd = fd
   }
 
-  public mutating func write(string: String) {
+  public mutating func write(_ string: String) {
     let utf8 = string.nulTerminatedUTF8
     utf8.withUnsafeBufferPointer {
       (utf8) -> Void in

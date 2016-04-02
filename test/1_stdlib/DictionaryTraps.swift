@@ -15,7 +15,7 @@ import Foundation
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
     var result: Self? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -159,7 +159,7 @@ class TestObjCKeyTy : NSObject {
     self.value = value
   }
 
-  override func isEqual(object: AnyObject!) -> Bool {
+  override func isEqual(_ object: AnyObject!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value

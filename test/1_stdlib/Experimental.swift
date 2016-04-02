@@ -15,8 +15,8 @@ import ObjectiveC
 var ExperimentalTestSuite = TestSuite("Experimental")
 
 ExperimentalTestSuite.test("ComposeOperator/SmokeTest") {
-  func incr(x: Int) -> Int { return x + 1 }
-  func twice(x: Int) -> Int { return x * 2 }
+  func incr(_ x: Int) -> Int { return x + 1 }
+  func twice(_ x: Int) -> Int { return x * 2 }
 
   expectEqual(7, (incr ∘ twice)(3))
 }
@@ -30,8 +30,8 @@ ExperimentalTestSuite.test("ComposeOperator/Types") {
   struct B {}
   struct C {}
 
-  func a(_: A) -> B { return B() }
-  func b(_: B) -> C { return C() }
+  func a(_ _: A) -> B { return B() }
+  func b(_ _: B) -> C { return C() }
 
   var result = b ∘ a
   typealias Expected = A -> C
@@ -46,8 +46,8 @@ ExperimentalTestSuite.test("ComposeOperator/CountCalls") {
 
   var aCalled = 0
   var bCalled = 0
-  func a(_: A) -> B { aCalled += 1; return B() }
-  func b(_: B) -> C { bCalled += 1; return C() }
+  func a(_ _: A) -> B { aCalled += 1; return B() }
+  func b(_ _: B) -> C { bCalled += 1; return C() }
 
   var result = b ∘ a
   expectEqual(0, aCalled)
@@ -64,8 +64,8 @@ struct C {}
 
 var aCalled = 0
 var bCalled = 0
-func a(_: A) -> B { aCalled += 1; return B() }
-func b(_: B) -> C { bCalled += 1; return C() }
+func a(_ _: A) -> B { aCalled += 1; return B() }
+func b(_ _: B) -> C { bCalled += 1; return C() }
 
 ExperimentalTestSuite.test("ComposeOperator/CountCalls/Workaround") {
   var result = b ∘ a

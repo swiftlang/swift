@@ -253,13 +253,13 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// Reserve enough space to store `n` ASCII characters.
   ///
   /// - Complexity: O(`n`).
-  public mutating func reserveCapacity(n: Int) {
+  public mutating func reserveCapacity(_ n: Int) {
     _core.reserveCapacity(n)
   }
   /// Append `x` to `self`.
   ///
   /// - Complexity: Amortized O(1).
-  public mutating func append(x: UnicodeScalar) {
+  public mutating func append(_ x: UnicodeScalar) {
     _core.append(x)
   }
   /// Append the elements of `newElements` to `self`.
@@ -279,7 +279,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UnicodeScalar
   >(
-    bounds: Range<Index>, with newElements: C
+    _ bounds: Range<Index>, with newElements: C
   ) {
     let rawSubRange = bounds.startIndex._position
       ..< bounds.endIndex._position

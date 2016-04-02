@@ -11,7 +11,7 @@ func acceptsAnyDictionary<KeyTy : Hashable, ValueTy>(
 func equalsUnordered<T : Comparable>(
   lhs: Array<(T, T)>, _ rhs: Array<(T, T)>
 ) -> Bool {
-  func comparePair(lhs: (T, T), _ rhs: (T, T)) -> Bool {
+  func comparePair(_ lhs: (T, T), _ rhs: (T, T)) -> Bool {
     return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
   }
   return lhs.sorted(isOrderedBefore: comparePair)

@@ -55,7 +55,7 @@ public struct Repeated<Element> : Collection {
 }
 
 /// Return a collection containing `n` repetitions of `elementInstance`.
-public func repeatElement<T>(element: T, count n: Int) -> Repeated<T> {
+public func repeatElement<T>(_ element: T, count n: Int) -> Repeated<T> {
   return Repeated(_repeating: element, count: n)
 }
 

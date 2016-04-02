@@ -279,7 +279,7 @@ func testCocoa() {
 testCocoa()
 
 extension ArraySlice {
-  mutating func qsort(compare: (Element, Element) -> Bool) {
+  mutating func qsort(_ compare: (Element, Element) -> Bool) {
     _introSort(&self, subRange: self.indices, isOrderedBefore: compare)
   }
 }
@@ -349,7 +349,7 @@ let testWidth = 11
 %arrayTypes = ['ContiguousArray', 'Array', 'ArraySlice']
 %for A in arrayTypes:
 
-func testReplace(make: () -> ${A}<X>) {
+func testReplace(_ make: () -> ${A}<X>) {
 
   checkRangeReplaceable(make, { X(100)..<X(100 + $0) })
 }

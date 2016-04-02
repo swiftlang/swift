@@ -18,7 +18,7 @@ import StdlibUnittest
 
 let MathTests = TestSuite("TGMath")
 
-func print3(op: String, _ d: Double, _ f: Float, _ g: CGFloat) -> String {
+func print3(_ op: String, _ d: Double, _ f: Float, _ g: CGFloat) -> String {
 #if arch(i386) || arch(arm)
   if (f != Float(g)  &&  f.isNaN != g.isNaN) {
     return "\(op)(CGFloat) got \(g) instead of \(f)"
@@ -31,7 +31,7 @@ func print3(op: String, _ d: Double, _ f: Float, _ g: CGFloat) -> String {
   return "\(op) \(d) \(f) \(op)"
 }
 
-func print3(op: String, _ d: Bool, _ f: Bool, _ g: Bool) -> String {
+func print3(_ op: String, _ d: Bool, _ f: Bool, _ g: Bool) -> String {
 #if arch(i386) || arch(arm)
   if (f != g) {
     return "\(op)(CGFloat) got \(g) instead of \(f)"
@@ -44,7 +44,7 @@ func print3(op: String, _ d: Bool, _ f: Bool, _ g: Bool) -> String {
   return "\(op) \(d) \(f) \(op)"
 }
 
-func print3(op: String, _ d: Int, _ f: Int, _ g: Int) -> String {
+func print3(_ op: String, _ d: Int, _ f: Int, _ g: Int) -> String {
 #if arch(i386) || arch(arm)
   if (f != g) {
     return "\(op)(CGFloat) got \(g) instead of \(f)"
@@ -57,7 +57,7 @@ func print3(op: String, _ d: Int, _ f: Int, _ g: Int) -> String {
   return "\(op) \(d) \(f) \(op)"
 }
 
-func print6(op: String, _ d1: Double, _ d2: Double, 
+func print6(_ op: String, _ d1: Double, _ d2: Double, 
   _ f1: Float, _ f2: Float, _ g1: CGFloat, _ g2: CGFloat)  -> String
 {
 #if arch(i386) || arch(arm)
@@ -72,7 +72,7 @@ func print6(op: String, _ d1: Double, _ d2: Double,
   return "\(op) \(d1),\(d2) \(f1),\(f2) \(op)"
 }
 
-func print6(op: String, _ d1: Double, _ di: Int, 
+func print6(_ op: String, _ d1: Double, _ di: Int, 
   _ f1: Float, _ fi: Int, _ g1: CGFloat, _ gi: Int) -> String
 {
 #if arch(i386) || arch(arm)

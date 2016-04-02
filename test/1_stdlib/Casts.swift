@@ -39,7 +39,7 @@ class DeinitTester {
     }
 }
 
-func testFailedTupleCast(onDeinit: () -> ()) {
+func testFailedTupleCast(_ onDeinit: () -> ()) {
     // This function is to establish a scope for t to 
     // be deallocated at the end of.
     let t: Any = (1, DeinitTester(onDeinit: onDeinit))

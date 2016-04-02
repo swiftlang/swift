@@ -5,7 +5,7 @@ func acceptsForwardIndex<I: ForwardIndex>(index: I) {}
 func acceptsBidirectionalIndex<I: BidirectionalIndex>(index: I) {}
 func acceptsRandomAccessIndex<I: RandomAccessIndex>(index: I) {}
 
-func testStringIndexTypes(s: String) {
+func testStringIndexTypes(_ s: String) {
   acceptsForwardIndex(s.utf8.startIndex)
   acceptsBidirectionalIndex(s.utf8.startIndex) // expected-error{{argument type 'String.UTF8View.Index' does not conform to expected type 'BidirectionalIndex'}}
   acceptsBidirectionalIndex(s.unicodeScalars.startIndex)

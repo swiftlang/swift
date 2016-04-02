@@ -75,7 +75,7 @@ OptionalTests.test("nil comparison") {
   expectEqual("forced extraction use: 2.", "forced extraction use: \(x!.successor()).")
 }
 
-func testRelation(p: (Int?, Int?) -> Bool) -> [Bool] {
+func testRelation(_ p: (Int?, Int?) -> Bool) -> [Bool] {
   typealias optPair = (Int?, Int?)
   
   let relationships: [optPair] = [

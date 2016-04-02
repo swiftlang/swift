@@ -1305,7 +1305,7 @@ NSStringAPIs.test("localizedStandardContains(_:)") {
 
 NSStringAPIs.test("localizedStandardRange(of:)") {
   if #available(OSX 10.11, iOS 9.0, *) {
-    func rangeOf(string: String, _ substring: String) -> Range<Int>? {
+    func rangeOf(_ string: String, _ substring: String) -> Range<Int>? {
       return toIntRange(
         string, string.localizedStandardRange(of: substring))
     }

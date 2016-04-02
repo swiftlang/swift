@@ -13,7 +13,7 @@ import ObjectiveC
 let PrintTests = TestSuite("PrintBoolean")
 
 PrintTests.test("CustomStringConvertible") {
-  func hasDescription(any: Any) {
+  func hasDescription(_ any: Any) {
     expectTrue(any is CustomStringConvertible)
   }
 

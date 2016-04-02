@@ -370,7 +370,7 @@ func getIllFormedUTF8String2(
   return (UnsafeMutablePointer(up), { up.deallocateCapacity(100) })
 }
 
-func asCCharArray(a: [UInt8]) -> [CChar] {
+func asCCharArray(_ a: [UInt8]) -> [CChar] {
   return a.map { CChar(bitPattern: $0) }
 }
 
