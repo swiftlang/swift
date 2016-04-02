@@ -325,7 +325,7 @@ public:
     return Found;
   }
 };
-} // end unnamed namespace
+} // end anonymous namespace
 
 static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
                              StmtKind Kind) {
@@ -1259,7 +1259,7 @@ public:
 
   void deliverCompletionResults();
 };
-} // end unnamed namespace
+} // end anonymous namespace
 
 void CodeCompletionCallbacksImpl::completeExpr() {
   if (DeliveredResults)
@@ -3951,7 +3951,7 @@ public:
     }
   }
 };
-} // end unnamed namespace
+} // end anonymous namespace
 
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
   assert(P.Tok.is(tok::code_complete));
@@ -4413,7 +4413,7 @@ namespace  {
       return true;
     }
   };
-} // end unnamed namespace
+} // end anonymous namespace
 
 /// Given an expression and its context, the analyzer tries to figure out the
 /// expected type of the expression by analyzing its context.
@@ -4978,7 +4978,7 @@ public:
     return new CodeCompletionCallbacksImpl(P, CompletionContext, Consumer);
   }
 };
-} // end unnamed namespace
+} // end anonymous namespace
 
 CodeCompletionCallbacksFactory *
 swift::ide::makeCodeCompletionCallbacksFactory(
