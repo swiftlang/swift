@@ -2126,6 +2126,38 @@ public func expectEqualsUnordered<T : Comparable>(
   expectEqualSequence(x, y, ${trace})
 }
 
+public func expectEqualsUnordered<
+  T : Strideable where T.Stride : Integer
+>(
+  expected: Range<T>, _ actual: [T], ${TRACE}
+) {
+  expectEqualsUnordered(
+    CountableRange(_uncheckedBounds:
+      (lower: expected.lowerBound, upper: expected.upperBound)),
+    actual,
+    ${trace},
+    showFrame: false)
+}
+
+public func expectEqualsUnordered<T : Strideable>(
+  expected: CountableRange<T>, _ actual: [T], ${TRACE}
+) {
+  if expected.count != actual.count {
+    expectationFailure("expected elements: \"\(expected)\"\n"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      trace: ${trace})
+  }
+  let r = Range(_uncheckedBounds:
+    (lower: expected.lowerBound, upper: expected.upperBound))
+  for e in actual {
+    if !r.contains(e) {
+      expectationFailure("expected elements: \"\(expected)\"\n"
+        + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+        trace: ${trace})
+    }
+  }
+}
+
 /// A nominal type that is equivalent to a tuple of two elements.
 ///
 /// We need a nominal type because we can't add protocol conformances to

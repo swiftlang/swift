@@ -119,5 +119,48 @@ AssertionsTestSuite.test("expectTrapping(_: RangeProtocol, in: RangeProtocol)") 
 % end
 }
 
+AssertionsTestSuite.test("expectEqualsUnordered(Range<T>, [T])") {
+% for Range in ['Range', 'CountableRange']:
+  expectEqualsUnordered(0..<0 as ${Range}, [])
+  expectFailure {
+    expectEqualsUnordered(0..<0 as ${Range}, [ 0 ])
+  }
+
+  expectEqualsUnordered(0..<1 as ${Range}, [ 0 ])
+  expectFailure {
+    expectEqualsUnordered(0..<1 as ${Range}, [])
+    expectEqualsUnordered(0..<1 as ${Range}, [ 1 ])
+  }
+
+  expectEqualsUnordered(0..<2 as ${Range}, [ 0, 1 ])
+  expectEqualsUnordered(0..<2 as ${Range}, [ 1, 0 ])
+  expectFailure {
+    expectEqualsUnordered(0..<2 as ${Range}, [])
+    expectEqualsUnordered(0..<2 as ${Range}, [ 0 ])
+    expectEqualsUnordered(0..<2 as ${Range}, [ 1 ])
+    expectEqualsUnordered(0..<2 as ${Range}, [ 0, 2 ])
+    expectEqualsUnordered(0..<2 as ${Range}, [ 2, 0 ])
+  }
+
+  expectEqualsUnordered(0..<3 as ${Range}, [ 0, 1, 2 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 0, 2, 1 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 1, 0, 2 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 1, 2, 0 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 2, 0, 1 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 2, 1, 0 ])
+  expectFailure {
+    expectEqualsUnordered(0..<3 as ${Range}, [])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 0 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 1 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 0, 1 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 1, 0 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 3, 0, 1 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 0, 3, 1 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 0, 1, 3 ])
+  }
+
+% end
+}
+
 runAllTests()
 
