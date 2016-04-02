@@ -256,9 +256,8 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
     if (doesClassMetadataRequireDynamicInitialization(IGM, theDecl))
       return nullptr;
 
-  // Otherwise, just respect genericity and Objective-C runtime visibility.
-  } else if (theDecl->isGenericContext() ||
-             theDecl->isOnlyObjCRuntimeVisible()) {
+  // Otherwise, just respect genericity.
+  } else if (theDecl->isGenericContext()) {
     return nullptr;
   }
 
@@ -292,15 +291,6 @@ irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM, CanType type,
 llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
                                             ClassDecl *theClass,
                                             bool allowUninitialized) {
-  // If the class is visible only through the Objective-C runtime, form the
-  // appropriate runtime call.
-  if (theClass->isOnlyObjCRuntimeVisible()) {
-    SmallString<64> scratch;
-    auto className =
-        IGF.IGM.getAddrOfGlobalString(theClass->getObjCRuntimeName(scratch));
-    return IGF.Builder.CreateCall(IGF.IGM.getLookUpClassFn(), className);
-  }
-
   auto classObject = IGF.IGM.getAddrOfObjCClass(theClass, NotForDefinition);
   if (allowUninitialized) return classObject;
 
