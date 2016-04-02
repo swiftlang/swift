@@ -2324,7 +2324,7 @@ namespace {
       case OverloadChoiceKind::DeclViaBridge: {
         // Look through an implicitly unwrapped optional.
         auto baseTy = base->getType()->getRValueType();
-        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
+        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
           base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                          cs.getConstraintLocator(base));
 
@@ -2370,7 +2370,7 @@ namespace {
 
       case OverloadChoiceKind::TupleIndex: {
         auto baseTy = base->getType()->getRValueType();
-        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
+        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
           base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                          cs.getConstraintLocator(base));
         }
@@ -4658,7 +4658,7 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
     // capture context. Look through ignored bases too.
     // TODO: Look through static method applications to the type.
     auto semanticExpr = expr->getSemanticsProvidingExpr();
-    while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(semanticExpr)){
+    while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(semanticExpr)) {
       semanticExpr = ignoredBase->getRHS()->getSemanticsProvidingExpr();
     }
     

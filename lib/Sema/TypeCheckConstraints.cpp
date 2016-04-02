@@ -2708,7 +2708,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   }
 
   // If we can bridge through an Objective-C class, do so.
-  if (Type objCClass = getDynamicBridgedThroughObjCClass(dc, fromType, toType)){
+  if (Type objCClass = getDynamicBridgedThroughObjCClass(dc, fromType, toType)) {
     if (isSubtypeOf(objCClass, fromType, dc))
       return CheckedCastKind::BridgeFromObjectiveC;
   }

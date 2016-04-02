@@ -92,7 +92,7 @@ public:
 
   void *
   operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(VersionConstraintAvailabilitySpec)){
+               unsigned Alignment = alignof(VersionConstraintAvailabilitySpec)) {
     return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }
 };
