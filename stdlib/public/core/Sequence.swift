@@ -380,7 +380,7 @@ extension Sequence {
 
     if i != ringBuffer.startIndex {
       return AnySequence(
-        [ringBuffer[i..<ringBuffer.endIndex], ringBuffer[0..<i]].flatten())
+        [ringBuffer[i..<ringBuffer.endIndex], ringBuffer[0..<i]].flattened())
     }
     return AnySequence(ringBuffer)
   }

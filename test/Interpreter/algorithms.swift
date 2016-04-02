@@ -25,7 +25,7 @@ print(two_one)
 // CHECK: [2, 1]
 
 // rdar://problem/18208283
-func flatten<Element, Seq: Sequence, InnerSequence: Sequence
+func flattened<Element, Seq: Sequence, InnerSequence: Sequence
        where Seq.Iterator.Element == InnerSequence, InnerSequence.Iterator.Element == Element> (_ outerSequence: Seq) -> [Element] {
   var result = [Element]()
 
@@ -37,7 +37,7 @@ func flatten<Element, Seq: Sequence, InnerSequence: Sequence
 }
 
 // CHECK: [1, 2, 3, 4, 5, 6]
-let flat = flatten([[1,2,3], [4,5,6]])
+let flat = flattened([[1,2,3], [4,5,6]])
 print(flat)
 
 // rdar://problem/19416848

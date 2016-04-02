@@ -386,7 +386,7 @@ extension Sequence {
   ///
   /// is equivalent to
   ///
-  ///     Array(s.map(transform).flatten())
+  ///     Array(s.map(transform).flattened())
   ///
   /// - Complexity: O(*M* + *N*), where *M* is the length of `self`
   ///   and *N* is the length of the result.
