@@ -6,6 +6,7 @@
 
 import SwiftPrivate
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This
 // workaround is needed to link all required libraries in case we compile
@@ -837,10 +838,10 @@ UTF8Decoder.test("Internal/_decodeOne") {
     }
   }
 
-  countSequences(head: 0x00...0x7f, tail: 0...0)
-  countSequences(head: 0xc0...0xdf, tail: 0...0xff)
-  countSequences(head: 0xe0...0xef, tail: 0...0xffff)
-  countSequences(head: 0xf0...0xff, tail: 0...0xffffff)
+  countValidSequences(head: 0x00...0x7f, tail: 0...0)
+  countValidSequences(head: 0xc0...0xdf, tail: 0...0xff)
+  countValidSequences(head: 0xe0...0xef, tail: 0...0xffff)
+  countValidSequences(head: 0xf0...0xff, tail: 0...0xffffff)
 
   // Valid sequences
   expectEqualSequence(validLengthCounts,
