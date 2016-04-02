@@ -3487,9 +3487,25 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 /// Diagnose an argument labeling issue, returning true if we successfully
 /// diagnosed the issue.
 static bool diagnoseArgumentLabelError(Expr *expr,
+                                       Expr *fnExpr,
                                        ArrayRef<Identifier> newNames,
-                                       bool isSubscript, ConstraintSystem &CS) {
+                                       ConstraintSystem &CS) {
   
+  auto emitFirstParamImplicitDeclFixIt = [&](InFlightDiagnostic &diag) {
+    // If attempting to call a function with an implicitly hidden
+    // first parameter, offer up a fix to change the declaration to fit the
+    // call site instead.
+    //
+    // func foo(bar: Int) => func foo(_ bar: Int)
+    if (auto funcDeclRefExpr = dyn_cast_or_null<DeclRefExpr>(fnExpr)) {
+      if (auto func = dyn_cast<FuncDecl>(funcDeclRefExpr->getDecl())) {
+        auto firstParam = func->getParameterList(0)->get(0);
+        diag.fixItInsert(firstParam->getNameLoc(), "_ ");
+      }
+    }
+  };
+  
+  bool isSubscript = fnExpr ? isa<SubscriptExpr>(fnExpr) : false;
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
     if (newNames[0].empty()) {
@@ -3530,9 +3546,11 @@ static bool diagnoseArgumentLabelError(Expr *expr,
     llvm::SmallString<16> str;
     str += newNames[0].str();
     str += ": ";
-    CS.TC.diagnose(expr->getStartLoc(), diag::missing_argument_labels, false,
-                   str.substr(0, str.size()-1), isSubscript)
-    .fixItInsert(expr->getStartLoc(), str);
+    auto diag = CS.TC.diagnose(expr->getStartLoc(),
+                               diag::missing_argument_labels, false,
+                               str.substr(0, str.size()-1), isSubscript);
+    diag.fixItInsert(expr->getStartLoc(), str);
+    emitFirstParamImplicitDeclFixIt(diag);
     return true;
   }
   
@@ -3639,6 +3657,12 @@ static bool diagnoseArgumentLabelError(Expr *expr,
       // Insert the name.
       newStr += ": ";
       diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
+      
+      // If we're attempting to fix the first parameter, offer up the same fix
+      // as a scalar tuple promotion.
+      if (i == 0) {
+        emitFirstParamImplicitDeclFixIt(diag);
+      }
       continue;
     }
     
@@ -3796,8 +3820,9 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 
   // If this is an argument label mismatch, then diagnose that error now.
   if (!correctNames.empty() &&
-      diagnoseArgumentLabelError(argExpr, correctNames,
-                                 /*isSubscript=*/isa<SubscriptExpr>(fnExpr),
+      diagnoseArgumentLabelError(argExpr,
+                                 fnExpr,
+                                 correctNames,
                                  *CCI.CS))
     return true;
 
@@ -5154,10 +5179,10 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     for (auto &arg : arguments)
       expectedNames.push_back(arg.Label);
 
-    return diagnoseArgumentLabelError(argExpr, expectedNames,
-                                      /*isSubscript*/false, *CS);
+    return diagnoseArgumentLabelError(argExpr, /*fnExpr=*/nullptr,
+                                      expectedNames, *CS);
   }
-    
+  
   case CC_GeneralMismatch:        // Something else is wrong.
   case CC_ArgumentCountMismatch:  // This candidate has wrong # arguments.
     // If we have no argument, the candidates must have expected one.

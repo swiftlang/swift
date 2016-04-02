@@ -224,51 +224,51 @@ public extension CGRect {
 
   @_transparent // @fragile
   @warn_unused_result(mutable_variant: "insetInPlace")
-  func insetBy(dx dx: CGFloat, dy: CGFloat) -> CGRect {
+  func insetBy(_ dx: CGFloat, dy: CGFloat) -> CGRect {
     return CGRectInset(self, dx, dy)
   }
 
   @_transparent // @fragile
-  mutating func insetInPlace(dx dx: CGFloat, dy: CGFloat) {
+  mutating func insetInPlace(_ dx: CGFloat, dy: CGFloat) {
     self = insetBy(dx: dx, dy: dy)
   }
 
   @_transparent // @fragile
   @warn_unused_result(mutable_variant: "offsetInPlace")
-  func offsetBy(dx dx: CGFloat, dy: CGFloat) -> CGRect {
+  func offsetBy(_ dx: CGFloat, dy: CGFloat) -> CGRect {
     return CGRectOffset(self, dx, dy)
   }
 
   @_transparent // @fragile
-  mutating func offsetInPlace(dx dx: CGFloat, dy: CGFloat) {
+  mutating func offsetInPlace(_ dx: CGFloat, dy: CGFloat) {
     self = offsetBy(dx: dx, dy: dy)
   }
 
   @_transparent // @fragile
   @warn_unused_result(mutable_variant: "unionInPlace")
-  func union(rect: CGRect) -> CGRect {
+  func union(_ rect: CGRect) -> CGRect {
     return CGRectUnion(self, rect)
   }
 
   @_transparent // @fragile
-  mutating func unionInPlace(rect: CGRect) {
+  mutating func unionInPlace(_ rect: CGRect) {
     self = union(rect)
   }
 
   @_transparent // @fragile
   @warn_unused_result(mutable_variant: "intersectInPlace")
-  func intersect(rect: CGRect) -> CGRect {
+  func intersect(_ rect: CGRect) -> CGRect {
     return CGRectIntersection(self, rect)
   }
 
   @_transparent // @fragile
-  mutating func intersectInPlace(rect: CGRect) {
+  mutating func intersectInPlace(_ rect: CGRect) {
     self = intersect(rect)
   }
 
   @_transparent // @fragile
   @warn_unused_result
-  func divide(atDistance: CGFloat, fromEdge: CGRectEdge)
+  func divide(_ atDistance: CGFloat, fromEdge: CGRectEdge)
     -> (slice: CGRect, remainder: CGRect)
   {
     var slice = CGRect.zero
@@ -279,19 +279,19 @@ public extension CGRect {
 
   @_transparent // @fragile
   @warn_unused_result
-  func contains(rect: CGRect) -> Bool {
+  func contains(_ rect: CGRect) -> Bool {
     return CGRectContainsRect(self, rect)
   }
 
   @_transparent // @fragile
   @warn_unused_result
-  func contains(point: CGPoint) -> Bool {
+  func contains(_ point: CGPoint) -> Bool {
     return CGRectContainsPoint(self, point)
   }
 
   @_transparent // @fragile
   @warn_unused_result
-  func intersects(rect: CGRect) -> Bool {
+  func intersects(_ rect: CGRect) -> Bool {
     return CGRectIntersectsRect(self, rect)
   }
 }

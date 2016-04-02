@@ -80,13 +80,13 @@ extension ObjCBool : CustomStringConvertible {
 
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
 
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
   return Bool(x)
 }
 
@@ -203,9 +203,9 @@ typealias Zone = NSZone
 func __pushAutoreleasePool() -> OpaquePointer
 
 @_silgen_name("_swift_objc_autoreleasePoolPop")
-func __popAutoreleasePool(pool: OpaquePointer)
+func __popAutoreleasePool(_ pool: OpaquePointer)
 
-public func autoreleasepool(@noescape code: () -> Void) {
+public func autoreleasepool(_ @noescape code: () -> Void) {
   let pool = __pushAutoreleasePool()
   code()
   __popAutoreleasePool(pool)

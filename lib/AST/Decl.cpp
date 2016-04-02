@@ -3883,11 +3883,7 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault(unsigned i) const {
 
   if (auto func = dyn_cast<FuncDecl>(this)) {
     // Operators do not have argument labels.
-    if (func->isOperator())
-      return false;
-
-    // Other functions have argument labels for every argument after the first.
-    return i > 0;
+    return !func->isOperator();
   }
 
   assert(isa<DestructorDecl>(this));
