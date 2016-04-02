@@ -119,6 +119,14 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
+  // FIXME(ABI)(compiler limitation):
+  //
+  //   public typealias Indices = Base.Indices
+  //   public var indices: Indices { ... }
+  //
+  // We can't do it right now because we don't have enough
+  // constraints on the Base.Indices type in this context.
+
   @warn_unused_result
   public func successor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
