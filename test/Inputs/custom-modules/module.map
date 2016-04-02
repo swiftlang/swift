@@ -1,0 +1,3 @@
+module ObjCRuntimeVisible {
+  header "ObjCRuntimeVisible.h"
+}

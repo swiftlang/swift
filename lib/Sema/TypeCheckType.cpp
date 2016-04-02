@@ -2494,7 +2494,8 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
 }
 
 /// Check whether the given declaration occurs within a constrained
-/// extension, or an extension of a class with generic ancestry, and
+/// extension, or an extension of a class with generic ancestry, or an
+/// extension of an Objective-C runtime visible class, and
 /// therefore is not representable in Objective-C.
 static bool checkObjCInExtensionContext(TypeChecker &tc,
                                         const ValueDecl *value,
@@ -2521,8 +2522,16 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
 
       if (!CD->hasClangNode() && CD->getGenericParams()) {
         if (diagnose) {
-          tc.diagnose(value->getLoc(), diag::objc_in_generic_extension);
+          tc.diagnose(value, diag::objc_in_generic_extension);
         }
+        return true;
+      }
+
+      // Cannot define @objc members of an Objective-C runtime visible class,
+      // because doing so would create a category.
+      if (CD->isOnlyObjCRuntimeVisible()) {
+        if (diagnose)
+          tc.diagnose(value, diag::objc_in_objc_runtime_visible);
         return true;
       }
 
