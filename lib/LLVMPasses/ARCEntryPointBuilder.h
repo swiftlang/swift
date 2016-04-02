@@ -97,8 +97,8 @@ public:
     // for the deployment target provided for this compilation.
     if (SWIFT_RT_USE_RegisterPreservingCC) {
       bool ShouldUseRegisterPreservingCC = false;
-      auto &TargeTriple = F.getParent()->getTargetTriple();
-      llvm::Triple Triple(TargeTriple);
+      auto &TargetTriple = F.getParent()->getTargetTriple();
+      llvm::Triple Triple(TargetTriple);
       auto Arch = Triple.getArch();
       if (Arch == llvm::Triple::ArchType::aarch64) {
         ShouldUseRegisterPreservingCC = true;
