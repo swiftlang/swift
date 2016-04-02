@@ -91,39 +91,6 @@ SliceTests.test("${Slice}.{startIndex,endIndex}") {
 %   end
 % end
 
-SliceTests.test("Slice.subscript(_: Range<Index>)") {
-  for test in subscriptRangeTests {
-    typealias Base = MinimalCollection<OpaqueValue<Int>>
-    Base.Index.trapOnRangeCheckFailure.value = false
-    let base = Base(elements: test.collection)
-    var slice = Slice(base: base, bounds: base.startIndex..<base.endIndex)
-    expectType(Slice<Base>.self, &slice)
-
-    var result = slice[test.bounds(in: slice)]
-    expectType(Slice<Base>.self, &result)
-
-    checkCollection(result, expected: test.expected) {
-      $0.value == $1.value
-    }
-
-    if test.bounds == test.collection.startIndex..<test.collection.endIndex {
-      let reSliced = result[base.startIndex..<base.endIndex]
-      checkCollection(
-        reSliced,
-        expected: test.collection,
-        stackTrace: SourceLocStack().with(test.loc))
-        { $0.value == $1.value }
-    } else {
-      // `Slice` disallows out-of-bounds slicing when the underlying index type
-      // can perform a range check.
-      expectFailure {
-        _blackHole(result[base.startIndex..<base.endIndex])
-      }
-    }
-  }
-}
-
-
 //===----------------------------------------------------------------------===//
 // MutableSlice<Base>
 //===----------------------------------------------------------------------===//
