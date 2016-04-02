@@ -2670,7 +2670,7 @@ public func expectPrinted<T>(
 }
 
 public func expectDebugPrinted<T>(
-  _ expectedOneOf patterns: [String], _ object: T, ${TRACE}
+  expectedOneOf patterns: [String], _ object: T, ${TRACE}
 ) {
   expectPrinted(expectedOneOf: patterns, String(reflecting: object), ${trace})
 }

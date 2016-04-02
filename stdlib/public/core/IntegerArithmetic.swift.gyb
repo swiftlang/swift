@@ -155,7 +155,7 @@ public func ~> <T : AbsoluteValuable>(x:T,_:(_Abs, ())) -> T {
 /// Concrete instances of `SignedNumber` can specialize this
 /// function by conforming to `AbsoluteValuable`.
 @_transparent
-public func abs<T : SignedNumber>(x: T) -> T {
+public func abs<T : SignedNumber>(_ x: T) -> T {
   return x~>_abs()
 }
 
