@@ -11,13 +11,16 @@
 import StdlibUnittest
 import Foundation
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
+
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
 
 struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {
@@ -93,10 +96,6 @@ struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
   init(_ value: Int) { self.value = value }
 
   var hashValue: Int { return value }
-
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCKeyTy.self
-  }
 
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
     return TestObjCKeyTy(value)

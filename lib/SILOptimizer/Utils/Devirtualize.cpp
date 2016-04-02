@@ -473,8 +473,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   if (AI.getFunction()->isFragile()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.
-    if (!(F->isFragile() || isValidLinkageForFragileRef(F->getLinkage()) ||
-          F->isExternalDeclaration()))
+    if (!F->hasValidLinkageForFragileRef())
       return false;
   }
 

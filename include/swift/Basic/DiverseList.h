@@ -17,13 +17,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_DIVERSELIST_H
-#define SWIFT_IRGEN_DIVERSELIST_H
+#ifndef SWIFT_BASIC_DIVERSELIST_H
+#define SWIFT_BASIC_DIVERSELIST_H
 
+#include "swift/Basic/Malloc.h"
 #include <cassert>
 #include <cstring>
 #include <utility>
-#include "swift/Basic/Malloc.h"
 
 namespace swift {
 
@@ -33,7 +33,7 @@ template <class T> class DiverseListImpl;
 ///
 /// \tparam T - A common base class of the objects in the list; must
 ///   provide an allocated_size() const method.
-/// \tparam InlineCapacity - the amount of inline storage to provide, in bytes
+/// \tparam InlineCapacity - the amount of inline storage to provide, in bytes.
 template <class T, unsigned InlineCapacity>
 class DiverseList : public DiverseListImpl<T> {
   char InlineStorage[InlineCapacity];
@@ -87,9 +87,8 @@ public:
       char *newStorage = End;
       End += needed;
       return newStorage;
-    } else {
-      return addNewStorageSlow(needed);
     }
+    return addNewStorageSlow(needed);
   }
   char *addNewStorageSlow(std::size_t needed);
 
@@ -107,7 +106,7 @@ public:
       return a.Offset == b.Offset;
     }
     friend bool operator!=(stable_iterator a, stable_iterator b) {
-      return a.Offset != b.Offset;
+      return !operator==(a, b);
     }    
   };
   stable_iterator stable_begin() const {
@@ -126,8 +125,8 @@ protected:
 };
 
 /// An "abstract" base class for DiverseList<T> which does not
-/// explicitly the preferred inline capacity.  Most of the
-/// implementation is on this class.
+/// explicitly set the preferred inline capacity.  Most of the
+/// implementation is in this class.
 template <class T> class DiverseListImpl : private DiverseListBase {
   DiverseListImpl(const DiverseListImpl<T> &other) = delete;
   DiverseListImpl(DiverseListImpl<T> &&other) = delete;
@@ -193,7 +192,7 @@ public:
       return *this;
     }
     iterator operator++(int _) {
-      iterator copy = *this;
+      auto copy = *this;
       operator++();
       return copy;
     }
@@ -206,7 +205,7 @@ public:
     }
 
     friend bool operator==(iterator a, iterator b) { return a.Ptr == b.Ptr; }
-    friend bool operator!=(iterator a, iterator b) { return a.Ptr != b.Ptr; }
+    friend bool operator!=(iterator a, iterator b) { return !operator==(a, b); }
   };
   iterator begin() { checkValid(); return iterator(Begin); }
   iterator end() { checkValid(); return iterator(End); }
@@ -236,7 +235,7 @@ public:
       return *this;
     }
     const_iterator operator++(int _) {
-      const_iterator copy = *this;
+      auto copy = *this;
       operator++();
       return copy;
     }
@@ -252,7 +251,7 @@ public:
       return a.Ptr == b.Ptr;
     }
     friend bool operator!=(const_iterator a, const_iterator b) {
-      return a.Ptr != b.Ptr;
+      return !operator==(a, b);
     }
   };
   const_iterator begin() const { checkValid(); return const_iterator(Begin); }
@@ -285,4 +284,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_DIVERSELIST_H

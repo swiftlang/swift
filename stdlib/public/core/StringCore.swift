@@ -24,6 +24,7 @@
 // size with the ternary operator.  This is also the cause of the
 // extra element requirement for 8 bit elements.  See the
 // implementation of subscript(Int) -> UTF16.CodeUnit below for details.
+@_fixed_layout
 public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
@@ -294,6 +295,7 @@ public struct _StringCore {
   }
 
   /// Get the Nth UTF-16 Code Unit stored.
+  @_versioned
   @warn_unused_result
   func _nthContiguous(position: Int) -> UTF16.CodeUnit {
     let p =
@@ -307,22 +309,25 @@ public struct _StringCore {
 
   /// Get the Nth UTF-16 Code Unit stored.
   public subscript(position: Int) -> UTF16.CodeUnit {
-    _precondition(
-      position >= 0,
-      "subscript: index precedes String start")
+    @inline(__always)
+    get {
+      _precondition(
+        position >= 0,
+        "subscript: index precedes String start")
 
-    _precondition(
-      position <= count,
-      "subscript: index points past String end")
+      _precondition(
+        position <= count,
+        "subscript: index points past String end")
 
-    if _fastPath(_baseAddress != nil) {
-      return _nthContiguous(position)
-    }
+      if _fastPath(_baseAddress != nil) {
+        return _nthContiguous(position)
+      }
 #if _runtime(_ObjC)
-    return _cocoaStringSubscript(self, position)
+      return _cocoaStringSubscript(self, position)
 #else
-    _sanityCheckFailure("subscript: non-native string without objc runtime")
+      _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
+    }
   }
 
   /// Write the string, in the given encoding, to output.
@@ -519,6 +524,7 @@ public struct _StringCore {
     _invariantCheck()
   }
 
+  @inline(never)
   mutating func append(rhs: _StringCore) {
     _invariantCheck()
     let minElementWidth
@@ -627,7 +633,7 @@ extension _StringCore : RangeReplaceableCollection {
       if _fastPath(elementWidth == 1) {
         var dst = rangeStart
         for u in newElements {
-          dst.pointee = UInt8(u & 0xFF)
+          dst.pointee = UInt8(truncatingBitPattern: u)
           dst += 1
         }
       }

@@ -153,15 +153,14 @@ static Node::Kind nominalTypeMarkerToNodeKind(char c) {
 
 static std::string archetypeName(Node::IndexType index,
                                  Node::IndexType depth) {
-  std::string str;
-  DemanglerPrinter name(str);
+  DemanglerPrinter name;
   do {
     name << (char)('A' + (index % 26));
     index /= 26;
   } while (index);
   if (depth != 0)
     name << depth;
-  return str;
+  return std::move(name).str();
 }
 
 namespace {
@@ -1369,12 +1368,11 @@ private:
   }
 
   NodePointer getDependentGenericParamType(unsigned depth, unsigned index) {
-    std::string Name;
-    DemanglerPrinter PrintName(Name);
+    DemanglerPrinter PrintName;
     PrintName << archetypeName(index, depth);
 
     auto paramTy = NodeFactory::create(Node::Kind::DependentGenericParamType,
-                                       std::move(Name));
+                                       std::move(PrintName).str());
     paramTy->addChild(NodeFactory::create(Node::Kind::Index, depth));
     paramTy->addChild(NodeFactory::create(Node::Kind::Index, index));
 
@@ -1773,7 +1771,7 @@ private:
         if (demangleBuiltinSize(size)) {
           return NodeFactory::create(
               Node::Kind::BuiltinTypeName,
-              (DemanglerPrinter("") << "Builtin.Float" << size).str());
+              std::move(DemanglerPrinter() << "Builtin.Float" << size).str());
         }
       }
       if (c == 'i') {
@@ -1781,7 +1779,7 @@ private:
         if (demangleBuiltinSize(size)) {
           return NodeFactory::create(
               Node::Kind::BuiltinTypeName,
-              (DemanglerPrinter("") << "Builtin.Int" << size).str());
+              (DemanglerPrinter() << "Builtin.Int" << size).str());
         }
       }
       if (c == 'v') {
@@ -1795,7 +1793,7 @@ private:
               return nullptr;
             return NodeFactory::create(
                 Node::Kind::BuiltinTypeName,
-                (DemanglerPrinter("") << "Builtin.Vec" << elts << "xInt" << size)
+                (DemanglerPrinter() << "Builtin.Vec" << elts << "xInt" << size)
                     .str());
           }
           if (Mangled.nextIf('f')) {
@@ -1804,13 +1802,13 @@ private:
               return nullptr;
             return NodeFactory::create(
                 Node::Kind::BuiltinTypeName,
-                (DemanglerPrinter("") << "Builtin.Vec" << elts << "xFloat"
+                (DemanglerPrinter() << "Builtin.Vec" << elts << "xFloat"
                                     << size).str());
           }
           if (Mangled.nextIf('p'))
             return NodeFactory::create(
                 Node::Kind::BuiltinTypeName,
-                (DemanglerPrinter("") << "Builtin.Vec" << elts << "xRawPointer")
+                (DemanglerPrinter() << "Builtin.Vec" << elts << "xRawPointer")
                     .str());
         }
       }
@@ -2248,16 +2246,15 @@ swift::Demangle::demangleTypeAsNode(const char *MangledName,
 namespace {
 class NodePrinter {
 private:
-  std::string Str;
   DemanglerPrinter Printer;
   DemangleOptions Options;
   
 public:
-  NodePrinter(DemangleOptions options) : Printer(Str), Options(options) {}
+  NodePrinter(DemangleOptions options) : Options(options) {}
   
   std::string printRoot(NodePointer root) {
     print(root);
-    return Str;
+    return std::move(Printer).str();
   }
 
 private:  
@@ -2884,13 +2881,12 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::ExplicitClosure:
   case Node::Kind::ImplicitClosure: {
     auto index = pointer->getChild(1)->getIndex();
-    std::string name;
-    DemanglerPrinter printName(name);
+    DemanglerPrinter printName;
     printName << '(';
     if (pointer->getKind() == Node::Kind::ImplicitClosure)
       printName << "implicit ";
     printName << "closure #" << (index + 1) << ")";
-    printEntity(false, false, name);
+    printEntity(false, false, std::move(printName).str());
     return;
   }
   case Node::Kind::Global:
@@ -2905,10 +2901,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::DefaultArgumentInitializer: {
     auto index = pointer->getChild(1);
-    std::string str;
-    DemanglerPrinter strPrinter(str);
+    DemanglerPrinter strPrinter;
     strPrinter << "(default argument " << index->getIndex() << ")";
-    printEntity(false, false, str);
+    printEntity(false, false, std::move(strPrinter).str());
     return;
   }
   case Node::Kind::DeclContext:
@@ -3677,4 +3672,6 @@ std::string Demangle::demangleTypeAsString(const char *MangledName,
     return mangled.str();
   return demangling;
 }
+
+
 

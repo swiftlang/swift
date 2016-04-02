@@ -37,5 +37,5 @@ func extensionMethodCurrying(x: Foo) {
   _ = x.zang
 }
 
-// CHECK-LABEL: sil shared @_TFC10extensions3Foo4zang
+// CHECK-LABEL: sil shared [thunk] @_TFC10extensions3Foo4zang
 // CHECK:         function_ref @_TFC10extensions3Foo4zang

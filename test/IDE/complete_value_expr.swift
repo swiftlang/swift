@@ -587,7 +587,7 @@ func testCurriedFunc() {
 // CF4-NEXT: End completions
 }
 
-func testImplicitlyCurriedFunc(var fs: FooStruct) {
+func testImplicitlyCurriedFunc(fs: inout FooStruct) {
   FooStruct.instanceFunc0(&fs)#^IMPLICITLY_CURRIED_FUNC_0^#
 // IMPLICITLY_CURRIED_FUNC_0: Begin completions
 // IMPLICITLY_CURRIED_FUNC_0-NEXT: Pattern/ExprSpecific: ()[#Void#]{{; name=.+$}}
@@ -832,12 +832,12 @@ func testInsideFunctionCall7() {
 // INSIDE_FUNCTION_CALL_7: End completions
 }
 
-func testInsideFunctionCall8(var x: FooStruct) {
+func testInsideFunctionCall8(x: inout FooStruct) {
   x.instanceFunc0(#^INSIDE_FUNCTION_CALL_8^#)
 // Since we already have '()', there is no pattern to complete.
 // INSIDE_FUNCTION_CALL_8-NOT: Pattern/{{.*}}:
 }
-func testInsideFunctionCall9(var x: FooStruct) {
+func testInsideFunctionCall9(x: inout FooStruct) {
   x.instanceFunc1(#^INSIDE_FUNCTION_CALL_9^#)
 // Annotated ')'
 // INSIDE_FUNCTION_CALL_9: Begin completions
@@ -845,7 +845,7 @@ func testInsideFunctionCall9(var x: FooStruct) {
 // INSIDE_FUNCTION_CALL_9-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_9: End completions
 }
-func testInsideFunctionCall10(var x: FooStruct) {
+func testInsideFunctionCall10(x: inout FooStruct) {
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_10^#)
 // Annotated ')'
 // INSIDE_FUNCTION_CALL_10: Begin completions
@@ -853,11 +853,11 @@ func testInsideFunctionCall10(var x: FooStruct) {
 // INSIDE_FUNCTION_CALL_10-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_10: End completions
 }
-func testInsideFunctionCall11(var x: FooStruct) {
+func testInsideFunctionCall11(x: inout FooStruct) {
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_11^#,
 // INSIDE_FUNCTION_CALL_11-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
 }
-func testInsideFunctionCall12(var x: FooStruct) {
+func testInsideFunctionCall12(x: inout FooStruct) {
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_12^#<#placeholder#>
 // INSIDE_FUNCTION_CALL_12-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
 }
@@ -1186,7 +1186,7 @@ func testFuncParenPattern2(fpp: FuncParenPattern) {
 // FUNC_PAREN_PATTERN_2-NEXT: End completions
 }
 
-func testFuncParenPattern3(var fpp: FuncParenPattern) {
+func testFuncParenPattern3(fpp: inout FuncParenPattern) {
   fpp.instanceFunc#^FUNC_PAREN_PATTERN_3^#
 // FUNC_PAREN_PATTERN_3: Begin completions
 // FUNC_PAREN_PATTERN_3-NEXT: Pattern/ExprSpecific: ({#Int#})[#Void#]{{; name=.+$}}
@@ -1439,11 +1439,11 @@ func testInterpolatedString1() {
 // FOO_OBJECT_DOT1: Begin completions
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal:      lazyInstanceVar[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc0()[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFunc5()[#Int?#]{{; name=.+$}}
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFunc6()[#Int!#]{{; name=.+$}}
 

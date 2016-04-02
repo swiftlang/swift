@@ -119,14 +119,13 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:    cacheIsNull:
-// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_getResilientMetadata(
-// CHECK-NEXT: store %swift.type* [[METADATA]], %swift.type** @_TMLC16class_resilience26ClassWithResilientProperty
+// CHECK-NEXT: call void @swift_once([[INT]]* @_TMaC16class_resilience26ClassWithResilientProperty.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientProperty to i8*))
+// CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** @_TMLC16class_resilience26ClassWithResilientProperty
 // CHECK-NEXT: br label %cont
 
 // CHECK:    cont:
 // CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
 // CHECK-NEXT: ret %swift.type* [[RESULT]]
-
 
 // ClassWithResilientProperty.color getter
 
@@ -148,8 +147,8 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:    cacheIsNull:
-// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_getResilientMetadata(
-// CHECK-NEXT: store %swift.type* [[METADATA]], %swift.type** @_TMLC16class_resilience33ClassWithResilientlySizedProperty
+// CHECK-NEXT: call void @swift_once([[INT]]* @_TMaC16class_resilience33ClassWithResilientlySizedProperty.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientlySizedProperty to i8*))
+// CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** @_TMLC16class_resilience33ClassWithResilientlySizedProperty
 // CHECK-NEXT: br label %cont
 
 // CHECK:    cont:
@@ -224,13 +223,12 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: ret i32 [[RESULT]]
 
 
-// ClassWithResilientProperty metadata instantiation function
+// ClassWithResilientProperty metadata initialization function
 
 
-// CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_ClassWithResilientProperty(%swift.type_pattern*, i8**)
-// CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
+// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_ClassWithResilientProperty
 // CHECK:             [[SIZE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct4Size()
-// CHECK:             call void @swift_initClassMetadata_UniversalStrategy(
+// CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_initClassMetadata_UniversalStrategy(
 // CHECK-native:      [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
 // CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] {{12|15}}
 // CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
@@ -239,15 +237,15 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] {{13|16}}
 // CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @_TWvdvC16class_resilience26ClassWithResilientProperty5colorVs5Int32
-// CHECK:             ret %swift.type* [[METADATA]]
+// CHECK:             store atomic %swift.type* [[METADATA]], %swift.type** @_TMLC16class_resilience26ClassWithResilientProperty release,
+// CHECK:             ret void
 
 
-// ClassWithResilientlySizedProperty metadata instantiation function
+// ClassWithResilientlySizedProperty metadata initialization function
 
-// CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_ClassWithResilientlySizedProperty(%swift.type_pattern*, i8**)
-// CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
+// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_ClassWithResilientlySizedProperty
 // CHECK:             [[RECTANGLE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct9Rectangle()
-// CHECK:             call void @swift_initClassMetadata_UniversalStrategy(
+// CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_initClassMetadata_UniversalStrategy(
 // CHECK-native:      [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
 // CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] {{11|14}}
 // CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
@@ -256,4 +254,6 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] {{12|15}}
 // CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @_TWvdvC16class_resilience33ClassWithResilientlySizedProperty5colorVs5Int32
-// CHECK:             ret %swift.type* [[METADATA]]
+// CHECK:             store atomic %swift.type* [[METADATA]], %swift.type** @_TMLC16class_resilience33ClassWithResilientlySizedProperty release,
+// CHECK:             ret void
+

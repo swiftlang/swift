@@ -17,13 +17,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Foundation
 
@@ -144,13 +137,13 @@ class MyBuffer<T> {
 var tests = TestSuite("ManagedBuffer")
 
 tests.test("basic") {
-  if true {
+  do {
     let s = TestManagedBuffer<LifetimeTracked>.create(0)
     expectEqual(1, LifetimeTracked.instances)
   }
   
   expectEqual(0, LifetimeTracked.instances)
-  if true {
+  do {
     let s = TestManagedBuffer<LifetimeTracked>.create(10)
     expectEqual(0, s.count)
     expectLE(10, s.myCapacity)
@@ -198,7 +191,7 @@ tests.test("ManagedBufferPointer/SizeValidation/MyBuffer") {
 tests.test("ManagedBufferPointer") {
   typealias Manager = ManagedBufferPointer<CountAndCapacity, LifetimeTracked>
 
-  if true {
+  do {
     var mgr = Manager(
       bufferClass: TestManagedBuffer<LifetimeTracked>.self,
       minimumCapacity: 10

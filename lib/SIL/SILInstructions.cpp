@@ -15,14 +15,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/AST/AST.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/Basic/AssertImplements.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILVisitor.h"
-#include "swift/AST/AST.h"
-#include "swift/Basic/AssertImplements.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -139,9 +140,8 @@ static void declareWitnessTable(SILModule &Mod,
   auto C = conformanceRef.getConcrete();
   if (!Mod.lookUpWitnessTable(C, false))
     Mod.createWitnessTableDeclaration(C,
-        TypeConverter::getLinkageForProtocolConformance(
-                                                  C->getRootNormalConformance(),
-                                                  NotForDefinition));
+        getLinkageForProtocolConformance(C->getRootNormalConformance(),
+                                         NotForDefinition));
 }
 
 AllocExistentialBoxInst *AllocExistentialBoxInst::create(
@@ -682,6 +682,25 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   #include "swift/SIL/SILNodes.def"
 
   llvm_unreachable("not a terminator?!");
+}
+
+bool TermInst::isFunctionExiting() const {
+  switch (getTermKind()) {
+    case TermKind::BranchInst:
+    case TermKind::CondBranchInst:
+    case TermKind::SwitchValueInst:
+    case TermKind::SwitchEnumInst:
+    case TermKind::SwitchEnumAddrInst:
+    case TermKind::DynamicMethodBranchInst:
+    case TermKind::CheckedCastBranchInst:
+    case TermKind::CheckedCastAddrBranchInst:
+    case TermKind::UnreachableInst:
+    case TermKind::TryApplyInst:
+      return false;
+    case TermKind::ReturnInst:
+    case TermKind::ThrowInst:
+      return true;
+  }
 }
 
 BranchInst::BranchInst(SILDebugLocation Loc, SILBasicBlock *DestBB,

@@ -25,7 +25,6 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
@@ -39,7 +38,8 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
                             IsBare, IsTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile);
+                            makeModuleFragile ? IsFragile : IsNotFragile,
+                            IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.

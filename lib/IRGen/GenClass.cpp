@@ -168,10 +168,15 @@ namespace {
 
     unsigned NumInherited = 0;
 
-    // Does the class require a metadata template? This will be true if
-    // the class or any of its ancestors have generic parameters, or if
-    // any of the below conditions are false.
-    bool ClassHasMetadataPattern = false;
+    // Does the class metadata require dynamic initialization above and
+    // beyond what the runtime can automatically achieve?
+    //
+    // This is true if the class or any of its ancestors:
+    //   - is generic,
+    //   - is resilient,
+    //   - has a parent type which isn't emittable as a constant,
+    //   - or has a field with resilient layout.
+    bool ClassMetadataRequiresDynamicInitialization = false;
 
     // Does the superclass have a fixed number of stored properties?
     // If not, and the class has generally-dependent layout, we have to
@@ -217,7 +222,8 @@ namespace {
       fieldLayout.InheritedStoredProperties = inheritedStoredProps;
       fieldLayout.AllFieldAccesses = IGM.Context.AllocateCopy(AllFieldAccesses);
       fieldLayout.MetadataAccess = MetadataAccess;
-      fieldLayout.HasMetadataPattern = ClassHasMetadataPattern;
+      fieldLayout.MetadataRequiresDynamicInitialization =
+        ClassMetadataRequiresDynamicInitialization;
       return fieldLayout;
     }
 
@@ -225,7 +231,17 @@ namespace {
     void addFieldsForClass(ClassDecl *theClass,
                            SILType classType) {
       if (theClass->isGenericContext())
-        ClassHasMetadataPattern = true;
+        ClassMetadataRequiresDynamicInitialization = true;
+
+      if (!ClassMetadataRequiresDynamicInitialization) {
+        if (auto parentType =
+              theClass->getDeclContext()->getDeclaredTypeInContext()) {
+          if (!tryEmitConstantTypeMetadataRef(IGM,
+                                              parentType->getCanonicalType(),
+                                              SymbolReferenceKind::Absolute))
+            ClassMetadataRequiresDynamicInitialization = true;
+        }
+      }
 
       if (theClass->hasSuperclass()) {
         // TODO: apply substitutions when computing base-class layouts!
@@ -247,7 +263,7 @@ namespace {
         } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
           // If the superclass is resilient, the number of stored properties
           // is not known at compile time.
-          ClassHasMetadataPattern = true;
+          ClassMetadataRequiresDynamicInitialization = true;
 
           ClassHasFixedFieldCount = false;
           ClassHasFixedSize = false;
@@ -281,7 +297,7 @@ namespace {
         auto &eltType = IGM.getTypeInfo(type);
 
         if (!eltType.isFixedSize()) {
-          ClassHasMetadataPattern = true;
+          ClassMetadataRequiresDynamicInitialization = true;
           ClassHasFixedSize = false;
 
           if (type.hasArchetype())
@@ -839,11 +855,19 @@ namespace {
       }
     }
 
+    llvm::Constant *getMetaclassRefOrNull(ClassDecl *theClass) {
+      if (theClass->isGenericContext()) {
+        return llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+      } else {
+        return IGM.getAddrOfMetaclassObject(theClass, NotForDefinition);
+      }
+    }
+
     void buildMetaclassStub() {
       assert(Layout && "can't build a metaclass from a category");
       // The isa is the metaclass pointer for the root class.
       auto rootClass = getRootClassForMetaclass(IGM, TheEntity.get<ClassDecl *>());
-      auto rootPtr = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
+      auto rootPtr = getMetaclassRefOrNull(rootClass);
 
       // The superclass of the metaclass is the metaclass of the
       // superclass.  Note that for metaclass stubs, we can always
@@ -854,11 +878,10 @@ namespace {
       llvm::Constant *superPtr;
       if (getClass()->hasSuperclass()) {
         auto base = getClass()->getSuperclass()->getClassOrBoundGenericClass();
-        superPtr = IGM.getAddrOfMetaclassObject(base, NotForDefinition);
+        superPtr = getMetaclassRefOrNull(base);
       } else {
-        superPtr = IGM.getAddrOfMetaclassObject(
-          IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()),
-          NotForDefinition);
+        superPtr = getMetaclassRefOrNull(
+          IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()));
       }
 
       auto dataPtr = emitROData(ForMetaClass);
@@ -904,7 +927,8 @@ namespace {
         fields.push_back(IGM.getAddrOfObjCClass(getClass(), NotForDefinition));
       else {
         auto type = getSelfType(getClass()).getSwiftRValueType();
-        llvm::Constant *metadata = tryEmitConstantTypeMetadataRef(IGM, type);
+        llvm::Constant *metadata =
+          tryEmitConstantHeapMetadataRef(IGM, type, /*allowUninit*/ true);
         assert(metadata &&
                "extended objc class doesn't have constant metadata?");
         fields.push_back(metadata);
@@ -994,7 +1018,9 @@ namespace {
             || Layout->getElements().size() == FirstFieldIndex) {
           instanceStart = instanceSize;
         } else if (Layout->getElement(FirstFieldIndex).getKind()
-                     == ElementLayout::Kind::Fixed) {
+                     == ElementLayout::Kind::Fixed ||
+                   Layout->getElement(FirstFieldIndex).getKind()
+                     == ElementLayout::Kind::Empty) {
           // FIXME: assumes layout is always sequential!
           instanceStart = Layout->getElement(FirstFieldIndex).getByteOffset();
         } else {
@@ -1823,10 +1849,12 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
                                      IGM.Context.Id_SwiftObject);
 }
 
-bool irgen::getClassHasMetadataPattern(IRGenModule &IGM, ClassDecl *theClass) {
-  // Classes imported from Objective-C never have a metadata pattern.
+bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
+                                                          ClassDecl *theClass) {
+  // Classes imported from Objective-C never requires dynamic initialization.
   if (theClass->hasClangNode())
     return false;
   
-  return getSelfTypeInfo(IGM, theClass).getClassLayout(IGM).HasMetadataPattern;
+  auto &layout = getSelfTypeInfo(IGM, theClass).getClassLayout(IGM);
+  return layout.MetadataRequiresDynamicInitialization;
 }

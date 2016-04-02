@@ -19,6 +19,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -342,6 +343,7 @@ public:
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
   unsigned NumAnonVars = 0;
+  unsigned NumCondFails = 0;
 
   /// Notes about instructions for which we're supposed to perform some
   /// sort of non-standard emission.  This enables some really simply local
@@ -1304,16 +1306,14 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   assert(params.empty() && "didn't claim all parameters!");
 
-  // Bind polymorphic arguments.  This can only be done after binding
-  // all the value parameters.
-  if (hasPolymorphicParameters(funcTy)) {
-    emitPolymorphicParameters(IGF, *IGF.CurSILFn, params,
-                              nullptr,
-      [&](unsigned paramIndex) -> llvm::Value* {
-        SILValue parameter = entry->getBBArgs()[paramIndex];
-        return IGF.getLoweredSingletonExplosion(parameter);
-      });
-  }
+  // Bind polymorphic arguments. This can only be done after binding
+  // all the value parameters, and must be done even for non-polymorphic
+  // functions because of imported Objective-C generics.
+  emitPolymorphicParameters(IGF, *IGF.CurSILFn, params, nullptr,
+                            [&](unsigned paramIndex) -> llvm::Value* {
+    SILValue parameter = entry->getBBArgs()[paramIndex];
+    return IGF.getLoweredSingletonExplosion(parameter);
+  });
 }
 
 /// Get metadata for the dynamic Self type if we have it.
@@ -3411,26 +3411,27 @@ void IRGenSILFunction::visitStoreUnownedInst(swift::StoreUnownedInst *i) {
   }
 }
 
-static void requireRefCountedType(IRGenSILFunction &IGF,
-                                  SourceLoc loc,
+static bool hasReferenceSemantics(IRGenSILFunction &IGF,
                                   SILType silType) {
   auto operType = silType.getSwiftRValueType();
   auto valueType = operType->getAnyOptionalObjectType();
   auto objType = valueType ? valueType : operType;
-  if (objType->mayHaveSuperclass()
-      || objType->isClassExistentialType()
-      || objType->is<BuiltinNativeObjectType>()
-      || objType->is<BuiltinBridgeObjectType>()
-      || objType->is<BuiltinUnknownObjectType>()) {
-    return;
-  }
-  IGF.IGM.error(loc, "isUnique operand type (" + Twine(operType.getString())
-                + ") is not a refcounted class");
+  return (objType->mayHaveSuperclass()
+          || objType->isClassExistentialType()
+          || objType->is<BuiltinNativeObjectType>()
+          || objType->is<BuiltinBridgeObjectType>()
+          || objType->is<BuiltinUnknownObjectType>());
 }
 
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
                                  SourceLoc loc, bool checkPinned) {
-  requireRefCountedType(IGF, loc, operand->getType());
+  if (!hasReferenceSemantics(IGF, operand->getType())) {
+    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(
+      &IGF.IGM.Module, llvm::Intrinsic::ID::trap);
+    IGF.Builder.CreateCall(trapIntrinsic, {});
+    return llvm::UndefValue::get(IGF.IGM.Int1Ty);
+  }
+
   auto &operTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(operand->getType()));
   LoadedRef ref =
     operTI.loadRefcountedPtr(IGF, loc, IGF.getLoweredAddress(operand));
@@ -4747,6 +4748,22 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   Builder.CreateCondBr(cond, failBB, contBB);
   Builder.emitBlock(failBB);
+
+  // Emit unique side-effecting inline asm calls in order to eliminate
+  // the possibility that an LLVM optimization or code generation pass
+  // will merge these blocks back together again. We emit an empty asm
+  // string with the side-effect flag set, and with a unique integer
+  // argument for each cond_fail we see in the function.
+  llvm::IntegerType *asmArgTy = IGM.Int32Ty;
+  llvm::Type *argTys = { asmArgTy };
+  llvm::FunctionType *asmFnTy =
+    llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
+  llvm::InlineAsm *inlineAsm =
+    llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
+  Builder.CreateCall(inlineAsm,
+                     llvm::ConstantInt::get(asmArgTy, NumCondFails++));
+
+  // Emit the trap instruction.
   llvm::Function *trapIntrinsic =
       llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
   Builder.CreateCall(trapIntrinsic, {});

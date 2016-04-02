@@ -165,6 +165,9 @@ struct crashreporter_annotations_t gCRAnnotations
 static void
 reportOnCrash(uint32_t flags, const char *message)
 {
+  // FIXME: SR-946 - we can't yet switch the following to use swift::Mutex
+  //                 since swift::Mutex uses fatalError and we could end
+  //                 up back here again ...and again ...and again
   static pthread_mutex_t crashlogLock = PTHREAD_MUTEX_INITIALIZER;
   pthread_mutex_lock(&crashlogLock);
   

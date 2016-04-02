@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_ASSERT_IMPLEMENTS_H
-#define SWIFT_BASIC_ASSERT_IMPLEMENTS_H
+#ifndef SWIFT_BASIC_ASSERTIMPLEMENTS_H
+#define SWIFT_BASIC_ASSERTIMPLEMENTS_H
 
 #include <type_traits>
 
@@ -58,6 +58,7 @@ namespace swift {
                                           &BaseClass::MemberName,               \
                                           &DerivedClass::MemberName>::value,    \
                 "" #DerivedClass " does not properly override " #MemberName)
-}
 
-#endif
+} // end namespace swift
+
+#endif // SWIFT_BASIC_ASSERTIMPLEMENTS_H

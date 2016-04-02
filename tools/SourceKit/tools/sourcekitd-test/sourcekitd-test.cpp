@@ -91,6 +91,9 @@ static sourcekitd_uid_t KeyModuleInterfaceName;
 static sourcekitd_uid_t KeyLength;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyUSR;
+static sourcekitd_uid_t KeyOriginalUSR;
+static sourcekitd_uid_t KeyDefaultImplementationOf;
+static sourcekitd_uid_t KeyInterestedUSR;
 static sourcekitd_uid_t KeyTypename;
 static sourcekitd_uid_t KeyOverrides;
 static sourcekitd_uid_t KeyRelatedDecls;
@@ -184,6 +187,9 @@ static int skt_main(int argc, const char **argv) {
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyUSR = sourcekitd_uid_get_from_cstr("key.usr");
+  KeyOriginalUSR = sourcekitd_uid_get_from_cstr("key.original_usr");
+  KeyDefaultImplementationOf = sourcekitd_uid_get_from_cstr("key.default_implementation_of");
+  KeyInterestedUSR = sourcekitd_uid_get_from_cstr("key.interested_usr");
   KeyTypename = sourcekitd_uid_get_from_cstr("key.typename");
   KeyOverrides = sourcekitd_uid_get_from_cstr("key.overrides");
   KeyRelatedDecls = sourcekitd_uid_get_from_cstr("key.related_decls");
@@ -591,6 +597,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     if (!Opts.ModuleGroupName.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyGroupName,
                                                Opts.ModuleGroupName.c_str());
+    if (!Opts.InterestedUSR.empty())
+      sourcekitd_request_dictionary_set_string(Req, KeyInterestedUSR,
+                                               Opts.InterestedUSR.c_str());
     break;
 
   case SourceKitRequest::FindInterfaceDoc:
@@ -961,6 +970,16 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OverrideUSRs.push_back(sourcekitd_variant_dictionary_get_string(Entry, KeyUSR));
   }
 
+  std::vector<const char *> GroupNames;
+  sourcekitd_variant_t GroupObj =
+    sourcekitd_variant_dictionary_get_value(Info, KeyModuleGroups);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(GroupObj);
+       i != e; ++i) {
+    sourcekitd_variant_t Entry =
+    sourcekitd_variant_array_get_value(GroupObj, i);
+    GroupNames.push_back(sourcekitd_variant_dictionary_get_string(Entry, KeyGroupName));
+  }
+
   std::vector<const char *> RelatedDecls;
   sourcekitd_variant_t RelatedDeclsObj =
   sourcekitd_variant_dictionary_get_value(Info, KeyRelatedDecls);
@@ -1013,6 +1032,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   if (TypeInterface)
     OS << TypeInterface << '\n';
   OS << "TYPE INTERFACE END\n";
+  OS << "MODULE GROUPS BEGIN\n";
+  for (auto Group : GroupNames)
+    OS << Group << '\n';
+  OS << "MODULE GROUPS END\n";
 }
 
 static void printFoundInterface(sourcekitd_variant_t Info,

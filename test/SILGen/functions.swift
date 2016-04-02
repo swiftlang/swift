@@ -302,12 +302,12 @@ func calls(i:Int, j:Int, k:Int) {
 }
 
 // -- Curried entry points
-// CHECK-LABEL: sil shared @_TFV9functions10SomeStruct6method{{.*}} : $@convention(thin) (@inout SomeStruct) -> @owned @callee_owned (Builtin.Int64) -> () {
+// CHECK-LABEL: sil shared [thunk] @_TFV9functions10SomeStruct6method{{.*}} : $@convention(thin) (@inout SomeStruct) -> @owned @callee_owned (Builtin.Int64) -> () {
 // CHECK:   [[UNCURRIED:%.*]] = function_ref @_TFV9functions10SomeStruct6method{{.*}} : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> (){{.*}} // user: %2
 // CHECK:   [[CURRIED:%.*]] = partial_apply [[UNCURRIED]]
 // CHECK:   return [[CURRIED]]
 
-// CHECK-LABEL: sil shared @_TFC9functions9SomeClass6method{{.*}} : $@convention(thin) (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
+// CHECK-LABEL: sil shared [thunk] @_TFC9functions9SomeClass6method{{.*}} : $@convention(thin) (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
 // CHECK: bb0(%0 : $SomeClass):
 // CHECK:   class_method %0 : $SomeClass, #SomeClass.method!1 : (SomeClass) -> (Builtin.Int64) -> ()
 // CHECK:   %2 = partial_apply %1(%0)
@@ -371,6 +371,10 @@ func noinline_callee() {}
 @inline(__always)
 func always_inline_callee() {}
 
+// CHECK-LABEL: sil [fragile] [always_inline] @_TF9functions27public_always_inline_calleeFT_T_ : $@convention(thin) () -> ()
+@inline(__always)
+public func public_always_inline_callee() {}
+
 protocol AlwaysInline {
   func alwaysInlined()
 }
@@ -398,7 +402,7 @@ final class r17828355Class {
 }
 
 // The curry thunk for the method should not include a class_method instruction.
-// CHECK-LABEL: sil shared @_TFC9functions14r17828355Class6methodF
+// CHECK-LABEL: sil shared [thunk] @_TFC9functions14r17828355Class6methodF
 // CHECK: bb0(%0 : $r17828355Class):
 // CHECK-NEXT: // function_ref functions.r17828355Class.method (Builtin.Int64) -> ()
 // CHECK-NEXT:  %1 = function_ref @_TFC9functions14r17828355Class6method{{.*}} : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
@@ -470,12 +474,12 @@ func partialApplyEnumCases(x: S, y: C) {
   let right2 = right(C())
 }
 
-// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload4Left{{.*}}
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TFO9functions23PartialApplyEnumPayload4Left{{.*}}
 // CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload4Left{{.*}}
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
 // CHECK:         return [[CLOSURE]]
 
-// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload5Right{{.*}}
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TFO9functions23PartialApplyEnumPayload5Right{{.*}}
 // CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload5Right{{.*}}
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
 // CHECK:         return [[CLOSURE]]

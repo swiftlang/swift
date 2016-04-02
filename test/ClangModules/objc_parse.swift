@@ -379,11 +379,20 @@ func testPropertyAndMethodCollision(obj: PropertyAndMethodCollision,
   obj.object = nil
   obj.object(obj, doSomething:Selector("action"))
 
+  obj.dynamicType.classRef = nil
+  obj.dynamicType.classRef(obj, doSomething:Selector("action"))
+
   rev.object = nil
   rev.object(rev, doSomething:Selector("action"))
 
-  var value: AnyObject = obj.protoProp()
+  rev.dynamicType.classRef = nil
+  rev.dynamicType.classRef(rev, doSomething:Selector("action"))
+
+  var value: AnyObject
+  value = obj.protoProp()
   value = obj.protoPropRO()
+  value = obj.dynamicType.protoClassProp()
+  value = obj.dynamicType.protoClassPropRO()
   _ = value
 }
 
@@ -587,3 +596,8 @@ func testNSUInteger(obj: NSUIntegerTests, uint: UInt, int: Int) {
   let num = NSNumber(unsignedInteger: uint)
   let _: String = num.unsignedIntegerValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
 }
+
+
+// <rdar://problem/25168818> Don't import None members in NS_OPTIONS types
+let _ = NSRuncingOptions.none // expected-error {{'none' is unavailable: use [] to construct an empty option set}}
+

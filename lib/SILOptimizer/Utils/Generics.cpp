@@ -19,27 +19,40 @@
 
 using namespace swift;
 
-ReabstractionInfo::ReabstractionInfo(SILFunction *Orig, ApplySite AI) {
-  SILModule &M = Orig->getModule();
-  Module *SM = M.getSwiftModule();
+// =============================================================================
+// ReabstractionInfo
+// =============================================================================
+
+// Initialize SpecializedType iff the specialization is allowed.
+ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
+                                     ArrayRef<Substitution> ParamSubs) {
+  if (!OrigF->shouldOptimize()) {
+    DEBUG(llvm::dbgs() << "    Cannot specialize function " << OrigF->getName()
+                       << " marked to be excluded from optimizations.\n");
+    return;
+  }
 
   TypeSubstitutionMap InterfaceSubs;
-  TypeSubstitutionMap ContextSubs;
-
-  if (Orig->getLoweredFunctionType()->getGenericSignature())
-    InterfaceSubs = Orig->getLoweredFunctionType()->getGenericSignature()
-      ->getSubstitutionMap(AI.getSubstitutions());
+  if (OrigF->getLoweredFunctionType()->getGenericSignature())
+    InterfaceSubs = OrigF->getLoweredFunctionType()->getGenericSignature()
+      ->getSubstitutionMap(ParamSubs);
 
   // We do not support partial specialization.
-  if (hasUnboundGenericTypes(InterfaceSubs))
+  if (hasUnboundGenericTypes(InterfaceSubs)) {
+    DEBUG(llvm::dbgs() <<
+          "    Cannot specialize with unbound interface substitutions.\n");
     return;
-  if (hasDynamicSelfTypes(InterfaceSubs))
+  }
+  if (hasDynamicSelfTypes(InterfaceSubs)) {
+    DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
     return;
+  }
+  SILModule &M = OrigF->getModule();
+  Module *SM = M.getSwiftModule();
 
-  SubstitutedType =
-    SILType::substFuncType(M, SM, InterfaceSubs,
-                           Orig->getLoweredFunctionType(),
-                           /*dropGenerics = */ true);
+  SubstitutedType = SILType::substFuncType(M, SM, InterfaceSubs,
+                                           OrigF->getLoweredFunctionType(),
+                                           /*dropGenerics = */ true);
 
   NumResults = SubstitutedType->getNumIndirectResults();
   Conversions.resize(NumResults + SubstitutedType->getParameters().size());
@@ -70,6 +83,8 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *Orig, ApplySite AI) {
   SpecializedType = createSpecializedType(SubstitutedType, M);
 }
 
+// Convert the substituted function type into a specialized function type based
+// on the ReabstractionInfo.
 CanSILFunctionType ReabstractionInfo::
 createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   llvm::SmallVector<SILResultInfo, 8> SpecializedResults;
@@ -116,6 +131,71 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
                          SpecializedResults, SubstFTy->getOptionalErrorResult(),
                          M.getASTContext());
 }
+
+// =============================================================================
+// GenericFuncSpecializer
+// =============================================================================
+
+GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
+                                               ArrayRef<Substitution> ParamSubs,
+                                               const ReabstractionInfo &ReInfo)
+    : M(GenericFunc->getModule()),
+      GenericFunc(GenericFunc),
+      ParamSubs(ParamSubs),
+      ReInfo(ReInfo) {
+
+  assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
+
+  if (GenericFunc->getContextGenericParams())
+    ContextSubs = GenericFunc->getContextGenericParams()
+      ->getSubstitutionMap(ParamSubs);
+
+  Mangle::Mangler Mangler;
+  GenericSpecializationMangler GenericMangler(Mangler, GenericFunc,
+                                                ParamSubs);
+  GenericMangler.mangle();
+  ClonedName = Mangler.finalize();
+
+  DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
+}
+
+// Return an existing specialization if one exists.
+SILFunction *GenericFuncSpecializer::lookupSpecialization() {
+  if (SILFunction *SpecializedF = M.lookUpFunction(ClonedName)) {
+    assert(ReInfo.getSpecializedType()
+           == SpecializedF->getLoweredFunctionType() &&
+           "Previously specialized function does not match expected type.");
+    return SpecializedF;
+  }
+  return nullptr;
+}
+
+// Forward decl for prespecialization support.
+static bool linkSpecialization(SILModule &M, SILFunction *F);
+
+// Create a new specialized function if possible, and cache it.
+SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
+  // Do not create any new specializations at Onone.
+  if (M.getOptions().Optimization <= SILOptions::SILOptMode::None)
+    return nullptr;
+
+  DEBUG(
+    if (M.getOptions().Optimization <= SILOptions::SILOptMode::Debug) {
+      llvm::dbgs() << "Creating a specialization: " << ClonedName << "\n"; });
+
+  // Create a new function.
+  SILFunction * SpecializedF =
+    GenericCloner::cloneFunction(GenericFunc, ReInfo, ContextSubs, ParamSubs,
+                                 ClonedName);
+
+  // Check if this specialization should be linked for prespecialization.
+  linkSpecialization(M, SpecializedF);
+  return SpecializedF;
+}
+
+// =============================================================================
+// Apply substitution
+// =============================================================================
 
 /// Fix the case where a void function returns the result of an apply, which is
 /// also a call of a void-returning function.
@@ -209,154 +289,6 @@ replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
   SILBuilderWithScope Builder(AI.getInstruction());
   FunctionRefInst *FRI = Builder.createFunctionRef(AI.getLoc(), NewF);
   return replaceWithSpecializedCallee(AI, FRI, Builder, ReInfo);
-}
-
-/// Check of a given name could be a name of a white-listed
-/// specialization.
-bool swift::isWhitelistedSpecialization(StringRef SpecName) {
-  // The whitelist of classes and functions from the stdlib,
-  // whose specializations we want to preserve.
-  ArrayRef<StringRef> Whitelist = {
-      "Array",
-      "_ArrayBuffer",
-      "_ContiguousArrayBuffer",
-      "Range",
-      "RangeIterator",
-      "_allocateUninitializedArray",
-      "UTF8",
-      "UTF16",
-      "String",
-      "_StringBuffer",
-      "_toStringReadOnlyPrintable",
-  };
-
-  // TODO: Once there is an efficient API to check if
-  // a given symbol is a specialization of a specific type,
-  // use it instead. Doing demangling just for this check
-  // is just wasteful.
-  auto DemangledNameString =
-     swift::Demangle::demangleSymbolAsString(SpecName);
-
-  StringRef DemangledName = DemangledNameString;
-
-  auto pos = DemangledName.find("generic ", 0);
-  if (pos == StringRef::npos)
-    return false;
-
-  // Create "of Swift"
-  llvm::SmallString<64> OfString;
-  llvm::raw_svector_ostream buffer(OfString);
-  buffer << "of ";
-  buffer << STDLIB_NAME <<'.';
-
-  StringRef OfStr = buffer.str();
-
-  pos = DemangledName.find(OfStr, pos);
-
-  if (pos == StringRef::npos)
-    return false;
-
-  pos += OfStr.size();
-
-  for(auto Name: Whitelist) {
-    auto pos1 = DemangledName.find(Name, pos);
-    if (pos1 == pos && !isalpha(DemangledName[pos1+Name.size()])) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/// Cache a specialization.
-/// For now, it is performed only for specializations in the
-/// standard library. But in the future, one could think of
-/// maintaining a cache of optimized specializations.
-///
-/// Mark specializations as public, so that they can be used
-/// by user applications. These specializations are supposed to be
-/// used only by -Onone compiled code. They should be never inlined.
-static bool cacheSpecialization(SILModule &M, SILFunction *F) {
-  // Do not remove functions from the white-list. Keep them around.
-  // Change their linkage to public, so that other applications can refer to it.
-
-  if (M.getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
-      F->getLinkage() != SILLinkage::Public &&
-      F->getModule().getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT) {
-    if (F->getLinkage() != SILLinkage::Public &&
-        isWhitelistedSpecialization(F->getName())) {
-
-      DEBUG(
-        auto DemangledNameString =
-          swift::Demangle::demangleSymbolAsString(F->getName());
-        StringRef DemangledName = DemangledNameString;
-        llvm::dbgs() << "Keep specialization: " << DemangledName << " : "
-                     << F->getName() << "\n");
-      // Make it public, so that others can refer to it.
-      //
-      // NOTE: This function may refer to non-public symbols, which may lead to
-      // problems, if you ever try to inline this function. Therefore, these
-      // specializations should only be used to refer to them, but should never
-      // be inlined!  The general rule could be: Never inline specializations
-      // from stdlib!
-      //
-      // NOTE: Making these specializations public at this point breaks
-      // some optimizations. Therefore, just mark the function.
-      // DeadFunctionElimination pass will check if the function is marked
-      // and preserve it if required.
-      F->setKeepAsPublic(true);
-      return true;
-    }
-  }
-  return false;
-}
-
-/// Try to look up an existing specialization in the specialization cache.
-/// If it is found, it tries to link this specialization.
-///
-/// For now, it performs a lookup only in the standard library.
-/// But in the future, one could think of maintaining a cache
-/// of optimized specializations.
-static SILFunction *lookupExistingSpecialization(SILModule &M,
-                                                 StringRef FunctionName) {
-  // Try to link existing specialization only in -Onone mode.
-  // All other compilation modes perform specialization themselves.
-  // TODO: Cache optimized specializations and perform lookup here?
-  // Only check that this function exists, but don't read
-  // its body. It can save some compile-time.
-  if (isWhitelistedSpecialization(FunctionName))
-    return M.hasFunction(FunctionName, SILLinkage::PublicExternal);
-
-  return nullptr;
-}
-
-SILFunction *swift::getExistingSpecialization(SILModule &M,
-                                              StringRef FunctionName) {
-  // First check if the module contains a required specialization already.
-  auto *Specialization = M.lookUpFunction(FunctionName);
-  if (Specialization)
-    return Specialization;
-
-  // Then check if the required specialization can be found elsewhere.
-  Specialization = lookupExistingSpecialization(M, FunctionName);
-  if (!Specialization)
-    return nullptr;
-
-  assert(hasPublicVisibility(Specialization->getLinkage()) &&
-         "Pre-specializations should have public visibility");
-
-  Specialization->setLinkage(SILLinkage::PublicExternal);
-
-  assert(Specialization->isExternalDeclaration()  &&
-         "Specialization should be a public external declaration");
-
-  DEBUG(llvm::dbgs() << "Found existing specialization for: " << FunctionName
-                     << '\n';
-        llvm::dbgs() << swift::Demangle::demangleSymbolAsString(
-                            Specialization->getName())
-                     << "\n\n");
-
-  return Specialization;
 }
 
 /// Create a re-abstraction thunk for a partial_apply.
@@ -453,28 +385,19 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
   return Thunk;
 }
 
-void swift::trySpecializeApplyOfGeneric(ApplySite Apply,
-                        llvm::SmallVectorImpl<SILInstruction *> &DeadApplies,
-                        llvm::SmallVectorImpl<SILFunction *> &NewFunctions) {
+void swift::trySpecializeApplyOfGeneric(
+    ApplySite Apply, DeadInstructionSet &DeadApplies,
+    llvm::SmallVectorImpl<SILFunction *> &NewFunctions) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
 
   auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
-  assert(F->isDefinition() && "Expected definition to specialize!");
-
-  if (!F->shouldOptimize()) {
-    DEBUG(llvm::dbgs() << "    Cannot specialize function " << F->getName()
-                       << " marked to be excluded from optimizations.\n");
-    return;
-  }
 
   DEBUG(llvm::dbgs() << "  ApplyInst: " << *Apply.getInstruction());
 
-  ReabstractionInfo ReInfo(F, Apply);
-  if (!ReInfo.getSpecializedType()) {
-    DEBUG(llvm::dbgs() <<
-          "    Cannot specialize with interface subs or dynamic self.\n");
+  ReabstractionInfo ReInfo(F, Apply.getSubstitutions());
+  if (!ReInfo.getSpecializedType())
     return;
-  }
+
   SILModule &M = Apply.getInstruction()->getModule();
 
   bool needAdaptUsers = false;
@@ -513,47 +436,22 @@ void swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     }
   }
 
-  TypeSubstitutionMap ContextSubs;
-
-  if (F->getContextGenericParams())
-    ContextSubs = F->getContextGenericParams()
-      ->getSubstitutionMap(Apply.getSubstitutions());
-
-  std::string ClonedName;
-  {
-    ArrayRef<Substitution> Subs = Apply.getSubstitutions();
-    Mangle::Mangler M;
-    GenericSpecializationMangler Mangler(M, F, Subs);
-    Mangler.mangle();
-    ClonedName = M.finalize();
-  }
-  DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
-
-  // If we already have this specialization, reuse it.
-  SILFunction *SpecializedF = M.lookUpFunction(ClonedName);
-
+  GenericFuncSpecializer FuncSpecializer(F, Apply.getSubstitutions(), ReInfo);
+  SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
   if (SpecializedF) {
-    assert(ReInfo.getSpecializedType() == SpecializedF->getLoweredFunctionType() &&
+    assert(ReInfo.getSpecializedType()
+           == SpecializedF->getLoweredFunctionType() &&
            "Previously specialized function does not match expected type.");
   } else {
-
-    // Do not create any new specializations at Onone.
-    if (M.getOptions().Optimization <= SILOptions::SILOptMode::None)
+    SpecializedF = FuncSpecializer.tryCreateSpecialization();
+    if (!SpecializedF)
       return;
 
-    DEBUG(
-      if (M.getOptions().Optimization <= SILOptions::SILOptMode::Debug) {
-        llvm::dbgs() << "Creating a specialization: " << ClonedName << "\n"; });
-
-    // Create a new function.
-    SpecializedF = GenericCloner::cloneFunction(F, ReInfo, ContextSubs,
-                                                   ClonedName, Apply);
-
-    // Check if this specialization should be cached.
-    cacheSpecialization(M, SpecializedF);
     NewFunctions.push_back(SpecializedF);
   }
-  DeadApplies.push_back(Apply.getInstruction());
+
+  DeadApplies.insert(Apply.getInstruction());
+
   if (replacePartialApplyWithoutReabstraction) {
     // There are some unknown users of the partial_apply. Therefore we need a
     // thunk which converts from the re-abstracted function back to the
@@ -573,6 +471,7 @@ void swift::trySpecializeApplyOfGeneric(ApplySite Apply,
                                       Arguments,
                                       PAI->getType());
     PAI->replaceAllUsesWith(NewPAI);
+    DeadApplies.insert(PAI);
     return;
   }
   // Make the required changes to the call site.
@@ -588,15 +487,172 @@ void swift::trySpecializeApplyOfGeneric(ApplySite Apply,
       if (auto FAS = FullApplySite::isa(User)) {
         SILBuilder Builder(User);
         replaceWithSpecializedCallee(FAS, NewPAI, Builder, ReInfo);
-        DeadApplies.push_back(User);
+        DeadApplies.insert(FAS.getInstruction());
         continue;
       }
       if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
         // This is a partial_apply of a re-abstraction thunk. Just skip this.
         assert(PAI->getType() == NewPAI->getType());
         PAI->replaceAllUsesWith(NewPAI);
-        DeadApplies.push_back(PAI);
+        DeadApplies.insert(PAI);
       }
     }
   }
 }
+
+// =============================================================================
+// Prespecialized symbol lookup.
+//
+// This uses the SIL linker to checks for the does not load the body of the pres
+// =============================================================================
+
+/// Link a specialization for generating prespecialized code.
+/// 
+/// For now, it is performed only for specializations in the
+/// standard library. But in the future, one could think of
+/// maintaining a cache of optimized specializations.
+///
+/// Mark specializations as public, so that they can be used by user
+/// applications. These specializations are generated during -O compilation of
+/// the library, but only used only by client code compiled at -Onone. They
+/// should be never inlined.
+static bool linkSpecialization(SILModule &M, SILFunction *F) {
+  // Do not remove functions from the white-list. Keep them around.
+  // Change their linkage to public, so that other applications can refer to it.
+
+  if (M.getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
+      F->getLinkage() != SILLinkage::Public &&
+      F->getModule().getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT) {
+    if (F->getLinkage() != SILLinkage::Public &&
+        isWhitelistedSpecialization(F->getName())) {
+
+      DEBUG(
+        auto DemangledNameString =
+          swift::Demangle::demangleSymbolAsString(F->getName());
+        StringRef DemangledName = DemangledNameString;
+        llvm::dbgs() << "Keep specialization: " << DemangledName << " : "
+                     << F->getName() << "\n");
+      // Make it public, so that others can refer to it.
+      //
+      // NOTE: This function may refer to non-public symbols, which may lead to
+      // problems, if you ever try to inline this function. Therefore, these
+      // specializations should only be used to refer to them, but should never
+      // be inlined!  The general rule could be: Never inline specializations
+      // from stdlib!
+      //
+      // NOTE: Making these specializations public at this point breaks
+      // some optimizations. Therefore, just mark the function.
+      // DeadFunctionElimination pass will check if the function is marked
+      // and preserve it if required.
+      F->setKeepAsPublic(true);
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Check of a given name could be a name of a white-listed
+/// specialization.
+bool swift::isWhitelistedSpecialization(StringRef SpecName) {
+  // The whitelist of classes and functions from the stdlib,
+  // whose specializations we want to preserve.
+  ArrayRef<StringRef> Whitelist = {
+      "Array",
+      "_ArrayBuffer",
+      "_ContiguousArrayBuffer",
+      "Range",
+      "RangeIterator",
+      "_allocateUninitializedArray",
+      "UTF8",
+      "UTF16",
+      "String",
+      "_StringBuffer",
+      "_toStringReadOnlyPrintable",
+  };
+
+  // TODO: Once there is an efficient API to check if
+  // a given symbol is a specialization of a specific type,
+  // use it instead. Doing demangling just for this check
+  // is just wasteful.
+  auto DemangledNameString =
+     swift::Demangle::demangleSymbolAsString(SpecName);
+
+  StringRef DemangledName = DemangledNameString;
+
+  auto pos = DemangledName.find("generic ", 0);
+  if (pos == StringRef::npos)
+    return false;
+
+  // Create "of Swift"
+  llvm::SmallString<64> OfString;
+  llvm::raw_svector_ostream buffer(OfString);
+  buffer << "of ";
+  buffer << STDLIB_NAME <<'.';
+
+  StringRef OfStr = buffer.str();
+
+  pos = DemangledName.find(OfStr, pos);
+
+  if (pos == StringRef::npos)
+    return false;
+
+  pos += OfStr.size();
+
+  for(auto Name: Whitelist) {
+    auto pos1 = DemangledName.find(Name, pos);
+    if (pos1 == pos && !isalpha(DemangledName[pos1+Name.size()])) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Try to look up an existing specialization in the specialization cache.
+/// If it is found, it tries to link this specialization.
+///
+/// For now, it performs a lookup only in the standard library.
+/// But in the future, one could think of maintaining a cache
+/// of optimized specializations.
+static SILFunction *lookupExistingSpecialization(SILModule &M,
+                                                 StringRef FunctionName) {
+  // Try to link existing specialization only in -Onone mode.
+  // All other compilation modes perform specialization themselves.
+  // TODO: Cache optimized specializations and perform lookup here?
+  // Only check that this function exists, but don't read
+  // its body. It can save some compile-time.
+  if (isWhitelistedSpecialization(FunctionName))
+    return M.hasFunction(FunctionName, SILLinkage::PublicExternal);
+
+  return nullptr;
+}
+
+SILFunction *swift::lookupPrespecializedSymbol(SILModule &M,
+                                               StringRef FunctionName) {
+  // First check if the module contains a required specialization already.
+  auto *Specialization = M.lookUpFunction(FunctionName);
+  if (Specialization)
+    return Specialization;
+
+  // Then check if the required specialization can be found elsewhere.
+  Specialization = lookupExistingSpecialization(M, FunctionName);
+  if (!Specialization)
+    return nullptr;
+
+  assert(hasPublicVisibility(Specialization->getLinkage()) &&
+         "Pre-specializations should have public visibility");
+
+  Specialization->setLinkage(SILLinkage::PublicExternal);
+
+  assert(Specialization->isExternalDeclaration()  &&
+         "Specialization should be a public external declaration");
+
+  DEBUG(llvm::dbgs() << "Found existing specialization for: " << FunctionName
+                     << '\n';
+        llvm::dbgs() << swift::Demangle::demangleSymbolAsString(
+                            Specialization->getName())
+                     << "\n\n");
+
+  return Specialization;
+}
+

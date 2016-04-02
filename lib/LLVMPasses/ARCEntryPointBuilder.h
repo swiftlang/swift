@@ -19,6 +19,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/Triple.h"
 
 namespace swift {
 
@@ -86,10 +87,26 @@ class ARCEntryPointBuilder {
 public:
   ARCEntryPointBuilder(Function &F)
       : B(&*F.begin()), Retain(), ObjectPtrTy(),
-        DefaultCC(SWIFT_LLVM_CC(DefaultCC)),
-        RegisterPreservingCC(SWIFT_LLVM_CC(RegisterPreservingCC)) {
-    //TODO: If the target does not support the new calling convention,
-    //set RegisterPreservingCC to use a standard C calling convention.
+        DefaultCC(SWIFT_LLVM_CC(DefaultCC)) {
+    //If the target does not support the new calling convention,
+    //set RegisterPreservingCC to use a default calling convention.
+    RegisterPreservingCC = DefaultCC;
+
+    // Check if the register preserving calling convention
+    // is supported by the backend and should be used
+    // for the deployment target provided for this compilation.
+    if (SWIFT_RT_USE_RegisterPreservingCC) {
+      bool ShouldUseRegisterPreservingCC = false;
+      auto &TargetTriple = F.getParent()->getTargetTriple();
+      llvm::Triple Triple(TargetTriple);
+      auto Arch = Triple.getArch();
+      if (Arch == llvm::Triple::ArchType::aarch64) {
+        ShouldUseRegisterPreservingCC = true;
+      }
+
+      if (ShouldUseRegisterPreservingCC)
+        RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
+    }
   }
 
   ~ARCEntryPointBuilder() = default;

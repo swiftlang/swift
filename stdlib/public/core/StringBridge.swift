@@ -116,6 +116,7 @@ internal func _cocoaStringSlice(
   return String(_cocoaString: cfResult)._core
 }
 
+@_versioned
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringSubscript(
   target: _StringCore, _ position: Int
@@ -267,6 +268,39 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   func copy() -> AnyObject {
     // Since this string is immutable we can just return ourselves.
     return self
+  }
+
+  /// The caller of this function guarantees that the closure 'body' does not
+  /// escape the object referenced by the opaque pointer passed to it or
+  /// anything transitively reachable form this object. Doing so
+  /// will result in undefined behavior.
+  @_semantics("self_no_escaping_closure")
+  func _unsafeWithNotEscapedSelfPointer<Result>(
+    @noescape body: (OpaquePointer) throws -> Result
+  ) rethrows -> Result {
+    let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
+    defer {
+      _fixLifetime(self)
+    }
+    return try body(selfAsPointer)
+  }
+
+  /// The caller of this function guarantees that the closure 'body' does not
+  /// escape either object referenced by the opaque pointer pair passed to it or
+  /// transitively reachable objects. Doing so will result in undefined
+  /// behavior.
+  @_semantics("pair_no_escaping_closure")
+  func _unsafeWithNotEscapedSelfPointerPair<Result>(
+    rhs: _NSContiguousString,
+    @noescape body: (OpaquePointer, OpaquePointer) throws -> Result
+  ) rethrows -> Result {
+    let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
+    let rhsAsPointer = unsafeBitCast(rhs, to: OpaquePointer.self)
+    defer {
+      _fixLifetime(self)
+      _fixLifetime(rhs)
+    }
+    return try body(selfAsPointer, rhsAsPointer)
   }
 
   public let _core: _StringCore

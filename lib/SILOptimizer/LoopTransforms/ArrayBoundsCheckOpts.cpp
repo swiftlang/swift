@@ -1115,7 +1115,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   // Find canonical induction variables.
   InductionAnalysis IndVars(DT, IVs, Preheader, Header, ExitingBlk, ExitBlk);
   bool IVarsFound = IndVars.analyse();
-  if (!IVarsFound){
+  if (!IVarsFound) {
     DEBUG(llvm::dbgs() << "No induction variables found\n");
   }
 

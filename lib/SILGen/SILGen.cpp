@@ -146,17 +146,9 @@ GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
 GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorProtocol)
 GET_BRIDGING_FN(Foundation, REQUIRED, ErrorProtocol, REQUIRED, NSError)
-GET_BRIDGING_FN(Foundation, REQUIRED, String, REQUIRED, NSString)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSString, REQUIRED, String)
-GET_BRIDGING_FN(Foundation, GENERIC, Array, REQUIRED, NSArray)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSArray, GENERIC, Array)
-GET_BRIDGING_FN(Foundation, GENERIC, Set, REQUIRED, NSSet)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSSet, GENERIC, Set)
-GET_BRIDGING_FN(Foundation, GENERIC, Dictionary, REQUIRED, NSDictionary)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSDictionary, GENERIC, Dictionary)
 
 #undef GET_BRIDGING_FN
-#undef REQURIED
+#undef REQUIRED
 #undef OPTIONAL
 #undef GENERIC
 
@@ -593,6 +585,8 @@ void SILGenModule::emitCurryThunk(ValueDecl *fd,
                                   SILDeclRef nextEntryPoint) {
   // Thunks are always emitted by need, so don't need delayed emission.
   SILFunction *f = getFunction(entryPoint, ForDefinition);
+  f->setThunk(IsThunk);
+
   preEmitFunction(entryPoint, fd, f, fd);
   PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
 
@@ -605,6 +599,7 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(!thunk.isForeign && "foreign-to-native thunks only");
   SILFunction *f = getFunction(thunk, ForDefinition);
+  f->setThunk(IsThunk);
   preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
   SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
@@ -623,6 +618,7 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
                     thunk.getAbstractClosureExpr());
   PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
   f->setBare(IsBare);
+  f->setThunk(IsThunk);
   SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
   postEmitFunction(thunk, f);
 }

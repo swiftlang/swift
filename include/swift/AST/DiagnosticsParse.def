@@ -148,9 +148,6 @@ WARNING(lex_editor_placeholder_in_playground,none,
 
 NOTE(note_in_decl_extension,none,
      "in %select{declaration|extension}0 of %1", (bool, Identifier))
-WARNING(inout_as_attr_deprecated,none,
-        "'inout' before a parameter name is deprecated, place it before the parameter type instead",
-        ())
 WARNING(line_directive_style_deprecated,none,
         "#line directive is deprecated, please use #sourceLocation instead",
         ())
@@ -692,12 +689,15 @@ ERROR(multiple_parameter_ellipsis,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
-ERROR(parameter_inout_var_let,none,
+ERROR(inout_as_attr_disallowed,none,
+      "'inout' before a parameter name is not allowed, place it before the parameter type instead",
+      ())
+ERROR(parameter_inout_var_let_repeated,none,
       "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
       ())
+ERROR(parameter_let_as_attr,none,
+      "'let' as a parameter attribute is not allowed", ())
 
-ERROR(var_parameter_not_allowed,none,
-        "parameters may not have the 'var' specifier", ())
 
 ERROR(expected_behavior_name,none,
       "expected behavior name after '[' in property declaration", ())
@@ -706,9 +706,6 @@ ERROR(expected_behavior_name,none,
 WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
-WARNING(parameter_extraneous_empty_name,none,
-        "extraneous '_' in parameter: %0 has no keyword argument name",
-        (Identifier))
 ERROR(parameter_operator_keyword_argument,none,
       "%select{operator|closure}0 cannot have keyword arguments", (bool))
 
@@ -986,6 +983,10 @@ ERROR(unexpected_tokens_before_closure_in,none,
    "unexpected tokens prior to 'in'", ())
 ERROR(expected_closure_rbrace,none,
       "expected '}' at end of closure", ())
+
+ERROR(trailing_closure_requires_parens,none,
+      "trailing closure requires parentheses for disambiguation in this"
+      " context", ())
 
 WARNING(trailing_closure_excess_newlines,none,
         "trailing closure is separated from call site by multiple newlines", ())

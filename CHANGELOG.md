@@ -1,6 +1,38 @@
+Note: This is in reverse chronological order, so newer entries are added to the top.
 
 Swift 3.0
 -------
+
+* [SE-0031](https://github.com/apple/swift-evolution/blob/master/proposals/0031-adjusting-inout-declarations.md) The location of the inout attribute has been moved to after the `:` and before the parameter type.
+```swift
+  func foo(inout x: Int) {
+  }
+```
+  will now be written as:
+```swift
+  func foo(x: inout Int) {
+  }
+```
+
+* [SE-0053](https://github.com/apple/swift-evolution/blob/master/proposals/0053-remove-let-from-function-parameters.md) `let` is no longer accepted as a parameter attribute for functions. The compiler provides a fixit to remove it from the function declaration.
+
+* [SE-0003](https://github.com/apple/swift-evolution/blob/master/proposals/0003-remove-var-parameters.md) `var` is no longer accepted as a parameter attribute for functions. The compiler provides a fixit to create a shadow copy in the function body.
+```swift
+  func foo(var x: Int) {
+  }
+```
+  will now be written as:
+```swift
+  func foo(x: Int) {
+    var x = x
+  }
+```
+
+* The "none" members of imported NS_OPTIONS option sets are marked as unavailable
+  when they are imported.  Use [] to make an empty option set, instead of a None member.
+
+* [SE-0043](https://github.com/apple/swift-evolution/blob/master/proposals/0043-declare-variables-in-case-labels-with-multiple-patterns.md)
+  landed, adding the ability to declare variables in multiple patterns in cases.
 
 * Renamification landed, so the Clang importer imports ObjC symbols
   substantially differently.  *Someone should expand on this point.*
@@ -59,6 +91,13 @@ Swift 3.0
         } catch is SomeError {
             throw OtherError()
         }
+    }
+    ```
+* Throwing closure arguments of a rethrowing function may now be optional. For example:
+
+    ```swift
+    func executeClosureIfNotNil(closure: (() throws -> Void)?) rethrows {
+        try closure?()
     }
     ```
 

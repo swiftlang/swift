@@ -77,6 +77,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
+    swift-stdlib-sil-serialize-all "1"           "build the Swift stdlib and overlays with all method bodies serialized"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
@@ -85,6 +86,7 @@ KNOWN_SETTINGS=(
     enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
+    build-runtime-with-host-compiler   "1"       "use the host c++ compiler to build everything"
     user-config-args            ""               "User-supplied arguments to cmake when used to do configuration"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
@@ -158,6 +160,7 @@ KNOWN_SETTINGS=(
     build-swift-static-stdlib   "0"              "set to 1 to build static versions of the Swift standard library and SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
+    build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
@@ -488,6 +491,10 @@ function set_deployment_target_based_options() {
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
+                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_COMPILER_RT})"
+                -DCOMPILER_RT_ENABLE_IOS:BOOL="$(false_true ${SKIP_IOS})"
+                -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
             )
 	    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
@@ -732,6 +739,11 @@ if [[ "${SKIP_BUILD_WATCHOS_SIMULATOR}" ]] ; then
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
+# FIXME: We currently do not support cross-compiling swift with compiler-rt.
+if [[ "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS}" ]]; then
+    SKIP_COMPILER_RT=1
+fi
+
 # WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
 case "${WORKSPACE}" in
     /*) ;;
@@ -803,6 +815,14 @@ function true_false() {
             exit 1
             ;;
     esac
+}
+
+function false_true() {
+    if [[ $(true_false "$1") = "TRUE" ]]; then
+        echo "FALSE"
+    else
+        echo "TRUE"
+    fi
 }
 
 function cmake_version() {
@@ -973,6 +993,14 @@ if [ ! -e "${WORKSPACE}/clang" ] ; then
 fi
 if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
     ln -sf "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
+fi
+
+# Symlink compiler-rt into the llvm tree, if it exists.
+COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
+if [ -e "${WORKSPACE}/compiler-rt" ] ; then
+    if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
+        ln -sf "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
+    fi
 fi
 
 PRODUCTS=(cmark llvm swift)
@@ -1209,6 +1237,10 @@ case "${CMAKE_GENERATOR}" in
             "${COMMON_CMAKE_OPTIONS[@]}"
             -DCMAKE_CONFIGURATION_TYPES="Debug;Release;MinSizeRel;RelWithDebInfo"
         )
+
+        # FIXME: We currently do not support building compiler-rt with the
+        # Xcode generator.
+        SKIP_COMPILER_RT=1
         ;;
 esac
 
@@ -1705,12 +1737,14 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_STDLIB_ENABLE_RESILIENCE:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_RESILIENCE}")
+                    -DSWIFT_STDLIB_SIL_SERIALIZE_ALL:BOOL=$(true_false "${SWIFT_STDLIB_SIL_SERIALIZE_ALL}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
                     -DSWIFT_BUILD_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
                     -DSWIFT_BUILD_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STDLIB}")
                     -DSWIFT_SERIALIZE_STDLIB_UNITTEST:BOOL=$(true_false "${BUILD_SERIALIZED_STDLIB_UNITTEST}")
+                    -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_BUILD_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_SDK_OVERLAY}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
@@ -1719,6 +1753,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
                     -DSWIFT_ENABLE_LTO:BOOL=$(true_false "${SWIFT_ENABLE_LTO}")
+                    -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     "${swift_cmake_options[@]}"
                     "${SWIFT_SOURCE_DIR}"
                 )
@@ -1901,6 +1936,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                         -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTest \
                         SWIFT_EXEC="${SWIFTC_BIN}" \
+                        SWIFT_LINK_OBJC_RUNTIME=YES \
                         SKIP_INSTALL=NO \
                         DEPLOYMENT_LOCATION=YES \
                         DSTROOT="${XCTEST_BUILD_DIR}" \
@@ -2029,6 +2065,31 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
 
             set -x
             ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- ${BUILD_ARGS} ${build_targets[@]}
+            { set +x; } 2>/dev/null
+        fi
+
+        # When we are building LLVM create symlinks to the c++ headers.
+        if [[ "${product}" == "llvm" ]]; then
+            set -x
+
+            # Find the location of the c++ header dir.
+            if [[ "$(uname -s)" == "Darwin" ]] ; then
+              HOST_CXX_DIR=$(dirname ${HOST_CXX})
+              HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
+            else # Linux
+              HOST_CXX_HEADERS_DIR="/usr/include/c++"
+            fi
+
+            # Find the path in which the local clang build is expecting to find
+            # the c++ header files.
+            BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
+
+            if [[ "${BUILD_RUNTIME_WITH_HOST_COMPILER}" ]]; then
+                echo "Using the host compiler to build Swift."
+            else
+                echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
+                ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
+            fi
             { set +x; } 2>/dev/null
         fi
     done
@@ -2168,7 +2229,8 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     xcodebuild \
                         -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTestFunctionalTests \
-                        SWIFT_EXEC="${SWIFTC_BIN}"
+                        SWIFT_EXEC="${SWIFTC_BIN}" \
+                        SWIFT_LINK_OBJC_RUNTIME=YES
                     { set +x; } 2>/dev/null
                 else
                     FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
@@ -2533,3 +2595,4 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         { set +x; } 2>/dev/null
     fi
 fi
+

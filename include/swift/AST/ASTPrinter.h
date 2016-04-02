@@ -17,6 +17,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/StringRef.h"
+#include "swift/AST/PrintOptions.h"
 
 namespace swift {
   class Decl;
@@ -29,7 +30,7 @@ namespace swift {
   class Pattern;
   class ExtensionDecl;
   class NominalTypeDecl;
-  struct PrintOptions;
+  class ValueDecl;
 
 /// Describes the context in which a name is being printed, which
 /// affects the keywords that need to be escaped.
@@ -68,6 +69,7 @@ enum class PrintStructureKind {
   FunctionType,
   FunctionReturnType,
   BuiltinAttribute,
+  TupleType,
   TupleElement,
   NumberLiteral,
   StringLiteral,
@@ -95,7 +97,7 @@ public:
   /// Called before printing of a declaration.
   ///
   /// Callers should use callPrintDeclPre().
-  virtual void printDeclPre(const Decl *D) {}
+  virtual void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) {}
   /// Called before printing at the point which would be considered the location
   /// of the declaration (normally the name of the declaration).
   ///
@@ -109,7 +111,7 @@ public:
   /// Called after finishing printing of a declaration.
   ///
   /// Callers should use callPrintDeclPost().
-  virtual void printDeclPost(const Decl *D) {}
+  virtual void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) {}
 
   /// Called before printing a type.
   virtual void printTypePre(const TypeLoc &TL) {}
@@ -129,11 +131,13 @@ public:
 
   /// Called before printing a synthesized extension.
   virtual void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                            const NominalTypeDecl *NTD) {}
+                                            const NominalTypeDecl *NTD,
+                                            Optional<BracketOptions> Bracket) {}
 
   /// Called after printing a synthesized extension.
   virtual void printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                             const NominalTypeDecl *NTD) {}
+                                             const NominalTypeDecl *NTD,
+                                             Optional<BracketOptions> Bracket) {}
 
   /// Called before printing a structured entity.
   ///
@@ -219,11 +223,11 @@ public:
   // MARK: Callback interface wrappers that perform ASTPrinter bookkeeping.
 
    /// Make a callback to printDeclPre(), performing any necessary bookeeping.
-  void callPrintDeclPre(const Decl *D);
+  void callPrintDeclPre(const Decl *D, Optional<BracketOptions> Bracket);
 
   /// Make a callback to printDeclPost(), performing any necessary bookeeping.
-  void callPrintDeclPost(const Decl *D) {
-    printDeclPost(D);
+  void callPrintDeclPost(const Decl *D, Optional<BracketOptions> Bracket) {
+    printDeclPost(D, Bracket);
   }
 
   /// Make a callback to avoidPrintDeclPost(), performing any necessary
@@ -253,6 +257,7 @@ public:
 
   /// To sanitize a malformed utf8 string to a well-formed one.
   static std::string sanitizeUtf8(StringRef Text);
+  static ValueDecl* findConformancesWithDocComment(ValueDecl *VD);
   static bool printTypeInterface(Type Ty, DeclContext *DC, std::string &Result);
   static bool printTypeInterface(Type Ty, DeclContext *DC, llvm::raw_ostream &Out);
 

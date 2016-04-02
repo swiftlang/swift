@@ -11,7 +11,7 @@ postfix func ++(x: inout MyInt) -> MyInt { return x }
 func !=(x: MyInt, y: MyInt) -> Bool { return true }
 
 let xxxx = 1
-func test1(var x: MyInt) {
+func test1(x: inout MyInt) {
   x#^INT_OPERATORS^#
 }
 // CHECK: .
@@ -20,7 +20,7 @@ func test1(var x: MyInt) {
 // CHECK: ++
 // CHECK: =
 
-func test2(var x: MyInt) {
+func test2(x: inout MyInt) {
   #^INT_OPERATORS_INNER,x^#
 }
 // INNER: x.

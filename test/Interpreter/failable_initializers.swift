@@ -3,45 +3,26 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var FailableInitTestSuite = TestSuite("FailableInit")
 
-class Canary {
-  static var count: Int = 0
-
-  init() {
-    Canary.count += 1
-  }
-
-  deinit {
-    Canary.count -= 1
-  }
-}
-
 class Bear {
-  let x: Canary
+  let x: LifetimeTracked
 
   /* Designated */
   init(n: Int) {
-    x = Canary()
+    x = LifetimeTracked(0)
   }
 
   init?(n: Int, before: Bool) {
     if before {
       return nil
     }
-    self.x = Canary()
+    self.x = LifetimeTracked(0)
   }
 
   init?(n: Int, after: Bool) {
-    self.x = Canary()
+    self.x = LifetimeTracked(0)
     if after {
       return nil
     }
@@ -51,7 +32,7 @@ class Bear {
     if before {
       return nil
     }
-    self.x = Canary()
+    self.x = LifetimeTracked(0)
     if after {
       return nil
     }
@@ -121,11 +102,11 @@ class Bear {
 }
 
 class PolarBear : Bear {
-  let y: Canary
+  let y: LifetimeTracked
 
   /* Designated */
   override init(n: Int) {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n)
   }
 
@@ -133,17 +114,17 @@ class PolarBear : Bear {
     if before {
       return nil
     }
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n)
   }
 
   init?(n: Int, during: Bool) {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n, before: during)
   }
 
   init?(n: Int, before: Bool, during: Bool) {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     if before {
       return nil
     }
@@ -151,7 +132,7 @@ class PolarBear : Bear {
   }
 
   override init?(n: Int, after: Bool) {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n)
     if after {
       return nil
@@ -159,7 +140,7 @@ class PolarBear : Bear {
   }
 
   init?(n: Int, during: Bool, after: Bool) {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n, before: during)
     if after {
       return nil
@@ -170,7 +151,7 @@ class PolarBear : Bear {
     if before {
       return nil
     }
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n)
     if after {
       return nil
@@ -181,7 +162,7 @@ class PolarBear : Bear {
     if before {
       return nil
     }
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n, before: during)
     if after {
       return nil
@@ -190,50 +171,50 @@ class PolarBear : Bear {
 }
 
 class GuineaPig<T> : Bear {
-  let y: Canary
+  let y: LifetimeTracked
   let t: T
 
   init?(t: T, during: Bool) {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     self.t = t
     super.init(n: 0, before: during)
   }
 }
 
 struct Chimera {
-  let x: Canary
-  let y: Canary
+  let x: LifetimeTracked
+  let y: LifetimeTracked
 
   init?(before: Bool) {
     if before {
       return nil
     }
-    x = Canary()
-    y = Canary()
+    x = LifetimeTracked(0)
+    y = LifetimeTracked(0)
   }
 
   init?(during: Bool) {
-    x = Canary()
+    x = LifetimeTracked(0)
     if during {
       return nil
     }
-    y = Canary()
+    y = LifetimeTracked(0)
   }
 
   init?(before: Bool, during: Bool) {
     if before {
       return nil
     }
-    x = Canary()
+    x = LifetimeTracked(0)
     if during {
       return nil
     }
-    y = Canary()
+    y = LifetimeTracked(0)
   }
 
   init?(after: Bool) {
-    x = Canary()
-    y = Canary()
+    x = LifetimeTracked(0)
+    y = LifetimeTracked(0)
     if after {
       return nil
     }
@@ -243,19 +224,19 @@ struct Chimera {
     if before {
       return nil
     }
-    x = Canary()
-    y = Canary()
+    x = LifetimeTracked(0)
+    y = LifetimeTracked(0)
     if after {
       return nil
     }
   }
 
   init?(during: Bool, after: Bool) {
-    x = Canary()
+    x = LifetimeTracked(0)
     if during {
       return nil
     }
-    y = Canary()
+    y = LifetimeTracked(0)
     if after {
       return nil
     }
@@ -265,11 +246,11 @@ struct Chimera {
     if before {
       return nil
     }
-    x = Canary()
+    x = LifetimeTracked(0)
     if during {
       return nil
     }
-    y = Canary()
+    y = LifetimeTracked(0)
     if after {
       return nil
     }
@@ -287,8 +268,6 @@ FailableInitTestSuite.test("FailableInitFailure_Root") {
   mustFail { Bear(n: 0, after: true) }
   mustFail { Bear(n: 0, before: true, after: false) }
   mustFail { Bear(n: 0, before: false, after: true) }
-
-  expectEqual(0, Canary.count)
 }
 
 FailableInitTestSuite.test("FailableInitFailure_Derived") {
@@ -304,14 +283,10 @@ FailableInitTestSuite.test("FailableInitFailure_Derived") {
   mustFail { PolarBear(n: 0, before: true, during: false, after: false) }
   mustFail { PolarBear(n: 0, before: false, during: true, after: false) }
   mustFail { PolarBear(n: 0, before: false, during: false, after: true) }
-
-  expectEqual(0, Canary.count)
 }
 
 FailableInitTestSuite.test("DesignatedInitFailure_DerivedGeneric") {
-  mustFail { GuineaPig<Canary>(t: Canary(), during: true) }
-
-  expectEqual(0, Canary.count)
+  mustFail { GuineaPig<LifetimeTracked>(t: LifetimeTracked(0), during: true) }
 }
 
 FailableInitTestSuite.test("ConvenienceInitFailure_Root") {
@@ -330,8 +305,6 @@ FailableInitTestSuite.test("ConvenienceInitFailure_Root") {
 
   _ = Bear(IUO: false)
   _ = Bear(force: false)
-
-  expectEqual(0, Canary.count)
 }
 
 FailableInitTestSuite.test("ConvenienceInitFailure_Derived") {
@@ -347,8 +320,6 @@ FailableInitTestSuite.test("ConvenienceInitFailure_Derived") {
   mustFail { PolarBear(before: true, during: false, after: false) }
   mustFail { PolarBear(before: false, during: true, after: false) }
   mustFail { PolarBear(before: false, during: false, after: true) }
-
-  expectEqual(0, Canary.count)
 }
 
 FailableInitTestSuite.test("InitFailure_Struct") {
@@ -364,8 +335,6 @@ FailableInitTestSuite.test("InitFailure_Struct") {
   mustFail { Chimera(before: true, during: false, after: false) }
   mustFail { Chimera(before: false, during: true, after: false) }
   mustFail { Chimera(before: false, during: false, after: true) }
-
-  expectEqual(0, Canary.count)
 }
 
 runAllTests()

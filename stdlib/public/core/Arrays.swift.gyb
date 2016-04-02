@@ -169,6 +169,9 @@ if True:
 }%
 
 ${SelfDocComment}
+% if Self != 'ArraySlice':
+@_fixed_layout
+%end
 public struct ${Self}<Element>
   : Collection, MutableCollection, _DestructorSafeContainer {
 
@@ -489,7 +492,7 @@ public func _deallocateUninitialized${Self}<Element>(
 }
 %end
 
-extension ${Self} : _ArrayProtocol {
+extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// Construct an empty ${Self}.
   @_semantics("array.init")
   public init() {
@@ -542,6 +545,7 @@ extension ${Self} : _ArrayProtocol {
 
   /// Entry point for `Array` literal construction; builds and returns
   /// a ${Self} of `count` uninitialized elements.
+  @_versioned
   @warn_unused_result
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
@@ -558,6 +562,7 @@ extension ${Self} : _ArrayProtocol {
   /// first element.
   ///
   /// - Precondition: `storage is _ContiguousArrayStorage`.
+  @_versioned
   @warn_unused_result
   @_semantics("array.uninitialized")
   internal static func _adoptStorage(
@@ -827,6 +832,7 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 extension ${Self} {
+  @_versioned
   @_transparent
   @warn_unused_result
   internal func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
@@ -1204,6 +1210,7 @@ internal struct _IgnorePointer<T> : _PointerFunction {
   }
 }
 
+@_versioned
 @inline(never)
 internal func _outlinedMakeUniqueBuffer<
   _Buffer : _ArrayBufferProtocol where _Buffer.Index == Int

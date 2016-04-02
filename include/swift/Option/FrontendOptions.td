@@ -224,25 +224,25 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def enable_omit_needless_words :
-  Flag<["-"], "enable-omit-needless-words">,
-  HelpText<"Omit needless words when importing Objective-C names">;
+def enable_infer_import_as_member :
+  Flag<["-"], "enable-infer-import-as-member">,
+  HelpText<"Infer when a global could be imported as a member">;
+
+def enable_import_objc_generics :
+  Flag<["-"], "enable-import-objc-generics">,
+  HelpText<"Import Objective-C lightweight generic type params">;
 
 def enable_strip_ns_prefix :
   Flag<["-"], "enable-strip-ns-prefix">,
   HelpText<"Strip 'NS' prefix from Foundation entities">;
 
-def enable_infer_default_arguments :
-  Flag<["-"], "enable-infer-default-arguments">,
-  HelpText<"Infer default arguments for imported parameters">;
-
-def enable_swift_name_lookup_tables :
-  Flag<["-"], "enable-swift-name-lookup-tables">,
-  HelpText<"Enable Swift name lookup tables in the Clang importer">;
-
 def swift3_migration :
   Flag<["-"], "swift3-migration">,
   HelpText<"Enable Fix-It based migration aids for Swift 3">;
+
+def disable_infer_iuos :
+  Flag<["-"], "disable-infer-iuos">,
+  HelpText<"Disable inferring IUO type for otherwise unconstrained variables">;
 
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,
@@ -292,6 +292,10 @@ def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
 def print_inst_counts : Flag<["-"], "print-inst-counts">,
   HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
            "in conjunction with -print-stats.">;
+
+def debug_on_sil : Flag<["-"], "gsil">,
+  HelpText<"Write the SIL into a file and generate debug-info to debug on SIL "
+           " level.">;
 
 def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
   HelpText<"Print the LLVM inline tree.">;

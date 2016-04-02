@@ -319,22 +319,6 @@ extension MutableCollection
   }
 }
 
-% for Self in [ 'Sequence', 'MutableCollection' ]:
-extension ${Self} where Self.Iterator.Element : Comparable {
-  @available(*, unavailable, renamed: "sorted")
-  public func sort() -> [Iterator.Element] {
-    fatalError("unavailable function can't be called")
-  }
-
-  @available(*, unavailable, renamed: "sorted(isOrderedBefore:)")
-  public func sort(
-    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
-  ) -> [Iterator.Element] {
-    fatalError("unavailable function can't be called")
-  }
-}
-%end
-
 extension MutableCollection
   where
   Self.Index : RandomAccessIndex,

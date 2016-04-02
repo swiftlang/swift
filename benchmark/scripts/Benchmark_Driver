@@ -255,10 +255,13 @@ def format_name(log_path):
     return '/'.join(log_path.split('/')[-2:])
 
 
-def compare_logs(compare_script, new_log, old_log):
+def compare_logs(compare_script, new_log, old_log, log_dir, opt):
     """Return diff of log files at paths `new_log` and `old_log`"""
     print('Comparing %s %s ...' % (format_name(old_log), format_name(new_log)))
-    subprocess.call([compare_script, old_log, new_log])
+    subprocess.call([compare_script, '--old-file', old_log,
+                    '--new-file', new_log, '--format', 'markdown',
+                     '--output', os.path.join(log_dir, 'latest_compare_{0}.md'
+                                              .format(opt))])
 
 
 def compare(args):
@@ -288,10 +291,12 @@ def compare(args):
            len(recent_logs['master_Onone']) > 1:
             compare_logs(compare_script,
                          recent_logs['master_O'][0],
-                         recent_logs['master_O'][1])
+                         recent_logs['master_O'][1],
+                         log_dir, 'O')
             compare_logs(compare_script,
                          recent_logs['master_Onone'][0],
-                         recent_logs['master_Onone'][1])
+                         recent_logs['master_Onone'][1],
+                         log_dir, 'Onone')
         else:
             print('master/master comparison skipped: no previous master logs')
     else:
@@ -307,10 +312,12 @@ def compare(args):
         else:
             compare_logs(compare_script,
                          recent_logs[current_branch + '_O'][0],
-                         recent_logs[current_branch + '_O'][1])
+                         recent_logs[current_branch + '_O'][1],
+                         log_dir, 'O')
             compare_logs(compare_script,
                          recent_logs[current_branch + '_Onone'][0],
-                         recent_logs[current_branch + '_Onone'][1])
+                         recent_logs[current_branch + '_Onone'][1],
+                         log_dir, 'Onone')
 
         if len(recent_logs['master_O']) == 0 or \
            len(recent_logs['master_Onone']) == 0:
@@ -319,10 +326,12 @@ def compare(args):
         else:
             compare_logs(compare_script,
                          recent_logs[current_branch + '_O'][0],
-                         recent_logs['master_O'][0])
+                         recent_logs['master_O'][0],
+                         log_dir, 'O')
             compare_logs(compare_script,
                          recent_logs[current_branch + '_Onone'][0],
-                         recent_logs['master_Onone'][0])
+                         recent_logs['master_Onone'][0],
+                         log_dir, 'Onone')
 
         # TODO: Fail on large regressions
 

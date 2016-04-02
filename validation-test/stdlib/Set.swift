@@ -13,14 +13,8 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
+// For rand32
 import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
 import Foundation
 
 // For experimental Set operators
@@ -105,7 +99,7 @@ func helperDeleteThree(k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
 }
 
 func uniformRandom(max: Int) -> Int {
-  return Int(arc4random_uniform(UInt32(max)))
+  return Int(rand32(exclusiveUpperBound: UInt32(max)))
 }
 
 func pickRandom<T>(a: [T]) -> T {
@@ -135,7 +129,7 @@ func isCocoaNSSet(s: NSSet) -> Bool {
 func getBridgedEmptyNSSet() -> NSSet {
   let s = Set<TestObjCKeyTy>()
 
-  let bridged = unsafeBitCast(_convertSetToNSSet(s), to: NSSet.self)
+  let bridged = unsafeBitCast(convertSetToNSSet(s), to: NSSet.self)
   expectTrue(isNativeNSSet(bridged))
 
   return bridged
@@ -170,11 +164,22 @@ func getAsNSMutableSet(members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
   return NSMutableSet(array: nsArray as [AnyObject])
 }
 
+public func convertSetToNSSet<T>(s: Set<T>) -> NSSet {
+  return s._bridgeToObjectiveC()
+}
+
+public func convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
+  if _slowPath(s == nil) { return [] }
+  var result: Set<T>?
+  Set._forceBridgeFromObjectiveC(s!, result: &result)
+  return result!
+}
+
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
 func getBridgedVerbatimSet(members: [Int] = [1010, 2020, 3030])
   -> Set<NSObject> {
   let nss = getAsNSSet(members)
-  let result: Set<NSObject> = _convertNSSetToSet(nss)
+  let result: Set<NSObject> = convertNSSetToSet(nss)
   expectTrue(isCocoaSet(result))
   return result
 }
@@ -190,7 +195,7 @@ func getNativeBridgedVerbatimSet(members: [Int] = [1010, 2020, 3030]) ->
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
 func getHugeBridgedVerbatimSet() -> Set<NSObject> {
   let nss = getAsNSSet(hugeNumberArray)
-  let result: Set<NSObject> = _convertNSSetToSet(nss)
+  let result: Set<NSObject> = convertNSSetToSet(nss)
   expectTrue(isCocoaSet(result))
   return result
 }
@@ -218,7 +223,7 @@ func getHugeBridgedNonverbatimSet() -> Set<TestBridgedKeyTy> {
 
 func getBridgedVerbatimSetAndNSMutableSet() -> (Set<NSObject>, NSMutableSet) {
   let nss = getAsNSMutableSet()
-  return (_convertNSSetToSet(nss), nss)
+  return (convertNSSetToSet(nss), nss)
 }
 
 func getBridgedNonverbatimSetAndNSMutableSet()
@@ -236,7 +241,7 @@ func getBridgedNSSetOfRefTypesBridgedVerbatim() -> NSSet {
   s.insert(TestObjCKeyTy(3030))
 
   let bridged =
-    unsafeBitCast(_convertSetToNSSet(s), to: NSSet.self)
+    unsafeBitCast(convertSetToNSSet(s), to: NSSet.self)
 
   expectTrue(isNativeNSSet(bridged))
 
@@ -253,7 +258,7 @@ func getBridgedNSSet_ValueTypesCustomBridged(
     s.insert(TestBridgedKeyTy(i * 1000 + i * 10))
   }
 
-  let bridged = _convertSetToNSSet(s)
+  let bridged = convertSetToNSSet(s)
   expectTrue(isNativeNSSet(bridged))
 
   return bridged
@@ -267,9 +272,9 @@ func getRoundtripBridgedNSSet() -> NSSet {
 
   let nss = NSSet(array: items as [AnyObject])
 
-  let s: Set<NSObject> = _convertNSSetToSet(nss)
+  let s: Set<NSObject> = convertNSSetToSet(nss)
 
-  let bridgedBack = _convertSetToNSSet(s)
+  let bridgedBack = convertSetToNSSet(s)
   expectTrue(isCocoaNSSet(bridgedBack))
   // FIXME: this should be true.
   //expectTrue(unsafeBitCast(nsd, to: Int.self) == unsafeBitCast(bridgedBack, to: Int.self))
@@ -285,7 +290,7 @@ func getBridgedNSSet_MemberTypesCustomBridged() -> NSSet {
   s.insert(TestBridgedKeyTy(2020))
   s.insert(TestBridgedKeyTy(3030))
 
-  let bridged = _convertSetToNSSet(s)
+  let bridged = convertSetToNSSet(s)
   expectTrue(isNativeNSSet(bridged))
 
   return bridged
@@ -1231,9 +1236,9 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.NSSetIsRetained") {
   var nss: NSSet = NSSet(set: getAsNSSet([ 1010, 1020, 1030 ]))
 
-  var s: Set<NSObject> = _convertNSSetToSet(nss)
+  var s: Set<NSObject> = convertNSSetToSet(nss)
 
-  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  var bridgedBack: NSSet = convertSetToNSSet(s)
 
   expectEqual(
     unsafeBitCast(nss, to: Int.self),
@@ -1247,9 +1252,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.NSSetIsRetained") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.NSSetIsCopied") {
   var nss: NSSet = NSSet(set: getAsNSSet([ 1010, 1020, 1030 ]))
 
-  var s: Set<TestBridgedKeyTy> = _convertNSSetToSet(nss)
+  var s: Set<TestBridgedKeyTy> = convertNSSetToSet(nss)
 
-  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  var bridgedBack: NSSet = convertSetToNSSet(s)
 
   expectNotEqual(
     unsafeBitCast(nss, to: Int.self),
@@ -1268,13 +1273,13 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ImmutableSetIsRetained") {
   CustomImmutableNSSet.timesMemberWasCalled = 0
   CustomImmutableNSSet.timesObjectEnumeratorWasCalled = 0
   CustomImmutableNSSet.timesCountWasCalled = 0
-  var s: Set<NSObject> = _convertNSSetToSet(nss)
+  var s: Set<NSObject> = convertNSSetToSet(nss)
   expectEqual(1, CustomImmutableNSSet.timesCopyWithZoneWasCalled)
   expectEqual(0, CustomImmutableNSSet.timesMemberWasCalled)
   expectEqual(0, CustomImmutableNSSet.timesObjectEnumeratorWasCalled)
   expectEqual(0, CustomImmutableNSSet.timesCountWasCalled)
 
-  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  var bridgedBack: NSSet = convertSetToNSSet(s)
   expectEqual(
     unsafeBitCast(nss, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
@@ -1291,13 +1296,13 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableSetIsCopied") {
   CustomImmutableNSSet.timesMemberWasCalled = 0
   CustomImmutableNSSet.timesObjectEnumeratorWasCalled = 0
   CustomImmutableNSSet.timesCountWasCalled = 0
-  var s: Set<TestBridgedKeyTy> = _convertNSSetToSet(nss)
+  var s: Set<TestBridgedKeyTy> = convertNSSetToSet(nss)
   expectEqual(0, CustomImmutableNSSet.timesCopyWithZoneWasCalled)
   expectEqual(0, CustomImmutableNSSet.timesMemberWasCalled)
   expectEqual(1, CustomImmutableNSSet.timesObjectEnumeratorWasCalled)
   expectNotEqual(0, CustomImmutableNSSet.timesCountWasCalled)
 
-  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  var bridgedBack: NSSet = convertSetToNSSet(s)
   expectNotEqual(
     unsafeBitCast(nss, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))

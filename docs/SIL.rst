@@ -315,8 +315,8 @@ has the following lowered type::
   @callee_owned () -> @owned @callee_owned (@in (Int,Int)) -> @out Float.
 
 As another example, suppose that ``h`` has type
-``Generator<(Int, @inout Int) -> Float>``.  Neither ``(Int, @inout Int)``
-nor ``@inout Int`` are potential results of substitution because they
+``Generator<(Int, inout Int) -> Float>``.  Neither ``(Int, inout Int)``
+nor ``inout Int`` are potential results of substitution because they
 aren't materializable, so ``h.fn`` has the following lowered type::
 
   @callee_owned () -> @owned @callee_owned (@in Int, @inout Int) -> @out Float
@@ -1447,7 +1447,7 @@ getter prior to calling the function and to write back to the property
 on return by loading from the buffer and invoking the setter with the final
 value. This Swift function::
 
-  func inout(x:@inout Int) {
+  func inout(x: inout Int) {
     x = 1
   }
 
@@ -2496,6 +2496,36 @@ copy_block
 Performs a copy of an Objective-C block. Unlike retains of other
 reference-counted types, this can produce a different value from the operand
 if the block is copied from the stack to the heap.
+
+builtin "unsafeGuaranteed"
+``````````````````````````
+
+::
+
+  sil-instruction := 'builtin' '"unsafeGuaranteed"' '<' sil-type '>' '(' sil-operand')' ':' sil-type
+
+  %1 = builtin "unsafeGuaranteed"<T>(%0 : $T) : ($T, Builtin.Int1)
+  // $T must be of AnyObject type.
+
+Asserts that there exists another reference of the value ``%0`` for the scope
+delineated by the call of this builtin up to the first call of a ``builtin
+"unsafeGuaranteedEnd"`` instruction that uses the second element ``%1.1`` of the
+returned value. If no such instruction can be found nothing can be assumed. This
+assertions holds for uses of the first tuple element of the returned value
+``%1.0`` within this scope. The returned reference value equals the input
+``%0``.
+
+builtin "unsafeGuaranteedEnd"
+`````````````````````````````
+
+::
+
+  sil-instruction := 'builtin' '"unsafeGuaranteedEnd"' '(' sil-operand')'
+
+  %1 = builtin "unsafeGuaranteedEnd"(%0 : $Builtin.Int1)
+  // $T must be of AnyObject type.
+
+Ends the scope for the ``builtin "unsafeGuaranteed"`` instruction.
 
 Literals
 ~~~~~~~~
@@ -3735,7 +3765,7 @@ unchecked_addr_cast
 
 Converts an address to a different address type. Using the resulting
 address is undefined unless ``B`` is layout compatible with ``A``. The
-layout of ``A`` may be smaller than that of ``B`` as long as the lower
+layout of ``B`` may be smaller than that of ``A`` as long as the lower
 order bytes have identical layout.
 
 unchecked_trivial_bit_cast

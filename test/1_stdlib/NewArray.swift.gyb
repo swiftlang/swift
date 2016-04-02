@@ -226,7 +226,7 @@ func nsArrayOfStrings() -> Array<NSString> {
 
   return src.withUnsafeBufferPointer {
     let ns =  NSArray(objects: UnsafePointer($0.baseAddress), count: $0.count)
-    return _convertNSArrayToArray(ns)
+    return ns as! [NSString]
   }
 }
 
@@ -411,7 +411,7 @@ func testInoutViolation() {
   ]
 
 %for A in arrayTypes:
-  if true {
+  do {
     var b = ${A}(a)
     b.sorted { x, y in
       b.removeAll()

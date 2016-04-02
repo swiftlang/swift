@@ -4,6 +4,16 @@
 
 import Foundation
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 class BridgedObjC : NSObject { }
 
 func == (x: BridgedObjC, y: BridgedObjC) -> Bool { return true }
@@ -15,10 +25,6 @@ struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
   
   var hashValue: Int { return 0 }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedObjC.self
-  }
-  
   func _bridgeToObjectiveC() -> BridgedObjC {
     return BridgedObjC()
   }

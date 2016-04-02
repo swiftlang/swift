@@ -26,6 +26,16 @@ import Swift
 import SwiftShims
 import ObjectiveC
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 //===--- class Tracked ----------------------------------------------------===//
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
@@ -71,10 +81,6 @@ struct X : _ObjectiveCBridgeable {
   
   init(_ value: Int) {
     self.value = value
-  }
-
-  static func _getObjectiveCType() -> Any.Type {
-    return Tracked.self
   }
 
   func _bridgeToObjectiveC() -> Tracked {

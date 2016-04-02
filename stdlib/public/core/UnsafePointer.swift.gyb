@@ -31,6 +31,7 @@
 /// - Memory is allocated, but value has not been initialized.
 ///
 /// - Memory is allocated and value is initialized.
+@_fixed_layout
 public struct ${Self}<Pointee>
   : RandomAccessIndex, Hashable,
     NilLiteralConvertible, _Pointer {
@@ -590,6 +591,7 @@ extension ${Self} {
 /// any other types; it makes a decent parameter to
 /// `UnsafeMutablePointer<Pointee>` when you just want to do bytewise
 /// pointer arithmetic.
+@_fixed_layout
 public // @testable
 struct _RawByte {
   let _inaccessible: UInt8

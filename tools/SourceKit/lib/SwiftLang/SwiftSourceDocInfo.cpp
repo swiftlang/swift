@@ -19,10 +19,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
@@ -78,6 +78,8 @@ static StringRef getTagForParameter(PrintStructureKind context) {
     return "decl.function.returntype";
   case PrintStructureKind::FunctionType:
     return "";
+  case PrintStructureKind::TupleType:
+    return "tuple";
   case PrintStructureKind::TupleElement:
     return "tuple.element";
   case PrintStructureKind::GenericParameter:
@@ -181,11 +183,11 @@ private:
 
   // MARK: The ASTPrinter callback interface.
 
-  void printDeclPre(const Decl *D) override {
+  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
     contextStack.emplace_back(PrintContext(D));
     openTag(getTagForDecl(D, /*isRef=*/false));
   }
-  void printDeclPost(const Decl *D) override {
+  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
     assert(contextStack.back().getDecl() == D && "unmatched printDeclPre");
     contextStack.pop_back();
     closeTag(getTagForDecl(D, /*isRef=*/false));
@@ -217,8 +219,9 @@ private:
   }
 
   void printStructurePre(PrintStructureKind kind, const Decl *D) override {
-    if (kind == PrintStructureKind::TupleElement)
-      fixupTupleElement(kind);
+    if (kind == PrintStructureKind::TupleElement ||
+        kind == PrintStructureKind::TupleType)
+      fixupTuple(kind);
 
     contextStack.emplace_back(PrintContext(kind));
     auto tag = getTagForParameter(kind);
@@ -233,10 +236,11 @@ private:
     }
   }
   void printStructurePost(PrintStructureKind kind, const Decl *D) override {
-    if (kind == PrintStructureKind::TupleElement) {
+    if (kind == PrintStructureKind::TupleElement ||
+        kind == PrintStructureKind::TupleType) {
       auto prev = contextStack.pop_back_val();
       (void)prev;
-      fixupTupleElement(kind);
+      fixupTuple(kind);
       assert(prev.is(kind) && "unmatched printStructurePre");
     } else {
       assert(contextStack.back().is(kind) && "unmatched printStructurePre");
@@ -341,15 +345,20 @@ private:
     }
   }
 
-  /// 'Fix' a tuple element structure kind to be a function parameter if we are
-  /// currently inside a function type. This simplifies functions that need to
-  /// differentiate a tuple from the input part of a function type.
-  void fixupTupleElement(PrintStructureKind &kind) {
-    assert(kind == PrintStructureKind::TupleElement);
+  /// 'Fix' a tuple or tuple element structure kind to be a function parameter
+  /// or function type if we are currently inside a function type. This
+  /// simplifies functions that need to differentiate a tuple from the input
+  /// part of a function type.
+  void fixupTuple(PrintStructureKind &kind) {
+    assert(kind == PrintStructureKind::TupleElement ||
+           kind == PrintStructureKind::TupleType);
     // Skip over 'type's in the context stack.
     for (auto I = contextStack.rbegin(), E = contextStack.rend(); I != E; ++I) {
       if (I->is(PrintStructureKind::FunctionType)) {
-        kind = PrintStructureKind::FunctionParameter;
+        if (kind == PrintStructureKind::TupleElement)
+          kind = PrintStructureKind::FunctionParameter;
+        else
+          kind = PrintStructureKind::FunctionType;
         break;
       } else if (!I->isType()) {
         break;
@@ -422,6 +431,24 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   while (VD->isImplicit() && VD->getOverriddenDecl())
     VD = VD->getOverriddenDecl();
 
+  VD->print(Printer, PO);
+}
+
+void SwiftLangSupport::
+printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
+                                          swift::NominalTypeDecl *Target,
+                                          llvm::raw_ostream &OS) {
+  static llvm::SmallDenseMap<swift::ValueDecl*,
+    std::unique_ptr<swift::SynthesizedExtensionAnalyzer>> TargetToAnalyzerMap;
+  FullyAnnotatedDeclarationPrinter Printer(OS);
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  if (TargetToAnalyzerMap.count(Target) == 0) {
+    std::unique_ptr<SynthesizedExtensionAnalyzer> Analyzer(
+      new SynthesizedExtensionAnalyzer(Target, PO));
+    TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
+  }
+  auto *Analyzer = TargetToAnalyzerMap.find(Target)->getSecond().get();
+  PO.initArchetypeTransformerForSynthesizedExtensions(Target, Analyzer);
   VD->print(Printer, PO);
 }
 
@@ -572,6 +599,11 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   if (auto IFaceGenRef = IFaceGenContexts.find(Info.ModuleName, Invok))
     Info.ModuleInterfaceName = IFaceGenRef->getDocumentName();
   Info.IsSystem = Mod.isSystemModule();
+  std::vector<StringRef> Groups;
+  if (auto MD = Mod.getAsSwiftModule()) {
+    Info.ModuleGroupArray = ide::collectModuleGroups(const_cast<ModuleDecl*>(MD),
+                                                     Groups);
+  }
   Receiver(Info);
   return false;
 }
@@ -631,6 +663,15 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
     ide::getDocumentationCommentAsXML(VD, OS);
   }
   unsigned DocCommentEnd = SS.size();
+
+  if (DocCommentEnd == DocCommentBegin) {
+    if (auto *Req = ASTPrinter::findConformancesWithDocComment(
+        const_cast<ValueDecl*>(VD))) {
+      llvm::raw_svector_ostream OS(SS);
+      ide::getDocumentationCommentAsXML(Req, OS);
+    }
+    DocCommentEnd = SS.size();
+  }
 
   unsigned DeclBegin = SS.size();
   {
@@ -1151,7 +1192,7 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-class RelatedIdScanner : public ide::SourceEntityWalker {
+class RelatedIdScanner : public SourceEntityWalker {
   ValueDecl *Dcl;
   llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges;
   SourceManager &SourceMgr;

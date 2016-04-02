@@ -997,7 +997,11 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // If control branched to the failure block, inject .None into the
   // result type.
   SGF.B.emitBlock(catchBB);
-  (void)catchBB->createBBArg(SILType::getExceptionType(SGF.getASTContext()));
+  FullExpr catchCleanups(SGF.Cleanups, E);
+  auto *errorArg = catchBB->createBBArg(
+      SILType::getExceptionType(SGF.getASTContext()));
+  (void) SGF.emitManagedRValueWithCleanup(errorArg);
+  catchCleanups.pop();
 
   if (isByAddress) {
     SGF.emitInjectOptionalNothingInto(E, optInit->getAddress(), optTL);
@@ -1181,7 +1185,7 @@ static RValue emitCFunctionPointer(SILGenFunction &gen,
                          /*foreign*/ true);
   SILValue cRef = gen.emitGlobalFunctionRef(expr, cEntryPoint);
   ManagedValue result = convertCFunctionSignature(gen, conversionExpr,
-                                                  ManagedValue::forUnmanaged(cRef));
+                                              ManagedValue::forUnmanaged(cRef));
   return RValue(gen, conversionExpr, result);
 }
 

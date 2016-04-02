@@ -480,6 +480,37 @@ func f(x : Int, y : Int) {
 
 
 
+// <rdar://problem/25178926> QoI: Warn about cases where switch statement "ignores" where clause
+enum Type {
+  case Foo
+  case Bar
+}
+func r25178926(a : Type) {
+  switch a {
+  case .Foo, .Bar where 1 != 100:
+    // expected-warning @-1 {{'where' only applies to the second pattern match in this case}}
+    // expected-note @-2 {{disambiguate by adding a line break between them if this is desired}} {{14-14=\n       }}
+    // expected-note @-3 {{duplicate the 'where' on both patterns to check both patterns}} {{12-12= where 1 != 100}}
+    break
+  }
+
+  switch a {
+  case .Foo: break
+  case .Bar where 1 != 100: break
+  }
+
+  switch a {
+  case .Foo,  // no warn
+       .Bar where 1 != 100:
+    break
+  }
+
+  switch a {
+  case .Foo where 1 != 100, .Bar where 1 != 100:
+    break
+  }
+}
+
 
 
 // Errors in case syntax

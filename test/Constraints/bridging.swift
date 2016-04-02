@@ -4,6 +4,16 @@
 
 import Foundation
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 public class BridgedClass : NSObject, NSCopying {
   @objc(copyWithZone:)
   public func copy(with zone: NSZone) -> AnyObject {
@@ -18,10 +28,6 @@ extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{confor
   public typealias _ObjectiveCType = BridgedClassSub
 
   public static func _isBridgedToObjectiveC() -> Bool { return true }
-
-  public static func _getObjectiveCType() -> Any.Type {
-    return BridgedClassSub.self
-  }
 
   public func _bridgeToObjectiveC() -> _ObjectiveCType {
     return BridgedClassSub()
@@ -54,10 +60,6 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedClass.self
-  }
-
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
   }

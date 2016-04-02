@@ -10,6 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
+internal class _Box<T> {
+  var value = [String]()
+  init(_ value : [String]) { self.value = value }
+}
+
 /// Command-line arguments for the current process.
 public enum Process {
   /// Return an array of string containing the list of command-line arguments
@@ -25,17 +32,13 @@ public enum Process {
     return result 
   }
 
+  @_versioned
   internal static var _argc: CInt = CInt()
+
+  @_versioned
   internal static var _unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
     = nil
-
-  internal enum _ProcessArgumentsState {
-    case notYetComputed
-    case computedArguments([String])
-  }
-
-  internal static var _arguments: [String]? = nil 
 
   /// Access to the raw argc value from C.
   public static var argc: CInt {
@@ -56,10 +59,18 @@ public enum Process {
   /// around by the optimizer which will break the data dependence on argc
   /// and argv.
   public static var arguments: [String] {
-    if _arguments == nil { 
-      _arguments = _computeArguments()
+    let argumentsPtr = UnsafeMutablePointer<AnyObject?>(
+      Builtin.addressof(&_swift_stdlib_ProcessArguments))
+
+    // Check whether argument has been initialized.
+    if let arguments = _stdlib_atomicLoadARCRef(object: argumentsPtr) {
+      return (arguments as! _Box<[String]>).value
     }
-    return _arguments!
+
+    let arguments = _Box<[String]>(_computeArguments())
+    _stdlib_atomicInitializeARCRef(object: argumentsPtr, desired: arguments)
+
+    return arguments.value
   } 
 }
 

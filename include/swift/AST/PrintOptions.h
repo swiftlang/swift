@@ -72,8 +72,8 @@ public:
 
   enum class MergeGroupKind : char {
     All,
-    Contraint,
-    Uncontraint,
+    MergeableWithTypeDef,
+    UnmergeableWithTypeDef,
   };
 
   void forEachExtensionMergeGroup(MergeGroupKind Kind,
@@ -81,6 +81,32 @@ public:
   bool isInSynthesizedExtension(const ValueDecl *VD);
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
   bool hasMergeGroup(MergeGroupKind Kind);
+};
+
+class BracketOptions {
+  Decl* Target;
+  bool OpenExtension;
+  bool CloseExtension;
+  bool CloseNominal;
+
+public:
+  BracketOptions(Decl *Target = nullptr, bool OpenExtension = true,
+                 bool CloseExtension = true, bool CloseNominal = true) :
+                  Target(Target), OpenExtension(OpenExtension),
+                  CloseExtension(CloseExtension),
+                  CloseNominal(CloseNominal) {}
+
+  bool shouldOpenExtension(const Decl *D) {
+    return D != Target || OpenExtension;
+  }
+
+  bool shouldCloseExtension(const Decl *D) {
+    return D != Target || CloseExtension;
+  }
+
+  bool shouldCloseNominal(const Decl *D) {
+    return D != Target || CloseNominal;
+  }
 };
 
 /// Options for printing AST nodes.
@@ -243,6 +269,10 @@ struct PrintOptions {
     BothAlways,
   };
 
+  /// Whether to print the doc-comment from the conformance if a member decl
+  /// has no associated doc-comment by itself.
+  bool ElevateDocCommentFromConformance = false;
+
   /// Whether to print the content of an extension decl inside the type decl where it
   /// extends from.
   std::function<bool(const ExtensionDecl *)> printExtensionContentAsMembers =
@@ -275,11 +305,7 @@ struct PrintOptions {
   /// \brief The information for converting archetypes to specialized types.
   std::shared_ptr<ArchetypeTransformContext> TransformContext;
 
-  bool shouldOpenExtension = true;
-
-  bool shouldCloseExtension = true;
-
-  bool shouldCloseNominal = true;
+  BracketOptions BracketOptions;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
@@ -322,6 +348,7 @@ struct PrintOptions {
     result.SkipDeinit = true;
     result.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
     result.EmptyLineBetweenMembers = true;
+    result.ElevateDocCommentFromConformance = true;
     return result;
   }
 
@@ -404,6 +431,7 @@ struct PrintOptions {
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.ExcludeAttrList.push_back(DAK_Swift3Migration);
+    PO.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
     PO.SkipPrivateStdlibDecls = true;
     PO.ExplodeEnumCaseDecls = true;
     return PO;

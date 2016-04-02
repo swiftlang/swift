@@ -739,3 +739,55 @@ func refcast_pclass_any(o: PClass) -> AnyObject {
 func refcast_any_punknown(o: AnyObject) -> PUnknown {
   return Builtin.castReference(o)
 }
+
+// CHECK-LABEL: sil hidden @_TF8builtins22unsafeGuaranteed_class
+// CHECK: bb0([[P:%.*]] : $A):
+// CHECK:   strong_retain  [[P]]
+// CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<A>([[P]] : $A)
+// CHECK:   [[R:%.*]] = tuple_extract [[T]] : $(A, Builtin.Int8), 0
+// CHECK:   [[K:%.*]] = tuple_extract [[T]] : $(A, Builtin.Int8), 1
+// CHECK:   strong_release [[R]] : $A
+// CHECK:   return [[P]] : $A
+// CHECK: }
+func unsafeGuaranteed_class(a: A) -> A {
+  Builtin.unsafeGuaranteed(a)
+  return a
+}
+
+// CHECK-LABEL: _TF8builtins24unsafeGuaranteed_generic
+// CHECK: bb0([[P:%.*]] : $T):
+// CHECK:   strong_retain  [[P]]
+// CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P]] : $T)
+// CHECK:   [[R:%.*]] = tuple_extract [[T]] : $(T, Builtin.Int8), 0
+// CHECK:   [[K:%.*]] = tuple_extract [[T]] : $(T, Builtin.Int8), 1
+// CHECK:   strong_release [[R]] : $T
+// CHECK:   return [[P]] : $T
+// CHECK: }
+func unsafeGuaranteed_generic<T: AnyObject> (a: T) -> T {
+  Builtin.unsafeGuaranteed(a)
+  return a
+}
+
+// CHECK_LABEL: sil hidden @_TF8builtins31unsafeGuaranteed_generic_return
+// CHECK: bb0([[P:%.*]] : $T):
+// CHECK:   strong_retain [[P]]
+// CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P]] : $T)
+// CHECK:   [[R]] = tuple_extract [[T]] : $(T, Builtin.Int8), 0
+// CHECK:   [[K]] = tuple_extract [[T]] : $(T, Builtin.Int8), 1
+// CHECK:   strong_release [[P]]
+// CHECK:   [[S:%.*]] = tuple ([[R]] : $T, [[K]] : $Builtin.Int8)
+// CHECK:   return [[S]] : $(T, Builtin.Int8)
+// CHECK: }
+func unsafeGuaranteed_generic_return<T: AnyObject> (a: T) -> (T, Builtin.Int8) {
+  return Builtin.unsafeGuaranteed(a)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins19unsafeGuaranteedEnd
+// CHECK: bb0([[P:%.*]] : $Builtin.Int8):
+// CHECK:   builtin "unsafeGuaranteedEnd"([[P]] : $Builtin.Int8)
+// CHECK:   [[S:%.*]] = tuple ()
+// CHECK:   return [[S]] : $()
+// CHECK: }
+func unsafeGuaranteedEnd(t: Builtin.Int8) {
+  Builtin.unsafeGuaranteedEnd(t)
+}

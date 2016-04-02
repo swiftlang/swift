@@ -2,6 +2,16 @@
 
 // REQUIRES: objc_interop
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 class A {
   var x = 0
 }
@@ -11,9 +21,6 @@ struct B : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return A.self
-  }
   func _bridgeToObjectiveC() -> A {
     return A()
   }
@@ -55,9 +62,6 @@ struct F : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return E.self
-  }
   func _bridgeToObjectiveC() -> E {
     return E()
   }
@@ -85,9 +89,6 @@ class G {
 }
 
 struct H : _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return G.self
-  }
   func _bridgeToObjectiveC() -> G {
     return G()
   }
@@ -118,9 +119,6 @@ struct I : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return A.self
-  }
   func _bridgeToObjectiveC() -> AnyObject {
     return A()
   }

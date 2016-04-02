@@ -3,6 +3,31 @@ import Darwin
 import StdlibUnittest
 import Foundation
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
+func convertDictionaryToNSDictionary<Key, Value>(
+  d: [Key : Value]
+) -> NSDictionary {
+  return d._bridgeToObjectiveC()
+}
+
+public func convertNSDictionaryToDictionary<
+  Key : Hashable, Value
+>(d: NSDictionary?) -> [Key : Value] {
+  if _slowPath(d == nil) { return [:] }
+  var result: [Key : Value]?
+  Dictionary._forceBridgeFromObjectiveC(d!, result: &result)
+  return result!
+}
+
 func isNativeDictionary<KeyTy : Hashable, ValueTy>(
   d: Dictionary<KeyTy, ValueTy>) -> Bool {
   switch d._variantStorage {
@@ -212,10 +237,6 @@ struct TestBridgedKeyTy
     return true
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCKeyTy.self
-  }
-
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
     _bridgedKeyBridgeOperations.fetchAndAdd(1)
     return TestObjCKeyTy(value)
@@ -277,10 +298,6 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
     return true
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCValueTy.self
-  }
-
   func _bridgeToObjectiveC() -> TestObjCValueTy {
     TestBridgedValueTy.bridgeOperations += 1
     return TestObjCValueTy(value)
@@ -333,10 +350,6 @@ struct TestBridgedEquatableValueTy
 
   static func _isBridgedToObjectiveC() -> Bool {
     return true
-  }
-
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCValueTy.self
   }
 
   func _bridgeToObjectiveC() -> TestObjCEquatableValueTy {
@@ -426,7 +439,7 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   let bridged =
-    unsafeBitCast(_convertDictionaryToNSDictionary(d), to: NSDictionary.self)
+    unsafeBitCast(convertDictionaryToNSDictionary(d), to: NSDictionary.self)
 
   assert(isNativeNSDictionary(bridged))
 
@@ -437,7 +450,7 @@ func getBridgedEmptyNSDictionary() -> NSDictionary {
   let d = Dictionary<TestObjCKeyTy, TestObjCValueTy>()
 
   let bridged =
-    unsafeBitCast(_convertDictionaryToNSDictionary(d), to: NSDictionary.self)
+    unsafeBitCast(convertDictionaryToNSDictionary(d), to: NSDictionary.self)
   assert(isNativeNSDictionary(bridged))
 
   return bridged
@@ -454,7 +467,7 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
     d[TestBridgedKeyTy(i * 10)] = TestBridgedValueTy(i * 10 + 1000)
   }
 
-  let bridged = _convertDictionaryToNSDictionary(d)
+  let bridged = convertDictionaryToNSDictionary(d)
   assert(isNativeNSDictionary(bridged))
 
   return bridged
@@ -906,10 +919,21 @@ func getBridgedNSArrayOfRefTypeVerbatimBridged(
     a.append(TestObjCValueTy(i * 10))
   }
 
-  let bridged = _convertArrayToNSArray(a)
+  let bridged = convertArrayToNSArray(a)
   assert(isNativeNSArray(bridged))
 
   return bridged
+}
+
+func convertNSArrayToArray<T>(source: NSArray?) -> [T] {
+  if _slowPath(source == nil) { return [] }
+  var result: [T]?
+  Array._forceBridgeFromObjectiveC(source!, result: &result)
+  return result!
+}
+
+func convertArrayToNSArray<T>(array: [T]) -> NSArray {
+  return array._bridgeToObjectiveC()
 }
 
 func getBridgedNSArrayOfValueTypeCustomBridged(
@@ -926,7 +950,7 @@ func getBridgedNSArrayOfValueTypeCustomBridged(
     a.append(TestBridgedValueTy(i * 10))
   }
 
-  let bridged = _convertArrayToNSArray(a)
+  let bridged = convertArrayToNSArray(a)
   assert(isNativeNSArray(bridged))
 
   return bridged

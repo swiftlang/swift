@@ -661,7 +661,7 @@ public:
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
   DeclContext *getDeclContext() const {
-    return InheritedConformance->getDeclContext();
+    return getType()->getClassOrBoundGenericClass();
   }
 
   /// Retrieve the state of this conformance.

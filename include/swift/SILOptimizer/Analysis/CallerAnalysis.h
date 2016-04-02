@@ -24,31 +24,12 @@
 
 namespace swift {
 
-using ApplyList = llvm::SmallVector<FullApplySite, 4>;
-
-class CallerAnalysisFunctionInfo {
+/// NOTE: this can be extended to contain the callsites of the function.
+struct CallerAnalysisFunctionInfo {
   /// A list of all the functions this function calls.
-  llvm::SmallVector<SILFunction *, 4> Callees;
-  /// A list of all the functions that calls this function.
-  /// Keeping this list allows us to iterate over the CallSites
-  /// deterministically.
-  llvm::SmallVector<SILFunction *, 4> Callers;
-  /// A map between all the callers and the callsites in them which
-  /// calls this function.
-  llvm::SmallDenseMap<SILFunction *, ApplyList, 1> CallSites; 
-
-public:
-  /// Return a list of all the callsites for this function.
-  ApplyList getCallSites() {
-    ApplyList Sites;
-    for (auto &F : Callers) {
-      for (auto &S : CallSites[F])
-        Sites.push_back(S);
-    }
-    return Sites;
-  }
-
-  friend class CallerAnalysis;
+  llvm::SetVector<SILFunction *> Callees;
+  /// A list of all the callers this function has.
+  llvm::SetVector<SILFunction *> Callers;
 };
 
 /// CallerAnalysis relies on keeping the Caller/Callee relation up-to-date
@@ -71,12 +52,8 @@ class CallerAnalysis : public SILAnalysis {
   /// A map between all the functions and their callsites in the module.
   llvm::DenseMap<SILFunction *, CallerAnalysisFunctionInfo> CallInfo;
 
-  /// A set of functions that needs to be recomputed. This is used to make sure
-  /// a function is not pushed to the RecomputeFunctionList more than once.
-  llvm::DenseSet<SILFunction *> RecomputeFunctionSet;
-
   /// A list of functions that needs to be recomputed.
-  llvm::SmallVector<SILFunction *, 16> RecomputeFunctionList;
+  llvm::SetVector<SILFunction *> RecomputeFunctionList;
 
   /// Iterate over all the call sites in the function and update
   /// CallInfo.
@@ -91,15 +68,14 @@ class CallerAnalysis : public SILAnalysis {
       processFunctionCallSites(F);
     }
     RecomputeFunctionList.clear(); 
-    RecomputeFunctionSet.clear();
   }
 
 public:
   CallerAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Caller), Mod(*M) {
     // Make sure we compute everything first time called.
     for(auto &F : Mod) {
-      RecomputeFunctionSet.insert(&F);
-      RecomputeFunctionList.push_back(&F);
+      CallInfo.FindAndConstruct(&F);
+      RecomputeFunctionList.insert(&F);
     }
   }
 
@@ -108,11 +84,7 @@ public:
   }
 
   virtual void notifyAnalysisOfFunction(SILFunction *F) {
-    // This is not a new function.
-    if (RecomputeFunctionSet.find(F) != RecomputeFunctionSet.end())
-      return;
-    RecomputeFunctionSet.insert(F);
-    RecomputeFunctionList.push_back(F);
+    RecomputeFunctionList.insert(F);
   }
 
   virtual void invalidate(SILFunction *F, InvalidationKind K) {
@@ -124,15 +96,13 @@ public:
     // This function has become "unknown" to us. Invalidate any callsite
     // information related to this function.
     invalidateExistingCalleeRelation(F);
-    if (RecomputeFunctionSet.find(F) != RecomputeFunctionSet.end())
-      return;
     // Make sure this function is recomputed next time.
-    RecomputeFunctionSet.insert(F);
-    RecomputeFunctionList.push_back(F);
+    RecomputeFunctionList.insert(F);
   }
 
   virtual void invalidateForDeadFunction(SILFunction *F, InvalidationKind K) {
     invalidateExistingCalleeRelation(F);
+    RecomputeFunctionList.remove(F);
   }
 
   virtual void invalidate(InvalidationKind K) {
@@ -143,10 +113,8 @@ public:
 
     CallInfo.clear();
     RecomputeFunctionList.clear();
-    RecomputeFunctionSet.clear();
     for(auto &F : Mod) {
-      RecomputeFunctionSet.insert(&F);
-      RecomputeFunctionList.push_back(&F);
+      RecomputeFunctionList.insert(&F);
     }
   }
 
@@ -156,17 +124,7 @@ public:
     // list.
     processRecomputeFunctionList();
     auto Iter = CallInfo.FindAndConstruct(F);
-    return !Iter.second.CallSites.empty();
-  }
-
-
-  /// Return all the callsites to this function in the current module.
-  ApplyList getCallSites(SILFunction *F) {
-    // Recompute every function in the invalidated function list and empty the
-    // list.
-    processRecomputeFunctionList();
-    auto Iter = CallInfo.FindAndConstruct(F);
-    return Iter.second.getCallSites();
+    return !Iter.second.Callers.empty();
   }
 };
 

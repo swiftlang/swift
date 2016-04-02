@@ -8,12 +8,6 @@ import Swift
 import StdlibUnittest
 import SwiftShims
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 
 var swiftObjectCanaryCount = 0
@@ -1433,6 +1427,16 @@ func computeCountLeadingZeroes(x: Int64) -> Int64 {
     r -= 1
   }
   return r
+}
+
+BitTwiddlingTestSuite.test("_pointerSize") {
+#if arch(i386) || arch(arm)
+  expectEqual(4, sizeof(Optional<AnyObject>.self))
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+  expectEqual(8, sizeof(Optional<AnyObject>.self))
+#else
+  fatalError("implement")
+#endif
 }
 
 BitTwiddlingTestSuite.test("_countLeadingZeros") {

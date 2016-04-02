@@ -121,7 +121,7 @@ Type PartialGenericTypeToArchetypeResolver::resolveSelfAssociatedType(
        AssociatedTypeDecl *assocType) {
   // We don't have enough information to find the associated type.
   // FIXME: Nonsense, but we shouldn't need this code anyway.
-  return DependentMemberType::get(selfTy, assocType->getName(), TC.Context);
+  return DependentMemberType::get(selfTy, assocType, TC.Context);
 }
 
 Type
@@ -177,9 +177,6 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // If the nested type comes from a type alias, use either the alias's
   // concrete type, or resolve its components down to another dependent member.
   if (auto alias = nestedPA->getTypeAliasDecl()) {
-    if (nestedPA->isConcreteType())
-      return nestedPA->getConcreteType();
-
     return TC.substMemberTypeWithBase(DC->getParentModule(), alias,
                                       baseTy, true);
   }

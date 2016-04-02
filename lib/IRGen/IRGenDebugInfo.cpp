@@ -239,21 +239,6 @@ static SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc,
 }
 
 
-/// Extract the start location from a SILLocation.
-///
-/// This returns a FullLocation, which contains the location that
-/// should be used for the linetable and the "true" AST location (used
-/// for, e.g., variable declarations).
-static FullLocation getFullLocation(Optional<SILLocation> OptLoc,
-                                    SourceManager &SM) {
-  if (!OptLoc)
-    return {};
-
-  SILLocation Loc = OptLoc.getValue();
-  return { Loc.decodeDebugLoc(SM),
-           SILLocation::decode(Loc.getSourceLoc(), SM) };
-}
-
 /// Determine whether this debug scope belongs to an explicit closure.
 static bool isExplicitClosure(const SILDebugScope *DS) {
   if (DS) {
@@ -661,12 +646,13 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   unsigned ScopeLine = 0; /// The source line used for the function prologue.
   // Bare functions and thunks should not have any line numbers. This
   // is especially important for shared functions like reabstraction
-  // thunk helpers, where getFullLocation() returns an arbitrary location
-  // of whichever use was emitted first.
+  // thunk helpers, where DS->Loc is an arbitrary location of whichever use
+  // was emitted first.
   if (DS && (!SILFn || (!SILFn->isBare() && !SILFn->isThunk()))) {
-    auto FL = getFullLocation(DS->Loc, SM);
-    L = FL.Loc;
-    ScopeLine = FL.LocForLinetable.Line;
+    L = DS->Loc.decodeDebugLoc(SM);
+    ScopeLine = L.Line;
+    if (!DS->Loc.isDebugInfoLoc())
+      L = SILLocation::decode(DS->Loc.getSourceLoc(), SM);
   }
 
   auto Line = L.Line;
@@ -1008,8 +994,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
     return;
 
   llvm::DIType *Ty = getOrCreateType(DbgTy);
-  if (Ty->isArtificial() || Ty == InternalType ||
-      Var->getVisibility() == llvm::GlobalValue::HiddenVisibility)
+  if (Ty->isArtificial() || Ty == InternalType || !Loc)
     // FIXME: Really these should be marked as artificial, but LLVM
     // currently has no support for flags to be put on global
     // variables. In the mean time, elide these variables, they

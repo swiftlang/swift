@@ -1,8 +1,0 @@
-// Verifies that we can correctly handle self cycles in control flow.
-// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim
-// Make sure we can move load of end out of loop even though we have store of start inside loop.
-// RUN: %target-sil-opt -enable-sil-verify-all %s -licm
-
-import Builtin
-import Swift
-

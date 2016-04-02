@@ -213,9 +213,9 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
 #undef CHECK_NAMED_TYPE
 
   // Map vector types to the corresponding C vectors.
-#define MAP_SIMD_TYPE(TYPE_NAME, CLANG_KIND)                           \
+#define MAP_SIMD_TYPE(TYPE_NAME, _, BUILTIN_KIND)                      \
   if (name.startswith(#TYPE_NAME)) {                                   \
-    return getClangVectorType(ctx, clang::BuiltinType::CLANG_KIND,     \
+    return getClangVectorType(ctx, clang::BuiltinType::BUILTIN_KIND,   \
                               clang::VectorType::GenericVector,        \
                               name.drop_front(sizeof(#TYPE_NAME)-1));  \
   }
@@ -730,9 +730,15 @@ clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {
   auto clangType = getClangType(params.getSILType());
   // @block_storage types must be @inout_aliasable and have
   // special lowering
-  if (params.isIndirectMutating() &&
-      !params.getSILType().is<SILBlockStorageType>()) {
-    return getClangASTContext().getPointerType(clangType);
+  if (!params.getSILType().is<SILBlockStorageType>()) {
+    if (params.isIndirectMutating()) {
+      return getClangASTContext().getPointerType(clangType);
+    }
+    if (params.isIndirect()) {
+      auto constTy =
+        getClangASTContext().getCanonicalType(clangType.withConst());
+      return getClangASTContext().getPointerType(constTy);
+    }
   }
   return clangType;
 }

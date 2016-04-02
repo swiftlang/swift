@@ -238,6 +238,16 @@ struct _InternalStruct {
 @property (assign) int scalar;
 @end
 
+@interface FooClassWithClassProperties : FooClassBase
+@property (class, assign) id assignable;
+@property (class, unsafe_unretained) id unsafeAssignable;
+@property (class, retain) id retainable;
+@property (class, strong) id strongRef;
+@property (class, copy) id copyable;
+@property (class, weak) id weakRef;
+@property (class, assign) int scalar;
+@end
+
 #define FOO_NIL ((id)0)
 
 @interface FooUnavailableMembers : FooClassBase

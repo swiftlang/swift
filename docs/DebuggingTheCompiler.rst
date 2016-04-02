@@ -113,6 +113,22 @@ debugging press <CTRL>-C on the LLDB prompt.
 Note that this only works in Xcode if the PATH variable in the scheme's
 environment setting contains the path to the dot tool.
 
+Debugging and Profiling on SIL level
+````````````````````````````````````
+
+The compiler provides a way to debug and profile on SIL level. To enable SIL
+debugging add the front-end option -gsil together with -g. Example::
+
+    swiftc -g -Xfrontend -gsil -O test.swift -o a.out
+
+This writes the SIL after optimizations into a file and generates debug info
+for it. In the debugger and profiler you can then see the SIL code instead of
+the swift source code.
+For details see the SILDebugInfoGenerator pass.
+
+To enable SIL debugging and profiling for the Swift standard library, use
+the build-script-impl option ``--build-sil-debugging-stdlib``.
+
 Other Utilities
 ```````````````
 

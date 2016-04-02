@@ -461,6 +461,34 @@ unsigned DeclContext::getGenericTypeContextDepth() const {
   return depth;
 }
 
+/// Get the most optimal resilience expansion for the body of this function.
+/// If the body is able to be inlined into functions in other resilience
+/// domains, this ensures that only sufficiently-conservative access patterns
+/// are used.
+ResilienceExpansion DeclContext::getResilienceExpansion() const {
+  for (const auto *dc = this; dc->isLocalContext(); dc = dc->getParent()) {
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(dc)) {
+      // If the function is not externally visible, we will not be serializing
+      // its body.
+      if (!func->getDeclContext()->isLocalContext() &&
+          func->getEffectiveAccess() != Accessibility::Public)
+        break;
+
+      // Bodies of public transparent and always-inline functions are
+      // serialized, so use conservative access patterns.
+      if (func->isTransparent())
+        return ResilienceExpansion::Minimal;
+
+      if (auto attr = func->getAttrs().getAttribute<InlineAttr>())
+        if (attr->getKind() == InlineKind::Always)
+          return ResilienceExpansion::Minimal;
+    }
+  }
+
+  return ResilienceExpansion::Maximal;
+
+}
+
 /// Determine whether the innermost context is generic.
 bool DeclContext::isInnermostContextGeneric() const {
   switch (getContextKind()) {

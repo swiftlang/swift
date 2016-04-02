@@ -170,14 +170,14 @@ FileUnit *SerializedModuleLoader::loadAST(
   if (err == serialization::Status::Valid) {
     Ctx.bumpGeneration();
 
+    M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
+
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
                                                 extendedInfo.isSIB());
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
-    if (extendedInfo.isResilient())
-      M.setResilienceEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     err = loadedModuleFile->associateWithFileContext(fileUnit,
@@ -423,15 +423,24 @@ void SerializedASTFile::getImportedModules(
   File.getImportedModules(imports, filter);
 }
 
+void SerializedASTFile::collectLinkLibrariesFromImports(
+    Module::LinkLibraryCallback callback) const {
+  llvm::SmallVector<Module::ImportedModule, 8> Imports;
+  File.getImportedModules(Imports, Module::ImportFilter::All);
+
+  for (auto Import : Imports)
+    Import.second->collectLinkLibraries(callback);
+}
+
 void SerializedASTFile::collectLinkLibraries(
     Module::LinkLibraryCallback callback) const {
   if (isSIB()) {
-    llvm::SmallVector<Module::ImportedModule, 8> Imports;
-    File.getImportedModules(Imports, Module::ImportFilter::All);
-
-    for (auto Import : Imports)
-      Import.second->collectLinkLibraries(callback);
+    collectLinkLibrariesFromImports(callback);
   } else {
+    if (File.getAssociatedModule()->getResilienceStrategy()
+        == ResilienceStrategy::Fragile) {
+      collectLinkLibrariesFromImports(callback);
+    }
     File.collectLinkLibraries(callback);
   }
 }
@@ -510,6 +519,11 @@ void
 SerializedASTFile::collectAllGroups(std::vector<StringRef> &Names) const {
   File.collectAllGroups(Names);
 };
+
+Optional<StringRef>
+SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
+  return File.getGroupNameByUSR(USR);
+}
 
 void
 SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {

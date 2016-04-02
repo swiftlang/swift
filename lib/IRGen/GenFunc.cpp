@@ -1734,6 +1734,28 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // Decompose the function's name into a builtin name and type list.
   const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(FnId);
 
+  if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteedEnd) {
+    // Just consume the incoming argument.
+    assert(args.size() == 1 && "Expecting one incoming argument");
+    args.claimAll();
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteed) {
+    // Just forward the incoming argument.
+    assert(args.size() == 1 && "Expecting one incoming argument");
+    out = std::move(args);
+    // This is a token.
+    out.add(llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0));
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::OnFastPath) {
+    // The onFastPath builtin has only an effect on SIL level, so we lower it
+    // to a no-op.
+    return;
+  }
+
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     args.claimAll();
@@ -1806,27 +1828,30 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // At that stage, the function name GV used by the profiling pass is hidden.
   // Fix the intrinsic call here by pointing it to the correct GV.
   if (IID == llvm::Intrinsic::instrprof_increment) {
-    // Extract the function name.
+    // Extract the PGO function name.
     auto *NameGEP = cast<llvm::User>(args.claimNext());
-    auto *NameGV = cast<llvm::GlobalVariable>(NameGEP->getOperand(0));
-    auto *NameC = NameGV->getInitializer();
-    StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
+    auto *NameGV = dyn_cast<llvm::GlobalVariable>(NameGEP->stripPointerCasts());
+    if (NameGV) {
+      auto *NameC = NameGV->getInitializer();
+      StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
+      StringRef PGOFuncName = Name.rtrim(StringRef("\0", 1));
 
-    // Find the existing function name pointer.
-    std::string NameValue = llvm::getInstrProfNameVarPrefix();
-    NameValue += Name;
-    StringRef ProfName = StringRef(NameValue).rtrim(StringRef("\0", 1));
-    auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(ProfName);
-    assert(FuncNamePtr && "No function name pointer for counter update");
+      // Point the increment call to the right function name variable.
+      std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
+          PGOFuncName, llvm::GlobalValue::LinkOnceAnyLinkage);
+      auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(PGOFuncNameVar);
 
-    // Create a GEP into the function name.
-    llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
-    auto *FuncName = llvm::GetElementPtrInst::CreateInBounds(
-        FuncNamePtr, makeArrayRef(Indices), "", IGF.Builder.GetInsertBlock());
+      if (FuncNamePtr) {
+        llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
+        NameGEP = llvm::GetElementPtrInst::CreateInBounds(
+            FuncNamePtr, makeArrayRef(Indices), "",
+            IGF.Builder.GetInsertBlock());
+      }
+    }
 
     // Replace the placeholder value with the new GEP.
     Explosion replacement;
-    replacement.add(FuncName);
+    replacement.add(NameGEP);
     replacement.add(args.claimAll());
     args = std::move(replacement);
   }
@@ -2899,9 +2924,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     case clang::CodeGen::ABIArgInfo::Direct: {
       auto toTy = AI.getCoerceToType();
 
-      // Mutating parameters are bridged as Clang pointer types. For now, this
-      // only ever comes up with Clang-generated accessors.
-      if (params[i - firstParam].isIndirectMutating()) {
+      // Indirect parameters are bridged as Clang pointer types.
+      if (params[i - firstParam].isIndirect()) {
         assert(paramType.isAddress() && "SIL type is not an address?");
 
         auto addr = in.claimNext();

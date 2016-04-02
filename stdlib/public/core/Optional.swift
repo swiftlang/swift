@@ -12,6 +12,7 @@
 
 /// A type that can represent either a `Wrapped` value or `nil`, the absence 
 /// of a value.
+@_fixed_layout
 public enum Optional<Wrapped> : NilLiteralConvertible {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.
@@ -148,6 +149,7 @@ public func != <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
 
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
+@_fixed_layout
 public struct _OptionalNilComparisonType : NilLiteralConvertible {
   /// Create an instance initialized with `nil`.
   @_transparent

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SOURCEMANAGER_H
-#define SWIFT_SOURCEMANAGER_H
+#ifndef SWIFT_BASIC_SOURCEMANAGER_H
+#define SWIFT_BASIC_SOURCEMANAGER_H
 
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/Optional.h"
@@ -231,7 +231,7 @@ private:
   }
 };
 
-} // namespace swift
+} // end namespace swift
 
-#endif // LLVM_SWIFT_SOURCEMANAGER_H
+#endif // SWIFT_BASIC_SOURCEMANAGER_H
 

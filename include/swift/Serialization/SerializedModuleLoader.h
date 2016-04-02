@@ -106,6 +106,9 @@ class SerializedASTFile final : public LoadedFile {
   SerializedASTFile(Module &M, ModuleFile &file, bool isSIB = false)
     : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
 
+  void
+  collectLinkLibrariesFromImports(Module::LinkLibraryCallback callback) const;
+
 public:
   bool isSIB() const { return IsSIB; }
 
@@ -144,6 +147,8 @@ public:
   Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const override;
 
   Optional<unsigned> getSourceOrderForDecl(const Decl *D) const override;
+
+  Optional<StringRef> getGroupNameByUSR(StringRef USR) const override;
 
   void collectAllGroups(std::vector<StringRef> &Names) const override;
 

@@ -597,7 +597,10 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::PointerToPointer:
   case ExprKind::LValueToPointer:
   case ExprKind::ForeignObjectConversion:
-    return false;
+    // Implicit conversion nodes have no syntax of their own; defer to the
+    // subexpression.
+    return cast<ImplicitConversionExpr>(this)->getSubExpr()
+      ->canAppendCallParentheses();
 
   case ExprKind::ForcedCheckedCast:
   case ExprKind::ConditionalCheckedCast:

@@ -34,13 +34,14 @@
 #ifndef SWIFT_BASIC_PREFIXMAP_H
 #define SWIFT_BASIC_PREFIXMAP_H
 
+#include "swift/Basic/Algorithm.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/type_traits.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <iterator>
-#include "swift/Basic/type_traits.h"
 
 namespace swift {
 
@@ -48,15 +49,11 @@ void printOpaquePrefixMap(raw_ostream &out, void *root,
                           void (*printNode)(raw_ostream &, void*));
 template <class KeyElementType> class PrefixMapKeyPrinter;
 
-inline constexpr size_t const_max_size(size_t x, size_t y) {
-  return (x < y ? y : x);
-}
-
 /// A map whose keys are sequences of comparable values, optimized for
 /// finding a mapped value for the longest matching initial subsequence.
 template <class KeyElementType, class ValueType,
           size_t InlineKeyCapacity
-             = const_max_size((sizeof(void*) - 1) / sizeof(KeyElementType), 1)>
+             = max<size_t>((sizeof(void*) - 1) / sizeof(KeyElementType), 1)>
 class PrefixMap {
 public:
   using KeyType = ArrayRef<KeyElementType>;
@@ -308,16 +305,16 @@ private:
   static void deleteTree(Node *root) {
     if (!root) return;
 
-    SmallVector<Node *, 8> queue; // actually a stack
-    auto enqueueChildrenAndDelete = [&](Node *node) {
-      if (node->Left) queue.push_back(node->Left);
-      if (node->Right) queue.push_back(node->Right);
-      if (node->Further) queue.push_back(node->Further);
+    SmallVector<Node *, 8> stack;
+    auto pushChildrenAndDelete = [&](Node *node) {
+      if (node->Left) stack.push_back(node->Left);
+      if (node->Right) stack.push_back(node->Right);
+      if (node->Further) stack.push_back(node->Further);
       delete node;
     };
-    enqueueChildrenAndDelete(root);
-    while (!queue.empty()) {
-      enqueueChildrenAndDelete(queue.pop_back_val());
+    pushChildrenAndDelete(root);
+    while (!stack.empty()) {
+      pushChildrenAndDelete(stack.pop_back_val());
     }
   }
 
@@ -325,18 +322,18 @@ private:
   static Node *cloneTree(Node *root) {
     if (!root) return nullptr;
 
-    SmallVector<Node **, 8> queue; // actually a stack.
-    auto copyAndEnqueueChildren = [&](Node **ptr) {
+    SmallVector<Node **, 8> stack;
+    auto copyAndPushChildren = [&](Node **ptr) {
       assert(*ptr);
       Node *copy = new Node(**ptr);
       *ptr = copy;
-      if (copy->Left) queue.push_back(&copy->Left);
-      if (copy->Right) queue.push_back(&copy->Right);
-      if (copy->Further) queue.push_back(&copy->Further);
+      if (copy->Left) stack.push_back(&copy->Left);
+      if (copy->Right) stack.push_back(&copy->Right);
+      if (copy->Further) stack.push_back(&copy->Further);
     };
     copyAndEnqueueChildren(&root);
-    while (!queue.empty()) {
-      copyAndEnqueueChildren(queue.pop_back_val());
+    while (!stack.empty()) {
+      copyAndEnqueueChildren(stack.pop_back_val());
     }
     return root;
   }
@@ -679,4 +676,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_PREFIXMAP_H

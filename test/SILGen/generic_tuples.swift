@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen -parse-as-library %s | FileCheck %s
 
 
-func dup<T>(let x: T) -> (T, T) { return (x,x) }
+func dup<T>(x: T) -> (T, T) { return (x,x) }
 // CHECK-LABEL:      sil hidden @_TF14generic_tuples3dup
 // CHECK:      ([[RESULT_0:%.*]] : $*T, [[RESULT_1:%.*]] : $*T, [[XVAR:%.*]] : $*T):
 // CHECK-NEXT: debug_value_addr [[XVAR]] : $*T, let, name "x"

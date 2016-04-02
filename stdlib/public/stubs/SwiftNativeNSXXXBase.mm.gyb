@@ -117,21 +117,36 @@ extern "C" int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" int32_t
+swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
+                                                             void *Rhs) {
+  NSString *lhs = (NSString *)Lhs;
+  NSString *rhs = (NSString *)Rhs;
+
+  // 'kCFCompareNonliteral' actually means "normalize to NFD".
+  int Result = CFStringCompare((__bridge CFStringRef)lhs,
+                               (__bridge CFStringRef)rhs, kCFCompareNonliteral);
+  return Result;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" size_t
-swift_stdlib_NSStringNFDHashValue(NSString *NS_RELEASES_ARGUMENT str) {
-  size_t Result = str.decomposedStringWithCanonicalMapping.hash;
+swift_stdlib_NSStringHashValue(NSString *NS_RELEASES_ARGUMENT str,
+                               bool isASCII) {
+  size_t Result =
+      isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
+
   swift_unknownRelease(str);
   return Result;
 }
 
-// For strings we know only have ASCII
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" size_t
-swift_stdlib_NSStringASCIIHashValue(NSString *NS_RELEASES_ARGUMENT str) {
-  size_t Result = str.hash;
-  swift_unknownRelease(str);
-  return Result;
+swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
+  NSString *str = (NSString *)opaque;
+  return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
 }
+
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,

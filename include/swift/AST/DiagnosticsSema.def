@@ -392,6 +392,8 @@ WARNING(selector_literal_deprecated_suggest,none,
         "use '#selector' instead", ())
 WARNING(selector_construction_suggest,none,
         "use '#selector' instead of explicitly constructing a 'Selector'", ())
+NOTE(selector_construction_suppress_warning,none,
+     "wrap the selector name in parentheses to suppress this warning", ())
 
 ERROR(cannot_return_value_from_void_func,none,
       "unexpected non-void return value in void function", ())
@@ -776,6 +778,9 @@ ERROR(inout_cant_be_variadic,none,
       "inout arguments cannot be variadic", ())
 ERROR(inout_only_parameter,none,
       "'inout' is only valid in parameter lists", ())
+ERROR(var_parameter_not_allowed,none,
+      "parameters may not have the 'var' specifier", ())
+
 
 ERROR(mutating_invalid_global_scope,none,
       "'mutating' is only valid on methods", ())
@@ -1048,6 +1053,9 @@ ERROR(extension_protocol_via_typealias,none,
       "typealias", (Type))
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
+ERROR(objc_generic_extension_using_type_parameter,none,
+      "Extension of a generic Objective-C class cannot access the class's "
+      "generic parameters", ())
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -1449,6 +1457,8 @@ NOTE(class_here,none,
      "class %0 declared here", (Identifier))
 ERROR(inheritance_from_final_class,none,
 "inheritance from a final class %0", (Identifier))
+ERROR(inheritance_from_objc_generic_class,none,
+"inheritance from a generic Objective-C class %0", (Identifier))
 
 
 // Enums
@@ -1976,6 +1986,8 @@ ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(generic_type_declared_here,none,
      "generic type %0 declared here", (Identifier))
+ERROR(cannot_partially_specialize_generic_function,none,
+     "cannot partially specialize a generic function", ())
 
 // Ambiguities
 ERROR(ambiguous_decl_ref,none,
@@ -2175,6 +2187,15 @@ ERROR(unnecessary_cast_over_optionset,none,
 
 ERROR(type_mismatch_multiple_pattern_list,none,
       "pattern variable bound to type %0, expected type %1", (Type, Type))
+
+WARNING(where_on_one_item, none,
+        "'where' only applies to the second pattern match in this case", ())
+
+NOTE(add_where_newline, none,
+     "disambiguate by adding a line break between them if this is desired", ())
+
+NOTE(duplicate_where, none,
+     "duplicate the 'where' on both patterns to check both patterns",())
 
 //------------------------------------------------------------------------------
 // Type Check Patterns

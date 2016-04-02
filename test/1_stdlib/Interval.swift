@@ -16,13 +16,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 // Check that the generic parameter is called 'Bound'.
 protocol TestProtocol1 {}
@@ -190,11 +183,11 @@ IntervalTestSuite.test("CustomStringConvertible/CustomDebugStringConvertible") {
 }
 
 IntervalTestSuite.test("rdar12016900") {
-  if true {
+  do {
     let wc = 0
     expectFalse((0x00D800 ..< 0x00E000).contains(wc))
   }
-  if true {
+  do {
     let wc = 0x00D800
     expectTrue((0x00D800 ..< 0x00E000).contains(wc))
   }

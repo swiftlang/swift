@@ -28,6 +28,7 @@ func _isDebugAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 0
 }
 
+@_versioned
 @_transparent
 @warn_unused_result
 internal func _isReleaseAssertConfiguration() -> Bool {
@@ -60,6 +61,7 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 #endif
 }
 
+@_versioned
 @_transparent
 @warn_unused_result
 internal
@@ -86,6 +88,7 @@ func _reportFatalError(
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
   flags: UInt32)
 
+@_versioned
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
@@ -94,6 +97,7 @@ func _reportUnimplementedInitializerInFile(
   _ line: UInt, _ column: UInt,
   flags: UInt32)
 
+@_versioned
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
@@ -105,6 +109,7 @@ func _reportUnimplementedInitializer(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
+@_versioned
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
@@ -135,6 +140,7 @@ func _assertionFailed(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
+@_versioned
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
@@ -166,6 +172,7 @@ func _assertionFailed(
 ///
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
+@_versioned
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")

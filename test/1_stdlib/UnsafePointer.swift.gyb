@@ -5,13 +5,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 protocol TestProtocol1 {}
 
@@ -93,12 +86,12 @@ ${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
 }
 
 ${SelfName}TestSuite.test("initFromInteger") {
-  if true {
+  do {
     let word: Int = 0x12345678
     let ptr = ${SelfType}(bitPattern: word)
     expectEqual(word, unsafeBitCast(ptr, to: Int.self))
   }
-  if true {
+  do {
     let uword: UInt = 0x12345678
     let ptr = ${SelfType}(bitPattern: uword)
     expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))

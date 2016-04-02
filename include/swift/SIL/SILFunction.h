@@ -20,6 +20,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILLinkage.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
@@ -36,6 +37,24 @@ enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
 enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
+
+class SILSpecializeAttr final :
+    private llvm::TrailingObjects<SILSpecializeAttr, Substitution> {
+  friend TrailingObjects;
+
+  unsigned numSubs;
+  
+  SILSpecializeAttr(ArrayRef<Substitution> subs);
+
+public:
+  static SILSpecializeAttr *create(SILModule &M, ArrayRef<Substitution> subs);
+
+  ArrayRef<Substitution> getSubstitutions() const {
+    return { getTrailingObjects<Substitution>(), numSubs };
+  }
+  
+  void print(llvm::raw_ostream &OS) const;
+};
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
@@ -139,6 +158,9 @@ private:
   /// TODO: Why is this using a std::string? Why don't we use uniqued
   /// StringRefs?
   llvm::SmallVector<std::string, 1> SemanticsAttrSet;
+
+  /// The function's remaining set of specialize attributes.
+  std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
@@ -303,6 +325,10 @@ public:
   /// Set the function's linkage attribute.
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
+  /// Returns true if this function can be referenced from a fragile function
+  /// body.
+  bool hasValidLinkageForFragileRef() const;
+
   /// Get's the effective linkage which is used to derive the llvm linkage.
   /// Usually this is the same as getLinkage(), except in one case: if this
   /// function is a method in a class which has higher visibility than the
@@ -382,6 +408,18 @@ public:
     auto Iter =
         std::remove(SemanticsAttrSet.begin(), SemanticsAttrSet.end(), Ref);
     SemanticsAttrSet.erase(Iter);
+  }
+
+  /// \returns the range of specialize attributes.
+  ArrayRef<SILSpecializeAttr*> getSpecializeAttrs() const {
+    return SpecializeAttrSet;
+  }
+
+  /// Removes all specialize attributes from this function.
+  void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
+
+  void addSpecializeAttr(SILSpecializeAttr *attr) {
+    SpecializeAttrSet.push_back(attr);
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
@@ -631,25 +669,16 @@ public:
   /// cannot be opened.
   void dump(const char *FileName) const;
 
-  // Helper for SILFunction::print().
-  struct ScopeSlotTracker {
-    llvm::DenseMap<const SILDebugScope *, unsigned> ScopeToIDMap;
-    unsigned ScopeIndex = 0;
-  };
-
-  /// Pretty-print the SILFunction with the designated stream as a 'sil'
-  /// definition.
+  /// Pretty-print the SILFunction to the tream \p OS.
   ///
-  /// \param Verbose In verbose mode, print the SIL locations.
-  void print(raw_ostream &OS, bool Verbose = false,
-             bool SortedSIL = false) const {
-    SILFunction::ScopeSlotTracker Tracker;
-    print(OS, Tracker, Verbose, SortedSIL);
+  /// \param Verbose Dump SIL location information in verbose mode.
+  void print(raw_ostream &OS, bool Verbose = false) const {
+    SILPrintContext PrintCtx(OS, Verbose);
+    print(PrintCtx);
   }
 
-  /// Version of print that accepts a ScopeSlotTracker.
-  void print(raw_ostream &OS, ScopeSlotTracker &ScopeTracker, bool Verbose,
-             bool SortedSIL) const;
+  /// Pretty-print the SILFunction with the context \p PrintCtx.
+  void print(SILPrintContext &PrintCtx) const;
 
   /// Pretty-print the SILFunction's name using SIL syntax,
   /// '@function_mangled_name'.

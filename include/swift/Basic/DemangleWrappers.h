@@ -16,8 +16,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_DEMANGLE_WRAPPERS_H
-#define SWIFT_BASIC_DEMANGLE_WRAPPERS_H
+#ifndef SWIFT_BASIC_DEMANGLEWRAPPERS_H
+#define SWIFT_BASIC_DEMANGLEWRAPPERS_H
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
@@ -57,5 +57,4 @@ demangleTypeAsString(StringRef MangledTypeName,
 } // end namespace demangle_wrappers
 } // end namespace swift
 
-#endif // LLVM_SWIFT_BASIC_DEMANGLE_WRAPPERS_H
-
+#endif // SWIFT_BASIC_DEMANGLEWRAPPERS_H

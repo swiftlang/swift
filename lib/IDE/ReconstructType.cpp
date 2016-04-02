@@ -1058,6 +1058,15 @@ static void VisitNodeConstructor(
           case TypeKind::Function: {
             const AnyFunctionType *identifier_func =
                 identifier_type->getAs<AnyFunctionType>();
+
+            // inits are typed as (Foo.Type) -> (args...) -> Foo, but don't
+            // assert that in case we're dealing with broken code.
+            if (identifier_func->getInput()->is<AnyMetatypeType>() &&
+                identifier_func->getResult()->is<AnyFunctionType>()) {
+              identifier_func =
+                  identifier_func->getResult()->getAs<AnyFunctionType>();
+            }
+
             const AnyFunctionType *type_func =
                 type_result._types.front()->getAs<AnyFunctionType>();
             if (CanType(identifier_func->getResult()

@@ -75,7 +75,7 @@ public struct EmptyCollection<Element> : Collection {
 public struct EmptyGenerator<Element> {}
 
 extension EmptyIterator {
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> EmptyIterator<Element> {
     fatalError("unavailable function can't be called")
   }

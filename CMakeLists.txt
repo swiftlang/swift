@@ -32,6 +32,10 @@ option(SWIFT_SERIALIZE_STDLIB_UNITTEST
     "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
     FALSE)
 
+option(SWIFT_STDLIB_SIL_DEBUGGING
+    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    FALSE)
+
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
@@ -58,6 +62,10 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
+option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
+       "Use the host compiler and not the internal clang to build the swift runtime"
+       FALSE)
+
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
     "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
@@ -78,7 +86,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc")
+    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
@@ -87,6 +95,7 @@ set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
 # components would approximately correspond to packages in a Debian-style Linux
 # packaging.  The following components are defined:
 #
+# * autolink-driver -- the Swift driver support tools
 # * compiler -- the Swift compiler and (on supported platforms) the REPL.
 # * clang-builtin-headers -- install a copy of Clang builtin headers under
 #   'lib/swift/clang'.  This is useful when Swift compiler is installed in
@@ -206,9 +215,18 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
 
+option(SWIFT_STDLIB_SIL_SERIALIZE_ALL
+    "Build the standard libraries and overlays serializing all method bodies"
+    TRUE)
+
 if(SWIFT_SERIALIZE_STDLIB_UNITTEST AND SWIFT_STDLIB_ENABLE_RESILIENCE)
   message(WARNING "Ignoring SWIFT_SERIALIZE_STDLIB_UNITTEST because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
   set(SWIFT_SERIALIZE_STDLIB_UNITTEST FALSE)
+endif()
+
+if(SWIFT_STDLIB_SIL_SERIALIZE_ALL AND SWIFT_STDLIB_ENABLE_RESILIENCE)
+  message(WARNING "Ignoring SWIFT_STDLIB_SIL_SERIALIZE_ALL because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
+  set(SWIFT_STDLIB_SIL_SERIALIZE_ALL FALSE)
 endif()
 
 #
@@ -685,6 +703,12 @@ if(SWIFT_BUILD_TOOLS)
 endif()
 add_subdirectory(utils)
 add_subdirectory(stdlib)
+
+if(SWIFT_BUILD_TOOLS)
+  add_subdirectory(tools/swift-reflection-test)
+  add_subdirectory(tools/swift-reflection-dump)
+endif()
+
 if(SWIFT_BUILD_PERF_TESTSUITE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   add_subdirectory(benchmark)
 endif()

@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_DIVERSESTACK_H
-#define SWIFT_IRGEN_DIVERSESTACK_H
+#ifndef SWIFT_BASIC_DIVERSESTACK_H
+#define SWIFT_BASIC_DIVERSESTACK_H
 
 #include "swift/Basic/Malloc.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
@@ -34,7 +34,7 @@ template <class T> class DiverseStackImpl;
 ///
 /// \tparam T - A common base class of the objects on the stack; must
 ///   provide an allocated_size() const method.
-/// \tparam InlineCapacity - the amount of inline storage to provide, in bytes
+/// \tparam InlineCapacity - the amount of inline storage to provide, in bytes.
 template <class T, unsigned InlineCapacity>
 class DiverseStack : public DiverseStackImpl<T> {
   char InlineStorage[InlineCapacity];
@@ -106,7 +106,7 @@ public:
       return a.Depth == b.Depth;
     }
     friend bool operator!=(stable_iterator a, stable_iterator b) {
-      return a.Depth != b.Depth;
+      return !operator==(a, b);
     }
 
     static stable_iterator invalid() {
@@ -256,7 +256,7 @@ public:
       return *this;
     }
     iterator operator++(int _) {
-      iterator copy = *this;
+      auto copy = *this;
       operator++();
       return copy;
     }
@@ -269,7 +269,7 @@ public:
     }
 
     friend bool operator==(iterator a, iterator b) { return a.Ptr == b.Ptr; }
-    friend bool operator!=(iterator a, iterator b) { return a.Ptr != b.Ptr; }
+    friend bool operator!=(iterator a, iterator b) { return !operator==(a, b); }
   };
 
   using DiverseStackBase::checkIterator;
@@ -304,7 +304,7 @@ public:
       return *this;
     }
     const_iterator operator++(int _) {
-      const_iterator copy = *this;
+      auto copy = *this;
       operator++();
       return copy;
     }
@@ -320,7 +320,7 @@ public:
       return a.Ptr == b.Ptr;
     }
     friend bool operator!=(const_iterator a, const_iterator b) {
-      return a.Ptr != b.Ptr;
+      return !operator==(a, b);
     }
   };
   const_iterator begin() const { checkValid(); return const_iterator(Begin); }
@@ -380,4 +380,4 @@ namespace llvm {
   };
 }
 
-#endif
+#endif // SWIFT_BASIC_DIVERSESTACK_H

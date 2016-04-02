@@ -56,6 +56,8 @@ class Mangler {
   bool DWARFMangling;
   /// If enabled, non-ASCII names are encoded in modified Punycode.
   bool UsePunycode;
+  /// Optimize out protocol names if a type only conforms to one protocol.
+  bool OptimizeProtocolNames;
 
 public:
   enum BindGenerics : unsigned {
@@ -100,8 +102,10 @@ public:
   /// archetypes and the 'a' mangling for alias types.
   /// \param usePunycode - emit modified Punycode instead of UTF-8.
   Mangler(bool DWARFMangling = false,
-          bool usePunycode = true)
-    : Buffer(Storage), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
+          bool usePunycode = true,
+          bool OptimizeProtocolNames = true)
+    : Buffer(Storage), DWARFMangling(DWARFMangling), UsePunycode(usePunycode),
+      OptimizeProtocolNames(OptimizeProtocolNames) {}
   void mangleContextOf(const ValueDecl *decl, BindGenerics shouldBind);
   void mangleContext(const DeclContext *ctx, BindGenerics shouldBind);
   void mangleModule(const ModuleDecl *module);

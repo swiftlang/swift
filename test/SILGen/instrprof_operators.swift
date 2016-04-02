@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -profile-generate %s | FileCheck %s
 
 // CHECK: sil hidden @[[F_OPERATORS:.*operators.*]] :
-// CHECK: %[[NAME:.*]] = string_literal utf8 "[[F_OPERATORS]]"
+// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_operators.swift:[[F_OPERATORS]]"
 // CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
 // CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 4
 // CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
@@ -10,7 +10,7 @@ func operators(a : Bool, b : Bool) {
   let c = a && b
   let d = a || b
 
-// CHECK: %[[NAME:.*]] = string_literal utf8 "[[F_OPERATORS]]"
+// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_operators.swift:[[F_OPERATORS]]"
 // CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
 // CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 4
 // CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 3
@@ -21,7 +21,7 @@ func operators(a : Bool, b : Bool) {
 }
 
 // CHECK: implicit closure
-// CHECK: %[[NAME:.*]] = string_literal utf8 "[[F_OPERATORS]]"
+// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_operators.swift:[[F_OPERATORS]]"
 // CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
 // CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 4
 // CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 1
@@ -29,7 +29,7 @@ func operators(a : Bool, b : Bool) {
 // CHECK-NOT: builtin "int_instrprof_increment"
 
 // CHECK: implicit closure
-// CHECK: %[[NAME:.*]] = string_literal utf8 "[[F_OPERATORS]]"
+// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_operators.swift:[[F_OPERATORS]]"
 // CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
 // CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 4
 // CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 2

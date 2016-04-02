@@ -1254,7 +1254,6 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 /// Generic functions and protocol witnesses carry polymorphic parameters.
 bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   switch (ty->getRepresentation()) {
-  case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
     // Should never be polymorphic.
     assert(!ty->isPolymorphic() && "polymorphic C function?!");
@@ -1263,8 +1262,13 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
-  case SILFunctionTypeRepresentation::ObjCMethod:
     return ty->isPolymorphic();
+
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+    // May be polymorphic at the SIL level, but no type metadata is actually
+    // passed.
+    return false;
 
   case SILFunctionTypeRepresentation::WitnessMethod:
     // Always carries polymorphic parameters for the Self type.
@@ -1453,8 +1457,6 @@ namespace {
 
   private:
     void initGenerics() {
-      assert(hasPolymorphicParameters(FnType));
-
       // The canonical mangling signature removes dependent types that are
       // equal to concrete types, but isn't necessarily parallel with
       // substitutions.

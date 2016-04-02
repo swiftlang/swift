@@ -245,6 +245,7 @@ Type TypeChecker::resolveTypeInContext(
   bool nonTypeOwner = !ownerDC->isTypeContext();
   auto ownerNominal = ownerDC->getAsNominalTypeOrNominalTypeExtensionContext();
   auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
+  auto alias = dyn_cast<TypeAliasDecl>(typeDecl);
   DeclContext *typeParent = nullptr;
   assert((ownerNominal || nonTypeOwner) &&
          "Owner must be a nominal type or a non type context");
@@ -317,6 +318,33 @@ Type TypeChecker::resolveTypeInContext(
             }
           }
         }
+      }
+    }
+    
+    // If we found an alias type in an inherited protocol, resolve it based on our
+    // own `Self`.
+    if (alias && alias->hasInterfaceType()) {
+      auto metaType = alias->getInterfaceType()->getAs<MetatypeType>();
+      auto memberType = metaType ? metaType->getInstanceType()->getAs<DependentMemberType>() :
+                        nullptr;
+
+      if (memberType && parentDC->getAsProtocolOrProtocolExtensionContext()) {
+        auto protoSelf = parentDC->getProtocolSelf();
+        auto selfTy = protoSelf->getDeclaredType()->castTo<GenericTypeParamType>();
+        auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
+
+        SmallVector<DependentMemberType *, 4> memberTypes;
+        do {
+          memberTypes.push_back(memberType);
+          memberType = memberType->getBase()->getAs<DependentMemberType>();
+        } while (memberType);
+
+        auto module = parentDC->getParentModule();
+        while (memberTypes.size()) {
+          baseTy = memberTypes.back()->substBaseType(module, baseTy, nullptr);
+          memberTypes.pop_back();
+        }
+        return baseTy;
       }
     }
 
@@ -514,6 +542,7 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
   auto unbound = ty->castTo<UnboundGenericType>();
   tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,
               unbound->getDecl()->getName());
+  // TODO: emit fixit for "NSArray" -> "NSArray<AnyObject>", etc.
 }
 
 /// \brief Returns a valid type or ErrorType in case of an error.
@@ -2490,7 +2519,7 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
       if (!CD)
         break;
 
-      if (CD->getGenericParams()) {
+      if (!CD->hasClangNode() && CD->getGenericParams()) {
         if (diagnose) {
           tc.diagnose(value->getLoc(), diag::objc_in_generic_extension);
         }
@@ -2988,8 +3017,8 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for classes.
-  if (auto *CT = T->getAs<ClassType>()) {
-    if (!CT->getDecl()->isObjC())
+  if (auto *CD = T->getClassOrBoundGenericClass()) {
+    if (!CD->isObjC())
       diagnose(TypeRange.Start, diag::not_objc_swift_class)
           .highlight(TypeRange);
     return;

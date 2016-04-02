@@ -473,7 +473,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            !TC.UsedConformances.empty());
 
-  // FIXME: Horrible hack. Store this somewhere more sane.
+  // FIXME: Horrible hack. Store this somewhere more appropriate.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
 
   // Compute captures for functions and closures we visited.

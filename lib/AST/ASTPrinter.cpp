@@ -40,12 +40,14 @@
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
+#include <queue>
 
 using namespace swift;
 namespace swift {
@@ -206,6 +208,24 @@ public:
 };
 
 struct SynthesizedExtensionAnalyzer::Implementation {
+  static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
+    DeclContext* DC = Target->getDeclContext();
+    Type BaseTy = Target->getDeclaredTypeInContext();
+    const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    if (!FD)
+      return true;
+    ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
+                                                    FD->getEffectiveFullName());
+    return !(Result && Result.Favored != D);
+  }
+
+  static bool isExtensionFavored(const NominalTypeDecl* Target,
+                                 const ExtensionDecl *ED) {
+    return std::find_if(ED->getMembers().begin(), ED->getMembers().end(),
+      [&](DeclIterator It) { return isMemberFavored(Target, *It);}) !=
+        ED->getMembers().end();
+  }
+
   struct SynthesizedExtensionInfo {
     ExtensionDecl *Ext = nullptr;
     std::vector<StringRef> KnownSatisfiedRequirements;
@@ -213,6 +233,29 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     operator bool() const { return Ext; }
     SynthesizedExtensionInfo(bool IsSynthesized = true) :
       IsSynthesized(IsSynthesized) {}
+    bool operator< (const SynthesizedExtensionInfo& Rhs) const {
+
+      // Synthesized are always after actual ones.
+       if (IsSynthesized != Rhs.IsSynthesized)
+         return !IsSynthesized;
+
+      // If not from the same file, sort by file name.
+      if (auto LFile = Ext->getSourceFileName()) {
+        if (auto RFile = Rhs.Ext->getSourceFileName()) {
+          int Result = LFile.getValue().compare(RFile.getValue());
+          if (Result != 0)
+            return Result < 0;
+        }
+      }
+
+      // Otherwise, sort by source order.
+      if (auto LeftOrder = Ext->getSourceOrder()) {
+        if (auto RightOrder = Rhs.Ext->getSourceOrder()) {
+          return LeftOrder.getValue() < RightOrder.getValue();
+        }
+      }
+      return false;
+    }
   };
 
   struct ExtensionMergeInfo {
@@ -234,21 +277,21 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     };
 
     bool HasDocComment;
-    bool HasInherits;
+    unsigned InheritsCount;
     std::set<Requirement> Requirements;
     void addRequirement(Type First, Type Second, RequirementReprKind Kind) {
       Requirements.insert({First, Second, Kind});
     }
     bool operator== (const ExtensionMergeInfo& Another) const {
-      // Trivially unmergable.
+      // Trivially unmergeable.
       if (HasDocComment || Another.HasDocComment)
         return false;
-      if (HasInherits || Another.HasInherits)
+      if (InheritsCount != 0 || Another.InheritsCount != 0)
         return false;
       return Requirements == Another.Requirements;
     }
-    bool isMergableWithTypeDef() {
-      return !HasDocComment && !HasInherits && Requirements.empty();
+    bool isMergeableWithTypeDef() {
+      return !HasDocComment && InheritsCount == 0 && Requirements.empty();
     }
   };
 
@@ -256,13 +299,40 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   typedef llvm::MapVector<ExtensionDecl*, ExtensionMergeInfo> ExtensionMergeInfoMap;
 
   struct ExtensionMergeGroup {
+
+    unsigned RequirementsCount;
+    unsigned InheritanceCount;
     MergeGroupKind Kind;
     std::vector<SynthesizedExtensionInfo*> Members;
+
     ExtensionMergeGroup(SynthesizedExtensionInfo *Info,
-                        bool MergableWithType) {
+                        unsigned RequirementsCount,
+                        unsigned InheritanceCount,
+                        bool MergeableWithType) :
+      RequirementsCount(RequirementsCount),
+      InheritanceCount(InheritanceCount),
+      Kind(MergeableWithType ? MergeGroupKind::MergeableWithTypeDef :
+                               MergeGroupKind::UnmergeableWithTypeDef) {
       Members.push_back(Info);
-      Kind = MergableWithType ? MergeGroupKind::Uncontraint :
-                                MergeGroupKind::Contraint;
+    }
+
+    void removeUnfavored(const NominalTypeDecl *Target) {
+      Members.erase(std::remove_if(Members.begin(), Members.end(),
+        [&](SynthesizedExtensionInfo *Info){
+          return !isExtensionFavored(Target, Info->Ext);}), Members.end());
+    }
+
+    void sortMembers() {
+      std::sort(Members.begin(), Members.end(),
+                [](SynthesizedExtensionInfo *LHS, SynthesizedExtensionInfo *RHS) {
+                  return (*LHS) < (*RHS);
+                });
+    }
+
+    bool operator< (const ExtensionMergeGroup& Rhs) const {
+      if (RequirementsCount == Rhs.RequirementsCount)
+        return InheritanceCount < Rhs.InheritanceCount;
+      return RequirementsCount < Rhs.RequirementsCount;
     }
   };
 
@@ -351,12 +421,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   }
 
 
-  bool hasInherits(ExtensionDecl *ED) {
+  unsigned countInherits(ExtensionDecl *ED) {
+    unsigned Count = 0;
     for (auto TL : ED->getInherited()) {
       if (shouldPrint(TL.getType()->getAnyNominal(), Options))
-        return true;
+        Count ++;
     }
-    return false;
+    return Count;
   }
 
   std::pair<SynthesizedExtensionInfo, ExtensionMergeInfo>
@@ -364,14 +435,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     SynthesizedExtensionInfo Result(IsSynthesized);
     ExtensionMergeInfo MergeInfo;
     MergeInfo.HasDocComment = !Ext->getRawComment().isEmpty();
-    MergeInfo.HasInherits = hasInherits(Ext);
+    MergeInfo.InheritsCount = countInherits(Ext);
     if (!Ext->isConstrainedExtension()) {
       if (IncludeUnconditional)
         Result.Ext = Ext;
       return {Result, MergeInfo};
     }
     assert(Ext->getGenericParams() && "No generic params.");
-    for (auto Req : Ext->getGenericParams()->getRequirements()){
+    for (auto Req : Ext->getGenericParams()->getRequirements()) {
       auto TupleOp = Req.getAsAnalyzedWrittenString();
       if (!TupleOp)
         continue;
@@ -414,7 +485,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   void populateMergeGroup(ExtensionInfoMap &InfoMap,
                           ExtensionMergeInfoMap &MergeInfoMap,
-                          MergeGroupVector &Results) {
+                          MergeGroupVector &Results,
+                          bool AllowMergeWithDefBody) {
     for (auto &Pair : InfoMap) {
       ExtensionDecl *ED = Pair.first;
       ExtensionMergeInfo &MergeInfo = MergeInfoMap[ED];
@@ -424,7 +496,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         return MergeInfo == MergeInfoMap[Group.Members.front()->Ext];
       });
       if (Found == Results.end()) {
-        Results.push_back({&ExtInfo, MergeInfo.isMergableWithTypeDef()});
+        Results.push_back({&ExtInfo,
+                          (unsigned)MergeInfo.Requirements.size(),
+                          MergeInfo.InheritsCount,
+                  AllowMergeWithDefBody && MergeInfo.isMergeableWithTypeDef()});
       } else {
         Found->Members.push_back(&ExtInfo);
       }
@@ -432,13 +507,36 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   }
 
   std::unique_ptr<ExtensionInfoMap>
-  collectSynthesizedExtensionInfo(MergeGroupVector &AllGroups) {
+  collectSynthesizedExtensionInfoForProtocol(MergeGroupVector &AllGroups) {
     std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
-    if (Target->getKind() == DeclKind::Protocol)
-      return InfoMap;
+    ExtensionMergeInfoMap MergeInfoMap;
+    for (auto *E : Target->getExtensions()) {
+      if (!shouldPrint(E, Options))
+        continue;
+      auto Pair = isApplicable(E, /*Synthesized*/false);
+      if (Pair.first) {
+        InfoMap->insert({E, Pair.first});
+        MergeInfoMap.insert({E, Pair.second});
+      }
+    }
+    populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups,
+                       /*AllowMergeWithDefBody*/false);
+    std::sort(AllGroups.begin(), AllGroups.end());
+    for (auto &Group : AllGroups) {
+      Group.sortMembers();
+    }
+    return InfoMap;
+  }
+
+  std::unique_ptr<ExtensionInfoMap>
+  collectSynthesizedExtensionInfo(MergeGroupVector &AllGroups) {
+    if (Target->getKind() == DeclKind::Protocol) {
+      return collectSynthesizedExtensionInfoForProtocol(AllGroups);
+    }
+    std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
     ExtensionMergeInfoMap MergeInfoMap;
     std::vector<NominalTypeDecl*> Unhandled;
-    auto addTypeLocNominal = [&](TypeLoc TL){
+    auto addTypeLocNominal = [&](TypeLoc TL) {
       if (TL.getType()) {
         if (auto D = TL.getType()->getAnyNominal()) {
           Unhandled.push_back(D);
@@ -476,7 +574,18 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     }
 
-    populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups);
+    populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups,
+                      /*AllowMergeWithDefBody*/true);
+
+    std::sort(AllGroups.begin(), AllGroups.end());
+    for (auto &Group : AllGroups) {
+      Group.removeUnfavored(Target);
+      Group.sortMembers();
+    }
+    AllGroups.erase(std::remove_if(AllGroups.begin(), AllGroups.end(),
+      [](ExtensionMergeGroup &Group) { return Group.Members.empty(); }),
+      AllGroups.end());
+
     return InfoMap;
   }
 };
@@ -658,6 +767,24 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   return Builder.str();
 }
 
+ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
+  assert(VD->getRawComment().isEmpty());
+  std::queue<ValueDecl*> AllConformances;
+  AllConformances.push(VD);
+  while(!AllConformances.empty()) {
+    auto *VD = AllConformances.front();
+    AllConformances.pop();
+    if (VD->getRawComment().isEmpty()) {
+      for (auto *Req : VD->getSatisfiedProtocolRequirements()) {
+        AllConformances.push(Req);
+      }
+    } else {
+      return VD;
+    }
+  }
+  return nullptr;
+}
+
 bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
                                     llvm::raw_ostream &OS) {
   if (!Ty)
@@ -741,13 +868,14 @@ void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
 }
 
-void ASTPrinter::callPrintDeclPre(const Decl *D) {
+void ASTPrinter::callPrintDeclPre(const Decl *D,
+                                  Optional<BracketOptions> Bracket) {
   forceNewlines();
 
   if (SynthesizeTarget && D->getKind() == DeclKind::Extension)
-    printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget);
+    printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget, Bracket);
   else
-    printDeclPre(D);
+    printDeclPre(D, Bracket);
 }
 
 ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
@@ -919,11 +1047,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printSwiftDocumentationComment(const Decl *D) {
-    auto RC = D->getRawComment();
-    if (RC.isEmpty())
-      return;
-
+  void printRawComment(RawComment RC) {
     indent();
 
     SmallVector<StringRef, 8> Lines;
@@ -938,6 +1062,23 @@ class PrintAST : public ASTVisitor<PrintAST> {
         Printer << Line;
         Printer.printNewline();
       }
+    }
+  }
+
+  void printSwiftDocumentationComment(const Decl *D) {
+    auto RC = D->getRawComment();
+    if (RC.isEmpty() && !Options.ElevateDocCommentFromConformance)
+      return;
+
+    if (RC.isEmpty()) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (auto *Req = ASTPrinter::findConformancesWithDocComment(
+            const_cast<ValueDecl*>(VD))) {
+          printRawComment(Req->getRawComment());
+        }
+      }
+    } else {
+      printRawComment(RC);
     }
   }
 
@@ -1116,14 +1257,15 @@ public:
       }
     }
 
-    Printer.callPrintDeclPre(D);
+    Printer.callPrintDeclPre(D, Options.BracketOptions);
     ASTVisitor::visit(D);
     if (Synthesize) {
       Printer.setSynthesizedTarget(nullptr);
       Printer.printSynthesizedExtensionPost(
-          cast<ExtensionDecl>(D), Options.TransformContext->getNominal());
+          cast<ExtensionDecl>(D), Options.TransformContext->getNominal(),
+          Options.BracketOptions);
     } else {
-      Printer.callPrintDeclPost(D);
+      Printer.callPrintDeclPost(D, Options.BracketOptions);
     }
     return true;
   }
@@ -1400,7 +1542,23 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
+static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
+  if (!Options.TransformContext || !D->getDeclContext()->isExtensionContext() ||
+      !Options.TransformContext->isPrintingSynthesizedExtension())
+    return true;
+  NominalTypeDecl *Target = Options.TransformContext->getNominal();
+  Type BaseTy = Target->getDeclaredTypeInContext();
+  const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+  if (!FD)
+    return true;
+  ResolveMemberResult Result = resolveValueMember(*Target->getDeclContext(),
+                                                  BaseTy, FD->getEffectiveFullName());
+  return !(Result && Result.Favored != D);
+}
+
 bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
+  if (!shouldPrintAsFavorable(D, Options))
+    return false;
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -1467,6 +1625,28 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->getOverriddenDecl()) return false;
       if (!VD->getSatisfiedProtocolRequirements().empty()) return false;
+
+      if (auto clangDecl = VD->getClangDecl()) {
+        // If the Clang declaration is from a protocol but was mirrored into
+        // class or extension thereof, treat it as an override.
+        if (isa<clang::ObjCProtocolDecl>(clangDecl->getDeclContext()) &&
+            VD->getDeclContext()->getAsClassOrClassExtensionContext())
+          return false;
+
+        // Check whether Clang considers it an override.
+        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+          SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+          objcMethod->getOverriddenMethods(overriddenMethods);
+          if (!overriddenMethods.empty()) return false;
+        } else if (auto objcProperty
+                     = dyn_cast<clang::ObjCPropertyDecl>(clangDecl)) {
+          if (auto getter = objcProperty->getGetterMethodDecl()) {
+            SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+            getter->getOverriddenMethods(overriddenMethods);
+            if (!overriddenMethods.empty()) return false;
+          }
+        }
+      }
     }
   }
 
@@ -1975,7 +2155,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
 
 void PrintAST::
 printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
-  if (Options.shouldOpenExtension) {
+  if (Options.BracketOptions.shouldOpenExtension(ExtDecl)) {
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";
@@ -1995,13 +2175,13 @@ printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(ExtDecl, false,
-                       Options.shouldOpenExtension,
-                       Options.shouldCloseExtension);
+                       Options.BracketOptions.shouldOpenExtension(ExtDecl),
+                       Options.BracketOptions.shouldCloseExtension(ExtDecl));
   }
 }
 
 void PrintAST::printExtension(ExtensionDecl* decl) {
-  if (Options.shouldOpenExtension) {
+  if (Options.BracketOptions.shouldOpenExtension(decl)) {
     printDocumentationComment(decl);
     printAttributes(decl);
     Printer << "extension ";
@@ -2023,8 +2203,8 @@ void PrintAST::printExtension(ExtensionDecl* decl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false,
-                       Options.shouldOpenExtension,
-                       Options.shouldCloseExtension);
+                       Options.BracketOptions.shouldOpenExtension(decl),
+                       Options.BracketOptions.shouldCloseExtension(decl));
   }
 }
 
@@ -2170,7 +2350,8 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
     printInherited(decl);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2195,7 +2376,8 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
     printInherited(decl);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2222,7 +2404,8 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   }
 
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2264,7 +2447,8 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     printInherited(decl, explicitClass);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl, false, true, Options.shouldCloseNominal);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2416,14 +2600,15 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
     RemoveFunc(DAK_AutoClosure);
 
 
-  if (Options.PrintDefaultParameterPlaceholder &&
-      param->isDefaultArgument()) {
-    Printer << " = ";
+  if (param->isDefaultArgument()) {
     auto defaultArgStr
       = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
     if (defaultArgStr.empty()) {
-      Printer << tok::kw_default;
+      if (Options.PrintDefaultParameterPlaceholder)
+        Printer << " = " << tok::kw_default;
     } else {
+      Printer << " = ";
+
       switch (param->getDefaultArgumentKind()) {
       case DefaultArgumentKind::File:
       case DefaultArgumentKind::Line:
@@ -2436,7 +2621,6 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
         Printer << defaultArgStr;
         break;
       }
-
     }
   }
 }
@@ -3359,6 +3543,9 @@ public:
   }
 
   void visitTupleType(TupleType *T) {
+    Printer.callPrintStructurePre(PrintStructureKind::TupleType);
+    defer { Printer.printStructurePost(PrintStructureKind::TupleType); };
+
     Printer << "(";
 
     auto Fields = T->getElements();

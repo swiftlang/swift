@@ -670,6 +670,10 @@ public:
     return getConstantInfo(constant).SILFnType;
   }
   
+  /// Returns the SILParameterInfo for the given declaration's `self` parameter.
+  /// `constant` must refer to a method.
+  SILParameterInfo getConstantSelfParameter(SILDeclRef constant);
+  
   /// Returns the SILFunctionType the given declaration must use to override.
   /// Will be the same as getConstantFunctionType if the declaration does
   /// not override.
@@ -777,11 +781,6 @@ public:
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
-
-  /// Get the linkage for a protocol conformance's witness table.
-  static SILLinkage getLinkageForProtocolConformance(
-                                             const NormalProtocolConformance *C,
-                                             ForDefinition_t definition);
 
   /// Get the capture list from a closure, with transitive function captures
   /// flattened.

@@ -174,6 +174,20 @@ FUNCTION(NativeSetDeallocating, swift_setDeallocating,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_nonatomic_retain_n(void *ptr, int32_t n);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRetainN, swift_nonatomic_retain_n,
+         _swift_nonatomic_retain_n, _swift_nonatomic_retain_n_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_release_n(void *ptr, int32_t n);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongReleaseN, swift_nonatomic_release_n,
+         _swift_nonatomic_release_n, _swift_nonatomic_release_n_,  RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
 // void swift_unknownRetain_n(void *ptr, int32_t n);
 FUNCTION(UnknownRetainN, swift_unknownRetain_n,
          DefaultCC,
@@ -183,6 +197,20 @@ FUNCTION(UnknownRetainN, swift_unknownRetain_n,
 
 // void swift_unknownRelease_n(void *ptr, int32_t n);
 FUNCTION(UnknownReleaseN, swift_unknownRelease_n,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unknownRetain_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnknownRetainN, swift_nonatomic_unknownRetain_n,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unknownRelease_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnknownReleaseN, swift_nonatomic_unknownRelease_n,
          DefaultCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, Int32Ty),
@@ -202,9 +230,37 @@ FUNCTION(BridgeObjectReleaseN, swift_bridgeObjectRelease_n,
          ARGS(BridgeObjectPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
+// void swift_nonatomic_bridgeObjectRetain_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicBridgeObjectRetainN, swift_nonatomic_bridgeObjectRetain_n,
+         DefaultCC,
+         RETURNS(BridgeObjectPtrTy),
+         ARGS(BridgeObjectPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_bridgeObjectRelease_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicBridgeObjectReleaseN, swift_nonatomic_bridgeObjectRelease_n,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(BridgeObjectPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_retain(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRetain, swift_nonatomic_retain,
+         _swift_nonatomic_retain, _swift_nonatomic_retain_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // void *swift_tryPin(void *ptr);
 FUNCTION(NativeTryPin, swift_tryPin, RegisterPreservingCC,
          RETURNS(RefCountedPtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_release(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRelease, swift_nonatomic_release,
+         _swift_nonatomic_release, _swift_nonatomic_release_, RegisterPreservingCC,
+         RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
@@ -228,6 +284,18 @@ FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(IsDeallocating, swift_isDeallocating,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ZExt))
 
+// void *swift_nonatomic_tryPin(void *ptr);
+FUNCTION(NonAtomicNativeTryPin, swift_nonatomic_tryPin, RegisterPreservingCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unpin(void *ptr);
+FUNCTION(NonAtomicNativeUnpin, swift_nonatomic_unpin, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_unknownRetain(void *ptr);
 FUNCTION(UnknownRetain, swift_unknownRetain, DefaultCC,
          RETURNS(VoidTy),
@@ -236,6 +304,18 @@ FUNCTION(UnknownRetain, swift_unknownRetain, DefaultCC,
 
 // void swift_unknownRelease(void *ptr);
 FUNCTION(UnknownRelease, swift_unknownRelease, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unknownRetain(void *ptr);
+FUNCTION(NonAtomicUnknownRetain, swift_nonatomic_unknownRetain, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownRelease(void *ptr);
+FUNCTION(NonAtomicUnknownRelease, swift_nonatomic_unknownRelease, DefaultCC,
          RETURNS(VoidTy),
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind))
@@ -251,6 +331,19 @@ FUNCTION(BridgeObjectStrongRelease, swift_bridgeObjectRelease, DefaultCC,
          RETURNS(VoidTy),
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind))
+
+// void *swift_nonatomic_bridgeObjectRetain(void *ptr);
+FUNCTION(NonAtomicBridgeObjectStrongRetain, swift_nonatomic_bridgeObjectRetain, DefaultCC,
+         RETURNS(BridgeObjectPtrTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_bridgeRelease(void *ptr);
+FUNCTION(NonAtomicBridgeObjectStrongRelease, swift_nonatomic_bridgeObjectRelease, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind))
+
 
 // error *swift_errorRetain(error *ptr);
 FUNCTION(ErrorStrongRetain, swift_errorRetain, DefaultCC,
@@ -568,12 +661,6 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, DefaultCC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// Metadata *swift_getResilientMetadata(GenericMetadata *pattern);
-FUNCTION(GetResilientMetadata, swift_getResilientMetadata, DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPatternPtrTy),
-         ATTRS(NoUnwind, ReadOnly))
-
 // Metadata *swift_getGenericMetadata(GenericMetadata *pattern,
 //                                    const void *arguments);
 FUNCTION(GetGenericMetadata, swift_getGenericMetadata, RegisterPreservingCC,
@@ -664,13 +751,13 @@ FUNCTION(GetExistentialMetadata,
          ATTRS(NoUnwind, ReadOnly))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };
-// void swift_initClassMetadata_UniversalStrategy(Metadata *self,
-//                                                size_t numFields,
-//                                                const FieldInfo *fields,
-//                                                size_t *fieldOffsets);
+// Metadata *swift_initClassMetadata_UniversalStrategy(Metadata *self,
+//                                                     size_t numFields,
+//                                                     const FieldInfo *fields,
+//                                                     size_t *fieldOffsets);
 FUNCTION(InitClassMetadataUniversal,
          swift_initClassMetadata_UniversalStrategy, DefaultCC,
-         RETURNS(VoidTy),
+         RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, SizeTy,
               SizeTy->getPointerTo(),
               SizeTy->getPointerTo()),
@@ -934,10 +1021,6 @@ FUNCTION(RegisterTypeMetadataRecords,
          ARGS(TypeMetadataRecordPtrTy, TypeMetadataRecordPtrTy),
          ATTRS(NoUnwind))
 
-FUNCTION(InitializeSuperclass, swift_initializeSuperclass, DefaultCC,
-         RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, Int1Ty),
-         ATTRS(NoUnwind))
 FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, DefaultCC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy),

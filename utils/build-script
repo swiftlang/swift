@@ -170,6 +170,7 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /lldb                       (optional)
                      /llbuild                    (optional)
                      /swiftpm                    (optional, requires llbuild)
+                     /compiler-rt                (optional)
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)
                      /swift-corelibs-libdispatch (optional)
@@ -545,6 +546,11 @@ build the Debug variant of the Swift standard library and SDK overlay""",
     run_tests_group.add_argument(
         "--skip-test-cygwin",
         help="skip testing Swift stdlibs for Cygwin",
+        action="store_true")
+    parser.add_argument(
+        "--build-runtime-with-host-compiler",
+        help="Use the host compiler, not the self-built one to compile the " +
+        "Swift runtime",
         action="store_true")
 
     parser.add_argument(
@@ -1090,6 +1096,8 @@ the number of parallel build jobs to use""",
         build_script_impl_args += ["--skip-test-watchos-host"]
     if args.skip_test_watchos_simulator:
         build_script_impl_args += ["--skip-test-watchos-simulator"]
+    if args.build_runtime_with_host_compiler:
+        build_script_impl_args += ["--build-runtime-with-host-compiler"]
     build_script_impl_args += build_script_impl_inferred_args
 
     # If we have extra_swift_args, combine all of them together and then add

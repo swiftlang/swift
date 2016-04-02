@@ -83,6 +83,6 @@ namespace swift {
       return (intptr_t)Storage;
     }
   };
-}
+} // end namespace swift
   
-#endif
+#endif // SWIFT_BASIC_OPTIONALENUM_H

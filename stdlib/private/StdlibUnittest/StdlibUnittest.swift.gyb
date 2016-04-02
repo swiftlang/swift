@@ -443,20 +443,49 @@ var _allTestSuites: [TestSuite] = []
 var _testSuiteNameToIndex: [String : Int] = [:]
 
 let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
+let _crashedPrefix = "CRASHED:"
 
 @_silgen_name("swift_stdlib_installTrapInterceptor")
 func _stdlib_installTrapInterceptor()
 
+#if _runtime(_ObjC)
+@objc protocol _StdlibUnittestNSException {
+  optional var name: AnyObject { get }
+}
+#endif
+
 func _childProcess() {
   _stdlib_installTrapInterceptor()
+
+#if _runtime(_ObjC)
+  objc_setUncaughtExceptionHandler {
+    var stderr = _Stderr()
+    let maybeNSException = unsafeBitCast($0, to:_StdlibUnittestNSException.self)
+    if let name = maybeNSException.name {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception " +
+        "\(name): \($0)",
+        to: &stderr)
+    } else {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception: \($0)",
+        to: &stderr)      
+    }
+  }
+#endif
+
   while let line = _stdlib_getline() {
     let parts = line._split(separator: ";")
     let testSuiteName = parts[0]
     let testName = parts[1]
+    var testParameter: Int?
+    if parts.count > 2 {
+      testParameter = Int(parts[2])!
+    } else {
+      testParameter = nil
+    }
 
     let testSuite = _allTestSuites[_testSuiteNameToIndex[testSuiteName]!]
     _anyExpectFailed = false
-    testSuite._runTest(testName)
+    testSuite._runTest(name: testName, parameter: testParameter)
 
     print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
 
@@ -507,15 +536,23 @@ struct _ParentProcess {
   }
 
   /// Returns the values of the corresponding variables in the child process.
-  mutating func _runTestInChild(testSuite: TestSuite, _ testName: String)
-    -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
+  internal mutating func _runTestInChild(
+    testSuite: TestSuite,
+    _ testName: String,
+    parameter: Int?
+  ) -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
         status: ProcessTerminationStatus?,
         crashStdout: [String], crashStderr: [String]) {
     if _pid <= 0 {
       _spawnChild()
     }
 
-    print("\(testSuite.name);\(testName)", to: &_childStdin)
+    print("\(testSuite.name);\(testName)", terminator: "", to: &_childStdin)
+    if let parameter = parameter {
+      print(";", terminator: "", to: &_childStdin)
+      print(parameter, terminator: "", to: &_childStdin)
+    }
+    print("", to: &_childStdin)
 
     let currentTest = testSuite._testByName(testName)
     if let stdinText = currentTest.stdinText {
@@ -579,7 +616,7 @@ struct _ParentProcess {
           if stdoutSeenCrashDelimiter {
             capturedCrashStdout.append(line)
           }
-          print("out>>> \(line)")
+          print("stdout>>> \(line)")
         }
         continue
       }
@@ -604,8 +641,11 @@ struct _ParentProcess {
           }
           if stderrSeenCrashDelimiter {
             capturedCrashStderr.append(line)
+            if findSubstring(line, _crashedPrefix) != nil {
+              line = "OK: saw expected \"\(line.lowercased())\""
+            }
           }
-          print("err>>> \(line)")
+          print("stderr>>> \(line)")
         }
         continue
       }
@@ -641,6 +681,100 @@ struct _ParentProcess {
       capturedCrashStdout, capturedCrashStderr)
   }
 
+  internal enum _TestStatus {
+    case skip([TestRunPredicate])
+    case pass
+    case fail
+    case uxPass
+    case xFail
+  }
+
+  internal mutating func runOneTest(
+    fullTestName fullTestName: String,
+    testSuite: TestSuite,
+    test t: TestSuite._Test,
+    testParameter: Int?
+  ) -> _TestStatus {
+    let activeSkips = t.getActiveSkipPredicates()
+    if !activeSkips.isEmpty {
+      return .skip(activeSkips)
+    }
+
+    let activeXFails = t.getActiveXFailPredicates()
+    let expectXFail = !activeXFails.isEmpty
+    let activeXFailsText = expectXFail ? " (XFAIL: \(activeXFails))" : ""
+    print("[ RUN      ] \(fullTestName)\(activeXFailsText)")
+
+    var expectCrash = false
+    var childTerminationStatus: ProcessTerminationStatus? = nil
+    var crashStdout: [String] = []
+    var crashStderr: [String] = []
+    if _runTestsInProcess {
+      if t.stdinText != nil {
+        print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
+        _anyExpectFailed = true
+      } else {
+        _anyExpectFailed = false
+        testSuite._runTest(name: t.name, parameter: testParameter)
+      }
+    } else {
+      (_anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
+       crashStderr) =
+        _runTestInChild(testSuite, t.name, parameter: testParameter)
+    }
+
+    // Determine if the test passed, not taking XFAILs into account.
+    var testPassed = false
+    switch (childTerminationStatus, expectCrash) {
+    case (.none, false):
+      testPassed = !_anyExpectFailed
+
+    case (.none, true):
+      testPassed = false
+      print("expecting a crash, but the test did not crash")
+
+    case (.some(_), false):
+      testPassed = false
+      print("the test crashed unexpectedly")
+
+    case (.some(_), true):
+      testPassed = !_anyExpectFailed
+    }
+    if testPassed && t.crashOutputMatches.count > 0 {
+      // If we still think that the test passed, check if the crash
+      // output matches our expectations.
+      let crashOutput = crashStdout + crashStderr
+      for expectedSubstring in t.crashOutputMatches {
+        var found = false
+        for s in crashOutput {
+          if findSubstring(s, expectedSubstring) != nil {
+            found = true
+            break
+          }
+        }
+        if !found {
+          print("did not find expected string after crash: \(expectedSubstring.debugDescription)")
+          testPassed = false
+        }
+      }
+    }
+
+    // Apply XFAILs.
+    switch (testPassed, expectXFail) {
+    case (true, false):
+      return .pass
+
+    case (true, true):
+      return .uxPass
+
+    case (false, false):
+      return .fail
+
+    case (false, true):
+      return .xFail
+    }
+  }
+
   mutating func run() {
     if let filter = _filter {
       print("StdlibUnittest: using filter: \(filter)")
@@ -650,92 +784,43 @@ struct _ParentProcess {
       var failedTests: [String] = []
       var skippedTests: [String] = []
       for t in testSuite._tests {
-        let fullTestName = "\(testSuite.name).\(t.name)"
-        if let filter = _filter where findSubstring(fullTestName, filter) == nil {
-          continue
-        }
-
-        let activeSkips = t.getActiveSkipPredicates()
-        if !activeSkips.isEmpty {
-          skippedTests += [ t.name ]
-          print("[ SKIP     ] \(fullTestName) (skip: \(activeSkips))")
-          continue
-        }
-
-        let activeXFails = t.getActiveXFailPredicates()
-        let expectXFail = !activeXFails.isEmpty
-        let activeXFailsText = expectXFail ? " (XFAIL: \(activeXFails))" : ""
-        print("[ RUN      ] \(fullTestName)\(activeXFailsText)")
-
-        var expectCrash = false
-        var childTerminationStatus: ProcessTerminationStatus? = nil
-        var crashStdout: [String] = []
-        var crashStderr: [String] = []
-        if _runTestsInProcess {
-          if t.stdinText != nil {
-            print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
-            _anyExpectFailed = true
-          } else {
-            _anyExpectFailed = false
-            testSuite._runTest(t.name)
+        for testParameter in t.parameterValues {
+          var testName = t.name
+          if let testParameter = testParameter {
+            testName += "/"
+            testName += String(testParameter)
           }
-        } else {
-          (_anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
-           crashStderr) =
-            _runTestInChild(testSuite, t.name)
-        }
+          let fullTestName = "\(testSuite.name).\(testName)"
+          if let filter = _filter
+            where findSubstring(fullTestName, filter) == nil {
 
-        // Determine if the test passed, not taking XFAILs into account.
-        var testPassed = false
-        switch (childTerminationStatus, expectCrash) {
-        case (.none, false):
-          testPassed = !_anyExpectFailed
-
-        case (.none, true):
-          testPassed = false
-          print("expecting a crash, but the test did not crash")
-
-        case (.some(_), false):
-          testPassed = false
-          print("the test crashed unexpectedly")
-
-        case (.some(_), true):
-          testPassed = !_anyExpectFailed
-        }
-        if testPassed && t.crashOutputMatches.count > 0 {
-          // If we still think that the test passed, check if the crash
-          // output matches our expectations.
-          let crashOutput = crashStdout + crashStderr
-          for expectedCrashOutput in t.crashOutputMatches {
-            var found = false
-            for s in crashOutput {
-              if findSubstring(s, expectedCrashOutput) != nil {
-                found = true
-                break
-              }
-            }
-            if !found {
-              print("did not find expected string after crash: \(expectedCrashOutput.debugDescription)")
-              testPassed = false
-            }
+            continue
           }
-        }
 
-        // Apply XFAILs.
-        switch (testPassed, expectXFail) {
-        case (true, false):
-          print("[       OK ] \(fullTestName)")
+          switch runOneTest(
+            fullTestName: fullTestName,
+            testSuite: testSuite,
+            test: t,
+            testParameter: testParameter
+          ) {
+          case .skip(let activeSkips):
+            skippedTests.append(testName)
+            print("[ SKIP     ] \(fullTestName) (skip: \(activeSkips))")
 
-        case (true, true):
-          uxpassedTests += [ t.name ]
-          print("[   UXPASS ] \(fullTestName)")
+          case .pass:
+            print("[       OK ] \(fullTestName)")
 
-        case (false, false):
-          failedTests += [ t.name ]
-          print("[     FAIL ] \(fullTestName)")
+          case .uxPass:
+            uxpassedTests.append(testName)
+            print("[   UXPASS ] \(fullTestName)")
 
-        case (false, true):
-          print("[    XFAIL ] \(fullTestName)")
+          case .fail:
+            failedTests.append(testName)
+            print("[     FAIL ] \(fullTestName)")
+
+          case .xFail:
+            print("[    XFAIL ] \(fullTestName)")
+          }
         }
       }
 
@@ -901,7 +986,7 @@ public class TestSuite {
     _testTearDownCode = code
   }
 
-  func _runTest(testName: String) {
+  func _runTest(name testName: String, parameter: Int?) {
     PersistentState.ranSomething = true
     for r in _allResettables {
       r.reset()
@@ -911,7 +996,15 @@ public class TestSuite {
       f()
     }
     let test = _testByName(testName)
-    test.code()
+    switch test.code {
+    case .single(let code):
+      precondition(
+        parameter == nil,
+        "can't pass parameters to non-parameterized tests")
+      code()
+    case .parameterized(code: let code, _):
+      code(parameter!)
+    }
     if let f = _testTearDownCode {
       f()
     }
@@ -924,7 +1017,12 @@ public class TestSuite {
     return _tests[_testNameToIndex[testName]!]
   }
 
-  struct _Test {
+  internal enum _TestCode {
+    case single(code: () -> Void)
+    case parameterized(code: (Int) -> Void, count: Int)
+  }
+
+  internal struct _Test {
     let name: String
     let testLoc: SourceLoc
     let xfail: [TestRunPredicate]
@@ -932,7 +1030,7 @@ public class TestSuite {
     let stdinText: String?
     let stdinEndsWithEOF: Bool
     let crashOutputMatches: [String]
-    let code: () -> Void
+    let code: _TestCode
 
     /// Whether the test harness should stop reusing the child process after
     /// running this test.
@@ -946,6 +1044,15 @@ public class TestSuite {
 
     func getActiveSkipPredicates() -> [TestRunPredicate] {
       return skip.filter { $0.evaluate() }
+    }
+
+    var parameterValues: [Int?] {
+      switch code {
+      case .single:
+        return [nil]
+      case .parameterized(code: _, count: let count):
+        return (0..<count).map { $0 }
+      }
     }
   }
 
@@ -990,15 +1097,29 @@ public class TestSuite {
       return self
     }
 
-    public func code(testFunction: () -> Void) {
+    internal func _build(testCode: _TestCode) {
       _testSuite._tests.append(
         _Test(
           name: _name, testLoc: _data._testLoc!, xfail: _data._xfail,
           skip: _data._skip,
           stdinText: _data._stdinText,
           stdinEndsWithEOF: _data._stdinEndsWithEOF,
-          crashOutputMatches: _data._crashOutputMatches, code: testFunction))
+          crashOutputMatches: _data._crashOutputMatches,
+          code: testCode))
       _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
+    }
+
+    public func code(testFunction: () -> Void) {
+      _build(.single(code: testFunction))
+    }
+
+    public func forEach<Data>(
+      in parameterSets: [Data],
+      testFunction: (Data) -> Void
+    ) {
+      _build(.parameterized(
+        code: { (i: Int) in testFunction(parameterSets[i]) },
+        count: parameterSets.count))
     }
   }
 

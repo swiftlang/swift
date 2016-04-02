@@ -44,8 +44,8 @@ public:
     Projected operator*() const { return Project(*Ptr); }
     iterator &operator++() { Ptr++; return *this; }
     iterator operator++(int) { return iterator(Ptr++); }
-    bool operator==(iterator rhs) { return Ptr == rhs.Ptr; }
-    bool operator!=(iterator rhs) { return Ptr != rhs.Ptr; }
+    bool operator==(iterator rhs) const { return Ptr == rhs.Ptr; }
+    bool operator!=(iterator rhs) const { return Ptr != rhs.Ptr; }
 
     iterator &operator+=(difference_type i) {
       Ptr += i;
@@ -100,6 +100,6 @@ public:
   }
 };
 
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_ARRAYREFVIEW_H

@@ -4,6 +4,16 @@
 // XFAIL: interpret
 // REQUIRES: objc_interop
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 // CHECK: testing...
 print("testing...")
 
@@ -39,9 +49,6 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return C.self
-  }
   func _bridgeToObjectiveC() -> C {
     return C()
   }
@@ -79,9 +86,6 @@ testBridging(PlainClass(), "PlainClass")
 
 //===----------------------------------------------------------------------===//
 struct ConditionallyBridged<T> : _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return C.self
-  }
   func _bridgeToObjectiveC() -> C {
     return C()
   }

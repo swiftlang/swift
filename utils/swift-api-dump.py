@@ -85,8 +85,6 @@ def create_parser():
     parser.add_argument('-i', '--swift-ide-test',
                         default=default_swift_ide_test,
                         help="The swift-ide-test executable.")
-    parser.add_argument('-3', '--swift-3', action='store_true',
-                        help="Use Swift 3 transformation")
     parser.add_argument('-o', '--output-dir', default=os.getcwd(),
                         help='Directory to which the output will be emitted.')
     parser.add_argument('-q', '--quiet', action='store_true',
@@ -97,6 +95,9 @@ def create_parser():
                         help='Add additional framework directories')
     parser.add_argument('-I', '--include-dir', action='append',
                         help='Add additional include directories')
+    parser.add_argument('--enable-infer-import-as-member', action='store_true',
+                        help='Infer when a global could be imported as a ' +
+                        'member.')
     return parser
 
 
@@ -289,10 +290,8 @@ def main():
 
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
-    if args.swift_3:
-        extra_args = extra_args + \
-            ['-enable-omit-needless-words', '-enable-infer-default-arguments']
-
+    if args.enable_infer_import_as_member:
+        extra_args = extra_args + ['-enable-infer-import-as-member']
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])
 

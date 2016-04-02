@@ -15,13 +15,6 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 // Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
@@ -132,13 +125,13 @@ struct InstrumentedIndex<I : RandomAccessIndex> : RandomAccessIndex {
 }
 
 tests.test("AnySequence.init(Sequence)") {
-  if true {
+  do {
     let base = MinimalSequence<OpaqueValue<Int>>(elements: [])
     var s = AnySequence(base)
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
   }
-  if true {
+  do {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
     let data = intData.map(OpaqueValue.init)
     let base = MinimalSequence(elements: data)
@@ -149,14 +142,14 @@ tests.test("AnySequence.init(Sequence)") {
 }
 
 tests.test("AnySequence.init(() -> Generator)") {
-  if true {
+  do {
     var s = AnySequence {
       return MinimalIterator<OpaqueValue<Int>>([])
     }
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
   }
-  if true {
+  do {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
     let data = intData.map(OpaqueValue.init)
     var s = AnySequence {

@@ -77,6 +77,11 @@
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
+// Skip through unavailable typedefs when importing types.
+// TAG_DECLS_AND_TYPEDEFS: @available(*, unavailable, message: "use double")
+// TAG_DECLS_AND_TYPEDEFS-NEXT: typealias real_t = Double
+// TAG_DECLS_AND_TYPEDEFS-NEXT: func realSin(value: Double) -> Double
+
 // NEGATIVE-NOT: typealias FooStructTypedef2
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
@@ -95,6 +100,8 @@
 // FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
+// FOUNDATION-NEXT: {{^}}  @available(*, unavailable, message: "use [] to construct an empty option set"){{$}}
+// FOUNDATION-NEXT: {{^}}  static var none: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var enableMince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var enableQuince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}

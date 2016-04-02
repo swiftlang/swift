@@ -11,7 +11,7 @@ protocol Unloadable {
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types21address_only_argument
-func address_only_argument(let x: Unloadable) {
+func address_only_argument(x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : $*Unloadable):
   // CHECK: debug_value_addr [[XARG]]
   // CHECK-NEXT: destroy_addr [[XARG]]
@@ -28,7 +28,7 @@ func address_only_ignored_argument(_: Unloadable) {
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types19address_only_return
-func address_only_return(let x: Unloadable, let y: Int) -> Unloadable {
+func address_only_return(x: Unloadable, y: Int) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64):
   // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
   // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
@@ -44,7 +44,7 @@ func address_only_missing_return() -> Unloadable {
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types39address_only_conditional_missing_return
-func address_only_conditional_missing_return(let x: Unloadable) -> Unloadable {
+func address_only_conditional_missing_return(x: Unloadable) -> Unloadable {
   // CHECK: bb0({{%.*}} : $*Unloadable, {{%.*}} : $*Unloadable):
   // CHECK:   switch_enum {{%.*}}, case #Bool.true_!enumelt: [[TRUE:bb[0-9]+]], case #Bool.false_!enumelt: [[FALSE:bb[0-9]+]]
   switch Bool.true_ {
@@ -112,7 +112,7 @@ func address_only_call_1_ignore_return() {
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types19address_only_call_2
-func address_only_call_2(let x: Unloadable) {
+func address_only_call_2(x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : $*Unloadable):
   // CHECK: debug_value_addr [[XARG]] : $*Unloadable
   some_address_only_function_2(x)
@@ -203,7 +203,7 @@ func address_only_assignment_from_temp_to_property() {
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types43address_only_assignment_from_lv_to_property
-func address_only_assignment_from_lv_to_property(let v: Unloadable) {
+func address_only_assignment_from_lv_to_property(v: Unloadable) {
   // CHECK: bb0([[VARG:%[0-9]+]] : $*Unloadable):
   // CHECK: debug_value_addr [[VARG]] : $*Unloadable
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable

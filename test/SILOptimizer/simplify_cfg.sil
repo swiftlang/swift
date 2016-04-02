@@ -572,7 +572,7 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: @dead_loop
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 sil @dead_loop : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0           // users: %1, %4

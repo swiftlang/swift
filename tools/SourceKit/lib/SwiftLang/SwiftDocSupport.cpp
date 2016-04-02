@@ -17,11 +17,11 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
@@ -57,17 +57,34 @@ struct TextRange {
 
 struct TextEntity {
   const Decl *Dcl = nullptr;
+  const Decl *SynthesizeTarget = nullptr;
+  const Decl *DefaultImplementationOf = nullptr;
   StringRef Argument;
   TextRange Range;
   unsigned LocOffset = 0;
   std::vector<TextEntity> SubEntities;
+  const bool IsSynthesizedExtension;
 
-  TextEntity(const Decl *D, unsigned StartOffset)
-    : Dcl(D), Range{StartOffset, 0} {}
-  TextEntity(const Decl *D, TextRange TR, unsigned LocOffset)
-    : Dcl(D), Range(TR), LocOffset(LocOffset) {}
-  TextEntity(const Decl *D, StringRef Arg, TextRange TR, unsigned LocOffset)
-    : Dcl(D), Argument(Arg), Range(TR), LocOffset(LocOffset) {}
+  TextEntity(const Decl *D, const Decl *SynthesizeTarget,
+             const Decl* DefaultImplementationOf,
+             unsigned StartOffset, bool IsSynthesizedExtension)
+    : Dcl(D), SynthesizeTarget(SynthesizeTarget),
+      DefaultImplementationOf(DefaultImplementationOf), Range{StartOffset, 0},
+      IsSynthesizedExtension(IsSynthesizedExtension) {}
+
+  TextEntity(const Decl *D, const Decl *SynthesizeTarget,
+             const Decl* DefaultImplementationOf, TextRange TR,
+             unsigned LocOffset, bool IsSynthesizedExtension) : Dcl(D),
+             DefaultImplementationOf(DefaultImplementationOf), Range(TR),
+              LocOffset(LocOffset),
+              IsSynthesizedExtension(IsSynthesizedExtension) {}
+
+  TextEntity(const Decl *D, const Decl *SynthesizeTarget,
+             const Decl* DefaultImplementationOf, StringRef Arg,
+             TextRange TR, unsigned LocOffset, bool IsSynthesizedExtension)
+    : Dcl(D), SynthesizeTarget(SynthesizeTarget),
+      DefaultImplementationOf(DefaultImplementationOf), Argument(Arg), Range(TR),
+      LocOffset(LocOffset), IsSynthesizedExtension(IsSynthesizedExtension) {}
 };
 
 struct TextReference {
@@ -80,6 +97,47 @@ struct TextReference {
 };
 
 class AnnotatingPrinter : public StreamPrinter {
+  const NominalTypeDecl *SynthesizeTarget = nullptr;
+
+  typedef llvm::SmallDenseMap<ValueDecl*, ValueDecl*> DefaultImplementMap;
+  llvm::SmallDenseMap<ProtocolDecl*, DefaultImplementMap> AllDefaultMaps;
+  DefaultImplementMap *DefaultMapToUse = nullptr;
+
+  void initDefaultMapToUse(const Decl *D) {
+    const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D);
+    if (!ED)
+      return;
+    if (ED->getExtendedType()) {
+      if (auto NTD = ED->getExtendedType()->getAnyNominal()) {
+        if (ProtocolDecl *PD = dyn_cast<ProtocolDecl>(NTD)) {
+          auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
+          DefaultMapToUse = &Pair.first->getSecond();
+          if (Pair.second) {
+            swift::collectDefaultImplementationForProtocolMembers(PD,
+                                                      Pair.first->getSecond());
+          }
+        }
+      }
+    }
+  }
+
+  void deinitDefaultMapToUse(const Decl*D) {
+    if (D->getKind() == DeclKind::Extension) {
+      DefaultMapToUse = nullptr;
+    }
+  }
+
+  ValueDecl *getDefaultImplementation(const Decl *D) {
+    if (!DefaultMapToUse)
+      return nullptr;
+    ValueDecl *VD = const_cast<ValueDecl*>(dyn_cast<ValueDecl>(D));
+    auto Found = DefaultMapToUse->find(VD);
+    if (Found != DefaultMapToUse->end()) {
+      return Found->second;
+    }
+    return nullptr;
+  }
+
 public:
   std::vector<TextEntity> TopEntities;
   std::vector<TextEntity> EntitiesStack;
@@ -91,11 +149,58 @@ public:
     assert(EntitiesStack.empty());
   }
 
-  void printDeclPre(const Decl *D) override {
+  bool shouldContinuePre(const Decl *D, Optional<BracketOptions> Bracket) {
+    assert(Bracket.hasValue());
+    if (!Bracket.getValue().shouldOpenExtension(D) &&
+        D->getKind() == DeclKind::Extension)
+      return false;
+    return true;
+  }
+
+  bool shouldContinuePost(const Decl *D, Optional<BracketOptions> Bracket) {
+    assert(Bracket.hasValue());
+    if (!Bracket.getValue().shouldCloseNominal(D) && dyn_cast<NominalTypeDecl>(D))
+      return false;
+    if (!Bracket.getValue().shouldCloseExtension(D) &&
+        D->getKind() == DeclKind::Extension)
+      return false;
+    return true;
+  }
+
+  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                                    const NominalTypeDecl *NTD,
+                                    Optional<BracketOptions> Bracket) override {
+    assert(!SynthesizeTarget);
+    SynthesizeTarget = NTD;
+    if (!shouldContinuePre(ED, Bracket))
+      return;
+    unsigned StartOffset = OS.tell();
+    EntitiesStack.emplace_back(ED, SynthesizeTarget, nullptr, StartOffset, true);
+  }
+
+  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                     const NominalTypeDecl *NTD,
+                                     Optional<BracketOptions> Bracket) override {
+    assert(SynthesizeTarget);
+    SynthesizeTarget = nullptr;
+    if (!shouldContinuePost(ED, Bracket))
+      return;
+    TextEntity Entity = std::move(EntitiesStack.back());
+    EntitiesStack.pop_back();
+    unsigned EndOffset = OS.tell();
+    Entity.Range.Length = EndOffset - Entity.Range.Offset;
+    TopEntities.push_back(std::move(Entity));
+  }
+
+  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
     if (isa<ParamDecl>(D))
       return; // Parameters are handled specially in addParameters().
+    if (!shouldContinuePre(D, Bracket))
+      return;
     unsigned StartOffset = OS.tell();
-    EntitiesStack.emplace_back(D, StartOffset);
+    initDefaultMapToUse(D);
+    EntitiesStack.emplace_back(D, SynthesizeTarget, getDefaultImplementation(D),
+                               StartOffset, false);
   }
 
   void printDeclLoc(const Decl *D) override {
@@ -105,19 +210,24 @@ public:
     }
   }
 
-  void printDeclPost(const Decl *D) override {
+  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
     if (isa<ParamDecl>(D))
       return; // Parameters are handled specially in addParameters().
-
-    assert(EntitiesStack.back().Dcl == D);
+    if (!shouldContinuePost(D, Bracket))
+      return;
+    assert(!EntitiesStack.empty());
     TextEntity Entity = std::move(EntitiesStack.back());
     EntitiesStack.pop_back();
     unsigned EndOffset = OS.tell();
     Entity.Range.Length = EndOffset - Entity.Range.Offset;
-    if (EntitiesStack.empty())
+    if (EntitiesStack.empty()) {
+      assert (D->getDeclContext()->isModuleScopeContext());
       TopEntities.push_back(std::move(Entity));
-    else
+    } else {
+      assert (!D->getDeclContext()->isModuleScopeContext());
       EntitiesStack.back().SubEntities.push_back(std::move(Entity));
+    }
+    deinitDefaultMapToUse(D);
   }
 
   void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
@@ -169,7 +279,10 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   }
 }
 
-static bool initDocEntityInfo(const Decl *D, bool IsRef, DocEntityInfo &Info,
+static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
+                              const Decl *DefaultImplementationOf,
+                              bool IsRef, bool IsSynthesizedExtension,
+                              DocEntityInfo &Info,
                               StringRef Arg = StringRef()) {
   if (!D || isa<ParamDecl>(D) ||
       (isa<VarDecl>(D) && D->getDeclContext()->isLocalContext())) {
@@ -187,28 +300,78 @@ static bool initDocEntityInfo(const Decl *D, bool IsRef, DocEntityInfo &Info,
     return false;
   }
 
-  Info.Kind = SwiftLangSupport::getUIDForDecl(D, IsRef);
+  if (IsSynthesizedExtension)
+    Info.Kind = SwiftLangSupport::getUIDForExtensionOfDecl(SynthesizedTarget);
+  else
+    Info.Kind = SwiftLangSupport::getUIDForDecl(D, IsRef);
+
   if (Info.Kind.isInvalid())
     return true;
   if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
     llvm::raw_svector_ostream NameOS(Info.Name);
     SwiftLangSupport::printDisplayName(VD, NameOS);
-
-    llvm::raw_svector_ostream OS(Info.USR);
-    SwiftLangSupport::printUSR(VD, OS);
+    {
+      llvm::raw_svector_ostream OS(Info.USR);
+      SwiftLangSupport::printUSR(VD, OS);
+      if (SynthesizedTarget) {
+        OS << SwiftLangSupport::SynthesizedUSRSeparator;
+        SwiftLangSupport::printUSR(dyn_cast<ValueDecl>(SynthesizedTarget), OS);
+        {
+          llvm::raw_svector_ostream OS(Info.OriginalUSR);
+          SwiftLangSupport::printUSR(VD, OS);
+        }
+      }
+    }
   }
+
+  if (DefaultImplementationOf) {
+    llvm::raw_svector_ostream OS(Info.ProvideImplementationOfUSR);
+    SwiftLangSupport::printUSR((ValueDecl*)DefaultImplementationOf, OS);
+  }
+
   Info.IsUnavailable = AvailableAttr::isUnavailable(D);
   Info.IsDeprecated = D->getAttrs().getDeprecated(D->getASTContext()) != nullptr;
+  Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
 
   if (!IsRef) {
     llvm::raw_svector_ostream OS(Info.DocComment);
-    ide::getDocumentationCommentAsXML(D, OS);
+
+    {
+      llvm::SmallString<128> DocBuffer;
+      {
+        llvm::raw_svector_ostream OSS(DocBuffer);
+        ide::getDocumentationCommentAsXML(D, OSS);
+      }
+      StringRef DocRef = (StringRef)DocBuffer;
+      if (IsSynthesizedExtension &&
+          DocRef.find("<Declaration>") != StringRef::npos) {
+        StringRef Open = "<Declaration>extension ";
+        assert(DocRef.find(Open) != StringRef::npos);
+        auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
+        auto SecondPart = DocRef.substr(FirstPart.size());
+        auto ExtendedName = ((ExtensionDecl*)D)->getExtendedType()->
+          getAnyNominal()->getName().str();
+        assert(SecondPart.startswith(ExtendedName));
+        SecondPart = SecondPart.substr(ExtendedName.size());
+        llvm::SmallString<128> UpdatedDocBuffer;
+        UpdatedDocBuffer.append(FirstPart);
+        UpdatedDocBuffer.append(((NominalTypeDecl*)SynthesizedTarget)->getName().
+                                str());
+        UpdatedDocBuffer.append(SecondPart);
+        OS << UpdatedDocBuffer;
+      } else
+        OS << DocBuffer;
+    }
 
     initDocGenericParams(D, Info);
 
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       llvm::raw_svector_ostream OS(Info.FullyAnnotatedDecl);
-      SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
+      if (SynthesizedTarget)
+        SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(VD,
+          (NominalTypeDecl*)SynthesizedTarget, OS);
+      else
+        SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
     }
   }
 
@@ -217,7 +380,10 @@ static bool initDocEntityInfo(const Decl *D, bool IsRef, DocEntityInfo &Info,
 
 static bool initDocEntityInfo(const TextEntity &Entity,
                               DocEntityInfo &Info) {
-  if (initDocEntityInfo(Entity.Dcl, /*IsRef=*/false, Info, Entity.Argument))
+  if (initDocEntityInfo(Entity.Dcl, Entity.SynthesizeTarget,
+                        Entity.DefaultImplementationOf,
+                        /*IsRef=*/false, Entity.IsSynthesizedExtension,
+                        Info, Entity.Argument))
     return true;
   Info.Offset = Entity.Range.Offset;
   Info.Length = Entity.Range.Length;
@@ -232,13 +398,13 @@ static const TypeDecl *getTypeDeclFromType(Type Ty) {
 
 static void passInherits(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, /*IsRef=*/true, EntInfo))
+  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, false, EntInfo))
     return;
   Consumer.handleInheritsEntity(EntInfo);
 }
 static void passConforms(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, /*IsRef=*/true, EntInfo))
+  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, false, EntInfo))
     return;
   Consumer.handleConformsToEntity(EntInfo);
 }
@@ -274,20 +440,24 @@ static void passConforms(ArrayRef<ValueDecl *> Dcls,
 }
 static void passExtends(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, /*IsRef=*/true, EntInfo))
+  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, false, EntInfo))
     return;
   Consumer.handleExtendsEntity(EntInfo);
 }
 
 static void reportRelated(ASTContext &Ctx,
                           const Decl *D,
+                          const Decl* SynthesizedTarget,
                           DocInfoConsumer &Consumer) {
   if (!D || isa<ParamDecl>(D))
     return;
   if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (Type T = ED->getExtendedType())
+    if (SynthesizedTarget) {
+      passExtends((ValueDecl*)SynthesizedTarget, Consumer);
+    } else if (Type T = ED->getExtendedType()) {
       if (auto TD = getTypeDeclFromType(T))
         passExtends(TD, Consumer);
+    }
 
     passInherits(ED->getInherited(), Consumer);
 
@@ -368,7 +538,9 @@ static void reportDocEntities(ASTContext &Ctx,
     if (initDocEntityInfo(Entity, EntInfo))
       continue;
     Consumer.startSourceEntity(EntInfo);
-    reportRelated(Ctx, Entity.Dcl, Consumer);
+    reportRelated(Ctx, Entity.Dcl,
+          Entity.IsSynthesizedExtension ? Entity.SynthesizeTarget : nullptr,
+                  Consumer);
     reportDocEntities(Ctx, Entity.SubEntities, Consumer);
     reportAttributes(Ctx, Entity.Dcl, Consumer);
     Consumer.finishSourceEntity(EntInfo.Kind);
@@ -481,7 +653,8 @@ private:
       const TextReference &Ref = References.front();
       References = References.slice(1);
       DocEntityInfo Info;
-      if (initDocEntityInfo(Ref.Dcl, /*IsRef=*/true, Info))
+      if (initDocEntityInfo(Ref.Dcl, nullptr, nullptr, /*IsRef=*/true, false,
+                            Info))
         continue;
       Info.Offset = Ref.Range.Offset;
       Info.Length = Ref.Range.Length;
@@ -545,7 +718,7 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
         SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
                                 BufferID);
       TextRange TR{ StartOffs, EndOffs-StartOffs };
-      TextEntity Param(param, Arg, TR, StartOffs);
+      TextEntity Param(param, nullptr, nullptr, Arg, TR, StartOffs, false);
       Ent.SubEntities.push_back(std::move(Param));
     }
   }
@@ -676,8 +849,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
-  printModuleInterface(M, TraversalOptions, Printer, Options, false);
-
+  printModuleInterface(M, None, TraversalOptions, Printer, Options,
+                       true);
   Info.Text = OS.str();
   Info.TopEntities = std::move(Printer.TopEntities);
   Info.References = std::move(Printer.References);
@@ -739,7 +912,7 @@ public:
       return true;
     TextRange TR = getTextRange(D->getSourceRange());
     unsigned LocOffset = getOffset(Range.getStart());
-    EntitiesStack.emplace_back(D, TR, LocOffset);
+    EntitiesStack.emplace_back(D, nullptr, nullptr, TR, LocOffset, false);
     return true;
   }
 

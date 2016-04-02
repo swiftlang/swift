@@ -762,8 +762,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.Playground |= Args.hasArg(OPT_playground);
   Opts.Swift3Migration |= Args.hasArg(OPT_swift3_migration);
   Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
-  Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
-  Opts.StripNSPrefix = Args.hasArg(OPT_enable_strip_ns_prefix);
+  Opts.StripNSPrefix |= Args.hasArg(OPT_enable_strip_ns_prefix);
+  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
+  if (Args.hasArg(OPT_disable_infer_iuos)) {
+    Opts.InferIUOs = false;
+  }
+  Opts.ImportObjCGenerics = Args.hasArg(OPT_enable_import_objc_generics);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 
@@ -874,13 +878,13 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     });
   }
 
-  Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
-  Opts.InferDefaultArguments |= Args.hasArg(OPT_enable_infer_default_arguments);
-  Opts.UseSwiftLookupTables |= Args.hasArg(OPT_enable_swift_name_lookup_tables);
+  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.Mode = ClangImporterOptions::Modes::EmbedBitcode;
+
+  Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   return false;
 }
@@ -1071,6 +1075,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
 
+  if (Args.hasArg(OPT_debug_on_sil)) {
+    // Derive the name of the SIL file for debugging from
+    // the regular outputfile.
+    StringRef BaseName = FEOpts.getSingleOutputFilename();
+    // If there are no or multiple outputfiles, derive the name
+    // from the module name.
+    if (BaseName.empty())
+      BaseName = FEOpts.ModuleName;
+    Opts.SILOutputFileNameForDebugging = BaseName.str();
+  }
   return false;
 }
 
@@ -1107,12 +1121,15 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
+                           const SILOptions &SILOpts,
                            StringRef SDKPath,
                            StringRef ResourceDir,
                            const llvm::Triple &Triple) {
   using namespace options;
 
-  if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
+  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
+      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+  } else if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
     if (A->getOption().matches(OPT_g))
       Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
@@ -1178,7 +1195,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
-  if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {
+  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
+    Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
+  } else if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {
     unsigned Index = FrontendOpts.PrimaryInput->Index;
     Opts.MainInputFilename = FrontendOpts.InputFilenames[Index];
   } else if (FrontendOpts.InputFilenames.size() == 1) {
@@ -1310,7 +1329,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts,
+  if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts, SILOpts,
                      getSDKPath(), SearchPathOpts.RuntimeResourcePath,
                      LangOpts.Target)) {
     return true;

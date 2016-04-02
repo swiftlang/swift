@@ -9,6 +9,8 @@
 @property (nonnull, readonly) NSSet *nonnullSet;
 @property (nonnull, readonly) NSString *nonnullString;
 
+@property (class, nonnull, readonly) NSString *nonnullSharedString;
+
 // Subscripts still have thunks wrapped around them.
 - (nonnull NSArray *)objectAtIndexedSubscript:(long)index;
 @end

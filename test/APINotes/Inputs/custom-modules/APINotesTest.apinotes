@@ -5,3 +5,11 @@ Functions:
 Globals:
   - Name: ANTGlobalValue
     SwiftName: global
+Tags:
+  - Name: PointStruct
+    SwiftName: Point
+Typedefs:
+  - Name: real_t
+    SwiftName: Real
+  - Name: RectStruct
+    SwiftName: Rect

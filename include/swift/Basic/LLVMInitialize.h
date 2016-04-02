@@ -40,4 +40,4 @@
   llvm::InitializeAllDisassemblers(); \
   llvm::InitializeAllTargetInfos();
 
-#endif
+#endif // SWIFT_BASIC_LLVMINITIALIZE_H

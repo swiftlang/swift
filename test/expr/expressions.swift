@@ -477,7 +477,7 @@ func testInOut(arg: inout Int) {
   var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
 
-  takesExplicitInt(5) // expected-error {{cannot convert value of type 'Int' to expected argument type 'inout Int'}}
+  takesExplicitInt(5) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -824,14 +824,20 @@ func swift22_deprecation_increment_decrement() {
 
   ++f     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= += 1}}
   f--     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{4-6= -= 1}}
-  _ = f-- // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+  _ = f-- // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{none}}
 
 
   ++si      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.successor()}}
   --si      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.predecessor()}}
   si++      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{5-7= = si.successor()}}
   si--      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{5-7= = si.predecessor()}}
-  _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+  _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{none}}
+
+
+  // <rdar://problem/24530312> Swift ++fix-it produces bad code in nested expressions
+  // This should not get a fixit hint.
+  var j = 2
+  i = ++j   // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{none}}
 }
 
 // SR-628 mixing lvalues and rvalues in tuple expression
@@ -840,7 +846,7 @@ var y = 1
 let _ = (x, x.successor()).0
 let _ = (x, 3).1
 (x,y) = (2,3)
-(x,4) = (1,2) // expected-error {{cannot assign to value: function call returns immutable value}}
+(x,4) = (1,2) // expected-error {{cannot assign to value: literals are not mutable}}
 (x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
 x = (x,(3,y)).1.1
 

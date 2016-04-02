@@ -782,6 +782,27 @@ static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
   }
 }
 
+static ValueDecl *getUnsafeGuaranteed(ASTContext &C, Identifier Id) {
+  // <T : AnyObject> T -> (T, Int8Ty)
+  //
+  GenericSignatureBuilder builder(C);
+  auto T = makeGenericParam();
+  builder.addParameter(T);
+  Type Int8Ty = BuiltinIntegerType::get(8, C);
+  builder.setResult(makeTuple(T, makeConcrete(Int8Ty)));
+  return builder.build(Id);
+}
+
+static ValueDecl *getUnsafeGuaranteedEnd(ASTContext &C, Identifier Id) {
+  // Int8Ty -> ()
+  Type Int8Ty = BuiltinIntegerType::get(8, C);
+  return getBuiltinFunction(Id, { Int8Ty }, TupleType::getEmpty(C));
+}
+
+static ValueDecl *getOnFastPath(ASTContext &Context, Identifier Id) {
+  return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
+}
+
 static ValueDecl *getCastReferenceOperation(ASTContext &ctx,
                                             Identifier name) {
   // <T, U> T -> U
@@ -1574,10 +1595,20 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (Types.size() != 1) return nullptr;
     return getCheckedConversionOperation(Context, Id, Types[0]);
 
+  case BuiltinValueKind::UnsafeGuaranteed:
+    return getUnsafeGuaranteed(Context, Id);
+
+  case BuiltinValueKind::UnsafeGuaranteedEnd:
+    return getUnsafeGuaranteedEnd(Context, Id);
+
+  case BuiltinValueKind::OnFastPath:
+    return getOnFastPath(Context, Id);
+
   case BuiltinValueKind::IntToFPWithOverflow:
     if (Types.size() != 2) return nullptr;
     return getIntToFPWithOverflowOperation(Context, Id, Types[0], Types[1]);
   }
+
   llvm_unreachable("bad builtin value!");
 }
 

@@ -191,7 +191,8 @@ editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
                     Optional<StringRef> Group, ArrayRef<const char *> Args,
-                    bool SynthesizedExtensions);
+                    bool SynthesizedExtensions,
+                    Optional<StringRef> InterestedUSR);
 
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
@@ -474,8 +475,9 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     int64_t SynthesizedExtension = false;
     Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
                  /*isOptional=*/true);
+    Optional<StringRef> InterestedUSR = Req.getString(KeyInterestedUSR);
     return Rec(editorOpenInterface(*Name, *ModuleName, GroupName, Args,
-                                   SynthesizedExtension));
+                                   SynthesizedExtension, InterestedUSR));
   }
 
   if (ReqUID == RequestEditorOpenHeaderInterface) {
@@ -877,6 +879,8 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
     Elem.set(KeyLine, Info.Line);
     Elem.set(KeyColumn, Info.Column);
   }
+  if (!Info.Group.empty())
+    Elem.set(KeyGroupName, Info.Group);
 
   if (Info.EntityType == EntityInfo::FuncDecl) {
     const FuncDeclEntityInfo &FDInfo =
@@ -1097,6 +1101,10 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyKeyword, Info.Argument);
   if (!Info.USR.empty())
     Elem.set(KeyUSR, Info.USR);
+  if (!Info.OriginalUSR.empty())
+    Elem.set(KeyOriginalUSR, Info.OriginalUSR);
+  if (!Info.ProvideImplementationOfUSR.empty())
+    Elem.set(KeyDefaultImplementationOf, Info.ProvideImplementationOfUSR);
   if (Info.Length > 0) {
     Elem.set(KeyOffset, Info.Offset);
     Elem.set(KeyLength, Info.Length);
@@ -1105,6 +1113,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyIsUnavailable, Info.IsUnavailable);
   if (Info.IsDeprecated)
     Elem.set(KeyIsDeprecated, Info.IsDeprecated);
+  if (Info.IsOptional)
+    Elem.set(KeyIsOptional, Info.IsOptional);
   if (!Info.DocComment.empty())
     Elem.set(KeyDocFullAsXML, Info.DocComment);
   if (!Info.FullyAnnotatedDecl.empty())
@@ -1297,6 +1307,13 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     for (auto USR : Info.OverrideUSRs) {
       auto Override = Overrides.appendDictionary();
       Override.set(KeyUSR, USR);
+    }
+  }
+  if (!Info.ModuleGroupArray.empty()) {
+    auto Groups = Elem.setArray(KeyModuleGroups);
+    for (auto Name : Info.ModuleGroupArray) {
+      auto Entry = Groups.appendDictionary();
+      Entry.set(KeyGroupName, Name);
     }
   }
   if (!Info.AnnotatedRelatedDeclarations.empty()) {
@@ -1774,14 +1791,15 @@ editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
                     Optional<StringRef> Group, ArrayRef<const char *> Args,
-                    bool SynthesizedExtensions) {
+                    bool SynthesizedExtensions,
+                    Optional<StringRef> InterestedUSR) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
                          /*EnableStructure=*/true,
                          /*EnableDiagnostics=*/false,
                          /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenInterface(EditC, Name, ModuleName, Group, Args,
-                           SynthesizedExtensions);
+                           SynthesizedExtensions, InterestedUSR);
   return EditC.createResponse();
 }
 

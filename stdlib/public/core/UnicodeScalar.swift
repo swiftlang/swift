@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A [Unicode scalar value](http://www.unicode.org/glossary/#unicode_scalar_value).
+@_fixed_layout
 public struct UnicodeScalar :
   _BuiltinUnicodeScalarLiteralConvertible,
   UnicodeScalarLiteralConvertible {

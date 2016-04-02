@@ -36,8 +36,24 @@ The LLVM lit-based testsuite
 Running the LLVM lit-based testsuite
 ------------------------------------
 
-You can run Swift tests using the ``build-script``, or, alternatively, using
-these targets in the build directory:
+It is recommended that you run the Swift test suites via ``utils/build-script``.
+For day-to-day work on the Swift compiler, using ``utils/build-script --test``
+should be sufficient.  The buildbot runs validation tests, so if those are
+accidentally broken, it should not go unnoticed.
+
+Before committing a large change to a compiler (especially a language change),
+or API changes to the standard library, it is recommended to run validation
+test suite, via ``utils/build-script --validation-test``.
+
+Although it is not recommended for day-to-day contributions, it is also
+technically possible to execute the tests directly via CMake. For example, if you have
+built Swift products at the directory ``build/Ninja-ReleaseAssert/swift-macosx-x86_64``,
+you may run the entire test suite directly using the following command::
+
+  cmake --build build/Ninja-ReleaseAssert/swift-macosx-x86_64 -- check-swift-macosx-x86_64
+
+Note that ``check-swift`` is suffixed with a target operating system and architecture.
+Besides ``check-swift``, other targets are also available. Here's the full list:
 
 * ``check-swift``
 
@@ -50,14 +66,6 @@ these targets in the build directory:
 * ``check-swift-all``
 
   Runs all tests.
-
-For day-to-day work on the Swift compiler, using ``check-swift`` should be
-sufficient.  The buildbot runs validation tests, so if those are accidentally
-broken, it should not go unnoticed.
-
-Before committing a large change to a compiler (especially a language change),
-or API changes to the standard library, it is recommended to run validation
-test suite.
 
 For every target above, there are variants for different optimizations:
 
@@ -259,6 +267,10 @@ code for the target that is not the build machine:
 * ``%target-sdk-name``: only for Apple platforms: ``xcrun``-style SDK name
   (``macosx``, ``iphoneos``, ``iphonesimulator``).
 
+* ``%target-static-stdlib-path``: the path to the static standard library.
+
+  Add ``REQUIRES: static_stdlib`` to the test.
+
 Always use ``%target-*`` substitutions unless you have a good reason.  For
 example, an exception would be a test that checks how the compiler handles
 mixing module files for incompatible platforms (that test would need to compile
@@ -358,15 +370,17 @@ FIXME: full list.
 
 * ``swift_ast_verifier``: present if the AST verifier is enabled in this build.
 
-When writing a test specific to x86, if possible, prefer ``REQUIRES:
-CPU=i386_or_x86_64`` to ``REQUIRES: CPU=x86_64``.
+* When writing a test specific to x86, if possible, prefer ``REQUIRES:
+  CPU=i386_or_x86_64`` to ``REQUIRES: CPU=x86_64``.
 
-``swift_test_mode_optimize[_unchecked|none]`` and
-``swift_test_mode_optimize[_unchecked|none]_<CPUNAME>`` to specify a test mode
-plus cpu configuration.
+* ``swift_test_mode_optimize[_unchecked|none]`` and
+  ``swift_test_mode_optimize[_unchecked|none]_<CPUNAME>``: specify a test mode
+  plus cpu configuration.
 
-``optimized_stdlib_<CPUNAME>``` to specify an optimized stdlib plus cpu
-configuration.
+* ``optimized_stdlib_<CPUNAME>``: an optimized stdlib plus cpu configuration.
+
+* ``XFAIL: linux``: tests that need to be adapted for Linux, for example parts
+  that depend on Objective-C interop need to be split out.
 
 Feature ``REQUIRES: executable_test``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

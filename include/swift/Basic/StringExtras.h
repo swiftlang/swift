@@ -182,6 +182,16 @@ namespace swift {
       unsigned getPosition() const {
         return Position;
       }
+
+      /// Retrieve the string up until this iterator
+      StringRef getPriorStr() const {
+        return String.slice(0, Position);
+      }
+
+      /// Retrieve the rest of the string (including this position)
+      StringRef getRestOfStr() const {
+        return String.slice(Position, String.size());
+      }
     };
 
     /// Find the first camelCase word in the given string.
@@ -251,6 +261,16 @@ namespace swift {
     /// initialisms.
     StringRef toLowercaseInitialisms(StringRef string,
                                      StringScratchSpace &scratch);
+
+    /// Lowercase the first word within the given camelCase string.
+    ///
+    /// \param string The string to lowercase.
+    /// \param scratch Scratch buffer used to form the resulting string.
+    ///
+    /// \returns the string with the first word lowercased, including
+    /// initialisms.
+    StringRef toLowercaseInitialisms(StringRef string,
+                                     SmallVectorImpl<char> &scratch);
 
     /// Sentence-case the given camelCase string by turning the first
     /// letter into an uppercase letter.
@@ -458,6 +478,7 @@ bool omitNeedlessWords(StringRef &baseName,
                        bool isProperty,
                        const InheritedNameSet *allPropertyNames,
                        StringScratchSpace &scratch);
-}
 
-#endif // LLVM_SWIFT_BASIC_STRINGEXTRAS_HPP
+} // end namespace swift
+
+#endif // SWIFT_BASIC_STRINGEXTRAS_H
