@@ -3,7 +3,7 @@
 
 ; Ensure that the options in the object file preserve ordering.  The linker
 ; options are order dependent, and we would accidentally reorder them because we
-; used a std::set rather than a llvm::SmallSetVector.
+; used a std::set rather than an llvm::SmallSetVector.
 
 @_swift1_autolink_entries_1 = private constant [7 x i8] c"Saleem\00", section ".swift1_autolink_entries", align 8
 @_swift1_autolink_entries_0 = private constant [8 x i8] c"Naureen\00", section ".swift1_autolink_entries", align 8
