@@ -109,6 +109,7 @@ extension OptionSet where Element == Self {
   /// Otherwise, return `nil`.
   ///
   /// - Postcondition: `self.intersect([member]).isEmpty`
+  @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
     let r = isSupersetOf(member) ? Optional(member) : nil
     self.subtractInPlace(member)

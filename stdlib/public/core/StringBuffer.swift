@@ -202,6 +202,7 @@ public struct _StringBuffer {
   ///   to extend.
   /// - parameter newUsedCount: The desired size of the substring.
   @inline(__always)
+  @discardableResult
   mutating func grow(
     oldBounds bounds: Range<UnsafePointer<_RawByte>>, newUsedCount: Int
   ) -> Bool {

@@ -1004,6 +1004,7 @@ extension ${Protocol} {
     base.replaceSubrange(subRange, with: newElements)
   }
 
+  @discardableResult
   public mutating func removeLast() -> Element {
     return base.removeLast()
   }
@@ -1165,11 +1166,13 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     }
   }
 
+  @discardableResult
   public mutating func remove(at i: ${Index}) -> T {
     _willMutate(.removeAtIndex(index: i._offset))
     return elements.remove(at: i.position)
   }
 
+  @discardableResult
   public mutating func removeLast() -> T {
     _willMutate(.removeLast)
     return elements.removeLast()

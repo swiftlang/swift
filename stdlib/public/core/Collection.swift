@@ -536,6 +536,7 @@ extension Collection where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   /// - Precondition: `!self.isEmpty`.
+  @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
@@ -567,6 +568,7 @@ extension Collection
   ///
   /// - Complexity: O(1)
   /// - Precondition: `!self.isEmpty`
+  @discardableResult
   public mutating func removeLast() -> Iterator.Element {
     let element = last!
     self = self[startIndex..<endIndex.predecessor()]
