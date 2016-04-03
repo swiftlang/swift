@@ -203,7 +203,7 @@ examples::
   class B3 : A {
     var counter: Int 
 
-    init withInitialCount(initialCount: Int)  { // subobject initializer
+    init withInitialCount(initialCount: Int) { // subobject initializer
       counter = initialCount
       super.init(withTitle: "Unnamed")
     }

@@ -1689,7 +1689,7 @@ extension PlainClass {
 
   // CHECK-LABEL: @objc(setWithRed:green:blue:alpha:) dynamic func set
   @objc(setWithRed:green:blue:alpha:)
-  func set(_: Float, green: Float, blue: Float, alpha: Float)  { }
+  func set(_: Float, green: Float, blue: Float, alpha: Float) { }
 
   // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) dynamic class func createWith
   @objc(createWithRed:green blue:alpha)

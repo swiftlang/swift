@@ -3224,7 +3224,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         if (intTy) {
           // If it is a switch on an integer type, check that all case values
           // are integer literals or undef.
-          if (!isa<SILUndef>(CaseVal))  {
+          if (!isa<SILUndef>(CaseVal)) {
             auto *IL = dyn_cast<IntegerLiteralInst>(CaseVal);
             if (!IL) {
               P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);

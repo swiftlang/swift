@@ -98,13 +98,13 @@ class MyTableViewController : NSTableViewController {
 }
 
 class MyOtherTableViewController : NSTableViewController {
-  override init(int i: Int)  {
+  override init(int i: Int) {
     super.init(int: i)
   }
 } // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSTableViewController'}}
 
 class MyThirdTableViewController : NSTableViewController {
-  override init(int i: Int)  {
+  override init(int i: Int) {
     super.init(int: i)
   }
 
