@@ -841,6 +841,12 @@ FUNCTION(GetObjectClass, object_getClass, C_CC,
          ARGS(ObjCPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// Class objc_lookUpClass(const char *name);
+FUNCTION(LookUpClass, objc_lookUpClass, C_CC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // Metadata *swift_getObjectType(id object);
 //
 // Since this is intended to look through dynamic subclasses, it's

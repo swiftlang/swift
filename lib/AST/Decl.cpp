@@ -37,6 +37,7 @@
 #include "swift/Basic/Fallthrough.h"
 
 #include "clang/Basic/CharInfo.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
 #include <algorithm>
@@ -2286,6 +2287,11 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
 
 StringRef ClassDecl::getObjCRuntimeName(
                        llvm::SmallVectorImpl<char> &buffer) const {
+  // If there is a Clang declaration, use it's runtime name.
+  if (auto objcClass
+        = dyn_cast_or_null<clang::ObjCInterfaceDecl>(getClangDecl()))
+    return objcClass->getObjCRuntimeNameAsString();
+
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName())
@@ -2294,6 +2300,19 @@ StringRef ClassDecl::getObjCRuntimeName(
 
   // Produce the mangled name for this class.
   return mangleObjCRuntimeName(this, buffer);
+}
+
+bool ClassDecl::isOnlyObjCRuntimeVisible() const {
+  auto clangDecl = getClangDecl();
+  if (!clangDecl) return false;
+
+  auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl);
+  if (!objcClass) return false;
+
+  if (auto def = objcClass->getDefinition())
+    objcClass = def;
+
+  return objcClass->hasAttr<clang::ObjCRuntimeVisibleAttr>();
 }
 
 ArtificialMainKind ClassDecl::getArtificialMainKind() const {

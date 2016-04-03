@@ -2090,9 +2090,14 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // make it implicitly @objc. However, if the declaration cannot be represented
   // as @objc, don't diagnose.
   Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
-  if (auto classDecl = contextTy->getClassOrBoundGenericClass())
+  if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
+    // One cannot define @objc members of Objective-C runtime visible classes.
+    if (classDecl->isOnlyObjCRuntimeVisible())
+      return None;
+
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
       return ObjCReason::DoNotDiagnose;
+  }
 
   return None;
 }
@@ -3833,6 +3838,11 @@ public:
 
         if (Super->hasClangNode() && Super->getGenericParams()) {
           TC.diagnose(CD, diag::inheritance_from_objc_generic_class,
+                      Super->getName());
+        }
+
+        if (Super->isOnlyObjCRuntimeVisible()) {
+          TC.diagnose(CD, diag::inheritance_from_objc_runtime_visible_class,
                       Super->getName());
         }
       }
