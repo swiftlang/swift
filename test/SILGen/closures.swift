@@ -7,7 +7,7 @@ var zero = 0
 // <rdar://problem/15921334>
 // CHECK-LABEL: sil hidden @_TF8closures46return_local_generic_function_without_captures{{.*}} : $@convention(thin) <A, R> () -> @owned @callee_owned (@in A) -> @out R {
 func return_local_generic_function_without_captures<A, R>() -> A -> R {
-  func f(_: A) -> R {
+  func f(_ _: A) -> R {
     Builtin.int_trap()
   }
   // CHECK:  [[FN:%.*]] = function_ref @_TFF8closures46return_local_generic_function_without_captures{{.*}} : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @out τ_0_1
@@ -16,8 +16,8 @@ func return_local_generic_function_without_captures<A, R>() -> A -> R {
   return f
 }
 
-func return_local_generic_function_with_captures<A, R>(a: A) -> A -> R {
-  func f(_: A) -> R {
+func return_local_generic_function_with_captures<A, R>(_ a: A) -> A -> R {
+  func f(_ _: A) -> R {
     _ = a
   }
 
@@ -25,7 +25,7 @@ func return_local_generic_function_with_captures<A, R>(a: A) -> A -> R {
 }
 
 // CHECK-LABEL: sil hidden @_TF8closures17read_only_capture
-func read_only_capture(x: Int) -> Int {
+func read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -49,7 +49,7 @@ func read_only_capture(x: Int) -> Int {
 // CHECK: return [[X]]
 
 // CHECK-LABEL: sil hidden @_TF8closures16write_to_capture
-func write_to_capture(x: Int) -> Int {
+func write_to_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -79,7 +79,7 @@ func write_to_capture(x: Int) -> Int {
 // CHECK: return
 
 // CHECK-LABEL: sil hidden @_TF8closures21multiple_closure_refs
-func multiple_closure_refs(x: Int) -> (() -> Int, () -> Int) {
+func multiple_closure_refs(_ x: Int) -> (() -> Int, () -> Int) {
   var x = x
   func cap() -> Int {
     return x
@@ -95,7 +95,7 @@ func multiple_closure_refs(x: Int) -> (() -> Int, () -> Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8closures18capture_local_func
-func capture_local_func(x: Int) -> () -> () -> Int {
+func capture_local_func(_ x: Int) -> () -> () -> Int {
   var x = x
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
@@ -119,7 +119,7 @@ func capture_local_func(x: Int) -> () -> () -> Int {
 // CHECK: return [[ALEPH_CLOSURE]]
 
 // CHECK-LABEL: sil hidden @_TF8closures22anon_read_only_capture
-func anon_read_only_capture(x: Int) -> Int {
+func anon_read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -140,7 +140,7 @@ func anon_read_only_capture(x: Int) -> Int {
 // CHECK: return [[X]]
 
 // CHECK-LABEL: sil hidden @_TF8closures21small_closure_capture
-func small_closure_capture(x: Int) -> Int {
+func small_closure_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -162,7 +162,7 @@ func small_closure_capture(x: Int) -> Int {
 
 
 // CHECK-LABEL: sil hidden @_TF8closures35small_closure_capture_with_argument
-func small_closure_capture_with_argument(x: Int) -> (y: Int) -> Int {
+func small_closure_capture_with_argument(_ x: Int) -> (y: Int) -> Int {
   var x = x
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
@@ -195,7 +195,7 @@ func small_closure_no_capture() -> (y: Int) -> Int {
 // CHECK: bb0([[YARG:%[0-9]+]] : $Int):
 
 // CHECK-LABEL: sil hidden @_TF8closures17uncaptured_locals{{.*}} :
-func uncaptured_locals(x: Int) -> (Int, Int) {
+func uncaptured_locals(_ x: Int) -> (Int, Int) {
   var x = x
   // -- locals without captures are stack-allocated
   // CHECK: bb0([[XARG:%[0-9]+]] : $Int):
@@ -277,7 +277,7 @@ class SelfCapturedInInit : Base {
   }
 }
 
-func takeClosure(fn: () -> Int) -> Int { return fn() }
+func takeClosure(_ fn: () -> Int) -> Int { return fn() }
 
 class TestCaptureList {
   var x = zero

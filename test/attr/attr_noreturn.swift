@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 @noreturn
-func exit(_: Int) {}
+func exit(_ _: Int) {}
 
 @noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
 class InvalidOnClass {}
@@ -106,7 +106,7 @@ struct MethodWithNoreturn {
   func neverReturns() { exit(0) }
 }
 
-func printInt(_: Int) {}
+func printInt(_ _: Int) {}
 var maybeReturns: (Int) -> () = exit // no-error
 var neverReturns1 = exit
 neverReturns1 = printInt // expected-error {{cannot assign value of type '(Int) -> ()' to type '@noreturn (Int) -> ()'}}
@@ -122,7 +122,7 @@ func testFunctionOverload() -> () {
   exit()
 }
 
-func testRvalue(lhs: (), rhs: @noreturn () -> ()) -> () {
+func testRvalue(_ lhs: (), rhs: @noreturn () -> ()) -> () {
   return rhs()
 }
 
@@ -131,6 +131,6 @@ var fnr: @noreturn (_: Int) -> () = exit
 @noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
 var fpr: (_: Int) -> () = exit
 
-func testWitnessMethod<T: TestProtocol>(t: T) {
+func testWitnessMethod<T: TestProtocol>(_ t: T) {
   _ = T.neverReturnsStatic
 }

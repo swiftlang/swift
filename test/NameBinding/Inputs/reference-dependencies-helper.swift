@@ -53,7 +53,7 @@ struct OtherFileEnumWrapper {
 protocol OtherFileProto {}
 struct OtherFileProtoImplementor : OtherFileProto {}
 func otherFileGetImpl() -> OtherFileProtoImplementor {}
-func otherFileUse(_: OtherFileProto) {}
+func otherFileUse(_ _: OtherFileProto) {}
 
 protocol OtherFileProto2 {}
 struct OtherFileProtoImplementor2 : OtherFileProto2 {}

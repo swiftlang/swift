@@ -11,5 +11,5 @@
 struct FooStruct {
   func a() {}
 }
-func f(foo: FooStruct) {
+func f(_ foo: FooStruct) {
   foo.#^A^#

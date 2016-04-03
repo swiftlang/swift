@@ -20,7 +20,7 @@ class MyDelegate : UIApplicationDelegate {}
 
 // Ensure that we coexist with normal references to the functions we
 // implicitly reference in the synthesized main.
-func foo(x: AnyObject.Type) -> String {
+func foo(_ x: AnyObject.Type) -> String {
   return NSStringFromClass(x)
 }
 func bar() {

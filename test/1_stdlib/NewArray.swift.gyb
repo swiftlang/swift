@@ -69,7 +69,7 @@ func < (x: X, y: X) -> Bool {
 
 //===----------------------------------------------------------------------===//
 
-func printSequence<T : Sequence>(x: T) {
+func printSequence<T : Sequence>(_ x: T) {
   print("[", terminator: "")
   var prefix = ""
   for a in x {
@@ -82,7 +82,7 @@ func printSequence<T : Sequence>(x: T) {
 
 typealias BufferID = UnsafePointer<Void>
 
-func bufferID<T : _ArrayProtocol>(x: T) -> BufferID {
+func bufferID<T : _ArrayProtocol>(_ x: T) -> BufferID {
   return x._buffer.identity
 }
 

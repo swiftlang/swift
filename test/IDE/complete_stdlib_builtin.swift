@@ -9,10 +9,10 @@
 
 // We don't give any useful completions, but we should not crash either.
 
-func testBuiltinRawPointer1(a: UnsafeMutablePointer<UInt8>) {
+func testBuiltinRawPointer1(_ a: UnsafeMutablePointer<UInt8>) {
   a.value#^BUILTIN_1^#
 }
 
-func testBuiltinRawPointer2(a: UnsafeMutablePointer<UInt8>) {
+func testBuiltinRawPointer2(_ a: UnsafeMutablePointer<UInt8>) {
   a.value.#^BUILTIN_2^#
 }

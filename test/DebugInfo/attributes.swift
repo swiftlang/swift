@@ -4,7 +4,7 @@
 
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "ObjCClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift,{{.*}} identifier: [[TY0:"[^"]*"]])
 @objc class ObjCClass {
-      @IBAction func click(_: AnyObject?) -> () {}
+      @IBAction func click(_ _: AnyObject?) -> () {}
 }
 
 // CHECK-DAG: ![[TY1:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "SwiftClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift
@@ -12,7 +12,7 @@ class SwiftClass {
       @objc func objcmethod() -> () {}
       func swiftmethod() -> () {}
       // Block attribute
-      func f(someBlock: @convention(block) (Int64) -> Int64) {
+      func f(_ someBlock: @convention(block) (Int64) -> Int64) {
       }
 }
 
@@ -30,9 +30,9 @@ weak var    weakRef1    : SwiftClass? = strongRef1
 unowned var unownedRef1 : SwiftClass
 
 protocol Protocol1 : class {
-  func foo(x: Float) -> Float
+  func foo(_ x: Float) -> Float
 }
 
 class Implementation : Protocol1 {
-  func foo(x: Float) -> Float { return 2*x }
+  func foo(_ x: Float) -> Float { return 2*x }
 }

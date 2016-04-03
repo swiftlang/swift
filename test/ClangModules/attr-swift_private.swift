@@ -17,7 +17,7 @@ import SwiftPrivateAttr
 // are available in that case and /not/ in the normal import case.
 
 // CHECK-LABEL: define{{( protected)?}} void @{{.+}}12testProperty
-public func testProperty(foo: Foo) {
+public func testProperty(_ foo: Foo) {
   // CHECK: @"\01L_selector(setPrivValue:)"
   _ = foo.__privValue
   foo.__privValue = foo
@@ -32,7 +32,7 @@ public func testProperty(foo: Foo) {
 }
 
 // CHECK-LABEL: define{{( protected)?}} void @{{.+}}11testMethods
-public func testMethods(foo: Foo) {
+public func testMethods(_ foo: Foo) {
   // CHECK: @"\01L_selector(noArgs)"
   foo.__noArgs()
   // CHECK: @"\01L_selector(oneArg:)"
@@ -61,7 +61,7 @@ public func testFactoryMethods() {
 }
 
 #if !IRGEN
-public func testSubscript(foo: Foo) {
+public func testSubscript(_ foo: Foo) {
   _ = foo[foo] // expected-error {{type 'Foo' has no subscript members}}
   _ = foo[1] // expected-error {{type 'Foo' has no subscript members}}
 }
@@ -109,7 +109,7 @@ _ = NSEnum.B
 _ = NSOptions.__privA
 _ = NSOptions.B
 
-func makeSureAnyObject(_: AnyObject) {}
+func makeSureAnyObject(_ _: AnyObject) {}
 
 #if !IRGEN
 func testUnavailableRefs() {
@@ -118,7 +118,7 @@ func testUnavailableRefs() {
 }
 #endif
 
-func testCF(a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
+func testCF(_ a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
   makeSureAnyObject(a)
   makeSureAnyObject(b)
 #if !IRGEN

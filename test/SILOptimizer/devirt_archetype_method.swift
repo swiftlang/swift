@@ -11,7 +11,7 @@ class ABC : Pingable {
   func ping() {}
 }
 
-func generic_call<T : Pingable>(x: T) {
+func generic_call<T : Pingable>(_ x: T) {
   x.ping()
 }
 

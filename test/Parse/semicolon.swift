@@ -46,7 +46,7 @@ for i in 1..<1000 {
 
 let six = (1..<3).reduce(0, combine: +);
 
-func lessThanTwo(input: UInt) -> Bool {
+func lessThanTwo(_ input: UInt) -> Bool {
     switch input {
     case 0:     return true;
     case 1, 2:  return true;

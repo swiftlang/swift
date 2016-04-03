@@ -191,14 +191,14 @@ OptionalTests.test("flatMap") {
 }
 
 @inline(never)
-func anyToAny<T, U>(a: T, _ : U.Type) -> U {
+func anyToAny<T, U>(_ a: T, _ : U.Type) -> U {
   return a as! U
 }
 @inline(never)
-func anyToAnyOrNil<T, U>(a: T, _ : U.Type) -> U? {
+func anyToAnyOrNil<T, U>(_ a: T, _ : U.Type) -> U? {
   return a as? U
 }
-func canGenericCast<T, U>(a: T, _ ty : U.Type) -> Bool {
+func canGenericCast<T, U>(_ a: T, _ ty : U.Type) -> Bool {
   return anyToAnyOrNil(a, ty) != nil
 }
 
@@ -274,7 +274,7 @@ class TestStream : Streamable {
   }
 }
 
-func debugPrintStr<T>(a: T) -> String {
+func debugPrintStr<T>(_ a: T) -> String {
   var s = ""
   debugPrint(a, terminator: "", to: &s)
   return s

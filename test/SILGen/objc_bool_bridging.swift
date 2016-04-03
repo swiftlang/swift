@@ -36,7 +36,7 @@ public func testFunctions() {
 }
 
 // CHECK-LABEL: sil @_TF18objc_bool_bridging11testMethodsFCSo4TestT_
-public func testMethods(x: Test) {
+public func testMethods(_ x: Test) {
   // CHECK-NOT: convert
   // CHECK: [[METHOD_1:%.+]] = class_method [volatile] %0 : $Test, #Test.testCBool!1.foreign
   // CHECK-NOT: convert
@@ -62,7 +62,7 @@ public func testMethods(x: Test) {
 }
 
 // CHECK-LABEL: sil @_TF18objc_bool_bridging14testPropertiesFCSo4TestT_
-public func testProperties(x: Test) {
+public func testProperties(_ x: Test) {
   // CHECK-NOT: convert
   // CHECK: [[SETTER_1:%.+]] = class_method [volatile] %0 : $Test, #Test.propCBool!setter.1.foreign
   // CHECK-NOT: convert
@@ -137,7 +137,7 @@ public func testBlocks() {
 }
 
 // CHECK-LABEL: sil @_TF18objc_bool_bridging14testBlockPropsFCSo4TestT_
-public func testBlockProps(x: Test) {
+public func testBlockProps(_ x: Test) {
   // CHECK: = function_ref @_TFF18objc_bool_bridging14testBlockPropsFCSo4TestT_U_FSbSb : $@convention(thin) (Bool) -> Bool
   // CHECK: [[SETTER_1:%.+]] = class_method [volatile] %0 : $Test, #Test.propCBoolBlock!setter.1.foreign
   // CHECK: = apply [[SETTER_1]]({{%.+}}, %0) : $@convention(objc_method) (@convention(block) (Bool) -> Bool, Test) -> ()
@@ -155,7 +155,7 @@ public func testBlockProps(x: Test) {
 }
 
 // CHECK-LABEL: sil @_TF18objc_bool_bridging26testFunctionPointerMethodsFCSo4TestT_
-public func testFunctionPointerMethods(x: Test) {
+public func testFunctionPointerMethods(_ x: Test) {
   // CHECK: [[METHOD_1:%.+]] = class_method [volatile] %0 : $Test, #Test.testCBoolFnToBlock!1.foreign
   // CHECK: [[CLOSURE_1:%.+]] = function_ref @_TToFF18objc_bool_bridging26testFunctionPointerMethodsFCSo4TestT_U_FSbSb : $@convention(c) (Bool) -> Bool
   // CHECK: [[RESULT_1:%.+]] = apply [[METHOD_1]]([[CLOSURE_1]], %0)
@@ -178,17 +178,17 @@ public func testFunctionPointerMethods(x: Test) {
 class NewClass : NSObject {
   // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass12takesClosure
   // CHECK-OBJCBOOL-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass12takesClosure
-  func takesClosure(_: (Bool) -> Bool) {}
+  func takesClosure(_ _: (Bool) -> Bool) {}
 
   // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass15takesCBoolBlock
   // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass15takesCBoolBlock
-  func takesCBoolBlock(_: @convention(block) (Bool) -> Bool) {}
+  func takesCBoolBlock(_ _: @convention(block) (Bool) -> Bool) {}
 
   // CHECK-OBJCBOOL-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass18takesObjCBoolBlock
   // CHECK-OBJCBOOL-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass18takesObjCBoolBlock
-  func takesObjCBoolBlock(_: @convention(block) (ObjCBool) -> ObjCBool) {}
+  func takesObjCBoolBlock(_ _: @convention(block) (ObjCBool) -> ObjCBool) {}
 
   // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass23takesDarwinBooleanBlock
   // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass23takesDarwinBooleanBlock
-  func takesDarwinBooleanBlock(_: @convention(block) (DarwinBoolean) -> DarwinBoolean) {}
+  func takesDarwinBooleanBlock(_ _: @convention(block) (DarwinBoolean) -> DarwinBoolean) {}
 }

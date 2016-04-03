@@ -18,7 +18,7 @@ class X : P, CP {
   // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $@thick X.Type):
   // CHECK: [[CTOR:%[0-9]+]] = class_method [[SELF]] : $@thick X.Type, #X.init!allocator.1 : X.Type -> (int: Int) -> X , $@convention(thin) (Int, @thick X.Type) -> @owned X
   // CHECK: apply [[CTOR]]([[I]], [[SELF]]) : $@convention(thin) (Int, @thick X.Type) -> @owned X
-  class func factory(i: Int) -> Self { return self.init(int: i) }
+  class func factory(_ i: Int) -> Self { return self.init(int: i) }
 }
 
 class Y : X { 
@@ -32,7 +32,7 @@ class GX<T> {
 class GY<T> : GX<[T]> { }
 
 // CHECK-LABEL: sil hidden @_TF12dynamic_self23testDynamicSelfDispatch{{.*}} : $@convention(thin) (@owned Y) -> ()
-func testDynamicSelfDispatch(y: Y) {
+func testDynamicSelfDispatch(_ y: Y) {
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
 // CHECK:   strong_retain [[Y]]
 // CHECK:   [[Y_AS_X:%[0-9]+]] = upcast [[Y]] : $Y to $X  
@@ -46,7 +46,7 @@ func testDynamicSelfDispatch(y: Y) {
 }
 
 // CHECK-LABEL: sil hidden @_TF12dynamic_self30testDynamicSelfDispatchGeneric{{.*}} : $@convention(thin) (@owned GY<Int>) -> ()
-func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
+func testDynamicSelfDispatchGeneric(_ gy: GY<Int>) {
   // CHECK: bb0([[GY:%[0-9]+]] : $GY<Int>):
   // CHECK:   strong_retain [[GY]]
   // CHECK:   [[GY_AS_GX:%[0-9]+]] = upcast [[GY]] : $GY<Int> to $GX<Array<Int>>
@@ -60,7 +60,7 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF12dynamic_self21testArchetypeDispatch{{.*}} : $@convention(thin) <T where T : P> (@in T) -> ()
-func testArchetypeDispatch<T: P>(t: T) {
+func testArchetypeDispatch<T: P>(_ t: T) {
   // CHECK: bb0([[T:%[0-9]+]] : $*T):
   // CHECK:   [[ARCHETYPE_F:%[0-9]+]] = witness_method $T, #P.f!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
@@ -69,7 +69,7 @@ func testArchetypeDispatch<T: P>(t: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF12dynamic_self23testExistentialDispatch{{.*}}
-func testExistentialDispatch(p: P) {
+func testExistentialDispatch(_ p: P) {
 // CHECK: bb0([[P:%[0-9]+]] : $*P):
 // CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr [[P]] : $*P to $*@opened([[N:".*"]]) P
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
@@ -83,7 +83,7 @@ func testExistentialDispatch(p: P) {
 }
 
 // CHECK-LABEL: sil hidden @_TF12dynamic_self28testExistentialDispatchClass{{.*}} : $@convention(thin) (@owned CP) -> ()
-func testExistentialDispatchClass(cp: CP) {
+func testExistentialDispatchClass(_ cp: CP) {
 // CHECK: bb0([[CP:%[0-9]+]] : $CP):
 // CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]]) CP
 // CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.f!1, [[CP_ADDR]]{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
@@ -98,7 +98,7 @@ func testExistentialDispatchClass(cp: CP) {
 }
 
 // CHECK-LABEL: sil hidden @_TF12dynamic_self21testAnyObjectDispatch{{.*}} : $@convention(thin) (@owned AnyObject) -> ()
-func testAnyObjectDispatch(o: AnyObject) {
+func testAnyObjectDispatch(_ o: AnyObject) {
   // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@opened({{.*}}) AnyObject, #ObjC.method!1.foreign, bb1, bb2
 
   // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject):
@@ -112,7 +112,7 @@ class ObjCInit {
 }
 
 // CHECK: sil hidden @_TF12dynamic_self12testObjCInit{{.*}} : $@convention(thin) (@thick ObjCInit.Type) -> ()
-func testObjCInit(meta: ObjCInit.Type) {
+func testObjCInit(_ meta: ObjCInit.Type) {
 // CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
 // CHECK:   [[O:%[0-9]+]] = alloc_box $ObjCInit
 // CHECK:   [[PB:%.*]] = project_box [[O]]

@@ -18,7 +18,7 @@ typealias MyN = Int
 #endif
 
 public class MyClass {
-  func doit(x: Int) {}
+  func doit(_ x: Int) {}
 #if FOO
   func doFooEnabled() {}
 #else

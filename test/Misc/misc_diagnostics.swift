@@ -38,9 +38,9 @@ func f() -> Bool {
 }
 
 // Test that nested diagnostics are properly surfaced.
-func takesInt(i: Int) {}
+func takesInt(_ i: Int) {}
 func noParams() -> Int { return 0 }
-func takesAndReturnsInt(i: Int) -> Int { return 0 }
+func takesAndReturnsInt(_ i: Int) -> Int { return 0 }
 
 takesInt(noParams(1)) // expected-error{{argument passed to call that takes no arguments}}
 
@@ -72,7 +72,7 @@ func bad_return2() -> (Int, Int) {
 }
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
-func bad_return3(lhs:Int, rhs:Int) {
+func bad_return3(_ lhs:Int, rhs:Int) {
   return lhs != 0  // expected-error {{'!=' produces 'Bool', not the expected contextual result type '()'}}
 }
 
@@ -117,7 +117,7 @@ func test17875634() {
 
   // Make sure the behavior matches the non-generic case.
   struct FakeNonGenericArray {
-    func append(p: (Int, Int)) {}
+    func append(_ p: (Int, Int)) {}
   }
   let a2 = FakeNonGenericArray()
   a2.append(row, col) // expected-error{{extra argument in call}}

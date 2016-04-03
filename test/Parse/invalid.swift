@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func foo(a: Int) {
+func foo(_ a: Int) {
   // expected-error @+1 {{invalid character in source file}} {{8-9= }}
   foo(<\a\>) // expected-error {{invalid character in source file}} {{10-11= }}
   // expected-error @-1 {{'<' is not a prefix unary operator}}
@@ -44,7 +44,7 @@ func test4() {
 }
 
 // rdar://problem/18507467
-func d(b: String -> <T>() -> T) {} // expected-error {{expected type for function result}}
+func d(_ b: String -> <T>() -> T) {} // expected-error {{expected type for function result}}
 // expected-error @-1 {{expected ',' separator}} {{20-20=,}}
 // expected-error @-2 {{expected parameter name followed by ':'}}
 // expected-error @-3 {{expected ',' separator}}
@@ -52,7 +52,7 @@ func d(b: String -> <T>() -> T) {} // expected-error {{expected type for functio
 
 // <rdar://problem/22143680> QoI: terrible diagnostic when trying to form a generic protocol
 protocol Animal<Food> {  // expected-error {{protocols do not allow generic parameters; use associated types instead}}
-  func feed(food: Food) // expected-error {{use of undeclared type 'Food'}}
+  func feed(_ food: Food) // expected-error {{use of undeclared type 'Food'}}
 }
 
 
@@ -64,7 +64,7 @@ func f573(s Starfish,  // expected-error {{parameter requires an explicit type}}
           _ ss: Salmon) -> [Int] {}
 func g573() { f573(Starfish(), Salmon()) }
 
-func SR698(a: Int, b: Int) {}
+func SR698(_ a: Int, b: Int) {}
 SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 
 //SR-979 - Two inout crash compiler

@@ -14,13 +14,13 @@ class A {
 }
 
 // CHECK-LABEL: sil hidden @_TF14objc_subscript16testSubscriptGet
-func testSubscriptGet(a: A, i: Int) -> ObjCClass {
+func testSubscriptGet(_ a: A, i: Int) -> ObjCClass {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.subscript!getter.1.foreign : (A) -> (Int) -> ObjCClass , $@convention(objc_method) (Int, A) -> @autoreleased ObjCClass
   return a[i]
 }
 
 // CHECK-LABEL: sil hidden @_TF14objc_subscript16testSubscriptSet
-func testSubscriptSet(a: A, i: Int, v: ObjCClass) {
+func testSubscriptSet(_ a: A, i: Int, v: ObjCClass) {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.subscript!setter.1.foreign : (A) -> (ObjCClass, Int) -> () , $@convention(objc_method) (ObjCClass, Int, A) -> ()
   a[i] = v
 }

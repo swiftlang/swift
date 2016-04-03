@@ -15,15 +15,15 @@ public protocol ResilientMethods {
   associatedtype AssocType : P
 
   func defaultWitness()
-  func anotherDefaultWitness(x: Int) -> Self
-  func defaultWitnessWithAssociatedType(a: AssocType)
-  func defaultWitnessMoreAbstractThanRequirement(a: AssocType, b: Int)
-  func defaultWitnessMoreAbstractThanGenericRequirement<T>(a: AssocType, t: T)
+  func anotherDefaultWitness(_ x: Int) -> Self
+  func defaultWitnessWithAssociatedType(_ a: AssocType)
+  func defaultWitnessMoreAbstractThanRequirement(_ a: AssocType, b: Int)
+  func defaultWitnessMoreAbstractThanGenericRequirement<T>(_ a: AssocType, t: T)
 
   func noDefaultWitness()
   func defaultWitnessIsNotPublic()
 
-  static func staticDefaultWitness(x: Int) -> Self
+  static func staticDefaultWitness(_ x: Int) -> Self
 }
 
 extension ResilientMethods {
@@ -34,23 +34,23 @@ extension ResilientMethods {
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientMethods21anotherDefaultWitnessfSix
 // CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientMethods21anotherDefaultWitnessfSix
-  public func anotherDefaultWitness(x: Int) -> Self {}
+  public func anotherDefaultWitness(_ x: Int) -> Self {}
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientMethods32defaultWitnessWithAssociatedTypefwx9AssocTypeT_
 // CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientMethods32defaultWitnessWithAssociatedTypefwx9AssocTypeT_
-  public func defaultWitnessWithAssociatedType(a: AssocType) {}
+  public func defaultWitnessWithAssociatedType(_ a: AssocType) {}
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientMethods41defaultWitnessMoreAbstractThanRequirementfTwx9AssocType1bSi_T_
 // CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientMethods41defaultWitnessMoreAbstractThanRequirementu0_rfTqd__1bqd_0__T_
-  public func defaultWitnessMoreAbstractThanRequirement<A, T>(a: A, b: T) {}
+  public func defaultWitnessMoreAbstractThanRequirement<A, T>(_ a: A, b: T) {}
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientMethods48defaultWitnessMoreAbstractThanGenericRequirementurfTwx9AssocType1tqd___T_
 // CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientMethods48defaultWitnessMoreAbstractThanGenericRequirementu0_rfTqd__1tqd_0__T_
-  public func defaultWitnessMoreAbstractThanGenericRequirement<A, T>(a: A, t: T) {}
+  public func defaultWitnessMoreAbstractThanGenericRequirement<A, T>(_ a: A, t: T) {}
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TZFP19protocol_resilience16ResilientMethods20staticDefaultWitnessfSix
 // CHECK-LABEL: sil @_TZFE19protocol_resiliencePS_16ResilientMethods20staticDefaultWitnessfSix
-  public static func staticDefaultWitness(x: Int) -> Self {}
+  public static func staticDefaultWitness(_ x: Int) -> Self {}
 
 // CHECK-LABEL: sil private @_TFE19protocol_resiliencePS_16ResilientMethodsP{{.*}}25defaultWitnessIsNotPublicfT_T_
   private func defaultWitnessIsNotPublic() {}
@@ -175,9 +175,9 @@ public protocol ResilientOperators {
   associatedtype AssocType : P
 
   prefix func ~~~(s: Self)
-  func <*><T>(s: Self, t: T)
-  func <**><T>(t: T, s: Self) -> AssocType
-  func <===><T : ResilientOperators>(t: T, s: Self) -> T.AssocType
+  func <*><T>(_ s: Self, t: T)
+  func <**><T>(_ t: T, s: Self) -> AssocType
+  func <===><T : ResilientOperators>(_ t: T, s: Self) -> T.AssocType
 }
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TZFP19protocol_resilience18ResilientOperatorsop3tttfxT_
@@ -186,18 +186,18 @@ public prefix func ~~~<S>(s: S) {}
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TZFP19protocol_resilience18ResilientOperatorsoi3lmgurfTxqd___T_
 // CHECK-LABEL: sil @_TZF19protocol_resilienceoi3lmgu0_rFTq_x_T_
-public func <*><T, S>(s: S, t: T) {}
+public func <*><T, S>(_ s: S, t: T) {}
 
 // Swap the generic parameters to make sure we don't mix up our DeclContexts
 // when mapping interface types in and out
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TZFP19protocol_resilience18ResilientOperatorsoi4lmmgurfTqd__x_wx9AssocType
 // CHECK-LABEL: sil @_TZF19protocol_resilienceoi4lmmgu0_RxS_18ResilientOperatorsrFTq_x_wx9AssocType
-public func <**><S : ResilientOperators, T>(t: T, s: S) -> S.AssocType {}
+public func <**><S : ResilientOperators, T>(_ t: T, s: S) -> S.AssocType {}
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TZFP19protocol_resilience18ResilientOperatorsoi5leeeguRd__S0_rfTqd__x_wd__9AssocType
 // CHECK-LABEL: sil @_TZF19protocol_resilienceoi5leeegu0_RxS_18ResilientOperators_S0_rFTxq__wx9AssocType
-public func <===><T : ResilientOperators, S : ResilientOperators>(t: T, s: S) -> T.AssocType {}
+public func <===><T : ResilientOperators, S : ResilientOperators>(_ t: T, s: S) -> T.AssocType {}
 
 
 public protocol ReabstractSelfBase {
@@ -209,7 +209,7 @@ public protocol ReabstractSelfRefined : class, ReabstractSelfBase {
   var callback: Self -> Self { get set }
 }
 
-func id<T>(t: T) -> T {}
+func id<T>(_ t: T) -> T {}
 
 extension ReabstractSelfBase {
   // A witness for the above requirement, but with 'Self' maximally abstracted
@@ -221,10 +221,10 @@ extension ReabstractSelfBase {
 
 final class X : ReabstractSelfRefined {}
 
-func inoutFunc(x: inout Int) {}
+func inoutFunc(_ x: inout Int) {}
 
 // CHECK-LABEL: sil hidden @_TF19protocol_resilience22inoutResilientProtocolFRP18resilient_protocol22OtherResilientProtocol_T_
-func inoutResilientProtocol(x: inout OtherResilientProtocol) {
+func inoutResilientProtocol(_ x: inout OtherResilientProtocol) {
   // CHECK: function_ref @_TFE18resilient_protocolPS_22OtherResilientProtocolm19propertyInExtensionSi
   inoutFunc(&x.propertyInExtension)
 }
@@ -232,7 +232,7 @@ func inoutResilientProtocol(x: inout OtherResilientProtocol) {
 struct OtherConformingType : OtherResilientProtocol {}
 
 // CHECK-LABEL: sil hidden @_TF19protocol_resilience22inoutResilientProtocolFRVS_19OtherConformingTypeT_
-func inoutResilientProtocol(x: inout OtherConformingType) {
+func inoutResilientProtocol(_ x: inout OtherConformingType) {
   // CHECK: function_ref @_TFE18resilient_protocolPS_22OtherResilientProtocolm19propertyInExtensionSi
   inoutFunc(&x.propertyInExtension)
 

@@ -41,7 +41,7 @@ if #available(OSX 10, *) { // expected-warning {{minimum deployment target ensur
 
 func doThing() {}
 
-func testUnreachableVersionAvailable(condition: Bool) {
+func testUnreachableVersionAvailable(_ condition: Bool) {
   if #available(OSX 10.0, *) { // expected-warning {{minimum deployment target ensures guard will always be true}}
     doThing() // no-warning
     return
@@ -57,7 +57,7 @@ func testUnreachableVersionAvailable(condition: Bool) {
   }
 }
 
-func testUnreachablePlatformAvailable(condition: Bool) {
+func testUnreachablePlatformAvailable(_ condition: Bool) {
   if #available(iOS 7.1, *) {
     doThing() // no-warning
     return

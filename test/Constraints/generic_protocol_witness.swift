@@ -50,14 +50,14 @@ func •(x: TooTightConstraints, y: Int) {} // expected-note {{candidate has non
 // Regression test for a crash when resolving a reference to a generic method
 // in a protocol.
 protocol NeedsAGenericMethod {
-  func method<T>(x: T)
+  func method<T>(_ x: T)
 }
-func usesAGenericMethod<U : NeedsAGenericMethod>(x: U) {
+func usesAGenericMethod<U : NeedsAGenericMethod>(_ x: U) {
   x.method(5)
 }
 
 struct L<T>: Sequence {} // expected-error {{type 'L<T>' does not conform to protocol 'Sequence'}}
 
-func z(x: L<Int>) {
+func z(_ x: L<Int>) {
   for xx in x {}
 }

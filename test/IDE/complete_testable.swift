@@ -33,7 +33,7 @@ import complete_testable_helper
 // TOP_LEVEL-NEG-NOT: InternalStruct
 // TOP_LEVEL-ALL-NEG-NOT: PrivateStruct
 
-func test(value: PublicStruct) {
+func test(_ value: PublicStruct) {
   value.#^MEMBER^#
 
   // MEMBER-ALL: Begin completions

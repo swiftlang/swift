@@ -4,17 +4,17 @@
 @_exported import Foundation // clang module
 
 @_silgen_name("swift_StringToNSString")
-func _convertStringToNSString(string: String) -> NSString
+func _convertStringToNSString(_ string: String) -> NSString
 
 @_silgen_name("swift_NSStringToString")
-func _convertNSStringToString(nsstring: NSString?) -> String
+func _convertNSStringToString(_ nsstring: NSString?) -> String
 
 // NSArray bridging entry points
-func _convertNSArrayToArray<T>(nsarr: NSArray?) -> [T] {
+func _convertNSArrayToArray<T>(_ nsarr: NSArray?) -> [T] {
   return [T]()
 }
 
-func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
+func _convertArrayToNSArray<T>(_ arr: [T]) -> NSArray {
   return NSArray()
 }
 
@@ -32,11 +32,11 @@ func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
 }
 
 // NSSet bridging entry points
-func _convertSetToNSSet<T: Hashable>(s: Set<T>) -> NSSet {
+func _convertSetToNSSet<T: Hashable>(_ s: Set<T>) -> NSSet {
   return NSSet()
 }
 
-func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
+func _convertNSSetToSet<T: NSObject>(_ s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 

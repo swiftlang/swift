@@ -52,7 +52,7 @@ mutIUO.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let
 immIUO.mutS = S() // expected-error{{cannot assign to property: 'immIUO' is a 'let' constant}}
 immIUO.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 
-func foo(x: Int) {}
+func foo(_ x: Int) {}
 
 var nonOptional: S = S()
 _ = nonOptional! // expected-error{{cannot force unwrap value of non-optional type 'S'}} {{16-17=}}

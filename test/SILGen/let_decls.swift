@@ -161,7 +161,7 @@ struct CloseOverAddressOnlyConstant<T> {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}callThroughLet
-func callThroughLet(predicate: (Int, Int) -> Bool) {
+func callThroughLet(_ predicate: (Int, Int) -> Bool) {
   let p = predicate
   if p(1, 2) {
   }
@@ -171,7 +171,7 @@ func callThroughLet(predicate: (Int, Int) -> Bool) {
 // Verify that we can emit address-only rvalues directly into the result slot in
 // chained calls.
 struct GenericTestStruct<T> {
-   func pass_address_only_rvalue_result(i: Int) -> T {
+   func pass_address_only_rvalue_result(_ i: Int) -> T {
      return self[i]
    }
    subscript (i : Int) -> T {
@@ -335,7 +335,7 @@ func testDebugValue(a : Int, b : SimpleProtocol) -> Int {
 
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
-func testAddressOnlyTupleArgument(bounds: (start: SimpleProtocol, pastEnd: Int)) {
+func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
@@ -348,7 +348,7 @@ func testAddressOnlyTupleArgument(bounds: (start: SimpleProtocol, pastEnd: Int))
 }
 
 
-func address_only_let_closure<T>(x:T) -> T {
+func address_only_let_closure<T>(_ x:T) -> T {
   return { { x }() }()
 }
 
@@ -360,7 +360,7 @@ struct GenericFunctionStruct<T, U> {
 // CHECK-LABEL: sil hidden @{{.*}}member_ref_abstraction_change
 // CHECK: function_ref reabstraction thunk helper
 // CHECK: return
-func member_ref_abstraction_change(x: GenericFunctionStruct<Int, Int>) -> Int -> Int {
+func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> Int -> Int {
   return x.f
 }
 

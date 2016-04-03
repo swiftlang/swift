@@ -5,8 +5,8 @@ protocol P0 {
   // expected-note@-1{{ambiguous inference of associated type 'Assoc1': 'Double' vs. 'Int'}}
   // expected-note@-2{{unable to infer associated type 'Assoc1' for protocol 'P0'}}
   // expected-note@-3{{unable to infer associated type 'Assoc1' for protocol 'P0'}}
-  func f0(_: Assoc1)
-  func g0(_: Assoc1)
+  func f0(_ _: Assoc1)
+  func g0(_ _: Assoc1)
 }
 
 protocol PSimple { }
@@ -14,65 +14,65 @@ extension Int : PSimple { }
 extension Double : PSimple { }
 
 struct X0a : P0 { // okay: Assoc1 == Int
-  func f0(_: Int) { }
-  func g0(_: Int) { }
+  func f0(_ _: Int) { }
+  func g0(_ _: Int) { }
 }
 
 struct X0b : P0 { // expected-error{{type 'X0b' does not conform to protocol 'P0'}}
-  func f0(_: Int) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Int'}}
-  func g0(_: Double) { } // expected-note{{matching requirement 'g0' to this declaration inferred associated type to 'Double'}}
+  func f0(_ _: Int) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Int'}}
+  func g0(_ _: Double) { } // expected-note{{matching requirement 'g0' to this declaration inferred associated type to 'Double'}}
 }
 
 struct X0c : P0 { // okay: Assoc1 == Int
-  func f0(_: Int) { }
-  func g0(_: Float) { }
-  func g0(_: Int) { }
+  func f0(_ _: Int) { }
+  func g0(_ _: Float) { }
+  func g0(_ _: Int) { }
 }
 
 struct X0d : P0 { // okay: Assoc1 == Int
-  func f0(_: Int) { }
-  func g0(_: Double) { } // viable, but no corresponding f0
-  func g0(_: Int) { }
+  func f0(_ _: Int) { }
+  func g0(_ _: Double) { } // viable, but no corresponding f0
+  func g0(_ _: Int) { }
 }
 
 struct X0e : P0 { // expected-error{{type 'X0e' does not conform to protocol 'P0'}}
-  func f0(_: Double) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Double}}
-  func f0(_: Int) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Int'}}
-  func g0(_: Double) { }
-  func g0(_: Int) { } 
+  func f0(_ _: Double) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Double}}
+  func f0(_ _: Int) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Int'}}
+  func g0(_ _: Double) { }
+  func g0(_ _: Int) { } 
 }
 
 struct X0f : P0 { // okay: Assoc1 = Int because Float doesn't conform to PSimple
-  func f0(_: Float) { }
-  func f0(_: Int) { }
-  func g0(_: Float) { }
-  func g0(_: Int) { }
+  func f0(_ _: Float) { }
+  func f0(_ _: Int) { }
+  func g0(_ _: Float) { }
+  func g0(_ _: Int) { }
 }
 
 struct X0g : P0 { // expected-error{{type 'X0g' does not conform to protocol 'P0'}}
-  func f0(_: Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
-  func g0(_: Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
+  func f0(_ _: Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
+  func g0(_ _: Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
 }
 
 struct X0h<T : PSimple> : P0 {
-  func f0(_: T) { }
+  func f0(_ _: T) { }
 }
 
 extension X0h {
-  func g0(_: T) { }
+  func g0(_ _: T) { }
 }
 
 struct X0i<T : PSimple> {
 }
 
 extension X0i {
-  func g0(_: T) { }
+  func g0(_ _: T) { }
 }
 
 extension X0i : P0 { }
 
 extension X0i {
-  func f0(_: T) { }
+  func f0(_ _: T) { }
 }
 
 // Protocol extension used to infer requirements
@@ -80,8 +80,8 @@ protocol P1 {
 }
 
 extension P1 {
-  final func f0(x: Int) { }
-  final func g0(x: Int) { }
+  final func f0(_ x: Int) { }
+  final func g0(_ x: Int) { }
 }
 
 struct X0j : P0, P1 { }
@@ -89,27 +89,27 @@ struct X0j : P0, P1 { }
 protocol P2 {
   associatedtype P2Assoc
 
-  func h0(x: P2Assoc)
+  func h0(_ x: P2Assoc)
 }
 
 extension P2 where Self.P2Assoc : PSimple {
-  final func f0(x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
-  final func g0(x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
+  final func f0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
+  final func g0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
 }
 
 struct X0k : P0, P2 {
-  func h0(x: Int) { }
+  func h0(_ x: Int) { }
 }
 
 struct X0l : P0, P2 { // expected-error{{type 'X0l' does not conform to protocol 'P0'}}
-  func h0(x: Float) { }
+  func h0(_ x: Float) { }
 }
 
 // Prefer declarations in the type to those in protocol extensions
 struct X0m : P0, P2 {
-  func f0(x: Double) { }
-  func g0(x: Double) { }
-  func h0(x: Double) { }
+  func f0(_ x: Double) { }
+  func g0(_ x: Double) { }
+  func h0(_ x: Double) { }
 }
 
 // Inference from properties.
@@ -167,11 +167,11 @@ struct XCollectionLikeP0a<T> : CollectionLikeP0 {
 // rdar://problem/21304164
 public protocol Thenable {
     associatedtype T // expected-note{{protocol requires nested type 'T'}}
-    func then(success: (_: T) -> T) -> Self
+    func then(_ success: (_: T) -> T) -> Self
 }
 
 public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>' does not conform to protocol 'Thenable'}}
-    public func then(success: (t: T, _: CorePromise<T>) -> T) -> Self {
+    public func then(_ success: (t: T, _: CorePromise<T>) -> T) -> Self {
         return self.then() { (t: T) -> T in
             return success(t: t, self)
         }
@@ -182,17 +182,17 @@ public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>
 protocol P3 {
   associatedtype Assoc = Int
   associatedtype Assoc2
-  func foo(x: Assoc2) -> Assoc?
+  func foo(_ x: Assoc2) -> Assoc?
 }
 
 protocol P4 : P3 { }
 
 extension P4 {
-  func foo(x: Int) -> Float? { return 0 }
+  func foo(_ x: Int) -> Float? { return 0 }
 }
 
 extension P3 where Assoc == Int {
-  func foo(x: Int) -> Assoc? { return nil }
+  func foo(_ x: Int) -> Assoc? { return nil }
 }
 
 

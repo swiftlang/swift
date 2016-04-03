@@ -32,13 +32,13 @@ public class ChildFoo: BaseFoo {
 
 
 @inline(never)
-public func test1(bf: BaseFoo) {
+public func test1(_ bf: BaseFoo) {
   bf.bar = "test1"
   print(bf.bar)
 }
 
 @inline(never)
-public func test2(f: Foo) {
+public func test2(_ f: Foo) {
   var f = f
   f.bar = "test2"
   print(f.bar)

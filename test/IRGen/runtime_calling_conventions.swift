@@ -12,13 +12,13 @@ public class C {
 // CHECK-LABEL: define {{(protected )?}}void @_TF27runtime_calling_conventions3fooFCS_1CT_(%C27runtime_calling_conventions1C*)
 // Check that runtime functions use a proper calling convention.
 // CHECK: call void {{.*}} @rt_swift_release
-public func foo(c: C) {
+public func foo(_ c: C) {
 }
 
 // OPT-CHECK-LABEL: define {{(protected )?}}void @_TF27runtime_calling_conventions3booFCS_1CT_(%C27runtime_calling_conventions1C*)
 // Check that runtime functions use a proper calling convention.
 // OPT-CHECK: tail call void @rt_swift_release
-public func boo(c: C) {
+public func boo(_ c: C) {
 }
 
 // Check that wrappers were generated, have a proper calling convention, linkage

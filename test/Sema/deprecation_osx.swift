@@ -30,7 +30,7 @@ func directUseShouldStillTriggerDeprecationWarning() {
   _ = NSDeprecatedEnum.first    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.51: Use a different API}}
 }
 
-func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
+func useInSignature(_ options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
 }
 
 
@@ -106,11 +106,11 @@ func annotatedUsesFunctionDeprecatedIn10_51() {
   _ = ClassDeprecatedIn10_51()
 }
 
-func hasParameterDeprecatedIn10_51(p: ClassDeprecatedIn10_51) { // expected-warning {{ClassDeprecatedIn10_51' was deprecated in OS X 10.51}}
+func hasParameterDeprecatedIn10_51(_ p: ClassDeprecatedIn10_51) { // expected-warning {{ClassDeprecatedIn10_51' was deprecated in OS X 10.51}}
 }
 
 @available(OSX, introduced: 10.8, deprecated: 10.51)
-func annotatedHasParameterDeprecatedIn10_51(p: ClassDeprecatedIn10_51) {
+func annotatedHasParameterDeprecatedIn10_51(_ p: ClassDeprecatedIn10_51) {
 }
 
 func hasReturnDeprecatedIn10_51() -> ClassDeprecatedIn10_51 { // expected-warning {{ClassDeprecatedIn10_51' was deprecated in OS X 10.51}}

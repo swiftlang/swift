@@ -32,11 +32,11 @@ class OtherIntroduced10_51 {
     return OtherIntroduced10_52()
   }
 
-  func takes10_52(o: OtherIntroduced10_52) { 
+  func takes10_52(_ o: OtherIntroduced10_52) { 
   }
 
   @available(OSX, introduced: 10.52)
-  func takes10_52Introduced10_52(o: OtherIntroduced10_52) {
+  func takes10_52Introduced10_52(_ o: OtherIntroduced10_52) {
   }
 
   var propOf10_52: OtherIntroduced10_52 = 
@@ -72,7 +72,7 @@ extension OtherIntroduced10_51 { // expected-error {{'OtherIntroduced10_51' is o
 
 extension OtherIntroduced10_9 {
   @available(OSX, introduced: 10.51)
-  func extensionMethodOnOtherIntroduced10_9AvailableOn10_51(p: OtherIntroduced10_51) { }
+  func extensionMethodOnOtherIntroduced10_9AvailableOn10_51(_ p: OtherIntroduced10_51) { }
 }
 
 @available(OSX, introduced: 10.51)

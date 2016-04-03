@@ -142,7 +142,7 @@ func mismatchIf<R1 : IteratorProtocol, R2 : IteratorProtocol>
   return (prev1, prev2)
 }
 
-func minElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
+func minElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
        -> R.Element {
   var range = range
   var result = range.next()!
@@ -154,7 +154,7 @@ func minElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
   return result
 }
 
-func maxElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
+func maxElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
        -> R.Element {
   var range = range
   var result = range.next()!
@@ -166,7 +166,7 @@ func maxElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
   return result
 }
 
-func minMaxElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
+func minMaxElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
        -> (R.Element, R.Element) {
   var range = range
   var min = range.next()!, max = min
@@ -179,12 +179,12 @@ func minMaxElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
 
 protocol RandomAccessStream : IteratorProtocol {
   func size() -> Int
-  func getNth(n: Int) -> Element
+  func getNth(_ n: Int) -> Element
   subscript (r : Range<Int>) -> Self { get }
 }
 
 func lowerBound<R : RandomAccessStream where R.Element : Comparable>
-       (inputrange : R, value : R.Element) -> R {
+       (_ inputrange : R, value : R.Element) -> R {
   var range = inputrange
   while range.size() > 1 {
     let mid = range.size() / 2

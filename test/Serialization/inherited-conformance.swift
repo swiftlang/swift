@@ -9,5 +9,5 @@ import User
 var test = User.OneToAThousand()
 print(test[test.startIndex])
 
-func useSigned<T: SpecialProto>(_: T) {}
+func useSigned<T: SpecialProto>(_ _: T) {}
 useSigned(5 as Int)

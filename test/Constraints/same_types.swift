@@ -22,18 +22,18 @@ struct Z: Barrable {
 }
 
 protocol TestSameTypeRequirement {
-  func foo<F1: Fooable where F1.Foo == X>(f: F1)
+  func foo<F1: Fooable where F1.Foo == X>(_ f: F1)
 }
 struct SatisfySameTypeRequirement : TestSameTypeRequirement {
-  func foo<F2: Fooable where F2.Foo == X>(f: F2) {}
+  func foo<F2: Fooable where F2.Foo == X>(_ f: F2) {}
 }
 
-func test1<T: Fooable where T.Foo == X>(fooable: T) -> X {
+func test1<T: Fooable where T.Foo == X>(_ fooable: T) -> X {
   return fooable.foo
 }
 
 struct NestedConstraint<T> {
-  func tFoo<U: Fooable where U.Foo == T>(fooable: U) -> T {
+  func tFoo<U: Fooable where U.Foo == T>(_ fooable: U) -> T {
     return fooable.foo
   }
 }
@@ -78,7 +78,7 @@ func fail2<
   return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
 }
 
-func test4<T: Barrable where T.Bar == Y>(t: T) -> Y {
+func test4<T: Barrable where T.Bar == Y>(_ t: T) -> Y {
   return t.bar
 }
 
@@ -90,15 +90,15 @@ func fail3<
   return t.bar // expected-error{{cannot convert return expression of type 'T.Bar' to return type 'X'}}
 }
 
-func test5<T: Barrable where T.Bar.Foo == X>(t: T) -> X {
+func test5<T: Barrable where T.Bar.Foo == X>(_ t: T) -> X {
   return t.bar.foo
 }
 
-func test6<T: Barrable where T.Bar == Y>(t: T) -> (Y, X) {
+func test6<T: Barrable where T.Bar == Y>(_ t: T) -> (Y, X) {
   return (t.bar, t.bar.foo)
 }
 
-func test7<T: Barrable where T.Bar == Y, T.Bar.Foo == X>(t: T) -> (Y, X) {
+func test7<T: Barrable where T.Bar == Y, T.Bar.Foo == X>(_ t: T) -> (Y, X) {
   return (t.bar, t.bar.foo)
 }
 
@@ -121,7 +121,7 @@ func fail5<
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
 }
 
-func test8<T: Fooable where T.Foo == X, T.Foo == Y>(t: T) {} // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Y'}}
+func test8<T: Fooable where T.Foo == X, T.Foo == Y>(_ t: T) {} // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Y'}}
 
 func testAssocTypeEquivalence<
   T: Fooable where T.Foo == X
@@ -129,7 +129,7 @@ func testAssocTypeEquivalence<
   return T.Foo.self
 }
 
-func fail6<T where T == Int>(t: T) -> Int { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
+func fail6<T where T == Int>(_ t: T) -> Int { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
   return t // expected-error{{cannot convert return expression of type 'T' to return type 'Int'}}
 }
 
@@ -150,6 +150,6 @@ func test8a<
 }
 
 // rdar://problem/19137463
-func rdar19137463<T where T.a == T>(t: T) {} // expected-error{{'a' is not a member type of 'T'}}
+func rdar19137463<T where T.a == T>(_ t: T) {} // expected-error{{'a' is not a member type of 'T'}}
 rdar19137463(1)
 

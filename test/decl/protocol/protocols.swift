@@ -8,7 +8,7 @@ protocol DefinitionsInProtocols {
 
 // Protocol decl.
 protocol Test {
-  func setTitle(_: String)
+  func setTitle(_ _: String)
   func erase() -> Bool
 
   var creator: String { get }
@@ -90,7 +90,7 @@ struct Circle {
   func circle_end() {}
 }
 
-func testCircular(circle: Circle) {
+func testCircular(_ circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
   _ = circle as CircleStart // expected-error{{'Circle' is not convertible to 'CircleStart'; did you mean to use 'as!' to force downcast?}} {{14-16=as!}}
@@ -197,11 +197,11 @@ struct IntStringGetter : GetATuple {
 //===----------------------------------------------------------------------===//
 // FIXME: Actually make use of default arguments, check substitutions, etc.
 protocol ProtoWithDefaultArg {
-  func increment(value: Int = 1) // expected-error{{default argument not permitted in a protocol method}}
+  func increment(_ value: Int = 1) // expected-error{{default argument not permitted in a protocol method}}
 }
 
 struct HasNoDefaultArg : ProtoWithDefaultArg {
-  func increment(_: Int) {}
+  func increment(_ _: Int) {}
 }
 
 //===----------------------------------------------------------------------===//
@@ -242,7 +242,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 // Using values of existential type.
 //===----------------------------------------------------------------------===//
 
-func existentialSequence(e: Sequence) { // expected-error{{has Self or associated type requirements}}
+func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
   var x = e.makeIterator() // expected-error{{type 'Sequence' does not conform to protocol 'IteratorProtocol'}}
   x.next()
   x.nonexistent()
@@ -253,7 +253,7 @@ protocol HasSequenceAndStream {
   func getR() -> R
 }
 
-func existentialSequenceAndStreamType(h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
+func existentialSequenceAndStreamType(_ h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Crummy diagnostics.
   var x = h.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'HasSequenceAndStream'; use a generic constraint instead}}
   x.makeIterator()
@@ -282,7 +282,7 @@ struct DictionaryIntInt {
   }
 }
 
-func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
+func testSubscripting(_ iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
   var i: Int = iis[17] 
   var i2 = i_s[17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'IntSubscriptable'; use a generic constraint instead}}
 }
@@ -310,7 +310,7 @@ func StaticProtocolFunc() {
   let a: StaticP = StaticS1()
   a.f() // expected-error{{static member 'f' cannot be used on instance of type 'StaticP'}}
 }
-func StaticProtocolGenericFunc<t : StaticP>(_: t) {
+func StaticProtocolGenericFunc<t : StaticP>(_ _: t) {
   t.f()
 }
 

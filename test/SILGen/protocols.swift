@@ -77,7 +77,7 @@ func use_subscript_archetype_rvalue_get<T : SubscriptableGet>(generic : T, idx :
 // CHECK-NEXT: destroy_addr %0
 
 
-func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(generic: inout T, idx : Int) -> Int {
+func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(_ generic: inout T, idx : Int) -> Int {
   return generic[idx]
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_get
@@ -95,7 +95,7 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(generic: inout 
 // CHECK: return [[APPLYRESULT]]
 
 
-func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(generic: inout T, idx : Int) {
+func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(_ generic: inout T, idx : Int) {
   generic[idx] = idx
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
@@ -190,7 +190,7 @@ func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(generic : T
 // CHECK-NEXT: destroy_addr %0
 
 
-func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(generic: inout T, v : Int) {
+func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(_ generic: inout T, v : Int) {
   generic.b = v
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
@@ -209,7 +209,7 @@ protocol Initializable {
 }
 
 // CHECK-LABEL: sil hidden @_TF9protocols27use_initializable_archetype
-func use_initializable_archetype<T: Initializable>(t: T, i: Int) {
+func use_initializable_archetype<T: Initializable>(_ t: T, i: Int) {
   // CHECK:   [[T_INIT:%[0-9]+]] = witness_method $T, #Initializable.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
   // CHECK:   [[T_META:%[0-9]+]] = metatype $@thick T.Type
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
@@ -223,7 +223,7 @@ func use_initializable_archetype<T: Initializable>(t: T, i: Int) {
 }
 
 // CHECK: sil hidden @_TF9protocols29use_initializable_existential
-func use_initializable_existential(im: Initializable.Type, i: Int) {
+func use_initializable_existential(_ im: Initializable.Type, i: Int) {
 // CHECK: bb0([[IM:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
 // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[IM]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
 // CHECK:   [[TEMP_VALUE:%[0-9]+]] = alloc_stack $Initializable
@@ -379,7 +379,7 @@ protocol ExistentialProperty {
   var p: PropertyWithGetterSetter { get set }
 }
 
-func testExistentialPropertyRead<T: ExistentialProperty>(t: inout T) {
+func testExistentialPropertyRead<T: ExistentialProperty>(_ t: inout T) {
     let b = t.p.b
 }
 // CHECK-LABEL: sil hidden @_TF9protocols27testExistentialPropertyRead
@@ -401,12 +401,12 @@ func testExistentialPropertyRead<T: ExistentialProperty>(t: inout T) {
 // CHECK-NOT:  witness_method
 // CHECK:      return
 
-func modify(x: inout Int) {}
+func modify(_ x: inout Int) {}
 
 // Make sure we call the materializeForSet callback with the correct
 // generic signature.
 
-func modifyProperty<T : PropertyWithGetterSetter>(x: inout T) {
+func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
   modify(&x.b)
 }
 // CHECK-LABEL: sil hidden @_TF9protocols14modifyPropertyuRxS_24PropertyWithGetterSetterrFRxT_

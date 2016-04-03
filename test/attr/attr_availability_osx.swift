@@ -40,14 +40,14 @@ deprecatedFunctionWithoutMessage() // expected-warning{{'deprecatedFunctionWitho
               message: "Use BetterClass instead")
 class DeprecatedClass { }
 
-func functionWithDeprecatedParameter(p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in OS X 10.10: Use BetterClass instead}}
+func functionWithDeprecatedParameter(_ p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in OS X 10.10: Use BetterClass instead}}
 
 @available(OSX, introduced: 10.5, deprecated: 10.11,
               message: "Use BetterClass instead")
 class DeprecatedClassIn10_11 { }
 
 // Elements deprecated later than the minimum deployment target (which is 10.10, in this case) should not generate warnings
-func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn10_11) { }
+func functionWithDeprecatedLaterParameter(_ p: DeprecatedClassIn10_11) { }
 
 // Unconditional platform unavailability
 @available(OSX, unavailable)

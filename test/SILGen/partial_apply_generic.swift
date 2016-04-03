@@ -6,7 +6,7 @@ protocol Foo {
 }
 
 // CHECK-LABEL: sil hidden @_TF21partial_apply_generic14getStaticFunc1
-func getStaticFunc1<T: Foo>(t: T.Type) -> () -> () {
+func getStaticFunc1<T: Foo>(_ t: T.Type) -> () -> () {
 // CHECK: [[REF:%.*]] = function_ref @_TZFP21partial_apply_generic3Foo10staticFunc
 // CHECK-NEXT: apply [[REF]]<T>(%0)
   return t.staticFunc
@@ -19,7 +19,7 @@ func getStaticFunc1<T: Foo>(t: T.Type) -> () -> () {
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil hidden @_TF21partial_apply_generic14getStaticFunc2
-func getStaticFunc2<T: Foo>(t: T) -> () -> () {
+func getStaticFunc2<T: Foo>(_ t: T) -> () -> () {
 // CHECK: [[REF:%.*]] = function_ref @_TZFP21partial_apply_generic3Foo10staticFunc
 // CHECK: apply [[REF]]<T>
   return T.staticFunc
@@ -28,7 +28,7 @@ func getStaticFunc2<T: Foo>(t: T) -> () -> () {
 }
 
 // CHECK-LABEL: sil hidden @_TF21partial_apply_generic16getInstanceFunc1
-func getInstanceFunc1<T: Foo>(t: T) -> () -> () {
+func getInstanceFunc1<T: Foo>(_ t: T) -> () -> () {
 // CHECK: [[REF:%.*]] = function_ref @_TFP21partial_apply_generic3Foo12instanceFunc
 // CHECK-NEXT: alloc_stack $T
 // CHECK-NEXT: copy_addr %0 to [initialization]
@@ -45,7 +45,7 @@ func getInstanceFunc1<T: Foo>(t: T) -> () -> () {
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil hidden @_TF21partial_apply_generic16getInstanceFunc2
-func getInstanceFunc2<T: Foo>(t: T) -> (T) -> () -> () {
+func getInstanceFunc2<T: Foo>(_ t: T) -> (T) -> () -> () {
 // CHECK: [[REF:%.*]] = function_ref @_TFP21partial_apply_generic3Foo12instanceFunc
 // CHECK-NEXT: partial_apply [[REF]]<T>(
   return T.instanceFunc
@@ -54,7 +54,7 @@ func getInstanceFunc2<T: Foo>(t: T) -> (T) -> () -> () {
 }
 
 // CHECK-LABEL: sil hidden @_TF21partial_apply_generic16getInstanceFunc3
-func getInstanceFunc3<T: Foo>(t: T.Type) -> (T) -> () -> () {
+func getInstanceFunc3<T: Foo>(_ t: T.Type) -> (T) -> () -> () {
 // CHECK: [[REF:%.*]] = function_ref @_TFP21partial_apply_generic3Foo12instanceFunc
 // CHECK-NEXT: partial_apply [[REF]]<T>(
   return t.instanceFunc

@@ -1,5 +1,5 @@
 struct Foo {
-  func advancedFeatures(x: Int) {}
+  func advancedFeatures(_ x: Int) {}
   var bigPower: Int = 0
 }
 func foo() {
@@ -30,7 +30,7 @@ struct X {
   func aaaCcc() {}
   func aaaa() {}
 }
-func test(x: X) {
+func test(_ x: X) {
   x.
 }
 

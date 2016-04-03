@@ -68,7 +68,7 @@ var x2 : MySt {
     return _x
   }
 }
-func testProperty(z: MySt) {
+func testProperty(_ z: MySt) {
   x1 = z
   x2 = z
   var m1 : MySt = x1

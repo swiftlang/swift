@@ -6,7 +6,7 @@ func testUnreachableAfterReturn() -> Int {
   x += 1 //expected-warning {{code after 'return' will never be executed}}
 }
 
-func testUnreachableAfterIfReturn(a: Bool) -> Int {
+func testUnreachableAfterIfReturn(_ a: Bool) -> Int {
   if a {
     return 1
   } else {
@@ -15,7 +15,7 @@ func testUnreachableAfterIfReturn(a: Bool) -> Int {
   var _: Int = testUnreachableAfterReturn() // expected-warning {{will never be executed}}
 }
 
-func testUnreachableForAfterContinue(b: Bool) {
+func testUnreachableForAfterContinue(_ b: Bool) {
   for (var i:Int = 0; i<10; i+=1) { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
     var y: Int = 300
     y += 1
@@ -28,7 +28,7 @@ func testUnreachableForAfterContinue(b: Bool) {
   }
 }
 
-func testUnreachableWhileAfterContinue(b: Bool) {
+func testUnreachableWhileAfterContinue(_ b: Bool) {
   var i:Int = 0
   while (i<10) { 
     var y: Int = 300
@@ -111,7 +111,7 @@ func testUnreachableCase5(a : Tree) {
 }
 
 
-func testUnreachableAfterThrow(e: ErrorProtocol) throws {
+func testUnreachableAfterThrow(_ e: ErrorProtocol) throws {
   throw e
   return   // expected-warning {{code after 'throw' will never be executed}}
 }

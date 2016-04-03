@@ -10,7 +10,7 @@ class A {
   // CHECK-LABEL: sil hidden @_TFC14objc_metatypes1A3foo
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_metatypes1A3foo
-  dynamic func foo(m: ObjCClass.Type) -> ObjCClass.Type {
+  dynamic func foo(_ m: ObjCClass.Type) -> ObjCClass.Type {
     // CHECK: bb0([[M:%[0-9]+]] : $@objc_metatype ObjCClass.Type, [[SELF:%[0-9]+]] : $A):
     // CHECK:   strong_retain [[SELF]] : $A
     // CHECK:   [[M_AS_THICK:%[0-9]+]] = objc_to_thick_metatype [[M]] : $@objc_metatype ObjCClass.Type to $@thick ObjCClass.Type
@@ -32,7 +32,7 @@ class A {
   // CHECK-NEXT:   return [[RESULT]] : $()
   dynamic class func bar() { }
 
-  dynamic func takeGizmo(g: Gizmo.Type) { }
+  dynamic func takeGizmo(_ g: Gizmo.Type) { }
 
   // CHECK-LABEL: sil hidden @_TFC14objc_metatypes1A7callFoo
   func callFoo() {

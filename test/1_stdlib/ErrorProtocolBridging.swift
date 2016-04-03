@@ -170,7 +170,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-func opaqueUpcastToAny<T>(x: T) -> Any {
+func opaqueUpcastToAny<T>(_ x: T) -> Any {
   return x
 }
 

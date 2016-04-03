@@ -38,7 +38,7 @@ class Foo {
 // CHECK: func m()
 }
 
-func bar(x: Foo) -> Int {
+func bar(_ x: Foo) -> Int {
   return x.x
 }
-// CHECK: func bar(x: Foo) -> Int
+// CHECK: func bar(_ x: Foo) -> Int

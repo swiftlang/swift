@@ -6,7 +6,7 @@ var global: Int
 
 struct S1 {}
 
-func foo(x: FooStruct1) -> S1 {}
+func foo(_ x: FooStruct1) -> S1 {}
 
 // RUN: rm -rf %t
 // RUN: mkdir %t

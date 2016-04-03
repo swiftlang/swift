@@ -7,4 +7,4 @@ protocol Fooable {
 }
 
 // CHECK: define hidden void @_TF18infinite_archetype3foo{{.*}}(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Fooable)
-func foo<T: Fooable where T == T.Foo>(x: T) -> T { return x }
+func foo<T: Fooable where T == T.Foo>(_ x: T) -> T { return x }

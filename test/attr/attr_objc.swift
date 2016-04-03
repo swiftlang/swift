@@ -107,7 +107,7 @@ func subject_freeFunc() { // expected-error {{@objc can only be used with member
 }
 
 @objc
-func subject_genericFunc<T>(t: T) { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-6=}}
+func subject_genericFunc<T>(_ t: T) { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-6=}}
   @objc
   var subject_localVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
 
@@ -115,7 +115,7 @@ func subject_genericFunc<T>(t: T) { // expected-error {{@objc can only be used w
   func subject_instanceFunc() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
 }
 
-func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}}
+func subject_funcParam(_ a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}}
 }
 
 @objc // expected-error {{@objc cannot be applied to this declaration}} {{1-7=}}
@@ -263,12 +263,12 @@ protocol subject_containerObjCProtocol1 {
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
-  func func_FunctionParam1(a: PlainStruct)
+  func func_FunctionParam1(_ a: PlainStruct)
   // expected-error@-1 {{method cannot be a member of an @objc protocol because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
-  func func_Variadic(_: AnyObject...)
+  func func_Variadic(_ _: AnyObject...)
   // expected-error @-1{{method cannot be a member of an @objc protocol because it has a variadic parameter}}
   // expected-note @-2{{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
@@ -322,7 +322,7 @@ class ConcreteContext3 {
   // expected-error@-1{{method cannot be marked @objc because it has generic parameters}}
 }
 
-func genericContext1<T>(_: T) {
+func genericContext1<T>(_ _: T) {
   @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{3-9=}}
   class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
 
@@ -522,42 +522,42 @@ class infer_instanceFunc1 {
 
   @objc func func1_() {} // no-error
 
-  func func2(a: Int) {}
-// CHECK-LABEL: @objc func func2(a: Int) {
+  func func2(_ a: Int) {}
+// CHECK-LABEL: @objc func func2(_ a: Int) {
 
-  @objc func func2_(a: Int) {} // no-error
+  @objc func func2_(_ a: Int) {} // no-error
 
-  func func3(a: Int) -> Int {}
-// CHECK-LABEL: @objc func func3(a: Int) -> Int {
+  func func3(_ a: Int) -> Int {}
+// CHECK-LABEL: @objc func func3(_ a: Int) -> Int {
 
-  @objc func func3_(a: Int) -> Int {} // no-error
+  @objc func func3_(_ a: Int) -> Int {} // no-error
 
-  func func4(a: Int, b: Double) {}
-// CHECK-LABEL: @objc func func4(a: Int, b: Double) {
+  func func4(_ a: Int, b: Double) {}
+// CHECK-LABEL: @objc func func4(_ a: Int, b: Double) {
 
-  @objc func func4_(a: Int, b: Double) {} // no-error
+  @objc func func4_(_ a: Int, b: Double) {} // no-error
 
-  func func5(a: String) {}
-// CHECK-LABEL: @objc func func5(a: String) {
+  func func5(_ a: String) {}
+// CHECK-LABEL: @objc func func5(_ a: String) {
 
-  @objc func func5_(a: String) {} // no-error
+  @objc func func5_(_ a: String) {} // no-error
 
   func func6() -> String {}
 // CHECK-LABEL: @objc func func6() -> String {
 
   @objc func func6_() -> String {} // no-error
 
-  func func7(a: PlainClass) {}
-// CHECK-LABEL: {{^}} func func7(a: PlainClass) {
+  func func7(_ a: PlainClass) {}
+// CHECK-LABEL: {{^}} func func7(_ a: PlainClass) {
 
-  @objc func func7_(a: PlainClass) {}
+  @objc func func7_(_ a: PlainClass) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
 
-  func func7m(a: PlainClass.Type) {}
-// CHECK-LABEL: {{^}} func func7m(a: PlainClass.Type) {
+  func func7m(_ a: PlainClass.Type) {}
+// CHECK-LABEL: {{^}} func func7m(_ a: PlainClass.Type) {
 
-  @objc func func7m_(a: PlainClass.Type) {}
+  @objc func func7m_(_ a: PlainClass.Type) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 
   func func8() -> PlainClass {}
@@ -573,10 +573,10 @@ class infer_instanceFunc1 {
   @objc func func8m_() -> PlainClass.Type {}
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
-  func func9(a: PlainStruct) {}
-// CHECK-LABEL: {{^}} func func9(a: PlainStruct) {
+  func func9(_ a: PlainStruct) {}
+// CHECK-LABEL: {{^}} func func9(_ a: PlainStruct) {
 
-  @objc func func9_(a: PlainStruct) {}
+  @objc func func9_(_ a: PlainStruct) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
@@ -587,55 +587,55 @@ class infer_instanceFunc1 {
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
-  func func11(a: PlainEnum) {}
-// CHECK-LABEL: {{^}} func func11(a: PlainEnum) {
+  func func11(_ a: PlainEnum) {}
+// CHECK-LABEL: {{^}} func func11(_ a: PlainEnum) {
 
-  @objc func func11_(a: PlainEnum) {}
+  @objc func func11_(_ a: PlainEnum) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
 
-  func func12(a: PlainProtocol) {}
-// CHECK-LABEL: {{^}} func func12(a: PlainProtocol) {
+  func func12(_ a: PlainProtocol) {}
+// CHECK-LABEL: {{^}} func func12(_ a: PlainProtocol) {
 
-  @objc func func12_(a: PlainProtocol) {}
+  @objc func func12_(_ a: PlainProtocol) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
-  func func13(a: Class_ObjC1) {}
-// CHECK-LABEL: @objc func func13(a: Class_ObjC1) {
+  func func13(_ a: Class_ObjC1) {}
+// CHECK-LABEL: @objc func func13(_ a: Class_ObjC1) {
 
-  @objc func func13_(a: Class_ObjC1) {} // no-error
+  @objc func func13_(_ a: Class_ObjC1) {} // no-error
 
-  func func14(a: Protocol_Class1) {}
-// CHECK-LABEL: {{^}} func func14(a: Protocol_Class1) {
+  func func14(_ a: Protocol_Class1) {}
+// CHECK-LABEL: {{^}} func func14(_ a: Protocol_Class1) {
 
-  @objc func func14_(a: Protocol_Class1) {}
+  @objc func func14_(_ a: Protocol_Class1) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
 
-  func func15(a: Protocol_ObjC1) {}
-// CHECK-LABEL: @objc func func15(a: Protocol_ObjC1) {
-  @objc func func15_(a: Protocol_ObjC1) {} // no-error
+  func func15(_ a: Protocol_ObjC1) {}
+// CHECK-LABEL: @objc func func15(_ a: Protocol_ObjC1) {
+  @objc func func15_(_ a: Protocol_ObjC1) {} // no-error
 
-  func func16(a: AnyObject) {}
-// CHECK-LABEL: @objc func func16(a: AnyObject) {
+  func func16(_ a: AnyObject) {}
+// CHECK-LABEL: @objc func func16(_ a: AnyObject) {
 
-  @objc func func16_(a: AnyObject) {} // no-error
+  @objc func func16_(_ a: AnyObject) {} // no-error
 
-  func func17(a: () -> ()) {}
-// CHECK-LABEL: {{^}}  @objc func func17(a: () -> ()) {
+  func func17(_ a: () -> ()) {}
+// CHECK-LABEL: {{^}}  @objc func func17(_ a: () -> ()) {
 
-  @objc func func17_(a: () -> ()) {}
+  @objc func func17_(_ a: () -> ()) {}
 
-  func func18(a: (Int) -> (), b: Int) {}
-// CHECK-LABEL: {{^}}  @objc func func18(a: (Int) -> (), b: Int)
+  func func18(_ a: (Int) -> (), b: Int) {}
+// CHECK-LABEL: {{^}}  @objc func func18(_ a: (Int) -> (), b: Int)
 
-  @objc func func18_(a: (Int) -> (), b: Int) {}
+  @objc func func18_(_ a: (Int) -> (), b: Int) {}
 
-  func func19(a: (String) -> (), b: Int) {}
-// CHECK-LABEL: {{^}}  @objc func func19(a: (String) -> (), b: Int) {
+  func func19(_ a: (String) -> (), b: Int) {}
+// CHECK-LABEL: {{^}}  @objc func func19(_ a: (String) -> (), b: Int) {
 
-  @objc func func19_(a: (String) -> (), b: Int) {}
+  @objc func func19_(_ a: (String) -> (), b: Int) {}
 
   func func_FunctionReturn1() -> () -> () {}
 // CHECK-LABEL: {{^}}  @objc func func_FunctionReturn1() -> () -> () {
@@ -669,24 +669,24 @@ class infer_instanceFunc1 {
   @objc func func_ZeroParams1a() {} // no-error
 
 
-  func func_OneParam1(a: Int) {}
-// CHECK-LABEL: @objc func func_OneParam1(a: Int) {
+  func func_OneParam1(_ a: Int) {}
+// CHECK-LABEL: @objc func func_OneParam1(_ a: Int) {
 
-  @objc func func_OneParam1a(a: Int) {} // no-error
+  @objc func func_OneParam1a(_ a: Int) {} // no-error
 
 
-  func func_TupleStyle1(a: Int, b: Int) {}
-  // CHECK-LABEL: {{^}} @objc func func_TupleStyle1(a: Int, b: Int) {
+  func func_TupleStyle1(_ a: Int, b: Int) {}
+  // CHECK-LABEL: {{^}} @objc func func_TupleStyle1(_ a: Int, b: Int) {
 
-  @objc func func_TupleStyle1a(a: Int, b: Int) {}
+  @objc func func_TupleStyle1a(_ a: Int, b: Int) {}
 
-  func func_TupleStyle2(a: Int, b: Int, c: Int) {}
-// CHECK-LABEL: {{^}} @objc func func_TupleStyle2(a: Int, b: Int, c: Int) {
+  func func_TupleStyle2(_ a: Int, b: Int, c: Int) {}
+// CHECK-LABEL: {{^}} @objc func func_TupleStyle2(_ a: Int, b: Int, c: Int) {
 
-  @objc func func_TupleStyle2a(a: Int, b: Int, c: Int) {}
+  @objc func func_TupleStyle2a(_ a: Int, b: Int, c: Int) {}
 
   // Check that we produce diagnostics for every parameter and return type.
-  @objc func func_MultipleDiags(a: PlainStruct, b: PlainEnum) -> protocol<> {}
+  @objc func func_MultipleDiags(_ a: PlainStruct, b: PlainEnum) -> protocol<> {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter 1 cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-error@-3 {{method cannot be marked @objc because the type of the parameter 2 cannot be represented in Objective-C}}
@@ -694,22 +694,22 @@ class infer_instanceFunc1 {
   // expected-error@-5 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-6 {{'protocol<>' is not considered '@objc'; use 'AnyObject' instead}}
 
-  @objc func func_UnnamedParam1(_: Int) {} // no-error
+  @objc func func_UnnamedParam1(_ _: Int) {} // no-error
 
-  @objc func func_UnnamedParam2(_: PlainStruct) {}
+  @objc func func_UnnamedParam2(_ _: PlainStruct) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
-  @objc func func_varParam1(a: AnyObject) {
+  @objc func func_varParam1(_ a: AnyObject) {
     var a = a
     let b = a; a = b
   }
 
-  func func_varParam2(a: AnyObject) {
+  func func_varParam2(_ a: AnyObject) {
     var a = a
     let b = a; a = b
   }
-// CHECK-LABEL: @objc func func_varParam2(a: AnyObject) {
+// CHECK-LABEL: @objc func func_varParam2(_ a: AnyObject) {
 }
 
 @objc
@@ -1464,10 +1464,10 @@ class infer_instanceVar2<
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
-  func func_GP_Unconstrained(a: GP_Unconstrained) {}
-// CHECK-LABEL: {{^}} func func_GP_Unconstrained(a: GP_Unconstrained) {
+  func func_GP_Unconstrained(_ a: GP_Unconstrained) {}
+// CHECK-LABEL: {{^}} func func_GP_Unconstrained(_ a: GP_Unconstrained) {
 
-  @objc func func_GP_Unconstrained_(a: GP_Unconstrained) {}
+  @objc func func_GP_Unconstrained_(_ a: GP_Unconstrained) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 }
@@ -1592,8 +1592,8 @@ protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
 
 class C {
   // Don't crash.
-  @objc func foo(x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
-  @IBAction func myAction(sender: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
+  @objc func foo(_ x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
+  @IBAction func myAction(_ sender: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
 }
 
 //===---
@@ -1639,23 +1639,23 @@ class HasNSManaged {
 
 @objc class TakesCPointers {
 // CHECK-LABEL: {{^}}@objc class TakesCPointers {
-  func constUnsafeMutablePointer(p: UnsafePointer<Int>) {}
-  // CHECK-LABEL: @objc func constUnsafeMutablePointer(p: UnsafePointer<Int>) {
+  func constUnsafeMutablePointer(_ p: UnsafePointer<Int>) {}
+  // CHECK-LABEL: @objc func constUnsafeMutablePointer(_ p: UnsafePointer<Int>) {
 
-  func constUnsafeMutablePointerToAnyObject(p: UnsafePointer<AnyObject>) {}
-  // CHECK-LABEL: @objc func constUnsafeMutablePointerToAnyObject(p: UnsafePointer<AnyObject>) {
+  func constUnsafeMutablePointerToAnyObject(_ p: UnsafePointer<AnyObject>) {}
+  // CHECK-LABEL: @objc func constUnsafeMutablePointerToAnyObject(_ p: UnsafePointer<AnyObject>) {
 
-  func constUnsafeMutablePointerToClass(p: UnsafePointer<TakesCPointers>) {}
-  // CHECK-LABEL: @objc func constUnsafeMutablePointerToClass(p: UnsafePointer<TakesCPointers>) {
+  func constUnsafeMutablePointerToClass(_ p: UnsafePointer<TakesCPointers>) {}
+  // CHECK-LABEL: @objc func constUnsafeMutablePointerToClass(_ p: UnsafePointer<TakesCPointers>) {
 
-  func mutableUnsafeMutablePointer(p: UnsafeMutablePointer<Int>) {}
-  // CHECK-LABEL: @objc func mutableUnsafeMutablePointer(p: UnsafeMutablePointer<Int>) {
+  func mutableUnsafeMutablePointer(_ p: UnsafeMutablePointer<Int>) {}
+  // CHECK-LABEL: @objc func mutableUnsafeMutablePointer(_ p: UnsafeMutablePointer<Int>) {
 
-  func mutableStrongUnsafeMutablePointerToAnyObject(p: UnsafeMutablePointer<AnyObject>) {}
-  // CHECK-LABEL: {{^}} @objc func mutableStrongUnsafeMutablePointerToAnyObject(p: UnsafeMutablePointer<AnyObject>) {
+  func mutableStrongUnsafeMutablePointerToAnyObject(_ p: UnsafeMutablePointer<AnyObject>) {}
+  // CHECK-LABEL: {{^}} @objc func mutableStrongUnsafeMutablePointerToAnyObject(_ p: UnsafeMutablePointer<AnyObject>) {
 
-  func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {}
-  // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
+  func mutableAutoreleasingUnsafeMutablePointerToAnyObject(_ p: AutoreleasingUnsafeMutablePointer<AnyObject>) {}
+  // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafeMutablePointerToAnyObject(_ p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
 }
 
 // @objc with nullary names
@@ -1685,21 +1685,21 @@ class Class_ObjC3 {
 extension PlainClass {
   // CHECK-LABEL: @objc(setFoo:) dynamic func
   @objc(setFoo:)
-  func foo(b: Bool) { }
+  func foo(_ b: Bool) { }
 
   // CHECK-LABEL: @objc(setWithRed:green:blue:alpha:) dynamic func set
   @objc(setWithRed:green:blue:alpha:)
-  func set(_: Float, green: Float, blue: Float, alpha: Float)  { }
+  func set(_ _: Float, green: Float, blue: Float, alpha: Float)  { }
 
   // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) dynamic class func createWith
   @objc(createWithRed:green blue:alpha)
-  class func createWithRed(_: Float, green: Float, blue: Float, alpha: Float) { }
+  class func createWithRed(_ _: Float, green: Float, blue: Float, alpha: Float) { }
   // expected-error@-2{{missing ':' after selector piece in @objc attribute}}{{28-28=:}}
   // expected-error@-3{{missing ':' after selector piece in @objc attribute}}{{39-39=:}}
 
   // CHECK-LABEL: @objc(::) dynamic func badlyNamed
   @objc(::)
-  func badlyNamed(_: Int, y: Int) {}
+  func badlyNamed(_ _: Int, y: Int) {}
 }
 
 @objc(Class:) // expected-error{{'@objc' class must have a simple name}}{{12-13=}}
@@ -1729,16 +1729,16 @@ class BadClass2 {
   }
 
   @objc(foo) // expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
-  func noArgNamesOneParam(x: Int) { }
+  func noArgNamesOneParam(_ x: Int) { }
   
   @objc(foo) // expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
-  func noArgNamesOneParam2(_: Int) { }
+  func noArgNamesOneParam2(_ _: Int) { }
 
   @objc(foo) // expected-error{{'@objc' method name provides names for 0 arguments, but method has 2 parameters}}
-  func noArgNamesTwoParams(_: Int, y: Int) { }
+  func noArgNamesTwoParams(_ _: Int, y: Int) { }
 
   @objc(foo:) // expected-error{{'@objc' method name provides one argument name, but method has 2 parameters}}
-  func oneArgNameTwoParams(_: Int, y: Int) { }
+  func oneArgNameTwoParams(_ _: Int, y: Int) { }
 
   @objc(foo:) // expected-error{{'@objc' method name provides one argument name, but method has 0 parameters}}
   func oneArgNameNoParams() { }
@@ -1777,14 +1777,14 @@ class Super {
   @objc(renamedFoo)
   var foo: Int { get { return 3 } } // expected-note 2{{overridden declaration is here}}
 
-  @objc func process(i: Int) -> Int { } // expected-note {{overriding '@objc' method 'process' here}}
+  @objc func process(_ i: Int) -> Int { } // expected-note {{overriding '@objc' method 'process' here}}
 }
 
 class Sub1 : Super {
   @objc(foo) // expected-error{{Objective-C property has a different name from the property it overrides ('foo' vs. 'renamedFoo')}}{{9-12=renamedFoo}}
   override var foo: Int { get { return 5 } }
 
-  override func process(i: Int?) -> Int { } // expected-error{{method cannot be an @objc override because the type of the parameter cannot be represented in Objective-C}}
+  override func process(_ i: Int?) -> Int { } // expected-error{{method cannot be an @objc override because the type of the parameter cannot be represented in Objective-C}}
 }
 
 class Sub2 : Super {
@@ -1813,28 +1813,28 @@ struct NotObjCStruct {}
 // CHECK-LABEL: @objc class ClosureArguments
 @objc class ClosureArguments {
   // CHECK: @objc func foo
-  @objc func foo(f: Int -> ()) {}
+  @objc func foo(_ f: Int -> ()) {}
   // CHECK: @objc func bar
-  @objc func bar(f: NotObjCEnum -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func bar(_ f: NotObjCEnum -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func bas
-  @objc func bas(f: NotObjCEnum -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func bas(_ f: NotObjCEnum -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zim
-  @objc func zim(f: () -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func zim(_ f: () -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zang
-  @objc func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
-  @objc func zangZang(f: (Int...) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func zang(_ f: (NotObjCEnum, NotObjCStruct) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func zangZang(_ f: (Int...) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func fooImplicit
-  func fooImplicit(f: Int -> ()) {}
+  func fooImplicit(_ f: Int -> ()) {}
   // CHECK: {{^}}  func barImplicit
-  func barImplicit(f: NotObjCEnum -> NotObjCStruct) {}
+  func barImplicit(_ f: NotObjCEnum -> NotObjCStruct) {}
   // CHECK: {{^}}  func basImplicit
-  func basImplicit(f: NotObjCEnum -> ()) {}
+  func basImplicit(_ f: NotObjCEnum -> ()) {}
   // CHECK: {{^}}  func zimImplicit
-  func zimImplicit(f: () -> NotObjCStruct) {}
+  func zimImplicit(_ f: () -> NotObjCStruct) {}
   // CHECK: {{^}}  func zangImplicit
-  func zangImplicit(f: (NotObjCEnum, NotObjCStruct) -> ()) {}
+  func zangImplicit(_ f: (NotObjCEnum, NotObjCStruct) -> ()) {}
   // CHECK: {{^}}  func zangZangImplicit
-  func zangZangImplicit(f: (Int...) -> ()) {}
+  func zangZangImplicit(_ f: (Int...) -> ()) {}
 }
 
 typealias GoodBlock = @convention(block) Int -> ()
@@ -1855,13 +1855,13 @@ class Load1 {
   // Okay: not @objc
   class func load() { }
   class func alloc() {}
-  class func allocWithZone(_: Int) {}
+  class func allocWithZone(_ _: Int) {}
 }
 
 @objc class Load2 {
   class func load() { } // expected-error{{method 'load()' defines Objective-C class method 'load', which is not permitted by Swift}}
   class func alloc() {} // expected-error{{method 'alloc()' defines Objective-C class method 'alloc', which is not permitted by Swift}}
-  class func allocWithZone(_: Int) {} // expected-error{{method 'allocWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
+  class func allocWithZone(_ _: Int) {} // expected-error{{method 'allocWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
 }
 
 @objc class Load3 {
@@ -1871,7 +1871,7 @@ class Load1 {
   }
 
   @objc(alloc) class var prop: Int { return 0 } // expected-error{{getter for 'prop' defines Objective-C class method 'alloc', which is not permitted by Swift}}
-  @objc(allocWithZone:) class func fooWithZone(_: Int) {} // expected-error{{method 'fooWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
+  @objc(allocWithZone:) class func fooWithZone(_ _: Int) {} // expected-error{{method 'fooWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
 }
 
 // Members of protocol extensions cannot be @objc
@@ -1924,7 +1924,7 @@ class ClassThrows1 {
 
   @objc func methodReturnsInt() throws -> Int { return 0 } // expected-error{{throwing method cannot be marked @objc because it returns a value of type 'Int'; return 'Void' or a type that bridges to an Objective-C class}}
 
-  @objc func methodAcceptsThrowingFunc(fn: (String) throws -> Int) { }
+  @objc func methodAcceptsThrowingFunc(_ fn: (String) throws -> Int) { }
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{throwing function types cannot be represented in Objective-C}}
 
@@ -1955,9 +1955,9 @@ class ClassThrows1 {
   // CHECK: {{^}} func methodReturnsOptionalObjCClass() throws -> Class_ObjC1?
   func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil }
 
-  // CHECK: @objc func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int)
+  // CHECK: @objc func methodWithTrailingClosures(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int)
   // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
-  func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int) throws { }
+  func methodWithTrailingClosures(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int) throws { }
 
   // CHECK: @objc init(degrees: Double) throws
   // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>
@@ -1966,78 +1966,78 @@ class ClassThrows1 {
 
 // CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"
 @objc class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
-  // CHECK: @objc override func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: ((Int) -> Int), fn3: ((Int) -> Int))
+  // CHECK: @objc override func methodWithTrailingClosures(_ s: String, fn1: ((Int) -> Int), fn2: ((Int) -> Int), fn3: ((Int) -> Int))
   // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
-  override func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: ((Int) -> Int), fn3: ((Int) -> Int)) throws { }
+  override func methodWithTrailingClosures(_ s: String, fn1: ((Int) -> Int), fn2: ((Int) -> Int), fn3: ((Int) -> Int)) throws { }
 }
 
 class ThrowsRedecl1 {
-  @objc func method1(x: Int, error: Class_ObjC1) { } // expected-note{{declared here}}
-  @objc func method1(x: Int) throws { } // expected-error{{with Objective-C selector 'method1:error:'}}
+  @objc func method1(_ x: Int, error: Class_ObjC1) { } // expected-note{{declared here}}
+  @objc func method1(_ x: Int) throws { } // expected-error{{with Objective-C selector 'method1:error:'}}
 
-  @objc func method2AndReturnError(x: Int) { } // expected-note{{declared here}}
+  @objc func method2AndReturnError(_ x: Int) { } // expected-note{{declared here}}
   @objc func method2() throws { } // expected-error{{with Objective-C selector 'method2AndReturnError:'}}
 
-  @objc func method3(x: Int, error: Int, closure: Int -> Int) { }  // expected-note{{declared here}}
-  @objc func method3(x: Int, closure: Int -> Int) throws { } // expected-error{{with Objective-C selector 'method3:error:closure:'}}
+  @objc func method3(_ x: Int, error: Int, closure: Int -> Int) { }  // expected-note{{declared here}}
+  @objc func method3(_ x: Int, closure: Int -> Int) throws { } // expected-error{{with Objective-C selector 'method3:error:closure:'}}
 
-  @objc(initAndReturnError:) func initMethod1(error: Int) { } // expected-note{{declared here}}
+  @objc(initAndReturnError:) func initMethod1(_ error: Int) { } // expected-note{{declared here}}
   @objc init() throws { } // expected-error{{with Objective-C selector 'initAndReturnError:'}}
 
-  @objc(initWithString:error:) func initMethod2(string: String, error: Int) { } // expected-note{{declared here}}
+  @objc(initWithString:error:) func initMethod2(_ string: String, error: Int) { } // expected-note{{declared here}}
   @objc init(string: String) throws { } // expected-error{{with Objective-C selector 'initWithString:error:'}}
 
-  @objc(initAndReturnError:fn:) func initMethod3(error: Int, fn: Int -> Int) { } // expected-note{{declared here}}
+  @objc(initAndReturnError:fn:) func initMethod3(_ error: Int, fn: Int -> Int) { } // expected-note{{declared here}}
   @objc init(fn: Int -> Int) throws { } // expected-error{{with Objective-C selector 'initAndReturnError:fn:'}}
 }
 
 class ThrowsObjCName {
-  @objc(method4:closure:error:) func method4(x: Int, closure: Int -> Int) throws { }
+  @objc(method4:closure:error:) func method4(_ x: Int, closure: Int -> Int) throws { }
 
-  @objc(method5AndReturnError:x:closure:) func method5(x: Int, closure: Int -> Int) throws { }
+  @objc(method5AndReturnError:x:closure:) func method5(_ x: Int, closure: Int -> Int) throws { }
 
   @objc(method6) func method6() throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
 
-  @objc(method7) func method7(x: Int) throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
+  @objc(method7) func method7(_ x: Int) throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
 
   // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   @objc(method8:fn1:error:fn2:)
-  func method8(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
+  func method8(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 
   // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   @objc(method9AndReturnError:s:fn1:fn2:)
-  func method9(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
+  func method9(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 }
 
 class SubclassThrowsObjCName : ThrowsObjCName {
   // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
-  override func method8(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
+  override func method8(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 
   // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
-  override func method9(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
+  override func method9(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 }
 
 @objc protocol ProtocolThrowsObjCName {
-  optional func doThing(x: String) throws -> String // expected-note{{requirement 'doThing' declared here}}
+  optional func doThing(_ x: String) throws -> String // expected-note{{requirement 'doThing' declared here}}
 }
 
 class ConformsToProtocolThrowsObjCName1 : ProtocolThrowsObjCName {
-  @objc func doThing(x: String) throws -> String { return x } // okay
+  @objc func doThing(_ x: String) throws -> String { return x } // okay
 }
 
 class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName { // expected-note{{class 'ConformsToProtocolThrowsObjCName2' declares conformance to protocol 'ProtocolThrowsObjCName' here}}
-  @objc func doThing(x: Int) throws -> String { return "" } // expected-error{{Objective-C method 'doThing:error:' provided by method 'doThing' conflicts with optional requirement method 'doThing' in protocol 'ProtocolThrowsObjCName'}}
+  @objc func doThing(_ x: Int) throws -> String { return "" } // expected-error{{Objective-C method 'doThing:error:' provided by method 'doThing' conflicts with optional requirement method 'doThing' in protocol 'ProtocolThrowsObjCName'}}
 }
 
 @objc class DictionaryTest {
-  // CHECK-LABEL: @objc func func_dictionary1a(x: Dictionary<ObjC_Class1, ObjC_Class1>)
-  func func_dictionary1a(x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
+  // CHECK-LABEL: @objc func func_dictionary1a(_ x: Dictionary<ObjC_Class1, ObjC_Class1>)
+  func func_dictionary1a(_ x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
 
-  // CHECK-LABEL: @objc func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>)
-  @objc func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
+  // CHECK-LABEL: @objc func func_dictionary1b(_ x: Dictionary<ObjC_Class1, ObjC_Class1>)
+  @objc func func_dictionary1b(_ x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
 
-  func func_dictionary2a(x: Dictionary<String, Int>) { }
-  @objc func func_dictionary2b(x: Dictionary<String, Int>) { }
+  func func_dictionary2a(_ x: Dictionary<String, Int>) { }
+  @objc func func_dictionary2b(_ x: Dictionary<String, Int>) { }
 }
 
 

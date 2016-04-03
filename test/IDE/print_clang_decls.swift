@@ -80,13 +80,13 @@
 // Skip through unavailable typedefs when importing types.
 // TAG_DECLS_AND_TYPEDEFS: @available(*, unavailable, message: "use double")
 // TAG_DECLS_AND_TYPEDEFS-NEXT: typealias real_t = Double
-// TAG_DECLS_AND_TYPEDEFS-NEXT: func realSin(value: Double) -> Double
+// TAG_DECLS_AND_TYPEDEFS-NEXT: func realSin(_ value: Double) -> Double
 
 // NEGATIVE-NOT: typealias FooStructTypedef2
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
-// FOUNDATION-NEXT  func objectAtIndex(index: Int) -> AnyObject!
+// FOUNDATION-NEXT  func objectAtIndex(_ index: Int) -> AnyObject!
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
@@ -118,13 +118,13 @@
 // CHECK-NULLABILITY: func getId1() -> AnyObject?
 // CHECK-NULLABILITY: var global_id: AnyObject?
 // CHECK-NULLABILITY: class SomeClass {
-// CHECK-NULLABILITY:   class func methodA(obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodA(obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   class func methodB(block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodB(block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   class func methodA(_ obj: SomeClass?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   func methodA(_ obj: SomeClass?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   class func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
 // CHECK-NULLABILITY:   func methodC() -> AnyObject?
 // CHECK-NULLABILITY:   var property: AnyObject?
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}
 // CHECK-NULLABILITY:   func optArrayMethod() -> [AnyObject]?
 // CHECK-NULLABILITY: }
-// CHECK-NULLABILITY: func compare_classes(sc1: SomeClass, _ sc2: SomeClass, _ sc3: SomeClass!)
+// CHECK-NULLABILITY: func compare_classes(_ sc1: SomeClass, _ sc2: SomeClass, _ sc3: SomeClass!)

@@ -30,7 +30,7 @@ func test0() {
 // CHECK-LABEL: sil hidden @_TF10reabstract10testThrowsFP_T_
 // CHECK:         function_ref @_TTRXFo_iT__iT__XFo___
 // CHECK:         function_ref @_TTRXFo_iT__iT_zoPs13ErrorProtocol__XFo__zoPS___
-func testThrows(x: Any) {
+func testThrows(_ x: Any) {
   _ = x as? () -> ()
   _ = x as? () throws -> ()
 }
@@ -43,9 +43,9 @@ struct Box<T> {
   let t: T
 }
 
-func notFun(c: inout C, i: Int) {}
+func notFun(_ c: inout C, i: Int) {}
 
-func testInoutOpaque(c: C, i: Int) {
+func testInoutOpaque(_ c: C, i: Int) {
   var c = c
   let box = Box(t: notFun)
   box.t(&c, i: i)

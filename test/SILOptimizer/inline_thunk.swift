@@ -16,12 +16,12 @@
 // CHECK: attributes #[[ATTR]] = { noinline }
 
 protocol Proto {
-  func testit(x: Int32) -> Int32
+  func testit(_ x: Int32) -> Int32
 }
 
 
 struct TestStruct : Proto {
-  func testit(x: Int32) -> Int32 {
+  func testit(_ x: Int32) -> Int32 {
 	var y = x * 2
 	y += 1
 	y *= x

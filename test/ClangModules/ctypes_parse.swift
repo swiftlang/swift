@@ -2,9 +2,9 @@
 
 import ctypes
 
-func checkRawRepresentable<T: RawRepresentable>(_: T) {}
-func checkEquatable<T: Equatable>(_: T) -> Bool {}
-func checkEquatablePattern(c: Color) {
+func checkRawRepresentable<T: RawRepresentable>(_ _: T) {}
+func checkEquatable<T: Equatable>(_ _: T) -> Bool {}
+func checkEquatablePattern(_ c: Color) {
   switch c {
     case red: return
     case green: return
@@ -82,8 +82,8 @@ func testPointers() {
 // Ensure that imported structs can be extended, even if typedef'ed on the C
 // side.
 
-func sqrt(x: Float) -> Float {}
-func atan2(x: Float, _ y: Float) -> Float {}
+func sqrt(_ x: Float) -> Float {}
+func atan2(_ x: Float, _ y: Float) -> Float {}
 
 extension Point {
   func asPolar() -> (rho: Float, theta: Float) {

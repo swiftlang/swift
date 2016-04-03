@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}}
   get {
@@ -326,7 +326,7 @@ func testSubscriptNoGetter(let iis: SubscriptNoGetter) { // expected-error {{'le
   var _: Int = iis[17]
 }
 
-func testSelectorStyleArguments1(x: Int, bar y: Int) {
+func testSelectorStyleArguments1(_ x: Int, bar y: Int) {
   var x = x
   var y = y
   x += 1
@@ -340,7 +340,7 @@ func testSelectorStyleArguments2(let x: Int, // expected-error {{'let' as a para
                                  
   
 }
-func testSelectorStyleArguments3(x: Int, bar y: Int) {
+func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
@@ -449,7 +449,7 @@ struct StructWithDelegatingInit {
   init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
 }
 
-func test_recovery_missing_name_2(let: Int) {} // expected-error {{'let' as a parameter attribute is not allowed}}{{35-38=}} 
+func test_recovery_missing_name_2(_ let: Int) {} // expected-error {{'let' as a parameter attribute is not allowed}}{{35-38=}} 
 // expected-error @-1 2{{expected ',' separator}} {{38-38=,}} expected-error @-1 2 {{expected parameter name followed by ':'}}
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function

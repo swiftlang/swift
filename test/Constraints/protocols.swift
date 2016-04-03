@@ -12,21 +12,21 @@ extension Float32 : Barable {
   func bar() {}
 }
 
-func f0(_: Barable) {}
-func f1(x: protocol<Fooable, Barable>) {}
-func f2(_: Float) {}
+func f0(_ _: Barable) {}
+func f1(_ x: protocol<Fooable, Barable>) {}
+func f2(_ _: Float) {}
 let nilFunc: Optional<(Barable) -> ()> = nil
 
-func g(_: (protocol<Barable, Fooable>) -> ()) {}
+func g(_ _: (protocol<Barable, Fooable>) -> ()) {}
 
 protocol Classable : AnyObject {}
 class SomeArbitraryClass {}
 
-func fc0(_: Classable) {}
-func fc1(_: protocol<Fooable, Classable>) {}
-func fc2(_: AnyObject) {}
-func fc3(_: SomeArbitraryClass) {}
-func gc(_: (protocol<Classable, Fooable>) -> ()) {}
+func fc0(_ _: Classable) {}
+func fc1(_ _: protocol<Fooable, Classable>) {}
+func fc2(_ _: AnyObject) {}
+func fc3(_ _: SomeArbitraryClass) {}
+func gc(_ _: (protocol<Classable, Fooable>) -> ()) {}
 
 var i : Int
 var f : Float
@@ -67,7 +67,7 @@ func getAnyObject() -> AnyObject? {
   return SomeArbitraryClass()
 }
 
-func castToClass(object: Any) -> SomeArbitraryClass? {
+func castToClass(_ object: Any) -> SomeArbitraryClass? {
   return object as? SomeArbitraryClass
 }
 

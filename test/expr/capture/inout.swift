@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 // An inout parameter can be captured.
-func foo(x: inout Int) {
+func foo(_ x: inout Int) {
   func bar() -> Int {
     return x
   }
@@ -9,7 +9,7 @@ func foo(x: inout Int) {
 
 // But not partially applied.
 struct C {
-  mutating func f(x: Int) {}
+  mutating func f(_ x: Int) {}
 }
 
 var c = C()

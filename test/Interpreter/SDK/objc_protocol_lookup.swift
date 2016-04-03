@@ -30,7 +30,7 @@ extension NSString: Fungible {
   func funge() {}
 }
 
-func check(x: AnyObject) {
+func check(_ x: AnyObject) {
   print("\(x is Fungible) \(x is Runcible)")
 }
 
@@ -65,7 +65,7 @@ class Durian : NSObject, Fruit {
   var juice: Juice
 }
 
-func consume(fruit: Fruit) {
+func consume(_ fruit: Fruit) {
   _ = fruit.juice
 }
 

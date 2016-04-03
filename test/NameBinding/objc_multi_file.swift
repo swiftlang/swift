@@ -35,10 +35,10 @@ class SubSubB : SubB {
 
 class SubSubB2 : SubB {
   // okay: doesn't conflict with hidden initializer
-  func initWithWibble(s: String) { } 
+  func initWithWibble(_ s: String) { } 
 }
 
 // rdar://problem/19941580
-func rdar19941580(foo: Foo) {
+func rdar19941580(_ foo: Foo) {
   var _: FooProto = foo
 }

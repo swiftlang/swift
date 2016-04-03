@@ -12,7 +12,7 @@
 import Foundation
 import Swift
 
-func hexAddrVal<T>(x: T) -> String {
+func hexAddrVal<T>(_ x: T) -> String {
   return "@0x" + String(UInt64(unsafeBitCast(x, to: Int.self)), radix: 16)
 }
 

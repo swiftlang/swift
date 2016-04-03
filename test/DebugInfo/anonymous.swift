@@ -5,6 +5,6 @@
 // CHECK: !DILocalVariable(name: "_2", arg: 3
 // CHECK: !DILocalVariable(name: "x4", arg: 4
 
-public func fourth<T>(_: T, _: T, _: T, x4 : T) -> T {
+public func fourth<T>(_ _: T, _: T, _: T, x4 : T) -> T {
   return x4
 }

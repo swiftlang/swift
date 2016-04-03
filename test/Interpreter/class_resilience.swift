@@ -45,7 +45,7 @@ public class ClassWithResilientProperty : ProtocolWithResilientProperty {
   }
 }
 
-@inline(never) func getS(p: ProtocolWithResilientProperty) -> Size {
+@inline(never) func getS(_ p: ProtocolWithResilientProperty) -> Size {
   return p.s
 }
 

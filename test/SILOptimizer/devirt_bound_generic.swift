@@ -31,7 +31,7 @@ final class D<T>: A<String> {
 
 
 @inline(never)
-public func testDevirt(a: A<Int>) -> Int32 {
+public func testDevirt(_ a: A<Int>) -> Int32 {
   return a.doSomething()
 }
 

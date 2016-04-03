@@ -15,7 +15,7 @@ protocol P3 { }
 protocol P4 { }
 
 // expected-error@+1{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{30-35=Assoc}}
-func typoAssoc1<T : P1>(x: T.assoc) { } 
+func typoAssoc1<T : P1>(_ x: T.assoc) { } 
 
 // expected-error@+2{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{40-45=Assoc}}
 // expected-error@+1{{'U' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{51-56=Assoc}}
@@ -32,7 +32,7 @@ func typoAssoc3<T : P2, U : P2 where
 
 // expected-error@+2{{'T' does not have a member type named 'Assocp2'; did you mean 'AssocP2'?}}{{32-39=AssocP2}}
 // expected-error@+1{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{40-45=Assoc}}
-func typoAssoc4<T : P2 where T.Assocp2.assoc : P3>(_: T) { }
+func typoAssoc4<T : P2 where T.Assocp2.assoc : P3>(_ _: T) { }
 
 
 // CHECK-GENERIC-LABEL: .typoAssoc4@
@@ -48,13 +48,13 @@ func typoAssoc4<T : P2 where T.Assocp2.assoc : P3>(_: T) { }
 
 // <rdar://problem/19620340>
 
-func typoFunc1<T : P1>(x: TypoType) { // expected-error{{use of undeclared type 'TypoType'}}
+func typoFunc1<T : P1>(_ x: TypoType) { // expected-error{{use of undeclared type 'TypoType'}}
   let _: T.Assoc -> () = { let _ = $0 } // expected-error{{'Assoc' is not a member type of 'T'}}
 }
 
-func typoFunc2<T : P1>(x: TypoType, y: T) { // expected-error{{use of undeclared type 'TypoType'}}
+func typoFunc2<T : P1>(_ x: TypoType, y: T) { // expected-error{{use of undeclared type 'TypoType'}}
   let _: T.Assoc -> () = { let _ = $0 } // expected-error{{'Assoc' is not a member type of 'T'}}
 }
 
-func typoFunc3<T : P1>(x: TypoType, y: T.Assoc -> ()) { // expected-error{{use of undeclared type 'TypoType'}}
+func typoFunc3<T : P1>(_ x: TypoType, y: T.Assoc -> ()) { // expected-error{{use of undeclared type 'TypoType'}}
 }

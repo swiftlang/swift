@@ -132,7 +132,7 @@ protocol CB {
   associatedtype C : Col
   typealias E = C.Elem
   
-  func setIt(element: E)
+  func setIt(_ element: E)
 }
 
 func go1<T : CB, U : Col where U.Elem == T.E>(col: U, builder: T) { // OK
@@ -159,7 +159,7 @@ protocol MySeq {
   typealias Elem = Self.I.Elem
   
   func makeIterator() -> I
-  func getIndex(i: Int) -> Elem
+  func getIndex(_ i: Int) -> Elem
   func first() -> Elem
 }
 
@@ -180,7 +180,7 @@ struct OneIntSeq: MySeq, MyIterator {
     return e
   }
   
-  func getIndex(i: Int) -> Float {
+  func getIndex(_ i: Int) -> Float {
     return e
   }
 }

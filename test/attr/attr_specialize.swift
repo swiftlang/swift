@@ -12,14 +12,14 @@ struct S<T> {}
 @_specialize(S<Int>)
 @_specialize(Int, Int) // expected-error{{generic type 'oneGenericParam' specialized with too many type parameters (got 2, but expected 1)}},
 @_specialize(T) // expected-error{{use of undeclared type 'T'}}
-public func oneGenericParam<T>(t: T) -> T {
+public func oneGenericParam<T>(_ t: T) -> T {
   return t
 }
 
 // CHECK: @_specialize(Int, Int)
 @_specialize(Int, Int)
 @_specialize(Int) // expected-error{{generic type 'twoGenericParams' specialized with too few type parameters (got 1, but expected 2)}},
-public func twoGenericParams<T, U>(t: T, u: U) -> (T, U) {
+public func twoGenericParams<T, U>(_ t: T, u: U) -> (T, U) {
   return (t, u)
 }
 
@@ -39,7 +39,7 @@ class G<T> {
   // CHECK: @_specialize(Int, S<Int>)
   @_specialize(Int, S<Int>)
   @_specialize(Int) // expected-error{{generic type 'oneGenericParam' specialized with too few type parameters (got 1, but expected 2)}},
-  func oneGenericParam<U>(t: T, u: U) -> (U, T) {
+  func oneGenericParam<U>(_ t: T, u: U) -> (U, T) {
     return (u, t)
   }
 }
@@ -54,7 +54,7 @@ struct AThing : Thing {}
 // CHECK: @_specialize(AThing)
 @_specialize(AThing)
 @_specialize(Int) // expected-error{{argument type 'Int' does not conform to expected type 'Thing'}}
-func oneRequirement<T : Thing>(t: T) {}
+func oneRequirement<T : Thing>(_ t: T) {}
 
 protocol HasElt {
   associatedtype Element
@@ -67,11 +67,11 @@ struct FloatElement : HasElt {
 }
 @_specialize(FloatElement)
 @_specialize(IntElement) // expected-error{{'<T : HasElt where T.Element == Float> (T) -> ()' (aka '<T : HasElt where T.Element == Float> T -> ()') requires the types 'Element' (aka 'Int') and 'Float' be equivalent}}
-func sameTypeRequirement<T : HasElt where T.Element == Float>(t: T) {}
+func sameTypeRequirement<T : HasElt where T.Element == Float>(_ t: T) {}
 
 class Base {}
 class Sub : Base {}
 class NonSub {}
 @_specialize(Sub)
 @_specialize(NonSub) // expected-error{{'<T : Base> (T) -> ()' (aka '<T : Base> T -> ()') requires that 'NonSub' inherit from 'Base'}}
-func superTypeRequirement<T : Base>(t: T) {}
+func superTypeRequirement<T : Base>(_ t: T) {}

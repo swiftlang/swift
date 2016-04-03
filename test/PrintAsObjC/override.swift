@@ -29,9 +29,9 @@ class A_Child : Base {
   // CHECK-NEXT: - (NSUInteger)foo;
   override func foo() -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_;
-  override func foo(_: Int) -> Int { return 0 }
+  override func foo(_ _: Int) -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
-  override func foo(x: Int, y: Int) -> Int { return x + y }
+  override func foo(_ x: Int, y: Int) -> Int { return x + y }
   
   
   // CHECK-NEXT: - (BOOL)doThingAndReturnError:(NSError * _Nullable * _Null_unspecified)error;
@@ -53,9 +53,9 @@ class A_Grandchild : A_Child {
   // CHECK-NEXT: - (NSUInteger)foo;
   override func foo() -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_;
-  override func foo(_: Int) -> Int { return 0 }
+  override func foo(_ _: Int) -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
-  override func foo(x: Int, y: Int) -> Int { return x + y }
+  override func foo(_ x: Int, y: Int) -> Int { return x + y }
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
@@ -83,9 +83,9 @@ class B_GrandchildViaEmpty : B_EmptyChild {
   // CHECK-NEXT: - (NSUInteger)foo;
   override func foo() -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_;
-  override func foo(_: Int) -> Int { return 0 }
+  override func foo(_ _: Int) -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
-  override func foo(x: Int, y: Int) -> Int { return x + y }
+  override func foo(_ x: Int, y: Int) -> Int { return x + y }
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
@@ -95,7 +95,7 @@ class B_GrandchildViaEmpty : B_EmptyChild {
 class FixMe : Base {
   // CHECK-NEXT: - (void)callback:(NSInteger (^ _Nullable)(void))fn;
   // CLANG: error: conflicting parameter types in declaration of 'callback:'
-  override func callback(fn: (() -> Int)?) {}
+  override func callback(_ fn: (() -> Int)?) {}
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end

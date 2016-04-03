@@ -17,7 +17,7 @@ enum E : ErrorProtocol {
   case X
 }
 
-func unwrap(b: Bool) throws -> Int {
+func unwrap(_ b: Bool) throws -> Int {
   if b {
     throw E.X
   }
@@ -265,7 +265,7 @@ struct Chimera {
   }
 }
 
-func mustThrow<T>(f: () throws -> T) {
+func mustThrow<T>(_ f: () throws -> T) {
   do {
     try f()
     preconditionFailure("Didn't throw")

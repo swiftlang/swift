@@ -35,11 +35,11 @@ struct MyCollection<Element> {
   @available(*, unavailable, renamed: "Element")
   typealias T = Element // expected-note 2{{'T' has been explicitly marked unavailable here}}
 
-  func foo(x: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{15-16=Element}}
+  func foo(_ x: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{15-16=Element}}
 }
 
 extension MyCollection {
-  func append(element: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{24-25=Element}}
+  func append(_ element: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{24-25=Element}}
 }
 
 var x : int // expected-error {{'int' is unavailable: oh no you don't}}
@@ -205,11 +205,11 @@ func someFuncUsingOldAttribute() { }
 
 
 // <rdar://problem/23853709> Compiler crash on call to unavailable "print"
-func OutputStreamTest(message: String, to: inout OutputStream) {
+func OutputStreamTest(_ message: String, to: inout OutputStream) {
   print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'to' label for the target stream: 'print((...), to: &...)'}}
 }
 
 // expected-note@+1{{'T' has been explicitly marked unavailable here}}
 struct UnavailableGenericParam<@available(*, unavailable, message: "nope") T> {
-  func f(t: T) { } // expected-error{{'T' is unavailable: nope}}
+  func f(_ t: T) { } // expected-error{{'T' is unavailable: nope}}
 }

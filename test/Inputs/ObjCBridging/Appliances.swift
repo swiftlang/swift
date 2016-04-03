@@ -28,7 +28,7 @@ extension Refrigerator : _ObjectiveCBridgeable {
     return true
   }
 
-  public static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  public static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Refrigerator {
     return Refrigerator(temperature: source!.temperature)
   }

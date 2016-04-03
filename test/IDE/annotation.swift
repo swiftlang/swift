@@ -17,7 +17,7 @@ struct S {
 // CHECK: typealias <TypeAlias>TypealiasForS</TypeAlias> = <Struct@[[@LINE-5]]:8>S</Struct>
 typealias TypealiasForS = S
 
-func test6(p: S) {
+func test6(_ p: S) {
   // CHECK: <Param@[[@LINE-1]]:12>p</Param>.<Var@[[@LINE-8]]:7>x</Var> <iFunc@>+</iFunc> 0
   p.x + 0
 }
@@ -63,7 +63,7 @@ func foo(n : Float) -> Int {
 // CHECK-NEXT: }
 protocol Prot {
   associatedtype Blarg
-  func protMeth(x: Int)
+  func protMeth(_ x: Int)
   var protocolProperty1: Int { get }
   var protocolProperty2: Int { get set }
 }
@@ -76,7 +76,7 @@ protocol Prot2 {}
 // CHECK: }
 class SubCls : MyCls, Prot {
   typealias Blarg = Prot2
-  func protMeth(x: Int) {}
+  func protMeth(_ x: Int) {}
   var protocolProperty1 = 0
   var protocolProperty2 = 0
 }
@@ -84,7 +84,7 @@ class SubCls : MyCls, Prot {
 // CHECK: func <Func>genFn</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@64:10>Prot</Protocol> where <GenericTypeParam@85:12>T</GenericTypeParam>.<AssociatedType@65:18>Blarg</AssociatedType> : <Protocol@71:10>Prot2</Protocol>>(<Param>p</Param> : <GenericTypeParam@85:12>T</GenericTypeParam>) -> <iStruct@>Int</iStruct> {}{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(p : T) -> Int {}
 
-func test(x: Int) {
+func test(_ x: Int) {
   // CHECK: <Func@[[@LINE-3]]:6>genFn</Func>(<Ctor@[[@LINE-11]]:28-Class@[[@LINE-11]]:7>SubCls</Ctor>())
   genFn(SubCls())
   // CHECK: "This is string \(<Func@[[@LINE-5]]:6>genFn</Func>({(<Param>a</Param>:<iStruct@>Int</iStruct>) in <Ctor@[[@LINE-13]]:28-Class@[[@LINE-13]]:7>SubCls</Ctor>()}(<Param@[[@LINE-3]]:11>x</Param>))) interpolation"
@@ -92,7 +92,7 @@ func test(x: Int) {
 }
 
 // CHECK: func <Func>bar</Func>(<Param>x</Param>: <iStruct@>Int</iStruct>) -> (<iStruct@>Int</iStruct>, <iStruct@>Float</iStruct>) {
-func bar(x: Int) -> (Int, Float) {
+func bar(_ x: Int) -> (Int, Float) {
   // CHECK: <Ctor@[[@LINE-84]]:8-TypeAlias@[[@LINE-78]]:11>TypealiasForS</Ctor>()
   TypealiasForS()
 }
@@ -101,10 +101,10 @@ class C2 {
   typealias WW = Int
   var p = 0
 
-  func meth(x: Int) {}
+  func meth(_ x: Int) {}
 }
 
-func test2(x: C2) {
+func test2(_ x: C2) {
   // CHECK: <Param@[[@LINE-1]]:12>x</Param>.<Func@[[@LINE-4]]:8>meth</Func>(0)
   x.meth(0)
 }
@@ -133,7 +133,7 @@ func test2() {
   GenCls<Int>()
 }
 
-func test3(name: Int, x: Int) {
+func test3(_ name: Int, x: Int) {
   // CHECK: <Param@[[@LINE-1]]:23>x</Param> = 0
   name = 0;  x = 0
 }
@@ -193,7 +193,7 @@ func test5() {
 
 class C7 {
   var c7ivar: Int
-  func meth(p: Undeclared) {
+  func meth(_ p: Undeclared) {
     // CHECK: <Var@[[@LINE-2]]:7>c7ivar</Var> = 0
     c7ivar = 0
   }
@@ -226,7 +226,7 @@ class Observers {
 
 class C9 {}
 // CHECK: func <Func>test6</Func>(<Param>o</Param>: <iProtocol@>AnyObject</iProtocol>) {
-func test6(o: AnyObject) {
+func test6(_ o: AnyObject) {
   // CHECK: let <Var>x</Var> = <Param@[[@LINE-1]]:12>o</Param> as! <Class@[[@LINE-3]]:7>C9</Class>
   let x = o as! C9
 }
@@ -248,7 +248,7 @@ class E {
 
 class C10 {
   init(int: Int, andThis: Float) {}
-  func meth(x: Int, withFloat: Float) {}
+  func meth(_ x: Int, withFloat: Float) {}
 }
 
 // CHECK: var <Var>c10</Var> = <Ctor@[[@LINE-4]]:3-Class@[[@LINE-5]]:7>C10</Ctor>(<Ctor@[[@LINE-4]]:3>int</Ctor>: 0, <Ctor@[[@LINE-4]]:3>andThis</Ctor>: 0)
@@ -260,7 +260,7 @@ func test7(int x: Int, andThis y: Float) {}
 // CHECK: <Func@[[@LINE-1]]:6>test7</Func>(<Func@[[@LINE-1]]:6>int</Func>: 0, <Func@[[@LINE-1]]:6>andThis</Func>: 0)
 test7(int: 0, andThis: 0)
 
-func test8<T : Prot2>(x: T) {}
+func test8<T : Prot2>(_ x: T) {}
 // CHECK: func <Func>test8</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@71:10>Prot2</Protocol>>(<Param>x</Param>: <GenericTypeParam@263:12>T</GenericTypeParam>) {}{{$}}
 
 class C11 {
@@ -287,8 +287,8 @@ extension C12.Inn {}
 extension AliasC12.AliasInn {}
 
 typealias AliasPH = C12
-func testPH(x: Int) {}
-func testPH(x: AliasPH) {}
+func testPH(_ x: Int) {}
+func testPH(_ x: AliasPH) {}
 // CHECK: <Func@[[@LINE-1]]:6>testPH</Func>(<#T##x: AliasPH##AliasPH##C12#>)
 testPH(<#T##x: AliasPH##AliasPH##C12#>)
 
@@ -297,18 +297,18 @@ class NumberTooLarge {}
 guard case let error as NumberTooLarge = NumberTooLarge() else {}
 
 // CHECK: <Func>testMod</Func>(<Param>x</Param>: <iMod>Swift</iMod>.<iStruct@>String</iStruct>) {
-func testMod(x: Swift.String) {
+func testMod(_ x: Swift.String) {
 // CHECK: let <Var>x</Var> = <iMod>Swift</iMod>
   let x = Swift
 }
 
 func +(a: C12, b: C12) {}
-func test9(a: C12, b: C12) {
+func test9(_ a: C12, b: C12) {
   // CHECK: <Param@[[@LINE-1]]:12>a</Param><Func@[[@LINE-2]]:6>+</Func><Param@[[@LINE-1]]:20>b</Param>
   a+b
 }
 
-func test10(a: [Int], i: Int) {
+func test10(_ a: [Int], i: Int) {
   // CHECK: <Param@[[@LINE-1]]:13>a</Param><iSubscript@>[</iSubscript><Param@[[@LINE-1]]:23>i</Param><iSubscript@>]</iSubscript>
   a[i]
 }
@@ -316,7 +316,7 @@ func test10(a: [Int], i: Int) {
 class CWS {
   subscript (i : Int, j : Int) -> Int { return 0 }
 }
-func test11(a: CWS, i: Int) {
+func test11(_ a: CWS, i: Int) {
   // CHECK: <Param@[[@LINE-1]]:13>a</Param><Subscript@[[@LINE-3]]:3>[</Subscript><Param@[[@LINE-1]]:21>i</Param>,<Param@[[@LINE-1]]:21>i</Param><Subscript@[[@LINE-3]]:3>]</Subscript>
   a[i,i]
 }

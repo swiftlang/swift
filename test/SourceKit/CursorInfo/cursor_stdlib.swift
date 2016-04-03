@@ -19,7 +19,7 @@ func foo2(a : inout [S1]) {
 }
 
 import Swift
-func foo3(a: Float, b: Bool) {}
+func foo3(_ a: Float, b: Bool) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=3:18 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-OVERLAY %s
 // CHECK-OVERLAY:      source.lang.swift.ref.var.global
@@ -43,7 +43,7 @@ func foo3(a: Float, b: Bool) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT2 %s
 // CHECK-REPLACEMENT2: <Group>Collection/Array</Group>
-// CHECK-REPLACEMENT2: <Declaration>mutating func append(newElement: <Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK-REPLACEMENT2: <Declaration>mutating func append(_ newElement: <Type usr="s:Si">Int</Type>)</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=15:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT3 %s
 // CHECK-REPLACEMENT3: <Group>Collection/Array</Group>
@@ -54,7 +54,7 @@ func foo3(a: Float, b: Bool) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=18:8 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT4 %s
 // CHECK-REPLACEMENT4: <Group>Collection/Array</Group>
-// CHECK-REPLACEMENT4: <Declaration>mutating func append(newElement: <Type usr="s:V13cursor_stdlib2S1">S1</Type>)</Declaration>
+// CHECK-REPLACEMENT4: <Declaration>mutating func append(_ newElement: <Type usr="s:V13cursor_stdlib2S1">S1</Type>)</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=21:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-MODULE-GROUP1 %s
 // CHECK-MODULE-GROUP1: MODULE GROUPS BEGIN

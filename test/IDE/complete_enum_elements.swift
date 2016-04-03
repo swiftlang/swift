@@ -254,40 +254,40 @@ func freeFunc() {}
 
 //===--- Complete enum elements in 'switch'.
 
-func testSwitch1(e: FooEnum) {
+func testSwitch1(_ e: FooEnum) {
   switch e {
   case #^ENUM_SW_1^#
   }
 }
-func testSwitch2(e: FooEnum) {
+func testSwitch2(_ e: FooEnum) {
   switch e {
   case .Foo1:
   case #^ENUM_SW_2^#
   }
 }
-func testSwitch3(e: BarEnum) {
+func testSwitch3(_ e: BarEnum) {
   switch e {
   case #^ENUM_SW_3^#
   }
 }
-func testSwitch4(e: BazEnum<Int>) {
+func testSwitch4(_ e: BazEnum<Int>) {
   switch e {
   case #^ENUM_SW_4^#
   }
 }
-func testSwitch5(e: QuxEnum) {
+func testSwitch5(_ e: QuxEnum) {
   switch e {
   case #^ENUM_SW_5^#
   }
 }
 
-func testSwitchWithDot1(e: FooEnum) {
+func testSwitchWithDot1(_ e: FooEnum) {
   switch e {
   case .#^ENUM_SW_WITH_DOT_1^#
   }
 }
 
-func testSwitchWithQualification1(e: FooEnum) {
+func testSwitchWithQualification1(_ e: FooEnum) {
   switch e {
   case FooEnum.#^ENUM_SW_WITH_QUAL_1^#
   }
@@ -300,14 +300,14 @@ func testSwitchExprError1() {
 }
 
 // FIXME
-func testSwitchInPattern1(e: BazEnum<Int>) {
+func testSwitchInPattern1(_ e: BazEnum<Int>) {
   switch e {
   case .Baz2(#^ENUM_SW_IN_PATTERN_1^#
   }
 }
 // ENUM_SW_IN_PATTERN_1-NOT: .Baz1
 
-func testSwitchInPattern2(e: BazEnum<Int>) {
+func testSwitchInPattern2(_ e: BazEnum<Int>) {
   switch e {
   case .Baz2(.#^ENUM_SW_IN_PATTERN_2^#
   }

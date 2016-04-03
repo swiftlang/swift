@@ -215,12 +215,12 @@ public extension P6 {
 
 public protocol P7 {
   associatedtype T1
-  func f1(t: T1)
+  func f1(_ t: T1)
 }
 
 public extension P7 {
-  public func nomergeFunc(t: T1) -> T1 { return t }
-  public func f1(t: T1) -> T1 { return t }
+  public func nomergeFunc(_ t: T1) -> T1 { return t }
+  public func f1(_ t: T1) -> T1 { return t }
 }
 
 // CHECK1: <synthesized>extension <ref:Struct>S1</ref> where T : P2 {

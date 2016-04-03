@@ -19,7 +19,7 @@ print("testing...")
 
 class C {}
 
-func bridgedStatus<T>(_: T.Type) -> String {
+func bridgedStatus<T>(_ _: T.Type) -> String {
   let bridged = _isBridgedToObjectiveC(T.self)
   let verbatim = _isBridgedVerbatimToObjectiveC(T.self)
   if !bridged && verbatim {

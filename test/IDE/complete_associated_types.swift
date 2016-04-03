@@ -174,7 +174,7 @@ func testStruct1() {
 func testStruct2() {
   StructWithAssociatedTypes#^STRUCT_AS_EXPR^#
 }
-func testStruct3(a: StructWithAssociatedTypes) {
+func testStruct3(_ a: StructWithAssociatedTypes) {
   a.#^STRUCT_INSTANCE^#
 }
 // STRUCT_TYPE_COUNT: Begin completions, 26 items

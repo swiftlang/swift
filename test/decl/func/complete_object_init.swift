@@ -71,7 +71,7 @@ class B1 : A {
   }
 }
 
-func testConstructB1(i: Int, f: Float, d: Double) {
+func testConstructB1(_ i: Int, f: Float, d: Double) {
   let b1a = B1(int: i)
   let b1b = B1(float: f)
   let b1c = B1(double: d)
@@ -92,7 +92,7 @@ class B2 : A {
   }
 }
 
-func testConstructB2(i: Int) {
+func testConstructB2(_ i: Int) {
   var b2a = B2()
   var b2b = B2(int: i) // expected-error{{argument passed to call that takes no arguments}}
 
@@ -168,6 +168,6 @@ class Child2 : Parent2 {
   convenience init(int: Int) { self.init() }
 }
 
-func testOverride(int: Int) {
+func testOverride(_ int: Int) {
   Child2(int: int) // okay, picks Child2.init // expected-warning{{unused}}
 }

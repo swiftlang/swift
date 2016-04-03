@@ -1,4 +1,4 @@
-func foo(foo: Int, bar: Int, baz: Int, buzz: Int) -> Int {
+func foo(_ foo: Int, bar: Int, baz: Int, buzz: Int) -> Int {
     return foo + bar + baz + buzz
 }
 
@@ -30,7 +30,7 @@ func f(a : Int,
   return 1
 }
 
-static func _consoleConnected(type: CGSNotificationType,
+static func _consoleConnected(_ type: CGSNotificationType,
         _ data: CGSNotificationData,
             _ length: CGSByteCount,
         _ arg: CGSNotificationArg,
@@ -69,7 +69,7 @@ static func _consoleConnected(type: CGSNotificationType,
 //                        "        bb b : Int,"
 // CHECK: key.sourcetext: "        cc c :Int) -> Int {"
 
-//                        "static func _consoleConnected(type: CGSNotificationType,"
+//                        "static func _consoleConnected(_ type: CGSNotificationType,"
 // CHECK: key.sourcetext: "                              _ data: CGSNotificationData,"
 
 //                        "        _ data: CGSNotificationData,"

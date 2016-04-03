@@ -11,7 +11,7 @@ func getInt() -> Int { return zero }
 // CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
 // CHECK:   copy_addr [[PBX]] to [initialization] [[PBY]] : $*Builtin.Int64
-func init_var_from_lvalue(x: Int) {
+func init_var_from_lvalue(_ x: Int) {
   var x = x
   var y = x
 }
@@ -22,7 +22,7 @@ func init_var_from_lvalue(x: Int) {
 // CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
 // CHECK:   copy_addr [[PBY]] to [[PBX]]
-func assign_var_from_lvalue(x: inout Int, y: Int) {
+func assign_var_from_lvalue(_ x: inout Int, y: Int) {
   var y = y
   x = y
 }
@@ -50,7 +50,7 @@ func init_var_from_computed_lvalue() {
 // CHECK:   [[Y_VAL:%.*]] = load [[PBY]]
 // CHECK:   [[SETTER:%.*]] = function_ref @_TF21copy_lvalue_peepholess8computedBi64_
 // CHECK:   apply [[SETTER]]([[Y_VAL]])
-func assign_computed_from_lvalue(y: Int) {
+func assign_computed_from_lvalue(_ y: Int) {
   var y = y
   computed = y
 }
@@ -59,6 +59,6 @@ func assign_computed_from_lvalue(y: Int) {
 // CHECK:   [[X:%.*]] = alloc_box
 // CHECK:   [[PBX:%.*]] = project_box [[X]]
 // CHECK:   assign {{%.*}} to [[PBX]]
-func assign_var_from_computed(x: inout Int) {
+func assign_var_from_computed(_ x: inout Int) {
   x = computed
 }

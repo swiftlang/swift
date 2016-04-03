@@ -4,7 +4,7 @@
 // CHECK:         function_ref @_TF5cdecl5apple
 // CHECK-LABEL: sil hidden @_TF5cdecl5apple
 @_cdecl("pear")
-func apple(f: @convention(c) Int -> Int) {
+func apple(_ f: @convention(c) Int -> Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF5cdecl16forceCEntryPoint
@@ -17,7 +17,7 @@ func forceCEntryPoint() {
 // CHECK:         function_ref @_TF5cdecl6orange
 // CHECK-LABEL: sil hidden @_TF5cdecl6orange
 @_cdecl("grapefruit")
-func orange(x: Int) -> Int {
+func orange(_ x: Int) -> Int {
   return x
 }
 
@@ -25,7 +25,7 @@ func orange(x: Int) -> Int {
 // CHECK:         function_ref @_TF5cdecl8broccoli
 // CHECK-LABEL: sil @_TF5cdecl8broccoli
 @_cdecl("cauliflower")
-public func broccoli(x: Int) -> Int {
+public func broccoli(_ x: Int) -> Int {
   return x
 }
 
@@ -33,7 +33,7 @@ public func broccoli(x: Int) -> Int {
 // CHECK:         function_ref @_TF5cdeclP[[PRIVATE:.*]]4kale
 // CHECK:       sil private @_TF5cdeclP[[PRIVATE:.*]]4kale
 @_cdecl("collard_greens")
-private func kale(x: Int) -> Int {
+private func kale(_ x: Int) -> Int {
   return x
 }
 

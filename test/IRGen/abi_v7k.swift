@@ -9,7 +9,7 @@
 // CHECK ret float
 // V7K-LABEL: __TF8test_v7k9addFloats{{.*}}
 // V7K: vadd.f32 s0, s0, s1
-func addFloats(x: Float, y : Float) -> Float {
+func addFloats(_ x: Float, y : Float) -> Float {
   return x+y
 }
 
@@ -20,7 +20,7 @@ func addFloats(x: Float, y : Float) -> Float {
 // V7K-LABEL: __TF8test_v7k10addDoubles
 // V7K: vadd.f64 d0, d0, d1
 // V7K: vadd.f64 d0, d0, d2
-func addDoubles(x: Double, y: Double, z: Double) -> Double {
+func addDoubles(_ x: Double, y: Double, z: Double) -> Double {
   return x+y+z
 }
 
@@ -30,7 +30,7 @@ func addDoubles(x: Double, y: Double, z: Double) -> Double {
 // V7K-LABEL: __TF8test_v7k6addFDF
 // V7K: vmul.f32 s0, s0, s1
 // z is back-filled to s1
-func addFDF(x: Float, y: Double, z: Float) -> Float {
+func addFDF(_ x: Float, y: Double, z: Float) -> Float {
   return x*z
 }
 
@@ -41,7 +41,7 @@ func addFDF(x: Float, y: Double, z: Float) -> Float {
 // V7K: vldr d16, [sp]
 // V7K: vadd.f64 d0, d6, d16
 // a is assigned to d6, c is passed via stack
-func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
+func addStack(_ d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
               d5: Double, a: Double, b: Float, c: Double) -> Double {
   return a+c
 }
@@ -52,7 +52,7 @@ func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
 // V7K: vldr s0, [sp, #8]
 // V7K: vadd.f32 s0, s14, s0
 // a is assigned to s14, b is via stack, c is via stack since it can't be back-filled to s15
-func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double, 
+func addStack2(_ d0: Double, d1: Double, d2: Double, d3: Double, d4: Double, 
                d5: Double, d6: Double, a: Float, b: Double, c: Float) -> Float {
   return a+c
 }
@@ -61,7 +61,7 @@ func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
 // CHECK-LABEL: define hidden void @_TF8test_v7k9testEmpty{{.*}}()
 // V7K-LABEL: __TF8test_v7k9testEmpty
 enum Empty {}
-func testEmpty(x: Empty) -> Empty {
+func testEmpty(_ x: Empty) -> Empty {
   return x
 }
 
@@ -70,7 +70,7 @@ func testEmpty(x: Empty) -> Empty {
 // V7K-LABEL: __TF8test_v7k10testSingle
 // V7K: movw    r0, #1
 enum SingleCase { case X }
-func testSingle(x: SingleCase) -> Int32{
+func testSingle(_ x: SingleCase) -> Int32{
   switch x {
   case SingleCase.X:
     return 1
@@ -83,7 +83,7 @@ func testSingle(x: SingleCase) -> Int32{
 // V7K: vstr d0
 // V7K: vmov.f64 d0
 enum DataCase { case Y(Int, Double) }
-func testData(x: DataCase) -> Double {
+func testData(_ x: DataCase) -> Double {
   switch x {
   case let .Y(i, d):
     return d
@@ -101,7 +101,7 @@ enum CLike2 {
   case A
   case B
 }
-func testClike2(x: CLike2) -> Int {
+func testClike2(_ x: CLike2) -> Int {
   switch x {
   case CLike2.A:
     return 1
@@ -127,7 +127,7 @@ enum CLike8 {
   case G
   case H
 }
-func testClike8(t: Int, x: CLike8) -> Int {
+func testClike8(_ t: Int, x: CLike8) -> Int {
   switch x {
   case CLike8.A:
     return 1
@@ -155,7 +155,7 @@ enum SinglePayload {
   case Char(Double)
   case Chapter
 }
-func testSingleP(x: SinglePayload) -> Double {
+func testSingleP(_ x: SinglePayload) -> Double {
   switch x {
   case let .Char(d):
     return d
@@ -182,7 +182,7 @@ enum MultiPayload {
   case Y(Double)
   case Z(Bignum)
 }
-func testMultiP(x: MultiPayload) -> Double {
+func testMultiP(_ x: MultiPayload) -> Double {
   switch x {
   case let .X(i):
     return Double(i)
@@ -198,7 +198,7 @@ func testMultiP(x: MultiPayload) -> Double {
 // CHECK: ret float [[ID]]
 // V7K-LABEL: __TF8test_v7k7testOpt
 // V7K: vldr s0
-func testOpt(x: Float?) -> Float {
+func testOpt(_ x: Float?) -> Float {
   return x!
 }
 
@@ -359,6 +359,6 @@ struct MyRect3 {
   var s9: MySize
   var s10: MySize
 }
-func testRet5(r: MyRect3) -> Double {
+func testRet5(_ r: MyRect3) -> Double {
   return Double(r.t) + r.p.x + r.s9.w
 }

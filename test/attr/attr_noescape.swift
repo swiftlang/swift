@@ -178,9 +178,9 @@ protocol P2 : P1 {
   associatedtype Element
 }
 
-func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> (), _: T) {}
+func overloadedEach<O: P1, T>(_ source: O, _ transform: O.Element -> (), _: T) {}
 
-func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> (), _: T) {}
+func overloadedEach<P: P2, T>(_ source: P, _ transform: P.Element -> (), _: T) {}
 
 struct S : P2 {
   typealias Element = Int
@@ -232,20 +232,20 @@ public func XCTAssert( @autoclosure expression: () -> Boolean, _ message: String
 
 
 /// SR-770 - Currying and `noescape`/`rethrows` don't work together anymore
-func curriedFlatMap<A, B>(x: [A]) -> (@noescape (A) -> [B]) -> [B] {
+func curriedFlatMap<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] {
   return { f in
     x.flatMap(f)
   }
 }
 
-func curriedFlatMap2<A, B>(x: [A]) -> (@noescape (A) -> [B]) -> [B] {
+func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] {
   return { (f : @noescape (A) -> [B]) in
     x.flatMap(f)
   }
 }
 
 func bad(a : (Int)-> Int) -> Int { return 42 }
-func escapeNoEscapeResult(x: [Int]) -> (@noescape (Int) -> Int) -> Int {
+func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int {
   return { f in
     bad(f)  // expected-error {{invalid conversion from non-escaping function of type '@noescape (Int) -> Int' to potentially escaping function type '(Int) -> Int'}}
   }
@@ -262,7 +262,7 @@ func doThing1(@noescape completion: CompletionHandler) {
   // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
   escape = completion
 }
-func doThing2(completion: CompletionHandlerNE) {
+func doThing2(_ completion: CompletionHandlerNE) {
   // expected-error @+2 {{@noescape value 'escape' may only be called}}
   // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
   escape = completion
@@ -279,7 +279,7 @@ enum r19997577Type {
   case Function(() -> r19997577Type, () -> r19997577Type)
   case Sum(() -> r19997577Type, () -> r19997577Type)
 
-  func reduce<Result>(initial: Result, @noescape _ combine: (Result, r19997577Type) -> Result) -> Result {
+  func reduce<Result>(_ initial: Result, @noescape _ combine: (Result, r19997577Type) -> Result) -> Result {
     let binary: @noescape (r19997577Type, r19997577Type) -> Result = { combine(combine(combine(initial, self), $0), $1) }
     switch self {
     case Unit:
@@ -294,9 +294,9 @@ enum r19997577Type {
 
 // type attribute and decl attribute
 func noescapeD(@noescape f: () -> Bool) {} // ok
-func noescapeT(f: @noescape () -> Bool) {} // ok
+func noescapeT(_ f: @noescape () -> Bool) {} // ok
 func autoclosureD(@autoclosure f: () -> Bool) {} // ok
-func autoclosureT(f: @autoclosure () -> Bool) {} // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@autoclosure }} {{22-35=}}
+func autoclosureT(_ f: @autoclosure () -> Bool) {} // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@autoclosure }} {{22-35=}}
 
 func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // ok
 func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // ok

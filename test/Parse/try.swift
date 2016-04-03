@@ -83,7 +83,7 @@ let _ = (try? "foo"*"bar") ?? 0
 
 
 // <rdar://problem/21414023> Assertion failure when compiling function that takes throwing functions and rethrows
-func rethrowsDispatchError(handleError: ((ErrorProtocol) throws -> ()), body: () throws -> ()) rethrows {
+func rethrowsDispatchError(_ handleError: ((ErrorProtocol) throws -> ()), body: () throws -> ()) rethrows {
   do {
     body()   // expected-error {{call can throw but is not marked with 'try'}}
   } catch {
@@ -92,14 +92,14 @@ func rethrowsDispatchError(handleError: ((ErrorProtocol) throws -> ()), body: ()
 
 // <rdar://problem/21432429> Calling rethrows from rethrows crashes Swift compiler
 struct r21432429 {
-  func x(f: () throws -> ()) rethrows {}
-  func y(f: () throws -> ()) rethrows {
+  func x(_ f: () throws -> ()) rethrows {}
+  func y(_ f: () throws -> ()) rethrows {
     x(f)  // expected-error {{call can throw but is not marked with 'try'}} expected-note {{call is to 'rethrows' function, but argument function can throw}}
   }
 }
 
 // <rdar://problem/21427855> Swift 2: Omitting try from call to throwing closure in rethrowing function crashes compiler
-func callThrowingClosureWithoutTry(closure: Int throws -> Int) rethrows {
+func callThrowingClosureWithoutTry(_ closure: Int throws -> Int) rethrows {
   closure(0)  // expected-error {{call can throw but is not marked with 'try'}}
 }
 
@@ -122,7 +122,7 @@ if try? maybeThrow() { // expected-error {{cannot be used as a boolean}} {{4-4=(
 let _: Int = try? foo() // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use 'try!' or chain with '?'?}} {{14-18=try!}}
 
 class X {}
-func test(_: X) {}
+func test(_ _: X) {}
 func producesObject() throws -> AnyObject { return X() }
 test(try producesObject()) // expected-error {{'AnyObject' is not convertible to 'X'; did you mean to use 'as!' to force downcast?}} {{26-26= as! X}}
 

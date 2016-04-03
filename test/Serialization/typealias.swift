@@ -32,7 +32,7 @@ none = ()
 func doNothing() {}
 var nullFn : NullFunction = doNothing
 
-func negate(x: MyInt64) -> AnotherInt64 {
+func negate(_ x: MyInt64) -> AnotherInt64 {
   return -x
 }
 var monadic : IntFunction = negate
@@ -40,7 +40,7 @@ print("\(monadic(i))\n", terminator: "")
 
 // OUTPUT: -42
 
-func subtract(x: MyInt64, y: MyInt64) -> MyInt64 {
+func subtract(_ x: MyInt64, y: MyInt64) -> MyInt64 {
   return x - y
 }
 var dyadic : TwoIntFunction = subtract
@@ -49,6 +49,6 @@ print("\(dyadic((named.b, i))) \(dyadic(both))\n", terminator: "")
 // OUTPUT: 22 0
 
 // Used for tests that only need to be type-checked.
-func check(_: BaseAlias) {
+func check(_ _: BaseAlias) {
 }
 

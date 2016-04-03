@@ -3,7 +3,7 @@
 
 import Foo
 
-func foo(a: FooClassDerived) {
+func foo(_ a: FooClassDerived) {
   a.fooInstanceFunc0()
   fooFunc1(0)
 }

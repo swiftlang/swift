@@ -11,8 +11,8 @@ class Test {
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
-  @objc func selector(sel: Selector) {} // no-warning
-  @objc func selectorRef(sel: UnsafeMutablePointer<Selector>) {} // no-warning
-  @objc func boolean(b: ObjCBool) {} // no-warning
-  @objc func booleanRef(ref: UnsafeMutablePointer<ObjCBool>) {} // no-warning
+  @objc func selector(_ sel: Selector) {} // no-warning
+  @objc func selectorRef(_ sel: UnsafeMutablePointer<Selector>) {} // no-warning
+  @objc func boolean(_ b: ObjCBool) {} // no-warning
+  @objc func booleanRef(_ ref: UnsafeMutablePointer<ObjCBool>) {} // no-warning
 }

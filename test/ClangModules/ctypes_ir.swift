@@ -31,6 +31,6 @@ func testStructWithFlexibleArray(s : StructWithFlexibleArray) {
 
 typealias EightUp = (Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8)
 
-func testArrays(x: UnsafeMutablePointer<Int8>, y: UnsafeMutablePointer<Int8>, z: UnsafeMutablePointer<EightUp>) {
+func testArrays(_ x: UnsafeMutablePointer<Int8>, y: UnsafeMutablePointer<Int8>, z: UnsafeMutablePointer<EightUp>) {
   useArray(x, y, z)
 }

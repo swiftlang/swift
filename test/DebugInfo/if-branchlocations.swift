@@ -12,10 +12,10 @@ class NSPathControl {
 
 class AppDelegate {
     
-  func LogStr(message: String) {
+  func LogStr(_ message: String) {
   }
 
-  func componentClicked(sender: AnyObject)
+  func componentClicked(_ sender: AnyObject)
   {
     if let control = sender as? NSPathControl
     {

@@ -31,7 +31,7 @@ func makeObject() -> NSObject? {
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]]
 // OPT: select_enum [[OPTIONAL]] : $Optional<Gizmo>
-func callInstanceMethod(gizmo: Gizmo) -> Gizmo? {
+func callInstanceMethod(_ gizmo: Gizmo) -> Gizmo? {
   let foo: Gizmo? = gizmo.nonNilGizmo()
 
   if foo == nil {
@@ -60,7 +60,7 @@ func callClassMethod() -> Gizmo? {
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
 // OPT: select_enum [[OPTIONAL]] : $Optional<Gizmo>,
-func loadProperty(gizmo: Gizmo) -> Gizmo? {
+func loadProperty(_ gizmo: Gizmo) -> Gizmo? {
   let foo: Gizmo? = gizmo.nonNilGizmoProperty
   if foo == nil {
     print("nil")
@@ -73,7 +73,7 @@ func loadProperty(gizmo: Gizmo) -> Gizmo? {
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
 // OPT: select_enum [[OPTIONAL]] : $Optional<Gizmo>
-func loadUnownedProperty(gizmo: Gizmo) -> Gizmo? {
+func loadUnownedProperty(_ gizmo: Gizmo) -> Gizmo? {
   let foo: Gizmo? = gizmo.unownedNonNilGizmoProperty
   if foo == nil {
     print("nil")

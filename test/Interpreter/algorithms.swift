@@ -41,5 +41,5 @@ let flat = flatten([[1,2,3], [4,5,6]])
 print(flat)
 
 // rdar://problem/19416848
-func observe<T:Sequence, V where V == T.Iterator.Element>(g:T) { }
+func observe<T:Sequence, V where V == T.Iterator.Element>(_ g:T) { }
 observe(["a":1])

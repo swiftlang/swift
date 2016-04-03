@@ -20,7 +20,7 @@ func test1() {
 }
 // RUN: %complete-test %s -group=stems -tok=S1_QUAL_NO_FILTER | FileCheck %s -check-prefix=S1_QUAL_NO_FILTER
 // RUN: %complete-test %s -group=stems -fuzz -tok=S1_QUAL_NO_FILTER | FileCheck %s -check-prefix=S1_QUAL_NO_FILTER
-func test2(x: S1) {
+func test2(_ x: S1) {
   x.#^S1_QUAL_NO_FILTER^#
 // Without a filter, we group.
 // S1_QUAL_NO_FILTER: fooBar:
@@ -117,10 +117,10 @@ struct Test4 {
 
 // RUN: %complete-test %s -fuzz -tok=DONT_FILTER_TYPES_1 | FileCheck %s -check-prefix=DONT_FILTER_TYPES_1
 struct Test5 {
-  func dontFilterTypes(a: Int, b: Int, ccc: String) {}
-  func dontFilterTypes(a: Int, b: Int, ddd: Float) {}
+  func dontFilterTypes(_ a: Int, b: Int, ccc: String) {}
+  func dontFilterTypes(_ a: Int, b: Int, ddd: Float) {}
 }
-func test5(x: Test5) {
+func test5(_ x: Test5) {
   x.#^DONT_FILTER_TYPES_1,ccc,str,ddd,flo^#
 }
 // DONT_FILTER_TYPES_1-LABEL: Results for filterText: ccc [
@@ -135,7 +135,7 @@ func test5(x: Test5) {
 // DONT_FILTER_TYPES_1-NEXT: ]
 
 // RUN: %complete-test %s -fuzz -tok=MIN_LENGTH_1 | FileCheck %s -check-prefix=MIN_LENGTH_1
-func test6(x: S1) {
+func test6(_ x: S1) {
   x.#^MIN_LENGTH_1,f,o,b^#
 }
 // MIN_LENGTH_1-LABEL: Results for filterText: f [

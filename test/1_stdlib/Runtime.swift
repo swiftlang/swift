@@ -425,7 +425,7 @@ struct GenericStructWithReferenceStorage<T> {
 }
 
 func exerciseReferenceStorageInGenericContext<T>(
-    x: GenericStructWithReferenceStorage<T>,
+    _ x: GenericStructWithReferenceStorage<T>,
     forceCopy y: GenericStructWithReferenceStorage<T>
 ) {
   expectEqual(x.unownedConcrete.malkovich, "malkovich")
@@ -468,11 +468,11 @@ Runtime.test("Struct layout with reference storage types") {
 
 var Reflection = TestSuite("Reflection")
 
-func wrap1   (x: Any) -> Any { return x }
-func wrap2<T>(x: T)   -> Any { return wrap1(x) }
-func wrap3   (x: Any) -> Any { return wrap2(x) }
-func wrap4<T>(x: T)   -> Any { return wrap3(x) }
-func wrap5   (x: Any) -> Any { return wrap4(x) }
+func wrap1   (_ x: Any) -> Any { return x }
+func wrap2<T>(_ x: T)   -> Any { return wrap1(x) }
+func wrap3   (_ x: Any) -> Any { return wrap2(x) }
+func wrap4<T>(_ x: T)   -> Any { return wrap3(x) }
+func wrap5   (_ x: Any) -> Any { return wrap4(x) }
 
 class JustNeedAMetatype {}
 
@@ -935,7 +935,7 @@ Reflection.test("CustomMirror") {
     checkEquatable(false, ObjectIdentifier(a), ObjectIdentifier(b))
 
     // Comparable
-    func isComparable<X : Comparable>(x: X) {}
+    func isComparable<X : Comparable>(_ x: X) {}
     isComparable(ObjectIdentifier(a))
     // Check the ObjectIdentifier created is stable
     expectTrue(
@@ -1501,7 +1501,7 @@ var AvailabilityVersionsTestSuite = TestSuite("AvailabilityVersions")
 
 AvailabilityVersionsTestSuite.test("lexicographic_compare") {
   func version(
-    major: Int,
+    _ major: Int,
     _ minor: Int,
     _ patch: Int
   ) -> _SwiftNSOperatingSystemVersion {

@@ -925,14 +925,14 @@ func getBridgedNSArrayOfRefTypeVerbatimBridged(
   return bridged
 }
 
-func convertNSArrayToArray<T>(source: NSArray?) -> [T] {
+func convertNSArrayToArray<T>(_ source: NSArray?) -> [T] {
   if _slowPath(source == nil) { return [] }
   var result: [T]?
   Array._forceBridgeFromObjectiveC(source!, result: &result)
   return result!
 }
 
-func convertArrayToNSArray<T>(array: [T]) -> NSArray {
+func convertArrayToNSArray<T>(_ array: [T]) -> NSArray {
   return array._bridgeToObjectiveC()
 }
 

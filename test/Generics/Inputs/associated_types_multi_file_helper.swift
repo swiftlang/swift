@@ -4,9 +4,9 @@ protocol Fooable {
 }
 
 struct X : Fooable {
-  func foo(x: Float) {}
+  func foo(_ x: Float) {}
 }
 
 struct Y : Fooable {
-  func foo(x: String) {}
+  func foo(_ x: String) {}
 }

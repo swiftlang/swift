@@ -96,7 +96,7 @@ func test2() {
 
 // Top 1
 // RUN: %complete-test -top=1 -tok=EXPR_1 %s | FileCheck %s -check-prefix=EXPR_TOP_1
-func test3(x: Int) {
+func test3(_ x: Int) {
   let y = x
   let z = x
   let zzz = x
@@ -119,7 +119,7 @@ func test3(x: Int) {
 
 // Top 3
 // RUN: %complete-test -top=3 -tok=EXPR_2 %s | FileCheck %s -check-prefix=EXPR_TOP_3
-func test4(x: Int) {
+func test4(_ x: Int) {
   let y = x
   let z = x
   let zzz = x
@@ -142,7 +142,7 @@ func test4(x: Int) {
 
 // Top 3 with type matching
 // RUN: %complete-test -top=3 -tok=EXPR_3 %s | FileCheck %s -check-prefix=EXPR_TOP_3_TYPE_MATCH
-func test4(x: Int) {
+func test4(_ x: Int) {
   let y: String = ""
   let z: String = y
   let zzz = x

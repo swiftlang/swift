@@ -26,17 +26,17 @@ struct X4<T : X3> {
 struct X5<T : P2> { }
 
 // Infer protocol requirements from the parameter type of a generic function.
-func inferFromParameterType<T>(x: X1<T>) {
+func inferFromParameterType<T>(_ x: X1<T>) {
   x.getT().p1()
 }
 
 // Infer protocol requirements from the return type of a generic function.
-func inferFromReturnType<T>(x: T) -> X1<T> {
+func inferFromReturnType<T>(_ x: T) -> X1<T> {
   x.p1()
 }
 
 // Infer protocol requirements from the superclass of a generic parameter.
-func inferFromSuperclass<T, U : X2<T>>(t: T, u: U) -> T {
+func inferFromSuperclass<T, U : X2<T>>(_ t: T, u: U) -> T {
   t.p1()
 }
 
@@ -59,7 +59,7 @@ class Box<T : Fox> {
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   T witness marker
 // CHECK-NEXT:   T : Fox [outer]
-  func unpack(x: X1<T>) {}
+  func unpack(_ x: X1<T>) {}
 }
 
 // ----------------------------------------------------------------------------
@@ -78,13 +78,13 @@ struct V<T : Canidae> {}
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   T witness marker
 // CHECK-NEXT:   T : Canidae
-func inferSuperclassRequirement1<T : Carnivora>(v: V<T>) {}
+func inferSuperclassRequirement1<T : Carnivora>(_ v: V<T>) {}
 
 // CHECK-LABEL: .inferSuperclassRequirement2@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   T witness marker
 // CHECK-NEXT:   T : Canidae
-func inferSuperclassRequirement2<T : Canidae>(v: U<T>) {}
+func inferSuperclassRequirement2<T : Canidae>(_ v: U<T>) {}
 
 // ----------------------------------------------------------------------------
 // Same-type requirements
@@ -122,7 +122,7 @@ struct Model_P3_P4_Eq<T : P3, U : P4 where T.P3Assoc == U.P4Assoc> { }
 // CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}:18]
 // CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}:18]
 // CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [inferred @ {{.*}}30]
-func inferSameType1<T, U>(x: Model_P3_P4_Eq<T, U>) { }
+func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) { }
 
 // CHECK-LABEL: .inferSameType2@
 // CHECK-NEXT: Requirements:
@@ -134,7 +134,7 @@ func inferSameType1<T, U>(x: Model_P3_P4_Eq<T, U>) { }
 // CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:18]
 // CHECK-NEXT:   T[.P3].P3Assoc : P2 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:54]
 // CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
-func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>(_: T) { }
+func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>(_ _: T) { }
 
 // CHECK-LABEL: .inferSameType3@
 // CHECK-NEXT: Requirements:
@@ -145,7 +145,7 @@ func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>
 // CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:61]
 // CHECK-NEXT:   T[.PCommonAssoc2].CommonAssoc == T[.PCommonAssoc1].CommonAssoc [inferred @ {{.*}}requirement_inference.swift:{{.*}}:69]
 // CHECK-NEXT: Generic signature
-func inferSameType3<T : PCommonAssoc1 where T.CommonAssoc : P1, T : PCommonAssoc2>(_: T) { }
+func inferSameType3<T : PCommonAssoc1 where T.CommonAssoc : P1, T : PCommonAssoc2>(_ _: T) { }
 
 protocol P5 {
   associatedtype Element

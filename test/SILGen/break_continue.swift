@@ -16,7 +16,7 @@ struct Bool : Boolean {
 }
 
 // CHECK-LABEL: sil hidden @_TFs5test1
-func test1(bi: Bool) {
+func test1(_ bi: Bool) {
   var b = bi
   for var c = b; b; b = c {
     if b {

@@ -52,13 +52,13 @@ extension D {
 // TYPE2: public class D<T1> {
 // TYPE2:    public func foo()
 // TYPE2:    public func conditionalFunc1()
-// TYPE2:    public func conditionalFunc2(t: T1) -> T1
+// TYPE2:    public func conditionalFunc2(_ t: T1) -> T1
 // TYPE2:    public func unconditionalFunc1()
-// TYPE2:    public func unconditionalFunc2(t: T1) -> T1
+// TYPE2:    public func unconditionalFunc2(_ t: T1) -> T1
 // TYPE2: }
 
 // TYPE3: public class D<Int> {
 // TYPE3:   public func foo()
 // TYPE3:   public func unconditionalFunc1()
-// TYPE3:   public func unconditionalFunc2(t: Int) -> Int
+// TYPE3:   public func unconditionalFunc2(_ t: Int) -> Int
 // TYPE3: }

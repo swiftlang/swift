@@ -19,7 +19,7 @@ class C {
 class X {
   init() {} 
 
-  @objc func foo(i: Int) { }
+  @objc func foo(_ i: Int) { }
   @objc func bar() { }
 
   @objc func ovl2() -> A { } // expected-note{{found this candidate}}
@@ -35,7 +35,7 @@ class X {
 class Y : P {
   init() {} 
 
-  @objc func foo(s: String) { }
+  @objc func foo(_ s: String) { }
   @objc func wibble() { }
 
   @objc func ovl1() -> A { }

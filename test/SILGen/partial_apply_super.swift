@@ -6,7 +6,7 @@
 
 import resilient_class
 
-func doFoo(f: () -> ()) {
+func doFoo(_ f: () -> ()) {
   f()
 }
 

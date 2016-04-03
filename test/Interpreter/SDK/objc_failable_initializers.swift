@@ -65,7 +65,7 @@ class MyDerivedDate : MyDate {
 
 }
 
-func mustFail<T>(f: () -> T?) {
+func mustFail<T>(_ f: () -> T?) {
   if f() != nil {
     preconditionFailure("Didn't fail")
   }

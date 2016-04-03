@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -enable-guaranteed-closure-contexts %s | FileCheck %s
 
-func use<T>(_: T) {}
+func use<T>(_ _: T) {}
 
-func escape(f: () -> ()) {}
+func escape(_ f: () -> ()) {}
 
 protocol P {}
 class C: P {}

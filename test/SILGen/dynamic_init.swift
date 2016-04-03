@@ -5,7 +5,7 @@ class C {
 }
 
 // CHECK-LABEL: sil hidden @_TF12dynamic_init15testDynamicInit
-func testDynamicInit(cm: C.Type) {
+func testDynamicInit(_ cm: C.Type) {
   // CHECK: bb0([[CM:%[0-9]+]] : $@thick C.Type):
   // CHECK:   [[METHOD:%[0-9]+]] = class_method [[CM]] : $@thick C.Type, #C.init!allocator.1 : C.Type -> () -> C , $@convention(thin) (@thick C.Type) -> @owned C
   // CHECK:   [[C_OBJ:%[0-9]+]] = apply [[METHOD]]([[CM]]) : $@convention(thin) (@thick C.Type) -> @owned C

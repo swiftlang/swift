@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 @swift3_migration(renamed: "g0(a:b:c:)", message: "it's good for you")
-func f0(x: Int, y: Int, z: Int) { }
+func f0(_ x: Int, y: Int, z: Int) { }
 
 @swift3_migration(renamed: "Y0")
 struct X0 { }

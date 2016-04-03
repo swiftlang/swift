@@ -14,7 +14,7 @@ var bfx : Int, bfy : Int
 
 _ = 10
 
-func _(x: Int) {} // expected-error {{expected identifier in function declaration}}
+func _(_ x: Int) {} // expected-error {{expected identifier in function declaration}}
 
 
 var self1 = self1 // expected-error {{variable used within its own initial value}}

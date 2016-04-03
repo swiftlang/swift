@@ -25,11 +25,11 @@ struct BarStruct : FooEvenMoreRefinedProtocol {
 // BAR_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:      instanceProperty[#Int#]
 // BAR_OBJECT_DOT-NEXT: End completions
 
-func test(a: FooStruct) {
+func test(_ a: FooStruct) {
   a.#^FOO_OBJECT_DOT_1^#
 }
 
-func test(a: BarStruct) {
+func test(_ a: BarStruct) {
   a.#^BAR_OBJECT_DOT_1^#
 }
 

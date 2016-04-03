@@ -26,8 +26,8 @@ enum NonObjCEnum: Int {
 }
 
 class Bar {
-  @objc func foo(x: Foo) {}
-  @objc func nonObjC(x: NonObjCEnum) {} //expected-error{{type of the parameter cannot be represented in Objective-C}} //expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
+  @objc func foo(_ x: Foo) {}
+  @objc func nonObjC(_ x: NonObjCEnum) {} //expected-error{{type of the parameter cannot be represented in Objective-C}} //expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
 }
 
 // <rdar://problem/23681566> @objc enums with payloads rejected with no source location info

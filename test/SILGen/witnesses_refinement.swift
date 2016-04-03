@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 protocol Saturable: Comparable {
-  func saturated(max: Self) -> Self
+  func saturated(_ max: Self) -> Self
 }
 
 extension Int: Saturable {
-  func saturated(max: Int) -> Int {
+  func saturated(_ max: Int) -> Int {
     return self > max ? max : self
   }
 }

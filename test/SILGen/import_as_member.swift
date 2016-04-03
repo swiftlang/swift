@@ -14,7 +14,7 @@ public func returnGlobalVar() -> Double {
 
 // SIL-LABEL: sil {{.*}}useProto{{.*}} (@owned IAMProto) -> () {
 // TODO: Add in body checks
-public func useProto(p: IAMProto) {
+public func useProto(_ p: IAMProto) {
 	p.mutateSomeState()
 	let v = p.someValue
 	p.someValue = v+1

@@ -14,7 +14,7 @@
 func decl_func_1() {}
 
 /// decl_func_2 Aaa.
-func decl_func_2<T>(t: T) {}
+func decl_func_2<T>(_ t: T) {}
 
 /// decl_func_3 Aaa.
 @unknown_attribute
@@ -128,7 +128,7 @@ struct decl_struct_1 {
   func instanceFunc2() {}
 
   /// instanceFunc3 Aaa.
-  func instanceFunc3<T>(t: T) {}
+  func instanceFunc3<T>(_ t: T) {}
 
   /// instanceFunc4 Aaa.
   @unknown_attribute

@@ -108,7 +108,7 @@ ResilientStructTestSuite.test("DynamicLayout") {
   }
 }
 
-@inline(never) func getB(p: MyResilientLayoutProtocol) -> Bool {
+@inline(never) func getB(_ p: MyResilientLayoutProtocol) -> Bool {
   return p.b1.b
 }
 
@@ -140,7 +140,7 @@ struct StructWithDependentAssociatedType : ProtocolWithAssociatedType {
   }
 }
 
-@inline(never) func getAssociatedType<T : ProtocolWithAssociatedType>(p: T)
+@inline(never) func getAssociatedType<T : ProtocolWithAssociatedType>(_ p: T)
     -> MyResilientLayoutProtocol.Type {
   return T.T.self
 }

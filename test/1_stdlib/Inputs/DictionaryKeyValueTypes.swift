@@ -1,7 +1,7 @@
 import Swift
 import StdlibUnittest
 
-func acceptsAnySet<T : Hashable>(s: Set<T>) {}
+func acceptsAnySet<T : Hashable>(_ s: Set<T>) {}
 
 func acceptsAnyDictionary<KeyTy : Hashable, ValueTy>(
   d: Dictionary<KeyTy, ValueTy>) {
@@ -21,7 +21,7 @@ func equalsUnordered<T : Comparable>(
   }
 }
 
-func equalsUnordered<T : Comparable>(lhs: [T], _ rhs: [T]) -> Bool {
+func equalsUnordered<T : Comparable>(_ lhs: [T], _ rhs: [T]) -> Bool {
   return lhs.sorted().elementsEqual(rhs.sorted())
 }
 

@@ -7,11 +7,11 @@
 
 // <rdar://problem/17569958> #endif not parsed correctly when occurs as last line in file
 #if DEBUG
-func debug(msg: String) {
+func debug(_ msg: String) {
     print(msg)
 }
 #else
-func debug(msg: String) {
+func debug(_ msg: String) {
 }
 // last line of file - make sure no \n sneaks in below #endif.
 #endif

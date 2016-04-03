@@ -20,7 +20,7 @@ import Foundation
 // PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/OtherModule[Foundation]: NSJapaneseEUCStringEncoding[#UInt#]{{; name=.+$}}
 // PLAIN_TOP_LEVEL: End completions
 
-func privateNominalMembers(a: String) {
+func privateNominalMembers(_ a: String) {
   a.#^PRIVATE_NOMINAL_MEMBERS_1^#
 }
 

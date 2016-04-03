@@ -3,16 +3,16 @@ import FooSwiftModule
 
 var glob : Int
 
-func foo(x: Int) {}
+func foo(_ x: Int) {}
 
-func goo(x: Int) {
+func goo(_ x: Int) {
   foo(glob+x+Int(fooIntVar)+fooSwiftFunc())
 }
 
 /// Aaa.  S1.  Bbb.
 struct S1 {}
 var w : S1
-func test2(x: S1) {}
+func test2(_ x: S1) {}
 
 class CC {
   init(x: Int) {
@@ -28,14 +28,14 @@ func testLetParam(arg1 : Int) {
 func testInoutParam(arg1 : inout Int) {
 }
 
-func testDefaultParam(arg1: Int = 0) {
+func testDefaultParam(_ arg1: Int = 0) {
 }
 
 fooSubFunc1(0)
 
-func myFunc(arg1: String) {
+func myFunc(_ arg1: String) {
 }
-func myFunc(arg1: String, options: Int) {
+func myFunc(_ arg1: String, options: Int) {
 }
 
 var derivedObj = FooClassDerived()
@@ -51,7 +51,7 @@ class C2 {
   }()
 }
 
-func test1(foo: FooUnavailableMembers) {
+func test1(_ foo: FooUnavailableMembers) {
   foo.availabilityIntroduced()
   foo.swiftUnavailable()
   foo.unavailable()
@@ -85,7 +85,7 @@ enum E1<T, U where T == U> {}
 
 func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: Int, external4 _: Int, _: Int) {}
 
-func nestedFunctionType(closure: (y: (z: Int) -> Int) -> Int) -> (y: (z: Int) -> Int) -> Int) { return closure }
+func nestedFunctionType(_ closure: (y: (z: Int) -> Int) -> Int) -> (y: (z: Int) -> Int) -> Int) { return closure }
 
 enum E2 {
   case C1
@@ -156,13 +156,13 @@ func paramAutoclosureNoescape1(@noescape msg: ()->String) {}
 func paramAutoclosureNoescape2(@autoclosure msg: ()->String) {}
 func paramAutoclosureNoescape3(@autoclosure(escaping) msg: ()->String) {}
 
-func paramDefaultPlaceholder(f: StaticString = #function, file: StaticString = #file, line: UInt = #line, col: UInt = #column, arr: [Int] = [], dict: [Int:Int] = [:], opt: Int? = nil, reg: Int = 1) {}
+func paramDefaultPlaceholder(_ f: StaticString = #function, file: StaticString = #file, line: UInt = #line, col: UInt = #column, arr: [Int] = [], dict: [Int:Int] = [:], opt: Int? = nil, reg: Int = 1) {}
 
 protocol P3 {
-  func f(s: Self) -> Self
+  func f(_ s: Self) -> Self
 }
 extension P3: P2 {
-  func f(s: Self) -> Self { return s }
+  func f(_ s: Self) -> Self { return s }
 }
 
 class C7 {
@@ -193,16 +193,16 @@ public class C8 : P4 {
   }
 }
 
-func foo2(f: C8) {
+func foo2(_ f: C8) {
   f.foo1()
   f.foo2()
 }
 
-func tupleInParam1(t: (Int, Int)) {}
-func tupleInParam2(t: ()) {}
-func tupleInParam2(t: () -> ()) {}
+func tupleInParam1(_ t: (Int, Int)) {}
+func tupleInParam2(_ t: ()) {}
+func tupleInParam2(_ t: () -> ()) {}
 func tupleResult1() -> (Int, Int) {}
-func tupleResult2(f: () -> Void) {}
+func tupleResult2(_ f: () -> Void) {}
 typealias MyVoid = ()
 
 // RUN: rm -rf %t.tmp
@@ -298,7 +298,7 @@ typealias MyVoid = ()
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)
-// CHECK13: <Declaration>func testDefaultParam(arg1: <Type usr="s:Si">Int</Type> = default)</Declaration>
+// CHECK13: <Declaration>func testDefaultParam(_ arg1: <Type usr="s:Si">Int</Type> = default)</Declaration>
 // CHECK13: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>testDefaultParam</decl.name>(<decl.var.parameter><decl.var.parameter.name>arg1</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type> = <syntaxtype.keyword>default</syntaxtype.keyword></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=34:4 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK14 %s
@@ -310,7 +310,7 @@ typealias MyVoid = ()
 // RUN: %sourcekitd-test -req=cursor -pos=38:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK15 %s
 // CHECK15: source.lang.swift.decl.function.free (38:6-38:40)
 // CHECK15: myFunc
-// CHECK15: <Declaration>func myFunc(arg1: <Type usr="s:SS">String</Type>, options: <Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK15: <Declaration>func myFunc(_ arg1: <Type usr="s:SS">String</Type>, options: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK15: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>myFunc</decl.name>(<decl.var.parameter><decl.var.parameter.name>arg1</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:SS">String</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>options</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 // CHECK15: RELATED BEGIN
 // CHECK15-NEXT: <RelatedName usr="s:F11cursor_info6myFuncFSST_">myFunc(_:)</RelatedName>
@@ -630,14 +630,14 @@ typealias MyVoid = ()
 // RUN: %sourcekitd-test -req=cursor -pos=162:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK74
 // CHECK74: source.lang.swift.decl.function.method.instance (162:8-162:18)
 // CHECK74: <Self : P3> (Self) -> (Self) -> Self
-// CHECK74: <Declaration>func f(s: <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type>) -&gt; <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type></Declaration>
+// CHECK74: <Declaration>func f(_ s: <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type>) -&gt; <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type></Declaration>
 // CHECK74: <decl.var.parameter.type><ref.generic_type_param usr="s:tP11cursor_info2P34SelfMx">Self</ref.generic_type_param></decl.var.parameter.type>
 // CHECK74-SAME: <decl.function.returntype><ref.generic_type_param usr="s:tP11cursor_info2P34SelfMx">Self</ref.generic_type_param></decl.function.returntype>
 
 // RUN: %sourcekitd-test -req=cursor -pos=165:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK75
 // CHECK75: source.lang.swift.decl.function.method.instance (165:8-165:18)
 // CHECK75: <Self : P3> (Self) -> (Self) -> Self
-// CHECK75: <Declaration>func f(s: <Type usr="s:tE11cursor_infoPS_2P34SelfMx">Self</Type>) -&gt; <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type></Declaration>
+// CHECK75: <Declaration>func f(_ s: <Type usr="s:tE11cursor_infoPS_2P34SelfMx">Self</Type>) -&gt; <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type></Declaration>
 // CHECK75: <decl.var.parameter.type><ref.generic_type_param usr="s:tE11cursor_infoPS_2P34SelfMx">Self</ref.generic_type_param></decl.var.parameter.type>
 // CHECK75-SAME: <decl.function.returntype><ref.generic_type_param usr="s:tP11cursor_info2P34SelfMx">Self</ref.generic_type_param></decl.function.returntype>
 // FIXME: the return type gets the USR for the original protocol, rather than the extension.

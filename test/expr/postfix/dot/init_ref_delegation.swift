@@ -254,7 +254,7 @@ protocol P {
   init(proto: String)
 }
 
-func foo<T: C where T: P>(x: T, y: T.Type) {
+func foo<T: C where T: P>(_ x: T, y: T.Type) {
   var c1 = x.dynamicType.init(required: 0)
   var c2 = x.dynamicType.init(x: 0) // expected-error{{'required' initializer}}
   var c3 = x.dynamicType.init() // expected-error{{'required' initializer}}
@@ -338,7 +338,7 @@ class TestNestedExpr {
   }
 
   convenience init(b: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
@@ -352,7 +352,7 @@ class TestNestedExpr {
   }
 
   convenience init(e: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
@@ -366,7 +366,7 @@ class TestNestedExpr {
   }
 
   convenience init(h: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(try! self.init(error: true)) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
@@ -382,7 +382,7 @@ class TestNestedExprSub : TestNestedExpr {
   }
 
   init(b: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 
@@ -396,7 +396,7 @@ class TestNestedExprSub : TestNestedExpr {
   }
 
   init(e: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 
@@ -410,7 +410,7 @@ class TestNestedExprSub : TestNestedExpr {
   }
 
   init(h: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 

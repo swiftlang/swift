@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: sil hidden @_TF14metatype_casts6t_is_u
 // CHECK:         checked_cast_br {{.*}} $@thick T.Type to $@thick U.Type
-func t_is_u<T, U>(_: T, _: U) -> Bool {
+func t_is_u<T, U>(_ _: T, _: U) -> Bool {
   return T.self is U.Type
 }
 
@@ -15,7 +15,7 @@ func int_is_t<T>() -> (Bool, T.Type?, T.Type) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14metatype_casts8t_is_int
-func t_is_int<T>(_: T) -> (Bool, Int.Type?, Int.Type) {
+func t_is_int<T>(_ _: T) -> (Bool, Int.Type?, Int.Type) {
   // CHECK: checked_cast_br {{%.*}} : $@thick T.Type to $@thick Int.Type
   // CHECK: checked_cast_br {{%.*}} : $@thick T.Type to $@thick Int.Type
   // CHECK: unconditional_checked_cast {{%.*}} : $@thick T.Type to $@thick Int.Type
@@ -28,13 +28,13 @@ class Ambulance : Emergency {}
 class FashionPolice {}
 
 // CHECK-LABEL: sil hidden @_TF14metatype_casts30anyObjectToExistentialMetatype
-func anyObjectToExistentialMetatype(o: AnyObject) -> Emergency.Type? {
+func anyObjectToExistentialMetatype(_ o: AnyObject) -> Emergency.Type? {
   // CHECK: checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to Emergency.Type in {{%.*}}
   return o as? Emergency.Type
 }
 
 // CHECK-LABEL: sil hidden @_TF14metatype_casts19anyObjectToMetatype
-func anyObjectToMetatype(o: AnyObject) -> FashionPolice.Type? {
+func anyObjectToMetatype(_ o: AnyObject) -> FashionPolice.Type? {
   // CHECK: checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to FashionPolice.Type in {{%.*}}
   return o as? FashionPolice.Type
 }

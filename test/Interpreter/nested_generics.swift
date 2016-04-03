@@ -26,7 +26,7 @@ class Foo<T : MyPrintable> {
     print("")
   }
 
-  func bar<U : MyPrintable>(u: U) {
+  func bar<U : MyPrintable>(_ u: U) {
     print("bar ", terminator: "")
     u.print()
     print("")

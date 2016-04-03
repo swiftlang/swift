@@ -10,14 +10,14 @@ import Foundation
 // CHECK-LABEL: sil hidden @_TF10objc_error28NSErrorErrorProtocol_erasureFCSo7NSErrorPs13ErrorProtocol_
 // CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $ErrorProtocol
 // CHECK:         return [[ERROR_TYPE]]
-func NSErrorErrorProtocol_erasure(x: NSError) -> ErrorProtocol {
+func NSErrorErrorProtocol_erasure(_ x: NSError) -> ErrorProtocol {
   return x
 }
 
 // CHECK-LABEL: sil hidden @_TF10objc_error38NSErrorErrorProtocol_archetype_erasure
 // CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $ErrorProtocol
 // CHECK:         return [[ERROR_TYPE]]
-func NSErrorErrorProtocol_archetype_erasure<T : NSError>(t: T) -> ErrorProtocol {
+func NSErrorErrorProtocol_archetype_erasure<T : NSError>(_ t: T) -> ErrorProtocol {
   return t
 }
 
@@ -65,7 +65,7 @@ func test_cast_to_nserror() {
 // A class-constrained archetype may be NSError, so we can't use scalar casts
 // in that case either.
 // CHECK-LABEL: sil hidden @_TF10objc_error28test_cast_to_class_archetype
-func test_cast_to_class_archetype<T: AnyObject>(_: T) {
+func test_cast_to_class_archetype<T: AnyObject>(_ _: T) {
   // CHECK: unconditional_checked_cast_addr {{.*}} ErrorClass in {{%.*}} : $*ErrorClass to T in {{.*}} : $*T
   let e = ErrorClass()
   let forcedCast = e as! T

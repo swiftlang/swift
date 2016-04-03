@@ -27,7 +27,7 @@ public func getExternalClass() -> ExternalClass {
 // CHECK-NOT: checked_cast_br
 // CHECK-NOT: bb1
 // CHECK: return
-@_transparent public func invokeFoo(obj: ExternalClass) {
+@_transparent public func invokeFoo(_ obj: ExternalClass) {
   obj.foo()
 }
 

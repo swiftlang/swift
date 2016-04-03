@@ -14,7 +14,7 @@ import Foundation
 
 public class A: NSObject {
   func foo() {}
-  @objc func bar(x: Int, baz y: Int) -> Int { return 1 }
+  @objc func bar(_ x: Int, baz y: Int) -> Int { return 1 }
 }
 public class B: A {
   func doSomething() {}

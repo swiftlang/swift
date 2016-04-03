@@ -154,7 +154,7 @@ func WhatShouldIDo2(p : P) {
   p.doSomething()
 }
 
-public func driver1<X>(x:X) {
+public func driver1<X>(_ x:X) {
   let b = B3<X>()
   WhatShouldIDo(b)
   WhatShouldIDo2(b)

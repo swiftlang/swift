@@ -16,7 +16,7 @@ func test2() {
   var _: Bool = true && 1 ~~ 2 && false // true && (1 ~~ 2) && false
 }
 
-func testOverriding(sub: Subclass) {
+func testOverriding(_ sub: Subclass) {
   sub.method()
 }
 

@@ -53,7 +53,7 @@ func test001() {
 // NEGATIVE_TOP_LEVEL_0-NOT: _InternalStruct
 // NEGATIVE_TOP_LEVEL_0: ]
 
-func test002(x: Foo) {
+func test002(_ x: Foo) {
   x.#^FOO_QUALIFIED_0,,^#
 }
 // RUN: %complete-test %s -tok=FOO_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=FOO_QUALIFIED_0
@@ -64,7 +64,7 @@ func test002(x: Foo) {
 // FOO_QUALIFIED_0-DAG:   _foo()
 // FOO_QUALIFIED_0: ]
 
-func test003(x: _Bar) {
+func test003(_ x: _Bar) {
   x.#^BAR_QUALIFIED_0,,_^#
 }
 // RUN: %complete-test %s -tok=BAR_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=BAR_QUALIFIED_0
@@ -85,7 +85,7 @@ func test003(x: _Bar) {
 // NEGATIVE_BAR_QUALIFIED_0-NOT:   _extFoo()
 // NEGATIVE_BAR_QUALIFIED_0: ]
 
-func test004(x: Baz) {
+func test004(_ x: Baz) {
   x.#^BAZ_QUALIFIED_0,,^#
 }
 // RUN: %complete-test %s -tok=BAZ_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=BAZ_QUALIFIED_0
@@ -94,7 +94,7 @@ func test004(x: Baz) {
 // BAZ_QUALIFIED_0-DAG:   _baz()
 // BAZ_QUALIFIED_0: ]
 
-func test005(x: SBaz) {
+func test005(_ x: SBaz) {
   x.#^BAZ_QUALIFIED_1,,^#
 }
 // RUN: %complete-test %s -tok=BAZ_QUALIFIED_1  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=BAZ_QUALIFIED_1

@@ -6,7 +6,7 @@ func canonical_empty_protocol() -> protocol<> {
 
 protocol P1 {
   func p1()
-  func f(_: Int) -> Int
+  func f(_ _: Int) -> Int
 }
 
 protocol P2 : P1 {
@@ -19,7 +19,7 @@ protocol P3 {
 
 protocol P4 : P3 {
   func p4()
-  func f(_: Double) -> Double
+  func f(_ _: Double) -> Double
 }
 
 typealias Any = protocol<>
@@ -78,22 +78,22 @@ protocol SuperREPLPrintable : REPLPrintable {
 }
 
 protocol FooProtocol {
-  func format(kind: UnicodeScalar, layout: String) -> String
+  func format(_ kind: UnicodeScalar, layout: String) -> String
 }
 
 struct SuperPrint : REPLPrintable, FooProtocol, SuperREPLPrintable {
   func replPrint() {}
   func superReplPrint() {}
-  func format(kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: UnicodeScalar, layout: String) -> String {}
 }
 
 struct Struct1 {}
 extension Struct1 : REPLPrintable, FooProtocol {
   func replPrint() {}
-  func format(kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: UnicodeScalar, layout: String) -> String {}
 }
 
-func accept_manyPrintable(_: protocol<REPLPrintable, FooProtocol>) {}
+func accept_manyPrintable(_ _: protocol<REPLPrintable, FooProtocol>) {}
 
 func return_superPrintable() -> protocol<FooProtocol, SuperREPLPrintable> {}
 

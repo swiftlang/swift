@@ -40,7 +40,7 @@ func getNonTrivialUnion1() -> NonTrivialUnion1 { return .Foo }
 func getNonTrivialUnion2() -> NonTrivialUnion2 { return .Foo }
 func getNonTrivialUnion3() -> NonTrivialUnion3 { return .Bar(C()) }
 /* TODO: Address-only unions
-func getAddressOnlyUnion<T>(_: T.Type) -> AddressOnlyUnion<T> { return .Foo }
+func getAddressOnlyUnion<T>(_ _: T.Type) -> AddressOnlyUnion<T> { return .Foo }
  */
 
 // CHECK-LABEL: sil hidden @_TF15lifetime_unions19destroyUnionRValuesFT_T_ : $@convention(thin) () -> () {

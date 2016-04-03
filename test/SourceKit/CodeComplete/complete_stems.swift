@@ -86,7 +86,7 @@ struct S {
   func HIJ_KLM(NOP NOP: Int) {}
   func HIJ_KLM(NOP_QRS NOP_QRS: Int) {}
 }
-func test002(x: S) {
+func test002(_ x: S) {
   x.#^S_QUALIFIED_0^#
 }
 // RUN: %complete-test %s -no-fuzz -group=stems -tok=S_QUALIFIED_0 | FileCheck %s -check-prefix=S_QUALIFIED_0
@@ -139,7 +139,7 @@ func test003() {
 // T_POSTFIX_0-NEXT: foo(self: T)
 
 // RUN: %complete-test %s -no-fuzz -add-inner-results -no-inner-operators -group=stems -tok=T_POSTFIX_1 | FileCheck %s -check-prefix=T_POSTFIX_1
-func test004(x: T) {
+func test004(_ x: T) {
   x#^T_POSTFIX_1^#
 }
 // T_POSTFIX_1: [x:

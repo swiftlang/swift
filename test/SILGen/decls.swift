@@ -90,7 +90,7 @@ func tuple_patterns() {
 // CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box $Int
 // CHECK-NEXT: [[PBY:%[0-9]+]] = project_box [[Y]]
 // CHECK-NEXT: store %1 to [[PBY]]
-func simple_arguments(x: Int, y: Int) -> Int {
+func simple_arguments(_ x: Int, y: Int) -> Int {
   var x = x
   var y = y
   return x+y
@@ -100,7 +100,7 @@ func simple_arguments(x: Int, y: Int) -> Int {
 // CHECK: bb0(%0 : $Int, %1 : $Float):
 // CHECK: [[UNIT:%[0-9]+]] = tuple ()
 // CHECK: [[TUPLE:%[0-9]+]] = tuple (%0 : $Int, %1 : $Float, [[UNIT]] : $())
-func tuple_argument(x: (Int, Float, ())) {
+func tuple_argument(_ x: (Int, Float, ())) {
 }
 
 // CHECK-LABEL: sil hidden @_TF5decls14inout_argument
@@ -110,7 +110,7 @@ func tuple_argument(x: (Int, Float, ())) {
 // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
 // CHECK: [[PBY:%[0-9]+]] = project_box [[YADDR]]
 // CHECK: copy_addr [[PBY]] to [[PBX]]
-func inout_argument(x: inout Int, y: Int) {
+func inout_argument(_ x: inout Int, y: Int) {
   var y = y
   x = y
 }
@@ -128,7 +128,7 @@ func load_from_global() -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF5decls15store_to_global
-func store_to_global(x: Int) {
+func store_to_global(_ x: Int) {
   var x = x
   global = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int

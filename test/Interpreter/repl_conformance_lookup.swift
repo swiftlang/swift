@@ -9,7 +9,7 @@ protocol Fooable {
 class C {}
 class D: C {}
 
-func fooify<T>(x: T) {
+func fooify<T>(_ x: T) {
   if let foo = x as? Fooable {
     foo.foo()
   } else {

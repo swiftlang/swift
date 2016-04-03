@@ -19,7 +19,7 @@ protocol P {
 struct X<T: P> {
 }
 
-func f<T : P>(z: T) {
+func f<T : P>(_ z: T) {
  _ = X<T.A>()
 }
 
@@ -40,7 +40,7 @@ struct Y2 : P2 {
   typealias A = Y2
 }
 
-func f<T : P2>(z: T) {
+func f<T : P2>(_ z: T) {
  _ = X2<T.A>()
 }
 
@@ -59,7 +59,7 @@ struct Y3 : DeclaredP {
 
 struct X3<T:P4> {}
 
-func f2<T:P4>(a: T) {
+func f2<T:P4>(_ a: T) {
  _ = X3<T.A>()
 }
 
@@ -107,7 +107,7 @@ protocol A {
     associatedtype B1: B // expected-error{{type may not reference itself as a requirement}}
     associatedtype C1: C
     
-    mutating func addObserver(observer: B1, forProperty: C1)
+    mutating func addObserver(_ observer: B1, forProperty: C1)
 }
 
 protocol C {
@@ -118,7 +118,7 @@ protocol B {
     associatedtype BA: A // expected-error{{type may not reference itself as a requirement}}
     associatedtype BC: C
     
-    func observeChangeOfProperty(property: BC, observable: BA)
+    func observeChangeOfProperty(_ property: BC, observable: BA)
 }
 
 

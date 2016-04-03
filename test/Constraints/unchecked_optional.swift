@@ -3,8 +3,8 @@
 class A {
   func do_a() {}
 
-  func do_b(x: Int) {}
-  func do_b(x: Float) {}
+  func do_b(_ x: Int) {}
+  func do_b(_ x: Float) {}
 
   func do_c(x x: Int) {}
   func do_c(y y: Int) {} 
@@ -51,12 +51,12 @@ struct Subscriptable {
   }
 }
 
-func test3(x: Subscriptable!) -> Int {
+func test3(_ x: Subscriptable!) -> Int {
   return x[0]
 }
 
 // Callable
-func test4(f: (Int -> Float)!) -> Float {
+func test4(_ f: (Int -> Float)!) -> Float {
   return f(5)
 }
 
@@ -85,8 +85,8 @@ func test10(x : Int?) -> Int! { return test10_helper(x) }
 // Fall back to object type behind an implicitly-unwrapped optional.
 protocol P11 { }
 extension Int : P11 { }
-func test11_helper<T : P11>(t: T) { }
-func test11(i: Int!, j: Int!) {
+func test11_helper<T : P11>(_ t: T) { }
+func test11(_ i: Int!, j: Int!) {
   var j = j
   test11_helper(i)
   test11_helper(j)

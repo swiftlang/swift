@@ -39,14 +39,14 @@ deprecatedFunctionWithoutMessage() // expected-warning{{'deprecatedFunctionWitho
               message: "Use BetterClass instead")
 class DeprecatedClass { }
 
-func functionWithDeprecatedParameter(p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in watchOS 2.0: Use BetterClass instead}}
+func functionWithDeprecatedParameter(_ p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in watchOS 2.0: Use BetterClass instead}}
 
 @available(watchOS, introduced: 2.0, deprecated: 4.0,
               message: "Use BetterClass instead")
 class DeprecatedClassIn3_0 { }
 
 // Elements deprecated later than the minimum deployment target (which is 2.0, in this case) should not generate warnings
-func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn3_0) { }
+func functionWithDeprecatedLaterParameter(_ p: DeprecatedClassIn3_0) { }
 
 // Treat watchOS as distinct from iOS in availability queries
 

@@ -54,7 +54,7 @@ func test001() {
 
 // RUN: %complete-test -tok=B_INSTANCE_0 %s | FileCheck -check-prefix=B_INSTANCE_0_ALL %s
 // RUN: %complete-test -tok=B_INSTANCE_0 %s -limit=1 | FileCheck -check-prefix=B_INSTANCE_0_1 %s
-func test002(x: B) {
+func test002(_ x: B) {
   x.#^B_INSTANCE_0^#
 
 // B_INSTANCE_0_ALL: a
@@ -76,7 +76,7 @@ struct C {
 
 // RUN: %complete-test -tok=C_INSTANCE_0 %s | FileCheck -check-prefix=C_INSTANCE_0_ALL %s
 // RUN: %complete-test -tok=C_INSTANCE_0 %s -limit=1 | FileCheck -check-prefix=C_INSTANCE_0_1 %s
-func test003(x: C) {
+func test003(_ x: C) {
   x.#^C_INSTANCE_0,aa^#
 
 // C_INSTANCE_0_ALL: aaa
@@ -89,15 +89,15 @@ func test003(x: C) {
 }
 
 struct D {
-  func aaa(x: A) {}
-  func aaa(x: B) {}
+  func aaa(_ x: A) {}
+  func aaa(_ x: B) {}
   func aab() {}
 }
 
 // RUN: %complete-test -group=overloads -tok=D_INSTANCE_0 %s | FileCheck -check-prefix=OVERLOADS_ALL %s
 // RUN: %complete-test -group=overloads -tok=D_INSTANCE_0 %s -limit=1 | FileCheck -check-prefix=OVERLOADS_1 %s
 // RUN: %complete-test -group=overloads -tok=D_INSTANCE_0 %s -start=1 -limit=1 | FileCheck -check-prefix=OVERLOADS_11 %s
-func test003(x: D) {
+func test003(_ x: D) {
   x.#^D_INSTANCE_0^#
 
 // OVERLOADS_ALL: aaa:

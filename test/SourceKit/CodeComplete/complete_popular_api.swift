@@ -1,4 +1,4 @@
-func test(x: Foo) {
+func test(_ x: Foo) {
   
   x.
 }
@@ -67,7 +67,7 @@ struct OuterNominal {
   class Derived : Super {
     var fromDerivedColor: Int = 0
 
-    func test(argColor: Int) {
+    func test(_ argColor: Int) {
       let localColor = 1
       #^POPULAR_STMT_0,,col^#
 // POPULAR_STMT_0-LABEL: Results for filterText: [

@@ -14,7 +14,7 @@ class C {
 }()
 }
 
-func foo1(a: Int, handler : () -> ()) {}
+func foo1(_ a: Int, handler : () -> ()) {}
 func foo2(handler : () -> ()) {}
 
 func foo3() {

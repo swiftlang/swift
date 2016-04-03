@@ -23,11 +23,11 @@ import Foundation
 // CHECK-NEXT: - (enum ObjcEnumNamed)takeAndReturnRenamedEnum:(enum ObjcEnumNamed)foo;
 // CHECK: @end
 @objc class AnEnumMethod {
-  @objc func takeAndReturnEnum(foo: FooComments) -> NegativeValues {
+  @objc func takeAndReturnEnum(_ foo: FooComments) -> NegativeValues {
     return .Zung
   }
-  @objc func acceptPlainEnum(_: NSMalformedEnumMissingTypedef) {}
-  @objc func takeAndReturnRenamedEnum(foo: EnumNamed) -> EnumNamed {
+  @objc func acceptPlainEnum(_ _: NSMalformedEnumMissingTypedef) {}
+  @objc func takeAndReturnRenamedEnum(_ foo: EnumNamed) -> EnumNamed {
     return .A
   }
 }
@@ -125,7 +125,7 @@ import Foundation
 // CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
 // CHECK: @end
 @objc class ZEnumMethod {
-  @objc func takeAndReturnEnum(foo: FooComments) -> NegativeValues {
+  @objc func takeAndReturnEnum(_ foo: FooComments) -> NegativeValues {
     return .Zung
   }
 }

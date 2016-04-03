@@ -40,7 +40,7 @@ func callUnavailableObjC() {
 
 // Declarations with Objective-C-originated potentially unavailable APIs
 
-func functionWithObjCParam(o: NSAvailableOn10_51) { // expected-error {{'NSAvailableOn10_51' is only available on OS X 10.51 or newer}}
+func functionWithObjCParam(_ o: NSAvailableOn10_51) { // expected-error {{'NSAvailableOn10_51' is only available on OS X 10.51 or newer}}
     // expected-note@-1 {{add @available attribute to enclosing global function}}
 }
 
@@ -73,7 +73,7 @@ let _: NSEnumWithUnavailableElement = .third // expected-error {{'third' is only
 
 // Differing availability on getters and setters imported from ObjC.
 
-func gettersAndSettersFromObjC(o: NSAvailableOn10_9) {
+func gettersAndSettersFromObjC(_ o: NSAvailableOn10_9) {
   let _: Int = o.propertyOn10_51WithSetterOn10_52After  // expected-error {{'propertyOn10_51WithSetterOn10_52After' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
@@ -176,13 +176,13 @@ class UserClass : UnannotatedFrameworkProtocol {
   }
 }
 
-func callViaUnannotatedFrameworkProtocol(p: UnannotatedFrameworkProtocol) {
+func callViaUnannotatedFrameworkProtocol(_ p: UnannotatedFrameworkProtocol) {
   let _ = p.returnSomething() // expected-error {{'returnSomething()' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
 }
 
-func callViaAnnotatedFrameworkProtocol(p: AnnotatedFrameworkProtocol) {
+func callViaAnnotatedFrameworkProtocol(_ p: AnnotatedFrameworkProtocol) {
   // We won't synthesize availability for AnnotatedFrameworkProtocol because
   // the protocol has an availability annotation on it.
   let _ = p.returnSomething()

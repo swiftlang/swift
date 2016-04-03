@@ -39,14 +39,14 @@ deprecatedFunctionWithoutMessage() // expected-warning{{'deprecatedFunctionWitho
               message: "Use BetterClass instead")
 class DeprecatedClass { }
 
-func functionWithDeprecatedParameter(p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in tvOS 9.0: Use BetterClass instead}}
+func functionWithDeprecatedParameter(_ p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in tvOS 9.0: Use BetterClass instead}}
 
 @available(tvOS, introduced: 7.0, deprecated: 10.0,
               message: "Use BetterClass instead")
 class DeprecatedClassIn8_0 { }
 
 // Elements deprecated later than the minimum deployment target (which is 9.0, in this case) should not generate warnings
-func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn8_0) { }
+func functionWithDeprecatedLaterParameter(_ p: DeprecatedClassIn8_0) { }
 
 // Treat tvOS as distinct from iOS in availability queries
 

@@ -125,7 +125,7 @@ func baz(y : AnyObject?) {
 // CHECK-NEXT:  %2 = unchecked_trivial_bit_cast %0 : $Optional<Int> to $ImplicitlyUnwrappedOptional<Int>
 // CHECK-NEXT:  return %2 : $ImplicitlyUnwrappedOptional<Int>
 // CHECK-NEXT:}
-func opt_to_opt_trivial(x: Int?) -> Int! {
+func opt_to_opt_trivial(_ x: Int?) -> Int! {
   return x
 }
 

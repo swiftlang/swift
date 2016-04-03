@@ -118,7 +118,7 @@ func ov_fn_result() -> Double {}
 func ov_fn_result2() -> (Int) -> (Int) -> Int {}
 func ov_fn_result2() -> (Int) -> (a_struct) -> Int {}
 
-func overloadtest(x: Int) {
+func overloadtest(_ x: Int) {
   var _ : Int = ((ov_fn_result))()
   var _ : Double = ((ov_fn_result))()
 

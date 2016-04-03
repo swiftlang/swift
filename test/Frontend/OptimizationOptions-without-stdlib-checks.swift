@@ -12,19 +12,19 @@ func test_assert() (x: Int, y: Int) -> Int {
   return x + y
 }
 
-func test_fatal(x: Int, y: Int) -> Int {
+func test_fatal(_ x: Int, y: Int) -> Int {
   if x > y {
     return x + y
   }
   _preconditionFailure("Human nature ...")
 }
 
-func test_precondition_check(x: Int, y: Int) -> Int {
+func test_precondition_check(_ x: Int, y: Int) -> Int {
   _precondition(x > y, "test precondition check")
   return x + y
 }
 
-func test_partial_safety_check(x: Int, y: Int) -> Int {
+func test_partial_safety_check(_ x: Int, y: Int) -> Int {
   _debugPrecondition(x > y, "test partial safety check")
   return x + y
 }

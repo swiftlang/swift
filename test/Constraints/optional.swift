@@ -2,19 +2,19 @@
 
 // REQUIRES: objc_interop
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 class A {
   @objc func do_a() {}
 
-  @objc(do_b_2:) func do_b(x: Int) {}
-  @objc func do_b(x: Float) {}
+  @objc(do_b_2:) func do_b(_ x: Int) {}
+  @objc func do_b(_ x: Float) {}
 
   @objc func do_c(x x: Int) {}
   @objc func do_c(y y: Int) {}
 }
 
-func test0(a: AnyObject) {
+func test0(_ a: AnyObject) {
   a.do_a?()
 
   a.do_b?(1)
@@ -24,7 +24,7 @@ func test0(a: AnyObject) {
   a.do_c?(x: 1)
 }
 
-func test1(a: A) {
+func test1(_ a: A) {
   a?.do_a() // expected-error {{cannot use optional chaining on non-optional value of type 'A'}} {{4-5=}}
   a!.do_a() // expected-error {{cannot force unwrap value of non-optional type 'A'}} {{4-5=}}
   // Produce a specialized diagnostic here?
@@ -33,7 +33,7 @@ func test1(a: A) {
 
 // <rdar://problem/15508756>
 extension Optional {
-  func bind<U>(f: Wrapped -> U?) -> U? {
+  func bind<U>(_ f: Wrapped -> U?) -> U? {
     switch self {
     case .some(let x):
       return f(x)
@@ -81,10 +81,10 @@ func test8(x : AnyObject?) {
 
 
 // Partial ordering with optionals
-func test9_helper<T>(x: T) -> Int { }
-func test9_helper<T>(x: T?) -> Double { }
+func test9_helper<T>(_ x: T) -> Int { }
+func test9_helper<T>(_ x: T?) -> Double { }
 
-func test9(i: Int, io: Int?) {
+func test9(_ i: Int, io: Int?) {
   let result = test9_helper(i)
   var _: Int = result
   let result2 = test9_helper(io)
@@ -93,12 +93,12 @@ func test9(i: Int, io: Int?) {
 
 protocol P { }
 
-func test10_helper<T : P>(x: T) -> Int { }
-func test10_helper<T : P>(x: T?) -> Double { }
+func test10_helper<T : P>(_ x: T) -> Int { }
+func test10_helper<T : P>(_ x: T?) -> Double { }
 
 extension Int : P { }
 
-func test10(i: Int, io: Int?) {
+func test10(_ i: Int, io: Int?) {
   let result = test10_helper(i)
   var _: Int = result
 
@@ -111,7 +111,7 @@ z = z ?? 3
 
 var fo: Float? = 3.14159
 
-func voidOptional(handler: () -> ()?) {}
+func voidOptional(_ handler: () -> ()?) {}
 func testVoidOptional() {
   let noop: () -> Void = {}
   voidOptional(noop)

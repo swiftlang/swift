@@ -1,7 +1,7 @@
 
 class C1 {
   init(passInt: Int, andThis: Float) {}
-  func meth(x: Int, passFloat: Float) {}
+  func meth(_ x: Int, passFloat: Float) {}
 }
 var c1 = C1(passInt: 0, andThis: 0)
 c1.meth(0, passFloat: 0)

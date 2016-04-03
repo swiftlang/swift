@@ -24,7 +24,7 @@ class A {
   class func mixed2(z z: Z) -> Y { }
 }
 
-func test_method_overload(a: A, x: X, y: Y) {
+func test_method_overload(_ a: A, x: X, y: Y) {
   var x1 = a.f(x: x)
   x1 = x
   _ = x1
@@ -34,18 +34,18 @@ func test_method_overload(a: A, x: X, y: Y) {
   _ = y1
 }
 
-func test_method_overload_coerce(a: A, x: inout X, y: inout Y, z: Z) {
+func test_method_overload_coerce(_ a: A, x: inout X, y: inout Y, z: Z) {
   var fail = a.g(z: z) // expected-error{{ambiguous use of 'g(z:)'}}
   x = a.g(z: z)
   y = a.g(z: z)
 }
 
-func test_method_value_coerce(a: A) {
+func test_method_value_coerce(_ a: A) {
   var _ : (X) -> X = a.f
   var _ : (A) -> (X) -> X = A.f
 }
 
-func test_static_method_overload(a: A, x: X, y: Y) {
+func test_static_method_overload(_ a: A, x: X, y: Y) {
   var x1 = A.sf(x: x)
   x1 = x
   _ = x1
@@ -55,18 +55,18 @@ func test_static_method_overload(a: A, x: X, y: Y) {
   _ = y1
 }
 
-func test_static_method_overload_coerce(a: A, x: inout X, y: inout Y, z: Z) {
+func test_static_method_overload_coerce(_ a: A, x: inout X, y: inout Y, z: Z) {
   var fail = A.sg(z: z) // expected-error{{ambiguous use of 'sg(z:)'}}
   x = A.sg(z: z)
   y = A.sg(z: z)
 }
 
-func test_static_method_value_coerce(a: A) {
+func test_static_method_value_coerce(_ a: A) {
   var _ : (X) -> X = A.sf
   var _ : (Y) -> Y = A.sf
 }
 
-func test_mixed_overload(a: A, x: X, y: Y) {
+func test_mixed_overload(_ a: A, x: X, y: Y) {
   var x1 = a.mixed(x: x)
   x1 = x
   var y1 = a.mixed(y: y) // expected-error{{incorrect argument label in call (have 'y:', expected 'x:')}}
@@ -78,7 +78,7 @@ func test_mixed_overload(a: A, x: X, y: Y) {
   y2 = y
 }
 
-func test_mixed_overload_coerce(a: A, x: inout X, y: Y, z: Z) {
+func test_mixed_overload_coerce(_ a: A, x: inout X, y: Y, z: Z) {
   a.mixed2(z: z)
   var y1 = A.mixed2(z: z)
   y1 = y
@@ -86,7 +86,7 @@ func test_mixed_overload_coerce(a: A, x: inout X, y: Y, z: Z) {
   x = a.mixed2(z: z)
 }
 
-func test_mixed_method_value_coerce(a: A) {
+func test_mixed_method_value_coerce(_ a: A) {
   var _ : (X) -> X = a.mixed
   var _ : (Y) -> Y = A.mixed
   var _ : (Y) -> Y = a.mixed; // expected-error{{cannot convert value of type '(x: X) -> X' to specified type '(Y) -> Y'}}

@@ -14,7 +14,7 @@ class A : P1 {
 
 func doFoo() {}
 
-func test_coercion(a: A, b: B) {
+func test_coercion(_ a: A, b: B) {
   // Coercion to a protocol type
   let x = a as P1
   x.foo()
@@ -28,7 +28,7 @@ class C : B { }
 class D : C { }
 
 
-func prefer_coercion(c: inout C) {
+func prefer_coercion(_ c: inout C) {
   let d = c as! D
   c = d
 }
@@ -39,7 +39,7 @@ var i8 = -1 as Int8
 
 // Coerce to a superclass with generic parameter inference
 class C1<T> { 
-  func f(x: T) { }
+  func f(_ x: T) { }
 }
 class C2<T> : C1<Int> { }
 

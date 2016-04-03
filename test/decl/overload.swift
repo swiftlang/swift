@@ -115,16 +115,16 @@ let mixed_redecl13: Int = 0 // expected-note {{previously declared here}}
 var mixed_redecl13: Int // expected-error {{invalid redeclaration}}
 
 var mixed_redecl14 : Int
-func mixed_redecl14(i: Int) {} // okay
+func mixed_redecl14(_ i: Int) {} // okay
 
-func mixed_redecl15(i: Int) {}
+func mixed_redecl15(_ i: Int) {}
 var mixed_redecl15 : Int  // okay
 
 class OverloadStaticFromBase {
   class func create() {}
 }
 class OverloadStaticFromBase_Derived : OverloadStaticFromBase {
-  class func create(x: Int) {}
+  class func create(_ x: Int) {}
 }
 
 
@@ -139,11 +139,11 @@ protocol P2 { }
 func ovl_generic1<T: protocol<P1, P2>>(t t: T) { } // expected-note{{previous}}
 func ovl_generic1<U: protocol<P1, P2>>(t t: U) { } // expected-error{{invalid redeclaration of 'ovl_generic1(t:)'}}
 
-func ovl_generic2<T : P1>(_: T) {} // expected-note{{previously declared here}}
-func ovl_generic2<T : P1>(_: T) {} // expected-error{{invalid redeclaration of 'ovl_generic2'}}
+func ovl_generic2<T : P1>(_ _: T) {} // expected-note{{previously declared here}}
+func ovl_generic2<T : P1>(_ _: T) {} // expected-error{{invalid redeclaration of 'ovl_generic2'}}
 
-func ovl_generic3<T : P1>(x: T) {} // OK
-func ovl_generic3<T : P2>(x: T) {} // OK
+func ovl_generic3<T : P1>(_ x: T) {} // OK
+func ovl_generic3<T : P2>(_ x: T) {} // OK
 
 // Redeclarations within nominal types
 struct X { }
@@ -231,8 +231,8 @@ func throwsFunc(code code: Int) { } // expected-note{{previously declared}}
 @noreturn func throwsFunc(code code: Int) throws { } // expected-error{{invalid redeclaration of 'throwsFunc(code:)'}}
 
 // throws function parameter -- OK
-func throwsFuncParam(fn: () throws -> ()) { }
-func throwsFuncParam(fn: () -> ()) { }
+func throwsFuncParam(_ fn: () throws -> ()) { }
+func throwsFuncParam(_ fn: () -> ()) { }
 
 // @noreturn
 func noreturn(code code: Int) { } // expected-note{{previously declared}}
@@ -269,8 +269,8 @@ protocol ProtocolWithMutating {
   mutating func test1() // expected-note {{previously declared}}
   func test1() // expected-error{{invalid redeclaration of 'test1()'}}
 
-  mutating func test2(a: Int?) // expected-note {{previously declared}}
-  func test2(a: Int!) // expected-error{{invalid redeclaration of 'test2'}}
+  mutating func test2(_ a: Int?) // expected-note {{previously declared}}
+  func test2(_ a: Int!) // expected-error{{invalid redeclaration of 'test2'}}
 
   @noreturn
   mutating func test3() // expected-note {{previously declared}}
@@ -284,8 +284,8 @@ struct StructWithMutating {
   mutating func test1() { } // expected-note {{previously declared}}
   func test1() { } // expected-error{{invalid redeclaration of 'test1()'}}
 
-  mutating func test2(a: Int?) { } // expected-note {{previously declared}}
-  func test2(a: Int!) { } // expected-error{{invalid redeclaration of 'test2'}}
+  mutating func test2(_ a: Int?) { } // expected-note {{previously declared}}
+  func test2(_ a: Int!) { } // expected-error{{invalid redeclaration of 'test2'}}
 
   @noreturn
   mutating func test3() { } // expected-note {{previously declared}}

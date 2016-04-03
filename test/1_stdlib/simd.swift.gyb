@@ -58,7 +58,7 @@ func same(_ x: ${mattype}, _ y: ${mattype}) -> Bool {
 
 
 /*
-func same<M: SIMDMatrixType>(x:M, _ y:M) -> Bool {
+func same<M: SIMDMatrixType>(_ x:M, _ y:M) -> Bool {
   for i in 0 ..< x.columns {
     if (!same(x[i], y[i])) { return false }
   }

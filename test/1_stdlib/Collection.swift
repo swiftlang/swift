@@ -87,7 +87,7 @@ func isPalindrome0<
   where
   S.Index : BidirectionalIndex,
   S.Iterator.Element : Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
   typealias Index = S.Index
 
   let a = seq.indices
@@ -112,7 +112,7 @@ func isPalindrome1<
   where
   S.Index : BidirectionalIndex,
   S.Iterator.Element : Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
 
   var a = PermutationGenerator(elements: seq, indices: seq.indices)
   var b = seq.lazy.reversed().makeIterator()
@@ -130,7 +130,7 @@ func isPalindrome1_5<
   S.Index: BidirectionalIndex,
   S.Iterator.Element == S.Iterator.Element,
   S.Iterator.Element: Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
 
   var b = seq.lazy.reversed().makeIterator()
   for nextChar in seq {
@@ -158,7 +158,7 @@ func isPalindrome2<
   where
   S.Index : BidirectionalIndex,
   S.Iterator.Element: Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
 
   var b = seq.startIndex, e = seq.endIndex
 
@@ -192,7 +192,7 @@ func isPalindrome4<
   where
   S.Index : BidirectionalIndex,
   S.Iterator.Element : Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
   typealias Index = S.Index
 
   var a = PermutationGenerator(elements: seq, indices: seq.indices)

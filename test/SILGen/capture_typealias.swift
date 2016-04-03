@@ -4,7 +4,7 @@ typealias Int = Builtin.Int64
 
 var zero: Int
 
-func call(f: () -> Int) -> Int {
+func call(_ f: () -> Int) -> Int {
   return f()
 }
 

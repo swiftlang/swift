@@ -37,7 +37,7 @@ numberBehavior = .behavior10_4
 var postingStyle: NSPostingStyle = .postWhenIdle
 postingStyle = .postASAP
 
-func handler(formatter: NSByteCountFormatter) {
+func handler(_ formatter: NSByteCountFormatter) {
 	// Ensure that the Equality protocol is properly added to an
 	// imported ObjC enum type before the type is referenced by name
     if (formatter.countStyle == .file) {}

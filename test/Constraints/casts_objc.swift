@@ -7,7 +7,7 @@ struct NotClass {}
 
 class SomeClass {}
 
-func nsobject_as_class_cast<T>(x: NSObject, _: T) {
+func nsobject_as_class_cast<T>(_ x: NSObject, _: T) {
   let _ = x is AnyObject.Type
   let _ = x as! AnyObject.Type
   let _ = x as? AnyObject.Type

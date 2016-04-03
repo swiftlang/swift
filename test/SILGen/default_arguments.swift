@@ -37,7 +37,7 @@ func testDefaultArg1() {
   defarg1(d:3.125)
 }
 
-func defarg2(i: Int, d: Double = 3.125, s: String = "Hello") { }
+func defarg2(_ i: Int, d: Double = 3.125, s: String = "Hello") { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments15testDefaultArg2
 func testDefaultArg2() {
@@ -86,7 +86,7 @@ func testMagicLiterals(file file: String = #file,
 // CHECK-LABEL: sil hidden @_TIF17default_arguments17testMagicLiteralsFT4fileSS8functionSS4lineSi6columnSi_T_A2_
 // CHECK: integer_literal $Builtin.Int2048, 0
 
-func closure(_: () -> ()) {}
+func closure(_ _: () -> ()) {}
 func autoclosure(@autoclosure _: () -> ()) {}
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments25testCallWithMagicLiteralsFT_T_
@@ -147,13 +147,13 @@ autoclosure(testMagicLiterals())
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments16testSelectorCallFTSi17withMagicLiteralsSi_T_
 // CHECK:         string_literal utf16 "testSelectorCall(_:withMagicLiterals:)"
-func testSelectorCall(x: Int, withMagicLiterals y: Int) {
+func testSelectorCall(_ x: Int, withMagicLiterals y: Int) {
   testMagicLiterals()
 }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments32testSelectorCallWithUnnamedPieceFTSiSi_T_
 // CHECK:         string_literal utf16 "testSelectorCallWithUnnamedPiece"
-func testSelectorCallWithUnnamedPiece(x: Int, _ y: Int) {
+func testSelectorCallWithUnnamedPiece(_ x: Int, _ y: Int) {
   testMagicLiterals()
 }
 
@@ -179,17 +179,17 @@ func testSubDefArg() -> SubDefArg {
 // CHECK-NOT: sil hidden @_TIFC17default_arguments9SubDefArgcFT3intSi_S0_A_ : $@convention(thin) () -> Int
 
 // <rdar://problem/17379550>
-func takeDefaultArgUnnamed(x: Int = 5) { }
+func takeDefaultArgUnnamed(_ x: Int = 5) { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments25testTakeDefaultArgUnnamed
-func testTakeDefaultArgUnnamed(i: Int) {
+func testTakeDefaultArgUnnamed(_ i: Int) {
   // CHECK: bb0([[I:%[0-9]+]] : $Int):
   // CHECK:   [[FN:%[0-9]+]] = function_ref @_TF17default_arguments21takeDefaultArgUnnamedFTSi_T_ : $@convention(thin) (Int) -> ()
   // CHECK:   apply [[FN]]([[I]]) : $@convention(thin) (Int) -> ()
   takeDefaultArgUnnamed(i)
 }
 
-func takeDSOHandle(handle: UnsafeMutablePointer<Void> = #dsohandle) { }
+func takeDSOHandle(_ handle: UnsafeMutablePointer<Void> = #dsohandle) { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments13testDSOHandleFT_T_
 func testDSOHandle() {
@@ -234,13 +234,13 @@ func testDefaultArgumentReabstraction() {
 // <rdar://problem/20494437> SILGen crash handling default arguments
 protocol r20494437ExecutionContext {}
 let r20494437Default: r20494437ExecutionContext
-func r20494437onComplete(executionContext: r20494437ExecutionContext = r20494437Default) {}
-func r20494437onSuccess(a: r20494437ExecutionContext) {
+func r20494437onComplete(_ executionContext: r20494437ExecutionContext = r20494437Default) {}
+func r20494437onSuccess(_ a: r20494437ExecutionContext) {
   r20494437onComplete(a)
 }
 
 // <rdar://problem/18400194> Parenthesized function expression crashes the compiler
-func r18400194(a: Int, x: Int = 97) {}
+func r18400194(_ a: Int, x: Int = 97) {}
 
 // CHECK-LABEL: sil hidden @_TIF17default_arguments9r18400194FTSi1xSi_T_A0_
 // CHECK: integer_literal $Builtin.Int2048, 97
@@ -257,7 +257,7 @@ func test_r18400194() {
 //   Don't add capture arguments to local default argument generators.
 func localFunctionWithDefaultArg() {
   var z = 5
-  func bar(x: Int? = nil) {
+  func bar(_ x: Int? = nil) {
     z += 1
   }
   bar()

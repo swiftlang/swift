@@ -41,7 +41,7 @@ public typealias VoidPairTuple = ((), ())
 public struct GenericCtor<U> {
   public init<T>(_ t : T) {}
 
-  public func doSomething<T>(t: T) {}
+  public func doSomething<T>(_ t: T) {}
 }
 
 // Protocols

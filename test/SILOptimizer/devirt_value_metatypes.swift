@@ -18,7 +18,7 @@ class B: A {
 // CHECK: checked_cast_br
 // CHECK: class_method
 // CHECK: }
-public func testValueMetatype(x:A) {
+public func testValueMetatype(_ x:A) {
     x.dynamicType.foo()
 }
 
@@ -41,7 +41,7 @@ public class D : C {
 // CHECK-NOT: checked_cast_br
 // CHECK-NOT: class_method
 // CHECK: }
-public func testD(x: D) -> Int {
+public func testD(_ x: D) -> Int {
   return (x.dynamicType as C.Type).foo()
 }
 
@@ -57,6 +57,6 @@ public final class E : C {
 // CHECK: function_ref
 // CHECK: apply
 // CHECK: return
-public func testE(x: E) -> Int {
+public func testE(_ x: E) -> Int {
   return (x.dynamicType as C.Type).foo()
 }

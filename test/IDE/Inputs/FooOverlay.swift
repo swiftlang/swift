@@ -3,6 +3,6 @@
 @_exported import func Foo.FooSub.fooSubFunc1 // scoped, from submodule
 @_exported import struct Foo.FooStruct1 // scoped, from top-level module
 
-func fooSubOverlayFunc1(x: Int32) -> Int32 {
+func fooSubOverlayFunc1(_ x: Int32) -> Int32 {
   return fooSubFunc1(x)
 }

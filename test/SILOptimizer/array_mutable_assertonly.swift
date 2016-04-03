@@ -17,7 +17,7 @@
 // TEST1: Hoisting make_mutable
 // TEST1: COW Array Opts
 
-func inoutarr(a: inout [Int]) {
+func inoutarr(_ a: inout [Int]) {
   for i in 0..<a.count {
     a[i] = 0
   }
@@ -30,7 +30,7 @@ struct S {
 // TEST2-LABEL: COW Array Opts in Func {{.*}}arrelt{{.*}}
 // TEST2: Hoisting make_mutable
 // TEST2: COW Array Opts
-func arrelt(s: inout S) {
+func arrelt(_ s: inout S) {
   for i in 0..<s.a.count {
     s.a[i] = 0
   }
@@ -93,7 +93,7 @@ struct Array2d {
 // TEST6:        Hoisting make_mutable
 // TEST6:   COW Array Opts in
 
-func test2DArrayLoop(A: inout Array2d) {
+func test2DArrayLoop(_ A: inout Array2d) {
   for r in 0 ..< A.rows {
     for c in 0 ..< A.cols {
       A.A[r*A.cols+c] += 1
@@ -106,7 +106,7 @@ class AClass {}
 // TEST7-LABEL: COW Array Opts in Func {{.*}}hoistArrayOfClasses{{.*}}
 // TEST7: Hoisting make_mutable
 // TEST7: COW Array Opts
-func hoistArrayOfClasses(A: inout [AClass], x: AClass) {
+func hoistArrayOfClasses(_ A: inout [AClass], x: AClass) {
   for i in 0 ..< A.count {
     A[i] = x
   }
@@ -116,14 +116,14 @@ func hoistArrayOfClasses(A: inout [AClass], x: AClass) {
 // TEST8: Hoisting make_mutable
 // TEST8: COW Array Opts
 
-func hoistMutableOfAppend(A: inout [Int]) {
+func hoistMutableOfAppend(_ A: inout [Int]) {
   for i in 0 ..< 10 {
     A.append(i)
   }
 }
 
 @inline(never)
-func use(a: [Int]) {
+func use(_ a: [Int]) {
 }
 
 class ArrayHolder {
@@ -189,7 +189,7 @@ class ArrayHolder {
 // TEST13: Hoisting make_mutable
 // TEST13: COW Array Opts
 
-func hoist2DArray(a: inout [[Int]]) {
+func hoist2DArray(_ a: inout [[Int]]) {
   for i in 0 ..< a.count {
     for y in 0 ..< a[i].count {
       a[i][y] = a[i][y] * 2

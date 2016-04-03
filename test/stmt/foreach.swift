@@ -4,7 +4,7 @@
 struct BadContainer1 {
 }
 
-func bad_containers_1(bc: BadContainer1) {
+func bad_containers_1(_ bc: BadContainer1) {
   for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'Sequence'}}
 }
 
@@ -12,7 +12,7 @@ struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does n
   var generate : Int
 }
 
-func bad_containers_2(bc: BadContainer2) {
+func bad_containers_2(_ bc: BadContainer2) {
   for e in bc { }
 }
 
@@ -20,7 +20,7 @@ struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does n
   func makeIterator() { } // expected-note{{inferred type '()' (by matching requirement 'makeIterator()') is invalid: does not conform to 'IteratorProtocol'}}
 }
 
-func bad_containers_3(bc: BadContainer3) {
+func bad_containers_3(_ bc: BadContainer3) {
   for e in bc { }
 }
 
@@ -31,7 +31,7 @@ struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does n
   func makeIterator() -> BadIterator1 { }
 }
 
-func bad_containers_4(bc: BadContainer4) {
+func bad_containers_4(_ bc: BadContainer4) {
   for e in bc { }
 }
 
@@ -53,7 +53,7 @@ struct GoodTupleIterator: Sequence, IteratorProtocol {
   func makeIterator() -> GoodTupleIterator {}
 }
 
-func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
+func patterns(_ gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   var sum : Int
   var sumf : Float
   for i : Int in gir { sum = sum + i }
@@ -75,7 +75,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   for (i, f) in gtr {}
 }
 
-func slices(i_s: [Int], ias: [[Int]]) {
+func slices(_ i_s: [Int], ias: [[Int]]) {
   var sum = 0
   for i in i_s { sum = sum + i }
 

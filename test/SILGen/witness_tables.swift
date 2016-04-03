@@ -33,7 +33,7 @@ protocol AnyProtocol {
 
   static func staticMethod(x x: Self)
 
-  func <~>(x: Self, y: Self)
+  func <~>(_ x: Self, y: Self)
 }
 
 protocol ClassProtocol : class {
@@ -47,7 +47,7 @@ protocol ClassProtocol : class {
 
   static func staticMethod(x x: Self)
 
-  func <~>(x: Self, y: Self)
+  func <~>(_ x: Self, y: Self)
 }
 
 @objc protocol ObjCProtocol {
@@ -78,7 +78,7 @@ struct ConformingStruct : AnyProtocol {
 
   static func staticMethod(x x: ConformingStruct) {}
 }
-func <~>(x: ConformingStruct, y: ConformingStruct) {}
+func <~>(_ x: ConformingStruct, y: ConformingStruct) {}
 // TABLE-LABEL: sil_witness_table hidden ConformingStruct: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -115,7 +115,7 @@ struct ConformingAddressOnlyStruct : AnyProtocol {
 
   static func staticMethod(x x: ConformingAddressOnlyStruct) {}
 }
-func <~>(x: ConformingAddressOnlyStruct, y: ConformingAddressOnlyStruct) {}
+func <~>(_ x: ConformingAddressOnlyStruct, y: ConformingAddressOnlyStruct) {}
 // TABLE-LABEL: sil_witness_table hidden ConformingAddressOnlyStruct: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -143,7 +143,7 @@ class ConformingClass : AnyProtocol {
 
   class func staticMethod(x x: ConformingClass) {}
 }
-func <~>(x: ConformingClass, y: ConformingClass) {}
+func <~>(_ x: ConformingClass, y: ConformingClass) {}
 // TABLE-LABEL: sil_witness_table hidden ConformingClass: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -172,7 +172,7 @@ extension ConformsByExtension : AnyProtocol {
 
   static func staticMethod(x x: ConformsByExtension) {}
 }
-func <~>(x: ConformsByExtension, y: ConformsByExtension) {}
+func <~>(_ x: ConformsByExtension, y: ConformsByExtension) {}
 // TABLE-LABEL: sil_witness_table hidden ConformsByExtension: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -200,7 +200,7 @@ extension OtherModuleStruct : AnyProtocol {
 
   static func staticMethod(x x: OtherModuleStruct) {}
 }
-func <~>(x: OtherModuleStruct, y: OtherModuleStruct) {}
+func <~>(_ x: OtherModuleStruct, y: OtherModuleStruct) {}
 // TABLE-LABEL: sil_witness_table hidden OtherModuleStruct: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -230,7 +230,7 @@ struct ConformsWithMoreGenericWitnesses : AnyProtocol, OtherProtocol {
 
   static func staticMethod<O>(x x: O) {}
 }
-func <~> <P: OtherProtocol>(x: P, y: P) {}
+func <~> <P: OtherProtocol>(_ x: P, y: P) {}
 // TABLE-LABEL: sil_witness_table hidden ConformsWithMoreGenericWitnesses: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -258,7 +258,7 @@ class ConformingClassToClassProtocol : ClassProtocol {
 
   class func staticMethod(x x: ConformingClassToClassProtocol) {}
 }
-func <~>(x: ConformingClassToClassProtocol,
+func <~>(_ x: ConformingClassToClassProtocol,
          y: ConformingClassToClassProtocol) {}
 // TABLE-LABEL: sil_witness_table hidden ConformingClassToClassProtocol: ClassProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
@@ -293,7 +293,7 @@ struct ConformingGeneric<R: AssocReqt> : AnyProtocol {
 
   static func staticMethod(x x: ConformingGeneric) {}
 }
-func <~> <R: AssocReqt>(x: ConformingGeneric<R>, y: ConformingGeneric<R>) {}
+func <~> <R: AssocReqt>(_ x: ConformingGeneric<R>, y: ConformingGeneric<R>) {}
 // TABLE-LABEL: sil_witness_table hidden <R where R : AssocReqt> ConformingGeneric<R>: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: R
@@ -320,7 +320,7 @@ struct ConformingGenericWithMoreGenericWitnesses<S: AssocReqt>
 
   static func staticMethod<Z>(x x: Z) {}
 }
-func <~> <AA: AnotherProtocol, BB: AnotherProtocol>(x: AA, y: BB) {}
+func <~> <AA: AnotherProtocol, BB: AnotherProtocol>(_ x: AA, y: BB) {}
 // TABLE-LABEL: sil_witness_table hidden <S where S : AssocReqt> ConformingGenericWithMoreGenericWitnesses<S>: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: S
@@ -357,7 +357,7 @@ struct InheritedConformance : InheritedProtocol1 {
 
   func inheritedMethod() {}
 }
-func <~>(x: InheritedConformance, y: InheritedConformance) {}
+func <~>(_ x: InheritedConformance, y: InheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden InheritedConformance: InheritedProtocol1 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: InheritedConformance: AnyProtocol module witness_tables
 // TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables20InheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethod{{.*}}
@@ -386,7 +386,7 @@ struct RedundantInheritedConformance : InheritedProtocol1, AnyProtocol {
 
   func inheritedMethod() {}
 }
-func <~>(x: RedundantInheritedConformance, y: RedundantInheritedConformance) {}
+func <~>(_ x: RedundantInheritedConformance, y: RedundantInheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden RedundantInheritedConformance: InheritedProtocol1 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: RedundantInheritedConformance: AnyProtocol module witness_tables
 // TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethod{{.*}}
@@ -415,7 +415,7 @@ struct DiamondInheritedConformance : InheritedProtocol1, InheritedProtocol2 {
 
   func inheritedMethod() {}
 }
-func <~>(x: DiamondInheritedConformance, y: DiamondInheritedConformance) {}
+func <~>(_ x: DiamondInheritedConformance, y: DiamondInheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: InheritedProtocol1 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: DiamondInheritedConformance: AnyProtocol module witness_tables
 // TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethod{{.*}}
@@ -448,7 +448,7 @@ class ClassInheritedConformance : InheritedClassProtocol {
 
   func inheritedMethod() {}
 }
-func <~>(x: ClassInheritedConformance, y: ClassInheritedConformance) {}
+func <~>(_ x: ClassInheritedConformance, y: ClassInheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden ClassInheritedConformance: InheritedClassProtocol module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: ClassInheritedConformance: AnyProtocol module witness_tables
 // TABLE-NEXT:    method #InheritedClassProtocol.inheritedMethod!1: @_TTWC14witness_tables25ClassInheritedConformanceS_22InheritedClassProtocolS_FS1_15inheritedMethod{{.*}}

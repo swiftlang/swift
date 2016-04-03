@@ -6,5 +6,5 @@
 //CHECK: @_alignment(16) struct Foo {
 @_alignment(16) struct Foo {}
 
-func foo(x: Foo) {}
+func foo(_ x: Foo) {}
 

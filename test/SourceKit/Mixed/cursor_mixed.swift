@@ -10,4 +10,4 @@ func test(b : Base) {
 // CHECK: c:objc(cs)Base(im)doIt:
 // CHECK: Base -> (Int32) -> Void
 // CHECK: Mixed
-// CHECK: <Declaration>func doIt(arg: <Type usr="s:Vs5Int32">Int32</Type>)</Declaration>
+// CHECK: <Declaration>func doIt(_ arg: <Type usr="s:Vs5Int32">Int32</Type>)</Declaration>

@@ -32,6 +32,6 @@ class NonGenericSubclass : GenericSubclass<ConcreteClass> {}
 // NEGATIVE-NOT: rocky
 // CHECK-NEXT: @end
 @objc class TopMoviesOfAllTime {
-  func rambo(c: ConcreteClass) {}
-  func rocky(c: NonGenericSubclass) {}
+  func rambo(_ c: ConcreteClass) {}
+  func rocky(_ c: NonGenericSubclass) {}
 }

@@ -43,7 +43,7 @@ func test001() {
 // TOP_LEVEL_0-NEXT:   FooBar.fooBaz()
 // TOP_LEVEL_0: ]
 
-func test002(abc: FooBar, abd: Base) {
+func test002(_ abc: FooBar, abd: Base) {
   #^TOP_LEVEL_1,ab,abc,abd^#
 }
 // RUN: %complete-test %s -no-fuzz -group=none -add-inner-results -tok=TOP_LEVEL_1 | FileCheck %s -check-prefix=TOP_LEVEL_1
@@ -69,7 +69,7 @@ func test002(abc: FooBar, abd: Base) {
 // TOP_LEVEL_1-NEXT:   abd.base()
 // TOP_LEVEL_1-NEXT: ]
 
-func test003(x: FooBar) {
+func test003(_ x: FooBar) {
   x.#^FOOBAR_QUALIFIED,pro,prop,prop.^#
 }
 // RUN: %complete-test %s -group=none -add-inner-results -tok=FOOBAR_QUALIFIED | FileCheck %s -check-prefix=FOOBAR_QUALIFIED
@@ -120,7 +120,7 @@ func test004() {
 // FOOBAR_POSTFIX_OP: {{^}}.{{$}}
 // FOOBAR_POSTFIX_OP: {{^}}({{$}}
 
-func test005(x: FooBar) {
+func test005(_ x: FooBar) {
   x#^FOOBAR_INSTANCE_POSTFIX^#
 }
 // RUN: %complete-test %s -group=none -no-inner-results -inner-operators -tok=FOOBAR_INSTANCE_POSTFIX | FileCheck %s -check-prefix=FOOBAR_INSTANCE_POSTFIX_OP
@@ -128,7 +128,7 @@ func test005(x: FooBar) {
 // FIXME: We should probably just have '[' here - rdar://22702955
 // FOOBAR_INSTANCE_POSTFIX_OP: [Foo]
 
-func test005(x: Base?) {
+func test005(_ x: Base?) {
   x#^OPTIONAL_POSTFIX^#
 }
 // RUN: %complete-test %s -group=none -no-inner-results -inner-operators -tok=OPTIONAL_POSTFIX | FileCheck %s -check-prefix=OPTIONAL_POSTFIX_OP

@@ -63,7 +63,7 @@ class GenericClass {
 
   // CHECK: [[@LINE+2]]:14 s:ZFC14swift_ide_test12GenericClass9classFuncFS0_T_{{$}}
   // CHECK: [[@LINE+1]]:24 s:vZFC14swift_ide_test12GenericClass9classFuncFS0_T_L_1aS0_{{$}}
-  class func classFunc(a: GenericClass) {}
+  class func classFunc(_ a: GenericClass) {}
 }
 
 // CHECK: [[@LINE+1]]:10 s:P14swift_ide_test4Prot{{$}}
@@ -71,7 +71,7 @@ protocol Prot {
   // CHECK: [[@LINE+1]]:18 s:P14swift_ide_test4Prot5Blarg{{$}}
   associatedtype Blarg
   // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethFwx5BlargwxS1_{{$}}
-  func protMeth(x: Blarg) -> Blarg
+  func protMeth(_ x: Blarg) -> Blarg
   // CHECK: [[@LINE+2]]:7 s:vP14swift_ide_test4Prot17protocolProperty1Si{{$}}
   // CHECK: [[@LINE+1]]:32 s:FP14swift_ide_test4Protg17protocolProperty1Si{{$}}
   var protocolProperty1: Int { get }
@@ -82,7 +82,7 @@ class SubCls : MyCls, Prot {
   // CHECK: [[@LINE+1]]:13 s:C14swift_ide_test6SubCls5Blarg{{$}}
   typealias Blarg = Prot2
   // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test6SubCls8protMethFPS_5Prot2_PS1__{{$}}
-  func protMeth(x: Blarg) -> Blarg {}
+  func protMeth(_ x: Blarg) -> Blarg {}
   // CHECK: [[@LINE+1]]:7 s:vC14swift_ide_test6SubCls17protocolProperty1Si{{$}}
   var protocolProperty1 = 0
 }
@@ -91,7 +91,7 @@ class SubCls : MyCls, Prot {
 func genFn<T : Prot where T.Blarg : Prot2>(p : T) -> Int {}
 
 // CHECK: [[@LINE+1]]:6 s:F14swift_ide_test3barFSiTSiSf_{{$}}
-func bar(x: Int) -> (Int, Float) {}
+func bar(_ x: Int) -> (Int, Float) {}
 
 // CHECK: [[@LINE+1]]:7 s:C14swift_ide_test6GenCls{{$}}
 class GenCls<T> {
@@ -153,9 +153,9 @@ class Observers {
 @objc
 class ObjCClass1 {
   // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test10ObjCClass113instanceFunc1FSiT_{{$}}
-  func instanceFunc1(a: Int) {}
+  func instanceFunc1(_ a: Int) {}
   // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test10ObjCClass111staticFunc1FSiT_{{$}}
-  class func staticFunc1(a: Int) {}
+  class func staticFunc1(_ a: Int) {}
 }
 
 // CHECK: [[@LINE+1]]:6 s:O14swift_ide_test5Suits{{$}}

@@ -46,7 +46,7 @@ class MyCls {
     var www : Int
 
     // CHECK: <kw>func</kw> foo(x: <type>Int</type>) {}
-    func foo(x: Int) {}
+    func foo(_ x: Int) {}
     // CHECK: <kw>var</kw> aaa : <type>Int</type> {
     var aaa : Int {
       // CHECK: <kw>get</kw> {}
@@ -149,7 +149,7 @@ var globComp : Int {
 // CHECK: <comment-block>/* foo is the best */</comment-block>
 /* foo is the best */
 // CHECK: <kw>func</kw> foo(n: <type>Float</type>) -> <type>Int</type> {
-func foo(n: Float) -> Int {
+func foo(_ n: Float) -> Int {
     // CHECK: <kw>var</kw> fnComp : <type>Int</type>
     var fnComp : Int {
       // CHECK: <kw>get</kw> {
@@ -173,7 +173,7 @@ protocol Prot {
   // CHECK: <kw>typealias</kw> Blarg
   typealias Blarg
   // CHECK: <kw>func</kw> protMeth(x: <type>Int</type>)
-  func protMeth(x: Int)
+  func protMeth(_ x: Int)
   // CHECK: <kw>var</kw> protocolProperty1: <type>Int</type> { <kw>get</kw> }
   var protocolProperty1: Int { get }
   // CHECK: <kw>var</kw> protocolProperty2: <type>Int</type> { <kw>get</kw> <kw>set</kw> }
@@ -205,9 +205,9 @@ protocol Prot2 : Prot {}
 class SubCls : MyCls, Prot {}
 
 // CHECK: <kw>func</kw> genFn<T : <type>Prot</type> <kw>where</kw> <type>T</type>.<type>Blarg</type> : <type>Prot2</type>>(<kw>_</kw>: <type>T</type>) -> <type>Int</type> {}{{$}}
-func genFn<T : Prot where T.Blarg : Prot2>(_: T) -> Int {}
+func genFn<T : Prot where T.Blarg : Prot2>(_ _: T) -> Int {}
 
-func f(x: Int) -> Int {
+func f(_ x: Int) -> Int {
   // CHECK: <comment-line>// string interpolation is the best</comment-line>
   // string interpolation is the best
   // CHECK: <str>"This is string </str>\<anchor>(</anchor>genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a})<anchor>)</anchor><str> interpolation"</str>
@@ -215,7 +215,7 @@ func f(x: Int) -> Int {
 }
 
 // CHECK: <kw>func</kw> bar(x: <type>Int</type>) -> (<type>Int</type>, <type>Float</type>) {
-func bar(x: Int) -> (Int, Float) {
+func bar(_ x: Int) -> (Int, Float) {
   // CHECK: foo({{(<type>)?}}Float{{(</type>)?}}())
   foo(Float())
 }
@@ -230,7 +230,7 @@ func test() {
 // CHECK: <kw>typealias</kw> MyInt = <type>Int</type>
 typealias MyInt = Int
 
-func test2(x: Int) {
+func test2(_ x: Int) {
   // CHECK: <str>"</str>\<anchor>(</anchor>x<anchor>)</anchor><str>"</str>
   "\(x)"
 }
@@ -254,7 +254,7 @@ class Observers {
 }
 
 // CHECK: <kw>func</kw> test3(o: <type>AnyObject</type>) {
-func test3(o: AnyObject) {
+func test3(_ o: AnyObject) {
   // CHECK: <kw>let</kw> x = o <kw>as</kw>! <type>MyCls</type>
   let x = o as! MyCls
 }
@@ -267,7 +267,7 @@ func test4(inout a: Int) {
 // CHECK: <kw>class</kw> MySubClass : <type>MyCls</type> {
 class MySubClass : MyCls {
     // CHECK: <attr-builtin>override</attr-builtin> <kw>func</kw> foo(x: <type>Int</type>) {}
-    override func foo(x: Int) {}
+    override func foo(_ x: Int) {}
 
     // CHECK: <attr-builtin>convenience</attr-builtin> <kw>init</kw>(a: <type>Int</type>) {}
     convenience init(a: Int) {}
@@ -328,7 +328,7 @@ func test5() -> Int {
   return 0
 }
 
-func test6<T : Prot>(x: T) {}
+func test6<T : Prot>(_ x: T) {}
 // CHECK: <kw>func</kw> test6<T : <type>Prot</type>>(x: <type>T</type>) {}{{$}}
 
 // http://whatever.com?ee=2&yy=1 and radar://123456
@@ -352,7 +352,7 @@ func <#test1#> () {}
 /// - parameter x: A number
 /// - parameter y: Another number
 /// - returns: `x + y`
-func foo(x: Int, y: Int) -> Int { return x + y }
+func foo(_ x: Int, y: Int) -> Int { return x + y }
 // CHECK: <doc-comment-line>/// Brief.
 // CHECK: </doc-comment-line><doc-comment-line>///
 // CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
@@ -376,7 +376,7 @@ func foo(x: Int, y: Int) -> Int { return x + y }
 /// - NOTE: NOTE2
 ///   - note: Not a Note field (not at top level)
 /// - returns: `x + y`
-func bar(x: Int, y: Int) -> Int { return x + y }
+func bar(_ x: Int, y: Int) -> Int { return x + y }
 // CHECK: <doc-comment-line>/// Brief.
 // CHECK: </doc-comment-line><doc-comment-line>///
 // CHECK: </doc-comment-line><doc-comment-line>/// Simple case.

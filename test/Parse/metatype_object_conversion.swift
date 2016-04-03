@@ -8,7 +8,7 @@ struct S {}
 protocol NonClassProto {}
 protocol ClassConstrainedProto : class {}
 
-func takesAnyObject(x: AnyObject) {}
+func takesAnyObject(_ x: AnyObject) {}
 
 func concreteTypes() {
   takesAnyObject(C.self) 
@@ -17,7 +17,7 @@ func concreteTypes() {
   takesAnyObject(ClassConstrainedProto.self) // expected-error{{argument type 'ClassConstrainedProto.Protocol' does not conform to expected type 'AnyObject'}}
 }
 
-func existentialMetatypes(nonClass: NonClassProto.Type,
+func existentialMetatypes(_ nonClass: NonClassProto.Type,
                           classConstrained: ClassConstrainedProto.Type,
                           compo: protocol<NonClassProto, ClassConstrainedProto>.Type) {
   takesAnyObject(nonClass) // expected-error{{argument type 'NonClassProto.Type' does not conform to expected type 'AnyObject'}}

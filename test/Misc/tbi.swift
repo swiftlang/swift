@@ -11,7 +11,7 @@
 // Verify that TBI is on by default in Swift on targets that support it. For our
 // purposes this means iOS8.0 or later.
 
-func f(i: Int) -> Int8 {
+func f(_ i: Int) -> Int8 {
   let j = i & 0xff_ffff_ffff_ffff
 // TBI-NOT: and
 // NO_TBI: and

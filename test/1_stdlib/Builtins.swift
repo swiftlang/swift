@@ -136,7 +136,7 @@ struct Large : P {
 
 struct ContainsP { var p: P }
 
-func exerciseArrayValueWitnesses<T>(value: T) {
+func exerciseArrayValueWitnesses<T>(_ value: T) {
   let buf = UnsafeMutablePointer<T>(allocatingCapacity: 5)
 
   (buf + 0).initialize(with: value)

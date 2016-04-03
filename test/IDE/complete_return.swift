@@ -18,7 +18,7 @@ class InternalGen {
   func InternalStringGen() -> String { return "" }
   func InternalStringOpGen() -> String? {return ""}
   func InternalIntTaker(i1 : Int, i2 : Int) {}
-  func InternalStringTaker(s1: String, s2 : String) {}
+  func InternalStringTaker(_ s1: String, s2 : String) {}
 }
 
 class Gen {
@@ -28,7 +28,7 @@ class Gen {
   func StringGen() -> String { return "" }
   func StringOpGen() -> String? {return ""}
   func IntTaker(i1 : Int, i2 : Int) {}
-  func StringTaker(s1: String, s2 : String) {}
+  func StringTaker(_ s1: String, s2 : String) {}
 }
 
 func testReturnVoid1() {
@@ -51,7 +51,7 @@ func testReturnInt1() {
 // RETURN_INT_1: End completions
 }
 
-func testReturnInt2(fooObject: FooStruct) {
+func testReturnInt2(_ fooObject: FooStruct) {
   return fooObject.#^RETURN_INT_2^#
 // RETURN_INT_2: Begin completions
 // RETURN_INT_2-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}

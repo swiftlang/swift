@@ -97,7 +97,7 @@ public func testAllocAndUseLet() -> Int32 {
 // DISABLECHECK-NOT: load
 // DISABLECHECK: return
 @inline(never)
-public func testUseLet(a:A0) -> Int32 {
+public func testUseLet(_ a:A0) -> Int32 {
   var counter: Int32
   // a.x and a.y should be loaded only once.
   counter = a.sum2() + a.sum2()
@@ -295,7 +295,7 @@ final public class S3 {
 // DISABLECHECK: load %[[X]]
 // DISABLECHECK-NOT: load %[[X]]
 // DISABLECHECK: return
-public func testLetTuple(s: S3) -> Int32 {
+public func testLetTuple(_ s: S3) -> Int32 {
   var counter: Int32 = 0
   counter += s.x.0
   action()
@@ -318,7 +318,7 @@ public func testLetTuple(s: S3) -> Int32 {
 // CHECK: load %[[X]]
 // CHECK: load %[[X]]
 // CHECK: return
-public func testVarTuple(s: S3) -> Int32 {
+public func testVarTuple(_ s: S3) -> Int32 {
   var counter: Int32 = 0
   counter += s.y.0
   action()

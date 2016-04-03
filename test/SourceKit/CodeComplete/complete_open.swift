@@ -1,5 +1,5 @@
 struct Foo {
-  func advancedFeatures(x: Int) {}
+  func advancedFeatures(_ x: Int) {}
   var bigPower: Int = 0
 }
 func foo() {

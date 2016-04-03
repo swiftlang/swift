@@ -3,7 +3,7 @@ class FooClass1 {
  lazy var lazyVar1 = 0
 }
 
-func lazyInClass1(a: FooClass1) {
+func lazyInClass1(_ a: FooClass1) {
  a.#^LAZY_IN_CLASS_1^#
 }
 

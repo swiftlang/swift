@@ -10,21 +10,21 @@
 
 // stdbool.h uses #define, so this test does as well.
 
-func testCBool(_: Bool) -> Bool
-func testObjCBool(_: Bool) -> Bool
-func testDarwinBoolean(_: Bool) -> Bool
+func testCBool(_ _: Bool) -> Bool
+func testObjCBool(_ _: Bool) -> Bool
+func testDarwinBoolean(_ _: Bool) -> Bool
 
 typealias CBoolTypedef = Bool
 typealias ObjCBoolTypedef = ObjCBool
 typealias DarwinBooleanTypedef = DarwinBoolean
 
-func testCBoolTypedef(_: CBoolTypedef) -> CBoolTypedef
-func testObjCBoolTypedef(_: Bool) -> Bool
-func testDarwinBooleanTypedef(_: Bool) -> Bool
+func testCBoolTypedef(_ _: CBoolTypedef) -> CBoolTypedef
+func testObjCBoolTypedef(_ _: Bool) -> Bool
+func testDarwinBooleanTypedef(_ _: Bool) -> Bool
 
-func testCBoolPointer(_: UnsafeMutablePointer<Bool>) -> UnsafePointer<Bool>
-func testObjCBoolPointer(_: UnsafeMutablePointer<ObjCBool>) -> UnsafePointer<ObjCBool>
-func testDarwinBooleanPointer(_: UnsafeMutablePointer<DarwinBoolean>) -> UnsafePointer<DarwinBoolean>
+func testCBoolPointer(_ _: UnsafeMutablePointer<Bool>) -> UnsafePointer<Bool>
+func testObjCBoolPointer(_ _: UnsafeMutablePointer<ObjCBool>) -> UnsafePointer<ObjCBool>
+func testDarwinBooleanPointer(_ _: UnsafeMutablePointer<DarwinBoolean>) -> UnsafePointer<DarwinBoolean>
 
 typealias CBoolFn = @convention(c) (Bool) -> Bool
 typealias ObjCBoolFn = @convention(c) (ObjCBool) -> ObjCBool
@@ -34,13 +34,13 @@ typealias CBoolBlock = (Bool) -> Bool
 typealias ObjCBoolBlock = (Bool) -> Bool
 typealias DarwinBooleanBlock = (Bool) -> Bool
 
-func testCBoolFnToBlock(_: @convention(c) (Bool) -> Bool) -> (Bool) -> Bool
-func testObjCBoolFnToBlock(_: @convention(c) (ObjCBool) -> ObjCBool) -> (Bool) -> Bool
-func testDarwinBooleanFnToBlock(_: @convention(c) (DarwinBoolean) -> DarwinBoolean) -> (Bool) -> Bool
+func testCBoolFnToBlock(_ _: @convention(c) (Bool) -> Bool) -> (Bool) -> Bool
+func testObjCBoolFnToBlock(_ _: @convention(c) (ObjCBool) -> ObjCBool) -> (Bool) -> Bool
+func testDarwinBooleanFnToBlock(_ _: @convention(c) (DarwinBoolean) -> DarwinBoolean) -> (Bool) -> Bool
 
-func testCBoolFnToBlockTypedef(_: CBoolFn) -> CBoolBlock
-func testObjCBoolFnToBlockTypedef(_: ObjCBoolFn) -> ObjCBoolBlock
-func testDarwinBooleanFnToBlockTypedef(_: DarwinBooleanFn) -> DarwinBooleanBlock
+func testCBoolFnToBlockTypedef(_ _: CBoolFn) -> CBoolBlock
+func testObjCBoolFnToBlockTypedef(_ _: ObjCBoolFn) -> ObjCBoolBlock
+func testDarwinBooleanFnToBlockTypedef(_ _: DarwinBooleanFn) -> DarwinBooleanBlock
 
 typealias CBoolFnToBlockType = (CBoolFn) -> CBoolBlock
 typealias ObjCCBoolFnToBlockType = (ObjCBoolFn) -> (ObjCBool) -> ObjCBool
@@ -59,9 +59,9 @@ class Test : NSObject {
   var propObjCBool: Bool
   var propDarwinBoolean: Bool
   
-  func testCBool(b: Bool) -> Bool
-  func testObjCBool(b: Bool) -> Bool
-  func testDarwinBoolean(b: Bool) -> Bool
+  func testCBool(_ b: Bool) -> Bool
+  func testObjCBool(_ b: Bool) -> Bool
+  func testDarwinBoolean(_ b: Bool) -> Bool
   
   var propCBoolBlock: (Bool) -> Bool
   var propObjCBoolBlock: (Bool) -> Bool
@@ -71,9 +71,9 @@ class Test : NSObject {
   func testObjCBoolFn(toBlock fp: @convention(c) (ObjCBool) -> ObjCBool) -> (Bool) -> Bool
   func testDarwinBooleanFn(toBlock fp: @convention(c) (DarwinBoolean) -> DarwinBoolean) -> (Bool) -> Bool
   
-  func produceCBoolBlockTypedef(outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (Bool) -> Bool)?>)
-  func produceObjCBoolBlockTypedef(outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (ObjCBool) -> ObjCBool)?>)
-  func produceDarwinBooleanBlockTypedef(outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (DarwinBoolean) -> DarwinBoolean)?>)
+  func produceCBoolBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (Bool) -> Bool)?>)
+  func produceObjCBoolBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (ObjCBool) -> ObjCBool)?>)
+  func produceDarwinBooleanBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (DarwinBoolean) -> DarwinBoolean)?>)
   
   init()
 }

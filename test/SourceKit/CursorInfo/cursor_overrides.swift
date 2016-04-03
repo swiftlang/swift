@@ -12,7 +12,7 @@ class SubCls : Cls {
   func meth() {}
 }
 
-func goo(x: SubCls) {
+func goo(_ x: SubCls) {
   x.meth()
 }
 

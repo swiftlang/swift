@@ -17,9 +17,9 @@
 
 // These lines should be contiguous.
 // CHECK-DAG: @_specialize(Int, Float)
-// CHECK-DAG: func specializeThis<T, U>(t: T, u: U)
+// CHECK-DAG: func specializeThis<T, U>(_ t: T, u: U)
 @_specialize(Int, Float)
-func specializeThis<T, U>(t: T, u: U) {}
+func specializeThis<T, U>(_ t: T, u: U) {}
 
 protocol PP {
   associatedtype PElt
@@ -43,11 +43,11 @@ struct GG<T : PP> {}
 //
 // CHECK-DAG: class CC<T : PP> {
 // CHECK-DAG: @_specialize(RR, SS)
-// CHECK-DAG: @inline(never) func foo<U : QQ>(u: U, g: GG<T>) -> (U, GG<T>)
+// CHECK-DAG: @inline(never) func foo<U : QQ>(_ u: U, g: GG<T>) -> (U, GG<T>)
 class CC<T : PP> {
   @inline(never)
   @_specialize(RR, SS)
-  func foo<U : QQ>(u: U, g: GG<T>) -> (U, GG<T>) {
+  func foo<U : QQ>(_ u: U, g: GG<T>) -> (U, GG<T>) {
     return (u, g)
   }
 }

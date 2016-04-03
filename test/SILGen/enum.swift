@@ -29,7 +29,7 @@ enum Optionable {
 }
 
 // CHECK-LABEL: sil hidden @_TFs16Optionable_casesFSiT_
-func Optionable_cases(x: Int) {
+func Optionable_cases(_ x: Int) {
 
   // CHECK:       [[FN:%.*]] = function_ref @_TFOs10Optionable4mereFMS_FSiS_
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin Optionable.Type
@@ -63,7 +63,7 @@ enum AddressOnly {
 }
 
 // CHECK-LABEL: sil hidden @_TFs17AddressOnly_casesFVs1ST_
-func AddressOnly_cases(s: S) {
+func AddressOnly_cases(_ s: S) {
 
   // CHECK:       [[FN:%.*]] = function_ref @_TFOs11AddressOnly4mereFMS_FPs1P_S_
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
@@ -121,7 +121,7 @@ enum PolyOptionable<T> {
 }
 
 // CHECK-LABEL: sil hidden @_TFs20PolyOptionable_casesurFxT_
-func PolyOptionable_cases<T>(t: T) {
+func PolyOptionable_cases<T>(_ t: T) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin PolyOptionable<T>.Type
 // CHECK-NEXT:    [[NOUGHT:%.*]] = alloc_stack $PolyOptionable<T>
@@ -148,7 +148,7 @@ func PolyOptionable_cases<T>(t: T) {
 // The substituted type is loadable and trivial here
 
 // CHECK-LABEL: sil hidden @_TFs32PolyOptionable_specialized_casesFSiT_
-func PolyOptionable_specialized_cases(t: Int) {
+func PolyOptionable_specialized_cases(_ t: Int) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin PolyOptionable<Int>.Type
 // CHECK-NEXT:    [[NOUGHT:%.*]] = enum $PolyOptionable<Int>, #PolyOptionable.nought!enumelt

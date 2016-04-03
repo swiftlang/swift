@@ -10,7 +10,7 @@ import Swift
 
 func hex(_ x: UInt64) -> String { return String(x, radix:16) }
 
-func hexAddrVal<T>(x: T) -> String {
+func hexAddrVal<T>(_ x: T) -> String {
   return "@0x" + hex(UInt64(unsafeBitCast(x, to: UInt.self)))
 }
 

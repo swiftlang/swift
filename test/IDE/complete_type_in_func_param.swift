@@ -204,7 +204,7 @@ protocol FooProtocol {
   var fooInstanceVar: Int
   typealias FooTypeAlias1
   func fooInstanceFunc0() -> Double
-  func fooInstanceFunc1(a: Int) -> Double
+  func fooInstanceFunc1(_ a: Int) -> Double
   subscript(i: Int) -> Double
 }
 
@@ -212,7 +212,7 @@ protocol BarProtocol {
   var barInstanceVar: Int
   typealias BarTypeAlias1
   func barInstanceFunc0() -> Double
-  func barInstanceFunc1(a: Int) -> Double
+  func barInstanceFunc1(_ a: Int) -> Double
 }
 
 typealias FooTypealias = Int
@@ -243,35 +243,35 @@ typealias FooTypealias = Int
 //===--- function result types.
 //===---
 
-func testTypeInParam1(a: #^TYPE_IN_FUNC_PARAM_1^#
+func testTypeInParam1(_ a: #^TYPE_IN_FUNC_PARAM_1^#
 
 struct TestTypeInConstructorParam1 {
   init(a: #^TYPE_IN_CONSTRUCTOR_PARAM_1^#
 }
 
 
-func testTypeInParam2(a: Int, b: #^TYPE_IN_FUNC_PARAM_2^#
+func testTypeInParam2(_ a: Int, b: #^TYPE_IN_FUNC_PARAM_2^#
 
 struct TestTypeInConstructorParam2 {
   init(a: Int, b: #^TYPE_IN_CONSTRUCTOR_PARAM_2^#
 }
 
 
-func testTypeInParam3(a: unknown_type, b: #^TYPE_IN_FUNC_PARAM_3^#
+func testTypeInParam3(_ a: unknown_type, b: #^TYPE_IN_FUNC_PARAM_3^#
 
 struct TestTypeInConstructorParam3 {
   init(a: unknown_type, b: #^TYPE_IN_CONSTRUCTOR_PARAM_3^#
 }
 
 
-func testTypeInParam4(a: , b: #^TYPE_IN_FUNC_PARAM_4^#
+func testTypeInParam4(_ a: , b: #^TYPE_IN_FUNC_PARAM_4^#
 
 struct TestTypeInConstructorParam4 {
   init(a: , b: #^TYPE_IN_CONSTRUCTOR_PARAM_4^#
 }
 
 
-func testTypeInParam5(a: b: #^TYPE_IN_FUNC_PARAM_5^#
+func testTypeInParam5(_ a: b: #^TYPE_IN_FUNC_PARAM_5^#
 
 struct TestTypeInConstructorParam5 {
   init(a: b: #^TYPE_IN_CONSTRUCTOR_PARAM_5^#
@@ -292,38 +292,38 @@ struct TestTypeInConstructorParam7 {
 }
 
 
-func testTypeInParam8(a: Int, var b: #^TYPE_IN_FUNC_PARAM_8^#
+func testTypeInParam8(_ a: Int, var b: #^TYPE_IN_FUNC_PARAM_8^#
 
 struct TestTypeInConstructorParam8 {
   init(a: Int, var a: #^TYPE_IN_CONSTRUCTOR_PARAM_8^#
 }
 
 
-func testTypeInParam9(a: Int, let b: #^TYPE_IN_FUNC_PARAM_9^#
+func testTypeInParam9(_ a: Int, let b: #^TYPE_IN_FUNC_PARAM_9^#
 
 struct TestTypeInConstructorParam9 {
   init(a: Int, let a: #^TYPE_IN_CONSTRUCTOR_PARAM_9^#
 }
 
 
-func testTypeInParamCurried1(a: unknown_type)(b: #^TYPE_IN_FUNC_PARAM_CURRIED_1^#
-func testTypeInParamCurried2(a: unknown_type)(var b: #^TYPE_IN_FUNC_PARAM_CURRIED_2^#
-func testTypeInParamCurried3(a: unknown_type)(let b: #^TYPE_IN_FUNC_PARAM_CURRIED_3^#
+func testTypeInParamCurried1(_ a: unknown_type)(b: #^TYPE_IN_FUNC_PARAM_CURRIED_1^#
+func testTypeInParamCurried2(_ a: unknown_type)(var b: #^TYPE_IN_FUNC_PARAM_CURRIED_2^#
+func testTypeInParamCurried3(_ a: unknown_type)(let b: #^TYPE_IN_FUNC_PARAM_CURRIED_3^#
 
 
 func testTypeInResult1() -> #^TYPE_IN_FUNC_RESULT_1^#
 func testTypeInResult2(a) -> #^TYPE_IN_FUNC_RESULT_2^#
-func testTypeInResult3(a:) -> #^TYPE_IN_FUNC_RESULT_3^#
-func testTypeInResult4(a: Int) -> #^TYPE_IN_FUNC_RESULT_4^#
-func testTypeInResult5(a: Int, ) -> #^TYPE_IN_FUNC_RESULT_5^#
-func testTypeInResult6(a: Int, b ) -> #^TYPE_IN_FUNC_RESULT_6^#
-func testTypeInResult7(a: Int, b: ) -> #^TYPE_IN_FUNC_RESULT_7^#
-func testTypeInResult8(a: Int, b: unknown_type) -> #^TYPE_IN_FUNC_RESULT_8^#
-func testTypeInResult9(a: Int, b: unknown_type)() -> #^TYPE_IN_FUNC_RESULT_9^#
-func testTypeInResult10(a: Int, b: unknown_type)(c) -> #^TYPE_IN_FUNC_RESULT_10^#
-func testTypeInResult11(a: Int, b: unknown_type)(c:) -> #^TYPE_IN_FUNC_RESULT_11^#
-func testTypeInResult12(a: Int, b: unknown_type)(c: Int) -> #^TYPE_IN_FUNC_RESULT_12^#
-func testTypeInResult13(a: Int, b: unknown_type)(c: Int,) -> #^TYPE_IN_FUNC_RESULT_13^#
+func testTypeInResult3(_ a:) -> #^TYPE_IN_FUNC_RESULT_3^#
+func testTypeInResult4(_ a: Int) -> #^TYPE_IN_FUNC_RESULT_4^#
+func testTypeInResult5(_ a: Int, ) -> #^TYPE_IN_FUNC_RESULT_5^#
+func testTypeInResult6(_ a: Int, b ) -> #^TYPE_IN_FUNC_RESULT_6^#
+func testTypeInResult7(_ a: Int, b: ) -> #^TYPE_IN_FUNC_RESULT_7^#
+func testTypeInResult8(_ a: Int, b: unknown_type) -> #^TYPE_IN_FUNC_RESULT_8^#
+func testTypeInResult9(_ a: Int, b: unknown_type)() -> #^TYPE_IN_FUNC_RESULT_9^#
+func testTypeInResult10(_ a: Int, b: unknown_type)(c) -> #^TYPE_IN_FUNC_RESULT_10^#
+func testTypeInResult11(_ a: Int, b: unknown_type)(c:) -> #^TYPE_IN_FUNC_RESULT_11^#
+func testTypeInResult12(_ a: Int, b: unknown_type)(c: Int) -> #^TYPE_IN_FUNC_RESULT_12^#
+func testTypeInResult13(_ a: Int, b: unknown_type)(c: Int,) -> #^TYPE_IN_FUNC_RESULT_13^#
 
 // TYPE_IN_PARAM_FORWARD: Begin completions
 // TYPE_IN_PARAM_FORWARD-DAG: Decl[TypeAlias]/CurrNominal: NestedTypealias[#Int#]{{; name=.+$}}
@@ -354,24 +354,24 @@ class TestTypesForwardInParam4 {
 }
 
 class TestTypesForwardInParam5 {
-  func instanceFunc(a: #^TYPE_IN_PARAM_FORWARD_5^#
+  func instanceFunc(_ a: #^TYPE_IN_PARAM_FORWARD_5^#
   typealias NestedTypealias = Int
 }
 
 class TestTypesForwardInParam6 {
-  func instanceFunc(a: #^TYPE_IN_PARAM_FORWARD_6^#) {
+  func instanceFunc(_ a: #^TYPE_IN_PARAM_FORWARD_6^#) {
     unknown_var = 42
   }
   typealias NestedTypealias = Int
 }
 
 class TestTypesForwardInParam7 {
-  func instanceFunc(a: Int, withFloat b: #^TYPE_IN_PARAM_FORWARD_7^#
+  func instanceFunc(_ a: Int, withFloat b: #^TYPE_IN_PARAM_FORWARD_7^#
   typealias NestedTypealias = Int
 }
 
 class TestTypesForwardInParam8 {
-  func instanceFunc(a: Int, withFloat b: #^TYPE_IN_PARAM_FORWARD_8^#) {
+  func instanceFunc(_ a: Int, withFloat b: #^TYPE_IN_PARAM_FORWARD_8^#) {
     unknown_var = 42
   }
   typealias NestedTypealias = Int

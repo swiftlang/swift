@@ -6,11 +6,11 @@ import ObjectiveC
 import Foundation
 
 class Foo {
-  @objc(methodForInt:) func method(a: Int32) { }
+  @objc(methodForInt:) func method(_ a: Int32) { }
 }
 
 // CHECK-LABEL: sil hidden @_TF13objc_selector14createSelector
-func createSelector(foo: Foo) -> Selector {
+func createSelector(_ foo: Foo) -> Selector {
   // CHECK: [[LITERAL:%[0-9]+]] = string_literal objc_selector "methodForInt:"
   // CHECK-NEXT: [[PTR:%[0-9]+]] = struct $OpaquePointer ([[LITERAL]] : $Builtin.RawPointer)
   // CHECK-NEXT: [[SEL:%[0-9]+]] = struct $Selector (%3 : $OpaquePointer)

@@ -143,7 +143,7 @@ let comparisonTests = [
 ]
 
 func checkStringComparison(
-  expected: ExpectedComparisonResult,
+  _ expected: ExpectedComparisonResult,
   _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
   // String / String
@@ -191,7 +191,7 @@ for test in comparisonTests {
 }
 
 func checkCharacterComparison(
-  expected: ExpectedComparisonResult,
+  _ expected: ExpectedComparisonResult,
   _ lhs: Character, _ rhs: Character, _ stackTrace: SourceLocStack
 ) {
   // Character / Character
@@ -225,7 +225,7 @@ for test in comparisonTests {
 }
 
 func checkHasPrefixHasSuffix(
-  lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
+  _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
 #if _runtime(_ObjC)
   if lhs == "" {

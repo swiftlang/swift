@@ -7,7 +7,7 @@
   public dynamic func implicitlyObjC() {}
 
   @IBOutlet public var outlet : ObjCClass! = ObjCClass()
-  @IBAction public func performAction(_: AnyObject?) {}
+  @IBAction public func performAction(_ _: AnyObject?) {}
 }
 
 public class NonObjCClass : ObjCProto {
@@ -21,5 +21,5 @@ public class NonObjCClass : ObjCProto {
   }
 
   @IBOutlet public var outlet : ObjCClass! = ObjCClass()
-  @IBAction public func performAction(_: AnyObject?) {}
+  @IBAction public func performAction(_ _: AnyObject?) {}
 }

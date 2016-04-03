@@ -5,7 +5,7 @@
 public extension AnyIterator {
   @available(*, deprecated)
   public extension AnySequence {
-    public func take(n: Int) -> AnySequence<Element> {
+    public func take(_ n: Int) -> AnySequence<Element> {
       return AnySequence([])
     }
 }

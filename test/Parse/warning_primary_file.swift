@@ -9,11 +9,11 @@
 // configuration argument, but doesn't because it's not the
 // primary input.
 
-public func foo(x: Int, y: Int) -> Int {
+public func foo(_ x: Int, y: Int) -> Int {
   return x + y
 }
 
-public func baz(x: Int, y: Int) -> Int {
+public func baz(_ x: Int, y: Int) -> Int {
   var z = x // expected-warning {{variable 'z' was never mutated}}
   return z + y
 }

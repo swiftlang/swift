@@ -97,7 +97,7 @@ func ??(x: Man, y: TheDevil) -> TheDevil {
   return y
 }
 
-func test3(a: Man, b: Man, c: TheDevil) -> TheDevil {
+func test3(_ a: Man, b: Man, c: TheDevil) -> TheDevil {
   return a ?? b ?? c
 }
 

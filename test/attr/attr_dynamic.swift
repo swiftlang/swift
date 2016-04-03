@@ -17,10 +17,10 @@ class Foo {
 
   dynamic var nonObjcVar: NotObjCAble // expected-error{{property cannot be marked dynamic because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
 
-  dynamic func foo(x: Int) {}
-  dynamic func bar(x: Int) {}
+  dynamic func foo(_ x: Int) {}
+  dynamic func bar(_ x: Int) {}
 
-  dynamic func nonObjcFunc(x: NotObjCAble) {} // expected-error{{method cannot be marked dynamic because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  dynamic func nonObjcFunc(_ x: NotObjCAble) {} // expected-error{{method cannot be marked dynamic because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
 
   dynamic subscript(x: Int) -> ObjCClass { get {} }
 
@@ -40,15 +40,15 @@ struct Bar {
 
   dynamic subscript(x: Int) -> ObjCClass { get {} } // expected-error{{only members of classes may be dynamic}} {{3-11=}}
 
-  dynamic func foo(x: Int) {} // expected-error{{only members of classes may be dynamic}} {{3-11=}}
+  dynamic func foo(_ x: Int) {} // expected-error{{only members of classes may be dynamic}} {{3-11=}}
 }
 
 // CHECK-LABEL: class InheritsDynamic : Foo {
 class InheritsDynamic: Foo {
-  // CHECK-LABEL: {{^}} dynamic override func foo(x: Int)
-  override func foo(x: Int) {}
-  // CHECK-LABEL: {{^}} dynamic override func foo(x: Int)
-  dynamic override func bar(x: Int) {}
+  // CHECK-LABEL: {{^}} dynamic override func foo(_ x: Int)
+  override func foo(_ x: Int) {}
+  // CHECK-LABEL: {{^}} dynamic override func foo(_ x: Int)
+  dynamic override func bar(_ x: Int) {}
 
   // CHECK: {{^}} override func notDynamic()
   override func notDynamic() {}

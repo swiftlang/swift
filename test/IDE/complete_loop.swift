@@ -58,7 +58,7 @@ class C {
 // LOOP_4-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]{{; name=.+$}}
 // LOOP_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntSeqGen()[#[Int]#]{{; name=.+$}}
 
-  func f5(a: [C]) {
+  func f5(_ a: [C]) {
     do {
       for user in a {
         user.#^LOOP_5^#

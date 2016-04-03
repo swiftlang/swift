@@ -6,7 +6,7 @@ Copyright (c) 452 Attila the Hun. All rights reserved.
 /* More Blah Blah */
 
 public class MyClass {
-  func doit(x: Int) {}
+  func doit(_ x: Int) {}
 }
 
 /// This is a very nice extension.

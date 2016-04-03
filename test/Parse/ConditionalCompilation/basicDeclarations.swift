@@ -28,8 +28,8 @@ class D {
 	}
 
 #if !BAR
-    func overload(a: Int) {}
-    func overload(b: String) {} // should not result in an error
+    func overload(_ a: Int) {}
+    func overload(_ b: String) {} // should not result in an error
 #endif
 }
 

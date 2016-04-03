@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func use<T>(_: T) {}
+func use<T>(_ _: T) {}
 
 
 class C {}

@@ -15,11 +15,11 @@
 
 import MixedWithHeaderAgain
 
-func testLine(line: Line) {
+func testLine(_ line: Line) {
   testLineImpl(line)
 }
 
-func useOriginal(a: ForwardClass, b: Derived, c: ForwardClassUser) {
+func useOriginal(_ a: ForwardClass, b: Derived, c: ForwardClassUser) {
   let conformer = c as! ProtoConformer
   testOriginal(a, b, conformer)
   doSomething(a)

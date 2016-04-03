@@ -5,60 +5,60 @@ protocol AddrOnly {}
 @objc class B {
   // We only allow B! -> B overrides for @objc methods.
   // The IUO force-unwrap requires a thunk.
-  @objc func iuo(x: B, y: B!, z: B) -> B? {}
+  @objc func iuo(_ x: B, y: B!, z: B) -> B? {}
 
   // f* don't require thunks, since the parameters and returns are object
   // references.
-  func f(x: B, y: B) -> B? {}
-  func f2(x: B, y: B) -> B? {}
-  func f3(x: B, y: B) -> B {}
-  func f4(x: B, y: B) -> B {}
+  func f(_ x: B, y: B) -> B? {}
+  func f2(_ x: B, y: B) -> B? {}
+  func f3(_ x: B, y: B) -> B {}
+  func f4(_ x: B, y: B) -> B {}
 
   // Thunking monomorphic address-only params and returns
-  func g(x: AddrOnly, y: AddrOnly) -> AddrOnly? {}
-  func g2(x: AddrOnly, y: AddrOnly) -> AddrOnly? {}
-  func g3(x: AddrOnly, y: AddrOnly) -> AddrOnly {}
-  func g4(x: AddrOnly, y: AddrOnly) -> AddrOnly {}
+  func g(_ x: AddrOnly, y: AddrOnly) -> AddrOnly? {}
+  func g2(_ x: AddrOnly, y: AddrOnly) -> AddrOnly? {}
+  func g3(_ x: AddrOnly, y: AddrOnly) -> AddrOnly {}
+  func g4(_ x: AddrOnly, y: AddrOnly) -> AddrOnly {}
 
   // Thunking polymorphic address-only params and returns
-  func h<T>(x: T, y: T) -> T? {}
-  func h2<T>(x: T, y: T) -> T? {}
-  func h3<T>(x: T, y: T) -> T {}
-  func h4<T>(x: T, y: T) -> T {}
+  func h<T>(_ x: T, y: T) -> T? {}
+  func h2<T>(_ x: T, y: T) -> T? {}
+  func h3<T>(_ x: T, y: T) -> T {}
+  func h4<T>(_ x: T, y: T) -> T {}
 
   // Thunking value params and returns
-  func i(x: Int, y: Int) -> Int? {}
-  func i2(x: Int, y: Int) -> Int? {}
-  func i3(x: Int, y: Int) -> Int {}
-  func i4(x: Int, y: Int) -> Int {}
+  func i(_ x: Int, y: Int) -> Int? {}
+  func i2(_ x: Int, y: Int) -> Int? {}
+  func i3(_ x: Int, y: Int) -> Int {}
+  func i4(_ x: Int, y: Int) -> Int {}
 
   // Note: i3, i4 are implicitly @objc
 }
 
 class D: B {
-  override func iuo(x: B?, y: B, z: B) -> B {}
+  override func iuo(_ x: B?, y: B, z: B) -> B {}
 
-  override func f(x: B?, y: B) -> B {}
-  override func f2(x: B, y: B) -> B {}
-  override func f3(x: B?, y: B) -> B {}
-  override func f4(x: B, y: B) -> B {}
+  override func f(_ x: B?, y: B) -> B {}
+  override func f2(_ x: B, y: B) -> B {}
+  override func f3(_ x: B?, y: B) -> B {}
+  override func f4(_ x: B, y: B) -> B {}
 
-  override func g(x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
-  override func g2(x: AddrOnly, y: AddrOnly) -> AddrOnly {}
-  override func g3(x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
-  override func g4(x: AddrOnly, y: AddrOnly) -> AddrOnly {}
+  override func g(_ x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
+  override func g2(_ x: AddrOnly, y: AddrOnly) -> AddrOnly {}
+  override func g3(_ x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
+  override func g4(_ x: AddrOnly, y: AddrOnly) -> AddrOnly {}
 
-  override func h<U>(x: U?, y: U) -> U {}
-  override func h2<U>(x: U, y: U) -> U {}
-  override func h3<U>(x: U?, y: U) -> U {}
-  override func h4<U>(x: U, y: U) -> U {}
+  override func h<U>(_ x: U?, y: U) -> U {}
+  override func h2<U>(_ x: U, y: U) -> U {}
+  override func h3<U>(_ x: U?, y: U) -> U {}
+  override func h4<U>(_ x: U, y: U) -> U {}
 
-  override func i(x: Int?, y: Int) -> Int {}
-  override func i2(x: Int, y: Int) -> Int {}
+  override func i(_ x: Int?, y: Int) -> Int {}
+  override func i2(_ x: Int, y: Int) -> Int {}
   // Int? cannot be represented in ObjC so the override has to be
   // explicitly @nonobjc
-  @nonobjc override func i3(x: Int?, y: Int) -> Int {}
-  override func i4(x: Int, y: Int) -> Int {}
+  @nonobjc override func i3(_ x: Int?, y: Int) -> Int {}
+  override func i4(_ x: Int, y: Int) -> Int {}
 }
 
 // Inherits the thunked impls from D
@@ -66,27 +66,27 @@ class E: D { }
 
 // Overrides w/ its own thunked impls
 class F: D {
-  override func f(x: B?, y: B) -> B {}
-  override func f2(x: B, y: B) -> B {}
-  override func f3(x: B?, y: B) -> B {}
-  override func f4(x: B, y: B) -> B {}
+  override func f(_ x: B?, y: B) -> B {}
+  override func f2(_ x: B, y: B) -> B {}
+  override func f3(_ x: B?, y: B) -> B {}
+  override func f4(_ x: B, y: B) -> B {}
 
-  override func g(x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
-  override func g2(x: AddrOnly, y: AddrOnly) -> AddrOnly {}
-  override func g3(x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
-  override func g4(x: AddrOnly, y: AddrOnly) -> AddrOnly {}
+  override func g(_ x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
+  override func g2(_ x: AddrOnly, y: AddrOnly) -> AddrOnly {}
+  override func g3(_ x: AddrOnly?, y: AddrOnly) -> AddrOnly {}
+  override func g4(_ x: AddrOnly, y: AddrOnly) -> AddrOnly {}
 
-  override func h<U>(x: U?, y: U) -> U {}
-  override func h2<U>(x: U, y: U) -> U {}
-  override func h3<U>(x: U?, y: U) -> U {}
-  override func h4<U>(x: U, y: U) -> U {}
+  override func h<U>(_ x: U?, y: U) -> U {}
+  override func h2<U>(_ x: U, y: U) -> U {}
+  override func h3<U>(_ x: U?, y: U) -> U {}
+  override func h4<U>(_ x: U, y: U) -> U {}
 
-  override func i(x: Int?, y: Int) -> Int {}
-  override func i2(x: Int, y: Int) -> Int {}
+  override func i(_ x: Int?, y: Int) -> Int {}
+  override func i2(_ x: Int, y: Int) -> Int {}
   // Int? cannot be represented in ObjC so the override has to be
   // explicitly @nonobjc
-  @nonobjc override func i3(x: Int?, y: Int) -> Int {}
-  override func i4(x: Int, y: Int) -> Int {}
+  @nonobjc override func i3(_ x: Int?, y: Int) -> Int {}
+  override func i4(_ x: Int, y: Int) -> Int {}
 }
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuo
@@ -120,10 +120,10 @@ class NoThrowVariance: ThrowVariance {
 // rdar://problem/20657811
 
 class X<T: B> {
-  func foo(x: T) { }
+  func foo(_ x: T) { }
 }
 class Y: X<D> {
-  override func foo(x: D) { }
+  override func foo(_ x: D) { }
 }
 
 // rdar://problem/21154055
@@ -131,11 +131,11 @@ class Y: X<D> {
 // optional.
 
 class Foo {
-  func foo(x: Int -> Int) -> (Int -> Int)? {}
+  func foo(_ x: Int -> Int) -> (Int -> Int)? {}
 }
 
 class Bar: Foo {
-  override func foo(x: (Int -> Int)?) -> Int -> Int {}
+  override func foo(_ x: (Int -> Int)?) -> Int -> Int {}
 }
 
 // rdar://problem/21364764
@@ -143,11 +143,11 @@ class Bar: Foo {
 struct S {}
 
 class Aap {
-  func cat(b: B?) -> B? {}
-  func dog(b: B!) -> B! {}
+  func cat(_ b: B?) -> B? {}
+  func dog(_ b: B!) -> B! {}
 
-  func catFast(s: S?) -> S? {}
-  func dogFast(s: S!) -> S! {}
+  func catFast(_ s: S?) -> S? {}
+  func dogFast(_ s: S!) -> S! {}
 
   func flip() -> (() -> S?) {}
 
@@ -155,11 +155,11 @@ class Aap {
 }
 
 class Noot : Aap {
-  override func cat(b: B!) -> B! {}
-  override func dog(b: B?) -> B? {}
+  override func cat(_ b: B!) -> B! {}
+  override func dog(_ b: B?) -> B? {}
 
-  override func catFast(s: S!) -> S! {}
-  override func dogFast(s: S?) -> S? {}
+  override func catFast(_ s: S!) -> S! {}
+  override func dogFast(_ s: S?) -> S? {}
 
   override func flip() -> (() -> S) {}
 

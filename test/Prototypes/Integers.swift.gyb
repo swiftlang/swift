@@ -263,7 +263,7 @@ public protocol Integer : ${IntegerBase} {
 
   /// Return n-th word in the underlying representation of `self`.
   @warn_unused_result
-  func nthWord(n: Word) -> UWord
+  func nthWord(_ n: Word) -> UWord
 
   /// A number of bits in current representation of `self`
   /// Will be constant for fixed-width integer types.
@@ -291,7 +291,7 @@ public func == <T : Integer>(lhs:T, rhs: T) -> Bool {
 
 @_transparent
 @warn_unused_result
-public func < <T : Integer>(lhs: T, rhs: T) -> Bool {
+public func < <T : Integer>(_ lhs: T, rhs: T) -> Bool {
   return lhs.isLess(than: rhs)
 }
 
@@ -312,7 +312,7 @@ public func != <T : Integer, U : Integer>(lhs:T, rhs: U) -> Bool {
 
 @_transparent
 @warn_unused_result
-public func < <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
+public func < <T : Integer, U : Integer>(_ lhs: T, rhs: U) -> Bool {
   let lhsSign = lhs < 0 ? -1 : lhs > 0 ? 1 : 0
   let rhsSign = rhs < 0 ? -1 : rhs > 0 ? 1 : 0
   if lhsSign != rhsSign { return lhsSign < rhsSign }
@@ -337,7 +337,7 @@ public func < <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
 
 @inline(__always)
 @warn_unused_result
-public func <= <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
+public func <= <T : Integer, U : Integer>(_ lhs: T, rhs: U) -> Bool {
   return !(rhs < lhs)
 }
 
@@ -372,7 +372,7 @@ public func != <T : Integer>(lhs:T, rhs: T) -> Bool {
 
 @inline(__always)
 @warn_unused_result
-public func <= <T : Integer>(lhs: T, rhs: T) -> Bool {
+public func <= <T : Integer>(_ lhs: T, rhs: T) -> Bool {
   return !(rhs < lhs)
 }
 
@@ -441,7 +441,7 @@ ${comment}
 % end
 
   @warn_unused_result
-  func doubleWidthMultiply(other: Self) -> (high: Self, low: AbsoluteValue)
+  func doubleWidthMultiply(_ other: Self) -> (high: Self, low: AbsoluteValue)
 
   init(_truncatingBits bits: UWord)
 }
@@ -851,7 +851,7 @@ public struct ${Self}
   }
 
   @_transparent
-  public func nthWord(n: Word) -> UWord {
+  public func nthWord(_ n: Word) -> UWord {
     _precondition(n >= 0, "Negative word index")
     if _fastPath(n < countRepresentedWords) {
       let shift = UWord(n._storage) &* ${word_bits}
@@ -890,7 +890,7 @@ public struct ${Self}
 
 %     dbits = bits*2
   @warn_unused_result
-  public func doubleWidthMultiply(other: ${Self})
+  public func doubleWidthMultiply(_ other: ${Self})
     -> (high: ${Self}, low: ${Self}.AbsoluteValue) {
 %       if bits > 64:
     fatalError("${bits}-bit integer multiplication is not supported")
@@ -973,7 +973,7 @@ public struct DoubleWidth<
   }
 
   @warn_unused_result
-  public func nthWord(n: Word) -> UWord {
+  public func nthWord(_ n: Word) -> UWord {
     if T.bitWidth < ${word_bits} || T.bitWidth % ${word_bits} != 0 {
       fatalError("nthWord is not supported on this type")
     }
@@ -1034,7 +1034,7 @@ public struct DoubleWidth<
   ) -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
     let isNegative = (self < DoubleWidth<T>()) != (rhs < DoubleWidth<T>())
 
-    func mul(x: Low, _ y: Low, _ carry: Low) -> (partial: Low, carry: Low) {
+    func mul(_ x: Low, _ y: Low, _ carry: Low) -> (partial: Low, carry: Low) {
       let pair = x.doubleWidthMultiply(y)
       let t = DoubleWidth<Low>(pair) + DoubleWidth<Low>((0, carry))
       return (partial: t._storage.low, carry: t._storage.high)
@@ -1043,7 +1043,7 @@ public struct DoubleWidth<
     var high: Low = 0
     var low: Low = 0
 
-    func mkResult(isOverflow: Bool)
+    func mkResult(_ isOverflow: Bool)
       -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
 
       // TODO: High() cast fails
@@ -1099,7 +1099,7 @@ public struct DoubleWidth<
 % end
 
   @warn_unused_result
-  public func doubleWidthMultiply(other: DoubleWidth<T>)
+  public func doubleWidthMultiply(_ other: DoubleWidth<T>)
     -> (high: DoubleWidth<T>, low: DoubleWidth<T>.AbsoluteValue) {
       fatalError()
   }
@@ -1207,7 +1207,7 @@ public struct ${Self}
     fatalError()
   }
 
-  public func nthWord(n: Word) -> UWord {
+  public func nthWord(_ n: Word) -> UWord {
     _precondition(n >= 0, "Negative word index")
     return _storage.nthWord(n)
   }
@@ -1224,7 +1224,7 @@ public struct ${Self}
 % end
 
   @warn_unused_result
-  public func doubleWidthMultiply(other: ${Self})
+  public func doubleWidthMultiply(_ other: ${Self})
     -> (high: ${Self}, low: ${Self}.AbsoluteValue) {
     let (high: high, low: low) = _storage.doubleWidthMultiply(other._storage)
     return (high: ${Self}(high), low: ${Self}.AbsoluteValue(low))
@@ -1241,7 +1241,7 @@ public struct ${Self}
 
 extension FixedWidthInteger {
   // @_transparent
-  public mutating func replaceUWord(n: Word, with newBits: UWord) -> Bool {
+  public mutating func replaceUWord(_ n: Word, with newBits: UWord) -> Bool {
     let flippedBits = nthWord(n) ^ newBits
     self ^= Self(_truncatingBits: flippedBits) << (${word_bits} * n)
     if nthWord(n) != newBits {
@@ -1251,7 +1251,7 @@ extension FixedWidthInteger {
   }
 
   /// a hex representation of every bit in the number
-  func hexBits(bitWidth: Word) -> String {
+  func hexBits(_ bitWidth: Word) -> String {
     let hexDigits: [UnicodeScalar] = [
       "0", "1", "2", "3", "4", "5", "6", "7",
       "8", "9", "A", "B", "C", "D", "E", "F"]
@@ -1366,7 +1366,7 @@ tests.test("Equality") {
   expectNotEqual(-49 as Int8, 49)
 }
 
-func indexOrder<T: RandomAccessIndex>(x: T, y: T)
+func indexOrder<T: RandomAccessIndex>(_ x: T, y: T)
   -> ExpectedComparisonResult {
   return x < y ? .lt : x > y ? .gt : .eq
 }

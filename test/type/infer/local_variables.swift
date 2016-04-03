@@ -1,10 +1,10 @@
 // RUN: %target-parse-verify-swift
 
-func dict_to_array(_: Dictionary<String, Int>) -> [(String, Int)] {
+func dict_to_array(_ _: Dictionary<String, Int>) -> [(String, Int)] {
   return Array<(String, Int)>()
 }
 
-func infer_type(i: Int, f: Float) {
+func infer_type(_ i: Int, f: Float) {
   // Simple types
   var i2 = i
   i2 = i

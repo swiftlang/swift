@@ -57,7 +57,7 @@ class MyDocument3 : NSAwesomeDocument {
   }
 }
 
-func createMyDocument3(url: NSURL) {
+func createMyDocument3(_ url: NSURL) {
   var md = MyDocument3()
   md = try! MyDocument3(contentsOf: url, ofType:"")
   _ = md
@@ -113,7 +113,7 @@ class MyThirdTableViewController : NSTableViewController {
   }
 }
 
-func checkInitWithCoder(coder: NSCoder) {
+func checkInitWithCoder(_ coder: NSCoder) {
   NSViewController(coder: coder) // expected-warning{{unused}}
   NSTableViewController(coder: coder) // expected-warning{{unused}}
   MyViewController(coder: coder) // expected-warning{{unused}}
@@ -142,7 +142,7 @@ class MyString : NSString {
 
 // <rdar://problem/17281900>
 class View: NSView {
-  override func addSubview(aView: NSView) {
+  override func addSubview(_ aView: NSView) {
     _ = MyViewController.init()
   }
 }

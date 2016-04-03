@@ -172,11 +172,11 @@ typealias GenericArgs = Optional<PrivateStruct> // expected-error {{type alias m
 
 public protocol HasAssocType {
   associatedtype Inferred
-  func test(input: Inferred)
+  func test(_ input: Inferred)
 }
 
 public struct AssocTypeImpl: HasAssocType {
-  public func test(input: Bool) {}
+  public func test(_ input: Bool) {}
 }
 public let _: AssocTypeImpl.Inferred?
 
@@ -210,16 +210,16 @@ public struct Subscripts {
 }
 
 public struct Methods {
-  func foo(a: PrivateStruct) -> Int { return 0 } // expected-error {{method must be declared private because its parameter uses a private type}}
-  func bar(a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{method must be declared private because its result uses a private type}}
+  func foo(_ a: PrivateStruct) -> Int { return 0 } // expected-error {{method must be declared private because its parameter uses a private type}}
+  func bar(_ a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{method must be declared private because its result uses a private type}}
 
-  public func a(a: PrivateStruct, b: Int) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a private type}}
-  public func b(a: Int, b: PrivateStruct) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a private type}}
-  public func c(a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
-  public func d(a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
-  public func e(a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its result uses an internal type}}
+  public func a(_ a: PrivateStruct, b: Int) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  public func b(_ a: Int, b: PrivateStruct) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  public func c(_ a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  public func d(_ a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  public func e(_ a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its result uses an internal type}}
 }
-func privateParam(a: PrivateStruct) {} // expected-error {{function must be declared private because its parameter uses a private type}}
+func privateParam(_ a: PrivateStruct) {} // expected-error {{function must be declared private because its parameter uses a private type}}
 
 public struct Initializers {
   init(a: PrivateStruct) {} // expected-error {{initializer must be declared private because its parameter uses a private type}}
@@ -318,10 +318,10 @@ public struct PublicGenericIP<T: InternalProto, U: PrivateProto> {} // expected-
 public struct PublicGenericPIReq<T: PrivateProto where T: InternalProto> {} // expected-error {{generic struct cannot be declared public because its generic parameter uses a private type}}
 public struct PublicGenericIPReq<T: InternalProto where T: PrivateProto> {} // expected-error {{generic struct cannot be declared public because its generic requirement uses a private type}}
 
-public func genericFunc<T: InternalProto>(_: T) {} // expected-error {{function cannot be declared public because its generic parameter uses an internal type}} {}
+public func genericFunc<T: InternalProto>(_ _: T) {} // expected-error {{function cannot be declared public because its generic parameter uses an internal type}} {}
 public class GenericClass<T: InternalProto> { // expected-error {{generic class cannot be declared public because its generic parameter uses an internal type}}
   public init<T: PrivateProto>(_: T) {} // expected-error {{initializer cannot be declared public because its generic parameter uses a private type}}
-  public func genericMethod<T: PrivateProto>(_: T) {} // expected-error {{instance method cannot be declared public because its generic parameter uses a private type}}
+  public func genericMethod<T: PrivateProto>(_ _: T) {} // expected-error {{instance method cannot be declared public because its generic parameter uses a private type}}
 }
 public enum GenericEnum<T: InternalProto> { // expected-error {{generic enum cannot be declared public because its generic parameter uses an internal type}}
   case A

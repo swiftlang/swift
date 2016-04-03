@@ -136,23 +136,23 @@ class ObjcClass {
 //===--- Tests.
 //===---
 
-func testOptionalVar1(a: FooStruct?) {
+func testOptionalVar1(_ a: FooStruct?) {
   a#^OPT_NO_DOT_1^#
 }
 
-func testOptionalVar2(a: FooStruct?) {
+func testOptionalVar2(_ a: FooStruct?) {
   a.#^OPT_DOT_1^#
 }
 
-func testOptionalVar3(a: FooStruct?) {
+func testOptionalVar3(_ a: FooStruct?) {
   a.  #^OPT_DOT_1_SPACES^#
 }
 
-func testImplicitlyUnwrappedOptionalVar1(a: FooStruct!) {
+func testImplicitlyUnwrappedOptionalVar1(_ a: FooStruct!) {
   a#^UN_OPT_NO_DOT_1^#
 }
 
-func testImplicitlyUnwrappedOptionalVar2(a: FooStruct!) {
+func testImplicitlyUnwrappedOptionalVar2(_ a: FooStruct!) {
   a.#^UN_OPT_DOT_1^#
 }
 
@@ -172,63 +172,63 @@ func testImplicitlyUnwrappedOptionalReturnValue2() {
   returnsImplicitlyUnwrappedOptional().#^UN_OPT_DOT_2^#
 }
 
-func testAnyObject1(a: AnyObject) {
+func testAnyObject1(_ a: AnyObject) {
   a.instanceVar#^UN_OPT_NO_DOT_3^#
 }
 
-func testAnyObject2(a: AnyObject) {
+func testAnyObject2(_ a: AnyObject) {
   a.instanceVar.#^UN_OPT_DOT_3^#
 }
 
-func testAnyObject3(a: AnyObject) {
+func testAnyObject3(_ a: AnyObject) {
   a.instanceFunc!()#^OPT_DL_NO_DOT_1^#
 }
 
-func testAnyObject4(a: AnyObject) {
+func testAnyObject4(_ a: AnyObject) {
   a.instanceFunc?()#^OPT_DL_NO_DOT_2^#
 }
 
-func testAnyObject5(a: AnyObject) {
+func testAnyObject5(_ a: AnyObject) {
   a.instanceFunc!().#^OPT_DL_DOT_1^#
 }
 
-func testAnyObject6(a: AnyObject) {
+func testAnyObject6(_ a: AnyObject) {
   a.instanceFunc?().#^OPT_DL_DOT_2^#
 }
 
-func testAnyObject7(a: AnyObject) {
+func testAnyObject7(_ a: AnyObject) {
   (a.instanceFunc?())#^OPT_DL_FORCE_RETURN_OPTIONAL_1^#
 }
 
-func testAnyObject8(a: AnyObject) {
+func testAnyObject8(_ a: AnyObject) {
   (a as? ObjcClass)#^OPT_CAST_AS_RESULT_1^#
 }
 
-func testOptionalTuple1(a: (Int, String)?) {
+func testOptionalTuple1(_ a: (Int, String)?) {
   a#^OPT_TUPLE_1^#
 }
 // OPT_TUPLE_1: Pattern/CurrNominal:                ?.0[#Int#]
 // OPT_TUPLE_1: Pattern/CurrNominal:                ?.1[#String#]
 
-func testOptionalTuple2(a: (Int, String)?) {
+func testOptionalTuple2(_ a: (Int, String)?) {
   a.#^OPT_TUPLE_2^#
 }
 // OPT_TUPLE_2: Pattern/CurrNominal/Erase[1]:       ?.0[#Int#]
 // OPT_TUPLE_2: Pattern/CurrNominal/Erase[1]:       ?.1[#String#]
 
-func testOptionalTuple3(a: (Int, String)?) {
+func testOptionalTuple3(_ a: (Int, String)?) {
   a?#^OPT_TUPLE_3^#
 }
 // OPT_TUPLE_3: Pattern/CurrNominal:                .0[#Int#]
 // OPT_TUPLE_3: Pattern/CurrNominal:                .1[#String#]
 
-func testOptionalTuple4(a: (x: Int, y: String)?) {
+func testOptionalTuple4(_ a: (x: Int, y: String)?) {
   a#^OPT_TUPLE_4^#
 }
 // OPT_TUPLE_4: Pattern/CurrNominal:                ?.x[#Int#]
 // OPT_TUPLE_4: Pattern/CurrNominal:                ?.y[#String#]
 
-func testOptionalTuple5(a: (x: Int, y: String)?) {
+func testOptionalTuple5(_ a: (x: Int, y: String)?) {
   a.#^OPT_TUPLE_5^#
 }
 // OPT_TUPLE_5: Pattern/CurrNominal/Erase[1]:       ?.x[#Int#]

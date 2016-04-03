@@ -1,12 +1,12 @@
 // RUN: %target-parse-verify-swift
 
 // Single extraneous keyword argument (tuple-to-scalar)
-func f1(a: Int) { }
+func f1(_ a: Int) { }
 f1(a: 5) // expected-error{{extraneous argument label 'a:' in call}}{{4-7=}}
 
 struct X1 {
   init(_ a: Int) { }
-  func f1(a: Int) {}
+  func f1(_ a: Int) {}
 }
 X1(a: 5).f1(b: 5) // expected-error{{extraneous argument label 'a:' in call}}{{4-7=}}
 
@@ -48,11 +48,11 @@ allkeywords1(x: 1, 2) // expected-error{{missing argument label 'y:' in call}} {
 allkeywords1(1, y: 2) // expected-error{{missing argument label 'x:' in call}} {{14-14=x: }}
 
 // If keyword is reserved, make sure to quote it. rdar://problem/21392294
-func reservedLabel(x: Int, `repeat`: Bool) {}
+func reservedLabel(_ x: Int, `repeat`: Bool) {}
 reservedLabel(1, true) // expected-error{{missing argument label 'repeat:' in call}}{{18-18=repeat: }}
 
 // Insert missing keyword before initial backtick. rdar://problem/21392294 part 2
-func reservedExpr(x: Int, y: Int) {}
+func reservedExpr(_ x: Int, y: Int) {}
 let `do` = 2
 reservedExpr(1, `do`) // expected-error{{missing argument label 'y:' in call}}{{17-17=y: }}
 reservedExpr(1, y: `do`)
@@ -65,14 +65,14 @@ GenericCtor<Int>()  // expected-error{{missing argument for parameter 't' in cal
 // -------------------------------------------
 // Extraneous keywords
 // -------------------------------------------
-func nokeywords1(x: Int, _ y: Int) { }
+func nokeywords1(_ x: Int, _ y: Int) { }
 
 nokeywords1(x: 1, y: 1) // expected-error{{extraneous argument labels 'x:y:' in call}}{{13-16=}}{{19-22=}}
 
 // -------------------------------------------
 // Some missing, some extraneous keywords
 // -------------------------------------------
-func somekeywords1(x: Int, y: Int, z: Int) { }
+func somekeywords1(_ x: Int, y: Int, z: Int) { }
 
 somekeywords1(x: 1, y: 2, z: 3) // expected-error{{extraneous argument label 'x:' in call}}{{15-18=}}
 somekeywords1(1, 2, 3) // expected-error{{missing argument labels 'y:z:' in call}}{{18-18=y: }}{{21-21=z: }}
@@ -152,7 +152,7 @@ variadics2(x: 1)
 variadics2(z: 1, 2, 3, y: 2) // expected-error{{missing argument for parameter 'x' in call}}
 variadics2(z: 1, 2, 3, x: 1) // expected-error{{argument 'x' must precede argument 'z'}}
 
-func variadics3(x: Int..., y: Int = 2, z: Int = 3) { }
+func variadics3(_ x: Int..., y: Int = 2, z: Int = 3) { }
 
 // Using variadics (in-order, complete)
 variadics3(1, 2, 3, y: 0, z: 1)
@@ -200,7 +200,7 @@ variadics4()
 variadics4(y: 0, x: 1, 2, 3) // expected-error{{extra argument in call}}
 variadics4(z: 1, x: 1) // FIXME: error
 
-func variadics5(x: Int, y: Int, _ z: Int...) { }
+func variadics5(_ x: Int, y: Int, _ z: Int...) { }
 
 // Using variadics (in-order, complete)
 variadics5(1, y: 2)
@@ -278,7 +278,7 @@ d = sub2[f: d] // expected-error{{incorrect argument label in subscript (have 'f
 // -------------------------------------------
 // Closures
 // -------------------------------------------
-func intToInt(i: Int) -> Int { return i }
+func intToInt(_ i: Int) -> Int { return i }
 
 func testClosures() {
   let c0 = { (x: Int, y: Int) in x + y }
@@ -319,20 +319,20 @@ trailingclosure3(x: 5) { return 5 }
 func trailingclosure4(f f: () -> Int) {}
 trailingclosure4 { 5 }
 
-func trailingClosure5<T>(file: String = #file, line: UInt = #line, expression: () -> T?) { }
+func trailingClosure5<T>(_ file: String = #file, line: UInt = #line, expression: () -> T?) { }
 func trailingClosure6<T>(value value: Int, expression: () -> T?) { }
 
 trailingClosure5(file: "hello", line: 17) { return Optional.Some(5) } // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
 trailingClosure6(5) { return Optional.Some(5) } // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
 
 class MismatchOverloaded1 {
-  func method1(x: Int!, arg: ((Int) -> Int)!) { }
-  func method1(x: Int!, secondArg: ((Int) -> Int)!) { }
+  func method1(_ x: Int!, arg: ((Int) -> Int)!) { }
+  func method1(_ x: Int!, secondArg: ((Int) -> Int)!) { }
 
   @available(*, unavailable)
-  func method2(x: Int!, arg: ((Int) -> Int)!) { }
+  func method2(_ x: Int!, arg: ((Int) -> Int)!) { }
 
-  func method2(x: Int!, secondArg: ((Int) -> Int)!) { }
+  func method2(_ x: Int!, secondArg: ((Int) -> Int)!) { }
 }
 
 var mismatchOverloaded1 = MismatchOverloaded1()
@@ -345,7 +345,7 @@ mismatchOverloaded1.method2(5) { $0 }
 // -------------------------------------------
 // Values of function type
 // -------------------------------------------
-func testValuesOfFunctionType(f1: (_: Int, arg: Int) -> () ) {
+func testValuesOfFunctionType(_ f1: (_: Int, arg: Int) -> () ) {
   f1(3, arg: 5)
   f1(x: 3, 5) // expected-error{{incorrect argument labels in call (have 'x:_:', expected '_:arg:')}} {{6-9=}} {{12-12=arg: }}
   f1(3, 5) // expected-error{{missing argument label 'arg:' in call}} {{9-9=arg: }}
@@ -369,7 +369,7 @@ float_literals1(x: 5)
 // -------------------------------------------
 func produceTuple1() -> (Int, Bool) { return (1, true) }
 
-func acceptTuple1<T>(x: (T, Bool)) { }
+func acceptTuple1<T>(_ x: (T, Bool)) { }
 
 acceptTuple1(produceTuple1())
 acceptTuple1((1, false))

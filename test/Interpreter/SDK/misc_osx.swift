@@ -4,7 +4,7 @@
 
 import CoreServices
 
-func testFSEventStreamRef(stream: FSEventStreamRef) {
+func testFSEventStreamRef(_ stream: FSEventStreamRef) {
   // FIXME: These should be distinct types, constructible from one another.
   _ = stream as ConstFSEventStreamRef // works by coincidence because both are currently OpaquePointer
   _ = ConstFSEventStreamRef(stream) // expected-error {{cannot invoke initializer for type 'ConstFSEventStreamRef' with an argument list of type '(FSEventStreamRef)'}}

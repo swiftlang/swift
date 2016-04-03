@@ -21,7 +21,7 @@ extension P {
 }
 
 // CHECK-LABEL: sil hidden @_TF18partial_apply_init24class_init_partial_apply
-func class_init_partial_apply(c: C.Type) {
+func class_init_partial_apply(_ c: C.Type) {
   // Partial applications at the static metatype use the direct (_TTd) thunk.
   // CHECK: function_ref @_TTdFC18partial_apply_init1CC
   let xC: Int -> C = C.init
@@ -42,7 +42,7 @@ func class_init_partial_apply(c: C.Type) {
 // CHECK:         class_method %0 : $@thick C.Type, #C.init!allocator.1
 
 // CHECK-LABEL: sil hidden @_TF18partial_apply_init28archetype_init_partial_apply
-func archetype_init_partial_apply<T: C where T: P>(t: T.Type) {
+func archetype_init_partial_apply<T: C where T: P>(_ t: T.Type) {
   // Archetype initializations are always dynamic, whether applied to the type or a metatype.
   // CHECK: function_ref @_TFC18partial_apply_init1CC
   let requiredT: Double -> T = T.init

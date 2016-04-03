@@ -15,7 +15,7 @@ class MyCls : OtherClass {
   // CHECK:       <call><name>foo</name>(<param>1</param>, <param><name>name</name>:"test"</param>, <param><name>param</name>:"test2"</param>)</call>
   // CHECK:     }</brace>
   // CHECK:   }</ifunc>
-  func foo(arg1: Int, name: String, param par: String) {
+  func foo(_ arg1: Int, name: String, param par: String) {
     var abc
     if 1 {
       foo(1, name:"test", param:"test2")
@@ -153,7 +153,7 @@ enum Rawness : Int {
 }
 
 // CHECK: <ffunc>func <name>rethrowFunc(<param>f: () throws -> ()</param>)</name> rethrows {}</ffunc>
-func rethrowFunc(f: () throws -> ()) rethrows {}
+func rethrowFunc(_ f: () throws -> ()) rethrows {}
 
 class NestedPoundIf{
     func foo1() {

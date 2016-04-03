@@ -227,7 +227,7 @@ func withSwiftObjectCanary<T>(
 
 var Runtime = TestSuite("Runtime")
 
-func _isClassOrObjCExistential_Opaque<T>(x: T.Type) -> Bool {
+func _isClassOrObjCExistential_Opaque<T>(_ x: T.Type) -> Bool {
   return _isClassOrObjCExistential(_opaqueIdentity(x))
 }
 

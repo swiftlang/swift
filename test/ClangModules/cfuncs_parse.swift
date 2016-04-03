@@ -4,12 +4,12 @@
 
 import cfuncs
 
-func test_cfunc1(i: Int) {
+func test_cfunc1(_ i: Int) {
   cfunc1() // okay
   cfunc1(i) // expected-error{{argument passed to call that takes no arguments}}
 }
 
-func test_cfunc2(i: Int) {
+func test_cfunc2(_ i: Int) {
   let f = cfunc2(i, 17)
   _ = f as Float
   cfunc2(b:17, a:i) // expected-error{{extraneous argument labels 'b:a:' in call}}
@@ -50,11 +50,11 @@ func test_pow() {
   pow(1.5, 2.5)
 }
 
-func test_puts(s: String) {
+func test_puts(_ s: String) {
   _ = s.withCString { puts($0) + 32 };
 }
 
-func test_fopen(filename: String) -> CInt {
+func test_fopen(_ filename: String) -> CInt {
   let file = filename.withCString { fopen($0, "r") }
   return file.pointee.inode
 }
@@ -119,7 +119,7 @@ func test_decay() {
   decay_param_const_array([1, 2, 3])
 }
 
-func exit(_: Float) {} // expected-note {{found this candidate}}
+func exit(_ _: Float) {} // expected-note {{found this candidate}}
 func test_ambiguous() {
   exit(5) // expected-error {{ambiguous use of 'exit'}}
 }

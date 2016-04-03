@@ -2,7 +2,7 @@
 
 struct Blob {}
 
-func withBlob(block: Blob -> ()) {}
+func withBlob(_ block: Blob -> ()) {}
 
 protocol Binding {}
 extension Int: Binding {}
@@ -11,15 +11,15 @@ extension String: Binding {}
 extension Blob: Binding {}
 
 struct Stmt {
-  func bind(values: Binding?...) -> Stmt {
+  func bind(_ values: Binding?...) -> Stmt {
     return self
   }
 
-  func bind(values: [Binding?]) -> Stmt {
+  func bind(_ values: [Binding?]) -> Stmt {
     return self
   }
 
-  func bind(values: [String: Binding?]) -> Stmt {
+  func bind(_ values: [String: Binding?]) -> Stmt {
     return self
   }
 }

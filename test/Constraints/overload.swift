@@ -1,17 +1,17 @@
 // RUN: %target-parse-verify-swift
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-func f0(_: Float) -> Float {}
-func f0(_: Int) -> Int {}
+func f0(_ _: Float) -> Float {}
+func f0(_ _: Int) -> Int {}
 
-func f1(_: Int) {}
+func f1(_ _: Int) {}
 
-func identity<T>(_: T) -> T {}
+func identity<T>(_ _: T) -> T {}
 
-func f2<T>(_: T) -> T {}
+func f2<T>(_ _: T) -> T {}
 // FIXME: Fun things happen when we make this T, U!
-func f2<T>(_: T, _: T) -> (T, T) { }
+func f2<T>(_ _: T, _: T) -> (T, T) { }
 
 struct X {}
 var x : X
@@ -41,8 +41,8 @@ class C : B {
   override init() { super.init() } 
 }
 
-func bar(b: B) -> Int {} // #1
-func bar(a: A) -> Float {} // #2
+func bar(_ b: B) -> Int {} // #1
+func bar(_ a: A) -> Float {} // #2
 
 var barResult = bar(C()) // selects #1, which is more specialized
 i = barResult // make sure we got #1
@@ -81,13 +81,13 @@ struct X2d {
 // Invalid declarations
 // FIXME: Suppress the diagnostic for the call below, because the invalid
 // declaration would have matched.
-func f3(x: Intthingy) -> Int { } // expected-error{{use of undeclared type 'Intthingy'}}
+func f3(_ x: Intthingy) -> Int { } // expected-error{{use of undeclared type 'Intthingy'}}
 
-func f3(x: Float) -> Float { }
+func f3(_ x: Float) -> Float { }
 f3(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
 
-func f4(i: Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
-func f4(j: Wibble) { } // expected-error{{use of undeclared type 'Wibble'}}
+func f4(_ i: Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
+func f4(_ j: Wibble) { } // expected-error{{use of undeclared type 'Wibble'}}
 f4(5)
 
 func f1() {
@@ -96,14 +96,14 @@ func f1() {
 }
 
 // We don't provide return-type sensitivity unless there is context.
-func f5(i: Int) -> A { return A() } // expected-note{{candidate}}
-func f5(i: Int) -> B { return B() } // expected-note{{candidate}}
+func f5(_ i: Int) -> A { return A() } // expected-note{{candidate}}
+func f5(_ i: Int) -> B { return B() } // expected-note{{candidate}}
 
 f5(5) // expected-error{{ambiguous use of 'f5'}}
 
 struct HasX1aProperty {
-  func write(_: X1a) {}
-  func write(_: P1) {}
+  func write(_ _: X1a) {}
+  func write(_ _: P1) {}
 
   var prop = X1a()
   func test() {
@@ -113,14 +113,14 @@ struct HasX1aProperty {
 
 // rdar://problem/16554496
 @available(*, unavailable)
-func availTest(x: Int) {}
-func availTest(x: Any) { markUsed("this one") }
-func doAvailTest(x: Int) {
+func availTest(_ x: Int) {}
+func availTest(_ x: Any) { markUsed("this one") }
+func doAvailTest(_ x: Int) {
   availTest(x)
 }
 
 // rdar://problem/20886179
-func test20886179(handlers: [(Int) -> Void], buttonIndex: Int) {
+func test20886179(_ handlers: [(Int) -> Void], buttonIndex: Int) {
     handlers[buttonIndex](buttonIndex)
 }
 

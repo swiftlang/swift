@@ -47,7 +47,7 @@ public class PublicClass {
 }
 
 // Just in case anyone wants to delete unused methods...
-func callit(b: Base, p: PublicClass) {
+func callit(_ b: Base, p: PublicClass) {
   b.foo()
   b.bar()
   b.other()

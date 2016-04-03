@@ -1,2 +1,2 @@
-func println(val: TriValue) {
+func println(_ val: TriValue) {
      switch val {

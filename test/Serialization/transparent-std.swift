@@ -10,7 +10,7 @@ import def_transparent_std
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF19def_transparent_std3fooFT1xBi1_1yBi1__Bi1_ : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 // SIL: = builtin "cmp_eq_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
-func test_foo(x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
+func test_foo(_ x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
   var a = foo(x: x, y: y)
   return a
 }
@@ -23,12 +23,12 @@ func test_foo(x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
 // SIL: = pointer_to_address
 // SIL: = tuple
 // SIL: = load
-func test_tuple(x: (Builtin.Int64, Builtin.NativeObject),
+func test_tuple(_ x: (Builtin.Int64, Builtin.NativeObject),
                 y: Builtin.RawPointer) {
   assign_tuple(x: x, y: y)
 }
 
-func test_conversion(c: C, t32: Builtin.Int32) {
+func test_conversion(_ c: C, t32: Builtin.Int32) {
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF19def_transparent_std22class_to_native_objectFT1cCS_1C_Bo : $@convention(thin) (@owned C) -> @owned Builtin.NativeObject {
 // SIL: bb0(%0 : $C):
 // SIL: unchecked_ref_cast %0 : $C to $Builtin.NativeObject

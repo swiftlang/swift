@@ -169,20 +169,20 @@ func class_existential_is_class_archetype
 }
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts40opaque_existential_to_addr_only_concrete{{.*}}
-func opaque_existential_to_addr_only_concrete(p: NotClassBound) -> Unloadable {
+func opaque_existential_to_addr_only_concrete(_ p: NotClassBound) -> Unloadable {
   return p as! Unloadable
   // CHECK: bb0([[RET:%.*]] : $*Unloadable, {{%.*}}: $*NotClassBound):
   // CHECK:   unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to Unloadable in [[RET]] : $*Unloadable
 }
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts40opaque_existential_is_addr_only_concrete{{.*}}
-func opaque_existential_is_addr_only_concrete(p: NotClassBound) -> Bool {
+func opaque_existential_is_addr_only_concrete(_ p: NotClassBound) -> Bool {
   return p is Unloadable
   // CHECK:   checked_cast_addr_br take_always NotClassBound in {{%.*}} : $*NotClassBound to Unloadable in
 }
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts39opaque_existential_to_loadable_concrete{{.*}}
-func opaque_existential_to_loadable_concrete(p: NotClassBound) -> S {
+func opaque_existential_to_loadable_concrete(_ p: NotClassBound) -> S {
   return p as! S
   // CHECK:   unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to S in [[DOWNCAST_ADDR:%.*]] : $*S
   // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*S
@@ -190,26 +190,26 @@ func opaque_existential_to_loadable_concrete(p: NotClassBound) -> S {
 }
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts39opaque_existential_is_loadable_concrete{{.*}}
-func opaque_existential_is_loadable_concrete(p: NotClassBound) -> Bool {
+func opaque_existential_is_loadable_concrete(_ p: NotClassBound) -> Bool {
   return p is S
   // CHECK: checked_cast_addr_br take_always NotClassBound in {{%.*}} : $*NotClassBound to S in
 }
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts26class_existential_to_class{{.*}}
-func class_existential_to_class(p: ClassBound) -> C {
+func class_existential_to_class(_ p: ClassBound) -> C {
   return p as! C
   // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} to $C
   // CHECK: return [[DOWNCAST]] : $C
 }
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts26class_existential_is_class{{.*}}
-func class_existential_is_class(p: ClassBound) -> Bool {
+func class_existential_is_class(_ p: ClassBound) -> Bool {
   return p is C
   // CHECK: checked_cast_br {{%.*}} to $C
 }
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts27optional_anyobject_to_classFGSqPs9AnyObject__GSqCS_1C_ 
 // CHECK:         checked_cast_br {{%.*}} : $AnyObject to $C
-func optional_anyobject_to_class(p: AnyObject?) -> C? {
+func optional_anyobject_to_class(_ p: AnyObject?) -> C? {
   return p as? C
 }

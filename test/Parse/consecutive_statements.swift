@@ -17,7 +17,7 @@ func statement_starts() {
 }
 
 // Within a function
-func test(i: inout Int, j: inout Int) {
+func test(_ i: inout Int, j: inout Int) {
   // Okay
   let q : Int; i = j; j = i; _ = q
 

@@ -43,13 +43,13 @@ func testInit() {
   ClassWithUnavailable(int: 0) // expected-error {{'init(int:)' is unavailable}} // expected-warning{{unused}}
 }
 
-func testSuvscript(cwu: ClassWithUnavailable) {
+func testSuvscript(_ cwu: ClassWithUnavailable) {
   _ = cwu[5] // expected-error{{'subscript' is unavailable}}
 }
 
 /* FIXME 'nil == a' fails to type-check with a bogus error message
  * <rdar://problem/17540796>
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 func testString() {
   let a : String = "Hey"
   if a == nil {

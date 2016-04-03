@@ -14,8 +14,8 @@ public class _AnyIteratorBase {}
 /// See also:
 ///
 ///     struct AnySequence<S: Sequence>
-///     func anyIterator<I: IteratorProtocol>(base: I) -> AnyIterator<I.Element>
-///     func anyIterator<T>(nextImplementation: () -> T?) -> AnyIterator<T>
+///     func anyIterator<I: IteratorProtocol>(_ base: I) -> AnyIterator<I.Element>
+///     func anyIterator<T>(_ nextImplementation: () -> T?) -> AnyIterator<T>
 public class AnyIterator<T> : _AnyIteratorBase, IteratorProtocol {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
@@ -51,7 +51,7 @@ extension AnyIterator : Sequence {
 ///         = lazyStrings.makeIterator()
 ///       return anyIterator(g)
 ///     }
-public func anyIterator<I: IteratorProtocol>(base: I) -> AnyIterator<I.Element> {
+public func anyIterator<I: IteratorProtocol>(_ base: I) -> AnyIterator<I.Element> {
   return FooIteratorBox(base)
 }
 

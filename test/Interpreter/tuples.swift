@@ -7,11 +7,11 @@ infix operator <+> {}
 infix operator <-> {}
 infix operator <+>= {}
 
-func <+>(a: Interval, b: Interval) -> Interval {
+func <+>(_ a: Interval, b: Interval) -> Interval {
   return (a.lo + b.lo, a.hi + b.hi)
 }
 
-func <->(a: Interval, b: Interval) -> Interval {
+func <->(_ a: Interval, b: Interval) -> Interval {
   return (a.lo - b.hi, a.hi - b.lo)
 }
 
@@ -20,7 +20,7 @@ func <+>=(a: inout Interval, b: Interval) {
   a.hi += b.hi
 }
 
-func print(x: Interval) {
+func print(_ x: Interval) {
   print("(lo=\(x.lo), hi=\(x.hi))")
 }
 
@@ -39,7 +39,7 @@ func mutate() {
 }
 mutate()
 
-func printInts(ints: Int...) {
+func printInts(_ ints: Int...) {
   print("\(ints.count) ints: ", terminator: "")
   for int in ints {
     print("\(int) ", terminator: "")

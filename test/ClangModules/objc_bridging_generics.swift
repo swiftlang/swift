@@ -5,11 +5,11 @@
 import Foundation
 import objc_generics
 
-func testNSArrayBridging(hive: Hive) {
+func testNSArrayBridging(_ hive: Hive) {
   _ = hive.bees as [Bee]
 }
 
-func testNSDictionaryBridging(hive: Hive) {
+func testNSDictionaryBridging(_ hive: Hive) {
   _ = hive.beesByName as [String : Bee] // expected-error{{value of optional type '[String : Bee]?' not unwrapped; did you mean to use '!' or '?'?}}
 
   var dict1 = hive.anythingToBees
@@ -17,11 +17,11 @@ func testNSDictionaryBridging(hive: Hive) {
   dict1 = dict2
 }
 
-func testNSSetBridging(hive: Hive) {
+func testNSSetBridging(_ hive: Hive) {
   _ = hive.allBees as Set<Bee>
 }
 
-public func expectType<T>(_: T.Type, _ x: inout T) {}
+public func expectType<T>(_ _: T.Type, _ x: inout T) {}
 
 func testNSMutableDictionarySubscript(
   dict: NSMutableDictionary, key: NSCopying, value: AnyObject) {
@@ -34,23 +34,23 @@ func testNSMutableDictionarySubscript(
 class C {}
 struct S {}
 
-func f(x: GenericClass<NSString>) -> NSString? { return x.thing() }
-func f1(x: GenericClass<NSString>) -> NSString? { return x.otherThing() }
-func f2(x: GenericClass<NSString>) -> Int32 { return x.count() }
-func f3(x: GenericClass<NSString>) -> NSString? { return x.propertyThing }
-func f4(x: GenericClass<NSString>) -> [NSString] { return x.arrayOfThings() }
-func f5(x: GenericClass<C>) -> [C] { return x.arrayOfThings() }
-func f6(x: GenericSubclass<NSString>) -> NSString? { return x.thing() }
-func f6(x: GenericSubclass<C>) -> C? { return x.thing() }
+func f(_ x: GenericClass<NSString>) -> NSString? { return x.thing() }
+func f1(_ x: GenericClass<NSString>) -> NSString? { return x.otherThing() }
+func f2(_ x: GenericClass<NSString>) -> Int32 { return x.count() }
+func f3(_ x: GenericClass<NSString>) -> NSString? { return x.propertyThing }
+func f4(_ x: GenericClass<NSString>) -> [NSString] { return x.arrayOfThings() }
+func f5(_ x: GenericClass<C>) -> [C] { return x.arrayOfThings() }
+func f6(_ x: GenericSubclass<NSString>) -> NSString? { return x.thing() }
+func f6(_ x: GenericSubclass<C>) -> C? { return x.thing() }
 
 func g() -> NSString? { return GenericClass<NSString>.classThing() }
 func g1() -> NSString? { return GenericClass<NSString>.otherClassThing() }
 
-func h(s: NSString?) -> GenericClass<NSString> {
+func h(_ s: NSString?) -> GenericClass<NSString> {
   return GenericClass(thing: s)
 }
 
-func j(x: GenericClass<NSString>?) {
+func j(_ x: GenericClass<NSString>?) {
   takeGenericClass(x)
 }
 

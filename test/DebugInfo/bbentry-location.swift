@@ -7,7 +7,7 @@ import UIKit
 class ActionViewController
 {
   var imageView: UIImageView!
-  func viewDidLoad(inputItems: [AnyObject]) {
+  func viewDidLoad(_ inputItems: [AnyObject]) {
     for item: AnyObject in inputItems {
       let inputItem = item as! NSExtensionItem
       for provider: AnyObject in inputItem.attachments! {

@@ -3,10 +3,10 @@
 @_exported import Foundation
 
 @_silgen_name("swift_StringToNSString") internal
-func _convertStringToNSString(string: String) -> NSString
+func _convertStringToNSString(_ string: String) -> NSString
 
 @_silgen_name("swift_NSStringToString") internal
-func _convertNSStringToString(nsstring: NSString?) -> String
+func _convertNSStringToString(_ nsstring: NSString?) -> String
 
 public func == (lhs: Object, rhs: Object) -> Bool {
   return lhs.isEqual(rhs)
@@ -15,11 +15,11 @@ public func == (lhs: Object, rhs: Object) -> Bool {
 public let utf88StringEncoding: UInt = 8
 
 // NSArray bridging entry points
-func _convertNSArrayToArray<T>(nsarr: NSArray?) -> [T] {
+func _convertNSArrayToArray<T>(_ nsarr: NSArray?) -> [T] {
   return [T]()
 }
 
-func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
+func _convertArrayToNSArray<T>(_ arr: [T]) -> NSArray {
   return NSArray()
 }
 
@@ -37,11 +37,11 @@ internal func _convertNSDictionaryToDictionary<K: Object, V: AnyObject>(
 }
 
 // NSSet bridging entry points
-internal func _convertSetToNSSet<T : Hashable>(s: Set<T>) -> NSSet {
+internal func _convertSetToNSSet<T : Hashable>(_ s: Set<T>) -> NSSet {
   return NSSet()
 }
 
-internal func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
+internal func _convertNSSetToSet<T : Hashable>(_ s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
@@ -53,7 +53,7 @@ extension String : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSString,
+  public static func _forceBridgeFromObjectiveC(_ x: NSString,
                                                 result: inout String?) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
@@ -235,7 +235,7 @@ extension Error : ErrorProtocol {
 }
 
 @_silgen_name("swift_convertNSErrorToErrorProtocol")
-func _convertNSErrorToErrorProtocol(string: Error?) -> ErrorProtocol
+func _convertNSErrorToErrorProtocol(_ string: Error?) -> ErrorProtocol
 
 @_silgen_name("swift_convertErrorProtocolToNSError")
-func _convertErrorProtocolToNSError(string: ErrorProtocol) -> Error
+func _convertErrorProtocolToNSError(_ string: ErrorProtocol) -> Error

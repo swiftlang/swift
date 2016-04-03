@@ -55,20 +55,20 @@ protocol Bar {}
 
 // Ensure protocol list manglings are '_' terminated regardless of length
 // CHECK-LABEL: sil hidden @_TF8mangling12any_protocolFP_T_
-func any_protocol(_: protocol<>) {}
+func any_protocol(_ _: protocol<>) {}
 // CHECK-LABEL: sil hidden @_TF8mangling12one_protocolFPS_3Foo_T_
-func one_protocol(_: Foo) {}
+func one_protocol(_ _: Foo) {}
 // CHECK-LABEL: sil hidden @_TF8mangling18one_protocol_twiceFTPS_3Foo_PS0___T_
-func one_protocol_twice(_: Foo, _: Foo) {}
+func one_protocol_twice(_ _: Foo, _: Foo) {}
 // CHECK-LABEL: sil hidden @_TF8mangling12two_protocolFPS_3BarS_3Foo_T_
-func two_protocol(_: protocol<Foo, Bar>) {}
+func two_protocol(_ _: protocol<Foo, Bar>) {}
 
 // Ensure archetype depths are mangled correctly.
 class Zim<T> {
   // CHECK-LABEL: sil hidden @_TFC8mangling3Zim4zangurfTxqd___T_
-  func zang<U>(_: T, _: U) {}
+  func zang<U>(_ _: T, _: U) {}
   // CHECK-LABEL: sil hidden @_TFC8mangling3Zim4zungurfTqd__x_T_
-  func zung<U>(_: U, _: T) {}
+  func zung<U>(_ _: U, _: T) {}
 }
 
 // Don't crash mangling single-protocol "composition" types.
@@ -94,7 +94,7 @@ enum GenericUnion<T> {
   case Foo(Int)
 }
 
-func instantiateGenericUnionConstructor<T>(t: T) {
+func instantiateGenericUnionConstructor<T>(_ t: T) {
   _ = GenericUnion<T>.Foo
 }
 
@@ -130,9 +130,9 @@ protocol HasAssocType {
 }
 
 // CHECK-LABEL: sil hidden @_TF8mangling4fooAuRxS_12HasAssocTyperFxT_ : $@convention(thin) <T where T : HasAssocType> (@in T) -> ()
-func fooA<T: HasAssocType>(_: T) {}
+func fooA<T: HasAssocType>(_ _: T) {}
 // CHECK-LABEL: sil hidden @_TF8mangling4fooBuRxS_12HasAssocTypewx5AssocS_9AssocReqtrFxT_ : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in T) -> ()
-func fooB<T: HasAssocType where T.Assoc: AssocReqt>(_: T) {}
+func fooB<T: HasAssocType where T.Assoc: AssocReqt>(_ _: T) {}
 
 // CHECK-LABEL: sil hidden @_TZF8manglingoi2qqFTSiSi_T_
 func ??(x: Int, y: Int) {}

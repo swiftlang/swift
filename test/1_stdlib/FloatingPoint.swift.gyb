@@ -220,7 +220,7 @@ func getPositiveSubnormal_Float64() -> Float64 {
 % for FloatSelf in ['Float32', 'Float64']:
 
 func checkFloatingPointComparison_${FloatSelf}(
-  expected: ExpectedComparisonResult,
+  _ expected: ExpectedComparisonResult,
   _ lhs: ${FloatSelf}, _ rhs: ${FloatSelf},
   //===--- TRACE boilerplate ----------------------------------------------===//
   // @autoclosure _ message: () -> String = "",

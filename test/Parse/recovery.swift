@@ -33,7 +33,7 @@ func useContainer() -> () {
   func exists() -> Bool { return true }
 }
 
-func test(a: BadAttributes) -> () {
+func test(_ a: BadAttributes) -> () {
   a.exists() // no-warning
 }
 
@@ -138,7 +138,7 @@ func missingWhileInRepeat() {
 }
 
 // expected-note @+1 {{in call to function 'acceptsClosure'}}
-func acceptsClosure<T>(t: T) -> Bool { return true }
+func acceptsClosure<T>(_ t: T) -> Bool { return true }
 
 func missingControllingExprInFor() {
   for // expected-error {{expected initialization in a 'for' statement}}
@@ -319,13 +319,13 @@ struct ErrorTypeInVarDecl11 {
   var v2 : Int
 }
 
-func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected identifier for type name}}
+func ErrorTypeInPattern1(_ _: protocol<) { } // expected-error {{expected identifier for type name}}
 
-func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol composition type}}
+func ErrorTypeInPattern2(_ _: protocol<F) { } // expected-error {{expected '>' to complete protocol composition type}}
 // expected-note@-1 {{to match this opening '<'}}
 // expected-error@-2 {{use of undeclared type 'F'}}
 
-func ErrorTypeInPattern3(_: protocol<F,) { } // expected-error {{expected identifier for type name}}
+func ErrorTypeInPattern3(_ _: protocol<F,) { } // expected-error {{expected identifier for type name}}
 // expected-error@-1 {{use of undeclared type 'F'}}
 
 struct ErrorGenericParameterList1< // expected-error {{expected an identifier to name generic parameter}} expected-error {{expected '{' in struct}}
@@ -515,8 +515,8 @@ func foo2(bar! = baz) {}
 // <rdar://problem/18662272> Infinite loop and unbounded memory consumption in parser
 class Baz {}
 class Bar<T> {}
-func f1(a: Bar<Baz!>) {}
-func f2(a: Bar<Baz /* some comment */!>) {}
+func f1(_ a: Bar<Baz!>) {}
+func f2(_ a: Bar<Baz /* some comment */!>) {}
 
 
 // rdar://19605567
@@ -538,7 +538,7 @@ case let (jeb):
 // rdar://19605164
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {
-func a(s: S[{{g) -> Int {}  // expected-note {{to match this opening '('}}
+func a(_ s: S[{{g) -> Int {}  // expected-note {{to match this opening '('}}
 // expected-error@+3 {{expected parameter name followed by ':'}}
 // expected-error@+2 2 {{expected ',' separator}}
 // expected-error@+1 {{expected ')' in parameter}}
@@ -567,7 +567,7 @@ func f1() {
 
 
 // <rdar://problem/20489838> QoI: Nonsensical error and fixit if "let" is missing between 'if let ... where' clauses
-func testMultiPatternConditionRecovery(x: Int?) {
+func testMultiPatternConditionRecovery(_ x: Int?) {
   // expected-error@+1 {{binding ended by previous 'where' clause; use 'let' to introduce a new one}} {{30-30=let }}
   if let y = x where y == 0, z = x {
     _ = y
@@ -643,7 +643,7 @@ protocol B23086402 {
 }
 
 // <rdar://problem/23550816> QoI: Poor diagnostic in argument list of "print" (varargs related)
-func test23086402(a: A23086402) {
+func test23086402(_ a: A23086402) {
   print(a.b.c + "")  // expected-error {{cannot convert value of type '[String]' to expected argument type 'String'}}
 }
 

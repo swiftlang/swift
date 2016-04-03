@@ -5,10 +5,10 @@
 
 // String/NSString bridging functions.
 @_silgen_name("swift_StringToNSString") internal
-func _convertStringToNSString(string: String) -> NSString
+func _convertStringToNSString(_ string: String) -> NSString
 
 @_silgen_name("swift_NSStringToString") internal
-func _convertNSStringToString(nsstring: NSString?) -> String
+func _convertNSStringToString(_ nsstring: NSString?) -> String
 
 @_silgen_name("swift_ArrayToNSArray") internal
 func _convertArrayToNSArray<T>(array: Array<T>) -> NSArray
@@ -137,6 +137,6 @@ extension NSError: ErrorProtocol {
   public var _code: Int { return code }
 }
 
-public func _convertErrorProtocolToNSError(x: ErrorProtocol) -> NSError {
+public func _convertErrorProtocolToNSError(_ x: ErrorProtocol) -> NSError {
   return x as NSError
 }

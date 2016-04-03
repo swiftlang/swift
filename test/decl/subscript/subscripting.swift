@@ -180,7 +180,7 @@ struct MissingGetterSubscript2 {
   }
 }
 
-func test_subscript(x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubscript,
+func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubscript,
                     ovl: inout OverloadedSubscript, ret: inout RetOverloadedSubscript) {
   no[i] = value // expected-error{{type 'NoSubscript' has no subscript members}}
 
@@ -201,11 +201,11 @@ func test_subscript(x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubscr
   ret[i] = value
 }
 
-func subscript_rvalue_materialize(i: inout Int) {
+func subscript_rvalue_materialize(_ i: inout Int) {
   i = X1(stored: 0)[i]
 }
 
-func subscript_coerce(fn: ([UnicodeScalar], [UnicodeScalar]) -> Bool) {}
+func subscript_coerce(_ fn: ([UnicodeScalar], [UnicodeScalar]) -> Bool) {}
 func test_subscript_coerce() {
   subscript_coerce({ $0[$0.count-1] < $1[$1.count-1] })
 }

@@ -7,7 +7,7 @@ protocol CustomStringConvertible {
 struct TestFormat {}
 
 protocol FormattedPrintable : CustomStringConvertible { 
-  func print(_: TestFormat)
+  func print(_ _: TestFormat)
 }
 
 struct IsPrintable1 : CustomStringConvertible {
@@ -17,9 +17,9 @@ struct IsPrintable1 : CustomStringConvertible {
 func accept_creates_Printable (@noescape _: () -> CustomStringConvertible) {}
 func accept_creates_FormattedPrintable (@noescape _: () -> FormattedPrintable) {}
 
-func fp_to_p(fp: FormattedPrintable) -> CustomStringConvertible { return fp; }
-func p_to_fp(p: CustomStringConvertible) -> FormattedPrintable { }
-func p_to_ip1(p: CustomStringConvertible) -> IsPrintable1 { }
+func fp_to_p(_ fp: FormattedPrintable) -> CustomStringConvertible { return fp; }
+func p_to_fp(_ p: CustomStringConvertible) -> FormattedPrintable { }
+func p_to_ip1(_ p: CustomStringConvertible) -> IsPrintable1 { }
 
 func protocolConformance(@autoclosure ac1: () -> CustomStringConvertible,
                          @autoclosure ac2: () -> FormattedPrintable,
@@ -41,8 +41,8 @@ func protocolConformance(@autoclosure ac1: () -> CustomStringConvertible,
   accept_creates_FormattedPrintable(ip1) // expected-error{{cannot convert value of type '@autoclosure () -> IsPrintable1' to expected argument type '@noescape () -> FormattedPrintable'}}
 }
 
-func p_gen_to_fp(_: () -> CustomStringConvertible) -> FormattedPrintable {}
-func fp_gen_to_p(_: () -> FormattedPrintable) -> CustomStringConvertible {}
+func p_gen_to_fp(_ _: () -> CustomStringConvertible) -> FormattedPrintable {}
+func fp_gen_to_p(_ _: () -> FormattedPrintable) -> CustomStringConvertible {}
 
 func nonTrivialNested() {
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003

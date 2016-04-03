@@ -79,15 +79,15 @@ class Parent : Patchwork {
 
 class Child : Parent {}
 
-func t1(s: Trivial?) -> Trivial {
+func t1(_ s: Trivial?) -> Trivial {
   return Trivial(n: s!.n * 2)
 }
 
-func l1(s: Loadable?) -> Loadable {
+func l1(_ s: Loadable?) -> Loadable {
   return Loadable(n: s!.n * 2)
 }
 
-func a1(s: AddrOnly?) -> AddrOnly {
+func a1(_ s: AddrOnly?) -> AddrOnly {
   return AddrOnly(n: s!.n * 2)
 }
 
@@ -111,27 +111,27 @@ FunctionConversionTestSuite.test("Optional") {
   expectEqual(64, g32(AddrOnly(n: 32))?.n)
 }
 
-func t2(s: Quilt) -> Trivial {
+func t2(_ s: Quilt) -> Trivial {
   return s as! Trivial
 }
 
-func t3(s: Quilt?) -> Trivial {
+func t3(_ s: Quilt?) -> Trivial {
   return s! as! Trivial
 }
 
-func l2(s: Quilt) -> Loadable {
+func l2(_ s: Quilt) -> Loadable {
   return s as! Loadable
 }
 
-func l3(s: Quilt?) -> Loadable {
+func l3(_ s: Quilt?) -> Loadable {
   return s! as! Loadable
 }
 
-func a2(s: Quilt) -> AddrOnly {
+func a2(_ s: Quilt) -> AddrOnly {
   return s as! AddrOnly
 }
 
-func a3(s: Quilt?) -> AddrOnly {
+func a3(_ s: Quilt?) -> AddrOnly {
   return s! as! AddrOnly
 }
 
@@ -161,7 +161,7 @@ FunctionConversionTestSuite.test("Existential") {
   expectEqual(33, g33(AddrOnly(n: 33)).n)
 }
 
-func em(t: Quilt.Type?) -> Trivial.Type {
+func em(_ t: Quilt.Type?) -> Trivial.Type {
   return t! as! Trivial.Type
 }
 
@@ -182,11 +182,11 @@ FunctionConversionTestSuite.test("ExistentialMetatype") {
   expectEqual(true, result4 as! Trivial.Type == Trivial.self)
 }
 
-func c1(p: Parent) -> (Child, Trivial) {
+func c1(_ p: Parent) -> (Child, Trivial) {
   return (Child(n: p.n), Trivial(n: p.n))
 }
 
-func c2(p: Parent?) -> (Child, Trivial) {
+func c2(_ p: Parent?) -> (Child, Trivial) {
   return (Child(n: p!.n), Trivial(n: p!.n))
 }
 
@@ -198,11 +198,11 @@ FunctionConversionTestSuite.test("ClassUpcast") {
   expectEqual(g2(Child(n: 4)).0!.n, 4)
 }
 
-func cm1(p: Parent.Type) -> (Child.Type, Trivial) {
+func cm1(_ p: Parent.Type) -> (Child.Type, Trivial) {
   return (Child.self, Trivial(n: 0))
 }
 
-func cm2(p: Parent.Type?) -> (Child.Type, Trivial) {
+func cm2(_ p: Parent.Type?) -> (Child.Type, Trivial) {
   return (Child.self, Trivial(n: 0))
 }
 
@@ -220,11 +220,11 @@ FunctionConversionTestSuite.test("ClassMetatypeUpcast") {
   expectEqual(true, result3.0! == Child.self)
 }
 
-func sq(i: Int) -> Int {
+func sq(_ i: Int) -> Int {
   return i * i
 }
 
-func f1(f: Any) -> Int -> Int {
+func f1(_ f: Any) -> Int -> Int {
   return f as! (Int -> Int)
 }
 
@@ -234,11 +234,11 @@ FunctionConversionTestSuite.test("FuncExistential") {
   expectEqual(100, f1(g11(sq))(10))
 }
 
-func generic1<T>(t: Parent) -> (T, Trivial) {
+func generic1<T>(_ t: Parent) -> (T, Trivial) {
   return (t as! T, Trivial(n: 0))
 }
 
-func generic2<T : Parent>(f: Parent -> (T, Trivial), t: T) -> Child -> (Parent, Trivial?) {
+func generic2<T : Parent>(_ f: Parent -> (T, Trivial), t: T) -> Child -> (Parent, Trivial?) {
   return f
 }
 

@@ -16,11 +16,11 @@ func test() {
   var _: Bool = 1 + 2 ~~ 3 + 4 // (1 + 2) ~~ (3 + 4)
 }
 
-func conformsToItself(x: inout P3, y: P3) {
+func conformsToItself(_ x: inout P3, y: P3) {
   x = y
 }
 
-func testOverrides(obj: Sub) {
+func testOverrides(_ obj: Sub) {
   obj.foo()
   obj.prop = 5
 }

@@ -6,11 +6,11 @@
 #if PROTO
 
 public protocol Proto {
-  func method<T>(_: T?)
+  func method<T>(_ _: T?)
 }
   
 extension Proto {
-  public func method<T>(_: T?) {}
+  public func method<T>(_ _: T?) {}
 }
 
 #elseif MODEL
@@ -29,7 +29,7 @@ import ModelModule
 
 struct OtherStruct {}
 
-func test<T: Proto>(x: T) {
+func test<T: Proto>(_ x: T) {
   x.method(OtherStruct())
 }
 

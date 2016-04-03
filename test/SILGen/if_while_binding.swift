@@ -3,9 +3,9 @@
 func foo() -> String? { return "" }
 func bar() -> String? { return "" }
 
-func a(x: String) {}
-func b(x: String) {}
-func c(x: String) {}
+func a(_ x: String) {}
+func b(_ x: String) {}
+func c(_ x: String) {}
 
 func marker_1() {}
 func marker_2() {}
@@ -112,7 +112,7 @@ func while_loop() {
 // CHECK:         br [[COND]]
 // CHECK:       [[DONE]]:
 // CHECK:         strong_release %0
-func while_loop_generic<T>(source: () -> T?) {
+func while_loop_generic<T>(_ source: () -> T?) {
   while let x = source() {
   }
 }

@@ -36,7 +36,7 @@ func g5(_ a: Int) { }
 class X {
   init(a a: Int) { } // expected-warning{{extraneous duplicate parameter name; 'a' already has an argument label}}{{8-10=}}
   func f1(a a: Int, b: Int) { }
-  func f2(a: Int, b b: Int) { } // expected-warning{{extraneous duplicate parameter name; 'b' already has an argument label}}{{19-21=}}
+  func f2(_ a: Int, b b: Int) { } // expected-warning{{extraneous duplicate parameter name; 'b' already has an argument label}}{{19-21=}}
 
   func f3(_ a: Int, b: Int) { }
   // expected-warning@-1{{extraneous '_' in parameter: 'a' has no keyword argument name}}{{11-13=}}

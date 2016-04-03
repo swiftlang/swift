@@ -8,7 +8,7 @@ enum binary {
   init() { self = .Zero }
 }
 
-func f5(x: inout binary) {}
+func f5(_ x: inout binary) {}
 
 //===---
 //===--- IB attributes
@@ -43,16 +43,16 @@ class Inspect {
 
 @objc_block  // expected-error {{attribute can only be applied to types, not declarations}}
 func foo() {}
-func foo(x: @convention(block) Int) {} // expected-error {{attribute only applies to syntactic function types}}
-func foo(x: @convention(block) (Int) -> Int) {}
+func foo(_ x: @convention(block) Int) {} // expected-error {{attribute only applies to syntactic function types}}
+func foo(_ x: @convention(block) (Int) -> Int) {}
 
 @_transparent
 func zim() {}
 @_transparent
-func zung<T>(_: T) {}
+func zung<T>(_ _: T) {}
 @_transparent // expected-error{{@_transparent cannot be applied to stored properties}} {{1-15=}}
 var zippity : Int
-func zoom(x: @_transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}}
+func zoom(_ x: @_transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}}
 protocol ProtoWithTransparent {
   @_transparent// expected-error{{@_transparent is not supported on declarations within protocols}} {{3-16=}}
   func transInProto()

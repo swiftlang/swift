@@ -9,7 +9,7 @@
 
 import has_xref
 
-func use<T: DefaultInitializable>(_: T) {}
-func test(x: SpecialInt) {
+func use<T: DefaultInitializable>(_ _: T) {}
+func test(_ x: SpecialInt) {
   use(x)
 }

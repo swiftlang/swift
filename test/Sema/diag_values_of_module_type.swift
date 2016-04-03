@@ -63,12 +63,12 @@ func goodTest1() {
   diag_values_of_module_type_foo.someFunc()
 }
 
-func goodTest2a(a: Swift.Int) {}
-func goodTest2b(a: Swift.Int, withInt b: Swift.Int) {}
+func goodTest2a(_ a: Swift.Int) {}
+func goodTest2b(_ a: Swift.Int, withInt b: Swift.Int) {}
 
 func goodTest3() -> Swift.Int {}
 
-func goodTest4<T : diag_values_of_module_type_foo.SomeProtocol>(_: T) {}
+func goodTest4<T : diag_values_of_module_type_foo.SomeProtocol>(_ _: T) {}
 
 func goodTest5<T : diag_values_of_module_type_foo.SomeProtocol
                where T.Foo == Swift.Int>(_: T) {}

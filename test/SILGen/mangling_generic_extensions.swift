@@ -19,9 +19,9 @@ extension Foo {
   // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foo3zimfT_T_
   func zim() { }
   // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foo4zangu_rfqd__T_
-  func zang<U>(_: U) { }
+  func zang<U>(_ _: U) { }
   // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foo4zungu_Rd__S_8Runcible_zwd__3Hatrfqd__T_
-  func zung<U: Runcible where U.Hat == T>(_: U) { }
+  func zung<U: Runcible where U.Hat == T>(_ _: U) { }
 }
 
 extension Foo where T: Runcible {

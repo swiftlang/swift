@@ -4,12 +4,12 @@ public func getBaseClass() -> BaseClass {
   return BaseClass()
 }
 
-public func useBaseClass(_: BaseClass) {}
+public func useBaseClass(_ _: BaseClass) {}
 
 @objc public
 protocol BaseProto {}
 
-public func useBaseProto(_: BaseProto) {}
+public func useBaseProto(_ _: BaseProto) {}
 
 extension BaseClass {
   public func extensionMethod() {}

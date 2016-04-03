@@ -9,7 +9,7 @@
 
 import test_module
 
-func foo(a: TwoInts) {
+func foo(_ a: TwoInts) {
 }
 
 // CHECK:      key.kind: source.lang.swift.import.module.swift

@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func makeIncrementor(amount: Int) -> () -> Int {
+func makeIncrementor(_ amount: Int) -> () -> Int {
   func incrementor() -> Int {
     currentTotal += amount // expected-error{{cannot capture 'currentTotal' before it is declared}}
     return currentTotal // note: redundant diagnostic suppressed
@@ -89,7 +89,7 @@ class X {
   func foo() { }
 }
 
-func captureLists(x: X) {
+func captureLists(_ x: X) {
   { [unowned x] in x.foo() }();
   let _: Void = { [unowned x] in x.foo() }()
   let _: Void = { [weak x] in x?.foo() }()

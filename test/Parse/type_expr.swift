@@ -109,7 +109,7 @@ func genQualifiedType() {
   _ = Gen<Foo>.Bar.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}} {{20-31=self}}
 }
 
-func archetype<T: Zim>(_: T) {
+func archetype<T: Zim>(_ _: T) {
   _ = T.self
   _ = T()
   // TODO let prop = T.prop
@@ -120,7 +120,7 @@ func archetype<T: Zim>(_: T) {
   _ = T.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}} {{9-20=self}}
 }
 
-func assocType<T: Zim where T.Zang: Zim>(_: T) {
+func assocType<T: Zim where T.Zang: Zim>(_ _: T) {
   _ = T.Zang.self
   _ = T.Zang()
   // TODO _ = T.Zang.prop

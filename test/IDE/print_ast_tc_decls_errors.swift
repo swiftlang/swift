@@ -169,7 +169,7 @@ typealias Typealias1 = FooNonExistentProtocol // expected-error {{use of undecla
 // TYREPR: {{^}}typealias Typealias1 = FooNonExistentProtocol{{$}}
 
 // sr-197
-func foo(bar: Typealias1<Int>) {} // Should not generate error "cannot specialize non-generic type '<<error type>>'"
+func foo(_ bar: Typealias1<Int>) {} // Should not generate error "cannot specialize non-generic type '<<error type>>'"
 
 // Associated types.
 

@@ -18,10 +18,10 @@ extension NSPort : SwiftObjCProto {}
 
 var obj : AnyObject
 
-func genericCast<T>(x: AnyObject, _: T.Type) -> T? {
+func genericCast<T>(_ x: AnyObject, _: T.Type) -> T? {
   return x as? T
 }
-func genericCastObjCBound<T: NSObject>(x: AnyObject, _: T.Type) -> T? {
+func genericCastObjCBound<T: NSObject>(_ x: AnyObject, _: T.Type) -> T? {
   return x as? T
 }
 
@@ -578,7 +578,7 @@ if let array = obj as? Dictionary<String, [Dictionary<String, String>]> {
 }
 
 // Helper function that downcasts 
-func downcastToStringArrayOptOpt(obj: AnyObject??!!) {
+func downcastToStringArrayOptOpt(_ obj: AnyObject??!!) {
   if let strArrOptOpt = obj as? [String]?? {
     if let strArrOpt = strArrOptOpt {
       if let strArr = strArrOpt {

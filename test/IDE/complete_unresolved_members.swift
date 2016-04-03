@@ -72,17 +72,17 @@ func OptionSetTaker1(Op : SomeOptions1) {}
 
 func OptionSetTaker2(Op : SomeOptions2) {}
 
-func OptionSetTaker3(Op1: SomeOptions1, Op2: SomeOptions2) {}
+func OptionSetTaker3(_ Op1: SomeOptions1, Op2: SomeOptions2) {}
 
-func OptionSetTaker4(Op1: SomeOptions2, Op2: SomeOptions1) {}
+func OptionSetTaker4(_ Op1: SomeOptions2, Op2: SomeOptions1) {}
 
-func OptionSetTaker5(Op1: SomeOptions1, Op2: SomeOptions2, En1 : SomeEnum1, En2: SomeEnum2) {}
+func OptionSetTaker5(_ Op1: SomeOptions1, Op2: SomeOptions2, En1 : SomeEnum1, En2: SomeEnum2) {}
 
-func OptionSetTaker6(Op1: SomeOptions1, Op2: SomeOptions2) {}
+func OptionSetTaker6(_ Op1: SomeOptions1, Op2: SomeOptions2) {}
 
-func OptionSetTaker6(Op1: SomeOptions2, Op2: SomeOptions1) {}
+func OptionSetTaker6(_ Op1: SomeOptions2, Op2: SomeOptions1) {}
 
-func OptionSetTaker7(Op1: SomeOptions1, Op2: SomeOptions2) -> Int {return 0}
+func OptionSetTaker7(_ Op1: SomeOptions1, Op2: SomeOptions2) -> Int {return 0}
 
 func EnumTaker1(E : SomeEnum1) {}
 
@@ -205,7 +205,7 @@ class C6 {
 }
 
 class C6 {
-  func f1(e: SomeEnum1) {
+  func f1(_ e: SomeEnum1) {
     if let x = Optional(e) where x == .#^UNRESOLVED_25^#
   }
 }

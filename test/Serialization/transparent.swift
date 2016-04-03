@@ -48,7 +48,7 @@ func wrap_br() {
 // SIL: bb[[CASE2]](%{{.*}} : $Int32):
 // SIL: bb[[CASE3]](%{{.*}} : $String):
 // SIL: bb[[CASE4]](%{{.*}} : $(Int32, String)):
-func test_switch(u: MaybePair) {
+func test_switch(_ u: MaybePair) {
   do_switch(u: u)
 }
 
@@ -66,7 +66,7 @@ func test_wrapper() {
 }
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent17open_existentialsFT1pPS_1P_2cpPS_2CP__T_
-func test_open_existentials(p: P, cp: CP) {
+func test_open_existentials(_ p: P, cp: CP) {
   // SIL: open_existential_addr [[EXIST:%[0-9]+]] : $*P to $*@opened([[N:".*"]]) P
   // SIL: open_existential_ref [[EXIST:%[0-9]+]] : $CP to $@opened([[M:".*"]]) CP
   open_existentials(p: p, cp: cp)

@@ -118,27 +118,27 @@ typealias FooTypealias = Int
 
 //===--- Test that we can code complete at the beginning of expr-postfix.
 
-func testExprPostfixBegin1(fooParam: FooStruct) {
+func testExprPostfixBegin1(_ fooParam: FooStruct) {
   #^EXPR_POSTFIX_BEGIN_1^#
 }
 
-func testExprPostfixBegin2(fooParam: FooStruct) {
+func testExprPostfixBegin2(_ fooParam: FooStruct) {
   1 + #^EXPR_POSTFIX_BEGIN_2^#
 }
 
-func testExprPostfixBegin3(fooParam: FooStruct) {
+func testExprPostfixBegin3(_ fooParam: FooStruct) {
   fooFunc()
   1 + #^EXPR_POSTFIX_BEGIN_3^#
 }
 
-func testExprPostfixBegin4(fooParam: FooStruct) {
+func testExprPostfixBegin4(_ fooParam: FooStruct) {
   "\(#^EXPR_POSTFIX_BEGIN_4^#)"
 }
 
-func testExprPostfixBegin3(fooParam: FooStruct) {
+func testExprPostfixBegin3(_ fooParam: FooStruct) {
   1+#^EXPR_POSTFIX_BEGIN_5^#
 }
-func testExprPostfixBegin3(fooParam: FooStruct) {
+func testExprPostfixBegin3(_ fooParam: FooStruct) {
   for i in 1...#^EXPR_POSTFIX_BEGIN_6^#
 }
 
@@ -146,17 +146,17 @@ func testExprPostfixBegin3(fooParam: FooStruct) {
 // In these cases, displaying '.instance*' completion results is technically
 // valid, but would be extremely surprising.
 
-func testExprPostfixBeginIgnored1(fooParam: FooStruct) {
+func testExprPostfixBeginIgnored1(_ fooParam: FooStruct) {
   fooFunc()
   #^EXPR_POSTFIX_BEGIN_IGNORED_1^#
 }
 
-func testExprPostfixBeginIgnored2(fooParam: FooStruct) {
+func testExprPostfixBeginIgnored2(_ fooParam: FooStruct) {
   123456789
   #^EXPR_POSTFIX_BEGIN_IGNORED_2^#
 }
 
-func testExprPostfixBeginIgnored3(fooParam: FooStruct) {
+func testExprPostfixBeginIgnored3(_ fooParam: FooStruct) {
   123456789 +
       fooFunc()
   #^EXPR_POSTFIX_BEGIN_IGNORED_3^#
@@ -164,7 +164,7 @@ func testExprPostfixBeginIgnored3(fooParam: FooStruct) {
 
 //===--- Test that we include function parameters in completion results.
 
-func testFindFuncParam1(fooParam: FooStruct, a: Int, b: Float, c: inout Double)(d: inout Double) {
+func testFindFuncParam1(_ fooParam: FooStruct, a: Int, b: Float, c: inout Double)(d: inout Double) {
   #^FIND_FUNC_PARAM_1^#
 // FIND_FUNC_PARAM_1: Begin completions
 // FIND_FUNC_PARAM_1-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
@@ -174,7 +174,7 @@ func testFindFuncParam1(fooParam: FooStruct, a: Int, b: Float, c: inout Double)(
 // FIND_FUNC_PARAM_1: End completions
 }
 
-func testFindFuncParam2<Foo : FooProtocol>(fooParam: FooStruct, foo: Foo) {
+func testFindFuncParam2<Foo : FooProtocol>(_ fooParam: FooStruct, foo: Foo) {
   #^FIND_FUNC_PARAM_2^#
 // FIND_FUNC_PARAM_2: Begin completions
 // FIND_FUNC_PARAM_2-DAG: Decl[GenericTypeParam]/Local: Foo[#Foo#]{{; name=.+$}}
@@ -183,7 +183,7 @@ func testFindFuncParam2<Foo : FooProtocol>(fooParam: FooStruct, foo: Foo) {
 }
 
 struct TestFindFuncParam3_4 {
-  func testFindFuncParam3(a: Int, b: Float)(c: Double) {
+  func testFindFuncParam3(_ a: Int, b: Float)(c: Double) {
     #^FIND_FUNC_PARAM_3^#
 // FIND_FUNC_PARAM_3: Begin completions
 // FIND_FUNC_PARAM_3-DAG: Decl[LocalVar]/Local: self[#TestFindFuncParam3_4#]{{; name=.+$}}
@@ -193,7 +193,7 @@ struct TestFindFuncParam3_4 {
 // FIND_FUNC_PARAM_3: End completions
   }
 
-  func testFindFuncParam4<U>(a: Int, b: U) {
+  func testFindFuncParam4<U>(_ a: Int, b: U) {
     #^FIND_FUNC_PARAM_4^#
 // FIND_FUNC_PARAM_4: Begin completions
 // FIND_FUNC_PARAM_4-DAG: Decl[GenericTypeParam]/Local: U[#U#]{{; name=.+$}}
@@ -205,7 +205,7 @@ struct TestFindFuncParam3_4 {
 }
 
 struct TestFindFuncParam5_6<T> {
-  func testFindFuncParam5(a: Int, b: T) {
+  func testFindFuncParam5(_ a: Int, b: T) {
     #^FIND_FUNC_PARAM_5^#
 // FIND_FUNC_PARAM_5: Begin completions
 // FIND_FUNC_PARAM_5-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
@@ -215,7 +215,7 @@ struct TestFindFuncParam5_6<T> {
 // FIND_FUNC_PARAM_5: End completions
   }
 
-  func testFindFuncParam6<U>(a: Int, b: T, c: U) {
+  func testFindFuncParam6<U>(_ a: Int, b: T, c: U) {
     #^FIND_FUNC_PARAM_6^#
 // FIND_FUNC_PARAM_6: Begin completions
 // FIND_FUNC_PARAM_6-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
@@ -229,7 +229,7 @@ struct TestFindFuncParam5_6<T> {
 }
 
 class TestFindFuncParam7 {
-  func testFindFuncParam7(a: Int, b: Float)(c: Double) {
+  func testFindFuncParam7(_ a: Int, b: Float)(c: Double) {
     #^FIND_FUNC_PARAM_7^#
 // FIND_FUNC_PARAM_7: Begin completions
 // FIND_FUNC_PARAM_7-DAG: Decl[LocalVar]/Local: self[#TestFindFuncParam7#]{{; name=.+$}}
@@ -240,7 +240,7 @@ class TestFindFuncParam7 {
   }
 }
 
-func testFindFuncParamSelector1(a: Int, b x: Float, foo fooParam: FooStruct, bar barParam: inout FooStruct) {
+func testFindFuncParamSelector1(_ a: Int, b x: Float, foo fooParam: FooStruct, bar barParam: inout FooStruct) {
   #^FIND_FUNC_PARAM_SELECTOR_1^#
 // FIND_FUNC_PARAM_SELECTOR_1: Begin completions
 // FIND_FUNC_PARAM_SELECTOR_1-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
@@ -413,7 +413,7 @@ func testGenericTypealias2() {
   y = #^GENERIC_TYPEALIAS_2^#
 }
 
-func testInForEach1(arg: Int) {
+func testInForEach1(_ arg: Int) {
   let local = 2
   for index in #^IN_FOR_EACH_1^# {
     let inBody = 3
@@ -426,14 +426,14 @@ func testInForEach1(arg: Int) {
 // IN_FOR_EACH_1: Decl[LocalVar]/Local:               arg[#Int#];
 // IN_FOR_EACH_1-NOT: Decl[LocalVar]
 }
-func testInForEach2(arg: Int) {
+func testInForEach2(_ arg: Int) {
   let local = 2
   for index in 1 ... #^IN_FOR_EACH_2^# {
     let inBody = 3
   }
   let after = 4
 }
-func testInForEach3(arg: Int) {
+func testInForEach3(_ arg: Int) {
   let local = 2
   for index: Int in 1 ... 2 where #^IN_FOR_EACH_3^# {
     let inBody = 3
@@ -448,7 +448,7 @@ func testInForEach3(arg: Int) {
 // IN_FOR_EACH_3: Decl[LocalVar]/Local:               arg[#Int#];
 // IN_FOR_EACH_3-NOT: Decl[LocalVar]
 }
-func testInForEach4(arg: Int) {
+func testInForEach4(_ arg: Int) {
   let local = 2
   for index in 1 ... 2 {
     #^IN_FOR_EACH_4^#

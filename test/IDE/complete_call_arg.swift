@@ -60,7 +60,7 @@ func foo1(a : Int, b : Int) {}
 func bar(a : String, b : String?) {}
 func bar1(a : String, b1 : String) {}
 func bar1(a : String, b2 : String) {}
-func foo3(a: Int?) {}
+func foo3(_ a: Int?) {}
 
 class InternalGen {
   func InternalIntGen() -> Int { return 0 }
@@ -68,7 +68,7 @@ class InternalGen {
   func InternalStringGen() -> String { return "" }
   func InternalStringOpGen() -> String? {return ""}
   func InternalIntTaker(i1 : Int, i2 : Int) {}
-  func InternalStringTaker(s1: String, s2 : String) {}
+  func InternalStringTaker(_ s1: String, s2 : String) {}
 }
 
 class Gen {
@@ -78,7 +78,7 @@ class Gen {
   func StringGen() -> String { return "" }
   func StringOpGen() -> String? {return ""}
   func IntTaker(i1 : Int, i2 : Int) {}
-  func StringTaker(s1: String, s2 : String) {}
+  func StringTaker(_ s1: String, s2 : String) {}
 }
 
 func GenGenerator(i : Int) -> Gen { return Gen() }
@@ -267,11 +267,11 @@ class C4 {
     foo(1, b1 : GenGenerator(1).#^MEMBER9^#
   }
 
-  func f10(G: Gen) {
+  func f10(_ G: Gen) {
     foo(G.#^FARG3^#
   }
 
-  func f11(G: Gen) {
+  func f11(_ G: Gen) {
     bar(G.#^FARG4^#
   }
 
@@ -353,7 +353,7 @@ func testArg2Name3() {
 }
 // FIRST_ARG_NAME_3: Keyword/ExprSpecific: arg1: [#Argument name#]
 
-func takeArray<T>(x: [T]) {}
+func takeArray<T>(_ x: [T]) {}
 struct TestBoundGeneric1 {
   let x: [Int]
   let y: [Int]

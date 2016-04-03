@@ -120,29 +120,29 @@ struct d0100_FooStruct {
   func instanceFunc0() {}
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc0(){{$}}
 
-  func instanceFunc1(a: Int) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFunc1(a: Int){{$}}
+  func instanceFunc1(_ a: Int) {}
+// PASS_COMMON-NEXT: {{^}}  func instanceFunc1(_ a: Int){{$}}
 
-  func instanceFunc2(a: Int, b: inout Double) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFunc2(a: Int, b: inout Double){{$}}
+  func instanceFunc2(_ a: Int, b: inout Double) {}
+// PASS_COMMON-NEXT: {{^}}  func instanceFunc2(_ a: Int, b: inout Double){{$}}
 
-  func instanceFunc3(a: Int, b: Double) { var a = a; a = 1; _ = a }
-// PASS_COMMON-NEXT: {{^}}  func instanceFunc3(a: Int, b: Double){{$}}
+  func instanceFunc3(_ a: Int, b: Double) { var a = a; a = 1; _ = a }
+// PASS_COMMON-NEXT: {{^}}  func instanceFunc3(_ a: Int, b: Double){{$}}
 
-  func instanceFuncWithDefaultArg1(a: Int = 0) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg1(a: Int = default){{$}}
+  func instanceFuncWithDefaultArg1(_ a: Int = 0) {}
+// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg1(_ a: Int = default){{$}}
 
-  func instanceFuncWithDefaultArg2(a: Int = 0, b: Double = 0) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg2(a: Int = default, b: Double = default){{$}}
+  func instanceFuncWithDefaultArg2(_ a: Int = 0, b: Double = 0) {}
+// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg2(_ a: Int = default, b: Double = default){{$}}
 
-  func varargInstanceFunc0(v: Int...) {}
-// PASS_COMMON-NEXT: {{^}}  func varargInstanceFunc0(v: Int...){{$}}
+  func varargInstanceFunc0(_ v: Int...) {}
+// PASS_COMMON-NEXT: {{^}}  func varargInstanceFunc0(_ v: Int...){{$}}
 
-  func varargInstanceFunc1(a: Float, v: Int...) {}
-// PASS_COMMON-NEXT: {{^}}  func varargInstanceFunc1(a: Float, v: Int...){{$}}
+  func varargInstanceFunc1(_ a: Float, v: Int...) {}
+// PASS_COMMON-NEXT: {{^}}  func varargInstanceFunc1(_ a: Float, v: Int...){{$}}
 
-  func varargInstanceFunc2(a: Float, b: Double, v: Int...) {}
-// PASS_COMMON-NEXT: {{^}}  func varargInstanceFunc2(a: Float, b: Double, v: Int...){{$}}
+  func varargInstanceFunc2(_ a: Float, b: Double, v: Int...) {}
+// PASS_COMMON-NEXT: {{^}}  func varargInstanceFunc2(_ a: Float, b: Double, v: Int...){{$}}
 
   func overloadedInstanceFunc1() -> Int { return 0; }
 // PASS_COMMON-NEXT: {{^}}  func overloadedInstanceFunc1() -> Int{{$}}
@@ -150,14 +150,14 @@ struct d0100_FooStruct {
   func overloadedInstanceFunc1() -> Double { return 0.0; }
 // PASS_COMMON-NEXT: {{^}}  func overloadedInstanceFunc1() -> Double{{$}}
 
-  func overloadedInstanceFunc2(x: Int) -> Int { return 0; }
-// PASS_COMMON-NEXT: {{^}}  func overloadedInstanceFunc2(x: Int) -> Int{{$}}
+  func overloadedInstanceFunc2(_ x: Int) -> Int { return 0; }
+// PASS_COMMON-NEXT: {{^}}  func overloadedInstanceFunc2(_ x: Int) -> Int{{$}}
 
-  func overloadedInstanceFunc2(x: Double) -> Int { return 0; }
-// PASS_COMMON-NEXT: {{^}}  func overloadedInstanceFunc2(x: Double) -> Int{{$}}
+  func overloadedInstanceFunc2(_ x: Double) -> Int { return 0; }
+// PASS_COMMON-NEXT: {{^}}  func overloadedInstanceFunc2(_ x: Double) -> Int{{$}}
 
-  func builderFunc1(a: Int) -> d0100_FooStruct { return d0100_FooStruct(); }
-// PASS_COMMON-NEXT: {{^}}  func builderFunc1(a: Int) -> d0100_FooStruct{{$}}
+  func builderFunc1(_ a: Int) -> d0100_FooStruct { return d0100_FooStruct(); }
+// PASS_COMMON-NEXT: {{^}}  func builderFunc1(_ a: Int) -> d0100_FooStruct{{$}}
 
   subscript(i: Int) -> Double {
     get {
@@ -173,17 +173,17 @@ struct d0100_FooStruct {
   }
 // PASS_COMMON-NEXT: {{^}}  subscript(i: Int, j: Int) -> Double { get }{{$}}
 
-  func bodyNameVoidFunc1(a: Int, b x: Float) {}
-// PASS_COMMON-NEXT: {{^}}  func bodyNameVoidFunc1(a: Int, b x: Float){{$}}
+  func bodyNameVoidFunc1(_ a: Int, b x: Float) {}
+// PASS_COMMON-NEXT: {{^}}  func bodyNameVoidFunc1(_ a: Int, b x: Float){{$}}
 
-  func bodyNameVoidFunc2(a: Int, b x: Float, c y: Double) {}
-// PASS_COMMON-NEXT: {{^}}  func bodyNameVoidFunc2(a: Int, b x: Float, c y: Double){{$}}
+  func bodyNameVoidFunc2(_ a: Int, b x: Float, c y: Double) {}
+// PASS_COMMON-NEXT: {{^}}  func bodyNameVoidFunc2(_ a: Int, b x: Float, c y: Double){{$}}
 
-  func bodyNameStringFunc1(a: Int, b x: Float) -> String { return "" }
-// PASS_COMMON-NEXT: {{^}}  func bodyNameStringFunc1(a: Int, b x: Float) -> String{{$}}
+  func bodyNameStringFunc1(_ a: Int, b x: Float) -> String { return "" }
+// PASS_COMMON-NEXT: {{^}}  func bodyNameStringFunc1(_ a: Int, b x: Float) -> String{{$}}
 
-  func bodyNameStringFunc2(a: Int, b x: Float, c y: Double) -> String { return "" }
-// PASS_COMMON-NEXT: {{^}}  func bodyNameStringFunc2(a: Int, b x: Float, c y: Double) -> String{{$}}
+  func bodyNameStringFunc2(_ a: Int, b x: Float, c y: Double) -> String { return "" }
+// PASS_COMMON-NEXT: {{^}}  func bodyNameStringFunc2(_ a: Int, b x: Float, c y: Double) -> String{{$}}
 
   struct NestedStruct {}
 // PASS_COMMON-NEXT: {{^}}  struct NestedStruct {{{$}}
@@ -219,8 +219,8 @@ struct d0100_FooStruct {
   static func staticFunc0() {}
 // PASS_COMMON-NEXT: {{^}}  static func staticFunc0(){{$}}
 
-  static func staticFunc1(a: Int) {}
-// PASS_COMMON-NEXT: {{^}}  static func staticFunc1(a: Int){{$}}
+  static func staticFunc1(_ a: Int) {}
+// PASS_COMMON-NEXT: {{^}}  static func staticFunc1(_ a: Int){{$}}
 
   static func overloadedStaticFunc1() -> Int { return 0 }
 // PASS_COMMON-NEXT: {{^}}  static func overloadedStaticFunc1() -> Int{{$}}
@@ -228,11 +228,11 @@ struct d0100_FooStruct {
   static func overloadedStaticFunc1() -> Double { return 0.0 }
 // PASS_COMMON-NEXT: {{^}}  static func overloadedStaticFunc1() -> Double{{$}}
 
-  static func overloadedStaticFunc2(x: Int) -> Int { return 0 }
-// PASS_COMMON-NEXT: {{^}}  static func overloadedStaticFunc2(x: Int) -> Int{{$}}
+  static func overloadedStaticFunc2(_ x: Int) -> Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  static func overloadedStaticFunc2(_ x: Int) -> Int{{$}}
 
-  static func overloadedStaticFunc2(x: Double) -> Int { return 0 }
-// PASS_COMMON-NEXT: {{^}}  static func overloadedStaticFunc2(x: Double) -> Int{{$}}
+  static func overloadedStaticFunc2(_ x: Double) -> Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  static func overloadedStaticFunc2(_ x: Double) -> Int{{$}}
 }
 // PASS_COMMON-NEXT: {{^}}  init(instanceVar1: Int){{$}}
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
@@ -546,8 +546,8 @@ class d0170_TestAvailability {
 @objc class d0180_TestIBAttrs {
 // PASS_COMMON-LABEL: {{^}}@objc class d0180_TestIBAttrs {{{$}}
 
-  @IBAction func anAction(_: AnyObject) {}
-// PASS_COMMON-NEXT: {{^}}  @IBAction @objc func anAction(_: AnyObject){{$}}
+  @IBAction func anAction(_ _: AnyObject) {}
+// PASS_COMMON-NEXT: {{^}}  @IBAction @objc func anAction(_ _: AnyObject){{$}}
 
   @IBDesignable
   class ADesignableClass {}
@@ -660,27 +660,27 @@ struct d0210_Qualifications {
 // PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  var propFromClang1: FooStruct1{{$}}
 
 
-  func instanceFuncFromStdlib1(a: Int) -> Float {
+  func instanceFuncFromStdlib1(_ a: Int) -> Float {
     return 0.0
   }
-// PASS_QUAL_UNQUAL-NEXT:       {{^}}  func instanceFuncFromStdlib1(a: Int) -> Float{{$}}
-// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  func instanceFuncFromStdlib1(a: Int) -> Float{{$}}
+// PASS_QUAL_UNQUAL-NEXT:       {{^}}  func instanceFuncFromStdlib1(_ a: Int) -> Float{{$}}
+// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  func instanceFuncFromStdlib1(_ a: Int) -> Float{{$}}
 
-  func instanceFuncFromStdlib2(a: ObjCBool) {}
-// PASS_QUAL_UNQUAL-NEXT:       {{^}}  func instanceFuncFromStdlib2(a: ObjCBool){{$}}
-// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  func instanceFuncFromStdlib2(a: ObjCBool){{$}}
+  func instanceFuncFromStdlib2(_ a: ObjCBool) {}
+// PASS_QUAL_UNQUAL-NEXT:       {{^}}  func instanceFuncFromStdlib2(_ a: ObjCBool){{$}}
+// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  func instanceFuncFromStdlib2(_ a: ObjCBool){{$}}
 
-  func instanceFuncFromSwift1(a: FooSwiftStruct) -> FooSwiftStruct {
+  func instanceFuncFromSwift1(_ a: FooSwiftStruct) -> FooSwiftStruct {
     return FooSwiftStruct()
   }
-// PASS_QUAL_UNQUAL-NEXT:       {{^}}  func instanceFuncFromSwift1(a: FooSwiftStruct) -> FooSwiftStruct{{$}}
-// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  func instanceFuncFromSwift1(a: foo_swift_module.FooSwiftStruct) -> foo_swift_module.FooSwiftStruct{{$}}
+// PASS_QUAL_UNQUAL-NEXT:       {{^}}  func instanceFuncFromSwift1(_ a: FooSwiftStruct) -> FooSwiftStruct{{$}}
+// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  func instanceFuncFromSwift1(_ a: foo_swift_module.FooSwiftStruct) -> foo_swift_module.FooSwiftStruct{{$}}
 
-  func instanceFuncFromClang1(a: FooStruct1) -> FooStruct1 {
+  func instanceFuncFromClang1(_ a: FooStruct1) -> FooStruct1 {
     return FooStruct1(x: 0, y: 0.0)
   }
-// PASS_QUAL_UNQUAL-NEXT:       {{^}}  func instanceFuncFromClang1(a: FooStruct1) -> FooStruct1{{$}}
-// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  func instanceFuncFromClang1(a: FooStruct1) -> FooStruct1{{$}}
+// PASS_QUAL_UNQUAL-NEXT:       {{^}}  func instanceFuncFromClang1(_ a: FooStruct1) -> FooStruct1{{$}}
+// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  func instanceFuncFromClang1(_ a: FooStruct1) -> FooStruct1{{$}}
 }
 
 // FIXME: this should be printed reasonably in case we use
@@ -1106,10 +1106,10 @@ postfix operator <*> {}
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 protocol d2600_ProtocolWithOperator1 {
-  postfix func <*>(_: Int)
+  postfix func <*>(_ _: Int)
 }
 // PASS_2500: {{^}}protocol d2600_ProtocolWithOperator1 {{{$}}
-// PASS_2500-NEXT: {{^}}  postfix func <*>(_: Int){{$}}
+// PASS_2500-NEXT: {{^}}  postfix func <*>(_ _: Int){{$}}
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 struct d2601_TestAssignment {}
@@ -1208,10 +1208,10 @@ struct GenericParams1<
       GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz,
                   d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz)
   {}
-// PASS_ONE_LINE_TYPE-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<BarProtocol, FooProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<BarProtocol, FooProtocol>, GenericBaz>(_ a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<FooProtocol, BarProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<FooProtocol, BarProtocol>, GenericBaz>(_ a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
 }
 
 struct GenericParams2<T : FooProtocol where T : BarProtocol> {}
@@ -1249,37 +1249,37 @@ struct d2900_TypeSugar1 {
 // PASS_COMMON-LABEL: {{^}}struct d2900_TypeSugar1 {{{$}}
 // SYNTHESIZE_SUGAR_ON_TYPES-LABEL: {{^}}struct d2900_TypeSugar1 {{{$}}
 
-  func f1(x: [Int]) {}
-// PASS_COMMON-NEXT: {{^}}  func f1(x: [Int]){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f1(x: [Int]){{$}}
+  func f1(_ x: [Int]) {}
+// PASS_COMMON-NEXT: {{^}}  func f1(_ x: [Int]){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f1(_ x: [Int]){{$}}
 
-  func f2(x: Array<Int>) {}
-// PASS_COMMON-NEXT: {{^}}  func f2(x: Array<Int>){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f2(x: [Int]){{$}}
+  func f2(_ x: Array<Int>) {}
+// PASS_COMMON-NEXT: {{^}}  func f2(_ x: Array<Int>){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f2(_ x: [Int]){{$}}
 
-  func f3(x: Int?) {}
-// PASS_COMMON-NEXT: {{^}}  func f3(x: Int?){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f3(x: Int?){{$}}
+  func f3(_ x: Int?) {}
+// PASS_COMMON-NEXT: {{^}}  func f3(_ x: Int?){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f3(_ x: Int?){{$}}
 
-  func f4(x: Optional<Int>) {}
-// PASS_COMMON-NEXT: {{^}}  func f4(x: Optional<Int>){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f4(x: Int?){{$}}
+  func f4(_ x: Optional<Int>) {}
+// PASS_COMMON-NEXT: {{^}}  func f4(_ x: Optional<Int>){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f4(_ x: Int?){{$}}
 
-  func f5(x: [Int]...) {}
-// PASS_COMMON-NEXT: {{^}}  func f5(x: [Int]...){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f5(x: [Int]...){{$}}
+  func f5(_ x: [Int]...) {}
+// PASS_COMMON-NEXT: {{^}}  func f5(_ x: [Int]...){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f5(_ x: [Int]...){{$}}
 
-  func f6(x: Array<Int>...) {}
-// PASS_COMMON-NEXT: {{^}}  func f6(x: Array<Int>...){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f6(x: [Int]...){{$}}
+  func f6(_ x: Array<Int>...) {}
+// PASS_COMMON-NEXT: {{^}}  func f6(_ x: Array<Int>...){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f6(_ x: [Int]...){{$}}
 
-  func f7(x: [Int : Int]...) {}
-// PASS_COMMON-NEXT: {{^}}  func f7(x: [Int : Int]...){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f7(x: [Int : Int]...){{$}}
+  func f7(_ x: [Int : Int]...) {}
+// PASS_COMMON-NEXT: {{^}}  func f7(_ x: [Int : Int]...){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f7(_ x: [Int : Int]...){{$}}
 
-  func f8(x: Dictionary<String, Int>...) {}
-// PASS_COMMON-NEXT: {{^}}  func f8(x: Dictionary<String, Int>...){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f8(x: [String : Int]...){{$}}
+  func f8(_ x: Dictionary<String, Int>...) {}
+// PASS_COMMON-NEXT: {{^}}  func f8(_ x: Dictionary<String, Int>...){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f8(_ x: [String : Int]...){{$}}
 }
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}

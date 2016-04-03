@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func fizzbuzz(i: Int) -> String {
+func fizzbuzz(_ i: Int) -> String {
   return i % 3 == 0
     ? "fizz"
     : i % 5 == 0
@@ -27,10 +27,10 @@ protocol AddressOnly {}
 struct A : AddressOnly {}
 struct B : AddressOnly {}
 
-func consumeAddressOnly(_: AddressOnly) {}
+func consumeAddressOnly(_ _: AddressOnly) {}
 
 // CHECK: sil hidden @_TF7if_expr19addr_only_ternary_1
-func addr_only_ternary_1(x: Bool) -> AddressOnly {
+func addr_only_ternary_1(_ x: Bool) -> AddressOnly {
   // CHECK: bb0([[RET:%.*]] : $*AddressOnly, {{.*}}):
   // CHECK: [[a:%[0-9]+]] = alloc_box $AddressOnly, var, name "a"
   // CHECK: [[PBa:%.*]] = project_box [[a]]

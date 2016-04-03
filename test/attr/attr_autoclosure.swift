@@ -49,10 +49,10 @@ protocol P2 : P1 {
   associatedtype Element
 }
 
-func overloadedEach<O: P1>(source: O, _ closure: () -> ()) {
+func overloadedEach<O: P1>(_ source: O, _ closure: () -> ()) {
 }
 
-func overloadedEach<P: P2>(source: P, _ closure: () -> ()) {
+func overloadedEach<P: P2>(_ source: P, _ closure: () -> ()) {
 }
 
 struct S : P2 {
@@ -86,7 +86,7 @@ class Sub : Super {
   override func f3(@autoclosure(escaping) x: () -> ()) { }  // expected-error{{does not override any method}}
 }
 
-func func12_sink(x: () -> Int) { }
+func func12_sink(_ x: () -> Int) { }
 
 func func12a(@autoclosure x: () -> Int) { 
   func12_sink(x) // expected-error{{invalid conversion from non-escaping function of type '@autoclosure () -> Int' to potentially escaping function type '() -> Int'}}

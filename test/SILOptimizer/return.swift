@@ -13,7 +13,7 @@ class MyClassWithClosure {
   var f : (s: String) -> String = { (s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
 }
 
-func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
+func multipleBlocksSingleMissing(_ b: Bool) -> (String, Int) {
   var y = 0 
   if b {
     return ("a", 1)
@@ -22,7 +22,7 @@ func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
   }
 } // expected-error {{missing return in a function expected to return '(String, Int)'}}
 
-func multipleBlocksAllMissing(x: Int) -> Int {
+func multipleBlocksAllMissing(_ x: Int) -> Int {
   var y : Int = x + 1 
   while (y > 0 ) {
     y -= 1
@@ -32,7 +32,7 @@ func multipleBlocksAllMissing(x: Int) -> Int {
   x += 1
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
-@noreturn func MYsubscriptNonASCII(idx: Int) -> UnicodeScalar {
+@noreturn func MYsubscriptNonASCII(_ idx: Int) -> UnicodeScalar {
 } // no-warning
 
 @noreturn @_silgen_name("exit") func exit () -> ()
@@ -47,13 +47,13 @@ func multipleBlocksAllMissing(x: Int) -> Int {
   _ = 0
 }// expected-error {{return from a 'noreturn' function}}
 
-func diagnose_missing_return_in_the_else_branch(i: Bool) -> Int {
+func diagnose_missing_return_in_the_else_branch(_ i: Bool) -> Int {
   if (i) {
     exit() 
   } 
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
-func diagnose_missing_return_no_error_after_noreturn(i: Bool) -> Int {
+func diagnose_missing_return_no_error_after_noreturn(_ i: Bool) -> Int {
   if (i) {
     exit()
   } else {
@@ -75,7 +75,7 @@ func diagnose_missing_return_no_error_after_noreturn_method() -> Int {
   TuringMachine().halt()
 } // no error
 
-func whileLoop(flag: Bool) -> Int {
+func whileLoop(_ flag: Bool) -> Int {
   var b = 1
   while (flag) {
     if b == 3 {
@@ -95,7 +95,7 @@ func whileTrueLoop() -> Int {
   } // no-error
 }
 
-func testUnreachableAfterNoReturn(x: Int) -> Int {
+func testUnreachableAfterNoReturn(_ x: Int) -> Int {
   exit(); // expected-note{{a call to a noreturn function}}
   return x; // expected-warning {{will never be executed}}
 }
@@ -108,7 +108,7 @@ func testUnreachableAfterNoReturnInADifferentBlock() -> Int {
   return x; // expected-warning {{will never be executed}}
 }
 
-func testReachableAfterNoReturnInADifferentBlock(x: Int) -> Int {
+func testReachableAfterNoReturnInADifferentBlock(_ x: Int) -> Int {
   if x == 5 {
     exit();
   }

@@ -401,7 +401,7 @@ protocol FooProtocol {
   var fooInstanceVar: Int
   typealias FooTypeAlias1
   func fooInstanceFunc0() -> Double
-  func fooInstanceFunc1(a: Int) -> Double
+  func fooInstanceFunc1(_ a: Int) -> Double
   subscript(i: Int) -> Double
 }
 
@@ -409,7 +409,7 @@ protocol BarProtocol {
   var barInstanceVar: Int
   typealias BarTypeAlias1
   func barInstanceFunc0() -> Double
-  func barInstanceFunc1(a: Int) -> Double
+  func barInstanceFunc1(_ a: Int) -> Double
 }
 
 typealias FooTypealias = Int
@@ -468,7 +468,7 @@ struct TestTypeInParamGeneric2<
     StructGenericFoo : FooProtocol,
     StructGenericBar : protocol<FooProtocol, BarProtocol>,
     StructGenericBaz> {
-  func testTypeInParamGeneric2(a: #^TYPE_IN_FUNC_PARAM_GENERIC_2^#
+  func testTypeInParamGeneric2(_ a: #^TYPE_IN_FUNC_PARAM_GENERIC_2^#
 }
 
 // TYPE_IN_FUNC_PARAM_GENERIC_2: Begin completions
@@ -514,7 +514,7 @@ struct TestTypeInParamGeneric4<
 struct TestTypeInParamGeneric5<StructGenericFoo> {
   struct TestTypeInParamGeneric5a<StructGenericBar> {
     struct TestTypeInParamGeneric5b<StructGenericBaz> {
-      func testTypeInParamGeneric5<GenericFoo>(a: #^TYPE_IN_FUNC_PARAM_GENERIC_5^#
+      func testTypeInParamGeneric5<GenericFoo>(_ a: #^TYPE_IN_FUNC_PARAM_GENERIC_5^#
     }
   }
 }
@@ -811,7 +811,7 @@ func testTypeInProtocolComposition3() {
 class VarBase1 {
   var instanceVarBase1: #^TYPE_IN_INSTANCE_VAR_1^#
 
-  func paramNestedTypesBase1(a: #^TYPE_IN_FUNC_PARAM_NESTED_TYPES_1^#
+  func paramNestedTypesBase1(_ a: #^TYPE_IN_FUNC_PARAM_NESTED_TYPES_1^#
 
   func localVarBaseTest1() {
     var localVar: #^TYPE_IN_LOCAL_VAR_1^#
@@ -831,7 +831,7 @@ class VarBase1 {
 extension VarBase1 {
   var instanceVarBaseExt1: #^TYPE_IN_INSTANCE_VAR_2^#
 
-  func paramNestedTypesBaseExt1(a: #^TYPE_IN_FUNC_PARAM_NESTED_TYPES_2^#
+  func paramNestedTypesBaseExt1(_ a: #^TYPE_IN_FUNC_PARAM_NESTED_TYPES_2^#
 
   func localVarBaseExtTest1() {
     var localVar: #^TYPE_IN_LOCAL_VAR_2^#
@@ -877,7 +877,7 @@ extension VarBase1 {
 class VarDerived1 : VarBase1 {
   var instanceVarDerived1 : #^TYPE_IN_INSTANCE_VAR_3^#
 
-  func paramNestedTypesDerived1(a: #^TYPE_IN_FUNC_PARAM_NESTED_TYPES_3^#
+  func paramNestedTypesDerived1(_ a: #^TYPE_IN_FUNC_PARAM_NESTED_TYPES_3^#
 
   func localVarDerivedTest1() {
     var localVar : #^TYPE_IN_LOCAL_VAR_3^#
@@ -897,7 +897,7 @@ class VarDerived1 : VarBase1 {
 extension VarDerived1 {
   var instanceVarDerivedExt1 : #^TYPE_IN_INSTANCE_VAR_4^#
 
-  func paramNestedTypesDerivedExt1(a: #^TYPE_IN_FUNC_PARAM_NESTED_TYPES_4^#
+  func paramNestedTypesDerivedExt1(_ a: #^TYPE_IN_FUNC_PARAM_NESTED_TYPES_4^#
 
   func localVarDerivedExtTest1() {
     var localVar : #^TYPE_IN_LOCAL_VAR_4^#
@@ -941,12 +941,12 @@ extension VarDerived1 {
 //===--- Test that we can complete based on user-provided type-identifier.
 //===---
 
-func testTypeIdentifierBase1(a: VarBase1.#^TYPE_IDENTIFIER_BASE_1^#
-func testTypeIdentifierBase2(a: Int, b: VarBase1.#^TYPE_IDENTIFIER_BASE_2^#
-func testTypeIdentifierBase3(a: unknown_type, b: VarBase1.#^TYPE_IDENTIFIER_BASE_3^#
-func testTypeIdentifierBase4(a: , b: VarBase1.#^TYPE_IDENTIFIER_BASE_4^#
+func testTypeIdentifierBase1(_ a: VarBase1.#^TYPE_IDENTIFIER_BASE_1^#
+func testTypeIdentifierBase2(_ a: Int, b: VarBase1.#^TYPE_IDENTIFIER_BASE_2^#
+func testTypeIdentifierBase3(_ a: unknown_type, b: VarBase1.#^TYPE_IDENTIFIER_BASE_3^#
+func testTypeIdentifierBase4(_ a: , b: VarBase1.#^TYPE_IDENTIFIER_BASE_4^#
 
-func testTypeIdentifierBaseNoDot1(a: VarBase1#^TYPE_IDENTIFIER_BASE_NO_DOT_1^#
+func testTypeIdentifierBaseNoDot1(_ a: VarBase1#^TYPE_IDENTIFIER_BASE_NO_DOT_1^#
 
 func testTypeIdentifierBaseNoDot2() {
   var localVar : protocol<VarBase1#^TYPE_IDENTIFIER_BASE_NO_DOT_2^#
@@ -954,7 +954,7 @@ func testTypeIdentifierBaseNoDot2() {
 
 typealias testTypeIdentifierBaseNoDot3 = VarBase1#^TYPE_IDENTIFIER_BASE_NO_DOT_3^#
 
-func testTypeIdentifierDerived1(a: VarDerived1.#^TYPE_IDENTIFIER_DERIVED_1^#
+func testTypeIdentifierDerived1(_ a: VarDerived1.#^TYPE_IDENTIFIER_DERIVED_1^#
 
 func testTypeIdentifierDerived2() {
   var localVar : protocol<VarDerived1.#^TYPE_IDENTIFIER_DERIVED_2^#
@@ -1004,7 +1004,7 @@ func testTypeIdentifierIrrelevant1() {
 //===--- Test that we can complete types in 'as' cast.
 //===---
 
-func testAsCast1(a: Int) {
+func testAsCast1(_ a: Int) {
   a as #^INSIDE_AS_CAST_1^#
 }
 

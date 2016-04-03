@@ -103,7 +103,7 @@ public func driver() -> () {
 // Comparable is similar to Equatable, but uses a usual method
 // instead of an operator.
 public protocol Comparable {
-   func compare(_: Self, _: Self) -> Bool
+   func compare(_ _: Self, _: Self) -> Bool
 }
 
 // Define a custom operator to be used instead of ==
@@ -112,21 +112,21 @@ infix operator --- { associativity left precedence 140 }
 // Simple is a protocol that simply defines an operator and
 // a few methods with different number of arguments.
 public protocol Simple {
-   func foo(_: Self) -> Bool
-   func boo(_: Self, _: Self) -> Bool
+   func foo(_ _: Self) -> Bool
+   func boo(_ _: Self, _: Self) -> Bool
    func ---(_: Self, _: Self) -> Bool
 }
 
 public class C: Equatable, Comparable, Simple {
-  public func compare(c1:C, _ c2:C) -> Bool {
+  public func compare(_ c1:C, _ c2:C) -> Bool {
     return c1 == c2
   }
   
-  public func foo(c:C) -> Bool {
+  public func foo(_ c:C) -> Bool {
     return true
   }
 
-  public func boo(c1:C, _ c2:C) -> Bool {
+  public func boo(_ c1:C, _ c2:C) -> Bool {
     return false
   }
 }
@@ -147,16 +147,16 @@ public func ---(lhs: C, rhs: C) -> Bool {
   return true
 }
 
-public func compareEquals<T:Equatable>(x: T, _ y:T) -> Bool {
+public func compareEquals<T:Equatable>(_ x: T, _ y:T) -> Bool {
   return x == y
 }
 
-public func compareMinMinMin<T:Simple>(x: T, _ y:T) -> Bool {
+public func compareMinMinMin<T:Simple>(_ x: T, _ y:T) -> Bool {
   return x --- y
 }
 
 
-public func compareComparable<T:Comparable>(x: T, _ y:T) -> Bool {
+public func compareComparable<T:Comparable>(_ x: T, _ y:T) -> Bool {
   return x.compare(x, y)
 }
 
@@ -193,7 +193,7 @@ public func testCompareComparable() -> Bool {
   return compareComparable(D(), D())
 }
 
-public func BooCall<T:Simple>(x:T, _ y:T) -> Bool {
+public func BooCall<T:Simple>(_ x:T, _ y:T) -> Bool {
   return x.boo(y, y) 
 }
 

@@ -4,7 +4,7 @@ protocol P {
   associatedtype A
   func makeIterator() -> Int
 }
-func f<U: P>(rhs: U) -> X<U.A> { // expected-error {{use of undeclared type 'X'}}
+func f<U: P>(_ rhs: U) -> X<U.A> { // expected-error {{use of undeclared type 'X'}}
   // FIXME: This diagnostic isn't great, it happens because the generic constraint
   // 'U' from the invalid type signature never gets resolved.
   let iter = rhs.makeIterator() // expected-error {{cannot invoke 'makeIterator' with no arguments}}

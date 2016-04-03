@@ -191,7 +191,7 @@ func f2() {
 // ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: VoidGen()[#Void#]
 // ASSIGN_10-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
 
-  func f11(C: C2) {
+  func f11(_ C: C2) {
     d = C.#^ASSIGN_11^#
   }
 

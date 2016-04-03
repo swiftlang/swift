@@ -12,7 +12,7 @@
 
 import Foundation
 
-func testDowncastObjectToArray(obj: AnyObject, objImplicit: AnyObject!) {
+func testDowncastObjectToArray(_ obj: AnyObject, objImplicit: AnyObject!) {
   var nsstrArr1 = (obj as! [NSString])! // expected-error{{cannot force unwrap value of non-optional type '[NSString]'}}{{39-40=}}
   var strArr1 = (obj as! [String])! // expected-error{{cannot force unwrap value of non-optional type '[String]'}}{{35-36=}}
 
@@ -20,7 +20,7 @@ func testDowncastObjectToArray(obj: AnyObject, objImplicit: AnyObject!) {
   var strArr2 = (objImplicit as! [String])! // expected-error{{cannot force unwrap value of non-optional type '[String]'}}{{43-44=}}
 }
 
-func testArrayDowncast(arr: [AnyObject], arrImplicit: [AnyObject]!) {
+func testArrayDowncast(_ arr: [AnyObject], arrImplicit: [AnyObject]!) {
   var nsstrArr1 = (arr as! [NSString])! // expected-error{{cannot force unwrap value of non-optional type '[NSString]'}} {{39-40=}}
   var strArr1 = (arr as! [String])! // expected-error{{cannot force unwrap value of non-optional type '[String]'}} {{35-36=}}
 
@@ -28,13 +28,13 @@ func testArrayDowncast(arr: [AnyObject], arrImplicit: [AnyObject]!) {
   var strArr2 = (arrImplicit as! [String])! // expected-error{{cannot force unwrap value of non-optional type '[String]'}} {{43-44=}}
 }
 
-func testDowncastNSArrayToArray(nsarray: NSArray) {
+func testDowncastNSArrayToArray(_ nsarray: NSArray) {
   _ = nsarray as! [NSString]
   _ = nsarray as! [String]
 }
 
 // CHECK-LABEL: testDowncastOptionalObject
-func testDowncastOptionalObject(obj: AnyObject?!) -> [String]? {
+func testDowncastOptionalObject(_ obj: AnyObject?!) -> [String]? {
   // CHECK: (optional_evaluation_expr implicit type='[String]?'
   // CHECK-NEXT: (inject_into_optional implicit type='[String]?'
   // CHECK: (forced_checked_cast_expr type='[String]'{{.*value_cast}}
@@ -45,7 +45,7 @@ func testDowncastOptionalObject(obj: AnyObject?!) -> [String]? {
 }
 
 // CHECK-LABEL: testDowncastOptionalObjectConditional
-func testDowncastOptionalObjectConditional(obj: AnyObject?!) -> [String]?? {
+func testDowncastOptionalObjectConditional(_ obj: AnyObject?!) -> [String]?? {
   // CHECK: (optional_evaluation_expr implicit type='[String]??'
   // CHECK-NEXT: (inject_into_optional implicit type='[String]??'
   // CHECK-NEXT: (optional_evaluation_expr implicit type='[String]?'

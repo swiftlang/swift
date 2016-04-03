@@ -43,7 +43,7 @@ func testAmbiguousStringComparisons(_ s: String) {
   let a12 = nsString > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
 }
 
-func acceptsSequence<S : Sequence>(sequence: S) {}
+func acceptsSequence<S : Sequence>(_ sequence: S) {}
 
 func testStringIsNotASequence(_ s: String) {
   acceptsSequence(s) // expected-error {{argument type 'String' does not conform to expected type 'Sequence'}}
@@ -60,9 +60,9 @@ func testStringDeprecation(_ hello: String) {
 }
 
 // Positive and negative tests for String index types
-func acceptsForwardIndex<I: ForwardIndex>(index: I) {}
-func acceptsBidirectionalIndex<I: BidirectionalIndex>(index: I) {}
-func acceptsRandomAccessIndex<I: RandomAccessIndex>(index: I) {}
+func acceptsForwardIndex<I: ForwardIndex>(_ index: I) {}
+func acceptsBidirectionalIndex<I: BidirectionalIndex>(_ index: I) {}
+func acceptsRandomAccessIndex<I: RandomAccessIndex>(_ index: I) {}
 
 func testStringIndexTypes(_ s: String) {
   acceptsForwardIndex(s.utf8.startIndex)

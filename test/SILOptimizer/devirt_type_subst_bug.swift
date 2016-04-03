@@ -15,6 +15,6 @@
 // substitution list from lookUpFunctionInWitnessTable and the list
 // from ApplyInst to match what GenericSignature expects.
 
-func asHex(a: [UInt8]) -> String {
+func asHex(_ a: [UInt8]) -> String {
   return a.map { "0x" + String($0, radix: 16) }.joined(separator: "")
 }

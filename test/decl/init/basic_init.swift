@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 class Foo {
-  func bar(_: bar) {} // expected-error{{use of undeclared type 'bar'}}
+  func bar(_ _: bar) {} // expected-error{{use of undeclared type 'bar'}}
 }
 
 class C {

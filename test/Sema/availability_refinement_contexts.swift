@@ -136,7 +136,7 @@ func functionWithUnnecessaryStmtCondition() {
 // CHECK-NEXT: {{^}}    (if_else versions=empty
 
 @available(OSX 10.51, *)
-func functionWithUnnecessaryStmtConditionsHavingElseBranch(p: Int?) {
+func functionWithUnnecessaryStmtConditionsHavingElseBranch(_ p: Int?) {
   // Else branch context version is bottom when check is unnecessary
   if #available(OSX 10.51, *) {
   } else {

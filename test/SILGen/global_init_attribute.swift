@@ -17,7 +17,7 @@ func foo() -> Int {
   return ExportedVar
 }
 
-func bar(i: Int) {
+func bar(_ i: Int) {
   ExportedVar = i
 }
 

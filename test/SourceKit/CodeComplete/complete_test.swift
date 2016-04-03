@@ -15,10 +15,10 @@
 // RUN: diff %t.complete-test %t.sourcekitd-test
 
 struct MyInt {
-  func advancedFeatures(x: Int) {}
-  func advancedFeatures(x: Int, y: Int) {}
+  func advancedFeatures(_ x: Int) {}
+  func advancedFeatures(_ x: Int, y: Int) {}
   var bigPower: Int = 0
-  func descriptiveIntention(x: Int) {}
+  func descriptiveIntention(_ x: Int) {}
 }
 
 func foo() {
@@ -45,6 +45,6 @@ struct ForDiff {
   func z() throws {}
 }
 
-func diff(x: ForDiff) {
+func diff(_ x: ForDiff) {
   x.#^DIFF^#
 }

@@ -20,11 +20,11 @@ import Foundation
   if ##^AFTER_POUND^#
 }
 
-func selectorArg1(obj: NSObject) {
+func selectorArg1(_ obj: NSObject) {
   obj.doSelector(#^SELECTOR_ARG1^#
 }
 
-func selectorArg2(obj: NSObject) {
+func selectorArg2(_ obj: NSObject) {
   obj.messageSomeObject(obj, selector:#^SELECTOR_ARG2^#
 }
 

@@ -1,12 +1,12 @@
 // RUN: %target-parse-verify-swift
 
-@_cdecl("cdecl_foo") func foo(x: Int) -> Int { return x }
+@_cdecl("cdecl_foo") func foo(_ x: Int) -> Int { return x }
 
 @_cdecl("") // expected-error{{symbol name cannot be empty}}
-func emptyName(x: Int) -> Int { return x }
+func emptyName(_ x: Int) -> Int { return x }
 
 @_cdecl("noBody")
-func noBody(x: Int) -> Int // expected-error{{expected '{' in body of function}}
+func noBody(_ x: Int) -> Int // expected-error{{expected '{' in body of function}}
 
 @_cdecl("property") // expected-error{{may only be used on 'func' declarations}}
 var property: Int
@@ -21,20 +21,20 @@ enum SwiftEnum { case A, B }
 @objc enum CEnum: Int { case A, B }
 
 @_cdecl("swiftStruct")
-func swiftStruct(x: SwiftStruct) {} // expected-error{{cannot be represented}} expected-note{{Swift struct}}
+func swiftStruct(_ x: SwiftStruct) {} // expected-error{{cannot be represented}} expected-note{{Swift struct}}
 
 @_cdecl("swiftEnum")
-func swiftEnum(x: SwiftEnum) {} // expected-error{{cannot be represented}} expected-note{{non-'@objc' enum}}
+func swiftEnum(_ x: SwiftEnum) {} // expected-error{{cannot be represented}} expected-note{{non-'@objc' enum}}
 
 @_cdecl("cEnum")
-func cEnum(x: CEnum) {}
+func cEnum(_ x: CEnum) {}
 
 class Foo {
   @_cdecl("Foo_foo") // expected-error{{can only be applied to global functions}}
-  func foo(x: Int) -> Int { return x }
+  func foo(_ x: Int) -> Int { return x }
 
   @_cdecl("Foo_foo_2") // expected-error{{can only be applied to global functions}}
-  static func foo(x: Int) -> Int { return x }
+  static func foo(_ x: Int) -> Int { return x }
 
   @_cdecl("Foo_init") // expected-error{{may only be used on 'func'}}
   init() {}

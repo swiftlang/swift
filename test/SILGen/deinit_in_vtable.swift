@@ -18,7 +18,7 @@ private class B : A {
 // CHECK: sil private @[[B:.*]] :
 
 @inline(never)
-private func testfunc(a: A) -> Int {
+private func testfunc(_ a: A) -> Int {
   return a.foo()
 }
 

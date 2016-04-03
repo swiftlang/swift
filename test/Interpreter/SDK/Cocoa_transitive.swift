@@ -7,6 +7,6 @@
 import Cocoa
 
 // Make sure the ObjectiveC adapter module gets imported, including ObjCSel.
-func rdar14759044(obj: NSObject) -> Bool {
+func rdar14759044(_ obj: NSObject) -> Bool {
   return obj.responds(to: "abc") // no-warning
 }

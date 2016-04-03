@@ -32,7 +32,7 @@ func <#test1#>() {}
 ///
 /// - parameter y: A number
 /// - returns: `x + y`
-func foo(x: Int, y: Int) -> Int { return x + y }
+func foo(_ x: Int, y: Int) -> Int { return x + y }
 
 /**
   - note: NOTENOTENOTE

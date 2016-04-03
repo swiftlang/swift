@@ -4,7 +4,7 @@
 
 import Foundation
 
-func acceptBridgeableNSError<E : _ObjectiveCBridgeableErrorProtocol>(e: E) { }
+func acceptBridgeableNSError<E : _ObjectiveCBridgeableErrorProtocol>(_ e: E) { }
 
 @objc enum E1 : Int, ErrorProtocol, _BridgedNSError {
   case A = 1

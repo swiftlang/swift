@@ -3,9 +3,9 @@
 /* block comments */
 /* /* nested too */ */
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-func f1(a: Int, _ y: Int) {}
+func f1(_ a: Int, _ y: Int) {}
 func f2() {}
 func f3() -> Int {}
 
@@ -13,17 +13,17 @@ func invalid_semi() {
   ; // expected-error {{';' statements are not allowed}} {{3-5=}}
 }
 
-func nested1(x: Int) {
+func nested1(_ x: Int) {
   var y : Int
   
-  func nested2(z: Int) -> Int {
+  func nested2(_ z: Int) -> Int {
     return x+y+z
   }
   
   nested2(1)
 }
 
-func funcdecl5(a: Int, y: Int) {
+func funcdecl5(_ a: Int, y: Int) {
   var x : Int
 
   // a few statements
@@ -274,14 +274,14 @@ func RepeatWhileStmt4() {
   } while + // expected-error {{unary operator cannot be separated from its operand}} {{12-1=}} expected-error {{expected expression in 'repeat-while' condition}}
 }
 
-func brokenSwitch(x: Int) -> Int {
+func brokenSwitch(_ x: Int) -> Int {
   switch x {
   case .Blah(var rep): // expected-error{{enum case 'Blah' not found in type 'Int'}}
     return rep
   }
 }
 
-func switchWithVarsNotMatchingTypes(x: Int, y: Int, z: String) -> Int {
+func switchWithVarsNotMatchingTypes(_ x: Int, y: Int, z: String) -> Int {
   switch (x,y,z) {
   case (let a, 0, _), (0, let a, _): // OK
     return a
@@ -450,7 +450,7 @@ func for_loop_multi_iter() {
 // rdar://problem/23684220
 // Even if the condition fails to typecheck, save it in the AST anyway; the old
 // condition may have contained a SequenceExpr.
-func r23684220(b: Any) {
+func r23684220(_ b: Any) {
   if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any' (aka 'protocol<>')}}
 }
 

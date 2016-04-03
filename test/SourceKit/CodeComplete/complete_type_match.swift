@@ -9,10 +9,10 @@ let valueA = [0]
 let valueS = ""
 let valueZ = 1
 
-func takeInt(x: Int, y: Int)
-func takeIntOpt(x: Int, y: Int?)
-func takeString(x: Int, y: String)
-func takeAny(x: Int, y: Any)
+func takeInt(_ x: Int, y: Int)
+func takeIntOpt(_ x: Int, y: Int?)
+func takeString(_ x: Int, y: String)
+func takeAny(_ x: Int, y: Any)
 
 takeInt(1, y: #^TOP_LEVEL_0^#)
 // TOP_LEVEL_0-NOT: nil
@@ -38,7 +38,7 @@ takeIntOpt(1, y: #^TOP_LEVEL_3^#)
 // TOP_LEVEL_3: valueA
 // TOP_LEVEL_3: valueS
 
-func testCrossContext(x: Int, y: String, z: Any) {
+func testCrossContext(_ x: Int, y: String, z: Any) {
   takeInt(1, y: #^CROSS_CONTEXT_0^#)
 }
 // CROSS_CONTEXT_0: x
@@ -55,7 +55,7 @@ struct FromMethod {
   func valueZ() -> Int { return 1 }
 }
 
-func testFromMethod(x: FromMethod) {
+func testFromMethod(_ x: FromMethod) {
   takeInt(1, y: x.#^FROM_METHOD_0^#)
 }
 // FROM_METHOD_0: valueZ()

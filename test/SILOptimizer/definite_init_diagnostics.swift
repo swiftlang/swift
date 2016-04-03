@@ -2,7 +2,7 @@
 
 import Swift
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 // These are tests for definite initialization, which is implemented by the
 // memory promotion pass.
@@ -13,8 +13,8 @@ func test1() -> Int {
   return a     // expected-error {{variable 'a' used before being initialized}}
 }
 
-func takes_inout(a: inout Int) {}
-func takes_closure(fn: () -> ()) {}
+func takes_inout(_ a: inout Int) {}
+func takes_closure(_ fn: () -> ()) {}
 
 class SomeClass { 
   var x : Int   // expected-note {{'self.x' not initialized}}
@@ -162,13 +162,13 @@ func test4() {
   markUsed(t6.b)
 }
 
-func tupleinout(a: inout (lo: Int, hi: Int)) {
+func tupleinout(_ a: inout (lo: Int, hi: Int)) {
   markUsed(a.0)   // ok
   markUsed(a.1)   // ok
 }
 
 // Address only types
-func test5<T>(x: T, y: T) {
+func test5<T>(_ x: T, y: T) {
   var a : ((T, T), T)  // expected-note {{variable defined here}}
   a.0 = (x, y)
   
@@ -188,7 +188,7 @@ func test6() -> Int {
 }
 
 // Control flow.
-func test7(cond: Bool) {
+func test7(_ cond: Bool) {
   var a : Int
   
   if cond { a = 42 } else { a = 17 }
@@ -205,7 +205,7 @@ protocol SomeProtocol {
 
 protocol DerivedProtocol : SomeProtocol {}
 
-func existentials(i: Int, dp: DerivedProtocol) {
+func existentials(_ i: Int, dp: DerivedProtocol) {
   // expected-warning @+1 {{variable 'a' was written to, but never read}}
   var a : Any = ()
   a = i
@@ -256,7 +256,7 @@ class DITLC_Class {
 
 struct EmptyStruct {}
 
-func useEmptyStruct(a: EmptyStruct) {}
+func useEmptyStruct(_ a: EmptyStruct) {}
 
 func emptyStructTest() {
   // <rdar://problem/20065892> Diagnostic for an uninitialized constant calls it a variable
@@ -526,7 +526,7 @@ enum DelegatingCtorEnum {
 
 protocol TriviallyConstructible {
   init()
-  func go(x: Int)
+  func go(_ x: Int)
 }
 
 extension TriviallyConstructible {
@@ -544,7 +544,7 @@ extension TriviallyConstructible {
 class TrivialClass : TriviallyConstructible {
   required init() {}
 
-  func go(x: Int) {}
+  func go(_ x: Int) {}
 
   convenience init(y: Int) {
     self.init(up: y * y)
@@ -554,7 +554,7 @@ class TrivialClass : TriviallyConstructible {
 struct TrivialStruct : TriviallyConstructible {
   init() {}
 
-  func go(x: Int) {}
+  func go(_ x: Int) {}
 
   init(y: Int) {
     self.init(up: y * y)
@@ -568,7 +568,7 @@ enum TrivialEnum : TriviallyConstructible {
     self = NotSoTrivial
   }
 
-  func go(x: Int) {}
+  func go(_ x: Int) {}
 
   init(y: Int) {
     self.init(up: y * y)
@@ -1148,7 +1148,7 @@ extension ProtocolInitTest {
 }
 
 // <rdar://problem/22436880> Function accepting UnsafeMutablePointer is able to change value of immutable value
-func bug22436880(x: UnsafeMutablePointer<Int>) {}
+func bug22436880(_ x: UnsafeMutablePointer<Int>) {}
 func test22436880() {
   let x: Int
   x = 1

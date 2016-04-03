@@ -12,7 +12,7 @@ class SA1 {
     foo = self.foo // no-error
     self.foo = foo // no-error
   }
-  func f(fooi: Int) {
+  func f(_ fooi: Int) {
     var foo = fooi
     foo = foo // expected-error {{assigning a variable to itself}}
     self.foo = self.foo // expected-error {{assigning a property to itself}}
@@ -35,7 +35,7 @@ class SA2 {
     foo = self.foo // no-error
     self.foo = foo // no-error
   }
-  func f(fooi: Int) {
+  func f(_ fooi: Int) {
     var foo = fooi
     foo = foo // expected-error {{assigning a variable to itself}}
     self.foo = self.foo // expected-error {{assigning a property to itself}}
@@ -72,7 +72,7 @@ class SA4 {
 class SA5 {
   var foo: Int = 0
 }
-func SA5_test(a: SA4, b: SA4) {
+func SA5_test(_ a: SA4, b: SA4) {
   a.foo = a.foo // expected-error {{assigning a property to itself}}
   a.foo = b.foo
 }

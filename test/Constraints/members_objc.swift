@@ -4,8 +4,8 @@ import Swift
 
 @objc
 protocol P2 {
-  func bar(x: Int)
-  static func pub(x: Int)
+  func bar(_ x: Int)
+  static func pub(_ x: Int)
 }
 
 func existential(p2 : P2) {

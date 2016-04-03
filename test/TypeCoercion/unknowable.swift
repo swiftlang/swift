@@ -12,18 +12,18 @@ func testLiteralMembers() {
 //===----------------------------------------------------------------------===//
 // Overloading with literals
 //===----------------------------------------------------------------------===//
-func ovlLitA(_: Int32) -> Int32 {}
-func ovlLitA(_: Int64) -> Int64 {}
-func ovlLitB(_: Int32) -> Int32 {} // expected-note{{}}
-func ovlLitB(_: Int64) -> Int64 {} // expected-note{{}}
+func ovlLitA(_ _: Int32) -> Int32 {}
+func ovlLitA(_ _: Int64) -> Int64 {}
+func ovlLitB(_ _: Int32) -> Int32 {} // expected-note{{}}
+func ovlLitB(_ _: Int64) -> Int64 {} // expected-note{{}}
 func testLiteralOverloadingovlLitB() {
   var y32 : Int32 = ovlLitA(ovlLitB(0))
   var y64 : Int64 = ovlLitA(ovlLitB(0))
   var y /*: Int*/ = ovlLitA(ovlLitB(0))  // expected-error{{ambiguous use of 'ovlLitB'}}
 }
 
-func literalOverloadSameReturn(i: Int) -> Int {}
-func literalOverloadSameReturn(i: Int32) -> Int {}
+func literalOverloadSameReturn(_ i: Int) -> Int {}
+func literalOverloadSameReturn(_ i: Int32) -> Int {}
 func literalOverload2() {
   var _ : Int = literalOverloadSameReturn(literalOverloadSameReturn(1))
 }
@@ -39,7 +39,7 @@ extension Int : CanWibble {
   func wibble() {}
 }
 
-func doWibble(_: CanWibble) {}
+func doWibble(_ _: CanWibble) {}
 
 func testWibble() {
   doWibble(1)

@@ -83,7 +83,7 @@ func testCompleteModuleQualified5() {
   corrupted_module.#^MODULE_QUALIFIED_5^#
 }
 
-func testPostfixOperator1(x: Int) {
+func testPostfixOperator1(_ x: Int) {
   x#^POSTFIX_OPERATOR_1^#
 }
 

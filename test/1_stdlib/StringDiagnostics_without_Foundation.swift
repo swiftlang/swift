@@ -1,9 +1,9 @@
 // RUN: %target-parse-verify-swift
 
 // Positive and negative tests for String index types
-func acceptsForwardIndex<I: ForwardIndex>(index: I) {}
-func acceptsBidirectionalIndex<I: BidirectionalIndex>(index: I) {}
-func acceptsRandomAccessIndex<I: RandomAccessIndex>(index: I) {}
+func acceptsForwardIndex<I: ForwardIndex>(_ index: I) {}
+func acceptsBidirectionalIndex<I: BidirectionalIndex>(_ index: I) {}
+func acceptsRandomAccessIndex<I: RandomAccessIndex>(_ index: I) {}
 
 func testStringIndexTypes(_ s: String) {
   acceptsForwardIndex(s.utf8.startIndex)

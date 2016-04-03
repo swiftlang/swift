@@ -164,7 +164,7 @@ protocol Fooable {
   mutating func mutFoo()
   func immutFoo()
 }
-func testOpenExistential(x: Fooable,
+func testOpenExistential(_ x: Fooable,
                          y: Fooable) {
   var x = x
   let y = y

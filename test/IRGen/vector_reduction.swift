@@ -6,7 +6,7 @@
 
 // CHECK: xor <2 x i64>
 
-public func f(a: UnsafePointer<Int>, b: UnsafePointer<Int>, count: Int) -> Int {
+public func f(_ a: UnsafePointer<Int>, b: UnsafePointer<Int>, count: Int) -> Int {
   var c = 0
 
   for i in 0..<count {

@@ -12,38 +12,38 @@ protocol Q {
 struct G<T> {}
 class C {}
 
-func a<T>(x: T) {}
-func b<T: P>(x: G<T>, y: T.Assoc) {}
-func c<T where T: P>(x: T, y: T.Assoc) {}
-func d<T: P, U: protocol<P, Q>>(x: T, y: U) {}
-func e<T, U where T: P, U: P, U: Q>(x: T, y: U) {}
+func a<T>(_ x: T) {}
+func b<T: P>(_ x: G<T>, y: T.Assoc) {}
+func c<T where T: P>(_ x: T, y: T.Assoc) {}
+func d<T: P, U: protocol<P, Q>>(_ x: T, y: U) {}
+func e<T, U where T: P, U: P, U: Q>(_ x: T, y: U) {}
 // FIXME: Same-type constraints expose a typechecker bug.
 // <rdar://problem/15730168>
-func f<T: Q where T.Assoc1 == T.Assoc2>(x: T) {}
-func g<T where T: Q, T.Assoc1 == T.Assoc2>(x: T) {}
-func h<T: P, U where T.Assoc == U>(x: T) {}
-func i<T: P where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2>(x: T) {}
-func j<T: C>(_: T) {}
-func k<T where T: C>(_: T) {}
-func l<T: C where T: P>(_: T) {}
-func m<T: P where T.Assoc: C>(_: T) {}
+func f<T: Q where T.Assoc1 == T.Assoc2>(_ x: T) {}
+func g<T where T: Q, T.Assoc1 == T.Assoc2>(_ x: T) {}
+func h<T: P, U where T.Assoc == U>(_ x: T) {}
+func i<T: P where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2>(_ x: T) {}
+func j<T: C>(_ _: T) {}
+func k<T where T: C>(_ _: T) {}
+func l<T: C where T: P>(_ _: T) {}
+func m<T: P where T.Assoc: C>(_ _: T) {}
 
 struct Foo<V> {
   func z() {}
 
-  func a<T>(x: T) {}
-  func b<T: P>(x: G<T>, y: T.Assoc) {}
-  func c<T where T: P>(x: T, y: T.Assoc) {}
-  func d<T: P, U: protocol<P, Q>>(x: T, y: U) {}
-  func e<T, U where T: P, U: P, U: Q>(x: T, y: U) {}
-  func f<T: Q where T.Assoc1 == T.Assoc2>(x: T) {}
-  func g<T where T: Q, T.Assoc1 == T.Assoc2>(x: T) {}
-  func h<T: P, U where T.Assoc == U>(x: T) {}
-  func i<T: P where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2>(x: T) {}
-  func j<T: C>(_: T) {}
-  func k<T where T: C>(_: T) {}
-  func l<T: C where T: P>(_: T) {}
-  func m<T: P where T.Assoc: C>(_: T) {}
+  func a<T>(_ x: T) {}
+  func b<T: P>(_ x: G<T>, y: T.Assoc) {}
+  func c<T where T: P>(_ x: T, y: T.Assoc) {}
+  func d<T: P, U: protocol<P, Q>>(_ x: T, y: U) {}
+  func e<T, U where T: P, U: P, U: Q>(_ x: T, y: U) {}
+  func f<T: Q where T.Assoc1 == T.Assoc2>(_ x: T) {}
+  func g<T where T: Q, T.Assoc1 == T.Assoc2>(_ x: T) {}
+  func h<T: P, U where T.Assoc == U>(_ x: T) {}
+  func i<T: P where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2>(_ x: T) {}
+  func j<T: C>(_ _: T) {}
+  func k<T where T: C>(_ _: T) {}
+  func l<T: C where T: P>(_ _: T) {}
+  func m<T: P where T.Assoc: C>(_ _: T) {}
 }
 
 // Test that we handle interface type lowering when accessing a dependent
@@ -56,7 +56,7 @@ protocol Fooable {
 protocol Barrable {
   associatedtype Bar: Fooable
 
-  func bar(_: Bar) -> Bar.Foo
+  func bar(_ _: Bar) -> Bar.Foo
 }
 
 struct FooBar<T: Fooable>: Barrable {
@@ -72,12 +72,12 @@ func concreteJungle<T where T : Fooable, T.Foo == C>() -> T.Foo {
   return C()
 }
 
-func concreteJungle<T where T : Fooable, T.Foo == C>(t: T.Foo) -> C {
+func concreteJungle<T where T : Fooable, T.Foo == C>(_ t: T.Foo) -> C {
   let c: C = t
   return c
 }
 
-func concreteJungle<T where T : Fooable, T.Foo == C>(f: T.Foo -> C) -> T.Foo {
+func concreteJungle<T where T : Fooable, T.Foo == C>(_ f: T.Foo -> C) -> T.Foo {
   let ff: C -> T.Foo = f
   return ff(C())
 }

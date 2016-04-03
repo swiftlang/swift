@@ -6,33 +6,33 @@ func ~= (x: (Int,Int), y: (Int,Int)) -> Bool {
   return true
 }
 
-func parseError1(x: Int) {
+func parseError1(_ x: Int) {
   switch func {} // expected-error {{expected expression in 'switch' statement}} expected-error {{expected '{' after 'switch' subject expression}} expected-error {{expected identifier in function declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
 }
 
-func parseError2(x: Int) {
+func parseError2(_ x: Int) {
   switch x // expected-error {{expected '{' after 'switch' subject expression}}
 }
 
-func parseError3(x: Int) {
+func parseError3(_ x: Int) {
   switch x {
     case // expected-error {{expected pattern}} expected-error {{expected ':' after 'case'}}
   }
 }
 
-func parseError4(x: Int) {
+func parseError4(_ x: Int) {
   switch x {
   case var z where // expected-error {{expected expression for 'where' guard of 'case'}} expected-error {{expected ':' after 'case'}}
   }
 }
 
-func parseError5(x: Int) {
+func parseError5(_ x: Int) {
   switch x {
   case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{12-13=_}}
   }
 }
 
-func parseError6(x: Int) {
+func parseError6(_ x: Int) {
   switch x {
   default // expected-error {{expected ':' after 'default'}}
   }
@@ -239,7 +239,7 @@ case (1, _):
   ()
 }
 
-func patternVarUsedInAnotherPattern(x: Int) {
+func patternVarUsedInAnotherPattern(_ x: Int) {
   switch x {
   case let a, // expected-error {{'a' must be bound in every pattern}}
        a:
@@ -273,7 +273,7 @@ func enumElementSyntaxOnTuple() {
 
 // sr-176
 enum Whatever { case Thing }
-func f0(values: [Whatever]) {
+func f0(_ values: [Whatever]) {
     switch value { // expected-error {{use of unresolved identifier 'value'}}
     case .Thing: // Ok. Don't emit diagnostics about enum case not found in type <<error type>>.
         break

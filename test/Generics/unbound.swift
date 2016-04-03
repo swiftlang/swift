@@ -29,7 +29,7 @@ class MyDict : Dict { } // expected-error{{reference to generic type 'Dict' requ
 var x : Dict // expected-error{{reference to generic type 'Dict' requires arguments in <...>}}
 
 // Cannot create parameters of generic type without arguments.
-func f(x: Dict) {} // expected-error{{reference to generic type 'Dict' requires arguments in <...>}}
+func f(_ x: Dict) {} // expected-error{{reference to generic type 'Dict' requires arguments in <...>}}
 
 
 // ---------------------------------------------
@@ -98,11 +98,11 @@ class SomeClassWithInvalidMethod {
 protocol r20792596P {}
 
 // expected-note @+1 {{in call to function 'foor20792596'}}
-func foor20792596<T: r20792596P>(x: T) -> T {
+func foor20792596<T: r20792596P>(_ x: T) -> T {
   return x
 }
 
-func callfoor20792596<T>(x: T) -> T {
+func callfoor20792596<T>(_ x: T) -> T {
   return foor20792596(x) // expected-error {{generic parameter 'T' could not be inferred}}
 }
 

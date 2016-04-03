@@ -6,14 +6,14 @@ public func getInput(x x: Int) -> Int {
   return x
 }
 
-public func getSecond(_: Int, y: Int) -> Int {
+public func getSecond(_ _: Int, y: Int) -> Int {
   return y
 }
 
-public func useNested(_: (x: Int, y: Int), n: Int) {}
+public func useNested(_ _: (x: Int, y: Int), n: Int) {}
 
 public func variadic(x x: Double, _ y: Int...) {}
-public func variadic2(y: Int..., x: Double) {}
+public func variadic2(_ y: Int..., x: Double) {}
 
 public func slice(x x: [Int]) {}
 public func optional(x x: Int?) {}
@@ -64,7 +64,7 @@ public protocol EqualOperator {
 }
 
 public func throws1() throws {}
-public func throws2<T>(t: T) throws -> T { return t }
+public func throws2<T>(_ t: T) throws -> T { return t }
 
 @warn_unused_result(message="you might want to keep it")
 public func mineGold() -> Int { return 1 }

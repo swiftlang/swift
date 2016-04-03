@@ -11,7 +11,7 @@ enum EquatableEnum {
 
 
 @inline(never)
-func useEquatable<T: Equatable>(_: T) {}
+func useEquatable<T: Equatable>(_ _: T) {}
 
 public func hasLocal() {
   enum LocalEnum : Int {

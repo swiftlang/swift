@@ -1,12 +1,12 @@
 // RUN: %target-parse-verify-swift
 
 class HasFunc {
-  func HasFunc(_: HasFunc) { // expected-error {{use of undeclared type 'HasFunc'}}
+  func HasFunc(_ _: HasFunc) { // expected-error {{use of undeclared type 'HasFunc'}}
   }
   func HasFunc() -> HasFunc { // expected-error {{use of undeclared type 'HasFunc'}}
     return HasFunc()
   }
-  func SomethingElse(_: SomethingElse) { // expected-error {{use of undeclared type 'SomethingElse'}}
+  func SomethingElse(_ _: SomethingElse) { // expected-error {{use of undeclared type 'SomethingElse'}}
     return nil
   }
   func SomethingElse() -> SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
@@ -15,10 +15,10 @@ class HasFunc {
 }
 
 class HasGenericFunc {
-  func HasGenericFunc<HasGenericFunc : HasGenericFunc>(x: HasGenericFunc) -> HasGenericFunc { // expected-error {{inheritance from non-protocol, non-class type 'HasGenericFunc'}}
+  func HasGenericFunc<HasGenericFunc : HasGenericFunc>(_ x: HasGenericFunc) -> HasGenericFunc { // expected-error {{inheritance from non-protocol, non-class type 'HasGenericFunc'}}
     return x
   }
-  func SomethingElse<SomethingElse : SomethingElse>(_: SomethingElse) -> SomethingElse? { // expected-error {{inheritance from non-protocol, non-class type 'SomethingElse'}}
+  func SomethingElse<SomethingElse : SomethingElse>(_ _: SomethingElse) -> SomethingElse? { // expected-error {{inheritance from non-protocol, non-class type 'SomethingElse'}}
     return nil
   }
 }
@@ -37,9 +37,9 @@ protocol ReferenceSomeProtocol {
   var SomeProtocol: SomeProtocol { get }  // expected-error {{'SomeProtocol' used within its own type}} expected-error 2 {{use of undeclared type 'SomeProtocol'}}
 }
 
-func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error {{use of undeclared type 'TopLevelFunc'}}'
-func TopLevelGenericFunc<TopLevelGenericFunc : TopLevelGenericFunc>(x: TopLevelGenericFunc) -> TopLevelGenericFunc { return x } // expected-error {{inheritance from non-protocol, non-class type 'TopLevelGenericFunc'}}
-func TopLevelGenericFunc2<T : TopLevelGenericFunc2>(x: T) -> T { return x} // expected-error {{use of undeclared type 'TopLevelGenericFunc2'}}
+func TopLevelFunc(_ x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error {{use of undeclared type 'TopLevelFunc'}}'
+func TopLevelGenericFunc<TopLevelGenericFunc : TopLevelGenericFunc>(_ x: TopLevelGenericFunc) -> TopLevelGenericFunc { return x } // expected-error {{inheritance from non-protocol, non-class type 'TopLevelGenericFunc'}}
+func TopLevelGenericFunc2<T : TopLevelGenericFunc2>(_ x: T) -> T { return x} // expected-error {{use of undeclared type 'TopLevelGenericFunc2'}}
 var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undeclared type 'TopLevelVar'}}
 
 

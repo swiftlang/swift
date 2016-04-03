@@ -54,7 +54,7 @@ PrintTests.test("custom string convertible structs") {
 }
 
 func test_ThickMetatypePrintingImpl<T>(
-  thickMetatype: T.Type,
+  _ thickMetatype: T.Type,
   _ expectedPrint: String,
   _ expectedDebug: String
   ) {

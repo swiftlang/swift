@@ -11,7 +11,7 @@ postfix func ++(x: inout MyInt) -> MyInt { return x }
 func !=(x: MyInt, y: MyInt) -> Bool { return true }
 
 let xxxx = 1
-func test1(x: inout MyInt) {
+func test1(_ x: inout MyInt) {
   x#^INT_OPERATORS^#
 }
 // CHECK: .
@@ -20,7 +20,7 @@ func test1(x: inout MyInt) {
 // CHECK: ++
 // CHECK: =
 
-func test2(x: inout MyInt) {
+func test2(_ x: inout MyInt) {
   #^INT_OPERATORS_INNER,x^#
 }
 // INNER: x.
@@ -57,7 +57,7 @@ struct MyBool {
 func &&(x: MyBool, y: MyBool) -> MyBool { return x }
 func ||(x: MyBool, y: MyBool) -> MyBool { return x }
 
-func test3(x: MyBool) {
+func test3(_ x: MyBool) {
   x#^BOOL_OPERATORS^#
 }
 // BOOL: .

@@ -61,12 +61,12 @@ struct S {}
 postfix operator ++ {}
 postfix func ++(x: inout S) -> S { return x }
 
-func testPostfix1(x: S) {
+func testPostfix1(_ x: S) {
   x#^POSTFIX_1^#
 }
 // POSTFIX_1-NOT: ++
 
-func testPostfix2(x: inout S) {
+func testPostfix2(_ x: inout S) {
   x#^POSTFIX_2^#
 }
 // POSTFIX_2: Begin completions
@@ -77,19 +77,19 @@ func testPostfix2(x: inout S) {
 
 postfix operator +- {}
 postfix func +-(x: S) -> S? { return x }
-func testPostfix3(x: S) {
+func testPostfix3(_ x: S) {
   x#^POSTFIX_3^#
 }
 // POSTFIX_3: Decl[PostfixOperatorFunction]/CurrModule:  +-[#S?#]
 
-func testPostfix4(x: S?) {
+func testPostfix4(_ x: S?) {
   x#^POSTFIX_4^#
 }
 // POSTFIX_4: Pattern/None:  ![#S#]
 
 struct T {}
 postfix func +-<G>(x: [G]) -> G { return x! }
-func testPostfix5(x: [T]) {
+func testPostfix5(_ x: [T]) {
   x#^POSTFIX_5^#
 }
 // POSTFIX_5: Decl[PostfixOperatorFunction]/CurrModule:  +-[#T#]
@@ -110,7 +110,7 @@ func testPostfix7() {
 }
 // POSTFIX_7: Decl[PostfixOperatorFunction]/CurrModule:  ***[#Double#]
 
-func testPostfix8(x: S) {
+func testPostfix8(_ x: S) {
   x#^POSTFIX_8^#
 }
 // POSTFIX_8-NOT: ***
@@ -120,17 +120,17 @@ protocol P {
   func foo() -> T
 }
 
-func testPostfix9<G: P where G.T == Int>(x: G) {
+func testPostfix9<G: P where G.T == Int>(_ x: G) {
   x.foo()#^POSTFIX_9^#
 }
 // POSTFIX_9: Decl[PostfixOperatorFunction]/CurrModule: ***[#Int#]
 
-func testPostfix10<G: P where G.T : Fooable>(x: G) {
+func testPostfix10<G: P where G.T : Fooable>(_ x: G) {
   x.foo()#^POSTFIX_10^#
 }
 // POSTFIX_10: Decl[PostfixOperatorFunction]/CurrModule: ***[#G.T#]
 
-func testPostfixSpace(x: inout S) {
+func testPostfixSpace(_ x: inout S) {
   x #^S_POSTFIX_SPACE^#
 }
 // S_POSTFIX_SPACE: Decl[PostfixOperatorFunction]/CurrModule/Erase[1]:  ++[#S#]
@@ -151,7 +151,7 @@ func +(x: S2, y: S2) -> S2 { return x }
 func **(x: S2, y: Int) -> S2 { return x }
 func **=(x: inout S2, y: Int) -> Void { return x }
 
-func testInfix1(x: S2) {
+func testInfix1(_ x: S2) {
   x#^INFIX_1^#
 }
 // S2_INFIX: Begin completions
@@ -167,7 +167,7 @@ func testInfix1(x: S2) {
 // NEGATIVE_S2_INFIX-NOT: ~>
 // NEGATIVE_S2_INFIX-NOT: = {#
 
-func testInfix2(x: inout S2) {
+func testInfix2(_ x: inout S2) {
   x#^INFIX_2^#
 }
 // S2_INFIX_LVALUE: Begin completions
@@ -183,7 +183,7 @@ func testInfix2(x: inout S2) {
 // NEGATIVE_S2_INFIX_LVALUE-NOT: ~=
 // NEGATIVE_S2_INFIX_LVALUE-NOT: ~>
 
-func testInfix3(x: inout S2) {
+func testInfix3(_ x: inout S2) {
   x#^INFIX_3^#
 }
 
@@ -195,11 +195,11 @@ func testInfix5() {
   (S2() + S2())#^INFIX_5^#
 }
 
-func testInfix6<T: P where T.T == S2>(x: T) {
+func testInfix6<T: P where T.T == S2>(_ x: T) {
   x.foo()#^INFIX_6^#
 }
 
-func testInfix7(x: S2?) {
+func testInfix7(_ x: S2?) {
   x#^INFIX_7^#
 }
 // S2_INFIX_OPTIONAL: Begin completions
@@ -216,7 +216,7 @@ struct S3: Equatable {}
 func ==(x: S3, y: S3) -> Bool { return true }
 func !=(x: S3, y: S3) -> Bool { return false}
 
-func testInfix8(x: S3?) {
+func testInfix8(_ x: S3?) {
   x#^INFIX_8^#
 }
 // The equality operators come from equatable.
@@ -231,12 +231,12 @@ infix operator **** {
 }
 func ****<T: Fooable>(x: T, y: T) -> T { return x }
 
-func testInfix9<T: P where T.T: Fooable>(x: T) {
+func testInfix9<T: P where T.T: Fooable>(_ x: T) {
   x.foo()#^INFIX_9^#
 }
 // FOOABLE_INFIX: Decl[InfixOperatorFunction]/CurrModule:   **** {#T.T#}[#T.T#]
 
-func testInfix10<T: P where T.T: Fooable>(x: T) {
+func testInfix10<T: P where T.T: Fooable>(_ x: T) {
   (x.foo() **** x.foo())#^INFIX_10^#
 }
 
@@ -259,14 +259,14 @@ func testInfix15<T: P where T.T == S2>() {
 func testInfix16<T: P where T.T == S2>() {
   T.foo#^INFIX_16^#
 }
-func testInfix17(x: Void) {
+func testInfix17(_ x: Void) {
   x#^INFIX_17^#
 }
-func testInfix18(x: (S2, S2) {
+func testInfix18(_ x: (S2, S2) {
   x#^INFIX_18^#
 }
 class EmptyClass {}
-func testInfix19(x: EmptyClass) {
+func testInfix19(_ x: EmptyClass) {
   x#^INFIX_19^#
 }
 // EMPTYCLASS_INFIX: Begin completions
@@ -278,7 +278,7 @@ enum E {
   case A
   case B(S2)
 }
-func testInfix20(x: E) {
+func testInfix20(_ x: E) {
   x#^INFIX_20^#
 }
 func testInfix21() {
@@ -288,7 +288,7 @@ func testInfix22() {
   E.B#^INFIX_22^#
 }
 
-func testSpace(x: S2) {
+func testSpace(_ x: S2) {
   x #^S2_INFIX_SPACE^#
 }
 // S2_INFIX_SPACE: Begin completions
@@ -296,7 +296,7 @@ func testSpace(x: S2) {
 // S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#S2#}[#S2#]
 // S2_INFIX_SPACE: End completions
 
-func testExtInfix1(x: inout S2) {
+func testExtInfix1(_ x: inout S2) {
   x + S2() + x + S2() + x + S2() + x#^EXT_INFIX_1^#
 }
 
@@ -315,7 +315,7 @@ infix operator &&& {
 }
 func &&&(x: Bool, y: Bool) -> S4 { return x }
 
-func testExtInfix2(x: S4) {
+func testExtInfix2(_ x: S4) {
   x + x == x + x#^EXT_INFIX_2^#
 }
 // S4_EXT_INFIX: Begin completions
@@ -329,7 +329,7 @@ func testExtInfix2(x: S4) {
 // S4_EXT_INFIX_NEG-NOT: +++
 // S4_EXT_INFIX_NEG-NOT: &&&
 
-func testExtInfix3(x: S4) {
+func testExtInfix3(_ x: S4) {
    x + x#^EXT_INFIX_3^#
 }
 // S4_EXT_INFIX_SIMPLE: Begin completions
@@ -337,7 +337,7 @@ func testExtInfix3(x: S4) {
 // S4_EXT_INFIX_SIMPLE-DAG: Decl[InfixOperatorFunction]/CurrModule:  +++ {#S4#}[#S4#]
 // S4_EXT_INFIX_SIMPLE: End completions
 
-func testExtInfix4(x: S4) {
+func testExtInfix4(_ x: S4) {
    1 + 1.0 + x#^EXT_INFIX_4^#
 }
 

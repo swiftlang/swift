@@ -4,7 +4,7 @@ class MyClass {
   func foo() { }
 }
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 func marker_1() {}
 func marker_2() {}
@@ -15,15 +15,15 @@ class DerivedClass : BaseClass {}
 
 var global_cond: Bool = false
 
-func bar(x: Int) {}
-func foo(x: Int, _ y: Bool) {}
+func bar(_ x: Int) {}
+func foo(_ x: Int, _ y: Bool) {}
 
 @noreturn
 func abort() { abort() }
 
 
 
-func assignment(x: Int, y: Int) {
+func assignment(_ x: Int, y: Int) {
   var x = x
   var y = y
   x = 42
@@ -39,7 +39,7 @@ func assignment(x: Int, y: Int) {
 // CHECK: integer_literal $Builtin.Int2048, 57
 // CHECK: assign
 
-func if_test(x: Int, y: Bool) {
+func if_test(_ x: Int, y: Bool) {
   if (y) {
    bar(x);
   }
@@ -48,7 +48,7 @@ func if_test(x: Int, y: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements7if_test
 
-func if_else(x: Int, y: Bool) {
+func if_else(_ x: Int, y: Bool) {
   if (y) {
    bar(x);
   } else {
@@ -59,7 +59,7 @@ func if_else(x: Int, y: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements7if_else
 
-func nested_if(x: Int, y: Bool, z: Bool) {
+func nested_if(_ x: Int, y: Bool, z: Bool) {
   if (y) {
     if (z) {
       bar(x);
@@ -74,7 +74,7 @@ func nested_if(x: Int, y: Bool, z: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements9nested_if
 
-func nested_if_merge_noret(x: Int, y: Bool, z: Bool) {
+func nested_if_merge_noret(_ x: Int, y: Bool, z: Bool) {
   if (y) {
     if (z) {
       bar(x);
@@ -88,7 +88,7 @@ func nested_if_merge_noret(x: Int, y: Bool, z: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements21nested_if_merge_noret
 
-func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
+func nested_if_merge_ret(_ x: Int, y: Bool, z: Bool) -> Int {
   if (y) {
     if (z) {
       bar(x);
@@ -104,7 +104,7 @@ func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
 
 // CHECK-LABEL: sil hidden  @_TF10statements19nested_if_merge_ret
 
-func else_break(x: Int, y: Bool, z: Bool) {
+func else_break(_ x: Int, y: Bool, z: Bool) {
   while z {
     if y {
     } else {
@@ -115,7 +115,7 @@ func else_break(x: Int, y: Bool, z: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements10else_break
 
-func loop_with_break(x: Int, _ y: Bool, _ z: Bool) -> Int {
+func loop_with_break(_ x: Int, _ y: Bool, _ z: Bool) -> Int {
   while (x > 2) {
    if (y) {
      bar(x);
@@ -126,7 +126,7 @@ func loop_with_break(x: Int, _ y: Bool, _ z: Bool) -> Int {
 
 // CHECK-LABEL: sil hidden  @_TF10statements15loop_with_break
 
-func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
+func loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
     if (y) {
      bar(x);
@@ -139,7 +139,7 @@ func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
 
 // CHECK-LABEL: sil hidden  @_TF10statements18loop_with_continue
 
-func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
+func do_loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   repeat {
     if (x < 42) {
      bar(x);
@@ -155,7 +155,7 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
 
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops1
-func for_loops1(x: Int, c: Bool) {
+func for_loops1(_ x: Int, c: Bool) {
   var x = x
   for i in 1..<100 {
     markUsed(i)
@@ -208,7 +208,7 @@ func foo() {}
 
 // <rdar://problem/13549626>
 // CHECK-LABEL: sil hidden  @_TF10statements14return_from_if
-func return_from_if(a: Bool) -> Int {
+func return_from_if(_ a: Bool) -> Int {
   // CHECK: bb0(%0 : $Bool):
   // CHECK: cond_br {{.*}}, [[THEN:bb[0-9]+]], [[ELSE:bb[0-9]+]]
   if a {
@@ -228,9 +228,9 @@ func return_from_if(a: Bool) -> Int {
 
 class C {}
 
-func use(c: C) {}
+func use(_ c: C) {}
 
-func for_each_loop(x: [C]) {
+func for_each_loop(_ x: [C]) {
   for i in x {
     use(i)
   }
@@ -493,12 +493,12 @@ func defer_test2(cond : Bool) {
   callee3()
 }
 
-func generic_callee_1<T>(_: T) {}
-func generic_callee_2<T>(_: T) {}
-func generic_callee_3<T>(_: T) {}
+func generic_callee_1<T>(_ _: T) {}
+func generic_callee_2<T>(_ _: T) {}
+func generic_callee_3<T>(_ _: T) {}
 
 // CHECK-LABEL: sil hidden @_TF10statements16defer_in_generic
-func defer_in_generic<T>(x: T) {
+func defer_in_generic<T>(_ x: T) {
   // CHECK: [[C3:%.*]] = function_ref @_TF10statements16generic_callee_3
   // CHECK: apply [[C3]]<T>
   // CHECK: [[C2:%.*]] = function_ref @_TFF10statements16defer_in_generic
@@ -511,7 +511,7 @@ func defer_in_generic<T>(x: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements13defer_mutableFSiT_
-func defer_mutable(x: Int) {
+func defer_mutable(_ x: Int) {
   var x = x
   // CHECK: [[BOX:%.*]] = alloc_box $Int
   // CHECK-NEXT: project_box [[BOX]]
@@ -524,7 +524,7 @@ func defer_mutable(x: Int) {
 
 protocol StaticFooProtocol { static func foo() }
 
-func testDeferOpenExistential(b: Bool, type: StaticFooProtocol.Type) {
+func testDeferOpenExistential(_ b: Bool, type: StaticFooProtocol.Type) {
   defer { type.foo() }
   if b { return }
   return
@@ -615,7 +615,7 @@ enum MyOptional<Wrapped> {
 // CHECK-NEXT: %4 = alloc_stack $MyOptional<T>
 // CHECK-NEXT: copy_addr %1 to [initialization] %4 : $*MyOptional<T>
 // CHECK-NEXT: switch_enum_addr %4 : $*MyOptional<T>, case #MyOptional.some!enumelt.1: bb2, default bb1
-func testAddressOnlyEnumInRequire<T>(a: MyOptional<T>) -> T {
+func testAddressOnlyEnumInRequire<T>(_ a: MyOptional<T>) -> T {
   // CHECK:  bb1:
   // CHECK-NEXT:   dealloc_stack %4
   // CHECK-NEXT:   dealloc_stack %3
@@ -646,7 +646,7 @@ func testAddressOnlyEnumInRequire<T>(a: MyOptional<T>) -> T {
 // CHECK-LABEL: sil hidden @_TF10statements19testCleanupEmission
 // <rdar://problem/20563234> let-else problem: cleanups for bound patterns shouldn't be run in the else block
 protocol MyProtocol {}
-func testCleanupEmission<T>(x: T) {
+func testCleanupEmission<T>(_ x: T) {
   // SILGen shouldn't crash/verify abort on this example.
   guard let x2 = x as? MyProtocol else { return }
   _ = x2

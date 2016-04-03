@@ -7,7 +7,7 @@ class Base : Hashable {
 func ==(lhs: Base, rhs: Base) -> Bool { return false }
 
 // Inputs that are more optional than the output.
-func f1(i: Int?, ii: Int??, a: [Base]?, d: [Base : Base]?) {
+func f1(_ i: Int?, ii: Int??, a: [Base]?, d: [Base : Base]?) {
   let i2 = i as! Int // expected-error{{downcast from 'Int?' to 'Int' only unwraps optionals; did you mean to use '!'?}}
   let i3 = ii as! Int // expected-error{{downcast from 'Int??' to 'Int' only unwraps optionals; did you mean to use '!!'?}}
   let a2 = a as! [Base] // expected-error{{downcast from '[Base]?' to '[Base]' only unwraps optionals; did you mean to use '!'?}}

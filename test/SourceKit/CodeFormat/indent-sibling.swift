@@ -38,7 +38,7 @@ value2 : Int,
      T2: Testable,
            T3: Testable,
 T4: where T4 : Testable>(t1 : T1, t2 : T2, t3 : T2) {}
-    func foo7(i1: Int, i2: Int,
+    func foo7(_ i1: Int, i2: Int,
                        i3: Int, i4: Int,
                                 i5 : Int) {}
     func foo7(i1 : Int,
@@ -161,7 +161,7 @@ class Foo2 {
 //                        "           T3: Testable,"
 // CHECK: key.sourcetext: "           T4: where T4 : Testable>(t1 : T1, t2 : T2, t3 : T2) {}"
 
-//                        "    func foo7(i1: Int, i2: Int,"
+//                        "    func foo7(_ i1: Int, i2: Int,"
 // CHECK: key.sourcetext: "              i3: Int, i4: Int,"
 
 //                        "                       i3: Int, i4: Int,"

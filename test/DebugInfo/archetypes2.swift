@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -verify -g -o - | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 class C<A> {
 // CHECK-DAG: !DILocalVariable(name: "x", arg: 1,{{.*}}line: [[@LINE+2]],{{.*}}type: !"_TtQq_C11archetypes21C"

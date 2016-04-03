@@ -24,15 +24,15 @@ func test_unavailable_func(x : NSObject) {
   NSDeallocateObject(x) // expected-error {{'NSDeallocateObject' is unavailable}}
 }
 
-func test_deprecated_imported_as_unavailable(s:UnsafeMutablePointer<CChar>) {
+func test_deprecated_imported_as_unavailable(_ s:UnsafeMutablePointer<CChar>) {
   _ = tmpnam(s) // expected-warning {{'tmpnam' is deprecated: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
 }
 
-func test_NSInvocation(x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}
+func test_NSInvocation(_ x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}
                        y: NSInvocationOperation,// expected-error {{'NSInvocationOperation' is unavailable}}
                        z: NSMethodSignature) {} // expected-error {{'NSMethodSignature' is unavailable}}
 
-func test_class_avail(x:NSObject, obj: AnyObject) {
+func test_class_avail(_ x:NSObject, obj: AnyObject) {
   x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
   NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}}
   obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
@@ -87,7 +87,7 @@ func test_NSZone(z : NSZone) {
   NSZoneName(z)             // expected-error {{'NSZoneName' is unavailable}}
 }
 
-func test_DistributedObjects(o: NSObject,
+func test_DistributedObjects(_ o: NSObject,
                              a: NSConnection,           // expected-error {{'NSConnection' is unavailable in Swift: Use NSXPCConnection instead}}
                              b: NSConnectionDelegate,   // expected-error {{'NSConnectionDelegate' is unavailable in Swift: Use NSXPCConnection instead}}
                              c: NSDistantObjectRequest, // expected-error {{'NSDistantObjectRequest' is unavailable in Swift: Use NSXPCConnection instead}}
@@ -103,9 +103,9 @@ func test_DistributedObjects(o: NSObject,
   o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
 }
 
-func test_NSCalendarDate(o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable in Swift: Use NSCalendar and NSDateComponents and NSDateFormatter instead}}
+func test_NSCalendarDate(_ o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable in Swift: Use NSCalendar and NSDateComponents and NSDateFormatter instead}}
 
-func test_dispatch(object: dispatch_object_t) {
+func test_dispatch(_ object: dispatch_object_t) {
   dispatch_retain(object);  // expected-error {{'dispatch_retain' is unavailable}}
   dispatch_release(object); // expected-error {{'dispatch_release' is unavailable}}
 }

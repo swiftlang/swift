@@ -306,7 +306,7 @@ extension FailableAddrOnlyStruct {
 // Structs with throwing initializers
 ////
 
-func unwrap(x: Int) throws -> Int { return x }
+func unwrap(_ x: Int) throws -> Int { return x }
 
 struct ThrowStruct {
   var x: Canary

@@ -44,7 +44,7 @@ struct SwiftStruct {
 }
 
 // Test that we don't include Clang completions in unexpected places.
-func testSwiftCompletions(foo: SwiftStruct) {
+func testSwiftCompletions(_ foo: SwiftStruct) {
   foo.#^SWIFT_COMPLETIONS^#
 // SWIFT_COMPLETIONS: Begin completions
 // SWIFT_COMPLETIONS-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
@@ -298,7 +298,7 @@ func testCompleteClassMembers2() {
 // CLANG_CLASS_MEMBERS_2-NEXT: End completions
 }
 
-func testCompleteInstanceMembers1(fooObject: FooClassDerived) {
+func testCompleteInstanceMembers1(_ fooObject: FooClassDerived) {
   fooObject#^CLANG_INSTANCE_MEMBERS_1^#
 // CLANG_INSTANCE_MEMBERS_1: Begin completions
 // CLANG_INSTANCE_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal:      .fooProperty1[#Int32#]{{; name=.+$}}

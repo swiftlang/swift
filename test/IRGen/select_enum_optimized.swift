@@ -14,7 +14,7 @@ enum NoPayload {
 // CHECK: ret i32 %1
 
 @inline(never)
-func selectDirect(e: NoPayload) -> Int32 {
+func selectDirect(_ e: NoPayload) -> Int32 {
   switch e {
   case .E0:
     return 0
@@ -33,7 +33,7 @@ func selectDirect(e: NoPayload) -> Int32 {
 // CHECK: ret i32 %2
 
 @inline(never)
-func selectNegOffset(e: NoPayload) -> Int32 {
+func selectNegOffset(_ e: NoPayload) -> Int32 {
   switch e {
   case .E0:
     return -6
@@ -52,7 +52,7 @@ func selectNegOffset(e: NoPayload) -> Int32 {
 // CHECK: ret i32 %2
 
 @inline(never)
-func selectPosOffset(e: NoPayload) -> Int32 {
+func selectPosOffset(_ e: NoPayload) -> Int32 {
   switch e {
   case .E0:
     return 3
@@ -73,7 +73,7 @@ func selectPosOffset(e: NoPayload) -> Int32 {
 // CHECK: ret
 
 @inline(never)
-func selectWithDefault(e: NoPayload) -> Int32 {
+func selectWithDefault(_ e: NoPayload) -> Int32 {
   switch e {
   case .E0:
     return 0
@@ -89,7 +89,7 @@ func selectWithDefault(e: NoPayload) -> Int32 {
 // CHECK: ret
 
 @inline(never)
-func selectNonContiguous(e: NoPayload) -> Int32 {
+func selectNonContiguous(_ e: NoPayload) -> Int32 {
   switch e {
   case .E0:
     return 0
@@ -109,7 +109,7 @@ var gg : Int32 = 10
 // CHECK: ret
 
 @inline(never)
-func selectNonConstant(e: NoPayload) -> Int32 {
+func selectNonConstant(_ e: NoPayload) -> Int32 {
   switch e {
   case .E0:
     return 0
@@ -127,7 +127,7 @@ func selectNonConstant(e: NoPayload) -> Int32 {
 // CHECK: ret
 
 @inline(never)
-func selectTuple(e: NoPayload) -> (Int32, Int32) {
+func selectTuple(_ e: NoPayload) -> (Int32, Int32) {
   switch e {
   case .E0:
     return (0, 1)
@@ -145,7 +145,7 @@ func selectTuple(e: NoPayload) -> (Int32, Int32) {
 // CHECK: ret
 
 @inline(never)
-func selectNonInt(e: NoPayload) -> String {
+func selectNonInt(_ e: NoPayload) -> String {
   switch e {
   case .E0:
     return "a"

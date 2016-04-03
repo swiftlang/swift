@@ -10,7 +10,7 @@ import PopularAPI
 
 let x = 1
 
-func test(y: Int) {
+func test(_ y: Int) {
   let z = 2
   #^TOP_LEVEL_0^#
 }

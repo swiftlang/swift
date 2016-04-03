@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-patterns -emit-silgen %s | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -1187,7 +1187,7 @@ enum ABC { case A, B, C }
 // CHECK:         function_ref @_TF6switch1dFT_T_
 // CHECK:       [[X_NOT_C]]:
 // CHECK:         function_ref @_TF6switch1eFT_T_
-func testTupleWildcards(x: ABC, _ y: ABC) {
+func testTupleWildcards(_ x: ABC, _ y: ABC) {
   switch (x, y) {
   case (.A, _):
     a()
@@ -1207,7 +1207,7 @@ enum LabeledScalarPayload {
 }
 
 // CHECK-LABEL: sil hidden @_TF6switch24testLabeledScalarPayloadFOS_20LabeledScalarPayloadP_
-func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
+func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
   // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt.1: bb1
   switch lsp {
   // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):

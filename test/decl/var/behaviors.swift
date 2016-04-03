@@ -112,7 +112,7 @@ extension hasStorage {
   static func initStorage() -> Value {
     fatalError("")
   }
-  static func initStorage(_: String) -> Value? {
+  static func initStorage(_ _: String) -> Value? {
     fatalError("")
   }
 
@@ -131,7 +131,7 @@ struct Foo<T> {
   var (storage4, storage5) = tuple // expected-error* {{initializer expression provided, but property behavior 'hasStorage' does not use it}}
     __behavior hasStorage
 
-  func foo<U>(_: U) {
+  func foo<U>(_ _: U) {
     var storage1: T __behavior hasStorage // expected-error {{not supported}}
     var storage2: U __behavior hasStorage // expected-error {{not supported}}
 
@@ -230,7 +230,7 @@ protocol storageWithInitialValue {
 extension storageWithInitialValue {
   var value: Value { get { } }
 
-  static func initStorage(x: Value) -> Value? {
+  static func initStorage(_ x: Value) -> Value? {
     return nil
   }
 }
