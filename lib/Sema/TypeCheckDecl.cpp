@@ -5123,6 +5123,7 @@ public:
 
     UNINTERESTING_ATTR(WarnUnusedResult)
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
+    UNINTERESTING_ATTR(DiscardableResult)
 
 #undef UNINTERESTING_ATTR
 

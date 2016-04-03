@@ -82,6 +82,7 @@ public:
   IGNORED_ATTR(Versioned)
   IGNORED_ATTR(WarnUnusedResult)
   IGNORED_ATTR(ShowInInterface)
+  IGNORED_ATTR(DiscardableResult)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -653,6 +654,7 @@ public:
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
+    IGNORED_ATTR(DiscardableResult)
 
     // FIXME: We actually do have things to enforce for versioned API.
     IGNORED_ATTR(Versioned)
