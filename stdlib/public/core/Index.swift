@@ -394,7 +394,7 @@ extension RandomAccessIndex {
   @warn_unused_result
   public func advanced(by n: Distance, limit: Self) -> Self {
     let d = self.distance(to: limit)
-    if d == 0 || (d > 0 ? d <= n : d >= n) {
+    if n >= 0 ? d <= n : d >= n {
       return limit
     }
     return self.advanced(by: n)
