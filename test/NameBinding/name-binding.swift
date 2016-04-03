@@ -221,3 +221,11 @@ struct Matrix4<T: FloatingPoint>  {
   }
 }
 
+// <rdar://problem/19558785> for-in collection/where expressions are parsed with pattern variables in scope
+func r19558785() {
+  let b = 10
+  for b in 0...b {
+    b
+  }
+}
+
