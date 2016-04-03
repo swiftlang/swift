@@ -157,7 +157,7 @@ protected:
   ExistentialTypeInfoBase(ArrayRef<ProtocolEntry> protocols,
                           As &&...args)
       : Base(std::forward<As>(args)...),
-        NumStoredProtocols(protocols.size())  {
+        NumStoredProtocols(protocols.size()) {
     std::uninitialized_copy(protocols.begin(), protocols.end(),
                             this->template getTrailingObjects<ProtocolEntry>());
   }

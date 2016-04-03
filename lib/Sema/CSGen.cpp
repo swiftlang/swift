@@ -189,7 +189,7 @@ namespace {
         LTI.haveStringLiteral = true;
         auto tyvar = expr->getType()->getAs<TypeVariableType>();
 
-        if (tyvar)  {
+        if (tyvar) {
           LTI.stringLiteralTyvars.push_back(tyvar);
         }
 

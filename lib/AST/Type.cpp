@@ -650,7 +650,7 @@ CanType CanType::getAnyOptionalObjectTypeImpl(CanType type,
   return CanType();
 }
 
-Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK)  {
+Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   if (auto boundTy = getAs<BoundGenericType>()) {
     auto &C = getASTContext();
     if (boundTy->getDecl() == C.getUnsafeMutablePointerDecl()) {
