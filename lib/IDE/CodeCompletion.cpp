@@ -105,7 +105,7 @@ void splitTextByComma(StringRef Text, std::vector<StringRef>& Subs) {
 }
 
 namespace clang {
-  namespace comments {
+namespace comments {
 class WordPairsArrangedViewer {
   ArrayRef<std::pair<StringRef, StringRef>> Content;
   std::vector<StringRef> ViewedText;
@@ -201,10 +201,11 @@ void getClangDocKeyword(ClangImporter &Importer, const Decl *D,
     }
   }
 }
-}}
+} // end namespace comments
+} // end namespace clang
 
 namespace llvm {
-  namespace markup {
+namespace markup {
 class SwiftDocWordExtractor : public MarkupASTWalker {
   CommandWordsPairs &Pairs;
   CodeCompletionCommandKind Kind;
@@ -257,7 +258,10 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
         break;
     }
   }
-}}}
+}
+} // end namespace markup
+} // end namespace llvm
+
 typedef llvm::function_ref<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
 DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
 
@@ -321,7 +325,7 @@ public:
     return Found;
   }
 };
-} // unnamed namespace
+} // end anonymous namespace
 
 static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
                              StmtKind Kind) {
@@ -1257,7 +1261,7 @@ public:
 
   void deliverCompletionResults();
 };
-} // end unnamed namespace
+} // end anonymous namespace
 
 void CodeCompletionCallbacksImpl::completeExpr() {
   if (DeliveredResults)
@@ -3949,8 +3953,7 @@ public:
     }
   }
 };
-
-} // end unnamed namespace
+} // end anonymous namespace
 
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
   assert(P.Tok.is(tok::code_complete));
@@ -4412,7 +4415,7 @@ namespace  {
       return true;
     }
   };
-}
+} // end anonymous namespace
 
 /// Given an expression and its context, the analyzer tries to figure out the
 /// expected type of the expression by analyzing its context.
@@ -4977,7 +4980,7 @@ public:
     return new CodeCompletionCallbacksImpl(P, CompletionContext, Consumer);
   }
 };
-} // end unnamed namespace
+} // end anonymous namespace
 
 CodeCompletionCallbacksFactory *
 swift::ide::makeCodeCompletionCallbacksFactory(
