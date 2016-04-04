@@ -658,32 +658,41 @@ public struct ${Self}<T> : ${SelfProtocols} {
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
   public func predecessor(of i: MinimalIndex) -> MinimalIndex {
-    // FIXME: perform a range check and use
+    // FIXME: swift-3-indexing-model: perform a range check and use
     // return _uncheckedIndex(forPosition: i.position - 1)
     return _index(forPosition: i.position - 1)
   }
 %     end
 
-/*
-FIXME: swift-3-indexing-model: move this code to an appropriate place.
-
-  public func distance(to other: MinimalRandomAccessIndex) -> Int {
-    _expectCompatibleIndices(self, other)
-    return other.position - position
+  @warn_unused_result
+  public func distance(from start: MinimalIndex, to end: MinimalIndex)
+    -> IndexDistance {
+%     if Traversal == 'Forward':
+    _precondition(start <= end,
+      "Only BidirectionalCollections can have end come before start")
+%     end
+    // FIXME: swift-3-indexing-model: perform a range check properly.
+    if start != endIndex {
+      _failEarlyRangeCheck(start, bounds: startIndex..<endIndex)
+    }
+    if end != endIndex {
+      _failEarlyRangeCheck(end, bounds: startIndex..<endIndex)
+    }
+    return end.position - start.position
   }
 
-  public func advanced(by n: Int) -> MinimalRandomAccessIndex {
-    let newPosition = position + n
-    expectLE(startIndex, newPosition)
-    expectGE(
-      endIndex, newPosition,
-      "position=\(self.position) startIndex=\(self.startIndex)")
-    return MinimalRandomAccessIndex(
-      collectionState: _collectionState,
-      position: newPosition, startIndex: startIndex, endIndex: endIndex)
+  @warn_unused_result
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+%     if Traversal == 'Forward':
+    _precondition(n >= 0,
+      "Only BidirectionalCollections can be advanced by a negative amount")
+%     end
+    // FIXME: swift-3-indexing-model: perform a range check properly.
+    if i != endIndex {
+      _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+    }
+    return _index(forPosition: i.position + n)
   }
-
-*/
 
   public subscript(i: MinimalIndex) -> T {
     get {
@@ -896,6 +905,18 @@ public struct ${Self}<Element> : ${SelfProtocols} {
   }
 %     end
 
+%     if Traversal == 'RandomAccess':
+  @warn_unused_result
+  public func distance(from start: MinimalIndex, to end: MinimalIndex)
+    -> IndexDistance {
+    return base.distance(from: start, to: end)
+  }
+
+  @warn_unused_result
+  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+    return base.index(n, stepsFrom: i)
+  }
+%     end
 
   public var startIndex: MinimalIndex {
     return base.startIndex
