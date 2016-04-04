@@ -1037,13 +1037,6 @@ public:
   DeclContext *importDeclContextOf(const clang::Decl *D,
                                    EffectiveClangContext context);
 
-  /// \brief Import the declaration context of a given Clang
-  /// declaration into Swift.
-  DeclContext *importDeclContextOf(const clang::Decl *D) {
-    return importDeclContextOf(
-             D, const_cast<clang::DeclContext *>(D->getDeclContext()));
-  }
-
   /// \brief Create a new named constant with the given value.
   ///
   /// \param name The name of the constant.
