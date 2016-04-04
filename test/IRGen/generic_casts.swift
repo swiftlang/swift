@@ -32,7 +32,7 @@ import gizmo
 // CHECK: }
 
 // CHECK: define hidden i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque* noalias nocapture, %swift.type* %T)
-func allToInt<T>(x: T) -> Int {
+func allToInt<T>(_ x: T) -> Int {
   return x as! Int
   // CHECK: [[BUF:%.*]] = alloca [[BUFFER:.24 x i8.]],
   // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
@@ -45,7 +45,7 @@ func allToInt<T>(x: T) -> Int {
 }
 
 // CHECK: define hidden void @_TF13generic_casts8intToAll{{.*}}(%swift.opaque* noalias nocapture sret, i64, %swift.type* %T) {{.*}} {
-func intToAll<T>(x: Int) -> T {
+func intToAll<T>(_ x: Int) -> T {
   // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
   // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0
   // CHECK: store i64 %1, i64* [[T0]],
@@ -55,7 +55,7 @@ func intToAll<T>(x: Int) -> T {
 }
 
 // CHECK: define hidden i64 @_TF13generic_casts8anyToInt{{.*}}(%"protocol<>"* noalias nocapture dereferenceable({{.*}}))
-func anyToInt(x: protocol<>) -> Int {
+func anyToInt(_ x: protocol<>) -> Int {
   return x as! Int
 }
 
@@ -71,7 +71,7 @@ func anyToInt(x: protocol<>) -> Int {
 @objc class ObjCClass {}
 
 // CHECK: define hidden %objc_object* @_TF13generic_casts9protoCast{{.*}}(%C13generic_casts9ObjCClass*) {{.*}} {
-func protoCast(x: ObjCClass) -> protocol<ObjCProto1, NSRuncing> {
+func protoCast(_ x: ObjCClass) -> protocol<ObjCProto1, NSRuncing> {
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_"
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing"
   // CHECK: call %objc_object* @swift_dynamicCastObjCProtocolUnconditional(%objc_object* {{%.*}}, i64 2, i8** {{%.*}})
@@ -88,7 +88,7 @@ func protoCast(x: ObjCClass) -> protocol<ObjCProto1, NSRuncing> {
 // <rdar://problem/15313840>
 // Class existential to opaque archetype cast
 // CHECK: define hidden void @_TF13generic_casts33classExistentialToOpaqueArchetype{{.*}}(%swift.opaque* noalias nocapture sret, %objc_object*, %swift.type* %T)
-func classExistentialToOpaqueArchetype<T>(x: ObjCProto1) -> T {
+func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
   var x = x
   // CHECK: [[X:%.*]] = alloca %P13generic_casts10ObjCProto1_
   // CHECK: [[LOCAL:%.*]] = alloca %P13generic_casts10ObjCProto1_

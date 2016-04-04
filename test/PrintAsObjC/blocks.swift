@@ -45,17 +45,17 @@ typealias MyInt = Int
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Callbacks {
-  func voidBlocks(input: () -> ()) -> () -> () {
+  func voidBlocks(_ input: () -> ()) -> () -> () {
     return input
   }
-  func manyArguments(input: (Float, Float, Double, Double) -> ()) {}
+  func manyArguments(_ input: (Float, Float, Double, Double) -> ()) {}
 
-  func blockTakesBlock(input: (() -> ()) -> ()) {}
-  func blockReturnsBlock(input: () -> () -> ()) {}
-  func blockTakesAndReturnsBlock(input:
+  func blockTakesBlock(_ input: (() -> ()) -> ()) {}
+  func blockReturnsBlock(_ input: () -> () -> ()) {}
+  func blockTakesAndReturnsBlock(_ input:
     ((Int16) -> (UInt16)) ->
                 ((Int8) -> (UInt8))) {}
-  func blockTakesTwoBlocksAndReturnsBlock(input:
+  func blockTakesTwoBlocksAndReturnsBlock(_ input:
     ((Int16) -> (UInt16),
                  (Int32) -> (UInt32)) ->
                 ((Int8) -> (UInt8))) {}
@@ -70,31 +70,31 @@ typealias MyInt = Int
     return nil
   }
 
-  func blockWithTypealias(input: MyTuple -> MyInt) {}
-  func blockWithSimpleTypealias(input: MyInt -> MyInt) {}
+  func blockWithTypealias(_ input: MyTuple -> MyInt) {}
+  func blockWithSimpleTypealias(_ input: MyInt -> MyInt) {}
 
-  func namedArguments(input: (f1: Float, f2: Float, d1: Double, d2: Double) -> ()) {}
-  func blockTakesNamedBlock(input: (block: () -> ()) -> ()) {}
+  func namedArguments(_ input: (f1: Float, f2: Float, d1: Double, d2: Double) -> ()) {}
+  func blockTakesNamedBlock(_ input: (block: () -> ()) -> ()) {}
   func returnsBlockWithNamedInput() -> ((object: NSObject) -> ())? {
     return nil
   }
 
-  func blockWithTypealiasWithNames(input: MyNamedTuple -> MyInt) {}
+  func blockWithTypealiasWithNames(_ input: MyNamedTuple -> MyInt) {}
 
-  func blockWithKeyword(_Nullable: (`class`: Int) -> Int) {}
+  func blockWithKeyword(_ _Nullable: (`class`: Int) -> Int) {}
 
-  func functionPointers(input: @convention(c) Int -> Int)
+  func functionPointers(_ input: @convention(c) Int -> Int)
       -> @convention(c) Int -> Int {
     return input
   }
 
   func functionPointerTakesAndReturnsFunctionPointer(
-    input: @convention(c) Int -> Int
+    _ input: @convention(c) Int -> Int
                               -> @convention(c) Int -> Int
   ) {
   }
 
-  func functionPointersWithName(input: @convention(c) (value: Int) -> Int)
+  func functionPointersWithName(_ input: @convention(c) (value: Int) -> Int)
       -> @convention(c) (result: Int) -> Int {
     return input
   }

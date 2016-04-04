@@ -16,7 +16,7 @@
 import basic
 import typealias Swift.Optional
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 markUsed(basic.foo(1, 2))
 
 // DWARF: .debug_info

@@ -156,7 +156,7 @@ end.  For example::
   // Return an array containing the elements of `source`, with
   // `separator` interposed between each consecutive pair.
   func array<S: SequenceType>(
-    source: S, 
+    _ source: S, 
     withSeparator separator: S.Iterator.Element
   ) -> [S.Iterator.Element] {
     var result: [S.Iterator.Element] = []
@@ -309,7 +309,7 @@ range of elements, denoted by two indices, by elements from a collection with a
     mutating func replaceSubrange<
       C: CollectionType where C.Iterator.Element == Self.Iterator.Element
     >(
-      subRange: Range<Index>, with newElements: C
+      _ subRange: Range<Index>, with newElements: C
     )
   }
 

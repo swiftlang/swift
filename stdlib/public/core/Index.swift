@@ -101,7 +101,7 @@ public protocol ForwardIndex : _Incrementable {
   /// range check.
   ///
   /// - Complexity: O(1).
-  static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>)
+  static func _failEarlyRangeCheck(_ index: Self, bounds: Range<Self>)
 
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
@@ -125,7 +125,7 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// - Complexity: O(1).
   static func _failEarlyRangeCheck2(
-    rangeStart rangeStart: Self,
+    rangeStart: Self,
     rangeEnd: Self,
     boundsStart: Self,
     boundsEnd: Self)
@@ -183,12 +183,12 @@ public protocol ForwardIndex : _Incrementable {
 // advance and distance implementations
 
 extension ForwardIndex {
-  public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
+  public static func _failEarlyRangeCheck(_ index: Self, bounds: Range<Self>) {
     // Can't perform range checks in O(1) on forward indices.
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart rangeStart: Self,
+    rangeStart: Self,
     rangeEnd: Self,
     boundsStart: Self,
     boundsEnd: Self
@@ -199,7 +199,7 @@ extension ForwardIndex {
   /// Do not use this method directly; call advanced(by: n) instead.
   @_transparent
   @warn_unused_result
-  internal func _advanceForward(n: Distance) -> Self {
+  internal func _advanceForward(_ n: Distance) -> Self {
     _precondition(n >= 0,
         "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
@@ -214,7 +214,7 @@ extension ForwardIndex {
   /// Do not use this method directly; call advanced(by: n, limit) instead.
   @_transparent
   @warn_unused_result
-  internal func _advanceForward(n: Distance, _ limit: Self) -> Self {
+  internal func _advanceForward(_ n: Distance, _ limit: Self) -> Self {
     _precondition(n >= 0,
         "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
@@ -358,7 +358,7 @@ public protocol RandomAccessIndex : BidirectionalIndex, Strideable,
 }
 
 extension RandomAccessIndex {
-  public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
+  public static func _failEarlyRangeCheck(_ index: Self, bounds: Range<Self>) {
     _precondition(
       bounds.startIndex <= index,
       "index is out of bounds: index designates a position before bounds.startIndex")
@@ -368,7 +368,7 @@ extension RandomAccessIndex {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart rangeStart: Self,
+    rangeStart: Self,
     rangeEnd: Self,
     boundsStart: Self,
     boundsEnd: Self

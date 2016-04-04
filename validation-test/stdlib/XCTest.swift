@@ -21,7 +21,7 @@ var XCTestTestSuite = TestSuite("XCTest")
 //       instantiate an NSInvocation with the given selector.
 
 
-func execute(run: () -> ()) {
+func execute(_ run: () -> ()) {
   run()
 }
 

@@ -109,7 +109,7 @@ ${Self}TestSuite.test("subscript(_:Index)/Set/DifferentCollections") {
 %for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 %  Self = 'Minimal%sRangeReplaceableCollection' % traversal
 
-func getTwoInterchangeable${Self}(elements: [Int])
+func getTwoInterchangeable${Self}(_ elements: [Int])
   -> (${Self}<OpaqueValue<Int>>, ${Self}<OpaqueValue<Int>>) {
   var c1 = ${Self}<OpaqueValue<Int>>()
   c1.append(contentsOf: elements.map(OpaqueValue.init))

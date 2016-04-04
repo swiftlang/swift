@@ -4,7 +4,7 @@
 // Test initialization and initializer inheritance.
 var depth = 0
 
-func printAtDepth(s: String) {
+func printAtDepth(_ s: String) {
   for i in 0..<depth { print("*", terminator: "") }
   print(s)
 }

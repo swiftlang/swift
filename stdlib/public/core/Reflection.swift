@@ -137,7 +137,7 @@ public protocol _Mirror {
 @warn_unused_result
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
-func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
+func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
   out.initialize(with: String(reflecting: x))
 }
 
@@ -147,11 +147,11 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
 /// of any type.
 @warn_unused_result
 @_silgen_name("swift_reflectAny")
-public func _reflect<T>(x: T) -> _Mirror
+public func _reflect<T>(_ x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStream>(
-  value: T,
+  _ value: T,
   to target: inout TargetStream,
   name: String? = nil,
   indent: Int = 0,
@@ -175,7 +175,7 @@ public func dump<T, TargetStream : OutputStream>(
 
 /// Dump an object's contents using its mirror to standard output.
 public func dump<T>(
-  value: T,
+  _ value: T,
   name: String? = nil,
   indent: Int = 0,
   maxDepth: Int = .max,
@@ -193,7 +193,7 @@ public func dump<T>(
 
 /// Dump an object's contents. User code should use dump().
 internal func _dump_unlocked<TargetStream : OutputStream>(
-  value: Any,
+  _ value: Any,
   to target: inout TargetStream,
   name: String?,
   indent: Int,
@@ -291,7 +291,7 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
 internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
-  mirror mirror: Mirror,
+  mirror: Mirror,
   to target: inout TargetStream,
   indent: Int,
   maxDepth: Int,
@@ -358,7 +358,7 @@ internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
 
 @_silgen_name("swift_MagicMirrorData_summary")
 func _swift_MagicMirrorData_summaryImpl(
-  metadata: Any.Type, _ result: UnsafeMutablePointer<String>
+  _ metadata: Any.Type, _ result: UnsafeMutablePointer<String>
 )
 
 @_fixed_layout
@@ -480,7 +480,7 @@ func _getEnumChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 @warn_unused_result
 @_silgen_name("swift_EnumMirror_caseName")
 func _swift_EnumMirror_caseName(
-    data: _MagicMirrorData) -> UnsafePointer<CChar>
+    _ data: _MagicMirrorData) -> UnsafePointer<CChar>
 
 struct _EnumMirror : _Mirror {
   let data: _MagicMirrorData
@@ -523,13 +523,13 @@ func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 public func _swift_ClassMirror_quickLookObject(_: _MagicMirrorData) -> AnyObject
 
 @_silgen_name("swift_isKind")
-func _swift_isKind(object: AnyObject, of: AnyObject) -> Bool
+func _swift_isKind(_ object: AnyObject, of: AnyObject) -> Bool
 
-func _isKind(object: AnyObject, of: String) -> Bool {
+func _isKind(_ object: AnyObject, of: String) -> Bool {
   return _swift_isKind(object, of: _bridgeToObjectiveC(of)!)
 }
 
-func _getClassPlaygroundQuickLook(object: AnyObject) -> PlaygroundQuickLook? {
+func _getClassPlaygroundQuickLook(_ object: AnyObject) -> PlaygroundQuickLook? {
   if _isKind(object, of: "NSNumber") {
     let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
     switch UInt8(number.objCType[0]) {

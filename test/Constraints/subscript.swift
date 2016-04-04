@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 // Simple subscript of arrays:
-func simpleSubscript(array: [Float], x: Int) -> Float {
+func simpleSubscript(_ array: [Float], x: Int) -> Float {
   _ = array[x]
   return array[x]
 }
@@ -19,7 +19,7 @@ class LameDictionary {
   }
 }
 
-func archetypeSubscript<T : IntToStringSubscript, U : LameDictionary>(t: T, u: U)
+func archetypeSubscript<T : IntToStringSubscript, U : LameDictionary>(_ t: T, u: U)
        -> String {
   // Subscript an archetype.
   if false { return t[17] }
@@ -29,7 +29,7 @@ func archetypeSubscript<T : IntToStringSubscript, U : LameDictionary>(t: T, u: U
 }
 
 // Subscript of existential type.
-func existentialSubscript(a: IntToStringSubscript) -> String {
+func existentialSubscript(_ a: IntToStringSubscript) -> String {
   return a[17]
 }
 
@@ -42,7 +42,7 @@ class MyDictionary<Key, Value> {
 class MyStringToInt<T> : MyDictionary<String, Int> { }
 
 // Subscript of generic type.
-func genericSubscript<T>(t: T,
+func genericSubscript<T>(_ t: T,
                          array: Array<Int>,
                          i2i: MyDictionary<Int, Int>,
                          t2i: MyDictionary<T, Int>,
@@ -79,7 +79,7 @@ let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in // expected-error {{express
 }
 
 // <rdar://problem/23670252> QoI: Misleading error message when assigning a value from [String : AnyObject]
-func r23670252(dictionary: [String : AnyObject], someObject: AnyObject) {
+func r23670252(_ dictionary: [String : AnyObject], someObject: AnyObject) {
   let color : String?
   color = dictionary["color"]  // expected-error {{cannot assign value of type 'AnyObject?' to type 'String?'}}
   _ = color

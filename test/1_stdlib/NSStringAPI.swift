@@ -260,7 +260,7 @@ NSStringAPIs.test("localizedCapitalized") {
 /// - Parameter expected: the expected result when the operation is
 ///   executed in the given localeID
 func expectLocalizedEquality(
-  expected: String,
+  _ expected: String,
   _ op: (_: NSLocale?) -> String,
   _ localeID: String? = nil,
   @autoclosure _ message: () -> String = "",
@@ -1159,7 +1159,7 @@ NSStringAPIs.test("rangeOfComposedCharacterSequences(for:)") {
 }
 
 func toIntRange(
-  string: String, _ maybeRange: Range<String.Index>?
+  _ string: String, _ maybeRange: Range<String.Index>?
 ) -> Range<Int>? {
   guard let range = maybeRange else { return nil }
 
@@ -1298,7 +1298,7 @@ NSStringAPIs.test("localizedStandardContains(_:)") {
 
 NSStringAPIs.test("localizedStandardRange(of:)") {
   if #available(OSX 10.11, iOS 9.0, *) {
-    func rangeOf(string: String, _ substring: String) -> Range<Int>? {
+    func rangeOf(_ string: String, _ substring: String) -> Range<Int>? {
       return toIntRange(
         string, string.localizedStandardRange(of: substring))
     }
@@ -1396,7 +1396,7 @@ NSStringAPIs.test("deletingLastPathComponent") {
 NSStringAPIs.test("folding(_:locale:)") {
 
   func fwo(
-    s: String, _ options: NSStringCompareOptions
+    _ s: String, _ options: NSStringCompareOptions
   ) -> (NSLocale?) -> String {
     return { loc in s.folding(options, locale: loc) }
   }

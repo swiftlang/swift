@@ -66,7 +66,7 @@ struct CountAndCapacity {
 // elements, interleaved with garbage, as a simple way of catching
 // potential bugs.
 final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
-  class func create(capacity: Int) -> TestManagedBuffer {
+  class func create(_ capacity: Int) -> TestManagedBuffer {
     let r = super.create(minimumCapacity: capacity) {
       CountAndCapacity(
         count: LifetimeTracked(0), capacity: $0.capacity)
@@ -104,7 +104,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
     }
   }
   
-  func append(x: T) {
+  func append(_ x: T) {
     let count = self.count
     precondition(count + 2 <= myCapacity)
     

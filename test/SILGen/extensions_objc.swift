@@ -12,7 +12,7 @@ extension Foo {
 }
 
 // CHECK-LABEL: sil hidden @_TF15extensions_objc19extensionReferencesFCS_3FooT_
-func extensionReferences(x: Foo) {
+func extensionReferences(_ x: Foo) {
   // dynamic extension methods are still dynamically dispatched.
   // CHECK: class_method [volatile] %0 : $Foo, #Foo.kay!1.foreign
   x.kay()
@@ -21,7 +21,7 @@ func extensionReferences(x: Foo) {
 
 }
 
-func extensionMethodCurrying(x: Foo) {
+func extensionMethodCurrying(_ x: Foo) {
   _ = x.kay
 }
 

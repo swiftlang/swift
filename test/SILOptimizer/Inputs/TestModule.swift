@@ -12,10 +12,10 @@ public struct MyStruct : Proto {
 }
 
 @inline(never)
-private func callit(p: Proto) {
+private func callit(_ p: Proto) {
 }
 
 @_transparent
-public func testit(n: MyStruct) {
+public func testit(_ n: MyStruct) {
   callit(n)
 }

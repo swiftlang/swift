@@ -291,7 +291,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
   /// \brief Ensure this Dictionary holds a unique reference to its
   /// buffer having at least minimumCapacity elements.  Return true
   /// iff this results in a change of capacity.
-  mutating func _ensureUniqueBuffer(minimumCapacity: Int) -> Bool {
+  mutating func _ensureUniqueBuffer(_ minimumCapacity: Int) -> Bool {
     var isUnique: Bool = isUniquelyReferencedNonObjC(&_owner)
 
     if !isUnique || capacity < minimumCapacity {
@@ -317,19 +317,19 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
     return false
   }
 
-  func _bucket(k: Key) -> Int {
+  func _bucket(_ k: Key) -> Int {
     return k.hashValue & _bucketMask
   }
 
-  func _next(bucket: Int) -> Int {
+  func _next(_ bucket: Int) -> Int {
     return (bucket + 1) & _bucketMask
   }
 
-  func _prev(bucket: Int) -> Int {
+  func _prev(_ bucket: Int) -> Int {
     return (bucket - 1) & _bucketMask
   }
 
-  func _find(k: Key, startBucket: Int) -> (Index,Bool) {
+  func _find(_ k: Key, startBucket: Int) -> (Index,Bool) {
     var bucket = startBucket
     
 
@@ -345,12 +345,12 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
     }
   }
 
-  func find(k: Key) -> (Index,Bool) {
+  func find(_ k: Key) -> (Index,Bool) {
     return _find(k, startBucket: _bucket(k))
   }
 
   mutating
-  func deleteKey(k: Key) -> Bool {
+  func deleteKey(_ k: Key) -> Bool {
     var start = _bucket(k)
     var (pos, found) = _find(k, startBucket: start)
 
@@ -503,7 +503,7 @@ extension String {
   }
 }
 
-func display(v : Dictionary<Int, X>) {
+func display(_ v : Dictionary<Int, X>) {
   print("[ ", terminator: "")
   var separator = ""
   for p in v {

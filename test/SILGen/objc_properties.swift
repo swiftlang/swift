@@ -17,7 +17,7 @@ class A {
   // Regular methods go through the @objc property accessors.
   // CHECK-LABEL: sil hidden @_TFC15objc_properties1A6method
   // CHECK: class_method {{.*}} #A.prop
-  func method(x: Int) {
+  func method(_ x: Int) {
     prop = x
     method(prop)
   }
@@ -58,25 +58,25 @@ class A {
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties11testPropGet
-func testPropGet(a: A) -> Int {
+func testPropGet(_ a: A) -> Int {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : (A) -> () -> Int , $@convention(objc_method) (A) -> Int
   return a.prop
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties11testPropSet
-func testPropSet(a: A, i: Int) {
+func testPropSet(_ a: A, i: Int) {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : (A) -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
   a.prop = i
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties19testComputedPropGet
-func testComputedPropGet(a: A) -> Int {
+func testComputedPropGet(_ a: A) -> Int {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : (A) -> () -> Int , $@convention(objc_method) (A) -> Int
   return a.computedProp
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties19testComputedPropSet
-func testComputedPropSet(a: A, i: Int) {
+func testComputedPropSet(_ a: A, i: Int) {
   // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : (A) -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
   a.computedProp = i
 }

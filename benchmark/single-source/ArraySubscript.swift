@@ -14,13 +14,13 @@
 import TestsUtils
 
 @inline(never)
-public func run_ArraySubscript(N: Int) {
+public func run_ArraySubscript(_ N: Int) {
   SRand()
 
   let numArrays = 200*N
   let numArrayElements = 100
 
-  func bound(x: Int) -> Int { return min(x, numArrayElements-1) }
+  func bound(_ x: Int) -> Int { return min(x, numArrayElements-1) }
 
   var arrays = [[Int]](repeating: [], count: numArrays)
   for i in 0..<numArrays {

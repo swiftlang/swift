@@ -15,7 +15,7 @@ NSSetAPI.test("Sequence") {
   expectSequenceType(result)
 }
 
-private func compareAnythingAtAll(x: AnyObject, y: AnyObject)
+private func compareAnythingAtAll(_ x: AnyObject, y: AnyObject)
   -> ExpectedComparisonResult {
   switch (x.description < y.description, x.description == y.description) {
   case (true, _): return .lt

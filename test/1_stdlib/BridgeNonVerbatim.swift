@@ -28,7 +28,7 @@ import ObjectiveC
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
     var result: Self? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -88,14 +88,14 @@ struct X : _ObjectiveCBridgeable {
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: Tracked,
+    _ x: Tracked,
     result: inout X?
   ) {
     result = X(x.value)
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    x: Tracked,
+    _ x: Tracked,
     result: inout X?
   ) -> Bool {
     result = X(x.value)

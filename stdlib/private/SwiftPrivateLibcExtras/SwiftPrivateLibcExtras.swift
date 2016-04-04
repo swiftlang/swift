@@ -17,7 +17,7 @@ import Darwin
 import Glibc
 #endif
 
-public func _stdlib_mkstemps(template: inout String, _ suffixlen: CInt) -> CInt {
+public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {
   var utf8 = template.nulTerminatedUTF8
   let (fd, fileName) = utf8.withUnsafeMutableBufferPointer {
     (utf8) -> (CInt, String) in
@@ -45,7 +45,7 @@ public struct _stdlib_fd_set {
       count: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits)
   }
 
-  public func isset(fd: CInt) -> Bool {
+  public func isset(_ fd: CInt) -> Bool {
     let fdInt = Int(fd)
     return (
         _data[fdInt / _stdlib_fd_set._wordBits] &
@@ -53,13 +53,13 @@ public struct _stdlib_fd_set {
       ) != 0
   }
 
-  public mutating func set(fd: CInt) {
+  public mutating func set(_ fd: CInt) {
     let fdInt = Int(fd)
     _data[fdInt / _stdlib_fd_set._wordBits] |=
       UInt32(1 << (fdInt % _stdlib_fd_set._wordBits))
   }
 
-  public mutating func clear(fd: CInt) {
+  public mutating func clear(_ fd: CInt) {
     let fdInt = Int(fd)
     _data[fdInt / _stdlib_fd_set._wordBits] &=
       ~UInt32(1 << (fdInt % _stdlib_fd_set._wordBits))
@@ -78,7 +78,7 @@ public struct _stdlib_fd_set {
 }
 
 public func _stdlib_select(
-  readfds: inout _stdlib_fd_set, _ writefds: inout _stdlib_fd_set,
+  _ readfds: inout _stdlib_fd_set, _ writefds: inout _stdlib_fd_set,
   _ errorfds: inout _stdlib_fd_set, _ timeout: UnsafeMutablePointer<timeval>
 ) -> CInt {
   return readfds._data.withUnsafeMutableBufferPointer {
@@ -104,7 +104,7 @@ public func _stdlib_select(
 //
 // Functions missing in `Darwin` module.
 //
-public func _WSTATUS(status: CInt) -> CInt {
+public func _WSTATUS(_ status: CInt) -> CInt {
   return status & 0x7f
 }
 
@@ -112,18 +112,18 @@ public var _WSTOPPED: CInt {
   return 0x7f
 }
 
-public func WIFEXITED(status: CInt) -> Bool {
+public func WIFEXITED(_ status: CInt) -> Bool {
   return _WSTATUS(status) == 0
 }
 
-public func WIFSIGNALED(status: CInt) -> Bool {
+public func WIFSIGNALED(_ status: CInt) -> Bool {
   return _WSTATUS(status) != _WSTOPPED && _WSTATUS(status) != 0
 }
 
-public func WEXITSTATUS(status: CInt) -> CInt {
+public func WEXITSTATUS(_ status: CInt) -> CInt {
   return (status >> 8) & 0xff
 }
 
-public func WTERMSIG(status: CInt) -> CInt {
+public func WTERMSIG(_ status: CInt) -> CInt {
   return _WSTATUS(status)
 }

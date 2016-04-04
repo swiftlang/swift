@@ -17,7 +17,7 @@ import ObjCIRExtras
 
 // Instance method invocation
 // CHECK: define hidden void @_TF7objc_ir15instanceMethodsFCSo1BT_([[B]]*
-func instanceMethods(b: B) {
+func instanceMethods(_ b: B) {
   // CHECK: load i8*, i8** @"\01L_selector(method:withFloat:)"
   // CHECK: call i32 bitcast (void ()* @objc_msgSend to i32
   var i = b.method(1, with: 2.5 as Float)
@@ -108,7 +108,7 @@ func getset(p p: FooProto) {
 }
 
 // CHECK-LABEL: define hidden void @_TF7objc_ir17pointerPropertiesFCSo14PointerWrapperT_(%CSo14PointerWrapper*) {{.*}} {
-func pointerProperties(obj: PointerWrapper) {
+func pointerProperties(_ obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIntPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIdPtr:)"

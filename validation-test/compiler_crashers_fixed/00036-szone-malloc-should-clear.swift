@@ -11,13 +11,13 @@
 // Issue found by https://github.com/tenderlove (Aaron Patterson)
 // https://gist.github.com/tenderlove/66ff6ae1feed92ac37f2
 
-func a(x: Any, _ y: Any) -> (((Any, Any) -> Any) -> Any) {
+func a(_ x: Any, _ y: Any) -> (((Any, Any) -> Any) -> Any) {
     return {
         (m: (Any, Any) -> Any) -> Any in
         return m(x, y)
     }
 }
-func b(z: (((Any, Any) -> Any) -> Any)) -> Any {
+func b(_ z: (((Any, Any) -> Any) -> Any)) -> Any {
     return z({
         (p: Any, q:Any) -> Any in
         return p

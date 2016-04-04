@@ -1,11 +1,11 @@
 
 var MY_MACRO: Int32 { get }
 
-func doSomethingInHead(arg: Int32)
+func doSomethingInHead(_ arg: Int32)
 
 class BaseInHead {
-  class func doIt(arg: Int32)
-  func doIt(arg: Int32)
+  class func doIt(_ arg: Int32)
+  func doIt(_ arg: Int32)
 }
 
 /// Awesome name.

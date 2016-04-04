@@ -80,8 +80,8 @@ protocol P1 {
 }
 
 extension P1 {
-  final func f0(x: Int) { }
-  final func g0(x: Int) { }
+  final func f0(_ x: Int) { }
+  final func g0(_ x: Int) { }
 }
 
 struct X0j : P0, P1 { }
@@ -89,27 +89,27 @@ struct X0j : P0, P1 { }
 protocol P2 {
   associatedtype P2Assoc
 
-  func h0(x: P2Assoc)
+  func h0(_ x: P2Assoc)
 }
 
 extension P2 where Self.P2Assoc : PSimple {
-  final func f0(x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
-  final func g0(x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
+  final func f0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
+  final func g0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
 }
 
 struct X0k : P0, P2 {
-  func h0(x: Int) { }
+  func h0(_ x: Int) { }
 }
 
 struct X0l : P0, P2 { // expected-error{{type 'X0l' does not conform to protocol 'P0'}}
-  func h0(x: Float) { }
+  func h0(_ x: Float) { }
 }
 
 // Prefer declarations in the type to those in protocol extensions
 struct X0m : P0, P2 {
-  func f0(x: Double) { }
-  func g0(x: Double) { }
-  func h0(x: Double) { }
+  func f0(_ x: Double) { }
+  func g0(_ x: Double) { }
+  func h0(_ x: Double) { }
 }
 
 // Inference from properties.
@@ -167,11 +167,11 @@ struct XCollectionLikeP0a<T> : CollectionLikeP0 {
 // rdar://problem/21304164
 public protocol Thenable {
     associatedtype T // expected-note{{protocol requires nested type 'T'}}
-    func then(success: (_: T) -> T) -> Self
+    func then(_ success: (_: T) -> T) -> Self
 }
 
 public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>' does not conform to protocol 'Thenable'}}
-    public func then(success: (t: T, _: CorePromise<T>) -> T) -> Self {
+    public func then(_ success: (t: T, _: CorePromise<T>) -> T) -> Self {
         return self.then() { (t: T) -> T in
             return success(t: t, self)
         }
@@ -182,17 +182,17 @@ public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>
 protocol P3 {
   associatedtype Assoc = Int
   associatedtype Assoc2
-  func foo(x: Assoc2) -> Assoc?
+  func foo(_ x: Assoc2) -> Assoc?
 }
 
 protocol P4 : P3 { }
 
 extension P4 {
-  func foo(x: Int) -> Float? { return 0 }
+  func foo(_ x: Int) -> Float? { return 0 }
 }
 
 extension P3 where Assoc == Int {
-  func foo(x: Int) -> Assoc? { return nil }
+  func foo(_ x: Int) -> Assoc? { return nil }
 }
 
 

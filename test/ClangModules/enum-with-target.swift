@@ -12,7 +12,7 @@ let calendarUnits2: NSCalendarUnit = [.NSMonthCalendarUnit, .NSYearCalendarUnit]
 let calendarUnitsDep: NSCalendarUnitDeprecated = [.eraCalendarUnitDeprecated, .yearCalendarUnitDeprecated] // expected-error 2 {{unavailable}}
 
 // rdar://problem/21081557
-func pokeRawValue(random: SomeRandomEnum) {
+func pokeRawValue(_ random: SomeRandomEnum) {
   switch (random) {
   case SomeRandomEnum.RawValue // expected-error{{enum case 'RawValue' not found in type 'SomeRandomEnum'}}
     // expected-error@-1{{expected ':' after 'case'}}

@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
 
 public protocol Foo { 
-  func foo(x:Int) -> Int
+  func foo(_ x:Int) -> Int
 }
 
 public extension Foo {
-  func boo(x:Int) -> Int32 {
+  func boo(_ x:Int) -> Int32 {
     return 2222 + x
   }
 
@@ -18,24 +18,24 @@ var gg = 1111
 
 public class C : Foo {
   @inline(never)
-  public func foo(x:Int) -> Int {
+  public func foo(_ x:Int) -> Int {
     gg += 1
     return gg + x
   }
 }
 
 @_transparent
-func callfoo(f: Foo) -> Int {
+func callfoo(_ f: Foo) -> Int {
   return f.foo(2) + f.foo(2)
 }
 
 @_transparent
-func callboo(f: Foo) -> Int32 {
+func callboo(_ f: Foo) -> Int32 {
   return f.boo(2) + f.boo(2)
 }
 
 @_transparent
-func callGetSelf(f: Foo) -> Foo {
+func callGetSelf(_ f: Foo) -> Foo {
   return f.getSelf()
 }
 
@@ -45,7 +45,7 @@ func callGetSelf(f: Foo) -> Foo {
 // CHECK: open_existential_addr
 // CHECK: return
 @inline(never)
-public func test_devirt_protocol_extension_method_invocation_with_self_return_type(c: C) -> Foo {
+public func test_devirt_protocol_extension_method_invocation_with_self_return_type(_ c: C) -> Foo {
   return callGetSelf(c)
 }
 
@@ -87,7 +87,7 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // CHECK: apply
 // CHECK: br bb1(
 @inline(never)
-public func test_devirt_protocol_method_invocation(c: C) -> Int {
+public func test_devirt_protocol_method_invocation(_ c: C) -> Int {
   return callfoo(c)
 }
 
@@ -107,7 +107,7 @@ public func test_devirt_protocol_method_invocation(c: C) -> Int {
 // CHECK: integer_literal
 // CHECK: return
 @inline(never)
-public func test_devirt_protocol_extension_method_invocation(c: C) -> Int32 {
+public func test_devirt_protocol_extension_method_invocation(_ c: C) -> Int32 {
   return callboo(c)
 }
 
@@ -123,7 +123,7 @@ class CC : Proto {
   func f() -> Self { return self }
 }
 
-func callDynamicSelfExistential(p: Proto) {
+func callDynamicSelfExistential(_ p: Proto) {
   p.f()
 }
 
@@ -136,7 +136,7 @@ public func testSelfReturnType() {
 // of methods with the Self return type.
 // rdar://20955745.
 protocol CP : class { func f() -> Self }
-func callDynamicSelfClassExistential(cp: CP) { cp.f() }
+func callDynamicSelfClassExistential(_ cp: CP) { cp.f() }
 class PP : CP {
   func f() -> Self { return self }
 }

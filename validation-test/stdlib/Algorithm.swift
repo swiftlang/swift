@@ -161,10 +161,10 @@ Algorithm.test("invalidOrderings") {
 }
 
 // The routine is based on http://www.cs.dartmouth.edu/~doug/mdmspe.pdf
-func makeQSortKiller(len: Int) -> [Int] {
+func makeQSortKiller(_ len: Int) -> [Int] {
   var candidate: Int = 0
   var keys = [Int:Int]()
-  func Compare(x: Int, y : Int) -> Bool {
+  func Compare(_ x: Int, y : Int) -> Bool {
     if keys[x] == nil && keys[y] == nil {
       if (x == candidate) {
         keys[x] = keys.count

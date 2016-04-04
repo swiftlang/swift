@@ -20,7 +20,7 @@ import SwiftShims
 @warn_unused_result
 @_semantics("availability.osversion")
 public func _stdlib_isOSVersionAtLeast(
-  major: Builtin.Word,
+  _ major: Builtin.Word,
   _ minor: Builtin.Word,
   _ patch: Builtin.Word
 ) -> Builtin.Int1 {

@@ -28,7 +28,7 @@ public func test1() -> Int32 {
 }
 
 @inline(never)
-public func test2(o: Derived) -> Int32 {
+public func test2(_ o: Derived) -> Int32 {
   return o.foo() + o.boo()
 }
 
@@ -40,12 +40,12 @@ public func test3() -> Int32 {
 }
 
 @inline(never)
-public func test4(o: Base<Int>) -> Int32 {
+public func test4(_ o: Base<Int>) -> Int32 {
   return o.foo() + o.boo()
 }
 
 @inline(never)
-public func test5<T>(o: Base<T>) -> Int32 {
+public func test5<T>(_ o: Base<T>) -> Int32 {
   return o.foo() + o.boo()
 }
 

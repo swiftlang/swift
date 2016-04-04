@@ -22,8 +22,8 @@ func testLiteralOverloadingovlLitB() {
   var y /*: Int*/ = ovlLitA(ovlLitB(0))  // expected-error{{ambiguous use of 'ovlLitB'}}
 }
 
-func literalOverloadSameReturn(i: Int) -> Int {}
-func literalOverloadSameReturn(i: Int32) -> Int {}
+func literalOverloadSameReturn(_ i: Int) -> Int {}
+func literalOverloadSameReturn(_ i: Int32) -> Int {}
 func literalOverload2() {
   var _ : Int = literalOverloadSameReturn(literalOverloadSameReturn(1))
 }

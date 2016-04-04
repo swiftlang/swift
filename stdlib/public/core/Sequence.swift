@@ -96,14 +96,14 @@ public protocol Sequence {
   /// - Complexity: O(N).
   @warn_unused_result
   func map<T>(
-    @noescape transform: (Iterator.Element) throws -> T
+    @noescape _ transform: (Iterator.Element) throws -> T
   ) rethrows -> [T]
 
   /// Returns an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   func filter(
-    @noescape includeElement: (Iterator.Element) throws -> Bool
+    @noescape _ includeElement: (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element]
 
   /// Call `body` on each element in `self` in the same order as a
@@ -126,14 +126,14 @@ public protocol Sequence {
   ///   skip subsequent calls.
   ///
   /// - Complexity: O(`self.count`)
-  func forEach(@noescape body: (Iterator.Element) throws -> Void) rethrows
+  func forEach(@noescape _ body: (Iterator.Element) throws -> Void) rethrows
 
   /// Returns a subsequence containing all but the first `n` elements.
   ///
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
-  func dropFirst(n: Int) -> SubSequence
+  func dropFirst(_ n: Int) -> SubSequence
 
   /// Returns a subsequence containing all but the last `n` elements.
   ///
@@ -141,7 +141,7 @@ public protocol Sequence {
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
-  func dropLast(n: Int) -> SubSequence
+  func dropLast(_ n: Int) -> SubSequence
 
   /// Returns a subsequence, up to `maxLength` in length, containing the
   /// initial elements.
@@ -151,7 +151,7 @@ public protocol Sequence {
   ///
   /// - Precondition: `maxLength >= 0`
   @warn_unused_result
-  func prefix(maxLength: Int) -> SubSequence
+  func prefix(_ maxLength: Int) -> SubSequence
 
   /// Returns a slice, up to `maxLength` in length, containing the
   /// final elements of `s`.
@@ -162,7 +162,7 @@ public protocol Sequence {
   /// - Precondition: `self` is a finite sequence.
   /// - Precondition: `maxLength >= 0`
   @warn_unused_result
-  func suffix(maxLength: Int) -> SubSequence
+  func suffix(_ maxLength: Int) -> SubSequence
 
   /// Returns the maximal `SubSequence`s of `self`, in order, that
   /// don't contain elements satisfying the predicate `isSeparator`.
@@ -182,18 +182,18 @@ public protocol Sequence {
   /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   func split(
-    maxSplits maxSplits: Int, omittingEmptySubsequences: Bool,
+    maxSplits: Int, omittingEmptySubsequences: Bool,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
   @warn_unused_result
   func _customContainsEquatableElement(
-    element: Iterator.Element
+    _ element: Iterator.Element
   ) -> Bool?
 
   /// If `self` is multi-pass (i.e., a `Collection`), invoke `preprocess` and
   /// return its result.  Otherwise, return `nil`.
-  func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R?
+  func _preprocessingPass<R>(@noescape _ preprocess: () -> R) -> R?
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
@@ -249,7 +249,7 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
     return _iterator.next()
   }
 
-  internal func dropFirst(n: Int) -> AnySequence<Base.Element> {
+  internal func dropFirst(_ n: Int) -> AnySequence<Base.Element> {
     // If this is already a _DropFirstSequence, we need to fold in
     // the current drop count and drop limit so no data is lost.
     //
@@ -296,7 +296,7 @@ internal class _PrefixSequence<Base : IteratorProtocol>
     return nil
   }
 
-  internal func prefix(maxLength: Int) -> AnySequence<Base.Element> {
+  internal func prefix(_ maxLength: Int) -> AnySequence<Base.Element> {
     return AnySequence(
       _PrefixSequence(
         _iterator: _iterator,
@@ -316,7 +316,7 @@ extension Sequence {
   /// - Complexity: O(N).
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Iterator.Element) throws -> T
+    @noescape _ transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     let initialCapacity = underestimatedCount
     var result = ContiguousArray<T>()
@@ -339,7 +339,7 @@ extension Sequence {
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Iterator.Element) throws -> Bool
+    @noescape _ includeElement: (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element] {
 
     var result = ContiguousArray<Iterator.Element>()
@@ -356,7 +356,7 @@ extension Sequence {
   }
 
   @warn_unused_result
-  public func suffix(maxLength: Int) -> AnySequence<Iterator.Element> {
+  public func suffix(_ maxLength: Int) -> AnySequence<Iterator.Element> {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
     if maxLength == 0 { return AnySequence([]) }
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
@@ -403,7 +403,7 @@ extension Sequence {
   /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    maxSplits maxSplits: Int = Int.max,
+    maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
@@ -463,13 +463,13 @@ extension Sequence {
     return 0
   }
 
-  public func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R? {
+  public func _preprocessingPass<R>(@noescape _ preprocess: () -> R) -> R? {
     return nil
   }
 
   @warn_unused_result
   public func _customContainsEquatableElement(
-    element: Iterator.Element
+    _ element: Iterator.Element
   ) -> Bool? {
     return nil
   }
@@ -495,7 +495,7 @@ extension Sequence {
   ///
   /// - Complexity: O(`self.count`)
   public func forEach(
-    @noescape body: (Iterator.Element) throws -> Void
+    @noescape _ body: (Iterator.Element) throws -> Void
   ) rethrows {
     for element in self {
       try body(element)
@@ -522,7 +522,7 @@ extension Sequence where Iterator.Element : Equatable {
   /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    separator separator: Iterator.Element,
+    separator: Iterator.Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true
   ) -> [AnySequence<Iterator.Element>] {
@@ -543,7 +543,7 @@ extension Sequence where
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
-  public func dropFirst(n: Int) -> AnySequence<Iterator.Element> {
+  public func dropFirst(_ n: Int) -> AnySequence<Iterator.Element> {
     precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
     return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: n))
@@ -555,7 +555,7 @@ extension Sequence where
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
-  public func dropLast(n: Int) -> AnySequence<Iterator.Element> {
+  public func dropLast(_ n: Int) -> AnySequence<Iterator.Element> {
     precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
 
@@ -582,7 +582,7 @@ extension Sequence where
   }
 
   @warn_unused_result
-  public func prefix(maxLength: Int) -> AnySequence<Iterator.Element> {
+  public func prefix(_ maxLength: Int) -> AnySequence<Iterator.Element> {
     precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
     if maxLength == 0 {
       return AnySequence(EmptyCollection<Iterator.Element>())
@@ -668,7 +668,7 @@ extension Sequence {
   }
 
   @available(*, unavailable, message: "call 'split(_:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
-  func split(maxSplit: Int, allowEmptySlices: Bool,
+  func split(_ maxSplit: Int, allowEmptySlices: Bool,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     fatalError("unavailable function can't be called")
@@ -678,7 +678,7 @@ extension Sequence {
 extension Sequence where Iterator.Element : Equatable {
   @available(*, unavailable, message: "call 'split(separator:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   public func split(
-    separator: Iterator.Element,
+    _ separator: Iterator.Element,
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
   ) -> [AnySequence<Iterator.Element>] {

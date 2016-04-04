@@ -87,7 +87,7 @@ public typealias Any = protocol<>
 ///
 ///     // If x has a method @objc getValue() -> Int, call it and
 ///     // return the result.  Otherwise, return `nil`.
-///     func getCValue1(x: AnyObject) -> Int? {
+///     func getCValue1(_ x: AnyObject) -> Int? {
 ///       if let f: () -> Int = x.getCValue { // <===
 ///         return f()
 ///       }
@@ -95,12 +95,12 @@ public typealias Any = protocol<>
 ///     }
 ///
 ///     // A more idiomatic implementation using "optional chaining"
-///     func getCValue2(x: AnyObject) -> Int? {
+///     func getCValue2(_ x: AnyObject) -> Int? {
 ///       return x.getCValue?() // <===
 ///     }
 ///
 ///     // An implementation that assumes the required method is present
-///     func getCValue3(x: AnyObject) -> Int { // <===
+///     func getCValue3(_ x: AnyObject) -> Int { // <===
 ///       return x.getCValue() // x.getCValue is implicitly unwrapped. // <===
 ///     }
 ///
@@ -135,7 +135,7 @@ public protocol AnyObject : class {}
 ///
 ///     // If x has an @objc cValue: Int, return its value.
 ///     // Otherwise, return `nil`.
-///     func getCValue(x: AnyClass) -> Int? {
+///     func getCValue(_ x: AnyClass) -> Int? {
 ///       return x.cValue // <===
 ///     }
 ///

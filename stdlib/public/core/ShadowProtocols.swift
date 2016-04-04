@@ -31,7 +31,7 @@ public protocol _ShadowProtocol {}
 public protocol _NSFastEnumeration : _ShadowProtocol {
   @objc(countByEnumeratingWithState:objects:count:)
   func countByEnumeratingWith(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 }
@@ -62,13 +62,13 @@ public protocol _NSArrayCore :
     _NSCopying, _NSFastEnumeration {
 
   @objc(objectAtIndex:)
-  func objectAt(index: Int) -> AnyObject
+  func objectAt(_ index: Int) -> AnyObject
 
   func getObjects(_: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
 
   @objc(countByEnumeratingWithState:objects:count:)
   func countByEnumeratingWith(
-         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+         _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
          objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 
@@ -94,7 +94,7 @@ public protocol _NSDictionaryCore :
   var count: Int { get }
 
   @objc(objectForKey:)
-  func objectFor(aKey: AnyObject) -> AnyObject?
+  func objectFor(_ aKey: AnyObject) -> AnyObject?
 
   func keyEnumerator() -> _NSEnumerator
 
@@ -103,12 +103,12 @@ public protocol _NSDictionaryCore :
   @objc(copyWithZone:)
   func copy(with zone: _SwiftNSZone) -> AnyObject
 
-  func getObjects(objects: UnsafeMutablePointer<AnyObject>,
+  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>,
     andKeys keys: UnsafeMutablePointer<AnyObject>)
 
   @objc(countByEnumeratingWithState:objects:count:)
   func countByEnumeratingWith(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 }
@@ -125,7 +125,7 @@ public protocol _NSDictionaryCore :
 public protocol _NSDictionary : _NSDictionaryCore {
   // Note! This API's type is different from what is imported by the clang
   // importer.
-  func getObjects(objects: UnsafeMutablePointer<AnyObject>,
+  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>,
       andKeys keys: UnsafeMutablePointer<AnyObject>)
 }
 
@@ -144,7 +144,7 @@ public protocol _NSSetCore :
   init(objects: UnsafePointer<AnyObject?>, count: Int)
 
   var count: Int { get }
-  func member(object: AnyObject) -> AnyObject?
+  func member(_ object: AnyObject) -> AnyObject?
   func objectEnumerator() -> _NSEnumerator
 
   // We also override the following methods for efficiency.
@@ -154,7 +154,7 @@ public protocol _NSSetCore :
 
   @objc(countByEnumeratingWithState:objects:count:)
   func countByEnumeratingWith(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 }

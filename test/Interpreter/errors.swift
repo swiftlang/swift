@@ -12,7 +12,7 @@ enum Excuse : ErrorProtocol { case CatAteHomework(LifetimeTracked) }
 
 var ErrorHandlingTests = TestSuite("ErrorHandling")
 
-func furball(b: Bool) throws -> LifetimeTracked {
+func furball(_ b: Bool) throws -> LifetimeTracked {
   if b {
     throw Excuse.CatAteHomework(LifetimeTracked(0))
   } else {

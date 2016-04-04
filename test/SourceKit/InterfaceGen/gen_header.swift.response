@@ -1,8 +1,8 @@
-public func doSomethingInHead(arg: Int32)
+public func doSomethingInHead(_ arg: Int32)
 
 public class BaseInHead {
 
-    public func doIt(arg: Int32)
+    public func doIt(_ arg: Int32)
 }
 
 /// Awesome name.
@@ -33,116 +33,126 @@ public protocol SameNameProtocol {
     key.length: 17
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 30,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 32,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 35,
+    key.offset: 37,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 43,
+    key.offset: 45,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 50,
+    key.offset: 52,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 56,
+    key.offset: 58,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 74,
+    key.offset: 76,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 81,
+    key.offset: 83,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 86,
+    key.offset: 88,
     key.length: 4
   },
   {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 93,
+    key.length: 1
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 91,
+    key.offset: 95,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 96,
+    key.offset: 100,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 106,
+    key.offset: 110,
     key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 124,
+    key.offset: 128,
     key.length: 26
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 150,
+    key.offset: 154,
     key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 168,
+    key.offset: 172,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 175,
+    key.offset: 179,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 181,
+    key.offset: 185,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 195,
+    key.offset: 199,
     key.length: 19
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 215,
+    key.offset: 219,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 222,
+    key.offset: 226,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 231,
+    key.offset: 235,
     key.length: 16
   }
 ]
 [
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 35,
+    key.offset: 37,
     key.length: 5,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 96,
+    key.offset: 100,
     key.length: 5,
     key.is_system: 1
   }
@@ -153,15 +163,15 @@ public protocol SameNameProtocol {
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "doSomethingInHead(_:)",
     key.offset: 7,
-    key.length: 34,
+    key.length: 36,
     key.nameoffset: 12,
-    key.namelength: 29,
+    key.namelength: 31,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "arg",
         key.offset: 30,
-        key.length: 10,
+        key.length: 12,
         key.typename: "Int32",
         key.nameoffset: 0,
         key.namelength: 0
@@ -172,28 +182,28 @@ public protocol SameNameProtocol {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "BaseInHead",
-    key.offset: 50,
-    key.length: 54,
+    key.offset: 52,
+    key.length: 56,
     key.runtime_name: "_TtC4main10BaseInHead",
-    key.nameoffset: 56,
+    key.nameoffset: 58,
     key.namelength: 10,
-    key.bodyoffset: 68,
-    key.bodylength: 35,
+    key.bodyoffset: 70,
+    key.bodylength: 37,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "doIt(_:)",
-        key.offset: 81,
-        key.length: 21,
-        key.nameoffset: 86,
-        key.namelength: 16,
+        key.offset: 83,
+        key.length: 23,
+        key.nameoffset: 88,
+        key.namelength: 18,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "arg",
-            key.offset: 91,
-            key.length: 10,
+            key.offset: 93,
+            key.length: 12,
             key.typename: "Int32",
             key.nameoffset: 0,
             key.namelength: 0
@@ -206,24 +216,24 @@ public protocol SameNameProtocol {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "SameName",
-    key.offset: 175,
+    key.offset: 179,
     key.length: 18,
     key.runtime_name: "_TtC4main8SameName",
-    key.nameoffset: 181,
+    key.nameoffset: 185,
     key.namelength: 8,
-    key.bodyoffset: 191,
+    key.bodyoffset: 195,
     key.bodylength: 1
   },
   {
     key.kind: source.lang.swift.decl.protocol,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "SameNameProtocol",
-    key.offset: 222,
+    key.offset: 226,
     key.length: 29,
     key.runtime_name: "_TtP4main16SameNameProtocol_",
-    key.nameoffset: 231,
+    key.nameoffset: 235,
     key.namelength: 16,
-    key.bodyoffset: 249,
+    key.bodyoffset: 253,
     key.bodylength: 1
   }
 ]

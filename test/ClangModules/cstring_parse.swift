@@ -11,6 +11,6 @@
 
 import cfuncs
 
-func test_puts(s: String) {
+func test_puts(_ s: String) {
   _ = puts(s) + 32
 }

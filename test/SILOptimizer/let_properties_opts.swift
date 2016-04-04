@@ -173,7 +173,7 @@ public struct StructWithPublicAndInternalAndPrivateLetProperties {
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop3
 // CHECK: return
-public func testClassLet1(f: Foo1) -> Int32 {
+public func testClassLet1(_ f: Foo1) -> Int32 {
   return f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -186,7 +186,7 @@ public func testClassLet1(f: Foo1) -> Int32 {
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop3
 // CHECK: return
-public func testClassLet1(f: inout Foo1) -> Int32 {
+public func testClassLet1(_ f: inout Foo1) -> Int32 {
   return f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -199,7 +199,7 @@ public func testClassLet1(f: inout Foo1) -> Int32 {
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: return
-public func testClassLet(f: Foo) -> Int32 {
+public func testClassLet(_ f: Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -208,7 +208,7 @@ public func testClassLet(f: Foo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testClassLet(f: inout Foo) -> Int32 {
+public func testClassLet(_ f: inout Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -218,7 +218,7 @@ public func testClassLet(f: inout Foo) -> Int32 {
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: return
-public func testClassPublicLet(f: Foo) -> Int32 {
+public func testClassPublicLet(_ f: Foo) -> Int32 {
   return f.Prop0
 }
 
@@ -227,7 +227,7 @@ public func testClassPublicLet(f: Foo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testStructLet(b: Boo) -> Int32 {
+public func testStructLet(_ b: Boo) -> Int32 {
   return b.Prop1 + b.Prop1 + b.Prop2 + b.Prop3
 }
 
@@ -236,7 +236,7 @@ public func testStructLet(b: Boo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testStructLet(b: inout Boo) -> Int32 {
+public func testStructLet(_ b: inout Boo) -> Int32 {
   return b.Prop1 + b.Prop1 + b.Prop2 + b.Prop3
 }
 
@@ -245,7 +245,7 @@ public func testStructLet(b: inout Boo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 1
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testStructPublicLet(b: Boo) -> Int32 {
+public func testStructPublicLet(_ b: Boo) -> Int32 {
   return b.Prop0
 }
 
@@ -257,7 +257,7 @@ public func testStructPublicLet(b: Boo) -> Int32 {
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
 // CHECK: return
-public func testClassLet2(f: Foo2) -> Int32 {
+public func testClassLet2(_ f: Foo2) -> Int32 {
   return f.x + f.x
 }
 
@@ -304,7 +304,7 @@ public func testStructWithMultipleInitsAndInlinedInitializer() {
 // CHECK-WMO-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_33StructWithOnlyPublicLetPropertiesVs5Int32 
 // CHECK-WMO: struct_extract %0 : $StructWithOnlyPublicLetProperties, #StructWithOnlyPublicLetProperties.Prop0
 // CHECK-WMO: return
-public func testStructPropertyAccessibility(b: StructWithOnlyPublicLetProperties) -> Int32 {
+public func testStructPropertyAccessibility(_ b: StructWithOnlyPublicLetProperties) -> Int32 {
   return b.Prop0 + b.Prop1
 }
 
@@ -321,7 +321,7 @@ public func testStructPropertyAccessibility(b: StructWithOnlyPublicLetProperties
 // CHECK-WMO: integer_literal $Builtin.Int32, 21
 // CHECK-WMO-NEXT: struct $Int32
 // CHECK-WMO-NEXT: return
-public func testStructPropertyAccessibility(b: StructWithPublicAndInternalLetProperties) -> Int32 {
+public func testStructPropertyAccessibility(_ b: StructWithPublicAndInternalLetProperties) -> Int32 {
   return b.Prop0 + b.Prop1
 }
 
@@ -338,7 +338,7 @@ public func testStructPropertyAccessibility(b: StructWithPublicAndInternalLetPro
 // CHECK-WMO: integer_literal $Builtin.Int32, 33
 // CHECK-WMO-NEXT: struct $Int32
 // CHECK-WMO-NEXT: return
-public func testStructPropertyAccessibility(b: StructWithPublicAndInternalAndPrivateLetProperties) -> Int32 {
+public func testStructPropertyAccessibility(_ b: StructWithPublicAndInternalAndPrivateLetProperties) -> Int32 {
   return b.Prop0 + b.Prop1 + b.Prop2
 }
 

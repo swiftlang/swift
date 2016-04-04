@@ -4,7 +4,7 @@
 public class Impl : InitProto {
   @objc public required init(int i: CInt) {}
 
-  public func takeStruct(input: testStruct) {
+  public func takeStruct(_ input: testStruct) {
     testStruct(input)
   }
 

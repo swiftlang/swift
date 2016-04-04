@@ -16,7 +16,7 @@ let reps = 1
 let arrayCount = 1024
 
 @inline(never)
-public func run_PopFrontArray(N: Int) {
+public func run_PopFrontArray(_ N: Int) {
   let orig = Array(repeating: 1, count: arrayCount)
   var a = [Int]()
   for _ in 1...20*N {
@@ -33,7 +33,7 @@ public func run_PopFrontArray(N: Int) {
 }
 
 @inline(never)
-public func run_PopFrontUnsafePointer(N: Int) {
+public func run_PopFrontUnsafePointer(_ N: Int) {
   var orig = Array(repeating: 1, count: arrayCount)
   let a = UnsafeMutablePointer<Int>(allocatingCapacity: arrayCount)
   for _ in 1...100*N {

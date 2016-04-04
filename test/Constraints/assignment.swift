@@ -44,8 +44,8 @@ slice[7] = f // expected-error{{cannot assign value of type 'Y' to type 'X'}}
 
 slice[7] = _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 
-func value(x: Int) {}
-func value2(x: inout Int) {}
+func value(_ x: Int) {}
+func value2(_ x: inout Int) {}
 value2(&_) // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 value(_) // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 

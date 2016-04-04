@@ -1,4 +1,4 @@
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 func f() {
   if 1==1 {
 #sourceLocation(file: "abc.swift", line: 42)

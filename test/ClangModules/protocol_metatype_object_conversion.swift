@@ -9,7 +9,7 @@ import ObjectiveC
 protocol NonObjCProto {}
 typealias TwoObjCProtos = protocol<ObjCProto, ObjCProto2>
 
-func takesProtocol(x: Protocol) {}
+func takesProtocol(_ x: Protocol) {}
 
 takesProtocol(ObjCProto.self)
 takesProtocol(ObjCProto2.self)
