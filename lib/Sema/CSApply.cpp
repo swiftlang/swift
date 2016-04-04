@@ -5857,6 +5857,12 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   // Some fixes need more information from the locator.
   ConstraintLocator *locator = fix.second;
 
+  // In the case of us having applied a type member constraint against a
+  // synthesized type variable during diagnostic generation, we may not have
+  // a valid locator.
+  if (!locator)
+    return false;  
+
   // Resolve the locator to a specific expression.
   SourceRange range;
   ConstraintLocator *resolved = simplifyLocator(*this, locator, range);
