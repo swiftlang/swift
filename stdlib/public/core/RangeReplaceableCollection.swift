@@ -272,7 +272,7 @@ extension RangeReplaceableCollection {
   }
 
   internal func _makeHalfOpen<
-    R: _RangeProtocol where R.Bound == Index
+    R : _RangeProtocol where R.Bound == Index
   >(r: R) -> Range<Index> {
     return Range(
       _uncheckedBounds: (
@@ -281,7 +281,7 @@ extension RangeReplaceableCollection {
   }
   
   public mutating func removeSubrange<
-    R: _RangeProtocol where R.Bound == Index
+    R : _RangeProtocol where R.Bound == Index
   >(bounds: R) {
     replaceSubrange(_makeHalfOpen(bounds), with: EmptyCollection())
   }
@@ -354,8 +354,8 @@ Index : Strideable, Index.Stride : Integer {
 
 extension RangeReplaceableCollection {
   public mutating func replaceSubrange<
-    R : _RangeProtocol, C : Collection 
-	where 
+    R : _RangeProtocol, C : Collection
+    where
     R.Bound == Self.Index, C.Iterator.Element == Iterator.Element
   >(
     subRange: R, with newElements: C
