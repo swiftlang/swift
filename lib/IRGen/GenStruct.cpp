@@ -726,7 +726,7 @@ private:
     llvm_unreachable("resilient structs are opaque");                  \
   }                                                                    \
   llvm_unreachable("bad struct type info kind!");                      \
-} while(0)
+} while (0)
 
 Address irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                   Address base,

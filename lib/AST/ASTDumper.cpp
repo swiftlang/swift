@@ -91,7 +91,7 @@ void RequirementRepr::dump() const {
 
 Optional<std::tuple<StringRef, StringRef, RequirementReprKind>>
 RequirementRepr::getAsAnalyzedWrittenString() const {
-  if(AsWrittenString.empty())
+  if (AsWrittenString.empty())
     return None;
   auto Pair = AsWrittenString.split("==");
   auto Kind = RequirementReprKind::SameType;

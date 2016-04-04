@@ -2173,7 +2173,7 @@ public func checkSequence<
   ) { $0 == $1 }
 }
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
 public func check${traversal}Collection<
   ${genericParam}, C : Collection
@@ -2824,7 +2824,7 @@ public func < (
   return lhs.value < rhs.value
 }
 
-% for kind in [ 'Value', 'Class' ]:
+% for kind in ['Value', 'Class']:
 %   Self = 'MinimalHashable%s' % kind
 
 /// A type that conforms only to `Equatable` and `Hashable`.

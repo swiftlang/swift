@@ -262,7 +262,7 @@ public:
       auto *S = cast<SwitchStmt>(Cursor->getAsStmt());
       if (SM.getLineAndColumn(S->getLBraceLoc()).first == Line)
         return false;
-      if(IsInCommentLine()) {
+      if (IsInCommentLine()) {
         for (auto Case : S->getCases()) {
           // switch ...
           // {
@@ -285,8 +285,8 @@ public:
     //    return 0
     //  }
     if (auto FD = dyn_cast_or_null<FuncDecl>(Start.getAsDecl())) {
-      if(FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
-        if(SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
+      if (FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
+        if (SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
           return false;
       }
     }
@@ -384,7 +384,7 @@ public:
         if (Loc.isValid() && SM.getLineNumber(Loc) == Line) {
           return false;
         }
-      } else if(auto *Seq = dyn_cast_or_null<SequenceExpr>(Cursor->getAsExpr())) {
+      } else if (auto *Seq = dyn_cast_or_null<SequenceExpr>(Cursor->getAsExpr())) {
         ArrayRef<Expr*> Elements = Seq->getElements();
         if (Elements.size() == 3 &&
             Elements[1]->getKind() == ExprKind::Assign &&
@@ -550,7 +550,7 @@ class FormatWalker : public SourceEntityWalker {
 
       // Case label items in a case statement are siblings.
       if (auto CS = dyn_cast_or_null<CaseStmt>(Node.dyn_cast<Stmt *>())) {
-        for(const CaseLabelItem& Item : CS->getCaseLabelItems()) {
+        for (const CaseLabelItem& Item : CS->getCaseLabelItems()) {
           addPair(Item.getEndLoc(), FindAlignLoc(Item.getStartLoc()), tok::comma);
         }
       }
@@ -578,13 +578,13 @@ class FormatWalker : public SourceEntityWalker {
   /// Sometimes, target is a part of "parent", for instance, "#else" is a part
   /// of an ifconfigstmt, so that ifconfigstmt is not really the parent of "#else".
   bool isTargetPartOf(swift::ASTWalker::ParentTy Parent) {
-    if(auto Conf = dyn_cast_or_null<IfConfigStmt>(Parent.getAsStmt())) {
+    if (auto Conf = dyn_cast_or_null<IfConfigStmt>(Parent.getAsStmt())) {
       for (auto Clause : Conf->getClauses()) {
         if (Clause.Loc == TargetLocation)
           return true;
       }
     } else if (auto Call = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
-      if(auto Clo = dyn_cast<ClosureExpr>(Call->getFn())) {
+      if (auto Clo = dyn_cast<ClosureExpr>(Call->getFn())) {
         if (Clo->getBody()->getLBraceLoc() == TargetLocation ||
             Clo->getBody()->getRBraceLoc() == TargetLocation) {
           return true;

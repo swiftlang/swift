@@ -272,7 +272,7 @@ linked list::
 
 We can measure the length of a cycle in these nodes as follows::
 
- cycle_length( someNode, (x: [inout] Node){ x = x.next } )
+ cycle_length(someNode, (x: [inout] Node){ x = x.next })
 
 This is why so many generic algorithms seem to work on both 
 ``class``\ es and non-``class``\ es: ``class`` *identities* 

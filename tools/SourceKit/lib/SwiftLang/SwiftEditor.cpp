@@ -746,7 +746,7 @@ void SwiftDocumentSemanticInfo::updateSemanticInfo(
 
   {
     llvm::sys::ScopedLock L(Mtx);
-    if(ASTGeneration > this->ASTGeneration) {
+    if (ASTGeneration > this->ASTGeneration) {
       SemaToks = std::move(Toks);
       SemaDiags = std::move(Diags);
       TokSnapshot = DiagSnapshot = std::move(Snapshot);
@@ -1553,7 +1553,7 @@ private:
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if(!EnclosingCall && !isa<BraceStmt>(S))
+          if (!EnclosingCall && !isa<BraceStmt>(S))
             OuterStmt = S;
         }
         return true;

@@ -254,13 +254,13 @@ public let joinWithSeparatorTests = [
 var JoinTestSuite = TestSuite("Join")
 
 % from itertools import product
-% traversals = [ 'Forward', 'Bidirectional', 'RandomAccess' ]
-% base_kinds = [ 'Defaulted', 'Minimal' ]
+% traversals = ['Forward', 'Bidirectional', 'RandomAccess']
+% base_kinds = ['Defaulted', 'Minimal']
 % collections = [
 %   ('{}{}RangeReplaceableCollection'.format(base_kind, traversal), traversal)
 %     for base_kind, traversal in product(base_kinds, traversals)
 % ]
-% other_array_types = [ 'Array', 'ArraySlice', 'ContiguousArray' ]
+% other_array_types = ['Array', 'ArraySlice', 'ContiguousArray']
 % collections += [(array, 'RandomAccess') for array in other_array_types]
 
 % for Base, traversal in collections:

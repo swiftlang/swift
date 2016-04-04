@@ -68,7 +68,7 @@ collectNameTypeMap(Type Ty, const DeclContext *DC) {
     assert(ParamDecls.size() == Args.size());
 
     // Map type parameter names with their instantiating arguments.
-    for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
+    for (unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
       (*IdMap)[ParamDecls[I]->getName().str()] = Args[I];
     }
   } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
@@ -154,7 +154,7 @@ class ArchetypeSelfTransformer : public PrinterArchetypeTransformer {
     auto ATT = cast<ArchetypeType>(Ty.getPointer());
     ArchetypeType *Self = ATT;
     std::vector<Identifier> Names;
-    for(; Self->getParent(); Self = Self->getParent()) {
+    for (; Self->getParent(); Self = Self->getParent()) {
       Names.insert(Names.begin(), Self->getName());
     }
     if (!Self->getSelfProtocol() || Names.empty())
@@ -371,7 +371,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     Text = Text.trim();
     auto ParamStart = Text.find_first_of('<');
     auto ParamEnd = Text.find_last_of('>');
-    if(StringRef::npos == ParamStart) {
+    if (StringRef::npos == ParamStart) {
       return checkElementType(Text);
     }
     Type GenericType = checkElementType(StringRef(Text.data(), ParamStart));
@@ -461,7 +461,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         auto Written = Req.getAsWrittenString();
         switch (Kind) {
           case RequirementReprKind::TypeConstraint:
-            if(!canPossiblyConvertTo(First, Second, *DC))
+            if (!canPossiblyConvertTo(First, Second, *DC))
               return {Result, MergeInfo};
             else if (isConvertibleTo(First, Second, *DC))
               Result.KnownSatisfiedRequirements.push_back(Written);
@@ -546,7 +546,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     for (auto TL : Target->getInherited()) {
       addTypeLocNominal(TL);
     }
-    while(!Unhandled.empty()) {
+    while (!Unhandled.empty()) {
       NominalTypeDecl* Back = Unhandled.back();
       Unhandled.pop_back();
       for (ExtensionDecl *E : Back->getExtensions()) {
@@ -600,8 +600,8 @@ SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 
 bool SynthesizedExtensionAnalyzer::
 isInSynthesizedExtension(const ValueDecl *VD) {
-  if(auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
-                                                getInnermostTypeContext())) {
+  if (auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
+                                                 getInnermostTypeContext())) {
     return Impl.InfoMap->count(Ext) != 0 &&
            Impl.InfoMap->find(Ext)->second.IsSynthesized;
   }
@@ -771,7 +771,7 @@ ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
   assert(VD->getRawComment().isEmpty());
   std::queue<ValueDecl*> AllConformances;
   AllConformances.push(VD);
-  while(!AllConformances.empty()) {
+  while (!AllConformances.empty()) {
     auto *VD = AllConformances.front();
     AllConformances.pop();
     if (VD->getRawComment().isEmpty()) {
@@ -3689,7 +3689,7 @@ public:
   }
 
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
-    if(Options.SkipAttributes)
+    if (Options.SkipAttributes)
       return;
     auto IsAttrExcluded = [&](DeclAttrKind Kind) {
       return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
@@ -3732,7 +3732,7 @@ public:
   }
 
   void printFunctionExtInfo(SILFunctionType::ExtInfo info) {
-    if(Options.SkipAttributes)
+    if (Options.SkipAttributes)
       return;
 
     if (Options.PrintFunctionRepresentationAttrs) {

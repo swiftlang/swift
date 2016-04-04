@@ -487,7 +487,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     // serializing a copy of the function. This comes up with generic
     // reabstraction thunks which have shared linkage.
     DeclContext *outerParamContext = SILMod.getSwiftModule();
-    while(true) {
+    while (true) {
       // Params' OuterParameters will point to contextParams.
       auto *Params = MF->maybeReadGenericParams(outerParamContext,
                                                 SILCursor, contextParams);

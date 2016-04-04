@@ -246,14 +246,14 @@ public:
     if (NeedSpecify)
       addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
                        DeclAttrParamEqual, "=");
-    if(!Annotation.empty())
+    if (!Annotation.empty())
       addTypeAnnotation(Annotation);
   }
 
   void addDeclAttrKeyword(StringRef Name, StringRef Annotation) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
                      DeclAttrKeyword, Name);
-    if(!Annotation.empty())
+    if (!Annotation.empty())
       addTypeAnnotation(Annotation);
   }
 

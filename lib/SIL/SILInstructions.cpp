@@ -902,7 +902,7 @@ SwitchValueInst *SwitchValueInst::create(
   SmallVector<SILBasicBlock *, 8> BBs;
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
-  for(auto pair: CaseBBs) {
+  for (auto pair: CaseBBs) {
     Cases.push_back(pair.first);
     BBs.push_back(pair.second);
   }

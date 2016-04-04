@@ -10,9 +10,9 @@ import StdlibUnittest
 import StdlibCollectionUnittest
 
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%  for mutable in [ False, True ]:
+%  for mutable in [False, True]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %    Self = "Minimal%s%sCollection" % (traversal, 'Mutable' if mutable else '')
 
@@ -106,7 +106,7 @@ ${Self}TestSuite.test("subscript(_:Index)/Set/DifferentCollections") {
 %  end
 %end
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 %  Self = 'Minimal%sRangeReplaceableCollection' % traversal
 
 func getTwoInterchangeable${Self}(elements: [Int])

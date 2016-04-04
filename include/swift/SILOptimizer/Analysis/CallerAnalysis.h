@@ -73,7 +73,7 @@ class CallerAnalysis : public SILAnalysis {
 public:
   CallerAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Caller), Mod(*M) {
     // Make sure we compute everything first time called.
-    for(auto &F : Mod) {
+    for (auto &F : Mod) {
       CallInfo.FindAndConstruct(&F);
       RecomputeFunctionList.insert(&F);
     }
@@ -113,7 +113,7 @@ public:
 
     CallInfo.clear();
     RecomputeFunctionList.clear();
-    for(auto &F : Mod) {
+    for (auto &F : Mod) {
       RecomputeFunctionList.insert(&F);
     }
   }

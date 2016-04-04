@@ -93,14 +93,14 @@ Formatting Variants
 (e.g. number types) *additionally* support a ``format(…)`` method
 parameterized according to that type's axes of variability::
 
-  print( offset )
-  print( offset.format() ) // equivalent to previous line
-  print( offset.format(radix: 16, width: 5, precision: 3) )
+  print(offset)
+  print(offset.format()) // equivalent to previous line
+  print(offset.format(radix: 16, width: 5, precision: 3))
 
 Although ``format(…)`` is intended to provide the most general
 interface, specialized formatting interfaces are also possible::
 
-  print( offset.hex() )
+  print(offset.hex())
 
 
 Design Details
@@ -342,7 +342,7 @@ adapter that transforms its input to upper case before writing it to
 an underlying stream::
 
   struct UpperStream<UnderlyingStream:OutputStream> : OutputStream {
-    func append(x: String) { base.append( x.toUpper() ) }
+    func append(x: String) { base.append(x.toUpper()) }
     var base: UnderlyingStream
   }
 
@@ -392,7 +392,7 @@ and, finally, we'd be able to write:
 
 .. parsed-literal::
 
-  print( n.format(radix:16)\ **.toUpper()** )
+  print(n.format(radix:16)\ **.toUpper()**)
 
 The complexity of this back-and-forth adapter dance is daunting, and
 might well be better handled in the language once we have some formal
@@ -402,7 +402,7 @@ more sense to build the important transformations directly into
 
 .. parsed-literal::
 
-  print( n.format(radix:16, **case:.upper** ) )
+  print(n.format(radix:16, **case:.upper**))
 
 Possible Simplifications
 ------------------------

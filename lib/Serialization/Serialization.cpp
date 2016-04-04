@@ -3560,7 +3560,7 @@ class YamlGroupInputParser {
           GroupNameAndFileName.append(llvm::sys::path::stem(FileName));
           Map[FileName] = GroupNameAndFileName.str();
         } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
-          if(parseRoot(Map, &Entry, *pCombined))
+          if (parseRoot(Map, &Entry, *pCombined))
             return true;
         } else
           return true;
@@ -3609,7 +3609,7 @@ public:
       return true;
     }
     pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
-    if(parseRoot(*pMap, Root, llvm::Twine()))
+    if (parseRoot(*pMap, Root, llvm::Twine()))
       return true;
 
     // Save the parsed map to the owner.
@@ -3684,7 +3684,7 @@ public:
 
   ArrayRef<StringRef> getOrderedGroupNames() {
     ViewBuffer.clear();
-    for(auto It = Map.begin(); It != Map.end(); ++ It) {
+    for (auto It = Map.begin(); It != Map.end(); ++ It) {
       ViewBuffer.push_back(It->first);
     }
     return llvm::makeArrayRef(ViewBuffer);

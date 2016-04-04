@@ -1663,7 +1663,7 @@ struct GroupNamesPrinter {
   }
 
   void addDecl(const Decl *D) {
-    if(auto VD = dyn_cast<ValueDecl>(D)) {
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
       if (!VD->isImplicit() && !VD->isPrivateStdlibDecl()) {
         StringRef Name = VD->getGroupName().hasValue() ?
           VD->getGroupName().getValue() : "";
@@ -1972,7 +1972,7 @@ public:
 
     llvm::markup::MarkupContext MC;
     auto DC = getDocComment(MC, D);
-    if(DC.hasValue())
+    if (DC.hasValue())
       llvm::markup::dump(DC.getValue()->getDocument(), OS);
 
     return true;
