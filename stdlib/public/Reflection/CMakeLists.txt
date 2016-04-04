@@ -1,4 +1,4 @@
-add_swift_library(swiftReflection IS_STDLIB
+add_swift_library(swiftReflection IS_STDLIB IS_HOST
   Demangle.cpp
   Remangle.cpp
   TypeRef.cpp
