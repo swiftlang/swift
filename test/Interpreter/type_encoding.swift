@@ -35,7 +35,7 @@ class t: NSObject {
 var ic: UInt32 = 0
 let ivars = class_copyIvarList( t.self, &ic )
 for i in 0..<ic {
-    print("\(String.fromCString(ivar_getName(ivars[Int(i)]))!) \(String.fromCString(ivar_getTypeEncoding(ivars[Int(i)]))!)")
+    print("\(String(validatingUTF8:ivar_getName(ivars[Int(i)]))!) \(String(validatingUTF8:ivar_getTypeEncoding(ivars[Int(i)]))!)")
 }
 
 // CHECK: d d
