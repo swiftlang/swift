@@ -1364,7 +1364,10 @@ namespace {
       auto name = IGM.getAddrOfGlobalString(ivar->getName().str());
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
-      auto typeEncode = IGM.getAddrOfGlobalString("");
+      std::string typeEnc;
+      if (requiresObjCPropertyDescriptor(IGM, ivar))
+        getObjCEncodingForPropertyType(IGM, ivar, typeEnc);
+      auto typeEncode = IGM.getAddrOfGlobalString(typeEnc.c_str());
 
       Size size;
       Alignment alignment;
