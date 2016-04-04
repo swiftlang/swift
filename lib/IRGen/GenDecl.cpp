@@ -2901,7 +2901,7 @@ bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion)
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
   if (decl->getModuleContext() == SILMod->getSwiftModule() &&
-      decl->getEffectiveAccess() != Accessibility::Public)
+      decl->getFormalAccess() != Accessibility::Public)
     return ResilienceExpansion::Maximal;
   return ResilienceExpansion::Minimal;
 }

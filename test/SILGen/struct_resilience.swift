@@ -209,26 +209,3 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
   return s.w
 
 }
-
-// Make sure that @_versioned entities can be resilient
-
-@_versioned struct VersionedResilientStruct {
-  @_versioned let x: Int
-  @_versioned let y: Int
-
-  @_versioned init(x: Int, y: Int) {
-    self.x = x
-    self.y = y
-  }
-}
-
-// CHECK-LABEL: sil [transparent] [fragile] @_TF17struct_resilience27useVersionedResilientStructFVS_24VersionedResilientStructS0_ : $@convention(thin) (@in VersionedResilientStruct) -> @out VersionedResilientStruct
-@_versioned
-@_transparent func useVersionedResilientStruct(s: VersionedResilientStruct)
-    -> VersionedResilientStruct {
-  // CHECK:       function_ref @_TFV17struct_resilience24VersionedResilientStructCfT1xSi1ySi_S0_
-  // CHECK:       function_ref @_TFV17struct_resilience24VersionedResilientStructg1ySi
-  // CHECK:       function_ref @_TFV17struct_resilience24VersionedResilientStructg1xSi
-
-  return VersionedResilientStruct(x: s.y, y: s.x)
-}
