@@ -160,28 +160,28 @@ public extension CGRect {
   }
 
   @_transparent // @fragile
-  mutating func insetInPlace(dx dx: CGFloat, dy: CGFloat) {
+  mutating func insetInPlace(dx: CGFloat, dy: CGFloat) {
     self = insetBy(dx: dx, dy: dy)
   }
 
   @_transparent // @fragile
-  mutating func offsetInPlace(dx dx: CGFloat, dy: CGFloat) {
+  mutating func offsetInPlace(dx: CGFloat, dy: CGFloat) {
     self = offsetBy(dx: dx, dy: dy)
   }
 
   @_transparent // @fragile
-  mutating func unionInPlace(rect: CGRect) {
+  mutating func unionInPlace(_ rect: CGRect) {
     self = union(rect)
   }
 
   @_transparent // @fragile
-  mutating func intersectInPlace(rect: CGRect) {
+  mutating func intersectInPlace(_ rect: CGRect) {
     self = intersect(rect)
   }
 
   @_transparent // @fragile
   @warn_unused_result
-  func divide(atDistance: CGFloat, fromEdge: CGRectEdge)
+  func divide(_ atDistance: CGFloat, fromEdge: CGRectEdge)
     -> (slice: CGRect, remainder: CGRect)
   {
     var slice = CGRect.zero

@@ -12,8 +12,8 @@ final class Dictionary<K, V> : DictionaryLiteralConvertible {
   init(dictionaryLiteral elements: (K, V)...) { }
 }
 
-func useDictStringInt(d: DictStringInt) {}
-func useDict<K, V>(d: Dictionary<K,V>) {}
+func useDictStringInt(_ d: DictStringInt) {}
+func useDict<K, V>(_ d: Dictionary<K,V>) {}
 
 // Concrete dictionary literals.
 useDictStringInt([ "Hello" : 1 ])

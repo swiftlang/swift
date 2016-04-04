@@ -958,7 +958,7 @@ DictionaryTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
 // Native dictionary tests.
 //===---
 
-func helperDeleteThree(k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
+func helperDeleteThree(_ k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
   var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
 
   d1[k1] = TestValueTy(1010)
@@ -1023,12 +1023,12 @@ DictionaryTestSuite.test("deleteChainCollision2") {
   assert(d[k6_0]!.value == 1060)
 }
 
-func uniformRandom(max: Int) -> Int {
+func uniformRandom(_ max: Int) -> Int {
   // FIXME: this is not uniform.
   return random() % max
 }
 
-func pickRandom<T>(a: [T]) -> T {
+func pickRandom<T>(_ a: [T]) -> T {
   return a[uniformRandom(a.count)]
 }
 
@@ -1037,7 +1037,7 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
   print("time is \(timeNow)")
   srandom(timeNow)
 
-  func check(d: Dictionary<TestKeyTy, TestValueTy>) {
+  func check(_ d: Dictionary<TestKeyTy, TestValueTy>) {
     var keys = Array(d.keys)
     for i in 0..<keys.count {
       for j in 0..<i {
@@ -1060,7 +1060,7 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
   let chainLength = 7
 
   var knownKeys: [TestKeyTy] = []
-  func getKey(value: Int) -> TestKeyTy {
+  func getKey(_ value: Int) -> TestKeyTy {
     for k in knownKeys {
       if k.value == value {
         return k
@@ -1136,7 +1136,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
 // NSDictionary -> Dictionary bridging tests.
 //===---
 
-func getAsNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
+func getAsNSDictionary(_ d: Dictionary<Int, Int>) -> NSDictionary {
   let keys = Array(d.keys.map { TestObjCKeyTy($0) })
   let values = Array(d.values.map { TestObjCValueTy($0) })
 
@@ -1145,7 +1145,7 @@ func getAsNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
   return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
-func getAsEquatableNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
+func getAsEquatableNSDictionary(_ d: Dictionary<Int, Int>) -> NSDictionary {
   let keys = Array(d.keys.map { TestObjCKeyTy($0) })
   let values = Array(d.values.map { TestObjCEquatableValueTy($0) })
 
@@ -1154,7 +1154,7 @@ func getAsEquatableNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
   return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
-func getAsNSMutableDictionary(d: Dictionary<Int, Int>) -> NSMutableDictionary {
+func getAsNSMutableDictionary(_ d: Dictionary<Int, Int>) -> NSMutableDictionary {
   let keys = Array(d.keys.map { TestObjCKeyTy($0) })
   let values = Array(d.values.map { TestObjCValueTy($0) })
 
@@ -1166,7 +1166,7 @@ func getBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
   return convertNSDictionaryToDictionary(nsd)
 }
 
-func getBridgedVerbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, AnyObject> {
+func getBridgedVerbatimDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<NSObject, AnyObject> {
   let nsd = getAsNSDictionary(d)
   return convertNSDictionaryToDictionary(nsd)
 }
@@ -1182,7 +1182,7 @@ func getBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridg
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
-func getBridgedNonverbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+func getBridgedNonverbatimDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   let nsd = getAsNSDictionary(d)
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
@@ -1193,12 +1193,12 @@ func getBridgedNonverbatimDictionaryAndNSMutableDictionary()
   return (Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self), nsd)
 }
 
-func getBridgedVerbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, TestObjCEquatableValueTy> {
+func getBridgedVerbatimEquatableDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<NSObject, TestObjCEquatableValueTy> {
   let nsd = getAsEquatableNSDictionary(d)
   return convertNSDictionaryToDictionary(nsd)
 }
 
-func getBridgedNonverbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedEquatableValueTy> {
+func getBridgedNonverbatimEquatableDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedEquatableValueTy> {
   let nsd = getAsEquatableNSDictionary(d)
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
@@ -2388,7 +2388,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
-  func helper(nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {
+  func helper(_ nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {
     let d1 = getBridgedVerbatimEquatableDictionary(nd1)
     let identity1 = unsafeBitCast(d1, to: Int.self)
     assert(isCocoaDictionary(d1))
@@ -3474,7 +3474,7 @@ DictionaryDerivedAPIs.test("isEmpty") {
   }
 }
 
-func callGenericIsEmpty<C : Collection>(collection: C) -> Bool {
+func callGenericIsEmpty<C : Collection>(_ collection: C) -> Bool {
   return collection.isEmpty
 }
 
@@ -3540,13 +3540,13 @@ DictionaryDerivedAPIs.test("values") {
 var ObjCThunks = TestSuite("ObjCThunks")
 
 class ObjCThunksHelper : NSObject {
-  dynamic func acceptArrayBridgedVerbatim(array: [TestObjCValueTy]) {
+  dynamic func acceptArrayBridgedVerbatim(_ array: [TestObjCValueTy]) {
     expectEqual(10, array[0].value)
     expectEqual(20, array[1].value)
     expectEqual(30, array[2].value)
   }
 
-  dynamic func acceptArrayBridgedNonverbatim(array: [TestBridgedValueTy]) {
+  dynamic func acceptArrayBridgedNonverbatim(_ array: [TestBridgedValueTy]) {
     // Cannot check elements because doing so would bridge them.
     expectEqual(3, array.count)
   }
@@ -3562,7 +3562,7 @@ class ObjCThunksHelper : NSObject {
   }
 
   dynamic func acceptDictionaryBridgedVerbatim(
-      d: [TestObjCKeyTy : TestObjCValueTy]) {
+      _ d: [TestObjCKeyTy : TestObjCValueTy]) {
     expectEqual(3, d.count)
     expectEqual(1010, d[TestObjCKeyTy(10)]!.value)
     expectEqual(1020, d[TestObjCKeyTy(20)]!.value)
@@ -3570,7 +3570,7 @@ class ObjCThunksHelper : NSObject {
   }
 
   dynamic func acceptDictionaryBridgedNonverbatim(
-      d: [TestBridgedKeyTy : TestBridgedValueTy]) {
+      _ d: [TestBridgedKeyTy : TestBridgedValueTy]) {
     expectEqual(3, d.count)
     // Cannot check elements because doing so would bridge them.
   }

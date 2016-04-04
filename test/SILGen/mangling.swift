@@ -94,7 +94,7 @@ enum GenericUnion<T> {
   case Foo(Int)
 }
 
-func instantiateGenericUnionConstructor<T>(t: T) {
+func instantiateGenericUnionConstructor<T>(_ t: T) {
   _ = GenericUnion<T>.Foo
 }
 

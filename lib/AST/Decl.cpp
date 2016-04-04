@@ -3895,7 +3895,7 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   llvm_unreachable("Invalid parameter index");
 }
 
-bool AbstractFunctionDecl::argumentNameIsAPIByDefault(unsigned i) const {
+bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   // Initializers have argument labels.
   if (isa<ConstructorDecl>(this))
     return true;
@@ -3905,8 +3905,8 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault(unsigned i) const {
     if (func->isOperator())
       return false;
 
-    // Other functions have argument labels for every argument after the first.
-    return i > 0;
+    // Other functions have argument labels for all arguments
+    return true;
   }
 
   assert(isa<DestructorDecl>(this));

@@ -16,7 +16,7 @@
 import Foundation
 import TestsUtils
 
-func countBitSet(num: Int) -> Int {
+func countBitSet(_ num: Int) -> Int {
   let bits = sizeof(Int) * 8
   var cnt : Int = 0
   var mask: Int = 1
@@ -30,7 +30,7 @@ func countBitSet(num: Int) -> Int {
 }
 
 @inline(never)
-public func run_BitCount(N: Int) {
+public func run_BitCount(_ N: Int) {
   for _ in 1...100*N {
     // Check some results.
     CheckResults(countBitSet(1) == 1, "Incorrect results in BitCount.")

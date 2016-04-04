@@ -90,10 +90,10 @@ RangeReplaceableTestSuite.test("reserveCapacity/dispatch") {
   expectCustomizable(tester, tester.log.reserveCapacity)
 }
 
-func identity(element: OpaqueValue<Int>) -> OpaqueValue<Int> {
+func identity(_ element: OpaqueValue<Int>) -> OpaqueValue<Int> {
   return element
 }
-func identityEq(element: MinimalEquatableValue) -> MinimalEquatableValue {
+func identityEq(_ element: MinimalEquatableValue) -> MinimalEquatableValue {
   return element
 }
 

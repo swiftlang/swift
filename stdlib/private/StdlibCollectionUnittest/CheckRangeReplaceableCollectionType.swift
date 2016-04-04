@@ -22,7 +22,7 @@ internal enum RangeSelection {
 
   internal func rangeOf<
     C : Collection
-  >(collection: C) -> Range<C.Index> {
+  >(_ collection: C) -> Range<C.Index> {
     switch self {
       case .emptyRange: return collection.endIndex..<collection.endIndex
       case .leftEdge: return collection.startIndex..<collection.startIndex
@@ -49,7 +49,7 @@ internal enum IndexSelection {
   case end
   case last
 
-  internal func indexIn<C : Collection>(collection: C) -> C.Index {
+  internal func indexIn<C : Collection>(_ collection: C) -> C.Index {
     switch self {
       case .start: return collection.startIndex
       case .middle: return collection.startIndex.advanced(by: collection.count / 2)
@@ -388,7 +388,7 @@ extension TestSuite {
     C.SubSequence.SubSequence == C.SubSequence,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -420,7 +420,7 @@ extension TestSuite {
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
@@ -1111,7 +1111,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
     CollectionWithEquatableElement.Index : BidirectionalIndex,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -1155,7 +1155,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
@@ -1237,7 +1237,7 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     CollectionWithEquatableElement.Index : RandomAccessIndex,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,

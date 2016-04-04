@@ -46,7 +46,7 @@ public struct _stdlib_ShardedAtomicCounter {
     self._shardsPtr.deallocateCapacity(self._shardsCount)
   }
 
-  public func add(operand: Int, randomInt: Int) {
+  public func add(_ operand: Int, randomInt: Int) {
     let shardIndex = Int(UInt(bitPattern: randomInt) % UInt(self._shardsCount))
     _swift_stdlib_atomicFetchAddInt(
       object: self._shardsPtr + shardIndex, operand: operand)

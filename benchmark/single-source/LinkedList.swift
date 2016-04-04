@@ -25,7 +25,7 @@ final class Node {
 }
 
 @inline(never)
-public func run_LinkedList(N: Int) {
+public func run_LinkedList(_ N: Int) {
   let size = 100
   var head = Node(n:nil, d:0)
   for i in 0..<size {

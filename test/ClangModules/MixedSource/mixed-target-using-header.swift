@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 
-func test(foo : FooProto) {
+func test(_ foo : FooProto) {
   _ = foo.bar as CInt
   _ = ExternIntX.x as CInt
 }
@@ -29,17 +29,17 @@ func testCFunction() {
 }
 
 class ProtoConformer : ForwardClassUser {
-  @objc func consumeForwardClass(arg: ForwardClass) {}
+  @objc func consumeForwardClass(_ arg: ForwardClass) {}
 
   @objc var forward = ForwardClass()
 }
 
-func testProtocolWrapper(conformer: ForwardClassUser) {
+func testProtocolWrapper(_ conformer: ForwardClassUser) {
   conformer.consumeForwardClass(conformer.forward)
 }
 testProtocolWrapper(ProtoConformer())
 
-func testStruct(p: Point) -> Point {
+func testStruct(_ p: Point) -> Point {
   var result = p
   result.y += 5
   return result

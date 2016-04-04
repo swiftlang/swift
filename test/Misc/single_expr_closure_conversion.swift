@@ -11,15 +11,15 @@ extension String: Binding {}
 extension Blob: Binding {}
 
 struct Stmt {
-  func bind(values: Binding?...) -> Stmt {
+  func bind(_ values: Binding?...) -> Stmt {
     return self
   }
 
-  func bind(values: [Binding?]) -> Stmt {
+  func bind(_ values: [Binding?]) -> Stmt {
     return self
   }
 
-  func bind(values: [String: Binding?]) -> Stmt {
+  func bind(_ values: [String: Binding?]) -> Stmt {
     return self
   }
 }
@@ -32,7 +32,7 @@ withBlob { stmt.bind(["1": 1, "2": 2.0, "3": "3", "4": $0]) }
 // <rdar://problem/19840785>
 // We shouldn't crash on the call to 'a.dispatch' below.
 class A {
-	func dispatch(f : () -> Void) {
+	func dispatch(_ f : () -> Void) {
 		f()
 	}
 }

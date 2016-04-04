@@ -15,7 +15,7 @@ class NSObjectWithCustomHashable : NSObject {
     self._hashValue = hashValue
   }
 
-  override func isEqual(other: AnyObject?) -> Bool {
+  override func isEqual(_ other: AnyObject?) -> Bool {
     let other_ = other as! NSObjectWithCustomHashable
     return self._value == other_._value
   }

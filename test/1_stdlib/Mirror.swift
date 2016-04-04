@@ -49,7 +49,7 @@ mirrors.test("RandomAccessStructure") {
 
 let letters = "abcdefghijklmnopqrstuvwxyz "
 
-func find(substring: String, within domain: String) -> String.Index? {
+func find(_ substring: String, within domain: String) -> String.Index? {
   let domainCount = domain.characters.count
   let substringCount = substring.characters.count
 
@@ -164,7 +164,7 @@ mirrors.test("Legacy") {
   let mb = Mirror(reflecting: B())
   
   func expectBMirror(
-    mb: Mirror,   stackTrace: SourceLocStack = SourceLocStack(),
+    _ mb: Mirror,   stackTrace: SourceLocStack = SourceLocStack(),
     file: String = #file, line: UInt = #line
   ) {
     expectTrue(mb.subjectType == B.self,

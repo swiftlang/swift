@@ -25,6 +25,6 @@ class D: C {}
 // CHECK:         unconditional_checked_cast {{%.*}} : $C to $D
 // CHECK:       [[TRAP]]:
 // CHECK:         unreachable
-func test(x: Foo) -> D {
+func test(_ x: Foo) -> D {
   return x.bar?.bas as! D
 }

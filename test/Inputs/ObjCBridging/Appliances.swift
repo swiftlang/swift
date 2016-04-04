@@ -14,21 +14,21 @@ extension Refrigerator : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(
-    source: _ObjectiveCType,
+    _ source: _ObjectiveCType,
     result: inout Refrigerator?
   ) {
     result = Refrigerator(temperature: source.temperature)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    source: _ObjectiveCType,
+    _ source: _ObjectiveCType,
     result: inout Refrigerator?
   ) -> Bool {
     result = Refrigerator(temperature: source.temperature)
     return true
   }
 
-  public static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  public static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Refrigerator {
     return Refrigerator(temperature: source!.temperature)
   }

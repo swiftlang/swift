@@ -27,10 +27,10 @@ final class Foo<T: NSCoding>: NSObject, NSCoding {
 }
 
 // FIXME: W* macro equivalents should be in the Darwin/Glibc overlay
-func WIFEXITED(status: Int32) -> Bool {
+func WIFEXITED(_ status: Int32) -> Bool {
   return (status & 0o177) == 0
 }
-func WEXITSTATUS(status: Int32) -> Int32 {
+func WEXITSTATUS(_ status: Int32) -> Int32 {
   return (status >> 8) & 0xFF
 }
 

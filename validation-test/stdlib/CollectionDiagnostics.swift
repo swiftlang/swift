@@ -32,13 +32,13 @@ func useCollectionTypeSubSequenceIndex<
   C : Collection
   where
   C.SubSequence.Index : BidirectionalIndex
->(c: C) {}
+>(_ c: C) {}
 
 func useCollectionTypeSubSequenceGeneratorElement<
   C : Collection
   where
   C.SubSequence.Iterator.Element == C.Iterator.Element
->(c: C) {}
+>(_ c: C) {}
 
 func sortResultIgnored<
   S : Sequence, MC : MutableCollection
@@ -46,7 +46,7 @@ func sortResultIgnored<
   S.Iterator.Element : Comparable,
   MC.Iterator.Element : Comparable
 >(
-  sequence: S,
+  _ sequence: S,
   mutableCollection: MC,
   array: [Int]
 ) {

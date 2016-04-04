@@ -127,7 +127,7 @@ class NonContiguousNSString : NSString {
 /// Verify that extended grapheme cluster boundaries in `subject` occur at
 /// positions specified in `expectedBoundaries`.
 func checkGraphemeClusterSegmentation(
-    expectedBoundaries: [Int], _ subject: String, _ stackTrace: SourceLocStack
+    _ expectedBoundaries: [Int], _ subject: String, _ stackTrace: SourceLocStack
 ) {
   var actualBoundaries: [Int] = [ 0 ]
   var unicodeScalarCount = 0
@@ -146,7 +146,7 @@ func checkGraphemeClusterSegmentation(
 }
 
 func checkGraphemeClusterSegmentation(
-    expectedBoundaries: [Int], scalars: [UInt32], _ stackTrace: SourceLocStack
+    _ expectedBoundaries: [Int], scalars: [UInt32], _ stackTrace: SourceLocStack
 ) {
   let subject = NonContiguousNSString(scalars) as String
   checkGraphemeClusterSegmentation(expectedBoundaries, subject,
@@ -154,7 +154,7 @@ func checkGraphemeClusterSegmentation(
 }
 
 func checkGraphemeClusterSegmentation(
-    expectedBoundaries: [Int], codeUnits: [UInt16], _ stackTrace: SourceLocStack
+    _ expectedBoundaries: [Int], codeUnits: [UInt16], _ stackTrace: SourceLocStack
 ) {
   let subject = NonContiguousNSString(codeUnits) as String
   checkGraphemeClusterSegmentation(expectedBoundaries, subject,

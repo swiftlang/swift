@@ -104,6 +104,6 @@ extension NSString {
   func test() {}
   class func test2() {}
 
-  class func fromColor(color: NSColor) -> NSString? { return nil; }
+  class func fromColor(_ color: NSColor) -> NSString? { return nil; }
 }
 

@@ -3,7 +3,7 @@
 struct SomeRange { }
 
 // Function declarations.
-func paramName(func: Int, in: SomeRange) { }
+func paramName(_ func: Int, in: SomeRange) { }
 func firstArgumentLabelWithParamName(in range: SomeRange) { }
 func firstArgumentLabelWithParamName2(range in: SomeRange) { }
 
@@ -34,7 +34,7 @@ class SomeClass { }
 typealias functionType = (in: SomeRange) -> Bool
 
 // Calls
-func testCalls(range: SomeRange) {
+func testCalls(_ range: SomeRange) {
   paramName(0, in: range)
   firstArgumentLabelWithParamName(in: range)
   firstArgumentLabelWithParamName2(range: range)

@@ -43,7 +43,7 @@ class Observer : NSObject {
 
   override init() { target = nil; super.init() }
 
-  func observeTarget(t: Target) {
+  func observeTarget(_ t: Target) {
     target = t
     target!.addObserver(self, forKeyPath:"objcValue",
       options: [.new, .old],
@@ -86,7 +86,7 @@ class ObserverKVO : NSObject {
 
   override init() { target = nil; super.init() }
 
-  func observeTarget(target: Target) {
+  func observeTarget(_ target: Target) {
     self.target = target
     self.target!.addObserver(self,
        forKeyPath: "objcValue",

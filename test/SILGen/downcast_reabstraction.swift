@@ -7,7 +7,7 @@
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @_TTRXFo_iT__iT__XFo___
 // CHECK:         [[SUBST_VAL:%.*]] = partial_apply [[REABSTRACT]]([[ORIG_VAL]])
 
-func condFunctionFromAny(x: Any) {
+func condFunctionFromAny(_ x: Any) {
   if let f = x as? () -> () {
     f()
   }
@@ -19,6 +19,6 @@ func condFunctionFromAny(x: Any) {
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @_TTRXFo_iT__iT__XFo___
 // CHECK:         [[SUBST_VAL:%.*]] = partial_apply [[REABSTRACT]]([[ORIG_VAL]])
 // CHECK:         apply [[SUBST_VAL]]()
-func uncondFunctionFromAny(x: Any) {
+func uncondFunctionFromAny(_ x: Any) {
   (x as! () -> ())()
 }

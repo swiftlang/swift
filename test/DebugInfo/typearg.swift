@@ -15,7 +15,7 @@ class AClass : AProtocol {
 // CHECK-SAME:                            flags: DIFlagArtificial
 // CHECK: ![[SWIFTMETATYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$swift.type",
 // CHECK-SAME:                                baseType: ![[VOIDPTR]]
-func aFunction<T : AProtocol>(x: T) {
+func aFunction<T : AProtocol>(_ x: T) {
     print("I am in aFunction: \(x.f())")
 }
 
@@ -26,7 +26,7 @@ class Foo<Bar> {
       func one() {
       }
 
-      func two<Baz>(x: Baz) {
+      func two<Baz>(_ x: Baz) {
     // TODO: leave breadcrumbs for how to dynamically derive T in the debugger
     // CHECK- FIXME: !DILocalVariable(name: "$swift.type.Bar"
     // CHECK: !DILocalVariable(name: "$swift.type.Baz"

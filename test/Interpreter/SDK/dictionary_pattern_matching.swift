@@ -11,7 +11,7 @@ struct State {
   let abbrev: String
 }
 
-func stateFromPlistLame(plist: Dictionary<String, AnyObject>) -> State? {
+func stateFromPlistLame(_ plist: Dictionary<String, AnyObject>) -> State? {
   if let name = plist["name"] as? NSString {
     if let population = plist["population"] as? NSNumber {
       if let abbrev = plist["abbrev"] as? NSString {
@@ -26,7 +26,7 @@ func stateFromPlistLame(plist: Dictionary<String, AnyObject>) -> State? {
   return nil
 }
 
-func stateFromPlistCool(plist: Dictionary<String, AnyObject>) -> State? {
+func stateFromPlistCool(_ plist: Dictionary<String, AnyObject>) -> State? {
   switch (plist["name"], plist["population"], plist["abbrev"]) {
   case let (name as String, pop as Int, abbr as String)
   where abbr.characters.count == 2:
@@ -102,7 +102,7 @@ enum Statistic : CustomReflectable {
   }
 }
 
-func statisticFromPlist(plist: Dictionary<String, AnyObject>) -> Statistic? {
+func statisticFromPlist(_ plist: Dictionary<String, AnyObject>) -> Statistic? {
   switch (plist["kind"], plist["name"], plist["population"], plist["abbrev"]) {
   case let ("state" as String, name as String, population as Int, abbrev as String)
   where abbrev.characters.count == 2:

@@ -29,7 +29,7 @@ RangeTestSuite.test("ReverseRange") {
   expectEqualSequence((0..<10).lazy.reversed(), [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
 }
 
-func isEquatable<E : Equatable>(e: E) {}
+func isEquatable<E : Equatable>(_ e: E) {}
 
 RangeTestSuite.test("Range/Equatable") {
   let r1: Range<Int> = 0..<0

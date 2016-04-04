@@ -22,7 +22,7 @@ class X {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15direct_to_class
-func direct_to_class(obj: AnyObject) {
+func direct_to_class(_ obj: AnyObject) {
   // CHECK: [[OBJ_SELF:%[0-9]+]] = open_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
@@ -30,7 +30,7 @@ func direct_to_class(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup18direct_to_protocol
-func direct_to_protocol(obj: AnyObject) {
+func direct_to_protocol(_ obj: AnyObject) {
   // CHECK: [[OBJ_SELF:%[0-9]+]] = open_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> Self -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
@@ -38,7 +38,7 @@ func direct_to_protocol(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup23direct_to_static_method
-func direct_to_static_method(obj: AnyObject) {
+func direct_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[START:[A-Za-z0-9_]+]]([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
@@ -53,7 +53,7 @@ func direct_to_static_method(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup12opt_to_class
-func opt_to_class(obj: AnyObject) {
+func opt_to_class(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[PARAM:%[0-9]+]] : $AnyObject)
   // CHECK: [[EXISTBOX:%[0-9]+]] = alloc_box $AnyObject 
@@ -100,13 +100,13 @@ func opt_to_class(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup20forced_without_outer
-func forced_without_outer(obj: AnyObject) {
+func forced_without_outer(_ obj: AnyObject) {
   // CHECK: dynamic_method_br
   var f = obj.f!
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup20opt_to_static_method
-func opt_to_static_method(obj: AnyObject) {
+func opt_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
@@ -124,7 +124,7 @@ func opt_to_static_method(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15opt_to_property
-func opt_to_property(obj: AnyObject) {
+func opt_to_property(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
@@ -150,7 +150,7 @@ func opt_to_property(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup19direct_to_subscript
-func direct_to_subscript(obj: AnyObject, i: Int) {
+func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
@@ -182,7 +182,7 @@ func direct_to_subscript(obj: AnyObject, i: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup16opt_to_subscript
-func opt_to_subscript(obj: AnyObject, i: Int) {
+func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
@@ -211,7 +211,7 @@ func opt_to_subscript(obj: AnyObject, i: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup8downcast
-func downcast(obj: AnyObject) -> X {
+func downcast(_ obj: AnyObject) -> X {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
@@ -252,6 +252,6 @@ func downcast(obj: AnyObject) -> X {
 // CHECK: bb3:
 // CHECK:        return
 
-func consume(fruit: Fruit) {
+func consume(_ fruit: Fruit) {
   _ = fruit.juice
 }

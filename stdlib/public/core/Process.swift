@@ -78,7 +78,7 @@ public enum Process {
 @_transparent
 public // COMPILER_INTRINSIC
 func _stdlib_didEnterMain(
-  argc argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+  argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
 ) {
   // Initialize the Process.argc and Process.unsafeArgv variables with the
   // values that were passed in to main.

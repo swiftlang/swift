@@ -13,7 +13,7 @@
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  x: T, @noescape _ f: () throws -> Result
+  _ x: T, @noescape _ f: () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try f()
@@ -22,7 +22,7 @@ public func withExtendedLifetime<T, Result>(
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  x: T, @noescape _ f: (T) throws -> Result
+  _ x: T, @noescape _ f: (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try f(x)
@@ -34,7 +34,7 @@ extension String {
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
   public func withCString<Result>(
-    @noescape f: (UnsafePointer<Int8>) throws -> Result
+    @noescape _ f: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     return try self.nulTerminatedUTF8.withUnsafeBufferPointer {
       try f(UnsafePointer($0.baseAddress))
@@ -45,7 +45,7 @@ extension String {
 // Fix the lifetime of the given instruction so that the ARC optimizer does not
 // shorten the lifetime of x to be before this point.
 @_transparent
-public func _fixLifetime<T>(x: T) {
+public func _fixLifetime<T>(_ x: T) {
   Builtin.fixLifetime(x)
 }
 
@@ -53,7 +53,7 @@ public func _fixLifetime<T>(x: T) {
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafeMutablePointer<T, Result>(
-  arg: inout T,
+  _ arg: inout T,
   @noescape _ body: (UnsafeMutablePointer<T>) throws -> Result
 ) rethrows -> Result
 {
@@ -62,7 +62,7 @@ public func withUnsafeMutablePointer<T, Result>(
 
 /// Like `withUnsafeMutablePointer`, but passes pointers to `arg0` and `arg1`.
 public func withUnsafeMutablePointers<A0, A1, Result>(
-  arg0: inout A0,
+  _ arg0: inout A0,
   _ arg1: inout A1,
   @noescape _ body: (
     UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
@@ -75,7 +75,7 @@ public func withUnsafeMutablePointers<A0, A1, Result>(
 /// Like `withUnsafeMutablePointer`, but passes pointers to `arg0`, `arg1`,
 /// and `arg2`.
 public func withUnsafeMutablePointers<A0, A1, A2, Result>(
-  arg0: inout A0,
+  _ arg0: inout A0,
   _ arg1: inout A1,
   _ arg2: inout A2,
   @noescape _ body: (
@@ -94,7 +94,7 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafePointer<T, Result>(
-  arg: inout T,
+  _ arg: inout T,
   @noescape _ body: (UnsafePointer<T>) throws -> Result
 ) rethrows -> Result
 {
@@ -103,7 +103,7 @@ public func withUnsafePointer<T, Result>(
 
 /// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
 public func withUnsafePointers<A0, A1, Result>(
-  arg0: inout A0,
+  _ arg0: inout A0,
   _ arg1: inout A1,
   @noescape _ body: (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
 ) rethrows -> Result {
@@ -115,7 +115,7 @@ public func withUnsafePointers<A0, A1, Result>(
 /// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
 /// and `arg2`.
 public func withUnsafePointers<A0, A1, A2, Result>(
-  arg0: inout A0,
+  _ arg0: inout A0,
   _ arg1: inout A1,
   _ arg2: inout A2,
   @noescape _ body: (

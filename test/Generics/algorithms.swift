@@ -13,7 +13,7 @@ protocol Comparable: Eq {
 }
 
 func find<R : IteratorProtocol where R.Element : Eq>
-       (range : R, value : R.Element) -> R {
+       (_ range : R, value : R.Element) -> R {
   var result = range
   for x in IteratorSequence(range) {
     if x == value {
@@ -25,7 +25,7 @@ func find<R : IteratorProtocol where R.Element : Eq>
 }
 
 func findIf<R : IteratorProtocol>(
-  range: R, predicate: (R.Element) -> Bool
+  _ range: R, predicate: (R.Element) -> Bool
 ) -> R {
   var result = range
   for x in IteratorSequence(range) {
@@ -38,7 +38,7 @@ func findIf<R : IteratorProtocol>(
 }
 
 func count<R : IteratorProtocol where R.Element : Eq>
-       (range : R, value : R.Element) -> Int {
+       (_ range : R, value : R.Element) -> Int {
   var result = 0
   for x in IteratorSequence(range) {
     if x == value {
@@ -50,7 +50,7 @@ func count<R : IteratorProtocol where R.Element : Eq>
 
 func countIf<
   R : IteratorProtocol
->(range: R, predicate: (R.Element) -> Bool) -> Int {
+>(_ range: R, predicate: (R.Element) -> Bool) -> Int {
   var result = 0
   for x in IteratorSequence(range) {
     if predicate(x) {
@@ -66,7 +66,7 @@ func equal<
   where
   R1.Element : Eq,
   R1.Element == R2.Element
->(range1 : R1, range2 : R2) -> Bool {
+>(_ range1 : R1, range2 : R2) -> Bool {
 
   var range1 = range1
   var range2 = range2
@@ -85,7 +85,7 @@ func equal<
 }
 
 func equalIf<R1 : IteratorProtocol, R2 : IteratorProtocol>
-       (range1 : R1, range2 : R2,
+       (_ range1 : R1, range2 : R2,
         predicate : (R1.Element, R2.Element)-> Bool) -> Bool {
   var range1 = range1
   var range2 = range2
@@ -108,7 +108,7 @@ func mismatch<
   where
   R1.Element : Eq,
   R1.Element == R2.Element
->(range1 : R1, range2 : R2) -> (R1, R2) {
+>(_ range1 : R1, range2 : R2) -> (R1, R2) {
   var range1 = range1
   var range2 = range2
   var prev1 = range1, prev2 = range2
@@ -125,7 +125,7 @@ func mismatch<
 }
 
 func mismatchIf<R1 : IteratorProtocol, R2 : IteratorProtocol>
-       (range1 : R1, range2 : R2,
+       (_ range1 : R1, range2 : R2,
         predicate : (R1.Element, R2.Element) -> Bool) -> (R1, R2) {
   var range1 = range1
   var range2 = range2
@@ -142,7 +142,7 @@ func mismatchIf<R1 : IteratorProtocol, R2 : IteratorProtocol>
   return (prev1, prev2)
 }
 
-func minElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
+func minElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
        -> R.Element {
   var range = range
   var result = range.next()!
@@ -154,7 +154,7 @@ func minElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
   return result
 }
 
-func maxElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
+func maxElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
        -> R.Element {
   var range = range
   var result = range.next()!
@@ -166,7 +166,7 @@ func maxElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
   return result
 }
 
-func minMaxElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
+func minMaxElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
        -> (R.Element, R.Element) {
   var range = range
   var min = range.next()!, max = min
@@ -179,12 +179,12 @@ func minMaxElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
 
 protocol RandomAccessStream : IteratorProtocol {
   func size() -> Int
-  func getNth(n: Int) -> Element
+  func getNth(_ n: Int) -> Element
   subscript (r : Range<Int>) -> Self { get }
 }
 
 func lowerBound<R : RandomAccessStream where R.Element : Comparable>
-       (inputrange : R, value : R.Element) -> R {
+       (_ inputrange : R, value : R.Element) -> R {
   var range = inputrange
   while range.size() > 1 {
     let mid = range.size() / 2
@@ -198,7 +198,7 @@ func lowerBound<R : RandomAccessStream where R.Element : Comparable>
 }
 
 func upperBound<R : RandomAccessStream where R.Element : Comparable>
-       (inputrange : R, value : R.Element) -> R {
+       (_ inputrange : R, value : R.Element) -> R {
   var range = inputrange
   while range.size() > 1 {
     let mid = range.size() / 2

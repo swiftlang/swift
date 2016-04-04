@@ -21,7 +21,7 @@ class X {
   }
 }
 
-func getIUO<T>(x: T?) -> T! { return x }
+func getIUO<T>(_ x: T?) -> T! { return x }
 
 // Bridge an array of an implicitly unwrapped class type.
 func testConvertArrayOfImplicitUnwrappedClass() {

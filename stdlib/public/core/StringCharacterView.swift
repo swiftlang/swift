@@ -51,7 +51,7 @@ extension String {
   ///   that is the target of this method) during the execution of
   ///   `body`: it may not appear to have its correct value.  Instead,
   ///   use only the `String.CharacterView` argument to `body`.
-  public mutating func withMutableCharacters<R>(body: (inout CharacterView) -> R) -> R {
+  public mutating func withMutableCharacters<R>(_ body: (inout CharacterView) -> R) -> R {
     // Naively mutating self.characters forces multiple references to
     // exist at the point of mutation. Instead, temporarily move the
     // core of this string into a CharacterView.
@@ -255,7 +255,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Character
   >(
-    bounds: Range<Index>, with newElements: C
+    _ bounds: Range<Index>, with newElements: C
   ) {
     let rawSubRange = bounds.startIndex._base._position
       ..< bounds.endIndex._base._position
@@ -266,14 +266,14 @@ extension String.CharacterView : RangeReplaceableCollection {
   /// Reserve enough space to store `n` ASCII characters.
   ///
   /// - Complexity: O(`n`).
-  public mutating func reserveCapacity(n: Int) {
+  public mutating func reserveCapacity(_ n: Int) {
     _core.reserveCapacity(n)
   }
 
   /// Append `c` to `self`.
   ///
   /// - Complexity: Amortized O(1).
-  public mutating func append(c: Character) {
+  public mutating func append(_ c: Character) {
     switch c._representation {
     case .small(let _63bits):
       let bytes = Character._smallValue(_63bits)
@@ -321,15 +321,15 @@ extension String.CharacterView {
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Character
   >(
-    subRange: Range<Index>, with newElements: C
+    _ subRange: Range<Index>, with newElements: C
   ) {
     fatalError("unavailable function can't be called")
   }
-
+    
   @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
-  >(newElements: S) {
+  >(_ newElements: S) {
     fatalError("unavailable function can't be called")
   }
 }

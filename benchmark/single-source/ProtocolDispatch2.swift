@@ -27,7 +27,7 @@ struct Game : Pingable {
 }
 
 @inline(never)
-func use_protocol(val : Int,_ game1 : Pingable, _ game2 : Pingable) -> Int {
+func use_protocol(_ val : Int,_ game1 : Pingable, _ game2 : Pingable) -> Int {
   var t = game1.ping() + game1.pong()
   if (val % 2 == 0) {
     t += game1.pong() + game1.ping()
@@ -44,12 +44,12 @@ func use_protocol(val : Int,_ game1 : Pingable, _ game2 : Pingable) -> Int {
 }
 
 @inline(never)
-func wrapper(val : Int,_ game1 : Pingable, _ game2 : Pingable) -> Int {
+func wrapper(_ val : Int,_ game1 : Pingable, _ game2 : Pingable) -> Int {
   return use_protocol(val, game1, game2)
 }
 
 @inline(never)
-public func run_ProtocolDispatch2(N: Int) {
+public func run_ProtocolDispatch2(_ N: Int) {
   var c = 0
   let g1 = Game()
   let g2 = Game()

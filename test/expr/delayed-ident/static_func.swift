@@ -2,11 +2,11 @@
 
 // Simple struct types
 struct X1 {
-  static func create(i: Int) -> X1 {  }
-  static func createGeneric<T>(d: T) -> X1 {  }
-  static func createMaybe(i : Int) -> X1! { }
+  static func create(_ i: Int) -> X1 {  }
+  static func createGeneric<T>(_ d: T) -> X1 {  }
+  static func createMaybe(_ i : Int) -> X1! { }
 
-  static func notAFactory(i: Int) -> Int { }
+  static func notAFactory(_ i: Int) -> Int { }
 }
 
 // Static methods
@@ -21,9 +21,9 @@ x1 = .createMaybe(5)
 
 // Generic struct types
 struct X2<T> {
-  static func create(t: T) -> X2 {  }
-  static func createGeneric<U>(t: T, u:U) -> X2 {  }
-  static func createMaybe(i : T) -> X2! { }
+  static func create(_ t: T) -> X2 {  }
+  static func createGeneric<U>(_ t: T, u:U) -> X2 {  }
+  static func createMaybe(_ i : T) -> X2! { }
 }
 
 // Static methods

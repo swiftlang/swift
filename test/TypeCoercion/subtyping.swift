@@ -17,9 +17,9 @@ struct IsPrintable1 : CustomStringConvertible {
 func accept_creates_Printable (@noescape _: () -> CustomStringConvertible) {}
 func accept_creates_FormattedPrintable (@noescape _: () -> FormattedPrintable) {}
 
-func fp_to_p(fp: FormattedPrintable) -> CustomStringConvertible { return fp; }
-func p_to_fp(p: CustomStringConvertible) -> FormattedPrintable { }
-func p_to_ip1(p: CustomStringConvertible) -> IsPrintable1 { }
+func fp_to_p(_ fp: FormattedPrintable) -> CustomStringConvertible { return fp; }
+func p_to_fp(_ p: CustomStringConvertible) -> FormattedPrintable { }
+func p_to_ip1(_ p: CustomStringConvertible) -> IsPrintable1 { }
 
 func protocolConformance(@autoclosure ac1: () -> CustomStringConvertible,
                          @autoclosure ac2: () -> FormattedPrintable,

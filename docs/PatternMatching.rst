@@ -398,7 +398,7 @@ work.
 
 The current Swift approximation is::
 
-  func length(list : List) : Int {
+  func length(_ list : List) : Int {
     switch list {
       case .nil: return 0
       case .cons(_,var tail): return 1 + length(tail)
@@ -408,7 +408,7 @@ The current Swift approximation is::
 That's quite a bit more syntax, but it's mostly the extra braces from the
 function body. We could remove those with something like this::
 
-  func length(list : List) : Int = switch list {
+  func length(_ list : List) : Int = switch list {
     case .nil: return 0
     case .cons(_,var tail): return 1 + length(tail)
   }

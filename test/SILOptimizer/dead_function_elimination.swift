@@ -85,13 +85,13 @@ class Other : Derived {
 
 @inline(never)
 @_semantics("optimize.sil.never") // avoid devirtualization
-func testClasses(b: Base) {
+func testClasses(_ b: Base) {
 	b.aliveMethod()
 }
 
 @inline(never)
 @_semantics("optimize.sil.never") // avoid devirtualization
-func testWithDerived(d: Derived) {
+func testWithDerived(_ d: Derived) {
 	d.baseNotCalled()
 	d.notInDerived()
 	d.calledWithSuper()
@@ -99,7 +99,7 @@ func testWithDerived(d: Derived) {
 
 @inline(never)
 @_semantics("optimize.sil.never") // avoid devirtualization
-func testWithOther(o: Other) {
+func testWithOther(_ o: Other) {
 	o.notInOther()
 }
 
@@ -130,7 +130,7 @@ struct Adopt : Prot {
 
 @inline(never)
 @_semantics("optimize.sil.never") // avoid devirtualization
-func testProtocols(p: Prot) {
+func testProtocols(_ p: Prot) {
 	p.aliveWitness()
 }
 

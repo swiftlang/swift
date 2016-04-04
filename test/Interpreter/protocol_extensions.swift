@@ -30,7 +30,7 @@ extension Collection {
 print(["a", "b", "c", "d"].clone().myCount)
 
 extension Collection {
-  final func indexMatching(fn: Iterator.Element -> Bool) -> Index? {
+  final func indexMatching(_ fn: Iterator.Element -> Bool) -> Index? {
     for i in myIndices {
       if fn(self[i]) { return i }
     }
@@ -44,7 +44,7 @@ print(["a", "b", "c", "d"].indexMatching({$0 == "c"})!)
 // Extend certain instances of a collection (those that have equatable
 // element types) with another algorithm.
 extension Collection where Self.Iterator.Element : Equatable {
-  final func myIndexOf(element: Iterator.Element) -> Index? {
+  final func myIndexOf(_ element: Iterator.Element) -> Index? {
     for i in self.indices {
       if self[i] == element { return i }
     }
@@ -71,7 +71,7 @@ for (index, element) in ["a", "b", "c"].myEnumerated() {
 
 extension Sequence {
   final public func myReduce<T>(
-    initial: T, @noescape combine: (T, Self.Iterator.Element) -> T
+    _ initial: T, @noescape combine: (T, Self.Iterator.Element) -> T
   ) -> T { 
     var result = initial
     for value in self {
@@ -86,7 +86,7 @@ print([1, 2, 3, 4, 5].myReduce(0, combine: +))
 
 
 extension Sequence {
-  final public func myZip<S : Sequence>(s: S) -> Zip2Sequence<Self, S> {
+  final public func myZip<S : Sequence>(_ s: S) -> Zip2Sequence<Self, S> {
     return Zip2Sequence(_sequence1: self, _sequence2: s)
   }
 }
@@ -119,7 +119,7 @@ print("")
 
 extension RangeReplaceableCollection {
   public final func myJoin<S : Sequence where S.Iterator.Element == Self>(
-    elements: S
+    _ elements: S
   ) -> Self {
     var result = Self()
     var iter = elements.makeIterator()
@@ -198,7 +198,7 @@ existP1 = ExistP1_Class()
 existP1.runExistP1()
 
 protocol P {
-  mutating func setValue(b: Bool)
+  mutating func setValue(_ b: Bool)
   func getValue() -> Bool
 }
 
@@ -210,17 +210,17 @@ extension P {
 }
 
 extension Bool : P {
-  mutating func setValue(b: Bool) { self = b }
+  mutating func setValue(_ b: Bool) { self = b }
   func getValue() -> Bool { return self }
 }
 
 class C : P {
   var theValue: Bool = false
-  func setValue(b: Bool) { theValue = b }
+  func setValue(_ b: Bool) { theValue = b }
   func getValue() -> Bool { return theValue }
 }
 
-func toggle(value: inout Bool) {
+func toggle(_ value: inout Bool) {
   value = !value
 }
 

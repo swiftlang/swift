@@ -53,13 +53,13 @@ ImportedObjCGenerics.test("Subclasses") {
 }
 
 ImportedObjCGenerics.test("SwiftGenerics") {
-  func openContainer<T: AnyObject>(x: Container<T>) -> T {
+  func openContainer<T: AnyObject>(_ x: Container<T>) -> T {
     return x.object
   }
-  func openStringContainer<T: Container<NSString>>(x: T) -> NSString {
+  func openStringContainer<T: Container<NSString>>(_ x: T) -> NSString {
     return x.object
   }
-  func openArbitraryContainer<S: AnyObject, T: Container<S>>(x: T) -> S {
+  func openArbitraryContainer<S: AnyObject, T: Container<S>>(_ x: T) -> S {
     return x.object
   }
 
@@ -88,7 +88,7 @@ ImportedObjCGenerics.test("SwiftGenerics") {
 }
 
 ImportedObjCGenerics.test("SwiftGenerics/Creation") {
-  func makeContainer<T: AnyObject>(x: T) -> Container<T> {
+  func makeContainer<T: AnyObject>(_ x: T) -> Container<T> {
     return Container(object: x)
   }
 
@@ -97,7 +97,7 @@ ImportedObjCGenerics.test("SwiftGenerics/Creation") {
 }
 
 ImportedObjCGenerics.test("ProtocolConstraints") {
-  func copyContainerContents<T: NSCopying>(x: CopyingContainer<T>) -> T {
+  func copyContainerContents<T: NSCopying>(_ x: CopyingContainer<T>) -> T {
     return x.object.copy(with: nil) as! T
   }
 
@@ -106,7 +106,7 @@ ImportedObjCGenerics.test("ProtocolConstraints") {
 }
 
 ImportedObjCGenerics.test("ClassConstraints") {
-  func makeContainedAnimalMakeNoise<T>(x: AnimalContainer<T>) -> NSString {
+  func makeContainedAnimalMakeNoise<T>(_ x: AnimalContainer<T>) -> NSString {
     return x.object.noise
   }
   let petCarrier = AnimalContainer(object: Dog())

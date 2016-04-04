@@ -25,11 +25,11 @@
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>note()</Name><USR>s:F14swift_ide_test4noteFT_T_</USR><Declaration>func note()</Declaration><Discussion><Note><Para>This function is very hip and exciting.</Para></Note></Discussion></Function>]
 
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>postcondition(_:)</Name><USR>s:F14swift_ide_test13postconditionFRSiT_</USR><Declaration>func postcondition(x: inout Int)</Declaration><Discussion><Postcondition><Para>x is unchanged</Para></Postcondition></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>postcondition(_:)</Name><USR>s:F14swift_ide_test13postconditionFRSiT_</USR><Declaration>func postcondition(_ x: inout Int)</Declaration><Discussion><Postcondition><Para>x is unchanged</Para></Postcondition></Discussion></Function>]
 
 // CHECK: {{.*}}DocCommentAsXML=none
 
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>precondition(_:)</Name><USR>s:F14swift_ide_test12preconditionFSiT_</USR><Declaration>func precondition(x: Int)</Declaration><Discussion><Precondition><Para><codeVoice>x &lt; 100</codeVoice></Para></Precondition></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>precondition(_:)</Name><USR>s:F14swift_ide_test12preconditionFSiT_</USR><Declaration>func precondition(_ x: Int)</Declaration><Discussion><Precondition><Para><codeVoice>x &lt; 100</codeVoice></Para></Precondition></Discussion></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>remark()</Name><USR>s:F14swift_ide_test6remarkFT_T_</USR><Declaration>func remark()</Declaration><Discussion><Remark><Para>Always, no, never forget to check your references.</Para></Remark></Discussion></Function>]
