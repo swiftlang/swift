@@ -13,7 +13,7 @@
 /// A type that supports subscript assignment to a mutable collection.
 ///
 /// - Important: In most cases, it's best to ignore this protocol and use
-///   `CollectionType` instead, as it has a more complete interface.
+///   `MutableCollection` instead, as it has a more complete interface.
 public protocol MutableIndexable : Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.

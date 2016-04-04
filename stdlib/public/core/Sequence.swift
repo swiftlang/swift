@@ -19,7 +19,7 @@
 /// Any code that uses multiple iterators (or `for`...`in` loops)
 /// over a single sequence should have static knowledge that the
 /// specific sequence is multi-pass, either because its concrete
-/// type is known or because it is constrained to `CollectionType`.
+/// type is known or because it is constrained to `Collection`.
 /// Also, the iterators must be obtained by distinct calls to the
 /// sequence's `makeIterator()` method, rather than by copying.
 public protocol IteratorProtocol {

@@ -201,7 +201,7 @@ public func < <BaseElements> (
 ///   that depend on `startIndex`, or of advancing a `${Collection}Index`
 ///   depends on how many empty subcollections are found in the base
 ///   collection, and may not offer the usual performance given by
-///   `CollectionType` or `${traversal}IndexType`. Be aware, therefore, that
+///   `Collection` or `${traversal}Index`. Be aware, therefore, that
 ///   general operations on `${Collection}` instances may not have the
 ///   documented complexity.
 ///
