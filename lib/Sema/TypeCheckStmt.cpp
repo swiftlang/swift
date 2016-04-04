@@ -986,7 +986,14 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   }
 
   auto valueE = E->getValueProvidingExpr();
-
+  
+  // Complain about '#selector'.
+  if (auto *ObjCSE = dyn_cast<ObjCSelectorExpr>(valueE)) {
+    diagnose(ObjCSE->getLoc(), diag::expression_unused_selector_result)
+      .highlight(E->getSourceRange());
+    return;
+  }
+    
   // Always complain about 'try?'.
   if (auto *OTE = dyn_cast<OptionalTryExpr>(valueE)) {
     diagnose(OTE->getTryLoc(), diag::expression_unused_optional_try)
