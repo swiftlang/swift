@@ -1070,6 +1070,10 @@ template <typename Runtime> struct TargetClassMetadata;
 template <typename Runtime> struct TargetStructMetadata;
 template <typename Runtime> struct TargetOpaqueMetadata;
 
+// FIXME: https://bugs.swift.org/browse/SR-1155
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+
 /// The common structure of all type metadata.
 template <typename Runtime>
 struct TargetMetadata {
@@ -3363,5 +3367,7 @@ std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
 
 } // end namespace swift
+
+#pragma clang diagnostic pop
 
 #endif /* SWIFT_RUNTIME_METADATA_H */
