@@ -5,7 +5,7 @@ func f2(_: Int = 5) -> Int { }
 func f3(_: Int...) -> Int { }
 
 class A { }
-class B : A { 
+class B : A {
   func iAmAB() {}
   func createB() -> B { return B() }
 }
@@ -112,7 +112,7 @@ class C {
   var a: Int = 1
 }
 var co: C? = nil
-var ciuo: C! = nil 
+var ciuo: C! = nil
 
 if co {} // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{6-6= != nil)}}
 if ciuo {} // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}
@@ -124,4 +124,22 @@ ciuo ? true : false // expected-error{{optional type 'C!' cannot be used as a bo
 !ciuo // expected-error{{optional type 'C!' cannot be used as a boolean; test for '== nil' instead}}{{1-2=}} {{2-2=(}} {{6-6= == nil)}}
 
 // Forgotten ! or ?
-var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
+var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=?}}
+
+// SR-839
+struct Q {
+  let s: String?
+}
+let q = Q(s: nil)
+let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=?}}
+let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
+let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=!}}
+let c = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
+
+// SR-1116
+struct S1116 {
+  var s: Int?
+}
+
+let a1116: [S1116] = []
+var s1116 = Set(1...10).subtract(a1116.map({ $0.s })) // expected-error {{'map' produces '[T]', not the expected contextual result type 'Set<Int>'}}
