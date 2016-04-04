@@ -79,16 +79,3 @@ public struct ChangeSize {
 }
 
 #endif
-
-// Test internal global variable hidden behind a public transparent
-// interface
-
-@_versioned var versionedGlobal: ChangeSize = ChangeSize()
-
-@_transparent public func getVersionedGlobal() -> ChangeSize {
-  return versionedGlobal
-}
-
-@_transparent public func setVersionedGlobal(c: Int) {
-  versionedGlobal.count = c
-}

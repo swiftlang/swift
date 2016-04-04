@@ -1,4 +1,4 @@
-// RUN: %target-resilience-test-wmo
+// RUN: %target-resilience-test
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -42,23 +42,6 @@ GlobalChangeSizeTest.test("ChangeSize") {
     expectEqual(globalChangeSizeSecond.validate(), true)
     expectEqual(globalChangeSizeFirst.count, -323)
     expectEqual(globalChangeSizeSecond.count, 545)
-  }
-}
-
-GlobalChangeSizeTest.test("ChangeSizeVersioned") {
-  do {
-    expectEqual(getVersionedGlobal().validate(), true)
-    expectEqual(getVersionedGlobal().count, 0)
-
-    setVersionedGlobal(101)
-
-    expectEqual(getVersionedGlobal().validate(), true)
-    expectEqual(getVersionedGlobal().count, 101)
-
-    setVersionedGlobal(-323)
-
-    expectEqual(getVersionedGlobal().validate(), true)
-    expectEqual(getVersionedGlobal().count, -323)
   }
 }
 

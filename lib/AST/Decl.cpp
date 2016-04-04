@@ -1214,20 +1214,21 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
 }
 
 bool AbstractStorageDecl::hasFixedLayout() const {
-  // If we're in a nominal type, just query the type.
-  auto nominal =
-    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (nominal)
-    return nominal->hasFixedLayout();
-
-  // Private and (unversioned) internal variables always have a
-  // fixed layout.
-  if (getEffectiveAccess() != Accessibility::Public)
+  // Private and internal variables always have a fixed layout.
+  // TODO: internal variables with availability information need to be
+  // resilient, since they can be used from @_transparent functions.
+  if (getFormalAccess() != Accessibility::Public)
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return true;
+
+  // If we're in a nominal type, just query the type.
+  auto nominal =
+    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (nominal)
+    return nominal->hasFixedLayout();
 
   // Must use resilient access patterns.
   assert(getDeclContext()->isModuleScopeContext());
@@ -1752,9 +1753,10 @@ Type TypeDecl::getDeclaredInterfaceType() const {
 
 
 bool NominalTypeDecl::hasFixedLayout() const {
-  // Private and (unversioned) internal types always have a
-  // fixed layout.
-  if (getEffectiveAccess() != Accessibility::Public)
+  // Private and internal types always have a fixed layout.
+  // TODO: internal types with availability information need to be
+  // resilient, since they can be used from @_transparent functions.
+  if (getFormalAccess() != Accessibility::Public)
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
