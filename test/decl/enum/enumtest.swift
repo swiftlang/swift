@@ -105,7 +105,7 @@ func test3a(a: ZeroOneTwoThree) {
 
 
 struct CGPoint { var x : Int, y : Int }
-typealias OtherPoint = ( x : Int, y : Int)
+typealias OtherPoint = (x : Int, y : Int)
 
 func test4() {
   var a : CGPoint

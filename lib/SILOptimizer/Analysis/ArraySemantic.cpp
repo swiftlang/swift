@@ -612,7 +612,7 @@ SILValue swift::ArraySemanticsCall::getArrayValue() const {
     return SILValue(ArrayDef);
   }
 
-  if(getKind() == ArrayCallKind::kArrayInit)
+  if (getKind() == ArrayCallKind::kArrayInit)
     return SILValue(SemanticsCall);
 
   return SILValue();

@@ -422,7 +422,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     unsigned major, minor, micro;
     if (triple.isiOS()) {
       triple.getiOSVersion(major, minor, micro);
-    } else if(triple.isWatchOS()) {
+    } else if (triple.isWatchOS()) {
       triple.getWatchOSVersion(major, minor, micro);
     } else {
       assert(triple.isMacOSX());

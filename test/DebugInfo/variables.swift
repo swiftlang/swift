@@ -76,7 +76,7 @@ myprint(tuple)
 var array_of_tuples : [(a : Int, b : Int)] = [(1,2)]
 var twod : [[Int]] = [[1]]
 
-func bar( x: [(a : Int, b : Int)], y: [[Int]] ) {
+func bar(x: [(a : Int, b : Int)], y: [[Int]]) {
 }
 
 

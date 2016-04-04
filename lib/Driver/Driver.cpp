@@ -848,7 +848,7 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
     // Includes both iOS and TVOS.
     return isSDKTooOld(sdkPath, clang::VersionTuple(9, 0), "Simulator", "OS");
 
-  } else if(target.isWatchOS()) {
+  } else if (target.isWatchOS()) {
     return isSDKTooOld(sdkPath, clang::VersionTuple(2, 0), "Simulator", "OS");
 
   } else {

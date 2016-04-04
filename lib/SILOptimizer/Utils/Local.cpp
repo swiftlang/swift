@@ -1587,14 +1587,14 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     Src = Builder.createLoad(Loc, Src);
   }
 
-  if(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
+  if (ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
     Builder.createRetainValue(Loc, Src);
 
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,
                                     false);
 
-  if(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
+  if (ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
     Builder.createReleaseValue(Loc, Src);
 
   SILInstruction *NewI = NewAI;

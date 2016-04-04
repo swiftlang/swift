@@ -198,7 +198,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    if(auto GPS = NTD->getGenericParams()) {
+    if (auto GPS = NTD->getGenericParams()) {
       for (auto GP : GPS->getParams()) {
         if (doIt(GP))
           return true;
@@ -240,7 +240,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       for (auto &P : AFD->getGenericParams()->getParams()) {
         if (doIt(P))
           return true;
-        for(auto Inherit : P->getInherited()) {
+        for (auto Inherit : P->getInherited()) {
           if (doIt(Inherit))
             return true;
         }
@@ -336,7 +336,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }                                                    \
       return NODE;                                         \
     }                                                      \
-  } while(false)
+  } while (false)
 
   Expr *visitErrorExpr(ErrorExpr *E) { return E; }
   Expr *visitCodeCompletionExpr(CodeCompletionExpr *E) { return E; }

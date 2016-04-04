@@ -707,7 +707,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return { false, nullptr };
 
-      for(auto &Element : Clause.Elements) {
+      for (auto &Element : Clause.Elements) {
         if (Expr *E = Element.dyn_cast<Expr*>()) {
           E->walk(*this);
         } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {

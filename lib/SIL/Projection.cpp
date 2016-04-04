@@ -879,7 +879,7 @@ std::string
 ProjectionTreeNode::getNameEncoding(const ProjectionTree &PT) const {
   std::string Encoding;
   const ProjectionTreeNode *Node = this;
-  while(Node) {
+  while (Node) {
     if (Node->isRoot())
       break;
     Encoding += std::to_string(Node->Proj->getIndex());

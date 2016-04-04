@@ -25,7 +25,7 @@ import Swift
 
 var ReadLineTestSuite = TestSuite("ReadLine")
 
-% for strip_newline in [ 'false', 'true' ]:
+% for strip_newline in ['false', 'true']:
 %   newline = '' if strip_newline == 'true' else '\\n'
 
 ReadLineTestSuite.test("EmptyLine/strippingNewline=${strip_newline}")

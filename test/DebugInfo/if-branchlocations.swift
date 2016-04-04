@@ -24,8 +24,8 @@ class AppDelegate {
       {
         LogStr( "Got an NSPathControlItem" )
         // Verify that the branch's location is >= the cleanup's location.
-        // ( The implicit false block of the conditional
-        //   below inherits the location from the condition. )
+        // (The implicit false block of the conditional
+        //  below inherits the location from the condition.)
         // CHECK: br{{.*}}line:[[@LINE+1]]
         if let url = item.URL
         {

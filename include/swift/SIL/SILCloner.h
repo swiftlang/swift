@@ -1732,7 +1732,7 @@ SILCloner<ImplClass>::visitSwitchValueInst(SwitchValueInst *Inst) {
   if (Inst->hasDefault())
     DefaultBB = getOpBasicBlock(Inst->getDefaultBB());
   SmallVector<std::pair<SILValue, SILBasicBlock*>, 8> CaseBBs;
-  for(int i = 0, e = Inst->getNumCases(); i != e; ++i)
+  for (int i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseBBs.push_back(std::make_pair(getOpValue(Inst->getCase(i).first),
                                      getOpBasicBlock(Inst->getCase(i).second)));
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

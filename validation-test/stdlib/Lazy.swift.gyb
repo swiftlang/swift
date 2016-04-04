@@ -171,7 +171,7 @@ LazyTestSuite.test("LazySequence<Sequence>/underestimatedCount") {
   expectEqual(42, lazySeq.underestimatedCount)
 }
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
 LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimatedCount") {
   let s = Minimal${traversal}Collection(
@@ -239,7 +239,7 @@ LazyTestSuite.test("LazySequence.array") {
     [], Array(base).map { $0.value }, "sequence should be consumed")
 }
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
 LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimatedCount") {
   let s = Minimal${traversal}Collection(

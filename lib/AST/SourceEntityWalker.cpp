@@ -160,7 +160,7 @@ std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
     if (SEWalker.shouldWalkInactiveConfigRegion()) {
       if (auto *ICS = dyn_cast<IfConfigStmt>(S)) {
         TraverseChildren = false;
-        for(auto Clause : ICS->getClauses()) {
+        for (auto Clause : ICS->getClauses()) {
           for (auto Member : Clause.Elements) {
             Member.walk(*this);
           }

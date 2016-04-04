@@ -18,7 +18,7 @@ import StdlibUnittestFoundationExtras
 import Foundation
 
 %{
-all_array_types = [ 'ContiguousArray', 'ArraySlice', 'Array' ]
+all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
 }%
 
 extension Array {
@@ -54,7 +54,7 @@ func withInoutT<T>(x: inout T, body: (x: inout T) -> Void) {
   body(x: &x)
 }
 
-% for element_type in [ 'TestValueTy', 'TestBridgedValueTy' ]:
+% for element_type in ['TestValueTy', 'TestBridgedValueTy']:
 %   for array_type in all_array_types:
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {

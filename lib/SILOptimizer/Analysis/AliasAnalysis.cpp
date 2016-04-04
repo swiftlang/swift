@@ -413,7 +413,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   // Typed access based TBAA only occurs on pointers. If we reach this point and
   // do not have a pointer, be conservative and return that the two types may
   // alias.
-  if(!LTy.isAddress() || !RTy.isAddress())
+  if (!LTy.isAddress() || !RTy.isAddress())
     return true;
 
   // If the types have unbound generic arguments then we don't know

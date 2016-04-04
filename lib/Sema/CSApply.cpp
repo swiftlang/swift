@@ -1500,7 +1500,7 @@ namespace {
 
       // Find the maximum-sized builtin integer type.
       
-      if(!MaxIntegerTypeDecl) {
+      if (!MaxIntegerTypeDecl) {
         SmallVector<ValueDecl *, 1> lookupResults;
         tc.getStdlibModule(dc)->lookupValue(/*filter=*/{},
                                             tc.Context.Id_MaxBuiltinIntegerType,
