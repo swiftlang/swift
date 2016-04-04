@@ -94,7 +94,7 @@ set(SWIFTLIB_ESSENTIAL
   Slice.swift.gyb
   Sort.swift.gyb
   StaticString.swift
-  Stride.swift
+  Stride.swift.gyb
   StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
