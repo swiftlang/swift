@@ -25,6 +25,7 @@ public struct Character :
   //
   // If the grapheme cluster can be represented as `.small`, it
   // should be represented as such.
+  @_versioned
   internal enum Representation {
     // A _StringBuffer whose first grapheme cluster is self.
     // NOTE: may be more than 1 Character long.
@@ -269,6 +270,7 @@ public struct Character :
     return String(self).utf16
   }
 
+  @_versioned
   internal var _representation: Representation
 }
 

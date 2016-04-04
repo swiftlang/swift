@@ -293,12 +293,17 @@ public:
 
   /// Returns true if the function has parameters that are consumed by the
   // callee.
-  bool hasOwnedParameters() {
+  bool hasOwnedParameters() const {
     for (auto &ParamInfo : getLoweredFunctionType()->getParameters()) {
       if (ParamInfo.isConsumed())
         return true;
     }
     return false;
+  }
+
+  // Returns true if the function has indirect out parameters.
+  bool hasIndirectResults() const {
+    return getLoweredFunctionType()->getNumIndirectResults() > 0;
   }
 
   /// Returns true if this function either has a self metadata argument or
