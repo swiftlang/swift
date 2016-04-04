@@ -2963,8 +2963,8 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   internal typealias Value = ${TypeParameters}
 %end
 
-  case native(NativeStorageOwner)
   case cocoa(CocoaStorage)
+  case native(NativeStorageOwner)
 
   @_versioned
   @_transparent

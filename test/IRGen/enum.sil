@@ -1350,9 +1350,9 @@ entry(%x : $*DynamicSinglePayload<T>):
 }
 
 enum MultiPayloadNoSpareBits {
-  case x(Builtin.Int64)
-  case y(Builtin.Int32)
   case z(Builtin.Int63)
+  case y(Builtin.Int32)
+  case x(Builtin.Int64)
   case a
   case b
   case c
@@ -1580,9 +1580,9 @@ entry:
 }
 
 enum MultiPayloadOneSpareBit {
-  case x(Builtin.Int62)
-  case y(Builtin.Int63)
   case z(Builtin.Int61)
+  case y(Builtin.Int63)
+  case x(Builtin.Int62)
   case a
   case b
   case c
@@ -1872,9 +1872,9 @@ entry:
 
 
 enum MultiPayloadTwoSpareBits {
-  case x(Builtin.Int62)
-  case y(Builtin.Int60)
   case z(Builtin.Int61)
+  case y(Builtin.Int60)
+  case x(Builtin.Int62)
   case a
   case b
   case c
@@ -2098,8 +2098,8 @@ sil_vtable D {}
 sil @_TFC4enum1DD : $@convention(method) (D) -> ()
 
 enum MultiPayloadClasses {
-  case x(C)
   case y(D)
+  case x(C)
   case z
   case w
 }
@@ -2168,12 +2168,12 @@ struct S {
 }
 
 enum MultiPayloadSpareBitAggregates {
-  // Has spare bits in the padding between Int32 and Int64
-  case x(Builtin.Int32, Builtin.Int64)
-  // Has spare bits in the object pointers
-  case y(C, C)
   // Has spare bits in the padding between struct fields
   case z(S)
+  // Has spare bits in the object pointers
+  case y(C, C)
+  // Has spare bits in the padding between Int32 and Int64
+  case x(Builtin.Int32, Builtin.Int64)
 }
 
 // CHECK-64-LABEL: define{{( protected)?}} void @multi_payload_spare_bit_aggregate_switch(i64, i64) {{.*}} {
@@ -2215,13 +2215,13 @@ end:
 
 // <rdar://problem/15759464>
 enum MultiPayloadInner {
-  case A(Builtin.Word)
   case B(Builtin.Word)
+  case A(Builtin.Word)
 }
 
 enum MultiPayloadNested {
-  case A(MultiPayloadInner)
   case B(MultiPayloadInner)
+  case A(MultiPayloadInner)
 }
 
 // CHECK-LABEL: define{{( protected)?}} void @multi_payload_nested_switch
@@ -2251,15 +2251,15 @@ end:
 }
 
 enum MultiPayloadInnerSpareBits {
-  case A(Builtin.NativeObject)
-  case B(Builtin.NativeObject)
-  case C(Builtin.NativeObject)
   case D(Builtin.NativeObject)
+  case C(Builtin.NativeObject)
+  case B(Builtin.NativeObject)
+  case A(Builtin.NativeObject)
 }
 
 enum MultiPayloadNestedSpareBits {
-  case A(MultiPayloadInnerSpareBits)
   case B(MultiPayloadInnerSpareBits)
+  case A(MultiPayloadInnerSpareBits)
 }
 
 // CHECK-64-LABEL: define{{( protected)?}} void @multi_payload_nested_spare_bits_switch(%O4enum27MultiPayloadNestedSpareBits* noalias nocapture dereferenceable({{.*}})) {{.*}} {
@@ -2290,9 +2290,9 @@ end:
 // -- test for a switch_enum bug for multi-payload, no-empty-case enums
 //    uncovered by Chris
 enum OnlyPayloads {
-  case x(Builtin.Int64)
-  case y(Builtin.Int32)
   case z(Builtin.Int16)
+  case y(Builtin.Int32)
+  case x(Builtin.Int64)
 }
 
 sil @only_payloads_switch : $(OnlyPayloads) -> () {
@@ -2313,8 +2313,8 @@ end:
 
 // Should not use spare bits, because T may be a tagged ObjC pointer.
 enum MultiPayloadClassGeneric<T: AnyObject> {
-  case A(C, Builtin.Word)
   case B(T)
+  case A(C, Builtin.Word)
 }
 
 // CHECK-64-LABEL: define{{( protected)?}} { i64, i64, i1 } @multi_payload_class_generic_no_spare_bits(i64, i64, i1, %swift.type* %T)
@@ -2332,8 +2332,8 @@ entry(%e : $MultiPayloadClassGeneric<C>):
 }
 
 enum MultiPayloadAddressOnlyFixed {
-  case X(protocol<>)
   case Y(Builtin.Int32)
+  case X(protocol<>)
 }
 
 // CHECK-LABEL: define{{( protected)?}} void @multi_payload_address_only_destroy(%O4enum28MultiPayloadAddressOnlyFixed* noalias nocapture dereferenceable({{.*}}))
@@ -2352,8 +2352,8 @@ struct AddressOnlySpareBitsPayload {
 }
 
 enum MultiPayloadAddressOnlySpareBits {
-  case X(AddressOnlySpareBitsPayload)
   case Y(AddressOnlySpareBitsPayload)
+  case X(AddressOnlySpareBitsPayload)
 }
 
 // CHECK-LABEL: define{{( protected)?}} void @multi_payload_address_only_spare_bits(%O4enum32MultiPayloadAddressOnlySpareBits* noalias nocapture dereferenceable({{.*}}))

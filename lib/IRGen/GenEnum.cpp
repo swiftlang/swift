@@ -4720,9 +4720,9 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
 
 
   // Resilient tag numbering decreases for payload tags, so reverse the
-  // payload tags if this enum is resilient from any context.
-  if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
-    std::reverse(elementsWithPayload.begin(), elementsWithPayload.end());
+  // payload tags. We do this for all enums, even when resilience is not
+  // enabled, to simplify some runtime shims that return Swift enums.
+  std::reverse(elementsWithPayload.begin(), elementsWithPayload.end());
 
   assert(numElements == elementsWithPayload.size()
            + elementsWithNoPayload.size()
