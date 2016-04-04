@@ -254,6 +254,12 @@ private:
     return {formDeclName(name, nonSelfParams), effectiveDC};
   }
 
+  Identifier getIdentifier(StringRef str) {
+    if (str == "")
+      return Identifier();
+    return context.getIdentifier(str);
+  }
+
   template <typename DeclType>
   inline DeclType *clangLookup(StringRef name,
                                clang::Sema::LookupNameKind kind);
@@ -330,7 +336,7 @@ private:
     // Lower-camel-case the incoming name
     NameBuffer buf;
     formHumbleCamelName(name, buf);
-    return {context.getIdentifier(buf)};
+    return getIdentifier(buf);
   }
 
   DeclName formDeclName(StringRef baseName) {
@@ -350,7 +356,7 @@ private:
       NameBuffer paramName;
       formHumbleCamelName(firstPrefix, paramName);
       return {context, getHumbleIdentifier(baseName),
-              context.getIdentifier(paramName)};
+              getIdentifier(paramName)};
     }
 
     StringScratchSpace scratch;
@@ -372,7 +378,7 @@ private:
     {
       SmallVector<Identifier, 8> argLabels;
       for (auto str : argStrs)
-        argLabels.push_back(context.getIdentifier(str));
+        argLabels.push_back(getIdentifier(str));
       DEBUG((beforeOmit = {context, getHumbleIdentifier(baseName), argLabels}));
     }
 
@@ -383,13 +389,14 @@ private:
               clangSema.getASTContext(), param->getType()));
     }
 
-    baseName = getHumbleIdentifier(baseName).str();
+    auto humbleBaseName = getHumbleIdentifier(baseName);
+    baseName = humbleBaseName.str();
     bool didOmit =
         omitNeedlessWords(baseName, argStrs, "", "", "", paramTypeNames, false,
                           false, nullptr, scratch);
     SmallVector<Identifier, 8> argLabels;
     for (auto str : argStrs)
-      argLabels.push_back(context.getIdentifier(str));
+      argLabels.push_back(getIdentifier(str));
 
     DeclName ret = {context, getHumbleIdentifier(baseName), argLabels};
 
@@ -724,8 +731,9 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
                                         pairedAccessor, effectiveDC);
       }
     }
-
-    return importAsStaticMethod(remainingName, nonSelfParams, effectiveDC);
+    StringRef methodName =
+        remainingName == "" ? workingName : StringRef(remainingName);
+    return importAsStaticMethod(methodName, nonSelfParams, effectiveDC);
   }
 
   return fail();

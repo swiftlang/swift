@@ -63,7 +63,7 @@ import InferImportAsMember
 // PRINT-NEXT:    static var staticOnlyProperty: Double { get }
 //
 // PRINT-LABEL:   /// Omit needless words
-// PRINT-NEXT:    static func onwNeedlessTypeArgLabel( Double: Double) -> Double
+// PRINT-NEXT:    static func onwNeedlessTypeArgLabel(_ Double: Double) -> Double
 //
 // PRINT-LABEL:   /// Fuzzy
 // PRINT-NEXT:    init(fuzzy fuzzy: ())
@@ -103,5 +103,5 @@ import InferImportAsMember
 // PRINT-NEXT:  extension IAMClass {
 // PRINT-NEXT:    class var typeID: UInt32 { get }
 // PRINT-NEXT:    init!(i i: Double)
-// PRINT-NEXT:    class func invert( iamOtherName: IAMOtherName!)
+// PRINT-NEXT:    class func invert(_ iamOtherName: IAMOtherName!)
 // PRINT-NEXT:  }
