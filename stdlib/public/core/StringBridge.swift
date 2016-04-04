@@ -116,6 +116,7 @@ internal func _cocoaStringSlice(
   return String(_cocoaString: cfResult)._core
 }
 
+@_versioned
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringSubscript(
   target: _StringCore, _ position: Int

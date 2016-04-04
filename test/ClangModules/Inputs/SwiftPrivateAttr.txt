@@ -4,6 +4,7 @@ protocol __PrivProto {
 }
 class Foo : NSObject, __PrivProto {
   var __privValue: AnyObject!
+  class var __privClassValue: AnyObject!
   func __noArgs()
   func __oneArg(arg: Int32)
   func __twoArgs(arg: Int32, other arg2: Int32)

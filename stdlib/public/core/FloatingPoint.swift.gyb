@@ -162,6 +162,7 @@ else:
 % end
 
 ${SelfDocComment}
+@_fixed_layout
 public struct ${Self} {
   public // @testable
   var _value: Builtin.FPIEEE${bits}

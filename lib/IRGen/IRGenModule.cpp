@@ -375,11 +375,13 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
 
   // Only use the new calling conventions on platforms that support it.
   auto Arch = Triple.getArch();
-  if (Arch == llvm::Triple::ArchType::x86_64 ||
-      Arch == llvm::Triple::ArchType::aarch64)
+  if (SWIFT_RT_USE_RegisterPreservingCC &&
+      Arch == llvm::Triple::ArchType::aarch64) {
     RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
-  else
+  }
+  else {
     RegisterPreservingCC = DefaultCC;
+  }
 
   ABITypes = new CodeGenABITypes(clangASTContext, Module);
 

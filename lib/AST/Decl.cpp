@@ -37,6 +37,7 @@
 #include "swift/Basic/Fallthrough.h"
 
 #include "clang/Basic/CharInfo.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
 #include <algorithm>
@@ -308,7 +309,7 @@ void Decl::setDeclContext(DeclContext *DC) {
 }
 
 bool Decl::isUserAccessible() const {
-  if (auto VD = dyn_cast<VarDecl>(this)){
+  if (auto VD = dyn_cast<VarDecl>(this)) {
     return VD->isUserAccessible();
   }
   return true;
@@ -991,14 +992,10 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
 bool PatternBindingDecl::hasStorage() const {
   // Walk the pattern, to check to see if any of the VarDecls included in it
   // have storage.
-  bool HasStorage = false;
   for (auto entry : getPatternList())
-    entry.getPattern()->forEachVariable([&](VarDecl *VD) {
-      if (VD->hasStorage())
-        HasStorage = true;
-    });
-
-  return HasStorage;
+    if (entry.getPattern()->hasStorage())
+      return true;
+  return false;
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P) {
@@ -1217,21 +1214,20 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
 }
 
 bool AbstractStorageDecl::hasFixedLayout() const {
-  // Private and internal variables always have a fixed layout.
-  // TODO: internal variables with availability information need to be
-  // resilient, since they can be used from @_transparent functions.
-  if (getFormalAccess() != Accessibility::Public)
-    return true;
-
-  // Check for an explicit @_fixed_layout attribute.
-  if (getAttrs().hasAttribute<FixedLayoutAttr>())
-    return true;
-
   // If we're in a nominal type, just query the type.
   auto nominal =
     getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   if (nominal)
     return nominal->hasFixedLayout();
+
+  // Private and (unversioned) internal variables always have a
+  // fixed layout.
+  if (getEffectiveAccess() != Accessibility::Public)
+    return true;
+
+  // Check for an explicit @_fixed_layout attribute.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+    return true;
 
   // Must use resilient access patterns.
   assert(getDeclContext()->isModuleScopeContext());
@@ -1756,10 +1752,9 @@ Type TypeDecl::getDeclaredInterfaceType() const {
 
 
 bool NominalTypeDecl::hasFixedLayout() const {
-  // Private and internal types always have a fixed layout.
-  // TODO: internal types with availability information need to be
-  // resilient, since they can be used from @_transparent functions.
-  if (getFormalAccess() != Accessibility::Public)
+  // Private and (unversioned) internal types always have a
+  // fixed layout.
+  if (getEffectiveAccess() != Accessibility::Public)
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
@@ -2292,6 +2287,11 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
 
 StringRef ClassDecl::getObjCRuntimeName(
                        llvm::SmallVectorImpl<char> &buffer) const {
+  // If there is a Clang declaration, use it's runtime name.
+  if (auto objcClass
+        = dyn_cast_or_null<clang::ObjCInterfaceDecl>(getClangDecl()))
+    return objcClass->getObjCRuntimeNameAsString();
+
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName())
@@ -2300,6 +2300,19 @@ StringRef ClassDecl::getObjCRuntimeName(
 
   // Produce the mangled name for this class.
   return mangleObjCRuntimeName(this, buffer);
+}
+
+bool ClassDecl::isOnlyObjCRuntimeVisible() const {
+  auto clangDecl = getClangDecl();
+  if (!clangDecl) return false;
+
+  auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl);
+  if (!objcClass) return false;
+
+  if (auto def = objcClass->getDefinition())
+    objcClass = def;
+
+  return objcClass->hasAttr<clang::ObjCRuntimeVisibleAttr>();
 }
 
 ArtificialMainKind ClassDecl::getArtificialMainKind() const {

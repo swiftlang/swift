@@ -41,6 +41,7 @@ extension String {
     internal struct _ScratchIterator : IteratorProtocol {
       var core: _StringCore
       var idx: Int
+      @_versioned
       init(_ core: _StringCore, _ pos: Int) {
         self.idx = pos
         self.core = core
@@ -101,8 +102,8 @@ extension String {
         return Index(_core.endIndex, _core)
       }
 
-      internal var _position: Int
-      internal var _core: _StringCore
+      @_versioned internal var _position: Int
+      @_versioned internal var _core: _StringCore
     }
 
     /// The position of the first `UnicodeScalar` if the `String` is

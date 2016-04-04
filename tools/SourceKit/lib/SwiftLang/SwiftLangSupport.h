@@ -231,6 +231,7 @@ public:
 
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);
+  static SourceKit::UIdent getUIDForExtensionOfDecl(const swift::Decl *D);
   static SourceKit::UIdent getUIDForLocalVar(bool IsRef = false);
   static SourceKit::UIdent getUIDForCodeCompletionDeclKind(
       swift::ide::CodeCompletionDeclKind Kind, bool IsRef = false);
@@ -267,6 +268,11 @@ public:
   static void printFullyAnnotatedDeclaration(const swift::ValueDecl *VD,
                                              swift::Type BaseTy,
                                              llvm::raw_ostream &OS);
+
+  static void printFullyAnnotatedSynthesizedDeclaration(
+                                            const swift::ValueDecl *VD,
+                                            swift::NominalTypeDecl *Target,
+                                            llvm::raw_ostream &OS);
 
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;

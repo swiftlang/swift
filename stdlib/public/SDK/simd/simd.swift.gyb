@@ -40,6 +40,7 @@ one_minus_ulp = { 'Float':'0x1.fffffep-1', 'Double':'0x1.fffffffffffffp-1' }
 
 /// A vector of ${cardinal[size]} `${type}`.  This corresponds to the C and
 /// Obj-C type `vector_${vectype}` and the C++ type `simd::${vectype}`.
+@_fixed_layout
 @_alignment(${vecsize})
 public struct ${vectype} :
     ArrayLiteralConvertible, CustomDebugStringConvertible {
@@ -697,6 +698,7 @@ public func *=(x: inout ${vectype}, y: ${type}) {
 %       transtype = ctype[type] + str(rows) + 'x' + str(cols)
 %       cmatrix = 'matrix_' + mattype
 
+@_fixed_layout
 public struct ${mattype} : CustomDebugStringConvertible {
 
   internal var _columns: (${', '.join([coltype]*cols)})

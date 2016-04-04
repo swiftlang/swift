@@ -6,7 +6,6 @@ add_swift_library(swiftIDE
   ModuleInterfacePrinting.cpp
   ReconstructType.cpp
   REPLCodeCompletion.cpp
-  SourceEntityWalker.cpp
   SwiftSourceDocInfo.cpp
   SyntaxModel.cpp
   Utils.cpp

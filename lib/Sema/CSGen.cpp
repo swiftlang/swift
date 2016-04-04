@@ -189,7 +189,7 @@ namespace {
         LTI.haveStringLiteral = true;
         auto tyvar = expr->getType()->getAs<TypeVariableType>();
 
-        if (tyvar)  {
+        if (tyvar) {
           LTI.stringLiteralTyvars.push_back(tyvar);
         }
 
@@ -1614,7 +1614,7 @@ namespace {
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
       // Open a member constraint for constructor delegations on the
       // subexpr type.
-      if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)){
+      if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)) {
         auto baseTy = expr->getBase()->getType()
                         ->getLValueOrInOutObjectType();
 

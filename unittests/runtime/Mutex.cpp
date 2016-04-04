@@ -153,9 +153,8 @@ TEST(MutexTest, LockableThreaded) {
 
   mutex.lock();
   auto thread = std::thread([&] { ASSERT_FALSE(mutex.try_lock()); });
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  mutex.unlock();
   thread.join();
+  mutex.unlock();
 
   thread = std::thread([&] {
     ASSERT_TRUE(mutex.try_lock());

@@ -73,7 +73,7 @@ public:
 
     // TODO: We may want to delete debug instructions to allow us to sink more
     // instructions.
-    for (auto *Operand : II->getUses())  {
+    for (auto *Operand : II->getUses()) {
       SILInstruction *User = Operand->getUser();
 
       // Check if the instruction is already in the user's block.

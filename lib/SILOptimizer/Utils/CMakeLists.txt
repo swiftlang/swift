@@ -6,9 +6,9 @@ set(UTILS_SOURCES
   Utils/FunctionSignatureOptUtils.cpp
   Utils/GenericCloner.cpp
   Utils/Generics.cpp
+  Utils/LoadStoreOptUtils.cpp
   Utils/Local.cpp
   Utils/LoopUtils.cpp
-  Utils/LSBase.cpp
   Utils/SILInliner.cpp
   Utils/SILSSAUpdater.cpp
   PARENT_SCOPE)

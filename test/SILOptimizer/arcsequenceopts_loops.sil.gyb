@@ -35,7 +35,7 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-NEXT: strong_retain
   strong_retain %0 : $Builtin.NativeObject
 % end
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
   br bb1
 
 // CHECK: bb1:

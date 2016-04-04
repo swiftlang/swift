@@ -104,6 +104,9 @@
 #define SWIFT_CC_DefaultCC_IMPL SWIFT_CC_c
 #define SWIFT_LLVM_CC_DefaultCC llvm::CallingConv::C
 
+#define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
+
+
 // If defined, it indicates that runtime function wrappers
 // should be used on all platforms, even they do not support
 // the new calling convention which requires this.
@@ -113,13 +116,19 @@
 // supported by the current target.
 // TODO: Define it once the runtime calling convention support has
 // been integrated into clang and llvm.
-//#define RT_USE_RegisterPreservingCC
+#define SWIFT_RT_USE_RegisterPreservingCC 0
+
+#if  __has_attribute(preserve_most)
+#define SWIFT_BACKEND_SUPPORTS_RegisterPreservingCC 1
+#else
+#define SWIFT_BACKEND_SUPPORTS_RegisterPreservingCC 0
+#endif
+
 
 // RegisterPreservingCC is a dedicated runtime calling convention to be used
 // when calling the most popular runtime functions.
-#if defined(RT_USE_RegisterPreservingCC) && __has_attribute(preserve_most) &&  \
-    (defined(__aarch64__) || defined(__x86_64__))
-
+#if SWIFT_RT_USE_RegisterPreservingCC &&                              \
+    SWIFT_BACKEND_SUPPORTS_RegisterPreservingCC && defined(__aarch64__)
 // Targets supporting the dedicated runtime convention should use it.
 // If a runtime function is using this calling convention, it can
 // be invoked only by means of a wrapper, which performs an indirect
@@ -134,7 +143,6 @@
   SWIFT_CC_preserve_most
 #define SWIFT_CC_RegisterPreservingCC_IMPL                     \
   SWIFT_CC_preserve_most
-#define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
 
 // Indicate that wrappers should be used, because it is required
 // for the calling convention to get around dynamic linking issues.
@@ -147,7 +155,6 @@
 // No wrappers are required in this case by the calling convention.
 #define SWIFT_CC_RegisterPreservingCC SWIFT_CC_c
 #define SWIFT_CC_RegisterPreservingCC_IMPL SWIFT_CC_c
-#define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::C
 
 #endif
 
@@ -171,6 +178,7 @@
 #define SWIFT_RT_ENTRY_REF_AS_STR(Name) "_" #Name
 
 #if defined(SWIFT_RT_USE_WRAPPERS_ALWAYS)
+#undef SWIFT_RT_USE_WRAPPERS
 #define SWIFT_RT_USE_WRAPPERS
 #endif
 

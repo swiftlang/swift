@@ -480,7 +480,8 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         SmallVector<Identifier, 4> identifiers;
         
         if (auto archetype = type->getAs<ArchetypeType>()) {
-          auto containingProtocol = cast<ProtocolDecl>(alias->getParent());
+          auto containingProtocol = dyn_cast<ProtocolDecl>(alias->getParent());
+          if (!containingProtocol) continue;
           
           // Go up archetype parents until we find our containing protocol.
           while (archetype->getSelfProtocol() != containingProtocol) {

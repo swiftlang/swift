@@ -83,14 +83,29 @@ public:
   bool hasMergeGroup(MergeGroupKind Kind);
 };
 
-struct BracketOptions {
-  bool shouldOpenExtension = true;
-  bool shouldCloseExtension = true;
-  bool shouldCloseNominal = true;
-  void reset() {
-    shouldOpenExtension = true;
-    shouldCloseExtension = true;
-    shouldCloseNominal = true;
+class BracketOptions {
+  Decl* Target;
+  bool OpenExtension;
+  bool CloseExtension;
+  bool CloseNominal;
+
+public:
+  BracketOptions(Decl *Target = nullptr, bool OpenExtension = true,
+                 bool CloseExtension = true, bool CloseNominal = true) :
+                  Target(Target), OpenExtension(OpenExtension),
+                  CloseExtension(CloseExtension),
+                  CloseNominal(CloseNominal) {}
+
+  bool shouldOpenExtension(const Decl *D) {
+    return D != Target || OpenExtension;
+  }
+
+  bool shouldCloseExtension(const Decl *D) {
+    return D != Target || CloseExtension;
+  }
+
+  bool shouldCloseNominal(const Decl *D) {
+    return D != Target || CloseNominal;
   }
 };
 
@@ -332,6 +347,7 @@ struct PrintOptions {
     result.SkipUnderscoredStdlibProtocols = true;
     result.SkipDeinit = true;
     result.ExcludeAttrList.push_back(DAK_WarnUnusedResult);
+    result.ExcludeAttrList.push_back(DAK_DiscardableResult);
     result.EmptyLineBetweenMembers = true;
     result.ElevateDocCommentFromConformance = true;
     return result;

@@ -188,6 +188,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   }
 }
 
+@_fixed_layout
 public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Make a buffer with uninitialized elements.  After using this

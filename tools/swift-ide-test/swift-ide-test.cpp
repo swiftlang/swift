@@ -21,6 +21,7 @@
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/DemangleWrappers.h"
@@ -35,7 +36,6 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -1058,7 +1058,7 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
 
 namespace {
 
-class AnnotationPrinter : public ide::SourceEntityWalker {
+class AnnotationPrinter : public SourceEntityWalker {
   SourceManager &SM;
   unsigned BufferID;
   llvm::raw_ostream &OS;
@@ -1624,7 +1624,7 @@ public:
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     const NominalTypeDecl *NTD,
                                     Optional<BracketOptions> Bracket) override {
-    if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension)
+    if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension(ED))
       return;
     OS << "<synthesized>";
   }
@@ -1632,7 +1632,7 @@ public:
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                      const NominalTypeDecl *NTD,
                                      Optional<BracketOptions> Bracket) override {
-    if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension)
+    if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension(ED))
       return;
     OS << "</synthesized>";
   }
@@ -2363,7 +2363,7 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
 
 namespace {
 
-class USRPrinter : public ide::SourceEntityWalker {
+class USRPrinter : public SourceEntityWalker {
   SourceManager &SM;
   unsigned BufferID;
   llvm::raw_ostream &OS;

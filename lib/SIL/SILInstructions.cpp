@@ -684,6 +684,25 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   llvm_unreachable("not a terminator?!");
 }
 
+bool TermInst::isFunctionExiting() const {
+  switch (getTermKind()) {
+    case TermKind::BranchInst:
+    case TermKind::CondBranchInst:
+    case TermKind::SwitchValueInst:
+    case TermKind::SwitchEnumInst:
+    case TermKind::SwitchEnumAddrInst:
+    case TermKind::DynamicMethodBranchInst:
+    case TermKind::CheckedCastBranchInst:
+    case TermKind::CheckedCastAddrBranchInst:
+    case TermKind::UnreachableInst:
+    case TermKind::TryApplyInst:
+      return false;
+    case TermKind::ReturnInst:
+    case TermKind::ThrowInst:
+      return true;
+  }
+}
+
 BranchInst::BranchInst(SILDebugLocation Loc, SILBasicBlock *DestBB,
                        ArrayRef<SILValue> Args)
     : TermInst(ValueKind::BranchInst, Loc), DestBB(this, DestBB),

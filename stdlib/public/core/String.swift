@@ -107,6 +107,7 @@ import SwiftShims
 /// space, where `N` is the length of the string representation (or
 /// more, if the underlying `NSString` has unusual performance
 /// characteristics).
+@_fixed_layout
 public struct String {
   /// An empty `String`.
   public init() {

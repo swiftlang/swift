@@ -379,11 +379,20 @@ func testPropertyAndMethodCollision(obj: PropertyAndMethodCollision,
   obj.object = nil
   obj.object(obj, doSomething:Selector("action"))
 
+  obj.dynamicType.classRef = nil
+  obj.dynamicType.classRef(obj, doSomething:Selector("action"))
+
   rev.object = nil
   rev.object(rev, doSomething:Selector("action"))
 
-  var value: AnyObject = obj.protoProp()
+  rev.dynamicType.classRef = nil
+  rev.dynamicType.classRef(rev, doSomething:Selector("action"))
+
+  var value: AnyObject
+  value = obj.protoProp()
   value = obj.protoPropRO()
+  value = obj.dynamicType.protoClassProp()
+  value = obj.dynamicType.protoClassPropRO()
   _ = value
 }
 

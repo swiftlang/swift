@@ -566,16 +566,11 @@ private:
 
     printDocumentationComment(VD);
 
-    if (VD->isStatic()) {
-      // Objective-C doesn't have class properties. Just print the accessors.
-      printAbstractFunctionAsMethod(VD->getGetter(), true);
-      if (auto setter = VD->getSetter())
-        printAbstractFunctionAsMethod(setter, true);
-      return;
-    }
-
     // For now, never promise atomicity.
     os << "@property (nonatomic";
+
+    if (!VD->isInstanceMember())
+      os << ", class";
 
     ASTContext &ctx = M.getASTContext();
     bool isSettable = VD->isSettable(nullptr);

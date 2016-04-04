@@ -1011,6 +1011,9 @@ class SILPerformanceInliner {
     /// inlining.
     RefCountBenefit = RemovedCallBenefit + 20,
 
+    /// The benefit of a onFastPath builtin.
+    FastPathBuiltinBenefit = RemovedCallBenefit + 40,
+
     /// Approximately up to this cost level a function can be inlined without
     /// increasing the code size.
     TrivialFunctionThreshold = 18,
@@ -1219,6 +1222,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
             BlockW.updateBenefit(Benefit, RefCountBenefit);
           }
         }
+      } else if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
+        if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
+          BlockW.updateBenefit(Benefit, FastPathBuiltinBenefit);
       }
     }
     // Don't count costs in blocks which are dead after inlining.

@@ -28,6 +28,7 @@ func _isDebugAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 0
 }
 
+@_versioned
 @_transparent
 @warn_unused_result
 internal func _isReleaseAssertConfiguration() -> Bool {
@@ -60,6 +61,7 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 #endif
 }
 
+@_versioned
 @_transparent
 @warn_unused_result
 internal

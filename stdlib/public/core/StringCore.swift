@@ -24,6 +24,7 @@
 // size with the ternary operator.  This is also the cause of the
 // extra element requirement for 8 bit elements.  See the
 // implementation of subscript(Int) -> UTF16.CodeUnit below for details.
+@_fixed_layout
 public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
@@ -294,6 +295,7 @@ public struct _StringCore {
   }
 
   /// Get the Nth UTF-16 Code Unit stored.
+  @_versioned
   @warn_unused_result
   func _nthContiguous(position: Int) -> UTF16.CodeUnit {
     let p =

@@ -1874,7 +1874,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   // before the return.
   for (auto &BB : TheMemory.getFunction()) {
     auto *Term = BB.getTerminator();
-    if (isa<ReturnInst>(Term) || isa<ThrowInst>(Term)) {
+    if (Term->isFunctionExiting()) {
       B.setInsertionPoint(Term);
       B.createDeallocStack(Loc, ControlVariableBox);
     }

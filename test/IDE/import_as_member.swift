@@ -58,7 +58,8 @@
 // PRINT-PROTO-NEXT:  typealias IAMProto_t = IAMProto
 // PRINT-PROTO-NEXT:  extension IAMProto {
 // PRINT-PROTO-NEXT:    func mutateSomeState()
-// PRINT-PROTO-NEXT:    func mutateSomeState(otherProto other: IAMProto_t!)
+// PRINT-PROTO-NEXT:    func mutateSomeState(withParameter _: Int)
+// PRINT-PROTO-NEXT:    func mutateSomeState(withFirstParameter _: Int)
 // PRINT-PROTO-NEXT:    var someValue: Int32
 // PRINT-PROTO-NEXT:  }
 

@@ -1113,6 +1113,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyIsUnavailable, Info.IsUnavailable);
   if (Info.IsDeprecated)
     Elem.set(KeyIsDeprecated, Info.IsDeprecated);
+  if (Info.IsOptional)
+    Elem.set(KeyIsOptional, Info.IsOptional);
   if (!Info.DocComment.empty())
     Elem.set(KeyDocFullAsXML, Info.DocComment);
   if (!Info.FullyAnnotatedDecl.empty())

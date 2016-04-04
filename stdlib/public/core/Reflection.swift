@@ -361,6 +361,7 @@ func _swift_MagicMirrorData_summaryImpl(
   metadata: Any.Type, _ result: UnsafeMutablePointer<String>
 )
 
+@_fixed_layout
 public struct _MagicMirrorData {
   let owner: Builtin.NativeObject
   let ptr: Builtin.RawPointer
@@ -407,6 +408,22 @@ struct _OpaqueMirror : _Mirror {
   var disposition: _MirrorDisposition { return .aggregate }
 }
 
+@warn_unused_result
+@_silgen_name("swift_TupleMirror_count")
+func _getTupleCount(_: _MagicMirrorData) -> Int
+
+// Like the other swift_*Mirror_subscript functions declared here and
+// elsewhere, this is implemented in the runtime.  The Swift CC would
+// normally require the String to be returned directly and the _Mirror
+// indirectly.  However, Clang isn't currently capable of doing that
+// reliably because the size of String exceeds the normal direct-return
+// ABI rules on most platforms.  Therefore, we make this function generic,
+// which has the disadvantage of passing the String type metadata as an
+// extra argument, but does force the string to be returned indirectly.
+@warn_unused_result
+@_silgen_name("swift_TupleMirror_subscript")
+func _getTupleChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
+
 internal struct _TupleMirror : _Mirror {
   let data: _MagicMirrorData
 
@@ -414,18 +431,23 @@ internal struct _TupleMirror : _Mirror {
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int {
-    @_silgen_name("swift_TupleMirror_count")get
+    return _getTupleCount(data)
   }
   subscript(i: Int) -> (String, _Mirror) {
-    return _subscript_get(i)
+    return _getTupleChild(i, data)
   }
-  @_silgen_name("swift_TupleMirror_subscript")
-  func _subscript_get<T>(i: Int) -> (T, _Mirror)
-
   var summary: String { return "(\(count) elements)" }
   var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .tuple }
 }
+
+@warn_unused_result
+@_silgen_name("swift_StructMirror_count")
+func _getStructCount(_: _MagicMirrorData) -> Int
+
+@warn_unused_result
+@_silgen_name("swift_StructMirror_subscript")
+func _getStructChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
 struct _StructMirror : _Mirror {
   let data: _MagicMirrorData
@@ -434,13 +456,11 @@ struct _StructMirror : _Mirror {
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int {
-    @_silgen_name("swift_StructMirror_count")get
+    return _getStructCount(data)
   }
   subscript(i: Int) -> (String, _Mirror) {
-    return _subscript_get(i)
+    return _getStructChild(i, data)
   }
-  @_silgen_name("swift_StructMirror_subscript")
-  func _subscript_get<T>(i: Int) -> (T, _Mirror)
 
   var summary: String {
     return _typeName(valueType)
@@ -449,6 +469,19 @@ struct _StructMirror : _Mirror {
   var disposition: _MirrorDisposition { return .`struct` }
 }
 
+@warn_unused_result
+@_silgen_name("swift_EnumMirror_count")
+func _getEnumCount(_: _MagicMirrorData) -> Int
+
+@warn_unused_result
+@_silgen_name("swift_EnumMirror_subscript")
+func _getEnumChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
+
+@warn_unused_result
+@_silgen_name("swift_EnumMirror_caseName")
+func _swift_EnumMirror_caseName(
+    data: _MagicMirrorData) -> UnsafePointer<CChar>
+
 struct _EnumMirror : _Mirror {
   let data: _MagicMirrorData
 
@@ -456,16 +489,14 @@ struct _EnumMirror : _Mirror {
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int {
-    @_silgen_name("swift_EnumMirror_count")get
+    return _getEnumCount(data)
   }
   var caseName: UnsafePointer<CChar> {
-    @_silgen_name("swift_EnumMirror_caseName")get
+    return _swift_EnumMirror_caseName(data)
   }
   subscript(i: Int) -> (String, _Mirror) {
-    return _subscript_get(i)
+    return _getEnumChild(i, data)
   }
-  @_silgen_name("swift_EnumMirror_subscript")
-  func _subscript_get<T>(i: Int) -> (T, _Mirror)
 
   var summary: String {
     let maybeCaseName = String(validatingUTF8: self.caseName)
@@ -483,24 +514,16 @@ struct _EnumMirror : _Mirror {
 @_silgen_name("swift_ClassMirror_count")
 func _getClassCount(_: _MagicMirrorData) -> Int
 
-// Like the other swift_*Mirror_subscript functions declared here and
-// elsewhere, this is implemented in the runtime.  The Swift CC would
-// normally require the String to be returned directly and the _Mirror
-// indirectly.  However, Clang isn't currently capable of doing that
-// reliably because the size of String exceeds the normal direct-return
-// ABI rules on most platforms.  Therefore, we make this function generic,
-// which has the disadvantage of passing the String type metadata as an
-// extra argument, but does force the string to be returned indirectly.
 @warn_unused_result
 @_silgen_name("swift_ClassMirror_subscript")
 func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
 #if _runtime(_ObjC)
-@warn_unused_result
 @_silgen_name("swift_ClassMirror_quickLookObject")
 public func _getClassPlaygroundQuickLook(
-  data: _MagicMirrorData
-) -> PlaygroundQuickLook?
+  _: inout PlaygroundQuickLook?,
+  _: _MagicMirrorData
+)
 #endif
 
 struct _ClassMirror : _Mirror {
@@ -522,7 +545,9 @@ struct _ClassMirror : _Mirror {
   }
   var quickLookObject: PlaygroundQuickLook? {
 #if _runtime(_ObjC)
-    return _getClassPlaygroundQuickLook(data)
+    var result: PlaygroundQuickLook? = nil
+    _getClassPlaygroundQuickLook(&result, data)
+    return result
 #else
     return nil
 #endif

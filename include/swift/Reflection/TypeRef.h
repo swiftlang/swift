@@ -550,7 +550,7 @@ public:
   }
 
   TypeRefPointer
-  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     return Substitutions[{GTP->getDepth(), GTP->getIndex()}];
   }
 

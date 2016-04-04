@@ -219,10 +219,10 @@ bool PartialApplyCombiner::allocateTemporaries() {
 
 /// Emit dealloc_stack for all temporaries.
 void PartialApplyCombiner::deallocateTemporaries() {
-  // Insert dealloc_stack instructions.
+  // Insert dealloc_stack instructions at all function exit points.
   for (SILBasicBlock &BB : *PAI->getFunction()) {
     TermInst *Term = BB.getTerminator();
-    if (!isa<ReturnInst>(Term) && !isa<ThrowInst>(Term))
+    if (!Term->isFunctionExiting())
       continue;
 
     for (auto Op : Tmps) {
@@ -482,6 +482,11 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 
 bool
 SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
+  // FIXME: We could probably optimize this case too
+  if (auto *AI = dyn_cast<ApplyInst>(Value))
+    if (AI->hasIndirectResults())
+      return false;
+
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
     if (isa<RefCountingInst>(Inst) ||

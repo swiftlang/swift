@@ -2090,9 +2090,14 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // make it implicitly @objc. However, if the declaration cannot be represented
   // as @objc, don't diagnose.
   Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
-  if (auto classDecl = contextTy->getClassOrBoundGenericClass())
+  if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
+    // One cannot define @objc members of Objective-C runtime visible classes.
+    if (classDecl->isOnlyObjCRuntimeVisible())
+      return None;
+
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
       return ObjCReason::DoNotDiagnose;
+  }
 
   return None;
 }
@@ -3245,7 +3250,7 @@ public:
         // default-initializable. If so, do it.
         if (PBD->getPattern(i)->hasType() &&
             !PBD->getInit(i) &&
-            PBD->hasStorage() &&
+            PBD->getPattern(i)->hasStorage() &&
             !PBD->getPattern(i)->getType()->is<ErrorType>()) {
 
           // If we have a type-adjusting attribute (like ownership), apply it now.
@@ -3833,6 +3838,11 @@ public:
 
         if (Super->hasClangNode() && Super->getGenericParams()) {
           TC.diagnose(CD, diag::inheritance_from_objc_generic_class,
+                      Super->getName());
+        }
+
+        if (Super->isOnlyObjCRuntimeVisible()) {
+          TC.diagnose(CD, diag::inheritance_from_objc_runtime_visible_class,
                       Super->getName());
         }
       }
@@ -5113,6 +5123,7 @@ public:
 
     UNINTERESTING_ATTR(WarnUnusedResult)
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
+    UNINTERESTING_ATTR(DiscardableResult)
 
 #undef UNINTERESTING_ATTR
 
@@ -5596,14 +5607,6 @@ public:
       TC.checkInheritanceClause(ED);
       if (auto nominal = ExtendedTy->getAnyNominal()) {
         TC.validateDecl(nominal);
-
-        if (auto extendedClass = dyn_cast<ClassDecl>(nominal)) {
-          if (extendedClass->hasClangNode() &&
-              extendedClass->getGenericParams()) {
-            TC.diagnose(ED, diag::extension_of_objc_generic_class,
-                        extendedClass->getName());
-          }
-        }
       }
 
       validateAttributes(TC, ED);

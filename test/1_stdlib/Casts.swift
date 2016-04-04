@@ -18,40 +18,13 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 let CastsTests = TestSuite("Casts")
 
 // Test for SR-426: missing release for some types after failed conversion
-class DeinitTester {
-    private let onDeinit: () -> ()
-    
-    init(onDeinit: () -> ()) {
-        self.onDeinit = onDeinit
-    }
-    deinit {
-        onDeinit()
-    }
-}
-
-func testFailedTupleCast(onDeinit: () -> ()) {
-    // This function is to establish a scope for t to 
-    // be deallocated at the end of.
-    let t: Any = (1, DeinitTester(onDeinit: onDeinit))
-    _ = t is Any.Type
-}
-
 CastsTests.test("No leak for failed tuple casts") {
-    var deinitRan = false
-    testFailedTupleCast {
-        deinitRan = true
-    }
-    expectTrue(deinitRan)
+    let t: Any = (1, LifetimeTracked(0))
+    expectFalse(t is Any.Type)
 }
 
 protocol P {}

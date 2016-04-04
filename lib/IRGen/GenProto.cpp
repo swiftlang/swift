@@ -1254,7 +1254,6 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 /// Generic functions and protocol witnesses carry polymorphic parameters.
 bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   switch (ty->getRepresentation()) {
-  case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
     // Should never be polymorphic.
     assert(!ty->isPolymorphic() && "polymorphic C function?!");
@@ -1265,6 +1264,7 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   case SILFunctionTypeRepresentation::Method:
     return ty->isPolymorphic();
 
+  case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
     // May be polymorphic at the SIL level, but no type metadata is actually
     // passed.

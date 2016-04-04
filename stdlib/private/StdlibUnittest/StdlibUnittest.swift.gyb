@@ -917,7 +917,7 @@ struct _ParentProcess {
             testName += "/"
             testName += String(testParameter)
           }
-          var fullTestName = "\(testSuite.name).\(testName)"
+          let fullTestName = "\(testSuite.name).\(testName)"
           if let filter = _filter
             where findSubstring(fullTestName, filter) == nil {
 

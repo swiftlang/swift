@@ -5204,7 +5204,8 @@ namespace {
                           NL_QualifiedDefault | NL_KnownNoDependency,
                           Impl.getTypeResolver(), lookup);
       for (auto result : lookup) {
-        if (isa<FuncDecl>(result) && result->isInstanceMember() &&
+        if (isa<FuncDecl>(result) &&
+            result->isInstanceMember() == decl->isInstanceProperty() &&
             result->getFullName().getArgumentNames().empty())
           return nullptr;
 
@@ -5257,7 +5258,7 @@ namespace {
       }
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-          /*static*/ false, /*IsLet*/ false,
+          decl->isClassProperty(), /*IsLet*/ false,
           Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
       result->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(dc, type));

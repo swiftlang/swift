@@ -522,7 +522,7 @@ void SwiftLookupTable::deserializeAll() {
 
 /// Print a stored context to the given output stream for debugging purposes.
 static void printStoredContext(SwiftLookupTable::StoredContext context,
-                               llvm::raw_ostream &out)  {
+                               llvm::raw_ostream &out) {
   switch (context.first) {
   case SwiftLookupTable::ContextKind::TranslationUnit:
     out << "TU";

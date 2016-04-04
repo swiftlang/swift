@@ -2641,7 +2641,7 @@ public:
               "switch_enum default destination must take no arguments");
   }
 
-  void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
+  void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
     require(SOI->getOperand()->getType().isAddress(),
             "switch_enum_addr operand must be an address");
 
@@ -2975,11 +2975,11 @@ public:
                   "stack dealloc does not match most recent stack alloc");
           stack.pop_back();
         }
-        if (isa<ReturnInst>(&i) || isa<ThrowInst>(&i)) {
-          require(stack.empty(),
-                  "return with stack allocs that haven't been deallocated");
-        }
         if (auto term = dyn_cast<TermInst>(&i)) {
+          if (term->isFunctionExiting()) {
+            require(stack.empty(),
+                    "return with stack allocs that haven't been deallocated");
+          }
           for (auto &successor : term->getSuccessors()) {
             SILBasicBlock *SuccBB = successor.getBB();
             auto found = visitedBBs.find(SuccBB);

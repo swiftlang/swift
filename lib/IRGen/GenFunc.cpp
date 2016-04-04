@@ -1750,6 +1750,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::OnFastPath) {
+    // The onFastPath builtin has only an effect on SIL level, so we lower it
+    // to a no-op.
+    return;
+  }
+
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     args.claimAll();

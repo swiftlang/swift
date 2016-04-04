@@ -6,11 +6,6 @@ import StdlibUnittest
 import ObjectiveC
 import Foundation
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-
 // Don't actually exit with a non-zero status, just say we're going to do it.
 _setTestSuiteFailedCallback() { print("abort()") }
 

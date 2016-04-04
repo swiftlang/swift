@@ -6582,7 +6582,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1733,
     key.length: 91,
     key.conforms: [
@@ -6593,9 +6593,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6618,7 +6618,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1826,
     key.length: 96,
     key.conforms: [
@@ -6629,9 +6629,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6654,7 +6654,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1924,
     key.length: 76,
     key.conforms: [
@@ -6665,9 +6665,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6690,7 +6690,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2002,
     key.length: 201,
     key.conforms: [
@@ -6701,9 +6701,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6813,7 +6813,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2205,
     key.length: 48,
     key.conforms: [
@@ -6824,13 +6824,13 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     }
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2255,
     key.length: 91,
     key.conforms: [
@@ -6841,9 +6841,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6866,7 +6866,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2348,
     key.length: 129,
     key.conforms: [
@@ -6877,9 +6877,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     },
     key.entities: [
       {
@@ -6901,7 +6901,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.struct,
+    key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 2479,
     key.length: 43,
     key.conforms: [
@@ -6912,9 +6912,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       }
     ],
     key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "Int",
-      key.usr: "s:Si"
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "FooComparisonResult",
+      key.usr: "c:@E@FooComparisonResult"
     }
   },
   {
@@ -6981,14 +6981,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.protocol,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension OptionSet</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
+    key.kind: source.lang.swift.decl.extension.struct,
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
     key.offset: 2710,
     key.length: 158,
     key.extends: {
-      key.kind: source.lang.swift.ref.protocol,
-      key.name: "OptionSet",
-      key.usr: "s:Ps9OptionSet"
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
     },
     key.entities: [
       {
@@ -7051,19 +7051,19 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.protocol,
+    key.kind: source.lang.swift.decl.extension.struct,
     key.generic_requirements: [
       {
         key.description: "Element == Self"
       }
     ],
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension OptionSet where Element == Self</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>Element == Self</codeVoice>, which is the default.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions where Element == Self</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>Element == Self</codeVoice>, which is the default.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
     key.offset: 2870,
     key.length: 167,
     key.extends: {
-      key.kind: source.lang.swift.ref.protocol,
-      key.name: "OptionSet",
-      key.usr: "s:Ps9OptionSet"
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
     },
     key.entities: [
       {
@@ -7126,19 +7126,19 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.protocol,
+    key.kind: source.lang.swift.decl.extension.struct,
     key.generic_requirements: [
       {
         key.description: "RawValue : BitwiseOperations"
       }
     ],
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension OptionSet where RawValue : BitwiseOperations</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>RawValue</codeVoice> conforms to <codeVoice>BitwiseOperations</codeVoice>, which is the usual case.  Each distinct bit of an option set&apos;s <codeVoice>.rawValue</codeVoice> corresponds to a disjoint element of the option set.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note><List-Bullet><Item><Para><codeVoice>union</codeVoice> is implemented as a bitwise &quot;or&quot; (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>intersection</codeVoice> is implemented as a bitwise &quot;and&quot; (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>exclusiveOr</codeVoice> is implemented as a bitwise &quot;exclusive or&quot; (<codeVoice>^</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item></List-Bullet></Discussion></Other>",
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions where RawValue : BitwiseOperations</Declaration><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>RawValue</codeVoice> conforms to <codeVoice>BitwiseOperations</codeVoice>, which is the usual case.  Each distinct bit of an option set&apos;s <codeVoice>.rawValue</codeVoice> corresponds to a disjoint element of the option set.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note><List-Bullet><Item><Para><codeVoice>union</codeVoice> is implemented as a bitwise &quot;or&quot; (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>intersection</codeVoice> is implemented as a bitwise &quot;and&quot; (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>exclusiveOr</codeVoice> is implemented as a bitwise &quot;exclusive or&quot; (<codeVoice>^</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item></List-Bullet></Discussion></Other>",
     key.offset: 3039,
     key.length: 206,
     key.extends: {
-      key.kind: source.lang.swift.ref.protocol,
-      key.name: "OptionSet",
-      key.usr: "s:Ps9OptionSet"
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
     },
     key.entities: [
       {
@@ -7211,14 +7211,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     ]
   },
   {
-    key.kind: source.lang.swift.decl.extension.protocol,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension SetAlgebra</Declaration><Abstract><Para><codeVoice>SetAlgebra</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>SetAlgebra</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
+    key.kind: source.lang.swift.decl.extension.struct,
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><Abstract><Para><codeVoice>SetAlgebra</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>SetAlgebra</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></Other>",
     key.offset: 3247,
     key.length: 744,
     key.extends: {
-      key.kind: source.lang.swift.ref.protocol,
-      key.name: "SetAlgebra",
-      key.usr: "s:Ps10SetAlgebra"
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
     },
     key.entities: [
       {
@@ -7240,7 +7240,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:FEsPs10SetAlgebracuRd__s8Sequencewx7ElementzWd__8Iterator7Element_rFqd__x</USR><Declaration>convenience init&lt;S : Sequence where S.Iterator.Element == Element&gt;(_ sequence: S)</Declaration><Abstract><Para>Creates the set containing all elements of <codeVoice>sequence</codeVoice>.</Para></Abstract></Function>",
         key.offset: 3282,
         key.length: 91,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>&lt;<decl.generic_type_param usr=\"s:tFEsPs10SetAlgebracuRd__s8Sequencewx7ElementzWd__8Iterator7Element_rFqd__xL_1SMqd__\"><decl.generic_type_param.name>S</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr=\"s:Ps8Sequence\">Sequence</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>S.Iterator.Element == Element</decl.generic_type_requirement>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>sequence</decl.var.parameter.name>: <decl.var.parameter.type>S</decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>&lt;<decl.generic_type_param usr=\"s:tFEsPs10SetAlgebracuRd__s8Sequencewx7ElementzWd__8Iterator7Element_rFqd__xL_1SMqd__\"><decl.generic_type_param.name>S</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr=\"s:Ps8Sequence\">Sequence</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>S.Iterator.Element == FooRuncingOptions</decl.generic_type_requirement>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>sequence</decl.var.parameter.name>: <decl.var.parameter.type>S</decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7259,7 +7259,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.doc.full_as_xml: "<Function><Name>init(arrayLiteral:)</Name><USR>s:FEsPs10SetAlgebracFt12arrayLiteralGSawx7Element__x</USR><Declaration>convenience init(arrayLiteral: Self.Element...)</Declaration><Abstract><Para>Creates a set containing all elements of the given <codeVoice>arrayLiteral</codeVoice>.</Para></Abstract><Discussion><Para>This initializer allows an array literal containing <codeVoice>Self.Element</codeVoice> to represent an instance of the set, wherever it is implied by the type context.</Para></Discussion></Function>",
         key.offset: 3379,
         key.length: 65,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>arrayLiteral</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param>.Element</decl.var.parameter.type>...</decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>arrayLiteral</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type>...</decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7421,7 +7421,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.doc.full_as_xml: "<Function><Name>element(_:subsumes:)</Name><USR>s:ZFEsPs10SetAlgebra7elementFTwx7Element8subsumeswxS0__Sb</USR><Declaration>static func element(a: Self.Element, subsumes b: Self.Element) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff <codeVoice>a</codeVoice> subsumes <codeVoice>b</codeVoice>.</Para></Abstract><Discussion><List-Bullet><Item><Para>Equivalent to <codeVoice>([a] as Self).isSupersetOf([b])</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
         key.offset: 3813,
         key.length: 82,
-        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>element</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param>.Element</decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>subsumes</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param>.Element</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.static>",
+        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>element</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>subsumes</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.static>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7447,7 +7447,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.doc.full_as_xml: "<Function><Name>element(_:isDisjointWith:)</Name><USR>s:ZFEsPs10SetAlgebra7elementFTwx7Element14isDisjointWithwxS0__Sb</USR><Declaration>static func element(a: Self.Element, isDisjointWith b: Self.Element) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff <codeVoice>a</codeVoice> is disjoint with <codeVoice>b</codeVoice>.</Para></Abstract><Discussion><Para>Two elements are disjoint when neither one subsumes the other.</Para><See><Para><codeVoice>Self.element(_, subsumes:_)</codeVoice></Para></See></Discussion></Function>",
         key.offset: 3901,
         key.length: 88,
-        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>element</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param>.Element</decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>isDisjointWith</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param>.Element</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.static>",
+        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>element</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>isDisjointWith</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.static>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,

@@ -876,7 +876,7 @@ extension Collection {
   @available(*, unavailable, renamed: "Iterator")
   public typealias Generator = Iterator
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> Iterator {
     fatalError("unavailable function can't be called")
   }

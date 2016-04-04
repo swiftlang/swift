@@ -525,6 +525,49 @@ void swift::swift_unknownRelease(void *object)
   return objc_release(static_cast<id>(object));
 }
 
+SWIFT_RUNTIME_EXPORT
+void swift::swift_nonatomic_unknownRetain_n(void *object, int n)
+    SWIFT_CC(DefaultCC_IMPL) {
+  if (isObjCTaggedPointerOrNull(object)) return;
+  if (usesNativeSwiftReferenceCounting_allocated(object)) {
+    swift_nonatomic_retain_n(static_cast<HeapObject *>(object), n);
+    return;
+  }
+  for (int i = 0; i < n; ++i)
+    objc_retain(static_cast<id>(object));
+}
+
+SWIFT_RUNTIME_EXPORT
+void swift::swift_nonatomic_unknownRelease_n(void *object, int n)
+    SWIFT_CC(DefaultCC_IMPL) {
+  if (isObjCTaggedPointerOrNull(object)) return;
+  if (usesNativeSwiftReferenceCounting_allocated(object))
+    return swift_nonatomic_release_n(static_cast<HeapObject *>(object), n);
+  for (int i = 0; i < n; ++i)
+    objc_release(static_cast<id>(object));
+}
+
+SWIFT_RUNTIME_EXPORT
+void swift::swift_nonatomic_unknownRetain(void *object)
+    SWIFT_CC(DefaultCC_IMPL) {
+  if (isObjCTaggedPointerOrNull(object)) return;
+  if (usesNativeSwiftReferenceCounting_allocated(object)) {
+    swift_nonatomic_retain(static_cast<HeapObject *>(object));
+    return;
+  }
+  objc_retain(static_cast<id>(object));
+}
+
+SWIFT_RUNTIME_EXPORT
+void swift::swift_nonatomic_unknownRelease(void *object)
+    SWIFT_CC(DefaultCC_IMPL) {
+  if (isObjCTaggedPointerOrNull(object)) return;
+  if (usesNativeSwiftReferenceCounting_allocated(object))
+    return SWIFT_RT_ENTRY_CALL(swift_release)(static_cast<HeapObject *>(object));
+  return objc_release(static_cast<id>(object));
+}
+
+
 /// Return true iff the given BridgeObject is not known to use native
 /// reference-counting.
 ///
@@ -568,6 +611,28 @@ void *swift::swift_bridgeObjectRetain(void *object)
 }
 
 SWIFT_RUNTIME_EXPORT
+void *swift::swift_nonatomic_bridgeObjectRetain(void *object)
+    SWIFT_CC(DefaultCC_IMPL) {
+#if SWIFT_OBJC_INTEROP
+  if (isObjCTaggedPointer(object))
+    return object;
+#endif
+
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
+
+#if SWIFT_OBJC_INTEROP
+  if (!isNonNative_unTagged_bridgeObject(object)) {
+    swift_nonatomic_retain(static_cast<HeapObject *>(objectRef));
+    return static_cast<HeapObject *>(objectRef);
+  }
+  return objc_retain(static_cast<id>(objectRef));
+#else
+  swift_nonatomic_retain(static_cast<HeapObject *>(objectRef));
+  return static_cast<HeapObject *>(objectRef);
+#endif
+}
+
+SWIFT_RUNTIME_EXPORT
 void swift::swift_bridgeObjectRelease(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -583,6 +648,25 @@ void swift::swift_bridgeObjectRelease(void *object)
   return objc_release(static_cast<id>(objectRef));
 #else
   swift_release(static_cast<HeapObject *>(objectRef));
+#endif
+}
+
+SWIFT_RUNTIME_EXPORT
+void swift::swift_nonatomic_bridgeObjectRelease(void *object)
+    SWIFT_CC(DefaultCC_IMPL) {
+#if SWIFT_OBJC_INTEROP
+  if (isObjCTaggedPointer(object))
+    return;
+#endif
+
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
+
+#if SWIFT_OBJC_INTEROP
+  if (!isNonNative_unTagged_bridgeObject(object))
+    return swift_nonatomic_release(static_cast<HeapObject *>(objectRef));
+  return objc_release(static_cast<id>(objectRef));
+#else
+  swift_nonatomic_release(static_cast<HeapObject *>(objectRef));
 #endif
 }
 
@@ -628,6 +712,51 @@ void swift::swift_bridgeObjectRelease_n(void *object, int n)
     objc_release(static_cast<id>(objectRef));
 #else
   swift_release_n(static_cast<HeapObject *>(objectRef), n);
+#endif
+}
+
+SWIFT_RUNTIME_EXPORT
+void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n)
+    SWIFT_CC(DefaultCC_IMPL) {
+#if SWIFT_OBJC_INTEROP
+  if (isObjCTaggedPointer(object))
+    return object;
+#endif
+
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
+
+#if SWIFT_OBJC_INTEROP
+  void *objc_ret = nullptr;
+  if (!isNonNative_unTagged_bridgeObject(object)) {
+    swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
+    return static_cast<HeapObject *>(objectRef);
+  }
+  for (int i = 0;i < n; ++i)
+    objc_ret = objc_retain(static_cast<id>(objectRef));
+  return objc_ret;
+#else
+  swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
+  return static_cast<HeapObject *>(objectRef);
+#endif
+}
+
+SWIFT_RUNTIME_EXPORT
+void swift::swift_nonatomic_bridgeObjectRelease_n(void *object, int n)
+    SWIFT_CC(DefaultCC_IMPL) {
+#if SWIFT_OBJC_INTEROP
+  if (isObjCTaggedPointer(object))
+    return;
+#endif
+
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
+
+#if SWIFT_OBJC_INTEROP
+  if (!isNonNative_unTagged_bridgeObject(object))
+    return swift_nonatomic_release_n(static_cast<HeapObject *>(objectRef), n);
+  for (int i = 0; i < n; ++i)
+    objc_release(static_cast<id>(objectRef));
+#else
+  swift_nonatomic_release_n(static_cast<HeapObject *>(objectRef), n);
 #endif
 }
 

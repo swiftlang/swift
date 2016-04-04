@@ -285,6 +285,7 @@ internal struct _UnmanagedAnyObjectArray {
 ///
 /// The order of elements in a set is stable between mutations but
 /// otherwise unpredictable.
+@_fixed_layout
 public struct Set<Element : Hashable> :
   SetAlgebra, Hashable, Collection, ArrayLiteralConvertible {
 
@@ -967,6 +968,7 @@ public func _setBridgeFromObjectiveCConditional<
 ///
 /// The order of elements in a dictionary is stable between mutations
 /// but otherwise unpredictable.
+@_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
   Collection, DictionaryLiteralConvertible {
 
@@ -1778,6 +1780,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     }
   }
 
+  @_versioned
   internal var _count: Int {
     set {
       _body.count = newValue
@@ -1886,6 +1889,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   }
 }
 
+@_fixed_layout
 public // @testable
 struct _Native${Self}Storage<${TypeParametersDecl}> :
   _HashStorage, CustomStringConvertible {
@@ -1947,6 +1951,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     }
   }
 
+  @_versioned
   @_transparent
   internal var count: Int {
     @warn_unused_result
@@ -1971,6 +1976,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     }
   }
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
   internal func key(at i: Int) -> Key {
@@ -1982,6 +1988,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return res
   }
 
+  @_versioned
   @warn_unused_result
   internal func isInitializedEntry(at i: Int) -> Bool {
     _precondition(i >= 0 && i < capacity)
@@ -2049,6 +2056,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     initializedEntries[toEntryAt] = true
   }
 
+  @_versioned
   @_transparent
   @warn_unused_result
   internal func value(at i: Int) -> Value {
@@ -2078,11 +2086,13 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return capacity &- 1
   }
 
+  @_versioned
   @warn_unused_result
   internal func _bucket(k: Key) -> Int {
     return _squeezeHashValue(k.hashValue, 0..<capacity)
   }
 
+  @_versioned
   @warn_unused_result
   internal func _successor(of bucket: Int) -> Int {
     // Bucket is within 0 and capacity. Therefore adding 1 does not overflow.
@@ -2099,6 +2109,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   ///
   /// If the key is not present, returns the position where it could be
   /// inserted.
+  @_versioned
   @warn_unused_result
   @inline(__always)
   internal func _find(key: Key, startBucket: Int)
@@ -2178,14 +2189,17 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   internal typealias Index = _Native${Self}Index<${TypeParameters}>
 
+  @_versioned
   internal var startIndex: Index {
     return Index(nativeStorage: self, offset: -1).successor()
   }
 
+  @_versioned
   internal var endIndex: Index {
     return Index(nativeStorage: self, offset: capacity)
   }
 
+  @_versioned
   @warn_unused_result
   internal func successor(of i: Index) -> Index {
     return i.successor()
@@ -2232,6 +2246,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 %end
   }
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
   internal func maybeGet(key: Key) -> Value? {
@@ -2350,6 +2365,7 @@ internal struct _BridgedNative${Self}Storage {
     }
   }
 
+  @_versioned
   internal func isInitializedEntry(at i: Int) -> Bool {
     return initializedEntries[i]
   }
@@ -2860,6 +2876,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
     return Index(cocoa${Self}, endIndex: ())
   }
 
+  @_versioned
   @warn_unused_result
   internal func successor(of i: Index) -> Index {
     return i.successor()
@@ -2986,6 +3003,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   case native(NativeStorageOwner)
   case cocoa(CocoaStorage)
 
+  @_versioned
   @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
@@ -3007,6 +3025,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
+  @_versioned
   internal var asNative: NativeStorage {
     switch self {
     case .native(let owner):
@@ -3163,6 +3182,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
+  @_versioned
   @warn_unused_result
   func successor(of i: Index) -> Index {
     if _fastPath(guaranteedNative) {
@@ -3265,6 +3285,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
 #if _runtime(_ObjC)
+  @_versioned
   @inline(never)
   internal static func maybeGetFromCocoaStorage(
     cocoaStorage : CocoaStorage, forKey key: Key
@@ -3277,6 +3298,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 #endif
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
   internal func maybeGet(key: Key) -> Value? {
@@ -3599,6 +3621,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   /// Returns an iterator over the `(Key, Value)` pairs.
   ///
   /// - Complexity: O(1).
+  @_versioned
   @inline(__always)
   internal func makeIterator() -> ${Self}Iterator<${TypeParameters}> {
     switch self {
@@ -3630,9 +3653,11 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
 
   // FIXME: swift-3-indexing-model: remove `nativeStorage`, we don't need it in
   // the new model.
+  @_versioned
   internal var nativeStorage: NativeStorage
   internal var offset: Int
 
+  @_versioned
   internal init(nativeStorage: NativeStorage, offset: Int) {
     self.nativeStorage = nativeStorage
     self.offset = offset
@@ -3809,15 +3834,18 @@ public struct ${Self}Index<${TypeParametersDecl}> :
 
   internal var _value: ${Self}IndexRepresentation<${TypeParameters}>
 
+  @_versioned
   internal static func _native(index: _NativeIndex) -> ${Self}Index {
     return ${Self}Index(_value: ._native(index))
   }
 #if _runtime(_ObjC)
+  @_versioned
   internal static func _cocoa(index: _CocoaIndex) -> ${Self}Index {
     return ${Self}Index(_value: ._cocoa(index))
   }
 #endif
 
+  @_versioned
   @_transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
@@ -3913,6 +3941,7 @@ public func < <${TypeParametersDecl}> (
 }
 
 #if _runtime(_ObjC)
+@_versioned
 final internal class _Cocoa${Self}Iterator : IteratorProtocol {
   internal typealias Element = ${AnySequenceType}
 
@@ -3948,10 +3977,12 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
   internal var itemIndex: Int = 0
   internal var itemCount: Int = 0
 
+  @_versioned
   internal init(_ cocoa${Self}: _NS${Self}) {
     self.cocoa${Self} = cocoa${Self}
   }
 
+  @_versioned
   internal func next() -> Element? {
     if itemIndex < 0 {
       return nil
@@ -4024,8 +4055,10 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
     _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
 
+  @_versioned
   internal var _state: ${Self}IteratorRepresentation<${TypeParameters}>
 
+  @_versioned
   internal static func _native(
     start start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner
   ) -> ${Self}Iterator {
@@ -4033,6 +4066,7 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
       _state: ._native(start: start, end: end, owner: owner))
   }
 #if _runtime(_ObjC)
+  @_versioned
   internal static func _cocoa(
     iterator: _Cocoa${Self}Iterator
   ) -> ${Self}Iterator{
@@ -4040,6 +4074,7 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
   }
 #endif
 
+  @_versioned
   @_transparent
   internal var _guaranteedNative: Bool {
 %if Self == 'Set':
@@ -4049,6 +4084,7 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
 %end
   }
 
+  @_versioned
   internal mutating func _nativeNext() -> ${Sequence}? {
     switch _state {
     case ._native(let startIndex, let endIndex, let owner):
@@ -4308,7 +4344,7 @@ extension Set {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> SetIterator<Element> {
     fatalError("unavailable function can't be called")
   }
@@ -4335,7 +4371,7 @@ extension Dictionary {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> DictionaryIterator<Key, Value> {
     fatalError("unavailable function can't be called")
   }

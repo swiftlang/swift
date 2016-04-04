@@ -14,9 +14,11 @@
 ///
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
+@_fixed_layout
 public struct Unmanaged<Instance : AnyObject> {
   internal unowned(unsafe) var _value: Instance
 
+  @_versioned
   @_transparent
   internal init(_private: Instance) { _value = _private }
 
@@ -181,11 +183,12 @@ public struct Unmanaged<Instance : AnyObject> {
   ///  }
   public func _withUnsafeGuaranteedRef<Result>(
     @noescape closure: (Instance) throws -> Result
-  ) rethrows {
+  ) rethrows -> Result {
     let instance = _value
     let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(instance)
-    try closure(guaranteedInstance)
+    let result = try closure(guaranteedInstance)
     Builtin.unsafeGuaranteedEnd(token)
+    return result
   }
 
   /// Perform an unbalanced retain of the object.

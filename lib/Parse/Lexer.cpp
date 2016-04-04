@@ -629,6 +629,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
   case '\0':                                 // whitespace / last char in file
     return false;
 
+  case '/':
+    if (tokBegin - 1 != bufferBegin && tokBegin[-2] == '*')
+      return false; // End of a slash-star comment, so whitespace.
+    else
+      return true;
+
   default:
     return true;
   }
@@ -655,6 +661,13 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
     // Prefer the '^' in "x^.y" to be a postfix op, not binary, but the '^' in
     // "^.y" to be a prefix op, not binary.
     return !isLeftBound;
+
+  case '/':
+    // A following comment counts as whitespace, so this token is not right bound.
+    if (tokEnd[1] == '/' || tokEnd[1] == '*')
+      return false;
+    else
+      return true;
 
   default:
     return true;
@@ -760,14 +773,20 @@ void Lexer::lexOperatorIdentifier() {
     // If there is a "//" in the middle of an identifier token, it starts
     // a single-line comment.
     auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
-    if (Pos != StringRef::npos)
+    if (Pos != StringRef::npos) {
       CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
 
     // If there is a "/*" in the middle of an identifier token, it starts
     // a multi-line comment.
     Pos = StringRef(TokStart, CurPtr-TokStart).find("/*");
-    if (Pos != StringRef::npos)
+    if (Pos != StringRef::npos) {
       CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
 
     // Verify there is no "*/" in the middle of the identifier token, we reject
     // it as potentially ending a block comment.
@@ -1887,6 +1906,3 @@ StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
 
   return StringRef(StartOfLine, EndOfIndentation - StartOfLine);
 }
-
-
-

@@ -564,3 +564,25 @@ class UnownedSelfNestedCapture {
     {[unowned self] in { self } }()()
   }
 }
+
+// Check that capturing 'self' via a 'super' call also captures the generic
+// signature if the base class is concrete and the derived class is generic
+
+class ConcreteBase {
+  func swim() {}
+}
+
+// CHECK-LABEL: sil shared @_TFFC8closures14GenericDerived4swimFT_T_U_FT_T_ : $@convention(thin) <Ocean> (@owned GenericDerived<Ocean>) -> ()
+// CHECK:         [[SUPER:%.*]] = upcast %0 : $GenericDerived<Ocean> to $ConcreteBase
+// CHECK:         [[METHOD:%.*]] = function_ref @_TFC8closures12ConcreteBase4swimfT_T_
+// CHECK:         apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed ConcreteBase) -> ()
+
+class GenericDerived<Ocean> : ConcreteBase {
+  override func swim() {
+    withFlotationAid {
+      super.swim()
+    }
+  }
+
+  func withFlotationAid(fn: () -> ()) {}
+}

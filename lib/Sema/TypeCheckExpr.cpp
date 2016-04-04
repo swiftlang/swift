@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APInt.h"
@@ -762,18 +763,33 @@ namespace {
       if (!type || !type->hasArchetype())
         return;
 
-      // Easy case.
-      if (!type->hasOpenedExistential()) {
-        capturesTypes = true;
-        return;
-      }
-
-      // This type contains both an archetype and an open existential. Walk the
-      // type to see if we have any archetypes that are *not* open existentials.
-      if (type.findIf([](Type t) -> bool {
-            return (t->is<ArchetypeType>() && !t->isOpenedExistential());
-          }))
-        capturesTypes = true;
+      // Walk the type to see if we have any archetypes that are *not* open
+      // existentials and that aren't type-erased.
+      class CapturesTypeWalker final : public TypeWalker {
+        bool &CapturesTypes;
+        
+      public:
+        CapturesTypeWalker(bool &capturesTypes) : CapturesTypes(capturesTypes){}
+        
+        Action walkToTypePre(Type t) override {
+          if (t->is<ArchetypeType>() && !t->isOpenedExistential()) {
+            CapturesTypes = true;
+            return Action::Stop;
+          }
+          
+          // ObjC generic type parameters don't have a runtime representation,
+          // so they don't count as captures.
+          if (auto bgt = t->getAs<BoundGenericClassType>()) {
+            if (bgt->getDecl()->hasClangNode()) {
+              return Action::SkipChildren;
+            }
+          }
+          
+          return Action::Continue;
+        }
+      };
+      
+      type.walk(CapturesTypeWalker(capturesTypes));
     }
 
     /// Add the specified capture to the closure's capture list, diagnosing it
@@ -795,6 +811,13 @@ namespace {
         capture = CapturedValue(VD, Flags);
         captureList[entryNumber-1] = capture;
       }
+
+      // Visit the type of the capture. If we capture 'self' via a 'super' call,
+      // and the superclass is not generic, there might not be any generic
+      // parameter types in the closure body, so we have to account for them
+      // here.
+      if (VD->hasType())
+        checkType(VD->getType());
 
       // If VD is a noescape decl, then the closure we're computing this for
       // must also be noescape.
@@ -1095,6 +1118,16 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     AFR.getCaptureInfo().setCaptures(None);
   else
     AFR.getCaptureInfo().setCaptures(Context.AllocateCopy(Captures));
+
+  // Extensions of generic ObjC functions can't use generic parameters from
+  // their context.
+  if (AFD && GenericParamCaptures) {
+    if (auto Clas = AFD->getParent()->getAsClassOrClassExtensionContext()) {
+      if (Clas->isGenericContext() && Clas->hasClangNode())
+        diagnose(AFD->getLoc(),
+                 diag::objc_generic_extension_using_type_parameter);
+    }
+  }
 
   // Diagnose if we have local captures and there were C pointers formed to
   // this function before we computed captures.

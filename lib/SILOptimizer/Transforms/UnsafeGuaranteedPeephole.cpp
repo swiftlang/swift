@@ -92,7 +92,10 @@ static SILBasicBlock::iterator
 findReleaseToMatchUnsafeGuaranteedValue(SILInstruction *UnsafeGuaranteedEndI,
                                         SILValue UnsafeGuaranteedValue,
                                         SILBasicBlock &BB) {
-  auto LastReleaseIt = std::prev(SILBasicBlock::iterator(UnsafeGuaranteedEndI));
+  auto UnsafeGuaranteedEndIIt = SILBasicBlock::iterator(UnsafeGuaranteedEndI);
+  if (UnsafeGuaranteedEndIIt == BB.begin())
+    return BB.end();
+  auto LastReleaseIt = std::prev(UnsafeGuaranteedEndIIt);
   while (LastReleaseIt != BB.begin() &&
          (isa<StrongReleaseInst>(*LastReleaseIt) ||
           isa<ReleaseValueInst>(*LastReleaseIt)) &&

@@ -442,7 +442,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       return {Result, MergeInfo};
     }
     assert(Ext->getGenericParams() && "No generic params.");
-    for (auto Req : Ext->getGenericParams()->getRequirements()){
+    for (auto Req : Ext->getGenericParams()->getRequirements()) {
       auto TupleOp = Req.getAsAnalyzedWrittenString();
       if (!TupleOp)
         continue;
@@ -536,7 +536,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
     ExtensionMergeInfoMap MergeInfoMap;
     std::vector<NominalTypeDecl*> Unhandled;
-    auto addTypeLocNominal = [&](TypeLoc TL){
+    auto addTypeLocNominal = [&](TypeLoc TL) {
       if (TL.getType()) {
         if (auto D = TL.getType()->getAnyNominal()) {
           Unhandled.push_back(D);
@@ -2155,7 +2155,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
 
 void PrintAST::
 printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
-  if (Options.BracketOptions.shouldOpenExtension) {
+  if (Options.BracketOptions.shouldOpenExtension(ExtDecl)) {
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";
@@ -2175,13 +2175,13 @@ printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(ExtDecl, false,
-                       Options.BracketOptions.shouldOpenExtension,
-                       Options.BracketOptions.shouldCloseExtension);
+                       Options.BracketOptions.shouldOpenExtension(ExtDecl),
+                       Options.BracketOptions.shouldCloseExtension(ExtDecl));
   }
 }
 
 void PrintAST::printExtension(ExtensionDecl* decl) {
-  if (Options.BracketOptions.shouldOpenExtension) {
+  if (Options.BracketOptions.shouldOpenExtension(decl)) {
     printDocumentationComment(decl);
     printAttributes(decl);
     Printer << "extension ";
@@ -2203,8 +2203,8 @@ void PrintAST::printExtension(ExtensionDecl* decl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false,
-                       Options.BracketOptions.shouldOpenExtension,
-                       Options.BracketOptions.shouldCloseExtension);
+                       Options.BracketOptions.shouldOpenExtension(decl),
+                       Options.BracketOptions.shouldCloseExtension(decl));
   }
 }
 
@@ -2351,7 +2351,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
-                       Options.BracketOptions.shouldCloseNominal);
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2377,7 +2377,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
-                       Options.BracketOptions.shouldCloseNominal);
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2405,7 +2405,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
-                       Options.BracketOptions.shouldCloseNominal);
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2448,7 +2448,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
-                       Options.BracketOptions.shouldCloseNominal);
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 

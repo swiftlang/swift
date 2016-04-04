@@ -23,6 +23,7 @@ public typealias Boolean = Swift.Boolean
 /// On 64-bit iOS, the Objective-C BOOL type is a typedef of C/C++
 /// bool. Elsewhere, it is "signed char". The Clang importer imports it as
 /// ObjCBool.
+@_fixed_layout
 public struct ObjCBool : Boolean, BooleanLiteralConvertible {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
@@ -96,6 +97,7 @@ func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
 /// convert between C strings and selectors.
 ///
 /// The compiler has special knowledge of this type.
+@_fixed_layout
 public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   var ptr : OpaquePointer
 
@@ -176,6 +178,7 @@ extension Selector : CustomReflectable {
 // NSZone
 //===----------------------------------------------------------------------===//
 
+@_fixed_layout
 public struct NSZone : NilLiteralConvertible {
   var pointer : OpaquePointer
 

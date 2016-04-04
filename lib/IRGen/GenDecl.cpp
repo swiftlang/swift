@@ -1652,7 +1652,7 @@ static bool isReadOnlyFunction(SILFunction *f) {
   // Check if the function has any 'owned' parameters. Owned parameters may
   // call the destructor of the object which could violate the readonly-ness
   // of the function.
-  if (f->hasOwnedParameters())
+  if (f->hasOwnedParameters() || f->hasIndirectResults())
     return false;
 
   auto Eff = f->getEffectsKind();
@@ -2901,7 +2901,7 @@ bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion)
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
   if (decl->getModuleContext() == SILMod->getSwiftModule() &&
-      decl->getFormalAccess() != Accessibility::Public)
+      decl->getEffectiveAccess() != Accessibility::Public)
     return ResilienceExpansion::Maximal;
   return ResilienceExpansion::Minimal;
 }

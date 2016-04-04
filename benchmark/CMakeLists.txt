@@ -130,7 +130,7 @@ if(NOT SWIFT_LIBRARY_PATH)
   set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib/swift")
 endif()
 
-runcmd(COMMAND "xcrun" "-f" "clang"
+runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
        VARIABLE CLANG_EXEC
        ERROR "Unable to find Clang driver")
 

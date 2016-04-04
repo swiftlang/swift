@@ -943,7 +943,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
       Pattern *pattern = elt.getPattern();
-      if (typeCheckPattern(pattern, dc, elementOptions, resolver)){
+      if (typeCheckPattern(pattern, dc, elementOptions, resolver)) {
         hadError = true;
         continue;
       }
