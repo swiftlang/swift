@@ -36,7 +36,7 @@ struct SomeError: ErrorProtocol {
 // CHECK-LABEL: define{{( protected)?}} %swift.error* @alloc_boxed_existential_concrete
 sil @alloc_boxed_existential_concrete : $@convention(thin) (@owned SomeError) -> @owned ErrorProtocol {
 entry(%x : $SomeError):
-  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @_TMfV17boxed_existential9SomeError, {{.*}}, i8** @_TWPV17boxed_existential9SomeErrors13ErrorProtocolS_, %swift.opaque* null, i1 false)
+  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @_TMfV17boxed_existential9SomeError, {{.*}}, i8** {{%.*|@_TWPV17boxed_existential9SomeErrors13ErrorProtocolS_}}, %swift.opaque* null, i1 false)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
   // CHECK: [[OPAQUE_ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   // CHECK: [[ADDR:%.*]] = bitcast %swift.opaque* [[OPAQUE_ADDR]] to %V17boxed_existential9SomeError*
