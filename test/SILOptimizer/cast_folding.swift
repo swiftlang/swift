@@ -773,6 +773,15 @@ public func test35() {
 }
 
 
+// Casts between nil of unrelated Optional type always suceed.
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding6test36FGSqCS_2CC_Sb
+// CHECK: checked_cast_addr_br take_always Optional<CC>
+// CHECK: return {{%.*}} : $Bool
+@inline(never)
+public func test36(c: CC?) -> Bool {
+  return c is DD?
+}
+
 
 print("test0=\(test0())")
 
@@ -873,3 +882,7 @@ print("test30=\(test30())")
 print("test32=\(test32())")
 
 print("test33=\(test33())")
+
+print("test34=\(test34())")
+
+print("test35=\(test35())")

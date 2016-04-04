@@ -183,31 +183,26 @@ OptionalTests.test("flatMap") {
 // FIXME: @inline(never) does not inhibit specialization
 
 @inline(never)
-@_semantics("optimize.sil.never")
 func anyToAny<T, U>(a: T, _ : U.Type) -> U {
   return a as! U
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
 func anyToAnyIs<T, U>(a: T, _ : U.Type) -> Bool {
   return a is U
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
 func anyToAnyIsOptional<T, U>(a: T?, _ : U.Type) -> Bool {
   return a is U?
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
 func anyToAnyOrNil<T, U>(a: T, _ : U.Type) -> U? {
   return a as? U
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
 func canGenericCast<T, U>(a: T, _ ty : U.Type) -> Bool {
   return anyToAnyOrNil(a, ty) != nil
 }
