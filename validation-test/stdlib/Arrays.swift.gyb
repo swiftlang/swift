@@ -64,7 +64,7 @@ CopyToNativeArrayBufferTests.test("Collection._copyToNativeArrayBuffer()") {
 }
 
 %{
-all_array_types = [ 'ContiguousArray', 'ArraySlice', 'Array' ]
+all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
 }%
 
 extension Array {

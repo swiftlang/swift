@@ -141,7 +141,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
 
     // We did not find this type, thus it is not mapped.
     return std::make_pair(Type(), "");
-  } while(0);
+  } while (0);
 
   clang::ASTContext &ClangCtx = Impl.getClangASTContext();
 

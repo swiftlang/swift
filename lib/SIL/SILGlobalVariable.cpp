@@ -149,7 +149,7 @@ SILGlobalVariable *SILGlobalVariable::getVariableOfStaticInitializer(
                      SILFunction *F) {
   SILInstruction *dummySI;
   SILGlobalVariable *GV;
-  if(analyzeStaticInitializer(F, dummySI, GV))
+  if (analyzeStaticInitializer(F, dummySI, GV))
     return GV;
   return nullptr;
 }
@@ -161,7 +161,7 @@ SILInstruction *SILGlobalVariable::getValueOfStaticInitializer() {
 
   SILInstruction *SI;
   SILGlobalVariable *dummyGV;
-  if(analyzeStaticInitializer(InitializerF, SI, dummyGV))
+  if (analyzeStaticInitializer(InitializerF, SI, dummyGV))
     return SI;
   return nullptr;
 }

@@ -139,7 +139,7 @@ public struct UTF8 : UnicodeCodec {
           _didExhaustIterator = true
           return .emptyInput
         }
-      } else if(_decodeBuffer & 0x80 == 0) {
+      } else if (_decodeBuffer & 0x80 == 0) {
         // ASCII in buffer.  We don't refill the buffer so we can return
         // to bufferless mode once we've exhausted it.
         break refillBuffer

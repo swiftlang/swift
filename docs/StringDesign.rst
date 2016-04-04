@@ -781,7 +781,7 @@ Indexing
   .. Admonition:: Example
 
     .. parsed-literal::
-        s[beginning...ending] // [s substringWithRange: NSMakeRange( beginning, ending )]
+        s[beginning...ending] // [s substringWithRange: NSMakeRange(beginning, ending)]
         s[beginning...]       // [s substringFromIndex: beginning]
         s[...ending]          // [s substringToIndex: ending]
 

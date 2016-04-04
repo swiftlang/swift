@@ -156,7 +156,7 @@ func _swift_stdlib_atomicLoadInt${bits}(
       object: UnsafeMutablePointer(target)))
 }
 
-%   for operation in [ 'Add', 'And', 'Or', 'Xor' ]:
+%   for operation in ['Add', 'And', 'Or', 'Xor']:
 // Warning: no overflow checking.
 @_transparent
 public // @testable
@@ -255,7 +255,7 @@ func _stdlib_atomicLoadARCRef(
   return nil
 }
 
-% for operation in [ 'Add', 'And', 'Or', 'Xor' ]:
+% for operation in ['Add', 'And', 'Or', 'Xor']:
 // Warning: no overflow checking.
 public func _swift_stdlib_atomicFetch${operation}Int(
   object target: UnsafeMutablePointer<Int>,

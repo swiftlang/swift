@@ -20,8 +20,8 @@
 //
 //             In consideration of your agreement to abide by the following terms, and
 //             subject to these terms, Apple grants you a personal, non - exclusive
-//             license, under Apple's copyrights in this original Apple software ( the
-//             "Apple Software" ), to use, reproduce, modify and redistribute the Apple
+//             license, under Apple's copyrights in this original Apple software (the
+//             "Apple Software"), to use, reproduce, modify and redistribute the Apple
 //             Software, with or without modifications, in source and / or binary forms
 //             provided that if you redistribute the Apple Software in its entirety and
 //             without modifications, you must retain this notice and the following text
@@ -41,14 +41,14 @@
 //             ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
 //
 //             IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL OR
-//             CONSEQUENTIAL DAMAGES ( INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+//             CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
 //             SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-//             INTERRUPTION ) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION, MODIFICATION
+//             INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION, MODIFICATION
 //             AND / OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER
-//             UNDER THEORY OF CONTRACT, TORT ( INCLUDING NEGLIGENCE ), STRICT LIABILITY OR
+//             UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY OR
 //             OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright ( C ) 2008 Apple Inc. All Rights Reserved.
+// Copyright (C) 2008 Apple Inc. All Rights Reserved.
 //
 
 
@@ -66,7 +66,7 @@ let KernelSource = "\n" +
 "   const unsigned int count)                                           \n" +
 "{                                                                      \n" +
 "   int i = get_global_id(0);                                           \n" +
-"   if(i < count)                                                       \n" +
+"   if (i < count)                                                      \n" +
 "       output[i] = input[i] * input[i];                                \n" +
 "}                                                                      \n" +
 "\n"
@@ -234,7 +234,7 @@ tests.test("clSetKernelArgsListAPPLE") {
 
   // Read back the results from the device to verify the output
   //
-  err = clEnqueueReadBuffer( commands, output, cl_bool(CL_TRUE), 0, sizeof(Float.self) * count, &results, cl_uint(0), nil, nil )
+  err = clEnqueueReadBuffer(commands, output, cl_bool(CL_TRUE), 0, sizeof(Float.self) * count, &results, cl_uint(0), nil, nil)
   if (err != CL_SUCCESS)
   {
     print("Error: Failed to read output array! \(err)")
@@ -246,7 +246,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   correct = 0
   for i in 0..<count
   {
-    if(results[i] == data[i] * data[i]){
+    if (results[i] == data[i] * data[i]) {
       correct += 1
     }
   }

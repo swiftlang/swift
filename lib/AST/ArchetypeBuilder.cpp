@@ -502,7 +502,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         if (identifiers.size()) {
           // Go down our PAs until we find the referenced PA.
           auto existingPA = this;
-          while(identifiers.size()) {
+          while (identifiers.size()) {
             auto identifier = identifiers.back();
             // If we end up looking for ourselves, don't recurse.
             if (existingPA == this && identifier == nestedName) {

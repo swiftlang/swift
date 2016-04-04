@@ -451,7 +451,7 @@ public protocol _MinimalIndex {
   var _collectionState: _CollectionState? { get }
 }
 
-% for Distance in [ '', 'Int32' ]:
+% for Distance in ['', 'Int32']:
 %   Index = 'MinimalForward%sIndex' % Distance
 
 public struct ${Index} : ForwardIndex {
@@ -853,8 +853,8 @@ extension MinimalRandomAccessIndex : _MinimalIndex {
 // Minimal***[Mutable]?Collection
 //===----------------------------------------------------------------------===//
 
-% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%   for mutable in [ False, True ]:
+% for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+%   for mutable in [False, True]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %     Protocol = 'Strict%s%sCollection' % (traversal, 'Mutable' if mutable else '')
 %     Self = 'Minimal%s%sCollection' % (traversal, 'Mutable' if mutable else '')
@@ -985,7 +985,7 @@ public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
 // Minimal***RangeReplaceableCollection
 //===----------------------------------------------------------------------===//
 
-% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+% for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 %   Protocol = 'Strict%sRangeReplaceableCollection' % traversal
 %   Self = 'Minimal%sRangeReplaceableCollection' % traversal
 %   Index = 'Minimal%sIndex' % traversal
@@ -1216,7 +1216,7 @@ public struct DefaultedSequence<Element> : StrictSequence {
   }
 }
 
-% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+% for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
 /// A Collection that uses as many default implementations as
 /// `Collection` can provide.

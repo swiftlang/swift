@@ -1567,7 +1567,7 @@ static const Decl* getGroupDecl(const Decl *D) {
 }
 
 Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
-  if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
+  if (!GroupNamesMap || GroupNamesMap->count(Id) == 0)
     return None;
   auto Original = (*GroupNamesMap)[Id];
   if (Original.empty())
@@ -1578,7 +1578,7 @@ Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
 }
 
 Optional<StringRef> ModuleFile::getSourceFileNameById(unsigned Id) const {
-  if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
+  if (!GroupNamesMap || GroupNamesMap->count(Id) == 0)
     return None;
   auto Original = (*GroupNamesMap)[Id];
   if (Original.empty())

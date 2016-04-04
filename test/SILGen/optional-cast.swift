@@ -146,7 +146,7 @@ func opt_to_opt_addressOnly<T>(x : T!) -> T? { return x }
 
 class C {}
 
-public struct TestAddressOnlyStruct<T>  {
+public struct TestAddressOnlyStruct<T> {
   func f(a : T?) {}
   
   // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCall

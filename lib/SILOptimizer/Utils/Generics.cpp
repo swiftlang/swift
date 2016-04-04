@@ -598,7 +598,7 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
 
   pos += OfStr.size();
 
-  for(auto Name: Whitelist) {
+  for (auto Name: Whitelist) {
     auto pos1 = DemangledName.find(Name, pos);
     if (pos1 == pos && !isalpha(DemangledName[pos1+Name.size()])) {
       return true;

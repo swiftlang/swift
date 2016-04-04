@@ -857,7 +857,7 @@ void ConstraintGraph::removeEdge(Constraint *constraint) {
 
 void ConstraintGraph::optimize() {
   // Merge equivalence classes until a fixed point is reached.
-  while(contractEdges()) {}
+  while (contractEdges()) {}
 }
 
 #pragma mark Debugging output
