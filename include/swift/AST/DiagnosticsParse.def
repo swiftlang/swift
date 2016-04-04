@@ -109,26 +109,26 @@ NOTE(lex_comment_start,none,
 ERROR(lex_unterminated_string,none,
       "unterminated string literal", ())
 ERROR(lex_invalid_escape,none,
-       "invalid escape sequence in literal", ())
+      "invalid escape sequence in literal", ())
 ERROR(lex_invalid_u_escape,none,
       "\\u{...} escape sequence expects between 1 and 8 hex digits", ())
 ERROR(lex_invalid_u_escape_rbrace,none,
       "expected '}' in \\u{...} escape sequence", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
-       "invalid unicode scalar", ())
+      "invalid unicode scalar", ())
 ERROR(lex_unicode_escape_braces,none,
       "expected hexadecimal code in braces after unicode escape", ())
 
 
 ERROR(lex_invalid_character,none,
-       "invalid character in source file", ())
+      "invalid character in source file", ())
 ERROR(lex_invalid_identifier_start_character,none,
-       "an identifier cannot begin with this character", ())
+      "an identifier cannot begin with this character", ())
 ERROR(lex_expected_digit_in_fp_exponent,none,
-       "expected a digit in floating point exponent", ())
+      "expected a digit in floating point exponent", ())
 ERROR(lex_expected_digit_in_int_literal,none,
-       "expected a digit after integer literal prefix", ())
+      "expected a digit after integer literal prefix", ())
 ERROR(lex_expected_binary_exponent_in_hex_float_literal,none,
       "hexadecimal floating point literal must end with an exponent", ())
 ERROR(lex_unexpected_block_comment_end,none,
@@ -955,7 +955,7 @@ ERROR(expected_dollar_numeric,none,
 ERROR(dollar_numeric_too_large,none,
       "numeric value following '$' is too large", ())
 ERROR(numeric_literal_numeric_member,none,
-   "expected named member of numeric literal", ())
+      "expected named member of numeric literal", ())
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())
@@ -978,9 +978,9 @@ ERROR(cannot_capture_fields,none,
 ERROR(expected_closure_result_type,none,
       "expected closure result type after '->'", ())
 ERROR(expected_closure_in,none,
-   "expected 'in' after the closure signature", ())
+      "expected 'in' after the closure signature", ())
 ERROR(unexpected_tokens_before_closure_in,none,
-   "unexpected tokens prior to 'in'", ())
+      "unexpected tokens prior to 'in'", ())
 ERROR(expected_closure_rbrace,none,
       "expected '}' at end of closure", ())
 
@@ -1284,19 +1284,19 @@ ERROR(unsupported_conditional_compilation_integer,none,
 ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
-			"compiler version must not have more than five components", ())
+      "compiler version must not have more than five components", ())
 WARNING(unused_compiler_version_component,none,
-			"the second version component is not used for comparison", ())
+        "the second version component is not used for comparison", ())
 ERROR(empty_version_component,none,
-			"found empty version component", ())
+      "found empty version component", ())
 ERROR(compiler_version_component_out_of_range,none,
       "compiler version component out of range: must be in [0, %0]",
       (unsigned))
 ERROR(empty_version_string,none,
       "version requirement is empty", ())
 WARNING(unknown_platform_condition_argument,none,
-      "unknown %0 for build configuration '%1'",
-      (StringRef, StringRef))
+        "unknown %0 for build configuration '%1'",
+        (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // Availability query parsing diagnostics
