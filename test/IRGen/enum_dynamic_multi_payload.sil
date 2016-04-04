@@ -5,15 +5,15 @@ import Builtin
 sil_stage canonical
 
 enum Either<T, U> {
-  case Left(T)
   case Right(U)
+  case Left(T)
 }
 
 enum EitherOr<T, U> {
+  case Right(U)
   case Left(T)
   case Middle
   case Center
-  case Right(U)
 }
 
 class C {}

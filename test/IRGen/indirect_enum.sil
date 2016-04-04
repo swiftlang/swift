@@ -15,8 +15,8 @@ import Swift
 // CHECK:         [[INDIRECT_FLAG:%.*]] = or [[WORD]] [[BITS]], 1
 indirect enum TreeA<T> {
   case Nil
-  case Leaf(T)
   case Branch(left: TreeA<T>, right: TreeA<T>)
+  case Leaf(T)
 }
 
 // CHECK-LABEL: define{{( protected)?}} private %swift.type** @get_field_types_TreeB
@@ -28,8 +28,8 @@ indirect enum TreeA<T> {
 // CHECK:         [[INDIRECT_FLAG:%.*]] = or [[WORD]] [[BITS]], 1
 enum TreeB<T> {
   case Nil
-  case Leaf(T)
   indirect case Branch(left: TreeB<T>, right: TreeB<T>)
+  case Leaf(T)
 }
 
 // CHECK-LABEL: define{{( protected)?}} private %swift.type** @get_field_types_Foo
@@ -39,12 +39,12 @@ enum TreeB<T> {
 // -- Bar(T)
 // CHECK-NOT:     ptrtoint %swift.type* %T
 enum Foo<T> {
-  indirect case Foo(Int)
   case Bar(T)
+  indirect case Foo(Int)
 }
 
 // rdar://problem/22169679
 enum E<T> {
-  indirect case A(E)
   case B(T)
+  indirect case A(E)
 }

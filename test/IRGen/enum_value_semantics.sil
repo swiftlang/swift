@@ -29,16 +29,16 @@ enum SinglePayloadNontrivial {
 }
 
 enum MultiPayloadTrivial {
-  case payload1(Builtin.Int64)
   case payload2(Builtin.Int32, Builtin.Int32)
+  case payload1(Builtin.Int64)
   case a
   case b
   case c
 }
 
 enum MultiPayloadNoEmptyCases {
-  case payload1(Builtin.Int64)
   case payload2(Builtin.Int32, Builtin.Int32)
+  case payload1(Builtin.Int64)
 }
 
 enum MultiPayloadEmptyPayload {
@@ -51,18 +51,18 @@ enum MultiPayloadEmptyPayload {
 
 // No spare bits
 enum MultiPayloadNontrivial {
-  case payload1(Builtin.NativeObject)
-  case payload2(Builtin.Int64)
-  case payload3(Builtin.Int64, Builtin.UnknownObject)
   case payload4(Builtin.Int64, Builtin.Int64)
+  case payload3(Builtin.Int64, Builtin.UnknownObject)
+  case payload2(Builtin.Int64)
+  case payload1(Builtin.NativeObject)
   case a
   case b
   case c
 }
 
 enum MultiPayloadGeneric<T> {
-  case payload1(T)
   case payload2(T)
+  case payload1(T)
   case a
   case b
   case c
@@ -71,9 +71,9 @@ enum MultiPayloadGeneric<T> {
 // Most significant bits of second 64-bit word of payload
 // are spare bits
 enum MultiPayloadNontrivialSpareBits {
-  case payload1(Builtin.NativeObject)
-  case payload2(Builtin.Int64)
   case payload3(Builtin.Int64, Builtin.UnknownObject)
+  case payload2(Builtin.Int64)
+  case payload1(Builtin.NativeObject)
   case a
   case b
   case c
@@ -81,14 +81,14 @@ enum MultiPayloadNontrivialSpareBits {
 
 // We only have 1 spare bit but 3 payload cases
 enum MultiPayloadSpareBitsAndExtraBits {
-  case payload1(Builtin.Int63)
-  case payload2(Builtin.NativeObject)
   case payload3(Builtin.NativeObject)
+  case payload2(Builtin.NativeObject)
+  case payload1(Builtin.Int63)
 }
 
 enum GenericFixedLayout<T> {
-  case foo(Builtin.Int64)
   case bar(Builtin.NativeObject)
+  case foo(Builtin.Int64)
 }
 
 
