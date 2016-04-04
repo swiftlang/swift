@@ -271,7 +271,7 @@ extension RangeReplaceableCollection {
     return result
   }
 
-  internal func makeHalfOpen<
+  internal func _makeHalfOpen<
     R: _RangeProtocol where R.Bound == Index
   >(r: R) -> Range<Index> {
     return Range(
@@ -283,7 +283,7 @@ extension RangeReplaceableCollection {
   public mutating func removeSubrange<
     R: _RangeProtocol where R.Bound == Index
   >(bounds: R) {
-    replaceSubrange(makeHalfOpen(bounds), with: EmptyCollection())
+    replaceSubrange(_makeHalfOpen(bounds), with: EmptyCollection())
   }
 
   public mutating func removeFirst(n: Int) {
@@ -360,7 +360,7 @@ extension RangeReplaceableCollection {
   >(
     subRange: R, with newElements: C
   ) {
-    self.replaceSubrange(makeHalfOpen(subRange), with: newElements)
+    self.replaceSubrange(_makeHalfOpen(subRange), with: newElements)
   }
   
   @warn_unused_result
