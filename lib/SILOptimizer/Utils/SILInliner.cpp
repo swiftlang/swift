@@ -37,10 +37,6 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     return false;
 
   SILFunction &F = getBuilder().getFunction();
-  if (CalleeFunction->getName() == "_TTSg5Vs4Int8___TFVs12_ArrayBufferg9_isNativeSb"
-      && F.getName() == "_TTSg5Vs4Int8___TFVs12_ArrayBufferg8endIndexSi")
-    llvm::errs();
-
   assert(AI.getFunction() && AI.getFunction() == &F &&
          "Inliner called on apply instruction in wrong function?");
   assert(((CalleeFunction->getRepresentation()
