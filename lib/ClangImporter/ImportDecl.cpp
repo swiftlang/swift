@@ -765,21 +765,21 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
 /// is derived from the name of the field in the outer type. Since the
 /// anonymous type is imported as a nested type of the outer type, this
 /// generated name will most likely be unique.
-static Identifier getClangDeclName(ClangImporter::Implementation &Impl,
-                                   const clang::TagDecl *decl) {
-  // Import the name of this declaration.
-  Identifier name = Impl.importFullName(decl).Imported.getBaseName();
-  if (!name.empty()) return name;
+static ClangImporter::Implementation::ImportedName
+getClangDeclName(ClangImporter::Implementation &Impl,
+                 const clang::TagDecl *decl) {
+  // If we have a name for this declaration, use it.
+  if (auto name = Impl.importFullName(decl)) return name;
 
   // If that didn't succeed, check whether this is an anonymous tag declaration
   // with a corresponding typedef-name declaration.
   if (decl->getDeclName().isEmpty()) {
     if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
-      return Impl.importFullName(typedefForAnon).Imported.getBaseName();
+      return Impl.importFullName(typedefForAnon);
   }
 
   if (!decl->isRecord())
-    return name;
+    return ClangImporter::Implementation::ImportedName();
 
   // If the type has no name and no structure name, but is not anonymous,
   // generate a name for it. Specifically this is for cases like:
@@ -788,7 +788,8 @@ static Identifier getClangDeclName(ClangImporter::Implementation &Impl,
   //   }
   // Where the member z is an unnamed struct, but does have a member-name
   // and is accessible as a member of struct a.
-  if (auto recordDecl = dyn_cast<clang::RecordDecl>(decl->getLexicalDeclContext())) {
+  if (auto recordDecl = dyn_cast<clang::RecordDecl>(
+                          decl->getLexicalDeclContext())) {
     for (auto field : recordDecl->fields()) {
       if (field->getType()->getAsTagDecl() == decl) {
         // We found the field. The field should not be anonymous, since we are
@@ -809,12 +810,15 @@ static Identifier getClangDeclName(ClangImporter::Implementation &Impl,
 
         IdStream << "__Unnamed_" << kind
                  << "_" << field->getName();
-        return Impl.SwiftContext.getIdentifier(IdStream.str());
+        ClangImporter::Implementation::ImportedName Result;
+        Result.Imported = Impl.SwiftContext.getIdentifier(IdStream.str());
+        Result.EffectiveContext = decl->getDeclContext();
+        return Result;
       }
     }
   }
 
-  return name;
+  return ClangImporter::Implementation::ImportedName();
 }
 
 /// Add an AvailableAttr to the declaration for the given
@@ -1063,8 +1067,9 @@ namespace {
     }
 
     ClassDecl *importCFClassType(const clang::TypedefNameDecl *decl,
-                                 Identifier className, CFPointeeInfo info) {
-      auto dc = Impl.importDeclContextOf(decl);
+                                 Identifier className, CFPointeeInfo info,
+                                 EffectiveClangContext effectiveContext) {
+      auto dc = Impl.importDeclContextOf(decl, effectiveContext);
       if (!dc) return nullptr;
 
       Type superclass = findCFSuperclass(decl, info);
@@ -1175,7 +1180,9 @@ namespace {
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
-              auto swiftClass = importCFClassType(Decl, Name, pointee);
+              auto swiftClass =
+                  importCFClassType(Decl, Name, pointee,
+                                    importedName.EffectiveContext);
               if (!swiftClass) return nullptr;
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
@@ -1668,16 +1675,17 @@ namespace {
         return nullptr;
       }
       
-      auto name = getClangDeclName(Impl, decl);
-      if (name.empty())
+      auto importedName = getClangDeclName(Impl, decl);
+      if (!importedName)
         return nullptr;
 
-      auto dc = Impl.importDeclContextOf(decl);
+      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
         return nullptr;
       
       ASTContext &cxt = Impl.SwiftContext;
-      
+      auto name = importedName.Imported.getBaseName();
+
       // Create the enum declaration and record it.
       NominalTypeDecl *result;
       auto enumInfo = Impl.getEnumInfo(decl);
@@ -1922,15 +1930,16 @@ namespace {
         return nullptr;
       }
 
-      auto name = getClangDeclName(Impl, decl);
-      if (name.empty())
+      auto importedName = getClangDeclName(Impl, decl);
+      if (!importedName)
         return nullptr;
 
-      auto dc = Impl.importDeclContextOf(decl);
+      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
         return nullptr;
 
       // Create the struct declaration and record it.
+      auto name = importedName.Imported.getBaseName();
       auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
                                  Impl.importSourceLoc(decl->getLocStart()),
                                  name,
@@ -2854,7 +2863,7 @@ namespace {
     }
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
-      auto dc = Impl.importDeclContextOf(decl);
+      auto dc = Impl.importDeclContextOf(decl, decl->getDeclContext());
       if (!dc)
         return nullptr;
 
@@ -3001,7 +3010,8 @@ namespace {
       }
 
       // Check whether we already imported this method.
-      if (!forceClassMethod && dc == Impl.importDeclContextOf(decl)) {
+      if (!forceClassMethod &&
+          dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
         // FIXME: Should also be able to do this for forced class
         // methods.
         auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
@@ -3076,7 +3086,8 @@ namespace {
         return nullptr;
 
       // Check whether we recursively imported this method
-      if (!forceClassMethod && dc == Impl.importDeclContextOf(decl)) {
+      if (!forceClassMethod &&
+          dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
         // FIXME: Should also be able to do this for forced class
         // methods.
         auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
@@ -3171,7 +3182,7 @@ namespace {
 
       // Check whether there's some special method to import.
       if (!forceClassMethod) {
-        if (dc == Impl.importDeclContextOf(decl) &&
+        if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()) &&
             !Impl.ImportedDecls[decl->getCanonicalDecl()])
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
@@ -4715,7 +4726,7 @@ namespace {
       if (!objcClass)
         return nullptr;
 
-      auto dc = Impl.importDeclContextOf(decl);
+      auto dc = Impl.importDeclContextOf(decl, decl->getDeclContext());
       if (!dc)
         return nullptr;
 
@@ -4847,9 +4858,10 @@ namespace {
     }
     
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
-      Identifier name = Impl.importFullName(decl).Imported.getBaseName();
-      if (name.empty())
-        return nullptr;
+      auto importedName = Impl.importFullName(decl);
+      if (!importedName) return nullptr;
+
+      Identifier name = importedName.Imported.getBaseName();
 
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
@@ -4866,7 +4878,7 @@ namespace {
 
       decl = decl->getDefinition();
 
-      auto dc = Impl.importDeclContextOf(decl);
+      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
         return nullptr;
 
@@ -4948,9 +4960,10 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto name = Impl.importFullName(decl).Imported.getBaseName();
-      if (name.empty())
-        return nullptr;
+      auto importedName = Impl.importFullName(decl);
+      if (!importedName) return nullptr;
+
+      auto name = importedName.Imported.getBaseName();
 
       auto createRootClass = [=](DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
@@ -5018,7 +5031,7 @@ namespace {
       decl = decl->getDefinition();
       assert(decl);
 
-      auto dc = Impl.importDeclContextOf(decl);
+      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
         return nullptr;
 
@@ -5106,7 +5119,7 @@ namespace {
     }
 
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl) {
-      auto dc = Impl.importDeclContextOf(decl);
+      auto dc = Impl.importDeclContextOf(decl, decl->getDeclContext());
       if (!dc)
         return nullptr;
 
@@ -5251,7 +5264,7 @@ namespace {
       }
 
       // Check whether the property already got imported.
-      if (dc == Impl.importDeclContextOf(decl)) {
+      if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
         auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
         if (known != Impl.ImportedDecls.end())
           return known->second;

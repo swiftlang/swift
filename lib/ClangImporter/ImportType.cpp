@@ -2067,7 +2067,8 @@ Type ClangImporter::Implementation::importMethodType(
     }
   }
 
-  DeclContext *origDC = importDeclContextOf(clangDecl);
+  DeclContext *origDC = importDeclContextOf(clangDecl,
+                                            clangDecl->getDeclContext());
   assert(origDC);
   auto mapTypeIntoContext = [&](Type type) -> Type {
     if (dc != origDC) {
