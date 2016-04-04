@@ -482,6 +482,11 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 
 bool
 SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
+  // FIXME: We could probably optimize this case too
+  if (auto *AI = dyn_cast<ApplyInst>(Value))
+    if (AI->hasIndirectResults())
+      return false;
+
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
     if (isa<RefCountingInst>(Inst) ||

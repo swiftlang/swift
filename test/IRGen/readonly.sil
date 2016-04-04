@@ -7,38 +7,45 @@ import SwiftShims
 
 private class XXX{}
 
-// This is the swift content of this file:
-//@effects(readonly) public func foo(x : Int) { }
-//@effects(readonly) public func bar(x : XXX) { }
+sil @XXX_dtor : $@convention(method) (@owned XXX) -> ()
+sil @XXX_ctor : $@convention(method) (@owned XXX) -> @owned XXX
 
-sil @_TFC8readonly3XXXD : $@convention(method) (@owned XXX) -> ()
-sil @_TFC8readonly3XXXd : $@convention(method) (@guaranteed XXX) -> @owned Builtin.NativeObject
-sil @_TFC8readonly3XXXcfMS0_FT_S0_ : $@convention(method) (@owned XXX) -> @owned XXX
-sil @_TFC8readonly3XXXCfMS0_FT_S0_ : $@convention(thin) (@thick XXX.Type) -> @owned XXX
+// CHECK: target datalayout
 
-//CHECK: target datalayout
+// No @owned or @out parameters -- function is read only at LLVM level
 
-//CHECK: ; Function Attrs: readonly
-//CHECK-NEXT: define{{( protected)?}} void @function_foo(
+// CHECK: ; Function Attrs: readonly
+// CHECK-NEXT: define{{( protected)?}} void @function_foo(
 sil [readonly] @function_foo : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %1 = tuple ()                                   // user: %2
-  return %1 : $()                                 // id: %2
+  %1 = tuple ()
+  return %1 : $()
 }
 
-//CHECK-NOT: ; Function Attrs: readonly
-//CHECK: define{{( protected)?}} void @function_bar(
+// There's an @owned parameter, and destructors can call arbitrary code
+// -- function is not read only at LLVM level
+
+// CHECK-NOT: ; Function Attrs: readonly
+// CHECK: define{{( protected)?}} void @function_bar(
 sil [readonly] @function_bar : $@convention(thin) (@owned XXX) -> () {
 bb0(%0 : $XXX):
-  strong_release %0 : $XXX                        // id: %2
-  %3 = tuple ()                                   // user: %4
-  return %3 : $()                                 // id: %4
+  strong_release %0 : $XXX
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// There's an @out parameter -- function is not read only at LLVM level
+
+// CHECK-NOT: ; Function Attrs: readonly
+// CHECK: define{{( protected)?}} void @function_baz(
+sil [readonly] @function_baz : $@convention(thin) () -> (@out Any) {
+bb0(%0 : $*Any):
+  init_existential_addr %0 : $*Any, $()
+  %1 = tuple ()
+  return %1 : $()
 }
 
 sil_vtable XXX {
-  #XXX.deinit!deallocator: _TFC8readonly3XXXD	// readonly.XXX.__deallocating_deinit
-  #XXX.init!initializer.1: _TFC8readonly3XXXcfMS0_FT_S0_	// readonly.XXX.init (readonly.XXX.Type)() -> readonly.XXX
+  #XXX.deinit!deallocator: XXX_dtor
+  #XXX.init!initializer.1: XXX_ctor
 }
-
-
-
