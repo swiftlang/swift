@@ -717,6 +717,18 @@ extension String {
     }
   }
 
+  /// Replace the text in `bounds` with `replacement`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
+  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  public mutating func replaceSubrange(
+    bounds: Range<Index>, with newElements: String
+  ) {
+    replaceSubrange(bounds, with: newElements.characters)
+  }
+
   /// Insert `newElement` at position `i`.
   ///
   /// Invalidates all indices with respect to `self`.
