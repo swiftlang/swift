@@ -1450,8 +1450,6 @@ public:
     // 2) The type has a fixed layout in all resilience domains, and the
     //    conformance is externally visible
     IsFragile_t isFragile = IsNotFragile;
-    if (SGM.makeModuleFragile)
-      isFragile = IsFragile;
     if (auto nominal = Conformance->getInterfaceType()->getAnyNominal())
       if (nominal->hasFixedLayout() &&
           proto->getEffectiveAccess() == Accessibility::Public &&
@@ -1810,8 +1808,6 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     InlineStrategy = AlwaysInline;
 
   IsFragile_t isFragile = IsNotFragile;
-  if (makeModuleFragile)
-    isFragile = IsFragile;
   if (witness.isFragile())
     isFragile = IsFragile;
 
