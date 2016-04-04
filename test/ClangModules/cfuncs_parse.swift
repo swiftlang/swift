@@ -145,6 +145,16 @@ func test_decay() {
   decay_param_const_array([1, 2, 3])
 }
 
+func test_nested_pointers() {
+  nested_pointer(nil)
+  nested_pointer_audited(nil)
+  nested_pointer_audited2(nil) // expected-error {{nil is not compatible with expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
+
+  nested_pointer(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>!'}}
+  nested_pointer_audited(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>>?'}}
+  nested_pointer_audited2(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
+}
+
 func exit(_: Float) {} // expected-note {{found this candidate}}
 func test_ambiguous() {
   exit(5) // expected-error {{ambiguous use of 'exit'}}

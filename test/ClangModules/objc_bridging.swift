@@ -47,7 +47,7 @@ func allocateMagic(_ zone: NSZone) -> UnsafeMutablePointer<Void> {
   return allocate(zone)
 }
 
-func constPointerToObjC(_ objects: [AnyObject?]) -> NSArray {
+func constPointerToObjC(_ objects: [AnyObject]) -> NSArray {
   return NSArray(objects: objects, count: objects.count)
 }
 

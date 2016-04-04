@@ -244,7 +244,7 @@ func isCocoaArray<Element>(_ a: Array<Element>) -> Bool {
 }
 
 func getAsImmutableNSArray(_ a: Array<Int>) -> NSArray {
-  var elements = a.map { TestObjCValueTy($0) as AnyObject? }
+  var elements = a.map { TestObjCValueTy($0) as AnyObject }
   return NSArray(objects: &elements, count: elements.count)
 }
 
@@ -273,7 +273,7 @@ class CustomImmutableNSArray : NSArray {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>, count: Int) {
     super.init(objects: objects, count: count)
   }
 
@@ -302,7 +302,7 @@ class CustomImmutableNSArray : NSArray {
   @objc
   override func countByEnumerating(
     with state: UnsafeMutablePointer<NSFastEnumerationState>,
-    objects: AutoreleasingUnsafeMutablePointer<AnyObject?>,
+    objects: AutoreleasingUnsafeMutablePointer<AnyObject>,
     count: Int
   ) -> Int {
     var theState = state.pointee

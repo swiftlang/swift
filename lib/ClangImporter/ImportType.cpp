@@ -150,17 +150,16 @@ namespace {
   getOptionalType(Type payloadType,
                   ImportTypeKind kind,
                   OptionalTypeKind OptKind = OTK_ImplicitlyUnwrappedOptional) {
-    // Import pointee types as true Optional.
-    if (kind == ImportTypeKind::Pointee)
-      return OptionalType::get(payloadType);
-
     switch (OptKind) {
-      case OTK_ImplicitlyUnwrappedOptional:
-        return ImplicitlyUnwrappedOptionalType::get(payloadType);
-      case OTK_None:
-        return payloadType;
-      case OTK_Optional:
+    case OTK_None:
+      return payloadType;
+    case OTK_Optional:
+      return OptionalType::get(payloadType);
+    case OTK_ImplicitlyUnwrappedOptional:
+      // Import pointee types as true Optional.
+      if (kind == ImportTypeKind::Pointee)
         return OptionalType::get(payloadType);
+      return ImplicitlyUnwrappedOptionalType::get(payloadType);
     }
   }
 

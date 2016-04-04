@@ -1167,7 +1167,7 @@ class CustomImmutableNSSet : NSSet {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }
@@ -3414,7 +3414,7 @@ class MockSetWithCustomCount : NSSet {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }

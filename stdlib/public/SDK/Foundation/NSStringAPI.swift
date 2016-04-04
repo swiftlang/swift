@@ -383,18 +383,28 @@ extension String {
   public func completePath(
     into outputName: UnsafeMutablePointer<String>? = nil,
     caseSensitive: Bool,
-    matchesInto matchesIntoArray: UnsafeMutablePointer<[String]>? = nil,
+    matchesInto outputArray: UnsafeMutablePointer<[String]>? = nil,
     filterTypes: [String]? = nil
   ) -> Int {
     var nsMatches: NSArray?
     var nsOutputName: NSString?
 
-    let result = outputName._withNilOrAddress(of: &nsOutputName) {
-      outputName in matchesIntoArray._withNilOrAddress(of: &nsMatches) {
-        matchesIntoArray in
-        self._ns.completePath(
-          into: outputName, caseSensitive: caseSensitive,
-          matchesInto: matchesIntoArray, filterTypes: filterTypes
+    let result: Int = outputName._withNilOrAddress(of: &nsOutputName) {
+      outputName in outputArray._withNilOrAddress(of: &nsMatches) {
+        outputArray in
+        // FIXME: completePath(...) is incorrectly annotated as requiring
+        // non-optional output parameters. rdar://problem/25494184
+        let outputNonOptionalName = AutoreleasingUnsafeMutablePointer<NSString>(
+          UnsafeMutablePointer<NSString>(outputName)
+        )
+        let outputNonOptionalArray = AutoreleasingUnsafeMutablePointer<NSArray>(
+          UnsafeMutablePointer<NSArray>(outputArray)
+        )
+        return self._ns.completePath(
+          into: outputNonOptionalName,
+          caseSensitive: caseSensitive,
+          matchesInto: outputNonOptionalArray,
+          filterTypes: filterTypes
         )
       }
     }
@@ -402,7 +412,7 @@ extension String {
     if let matches = nsMatches {
       // Since this function is effectively a bridge thunk, use the
       // bridge thunk semantics for the NSArray conversion
-      matchesIntoArray?.pointee = matches as! [String]
+      outputArray?.pointee = matches as! [String]
     }
 
     if let n = nsOutputName {

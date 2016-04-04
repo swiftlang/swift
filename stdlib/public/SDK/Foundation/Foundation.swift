@@ -523,8 +523,8 @@ extension NSDictionary : DictionaryLiteralConvertible {
     dictionaryLiteral elements: (NSCopying, AnyObject)...
   ) {
     self.init(
-      objects: elements.map { (AnyObject?)($0.1) },
-      forKeys: elements.map { (NSCopying?)($0.0) },
+      objects: elements.map { $0.1 },
+      forKeys: elements.map { $0.0 },
       count: elements.count)
   }
 }
