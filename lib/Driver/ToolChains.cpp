@@ -250,8 +250,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     auto *IA = cast<InputAction>(context.InputActions[0]);
     const Arg &PrimaryInputArg = IA->getInputArg();
 
-    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-        context.getTopLevelInputFiles().size() > TOO_MANY_FILES) {
+    if (context.OI.CompilerMode != OutputInfo::Mode::UpdateCode &&
+        (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+        context.getTopLevelInputFiles().size() > TOO_MANY_FILES)) {
       Arguments.push_back("-filelist");
       Arguments.push_back(context.getAllSourcesPath());
       Arguments.push_back("-primary-file");
@@ -363,8 +364,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != types::TY_Nothing) {
-    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-        context.Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES) {
+    if (context.OI.CompilerMode != OutputInfo::Mode::UpdateCode &&
+        (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+        context.Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES)) {
       Arguments.push_back("-output-filelist");
       Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
       II.FilelistInfo = {Arguments.back(),
@@ -570,8 +572,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   // mode options.
   Arguments.push_back("-emit-module");
 
-  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-      context.Inputs.size() > TOO_MANY_FILES) {
+  if (context.OI.CompilerMode != OutputInfo::Mode::UpdateCode &&
+      (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+      context.Inputs.size() > TOO_MANY_FILES)) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", ""));
     II.FilelistInfo = {Arguments.back(), types::TY_SwiftModuleFile,
@@ -859,8 +862,9 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   InvocationInfo II{"ld"};
   ArgStringList &Arguments = II.Arguments;
 
-  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-      context.Inputs.size() > TOO_MANY_FILES) {
+  if (context.OI.CompilerMode != OutputInfo::Mode::UpdateCode &&
+      (context.Args.hasArg(options::OPT_driver_use_filelists) ||
+       context.Inputs.size() > TOO_MANY_FILES)) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
     II.FilelistInfo = {Arguments.back(), types::TY_Object, FilelistInfo::Input};

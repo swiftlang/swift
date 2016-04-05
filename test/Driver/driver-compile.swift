@@ -40,7 +40,7 @@
 // RUN: rm -rf %t && mkdir -p %t/DISTINCTIVE-PATH/usr/bin/
 // RUN: ln %swift_driver_plain %t/DISTINCTIVE-PATH/usr/bin/swiftc
 // RUN: ln -s "swiftc" %t/DISTINCTIVE-PATH/usr/bin/swift-update
-// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -update-code -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -update-code -driver-use-filelists -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
 // RUN: FileCheck -check-prefix UPDATE-CODE %s < %t.upd.txt
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
@@ -113,6 +113,8 @@
 // FILELIST: -primary-file {{.*/(driver-compile.swift|empty.swift)}}
 // FILELIST: -output-filelist {{[^-]}}
 
+// UPDATE-CODE-NOT: -filelist
+// UPDATE-CODE-NOT: -output-filelist
 // UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift-update
 // UPDATE-CODE: -c{{ }}
 // UPDATE-CODE: -o {{.+}}.remap
