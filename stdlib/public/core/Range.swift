@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An iterator over the elements of `Range<Element>`.
+@_fixed_layout
 public struct RangeIterator<
   Element : ForwardIndex
 > : IteratorProtocol, Sequence {
@@ -72,6 +73,7 @@ public struct RangeIterator<
 ///     }
 ///     print(brackets(Range<Int>(start: -99, end: 100), 0))
 ///     // Prints "0"
+@_fixed_layout
 public struct Range<
   Element : ForwardIndex
 > : Equatable, Collection,
@@ -87,6 +89,7 @@ public struct Range<
 
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
+  @_versioned
   @_transparent
   internal init(_start: Element, end: Element) {
     self.startIndex = _start
