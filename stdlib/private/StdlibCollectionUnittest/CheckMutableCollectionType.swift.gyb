@@ -175,6 +175,73 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       }
     }
   }
+
+  let tests = _product(
+    subscriptRangeTests,
+    _SubSequenceSubscriptOnIndexMode.all)
+
+  self.test("\(testNamePrefix).SubSequence.subscript(_: Index)/Set/OutOfBounds")
+    .forEach(in: tests) {
+    (test, mode) in
+    let elements = test.collection
+    let sliceFromLeft = test.bounds.lowerBound
+    let sliceFromRight = elements.count - test.bounds.upperBound
+    print("\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)")
+    let base = makeWrappedCollection(elements)
+    let sliceStartIndex =
+      base.index(numericCast(sliceFromLeft), stepsFrom: base.startIndex)
+    let sliceEndIndex = base.index(
+      numericCast(elements.count - sliceFromRight),
+      stepsFrom: base.startIndex)
+    var slice = base[sliceStartIndex..<sliceEndIndex]
+    expectType(C.SubSequence.self, &slice)
+
+    var index: C.Index = base.startIndex
+    switch mode {
+    case .inRange:
+      let sliceNumericIndices =
+        sliceFromLeft..<(elements.count - sliceFromRight)
+      for (i, index) in base.indices.enumerated() {
+        if sliceNumericIndices.contains(i) {
+          slice[index] = wrapValue(OpaqueValue(elements[i].value + 90000))
+        }
+      }
+      for (i, index) in base.indices.enumerated() {
+        if sliceNumericIndices.contains(i) {
+          expectEqual(
+            elements[i].value + 90000,
+            extractValue(slice[index]).value)
+          expectEqual(
+            extractValue(base[index]).value + 90000,
+            extractValue(slice[index]).value)
+        }
+      }
+      return
+    case .outOfRangeToTheLeft:
+      if sliceFromLeft == 0 { return }
+      index = base.index(
+        numericCast(sliceFromLeft - 1),
+        stepsFrom: base.startIndex)
+    case .outOfRangeToTheRight:
+      if sliceFromRight == 0 { return }
+      index = base.index(
+        numericCast(elements.count - sliceFromRight),
+        stepsFrom: base.startIndex)
+    case .baseEndIndex:
+      index = base.endIndex
+    case .sliceEndIndex:
+      index = sliceEndIndex
+    }
+
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
+      expectCrashLater()
+      slice[index] = wrapValue(OpaqueValue(9999))
+    } else {
+      expectFailure {
+        slice[index] = wrapValue(OpaqueValue(9999))
+      }
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -263,6 +330,123 @@ if isFixedLengthCollection {
         test.expected,
         c.map(extractValue).map { $0.value },
         stackTrace: SourceLocStack().with(test.loc))
+    }
+  }
+}
+
+if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
+  let tests = _product(
+    subscriptRangeTests,
+    _SubSequenceSubscriptOnRangeMode.all)
+
+  self.test("\(testNamePrefix).SubSequence.subscript(_: Range)/Set/OutOfBounds")
+    .forEach(in: tests) {
+    (test, mode) in
+    let elements = test.collection
+    let sliceFromLeft = test.bounds.lowerBound
+    let sliceFromRight = elements.count - test.bounds.upperBound
+    print("\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)")
+    let base = makeWrappedCollection(elements)
+    let sliceStartIndex =
+      base.index(numericCast(sliceFromLeft), stepsFrom: base.startIndex)
+    let sliceEndIndex = base.index(
+      numericCast(elements.count - sliceFromRight),
+      stepsFrom: base.startIndex)
+    var slice = base[sliceStartIndex..<sliceEndIndex]
+    expectType(C.SubSequence.self, &slice)
+
+    var bounds: Range<C.Index> = base.startIndex..<base.startIndex
+    switch mode {
+    case .inRange:
+      let sliceNumericIndices =
+        sliceFromLeft..<(elements.count - sliceFromRight + 1)
+      for (i, subSliceStartIndex) in base.indices.enumerated() {
+        for (j, subSliceEndIndex) in base.indices.enumerated() {
+          if i <= j &&
+            sliceNumericIndices.contains(i) &&
+            sliceNumericIndices.contains(j) {
+            let newValues = makeWrappedCollection(
+              elements[i..<j].map { OpaqueValue($0.value + 90000) }
+            )
+            slice[subSliceStartIndex..<subSliceEndIndex]
+              = newValues[newValues.startIndex..<newValues.endIndex]
+            let subSlice = slice[subSliceStartIndex..<subSliceEndIndex]
+            for (k, index) in subSlice.indices.enumerated() {
+              expectEqual(
+                elements[i + k].value + 90000,
+                extractValue(subSlice[index]).value)
+              expectEqual(
+                extractValue(base[index]).value + 90000,
+                extractValue(subSlice[index]).value)
+              expectEqual(
+                extractValue(slice[index]).value,
+                extractValue(subSlice[index]).value)
+            }
+            let oldValues = makeWrappedCollection(Array(elements[i..<j]))
+            slice[subSliceStartIndex..<subSliceEndIndex]
+              = oldValues[oldValues.startIndex..<oldValues.endIndex]
+          }
+        }
+      }
+      return
+    case .outOfRangeToTheLeftEmpty:
+      if sliceFromLeft == 0 { return }
+      let index = base.index(
+        numericCast(sliceFromLeft - 1),
+        stepsFrom: base.startIndex)
+      bounds = index..<index
+      break
+    case .outOfRangeToTheLeftNonEmpty:
+      if sliceFromLeft == 0 { return }
+      let index = base.index(
+        numericCast(sliceFromLeft - 1),
+        stepsFrom: base.startIndex)
+      bounds = index..<sliceStartIndex
+      break
+    case .outOfRangeToTheRightEmpty:
+      if sliceFromRight == 0 { return }
+      let index = base.index(
+        numericCast(elements.count - sliceFromRight + 1),
+        stepsFrom: base.startIndex)
+      bounds = index..<index
+      break
+    case .outOfRangeToTheRightNonEmpty:
+      if sliceFromRight == 0 { return }
+      let index = base.index(
+        numericCast(elements.count - sliceFromRight + 1),
+        stepsFrom: base.startIndex)
+      bounds = sliceEndIndex..<index
+      break
+    case .outOfRangeBothSides:
+      if sliceFromLeft == 0 { return }
+      if sliceFromRight == 0 { return }
+      bounds =
+        base.index(
+          numericCast(sliceFromLeft - 1),
+          stepsFrom: base.startIndex)
+        ..<
+        base.index(
+          numericCast(elements.count - sliceFromRight + 1),
+          stepsFrom: base.startIndex)
+      break
+    case .baseEndIndex:
+      if sliceFromRight == 0 { return }
+      bounds = sliceEndIndex..<base.endIndex
+      break
+    }
+
+    let count: Int = numericCast(
+      base.distance(from: bounds.lowerBound, to: bounds.upperBound))
+    let newValues = makeWrappedCollection(Array(elements[0..<count]))
+    let newSlice = newValues[newValues.startIndex..<newValues.endIndex]
+
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
+      expectCrashLater()
+      slice[bounds] = newSlice
+    } else {
+      expectFailure {
+        slice[bounds] = newSlice
+      }
     }
   }
 }
