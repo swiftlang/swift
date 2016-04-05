@@ -289,7 +289,7 @@ template <typename Runtime>
 static int doDumpHeapInstance(std::string BinaryFilename) {
   using StoredPointer = typename Runtime::StoredPointer;
 
-  PipeMemoryReader<Runtime> Pipe;
+  auto Pipe = std::make_shared<PipeMemoryReader<Runtime>>();
 
   pid_t pid = fork();
   switch (pid) {
@@ -297,33 +297,33 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
       errorAndExit("Couldn't fork child process");
       exit(EXIT_FAILURE);
     case 0: { // Child:
-      close(Pipe.getParentWriteFD());
-      close(Pipe.getParentReadFD());
-      dup2(Pipe.getChildReadFD(), STDIN_FILENO);
-      dup2(Pipe.getChildWriteFD(), STDOUT_FILENO);
+      close(Pipe->getParentWriteFD());
+      close(Pipe->getParentReadFD());
+      dup2(Pipe->getChildReadFD(), STDIN_FILENO);
+      dup2(Pipe->getChildWriteFD(), STDOUT_FILENO);
       execv(BinaryFilename.c_str(), NULL);
       exit(EXIT_SUCCESS);
     }
     default: { // Parent
-      close(Pipe.getChildReadFD());
-      close(Pipe.getChildWriteFD());
+      close(Pipe->getChildReadFD());
+      close(Pipe->getChildWriteFD());
 
       ReflectionContext<External<Runtime>> RC(Pipe);
 
-      uint8_t PointerSize = Pipe.receivePointerSize();
+      uint8_t PointerSize = Pipe->receivePointerSize();
       if (PointerSize != Runtime::PointerSize)
         errorAndExit("Child process had unexpected architecture");
 
-      StoredPointer instance = Pipe.receiveInstanceAddress();
+      StoredPointer instance = Pipe->receiveInstanceAddress();
       assert(instance);
       std::cout << "Parent: instance pointer in child address space: 0x";
       std::cout << std::hex << instance << std::endl;
 
       StoredPointer isa;
-      if (!Pipe.readInteger(instance, &isa))
+      if (!Pipe->readInteger(instance, &isa))
         errorAndExit("Couldn't get heap object's metadata address");
 
-      for (auto &Info : Pipe.receiveReflectionInfo())
+      for (auto &Info : Pipe->receiveReflectionInfo())
         RC.addReflectionInfo(Info);
 
       std::cout << "Parent: metadata pointer in child address space: 0x";
@@ -343,8 +343,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
     }
   }
 
-  Pipe.sendExitMessage();
-
+  Pipe->sendExitMessage();
   return EXIT_SUCCESS;
 }
 
