@@ -45,10 +45,10 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
 
   // If Ptr has reference semantics itself, create a strong_release.
   if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRelease(Loc, Ptr);
+    return B.createStrongRelease(Loc, Ptr, Atomicity::Atomic);
 
   // Otherwise create a release value.
-  return B.createReleaseValue(Loc, Ptr);
+  return B.createReleaseValue(Loc, Ptr, Atomicity::Atomic);
 }
 
 //===----------------------------------------------------------------------===//
@@ -407,7 +407,8 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
     for (auto &ArgDesc : ArgDescs) {
       if (ArgDesc.CalleeRelease.empty())
         continue;
-      Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index));
+      Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index),
+                                 Atomicity::Atomic);
     }
     Builder.createThrow(Loc, ErrorArg);
 

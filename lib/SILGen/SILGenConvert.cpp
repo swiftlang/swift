@@ -543,7 +543,7 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
   // reference when we use it to prevent it being released and attempting to
   // deallocate itself. It doesn't matter if we ever actually clean up that
   // retain though.
-  B.createStrongRetain(loc, value);
+  B.createStrongRetain(loc, value, Atomicity::Atomic);
   
   return ManagedValue::forUnmanaged(value);
 }
