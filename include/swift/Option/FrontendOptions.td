@@ -172,6 +172,9 @@ def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
 def disable_llvm_optzns : Flag<["-"], "disable-llvm-optzns">,
   HelpText<"Don't run LLVM optimization passes">;
 
+def disable_sil_perf_optzns : Flag<["-"], "disable-sil-perf-optzns">,
+  HelpText<"Don't run SIL performance optimization passes">;
+
 def disable_llvm_arc_opts : Flag<["-"], "disable-llvm-arc-opts">,
   HelpText<"Don't run LLVM ARC optimization passes.">;
 
