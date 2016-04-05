@@ -532,7 +532,7 @@ alive.
 
     // The call to ``withExtendedLifetime(Head)`` makes sure that the lifetime of
     // Head is guaranteed to extend over the region of code that uses Unmanaged
-    // refererences. Because there exists a reference to Head for the duration
+    // references. Because there exists a reference to Head for the duration
     // of the scope and we don't modify the list of ``Node``s there also exist a
     // reference through the chain of ``Head.next``, ``Head.next.next``, ...
     // instances.
@@ -544,7 +544,7 @@ alive.
 
       // Use the unmanaged reference in a call/variable access. The use of
       // _withUnsafeGuaranteedRef allows the compiler to remove the ultimate
-      // retain/release accross the call/access.
+      // retain/release across the call/access.
 
       while let Next = Ref._withUnsafeGuaranteedRef { $0.next } {
         ...
