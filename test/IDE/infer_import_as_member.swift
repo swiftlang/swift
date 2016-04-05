@@ -48,6 +48,7 @@ import InferImportAsMember
 // PRINT-LABEL:   /// Various static functions that can't quite be imported as properties.
 // PRINT-NEXT:    static func staticGetNonPropertyNumParams() -> Float
 // PRINT-NEXT:    static func staticSetNonPropertyNumParams(a a: Float, b b: Float)
+// PRINT-NEXT:    static func staticGetNonPropertyNumParamsGetter(d d: Double)
 // PRINT-NEXT:    static func staticGetNonPropertyType() -> Float
 // PRINT-NEXT:    static func staticSetNonPropertyType(x x: Double)
 // PRINT-NEXT:    static func staticGetNonPropertyNoSelf() -> Float
