@@ -42,9 +42,8 @@ struct _ObjCMirror : _Mirror {
     return _getObjCSummary(data)
   }
   public var quickLookObject: PlaygroundQuickLook? {
-    var result: PlaygroundQuickLook? = nil
-    _getClassPlaygroundQuickLook(&result, data)
-    return result
+    let object = _swift_ClassMirror_quickLookObject(data)
+    return _getClassPlaygroundQuickLook(object)
   }
   public var disposition: _MirrorDisposition { return .objCObject }
 }
@@ -70,9 +69,8 @@ struct _ObjCSuperMirror : _Mirror {
     return _getObjCSummary(data)
   }
   public var quickLookObject: PlaygroundQuickLook? {
-    var result: PlaygroundQuickLook? = nil
-    _getClassPlaygroundQuickLook(&result, data)
-    return result
+    let object = _swift_ClassMirror_quickLookObject(data)
+    return _getClassPlaygroundQuickLook(object)
   }
   public var disposition: _MirrorDisposition { return .objCObject }
 }
