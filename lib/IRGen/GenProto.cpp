@@ -740,6 +740,7 @@ public:
           }
         } callback;
         Fulfillments->searchTypeMetadata(IGM, ConcreteType, IsExact,
+                                         /*isSelf*/ false,
                                          /*sourceIndex*/ 0, MetadataPath(),
                                          callback);
       }
@@ -1464,20 +1465,22 @@ namespace {
     }
 
     void considerNewTypeSource(SourceKind kind, unsigned paramIndex,
-                               CanType type, IsExact_t isExact) {
+                               CanType type, IsExact_t isExact,
+                               bool isSelfParameter) {
       if (!Fulfillments.isInterestingTypeForFulfillments(type)) return;
 
       // Prospectively add a source.
       Sources.emplace_back(kind, paramIndex, type);
 
       // Consider the source.
-      if (!considerType(type, isExact, Sources.size() - 1, MetadataPath())) {
+      if (!considerType(type, isExact, isSelfParameter,
+                        Sources.size() - 1, MetadataPath())) {
         // If it wasn't used in any fulfillments, remove it.
         Sources.pop_back();
       }
     }
 
-    bool considerType(CanType type, IsExact_t isExact,
+    bool considerType(CanType type, IsExact_t isExact, bool isSelfParameter,
                       unsigned sourceIndex, MetadataPath &&path) {
       struct Callback : FulfillmentMap::InterestingKeysCallback {
         PolymorphicConvention &Self;
@@ -1497,7 +1500,8 @@ namespace {
           return Self.getConformsTo(type);
         }
       } callbacks(*this);
-      return Fulfillments.searchTypeMetadata(IGM, type, isExact, sourceIndex,
+      return Fulfillments.searchTypeMetadata(IGM, type, isExact, isSelfParameter,
+                                             sourceIndex,
                                              std::move(path), callbacks);
     }
 
@@ -1522,7 +1526,8 @@ namespace {
         // If the Self type is concrete, we have a witness thunk with a
         // fully substituted Self type. The witness table parameter is not
         // used.
-        considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
+        considerType(selfTy, IsInexact, /*isSelfParameter*/ true,
+                     Sources.size() - 1, MetadataPath());
       }
     }
 
@@ -1540,7 +1545,8 @@ namespace {
       if (isa<GenericTypeParamType>(selfTy))
         addSelfMetadataFulfillment(selfTy);
       else
-        considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
+        considerType(selfTy, IsInexact, /*isSelfParameter*/ true,
+                     Sources.size() - 1, MetadataPath());
     }
 
     void considerParameter(SILParameterInfo param, unsigned paramIndex,
@@ -1557,7 +1563,8 @@ namespace {
         if (!isSelfParameter) return;
         if (type->getNominalOrBoundGenericNominal()) {
           considerNewTypeSource(SourceKind::GenericLValueMetadata,
-                                paramIndex, type, IsExact);
+                                paramIndex, type, IsExact,
+                                isSelfParameter);
         }
         return;
 
@@ -1568,7 +1575,7 @@ namespace {
         // Classes are sources of metadata.
         if (type->getClassOrBoundGenericClass()) {
           considerNewTypeSource(SourceKind::ClassPointer, paramIndex, type,
-                                IsInexact);
+                                IsInexact, isSelfParameter);
           return;
         }
 
@@ -1579,7 +1586,7 @@ namespace {
 
           CanType objTy = metatypeTy.getInstanceType();
           considerNewTypeSource(SourceKind::Metadata, paramIndex, objTy,
-                                IsInexact);
+                                IsInexact, isSelfParameter);
           return;
         }
 
