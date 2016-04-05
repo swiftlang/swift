@@ -18,66 +18,8 @@
 
 // XFAIL: linux
 
-var xCount = 0
-var xSerial = 0
-
 import StdlibUnittest
 import StdlibCollectionUnittest
-
-// Instead of testing with Int elements, we use this wrapper class
-// that can help us track allocations and find issues with object
-// lifetime inside Array implementations.
-final class X
-  : Comparable, CustomStringConvertible, 
-    IntegerLiteralConvertible, Strideable
-{
-  required init(_ value: Int) {
-    xCount += 1
-    xSerial += 1
-    serial = xSerial
-    self.value = value
-  }
-  
-  deinit {
-    assert(serial > 0, "double destruction!")
-    xCount -= 1
-    serial = -serial
-  }
-
-  var description: String {
-    assert(serial > 0, "dead X!")
-    return value.description
-  }
-
-  func successor() -> Self {
-    return self.dynamicType.init(self.value + 1)
-  }
-  
-  convenience init(integerLiteral value: Int) {
-    self.init(value)
-  }
-
-  @warn_unused_result
-  func distance(to other: X) -> Int {
-    return value.distance(to: other.value)
-  }
-
-  @warn_unused_result
-  func advanced(by n: Int) -> X {
-    return X(value.advanced(by: n))
-  }
-  
-  var value: Int
-  var serial: Int
-}
-
-func == (x: X, y: X) -> Bool {
-  return x.value == y.value
-}
-
-func < (x: X, y: X) -> Bool {
-  return x.value < y.value
-}
 
 //===----------------------------------------------------------------------===//
 
@@ -126,33 +68,39 @@ func test<
   where
   T.Iterator.Element == T._Buffer.Element,
   T._Buffer.Element == T.Element,
-  T.Element == X,
+  T.Element == LifetimeTracked,
   T.Index == Int,
   T : RandomAccessCollection
 >(_: T.Type, _ label: String) {
   print("test: \(label)...", terminator: "")
 
-  var x: T = [1, 2, 3, 4, 5]
-  
-  checkEqual(x, 1...5, true)
+  var x: T = [
+    LifetimeTracked(1),
+    LifetimeTracked(2),
+    LifetimeTracked(3),
+    LifetimeTracked(4),
+    LifetimeTracked(5)
+  ]
+
+  checkEqual(x, LifetimeTracked(1)...LifetimeTracked(5), true)
 
   x.reserveCapacity(x.count + 2)
-  checkEqual(x, 1...5, true)
+  checkEqual(x, LifetimeTracked(1)...LifetimeTracked(5), true)
   
   let bufferId0 = bufferID(x)
 
   // Append a range of integers
-  x += 0..<2
+  x += LifetimeTracked(0)..<LifetimeTracked(2)
   let bufferId1 = checkReallocation(x, bufferId0, false)
   
   for i in x.count..<(x.capacity + 1) {
     let bufferId1a = checkReallocation(x, bufferId1, false)
-    x.append(13)
+    x.append(LifetimeTracked(13))
   }
   let bufferId2 = checkReallocation(x, bufferId1, true)
 
   let y = x
-  x[x.predecessor(of: x.endIndex)] = 17
+  x[x.predecessor(of: x.endIndex)] = LifetimeTracked(17)
   let bufferId3 = checkReallocation(x, bufferId2, true)
   checkEqual(x, y, false)
 
@@ -181,27 +129,32 @@ func test<
     }
   }
 
-  checkReallocations(x, "append") { (x: inout T) -> () in x.append(42) }
-  checkReallocations(x, "+=") { (x: inout T) -> () in x.append(42) }
+  checkReallocations(x, "append") {
+    (x: inout T) -> () in x.append(LifetimeTracked(42))
+  }
+  checkReallocations(x, "+=") {
+    (x: inout T) -> () in x.append(LifetimeTracked(42))
+  }
   print("done.")
 }
 
 print("testing...")
 // CHECK: testing...
 
-test(ContiguousArray<X>.self, "ContiguousArray")
+test(ContiguousArray<LifetimeTracked>.self, "ContiguousArray")
 // CHECK-NEXT: test: ContiguousArray...done
 
 
-test(Array<X>.self, "Array")
+test(Array<LifetimeTracked>.self, "Array")
 // CHECK-NEXT: test: Array...done
 
-test(ArraySlice<X>.self, "ArraySlice")
+test(ArraySlice<LifetimeTracked>.self, "ArraySlice")
 // CHECK-NEXT: test: ArraySlice...done
 
 func testAsArray() {
   print("== AsArray ==")
-  var w: ContiguousArray<X> = [4, 2, 1]
+  var w: ContiguousArray<LifetimeTracked>
+    = [LifetimeTracked(4), LifetimeTracked(2), LifetimeTracked(1)]
   // CHECK: == AsArray == 
   
   let x = ContiguousArray(w)
@@ -302,7 +255,7 @@ func testSlice() {
   // CHECK: == ArraySlice ==
 
   // do some tests on the shared semantics
-  var b = ContiguousArray(X(0)..<X(10))
+  var b = ContiguousArray(LifetimeTracked(0)..<LifetimeTracked(10))
 
   // ArraySlice it
   var bSlice = b[3..<8]
@@ -310,14 +263,14 @@ func testSlice() {
   // CHECK-NEXT: <5>
   print("bSlice0: \(bSlice)")      // CHECK-NEXT: bSlice0: [3, 4, 5, 6, 7]
 
-  // bSlice += X(11)..<X(13)
+  // bSlice += LifetimeTracked(11)..<LifetimeTracked(13)
 
   // Writing into b does not change bSlice
-  b[4] = 41        
+  b[4] = LifetimeTracked(41)
   print("bSlice1: \(bSlice)")      // CHECK-NEXT: bSlice1: [3, 4, 5, 6, 7]
 
   // Writing into bSlice does not change b
-  bSlice[3] = 32
+  bSlice[3] = LifetimeTracked(32)
 
   print("bSlice2: \(bSlice)")     // CHECK-NEXT: bSlice2: [32, 4, 5, 6, 7]
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
@@ -362,17 +315,18 @@ let testWidth = 11
 %arrayTypes = ['ContiguousArray', 'Array', 'ArraySlice']
 %for A in arrayTypes:
 
-func testReplace(make: () -> ${A}<X>) {
+func testReplace(make: () -> ${A}<LifetimeTracked>) {
 
-  checkRangeReplaceable(make, { X(100)..<X(100 + $0) })
+  checkRangeReplaceable(
+    make, { LifetimeTracked(100)..<LifetimeTracked(100 + $0) })
 }
 
 func testReplace${A}(
-  makeOne: () -> ${A}<X> = {
-    var x = ${A}<X>()
+  makeOne: () -> ${A}<LifetimeTracked> = {
+    var x = ${A}<LifetimeTracked>()
     // make sure some - but not all - replacements will have to grow the buffer
     x.reserveCapacity(testWidth * 3 / 2)
-    x += X(0)..<X(testWidth)
+    x += LifetimeTracked(0)..<LifetimeTracked(testWidth)
     return x
   }
 ) {
@@ -399,7 +353,7 @@ testReplace${A}()
 for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
   print("testing subrange replacement in \(label) Sub-ArraySlice")
   testReplaceArraySlice {
-    var a = ContiguousArray(X(-testWidth)..<X(maxValue))
+    var a = ContiguousArray(LifetimeTracked(-testWidth)..<LifetimeTracked(maxValue))
     a.reserveCapacity(a.count * 3 / 2)
     return a[testWidth..<(2 * testWidth)]
   }
@@ -419,9 +373,7 @@ for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
 // here.  This crashes when withUnsafeMutableBufferPointer is not
 // sufficiently careful.
 func testInoutViolation() {
-  var a: [X] = [
-    X(10), X(8), X(6), X(4), X(2), X(0), X(9), X(7), X(5), X(3), X(1)
-  ]
+  var a: [LifetimeTracked] = [10, 8, 6, 4, 2, 0, 9, 7, 5, 3, 1].map { LifetimeTracked($0) }
 
 %for A in arrayTypes:
   do {
@@ -450,11 +402,11 @@ func testSingleElementModifiers${A}() {
   print("testing ${A} single-argument modifiers")
   // CHECK-NEXT: testing ${A} single-argument modifiers
   
-  var a = ${A}(X(0)..<10)
+  var a = ${A}(LifetimeTracked(0)..<LifetimeTracked(10))
   print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
-  a.insert(42, at: 4)
+  a.insert(LifetimeTracked(42), at: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
   
   print(a.remove(at: 2).value) // CHECK-NEXT: 2
@@ -480,11 +432,11 @@ func testIsEmptyFirstLast${A}() {
   print("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
   print("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
   
-  var a = ${A}(X(0)..<10)
+  var a = ${A}(LifetimeTracked(0)..<LifetimeTracked(10))
   print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
-  a.insert(42, at: 4)
+  a.insert(LifetimeTracked(42), at: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
   
   print(a.remove(at: 2).value) // CHECK-NEXT: 2
@@ -522,7 +474,7 @@ class Rdar16914909 : NSObject {
 Rdar16914909().doColorStuff()
 // CHECK-NEXT: appended
 
-print("leaks = \(xCount)")
+print("leaks = \(LifetimeTracked.instances)")
 // CHECK-NEXT: leaks = 0
 
 // CHECK-NEXT: all done.
