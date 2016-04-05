@@ -18,6 +18,8 @@
 #ifndef SWIFT_IRGEN_GENCALL_H
 #define SWIFT_IRGEN_GENCALL_H
 
+#include <stdint.h>
+
 #include "swift/Basic/LLVM.h"
 #include "llvm/IR/CallingConv.h"
 
