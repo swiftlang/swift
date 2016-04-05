@@ -14,10 +14,6 @@
 // ambiguity indexing CountableRange<T> outside a generic context.
 public enum _DisabledRangeIndex_ {}
 
-// FIXME swift-3-indexing-model: Decide whether to de-underscore these
-// protocols and/or to incorporate their default implementations into
-// the concrete models.
-
 public protocol RangeProtocol : Equatable {
   associatedtype Bound : Comparable
   
