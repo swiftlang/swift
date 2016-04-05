@@ -291,7 +291,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   // Translate the context.
   auto contextOpt = translateContext(effectiveContext);
   if (!contextOpt) {
-    // If is is a declaration with a swift_name attribute, we might be
+    // If it is a declaration with a swift_name attribute, we might be
     // able to resolve this later.
     if (auto decl = newEntry.dyn_cast<clang::NamedDecl *>()) {
       if (decl->hasAttr<clang::SwiftNameAttr>()) {
