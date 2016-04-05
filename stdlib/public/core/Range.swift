@@ -24,7 +24,6 @@ public protocol RangeProtocol : Equatable {
   init(_uncheckedBounds: (lower: Bound, upper: Bound))
   func contains(value: Bound) -> Bool
   func overlaps(other: Self) -> Bool
-  func isSubrange(of other: Self) -> Bool
   var isEmpty: Bool { get }
   
   // Note: it is crucial to enforce the invariant that lowerBound <=
