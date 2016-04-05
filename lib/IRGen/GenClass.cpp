@@ -770,7 +770,8 @@ namespace {
     SmallVector<llvm::Constant*, 16> OptInstanceMethods;
     SmallVector<llvm::Constant*, 16> OptClassMethods;
     SmallVector<llvm::Constant*, 4> Protocols;
-    SmallVector<llvm::Constant*, 8> Properties;
+    SmallVector<llvm::Constant*, 8> InstanceProperties;
+    SmallVector<llvm::Constant*, 8> ClassProperties;
     SmallVector<llvm::Constant*, 8> InstanceMethodTypesExt;
     SmallVector<llvm::Constant*, 8> ClassMethodTypesExt;
     SmallVector<llvm::Constant*, 8> OptInstanceMethodTypesExt;
@@ -918,62 +919,78 @@ namespace {
   public:
     llvm::Constant *emitCategory() {
       assert(TheExtension && "can't emit category data for a class");
-      SmallVector<llvm::Constant*, 11> fields;
+      llvm::Constant *fields[8];
       // struct category_t {
       //   char const *name;
-      fields.push_back(IGM.getAddrOfGlobalString(CategoryName));
+      fields[0] = IGM.getAddrOfGlobalString(CategoryName);
       //   const class_t *theClass;
       if (getClass()->hasClangNode())
-        fields.push_back(IGM.getAddrOfObjCClass(getClass(), NotForDefinition));
+        fields[1] = IGM.getAddrOfObjCClass(getClass(), NotForDefinition);
       else {
         auto type = getSelfType(getClass()).getSwiftRValueType();
         llvm::Constant *metadata =
           tryEmitConstantHeapMetadataRef(IGM, type, /*allowUninit*/ true);
         assert(metadata &&
                "extended objc class doesn't have constant metadata?");
-        fields.push_back(metadata);
+        fields[1] = metadata;
       }
       //   const method_list_t *instanceMethods;
-      fields.push_back(buildInstanceMethodList());
+      fields[2] = buildInstanceMethodList();
       //   const method_list_t *classMethods;
-      fields.push_back(buildClassMethodList());
+      fields[3] = buildClassMethodList();
       //   const protocol_list_t *baseProtocols;
-      fields.push_back(buildProtocolList());
+      fields[4] = buildProtocolList();
       //   const property_list_t *properties;
-      fields.push_back(buildPropertyList());
+      fields[5] = buildPropertyList(ForClass);
+      //   const property_list_t *classProperties;
+      fields[6] = buildPropertyList(ForMetaClass);
+      //   uint32_t size;
+      auto sizeofPointer = IGM.getPointerSize().getValue();
+      unsigned size = sizeofPointer * llvm::array_lengthof(fields);
+      // Adjust for 'size', which is always 32 bits rather than pointer-sized.
+      // FIXME: Clang does this by using non-ad-hoc types for ObjC runtime
+      // structures.
+      size -= (sizeofPointer - 4) * 1;
+      fields[7] = llvm::ConstantInt::get(IGM.Int32Ty, size);
       // };
-      
+
       return buildGlobalVariable(fields, "_CATEGORY_");
     }
     
     llvm::Constant *emitProtocol() {
-      SmallVector<llvm::Constant*, 11> fields;
+      llvm::Constant *fields[13];
       llvm::SmallString<64> nameBuffer;
 
       assert(isBuildingProtocol() && "not emitting a protocol");
       
       // struct protocol_t {
       //   Class super;
-      fields.push_back(null());
+      fields[0] = null();
       //   char const *name;
-      fields.push_back(IGM.getAddrOfGlobalString(getEntityName(nameBuffer)));
+      fields[1] = IGM.getAddrOfGlobalString(getEntityName(nameBuffer));
       //   const protocol_list_t *baseProtocols;
-      fields.push_back(buildProtocolList());
+      fields[2] = buildProtocolList();
       //   const method_list_t *requiredInstanceMethods;
-      fields.push_back(buildInstanceMethodList());
+      fields[3] = buildInstanceMethodList();
       //   const method_list_t *requiredClassMethods;
-      fields.push_back(buildClassMethodList());
+      fields[4] = buildClassMethodList();
       //   const method_list_t *optionalInstanceMethods;
-      fields.push_back(buildOptInstanceMethodList());
+      fields[5] = buildOptInstanceMethodList();
       //   const method_list_t *optionalClassMethods;
-      fields.push_back(buildOptClassMethodList());
+      fields[6] = buildOptClassMethodList();
       //   const property_list_t *properties;
-      fields.push_back(buildPropertyList());
+      fields[7] = buildPropertyList(ForClass);
+
       //   uint32_t size;
-      unsigned size = IGM.getPointerSize().getValue() * fields.size() +
-                      IGM.getPointerSize().getValue(); // This is for extendedMethodTypes
-      size += 8; // 'size' and 'flags' fields that haven't been added yet.
-      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, size));
+      auto sizeofPointer = IGM.getPointerSize().getValue();
+      unsigned size = sizeofPointer * llvm::array_lengthof(fields);
+      // Adjust for 'size' and 'flags', which are always 32 bits rather than
+      // pointer-sized.
+      // FIXME: Clang does this by using non-ad-hoc types for ObjC runtime
+      // structures.
+      size -= (sizeofPointer - 4) * 2;
+      fields[8] = llvm::ConstantInt::get(IGM.Int32Ty, size);
+
       //   uint32_t flags;
       auto flags = ProtocolDescriptorFlags()
         .withSwift(!getProtocol()->hasClangNode())
@@ -981,11 +998,14 @@ namespace {
         .withDispatchStrategy(ProtocolDispatchStrategy::ObjC)
         .withSpecialProtocol(getSpecialProtocolID(getProtocol()));
       
-      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, flags.getIntValue()));
+      fields[9] = llvm::ConstantInt::get(IGM.Int32Ty, flags.getIntValue());
       
-      // const char ** extendedMethodTypes;
-      fields.push_back(buildOptExtendedMethodTypes());
-      
+      //   const char ** extendedMethodTypes;
+      fields[10] = buildOptExtendedMethodTypes();
+      //   const char *demangledName;
+      fields[11] = null();
+      //   const property_list_t *classProperties;
+      fields[12] = buildPropertyList(ForMetaClass);
       // };
       
       return buildGlobalVariable(fields, "_PROTOCOL_");
@@ -1062,7 +1082,7 @@ namespace {
       fields.push_back(null());
 
       //   const property_list_t *baseProperties;
-      fields.push_back(forMeta ? null() : buildPropertyList());
+      fields.push_back(buildPropertyList(forMeta));
 
       // };
 
@@ -1443,10 +1463,11 @@ namespace {
     /// Properties need to be collected in the properties list.
     void visitProperty(VarDecl *var) {
       if (requiresObjCPropertyDescriptor(IGM, var)) {
-        // ObjC doesn't support formal class properties.
-        if (!var->isStatic())
-          if (llvm::Constant *prop = buildProperty(var))
-            Properties.push_back(prop);
+        if (llvm::Constant *prop = buildProperty(var)) {
+          auto &properties =
+              (var->isStatic() ? ClassProperties : InstanceProperties);
+          properties.push_back(prop);
+        }
 
         // Don't emit getter/setter descriptors for @NSManaged properties.
         if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
@@ -1569,12 +1590,19 @@ namespace {
     /// };
     ///
     /// This method does not return a value of a predictable type.
-    llvm::Constant *buildPropertyList() {
+    llvm::Constant *buildPropertyList(ForMetaClass_t classOrMeta) {
       Size eltSize = 2 * IGM.getPointerSize();
-      return buildOptionalList(Properties, eltSize,
-                               chooseNamePrefix("_PROPERTIES_",
-                                                "_CATEGORY_PROPERTIES_",
-                                                "_PROTOCOL_PROPERTIES_"));
+      StringRef namePrefix;
+      if (classOrMeta == ForClass) {
+        return buildOptionalList(InstanceProperties, eltSize,
+                                 chooseNamePrefix("_PROPERTIES_",
+                                                  "_CATEGORY_PROPERTIES_",
+                                                  "_PROTOCOL_PROPERTIES_"));
+      }
+      return buildOptionalList(ClassProperties, eltSize,
+                               chooseNamePrefix("_CLASS_PROPERTIES_",
+                                                "_CATEGORY_CLASS_PROPERTIES_",
+                                                "_PROTOCOL_CLASS_PROPERTIES_"));
     }
 
     /*** General ***********************************************************/
