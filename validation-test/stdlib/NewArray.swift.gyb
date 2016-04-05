@@ -22,6 +22,7 @@ var xCount = 0
 var xSerial = 0
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
