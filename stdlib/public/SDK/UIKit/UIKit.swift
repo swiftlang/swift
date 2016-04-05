@@ -204,7 +204,7 @@ extension UIView : CustomPlaygroundQuickLookable {
       // be present.)
       let ctx: CGContext! = UIGraphicsGetCurrentContext()
       UIColor(white:1.0, alpha:0.0).set()
-      CGContextFillRect(ctx, bounds)
+      ctx.fillRect(bounds)
       layer.render(in: ctx)
 
       let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
