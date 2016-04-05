@@ -13,8 +13,6 @@ import Foundation
 import StdlibUnittest
 import ObjCClasses
 
-let wut = Container<NSString>.self
-
 var ImportedObjCGenerics = TestSuite("ImportedObjCGenerics")
 
 ImportedObjCGenerics.test("Creation") {
