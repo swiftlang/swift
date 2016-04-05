@@ -10,6 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A type that provides subscript access to its elements, with
+/// bidirectional index traversal.
+///
+/// - Important: In most cases, it's best to ignore this protocol and use
+///   `BidirectionalCollection` instead, as it has a more complete interface.
 public protocol BidirectionalIndexable : Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.

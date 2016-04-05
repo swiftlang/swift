@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that provides subscript access to its elements.
+/// A type that provides subscript access to its elements, with forward
+/// index traversal.
 ///
 /// - Important: In most cases, it's best to ignore this protocol and use
 ///   `Collection` instead, as it has a more complete interface.
@@ -23,10 +24,13 @@ public protocol IndexableBase {
   // `Iterator` type from a minimal collection, but it is also used in
   // exposed places like as a constraint on `IndexingIterator`.
 
-  /// A type that represents a valid position in the collection.
+  /// A type that represents a position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
+  /// "past the end" position that's not valid for use as a subscript
+  /// argument.
+  ///
+  /// - SeeAlso: endIndex
   associatedtype Index : Comparable
 
   /// The position of the first element in a non-empty collection.
@@ -40,7 +44,7 @@ public protocol IndexableBase {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
+  /// `successor(_)`.
   ///
   /// - Complexity: O(1)
   var endIndex: Index { get }
@@ -55,13 +59,25 @@ public protocol IndexableBase {
   // expressing it today.
   associatedtype _Element
 
-  /// Returns the element at the given `position`.
+  /// Accesses the element at the given `position`.
   ///
   /// - Complexity: O(1)
+  ///
+  /// - Requires: `position` is valid for subscripting `self`.  That
+  ///   is, it is reachable from `startIndex` by zero or more
+  ///   applications of `successor(_)` and is not equal to `endIndex`
   subscript(position: Index) -> _Element { get }
 
   // WORKAROUND: rdar://25214066
+  /// A `Sequence` that can represent a contiguous subrange of `self`'s
+  /// elements.
   associatedtype SubSequence
+
+  /// Accesses the subrange bounded by `bounds`.
+  ///
+  /// - Complexity: O(1)
+  ///
+  /// - Precondition: `bounds.isSubrange(of: startIndex..<endIndex)`
   subscript(bounds: Range<Index>) -> SubSequence { get }
   
   /// Performs a range check in O(1), or a no-op when a range check is not
@@ -108,7 +124,7 @@ public protocol IndexableBase {
   /// Returns the next consecutive `Index` in a discrete sequence of
   /// `Index` values.
   ///
-  /// - Precondition: `i` has a well-defined successor.
+  /// - Precondition: `(startIndex..<endIndex).contains(i)`
   @warn_unused_result
   func successor(of i: Index) -> Index
 
