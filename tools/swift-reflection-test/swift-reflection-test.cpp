@@ -17,6 +17,7 @@
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
 #include "messages.h"
+#include "overrides.h"
 
 #include <unistd.h>
 
@@ -291,7 +292,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
 
   auto Pipe = std::make_shared<PipeMemoryReader<Runtime>>();
 
-  pid_t pid = fork();
+  pid_t pid = _fork();
   switch (pid) {
     case -1:
       errorAndExit("Couldn't fork child process");
@@ -301,7 +302,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
       close(Pipe->getParentReadFD());
       dup2(Pipe->getChildReadFD(), STDIN_FILENO);
       dup2(Pipe->getChildWriteFD(), STDOUT_FILENO);
-      execv(BinaryFilename.c_str(), NULL);
+      _execv(BinaryFilename.c_str(), NULL);
       exit(EXIT_SUCCESS);
     }
     default: { // Parent
