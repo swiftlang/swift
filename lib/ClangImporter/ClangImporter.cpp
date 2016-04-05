@@ -793,6 +793,9 @@ void ClangImporter::Implementation::addEntryToLookupTable(
                               ArrayRef<Identifier>()),
                      named, importedName.EffectiveContext);
   } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
+    // If the category is invalid, don't add it.
+    if (category->isInvalidDecl()) return;
+
     table.addCategory(category);
   }
 
@@ -2044,6 +2047,9 @@ auto ClangImporter::Implementation::importFullName(
   // class context.
   if (auto category = dyn_cast_or_null<clang::ObjCCategoryDecl>(
                         result.EffectiveContext.getAsDeclContext())) {
+    // If the enclosing category is invalid, we cannot import the declaration.
+    if (category->isInvalidDecl()) return result;
+
     result.EffectiveContext = category->getClassInterface();
   }
 
@@ -2861,8 +2867,12 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
     auto dc = objcProperty->getDeclContext();
     auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc);
     if (!objcClass) {
-      if (auto objcCategory = dyn_cast<clang::ObjCCategoryDecl>(dc))
+      if (auto objcCategory = dyn_cast<clang::ObjCCategoryDecl>(dc)) {
+        // If the enclosing category is invalid, suppress this declaration.
+        if (objcCategory->isInvalidDecl()) return true;
+
         objcClass = objcCategory->getClassInterface();
+      }
     }
 
     if (objcClass) {

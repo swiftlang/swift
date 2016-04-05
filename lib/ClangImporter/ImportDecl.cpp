@@ -4704,6 +4704,9 @@ namespace {
     }
 
     Decl *VisitObjCCategoryDecl(const clang::ObjCCategoryDecl *decl) {
+      // If the declaration is invalid, fail.
+      if (decl->isInvalidDecl()) return nullptr;
+
       // Objective-C categories and extensions map to Swift extensions.
       clang::SourceLocation categoryNameLoc = decl->getCategoryNameLoc();
       if (categoryNameLoc.isMacroID()) {
