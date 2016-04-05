@@ -35,7 +35,7 @@ extension WKInterfaceController {
   public func presentController(
     namesAndContexts: [(name: String, context: AnyObject)]
   ) {
-    self.present(
+    self.presentController(
       withNames: namesAndContexts.map { $0.name },
       contexts: namesAndContexts.map { $0.context })
   }
