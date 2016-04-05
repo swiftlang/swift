@@ -28,12 +28,18 @@ extern "C" {
 
 typedef uint64_t addr_t;
 
+typedef uint8_t (*PointerSizeFunction)();
+typedef uint8_t (*SizeSizeFunction)();
+typedef bool (*ReadBytesFunction)(addr_t address, uint8_t *dest, uint64_t size);
+typedef uint64_t (*GetStringLengthFunction)(addr_t address);
+typedef addr_t (*GetSymbolAddressFunction)(const char *name, uint64_t name_length);
+
 typedef struct MemoryReaderImpl {
   /// Get the size in bytes of the target's pointer type.
-  uint8_t (*getPointerSize)();
+  PointerSizeFunction getPointerSize;
 
   /// Get the size in bytes of the target's size type.
-  uint8_t (*getSizeSize)();
+  SizeSizeFunction getSizeSize;
 
   // FIXME: -Wdocumentation complains about \param and \returns on function pointers.
 #pragma clang diagnostic push
@@ -45,15 +51,7 @@ typedef struct MemoryReaderImpl {
   /// \param dest the caller-owned buffer into which to store the string
   /// \param size the number of bytes to read
   /// \returns true if the read was successful
-  bool (*readBytes)(addr_t address, uint8_t *dest, uint64_t size);
-
-  /// Read an integer scalar from the target.
-  ///
-  /// \parameter address the address in the target address space
-  /// \param value the local address to store the result of the read
-  /// \param size the size in bytes of the integer type
-  /// \returns true if the read was successful.
-  bool (*readInteger)(addr_t address, uint64_t *value, uint8_t size);
+  ReadBytesFunction readBytes;
 
   /// Get the string length at the given address.
   ///
@@ -63,12 +61,12 @@ typedef struct MemoryReaderImpl {
   ///
   /// \param address the address in the target address space
   /// \returns The length of the string or 0 if the scan was unsuccessful.
-  uint64_t (*getStringLength)(addr_t address);
+  GetStringLengthFunction getStringLength;
 
   /// Get the address of a symbol in the target address space.
   ///
   /// \returns true if the lookup was successful.
-  addr_t (*getSymbolAddress)(const char *name, uint64_t name_length);
+  GetSymbolAddressFunction getSymbolAddress;
 
 #pragma clang diagnostic pop
 
