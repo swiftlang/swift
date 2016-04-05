@@ -38,9 +38,9 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ConvertUTF.h"
 
-#include "CallingConvention.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
+#include "GenCall.h"
 #include "GenClass.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"

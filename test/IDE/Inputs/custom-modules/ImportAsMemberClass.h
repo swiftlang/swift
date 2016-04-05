@@ -3,14 +3,14 @@
 
 @import Foundation;
 
-__attribute__((swift_name("SomeClass")))
-@interface IAMSomeClass : NSObject
-@end
-
 typedef NS_OPTIONS(NSInteger, IAMSomeClassOptions) {
   IAMSomeClassFuzzyDice = 0x01,
   IAMSomeClassSpoiler = 0x02
 } __attribute__((swift_name("SomeClass.Options")));
+
+__attribute__((swift_name("SomeClass")))
+@interface IAMSomeClass : NSObject
+@end
 
 __attribute__((swift_name("SomeClass.init(value:)")))
 IAMSomeClass * _Nonnull MakeIAMSomeClass(double x);

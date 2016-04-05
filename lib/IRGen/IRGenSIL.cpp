@@ -47,6 +47,8 @@
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "GenArchetype.h"
+#include "GenBuiltin.h"
+#include "GenCall.h"
 #include "GenCast.h"
 #include "GenClass.h"
 #include "GenExistential.h"
@@ -1017,83 +1019,6 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
   return bbargs.slice(numIndirectResults);
 }
 
-/// Emit a direct parameter that was passed under a C-based CC.
-static void emitDirectExternalParameter(IRGenSILFunction &IGF,
-                                        Explosion &in,
-                                        llvm::Type *coercionTy,
-                                        Explosion &out,
-                                        SILType paramType,
-                                        const LoadableTypeInfo &paramTI) {
-  // The ABI IR types for the entrypoint might differ from the
-  // Swift IR types for the body of the function.
-
-  ArrayRef<llvm::Type*> expandedTys;
-  if (auto expansionTy = dyn_cast<llvm::StructType>(coercionTy)) {
-    expandedTys = makeArrayRef(expansionTy->element_begin(),
-                               expansionTy->getNumElements());
-
-  // Fast-path a really common case.  This check assumes that either
-  // the storage type of a type is an llvm::StructType or it has a
-  // single-element explosion.
-  } else if (coercionTy == paramTI.getStorageType()) {
-    out.add(in.claimNext());
-    return;
-  } else {
-    expandedTys = coercionTy;
-  }
-
-  auto outputSchema = paramTI.getSchema();
-
-  // Check to see if we can pairwise-coerce Swift's exploded scalars
-  // to Clang's expanded elements.
-  if (canCoerceToSchema(IGF.IGM, expandedTys, outputSchema)) {
-    for (auto &outputElt : outputSchema) {
-      llvm::Value *param = in.claimNext();
-      llvm::Type *outputTy = outputElt.getScalarType();
-      if (param->getType() != outputTy)
-        param = IGF.coerceValue(param, outputTy, IGF.IGM.DataLayout);
-      out.add(param);
-    }
-    return;
-  }
-
-  // Otherwise, we need to traffic through memory.
-  // Create a temporary.
-  Address temporary; Size tempSize;
-  std::tie(temporary, tempSize) = allocateForCoercion(IGF,
-                                          coercionTy,
-                                          paramTI.getStorageType(),
-                                          "");
-  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
-
-  // Write the input parameters into the temporary:
-  Address coercedAddr =
-    IGF.Builder.CreateBitCast(temporary, coercionTy->getPointerTo());
-
-  // Break down a struct expansion if necessary.
-  if (auto expansionTy = dyn_cast<llvm::StructType>(coercionTy)) {
-    auto layout = IGF.IGM.DataLayout.getStructLayout(expansionTy);
-    for (unsigned i = 0, e = expansionTy->getNumElements(); i != e; ++i) {
-      auto fieldOffset = Size(layout->getElementOffset(i));
-      auto fieldAddr = IGF.Builder.CreateStructGEP(coercedAddr, i, fieldOffset);
-      IGF.Builder.CreateStore(in.claimNext(), fieldAddr);
-    }
-
-  // Otherwise, store the single scalar.
-  } else {
-    IGF.Builder.CreateStore(in.claimNext(), coercedAddr);
-  }
-
-  // Pull out the elements.
-  temporary = IGF.Builder.CreateBitCast(temporary,
-                                      paramTI.getStorageType()->getPointerTo());
-  paramTI.loadAsTake(IGF, temporary, out);
-
-  // Deallocate the temporary.
-  // `deallocateStack` emits the lifetime.end marker for us.
-  paramTI.deallocateStack(IGF, temporary, paramType);
-}
-
 static void bindParameter(IRGenSILFunction &IGF,
                           SILArgument *param,
                           Explosion &allParamValues) {
@@ -1268,40 +1193,11 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     }
     
     auto &loadableArgTI = cast<LoadableTypeInfo>(argTI);
+
     Explosion argExplosion;
-
-    auto clangArgTy = FI.arg_begin()[argTyIdx].type;
-    auto AI = FI.arg_begin()[argTyIdx].info;
-
-    // Drop padding arguments.
-    if (AI.getPaddingType())
-      params.claimNext();
-
-    switch (AI.getKind()) {
-    case clang::CodeGen::ABIArgInfo::Extend:
-    case clang::CodeGen::ABIArgInfo::Direct: {
-      emitDirectExternalParameter(IGF, params, AI.getCoerceToType(),
-                                  argExplosion, arg->getType(), loadableArgTI);
-      IGF.setLoweredExplosion(arg, argExplosion);
-      continue;
-    }
-    case clang::CodeGen::ABIArgInfo::Indirect: {
-      Address address = loadableArgTI.getAddressForPointer(params.claimNext());
-      loadableArgTI.loadAsTake(IGF, address, argExplosion);
-      IGF.setLoweredExplosion(arg, argExplosion);
-      continue;
-    }
-    case clang::CodeGen::ABIArgInfo::Expand: {
-      emitClangExpandedParameter(IGF, params, argExplosion, clangArgTy,
-                                 arg->getType(), loadableArgTI);
-      IGF.setLoweredExplosion(arg, argExplosion);
-      continue;
-    }
-
-    case clang::CodeGen::ABIArgInfo::Ignore:
-    case clang::CodeGen::ABIArgInfo::InAlloca:
-      llvm_unreachable("Need to handle InAlloca during signature expansion");
-    }
+    emitForeignParameter(IGF, params, foreignInfo, argTyIdx,
+                         arg->getType(), loadableArgTI, argExplosion);
+    IGF.setLoweredExplosion(arg, argExplosion);
   }
 
   assert(params.empty() && "didn't claim all parameters!");

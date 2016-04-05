@@ -281,6 +281,11 @@ private:
   /// The reader responsible for lazily loading the contents of this table.
   SwiftLookupTableReader *Reader;
 
+  /// Entries whose effective contexts could not be resolved, and
+  /// therefore will need to be added later.
+  SmallVector<std::tuple<DeclName, SingleEntry, EffectiveClangContext>, 4>
+    UnresolvedEntries;
+
   friend class SwiftLookupTableReader;
   friend class SwiftLookupTableWriter;
 
@@ -319,6 +324,15 @@ public:
 
   /// Add an Objective-C category or extension to the table.
   void addCategory(clang::ObjCCategoryDecl *category);
+
+  /// Resolve any unresolved entries.
+  ///
+  /// \param unresolved Will be populated with the list of entries
+  /// that could not be resolved.
+  ///
+  /// \returns true if any remaining entries could not be resolved,
+  /// and false otherwise.
+  bool resolveUnresolvedEntries(SmallVectorImpl<SingleEntry> &unresolved);
 
 private:
   /// Lookup the set of entities with the given base name.
