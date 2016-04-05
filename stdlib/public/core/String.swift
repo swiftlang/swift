@@ -707,7 +707,7 @@ extension String {
   /// - Complexity: O(`bounds.count`) if `bounds.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
-    Bounds : _RangeProtocol, C : Collection
+    Bounds : RangeProtocol, C : Collection
     where C.Iterator.Element == Character, Bounds.Bound == Index
   >(
     bounds: Bounds, with newElements: C

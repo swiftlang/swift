@@ -253,7 +253,7 @@ public func expectGE(lhs: Int, _ rhs: Int, ${TRACE}) {
   }
 }
 
-public func expectTrapping<R : _RangeProtocol>(
+public func expectTrapping<R : RangeProtocol>(
   point: R.Bound, in range: R, ${TRACE}
 ) {
   if !range.contains(point) {
@@ -262,15 +262,15 @@ public func expectTrapping<R : _RangeProtocol>(
   }
 }
 
-extension _RangeProtocol {
+extension RangeProtocol {
   internal var _isHalfOpen: Bool {
     return !self.contains(self.upperBound)
   }
 }
 
-extension _HalfOpenRange {
+extension HalfOpenRangeProtocol {
   internal func _contains<
-    Other : _RangeProtocol
+    Other : RangeProtocol
     where
     Other.Bound == Bound
   >(other: Other) -> Bool {
@@ -284,9 +284,9 @@ extension _HalfOpenRange {
   }
 }
 
-extension _ClosedRange {
+extension ClosedRangeProtocol {
   internal func _contains<
-    Other : _ClosedRange
+    Other : ClosedRangeProtocol
     where
     Other.Bound == Bound
   >(other: Other) -> Bool {
@@ -297,7 +297,7 @@ extension _ClosedRange {
 }
 
 public func expectTrapping<
-  R1 : _RangeProtocol, R2 : _HalfOpenRange
+  R1 : RangeProtocol, R2 : HalfOpenRangeProtocol
   where
   R1.Bound == R2.Bound
 >(
@@ -310,7 +310,7 @@ public func expectTrapping<
 }
 
 public func expectTrapping<
-  R1 : _ClosedRange, R2 : _ClosedRange
+  R1 : ClosedRangeProtocol, R2 : ClosedRangeProtocol
   where
   R1.Bound == R2.Bound
 >(

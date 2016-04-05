@@ -18,13 +18,13 @@ public enum _DisabledRangeIndex_ {}
 // protocols and/or to incorporate their default implementations into
 // the concrete models.
 
-public // implementation sharing
-protocol _RangeProtocol {
+public protocol RangeProtocol : Equatable {
   associatedtype Bound : Comparable
   
   init(_uncheckedBounds: (lower: Bound, upper: Bound))
   func contains(value: Bound) -> Bool
   func overlaps(other: Self) -> Bool
+  func isSubrange(of other: Self) -> Bool
   var isEmpty: Bool { get }
   
   // Note: it is crucial to enforce the invariant that lowerBound <=
@@ -41,7 +41,7 @@ protocol _RangeProtocol {
   func clamped(to limits: Self) -> Self
 }
 
-extension _RangeProtocol {
+extension RangeProtocol {
 
   @inline(__always)
   public init(_ other: Self) {
@@ -50,7 +50,7 @@ extension _RangeProtocol {
   
   @inline(__always)
   public func overlaps<
-    Other: _RangeProtocol where Other.Bound == Bound
+    Other: RangeProtocol where Other.Bound == Bound
   >(other: Other) -> Bool {
     return (!other.isEmpty && self.contains(other.lowerBound))
         || (!self.isEmpty && other.contains(lowerBound))
@@ -77,13 +77,12 @@ extension _RangeProtocol {
   }
 }
 
-public // implementation sharing
-protocol _HalfOpenRange : _RangeProtocol {}
+public protocol HalfOpenRangeProtocol : RangeProtocol {}
 
-extension _HalfOpenRange {
+extension HalfOpenRangeProtocol {
   @inline(__always)
   public init<
-    Other: _HalfOpenRange where Other.Bound == Bound
+    Other: HalfOpenRangeProtocol where Other.Bound == Bound
   >(_ other: Other) {
     self.init(
       _uncheckedBounds: (lower: other.lowerBound, upper: other.upperBound)
@@ -102,7 +101,7 @@ extension _HalfOpenRange {
 }
 
 // WORKAROUND rdar://25214598 - should be Bound : Strideable
-extension _HalfOpenRange
+extension HalfOpenRangeProtocol
 where Bound : _Strideable, Bound.Stride : Integer {
   public var count: Bound.Stride {
     return lowerBound.distance(to: upperBound)
@@ -143,7 +142,7 @@ public struct CountableRange<
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : Equatable, RandomAccessCollection,
   CustomStringConvertible, CustomDebugStringConvertible, 
-  _HalfOpenRange {
+  HalfOpenRangeProtocol {
 
   public typealias Element = Bound
   public typealias Index = Element
@@ -209,7 +208,7 @@ public struct CountableRange<
     return "CountableRange(\(String(reflecting: lowerBound))..<\(String(reflecting: upperBound)))"
   }
 
-  public // ambiguity resolution between _RangeProtocol and Collection defaults
+  public // ambiguity resolution between RangeProtocol and Collection defaults
   var isEmpty: Bool {
     return lowerBound == upperBound
   }
@@ -328,7 +327,7 @@ public func == <Bound>(
 public struct Range<
   Bound : Comparable
 > : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
-    _HalfOpenRange {
+    HalfOpenRangeProtocol {
 
   /// Construct a range with `lowerBound == start` and `upperBound ==
   /// end`.
@@ -483,7 +482,7 @@ public func ..< <
 }
 
 @warn_unused_result
-public func ~= <R: _RangeProtocol> (
+public func ~= <R: RangeProtocol> (
   pattern: R, value: R.Bound
 ) -> Bool {
   return pattern.contains(value)

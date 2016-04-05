@@ -13,13 +13,12 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range and [Closed]CountableRange.
 
-public // implementation sharing
-protocol _ClosedRange : _RangeProtocol {}
+public protocol ClosedRangeProtocol : RangeProtocol {}
 
-extension _ClosedRange {
+extension ClosedRangeProtocol {
   @inline(__always)
   public init<
-    Other: _ClosedRange where Other.Bound == Bound
+    Other: ClosedRangeProtocol where Other.Bound == Bound
   >(_ other: Other) {
     self.init(
       _uncheckedBounds: (lower: other.lowerBound, upper: other.upperBound)
@@ -38,7 +37,7 @@ extension _ClosedRange {
 }
 
 // WORKAROUND rdar://25214598 - should be Bound : Strideable
-internal enum _ClosedRangeIndex<
+internal enum ClosedRangeProtocolIndex<
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > {
 case pastEnd
@@ -83,7 +82,7 @@ public struct ClosedRangeIndex<
     }
   }
   
-  internal var _value : _ClosedRangeIndex<Bound>
+  internal var _value : ClosedRangeProtocolIndex<Bound>
   internal var _dereferenced : Bound {
     switch _value {
     case .inRange(let x): return x
@@ -115,7 +114,9 @@ public func < <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
 }
 
 // WORKAROUND rdar://25214598 - should be Bound : Strideable
-extension _ClosedRange where Bound : _Strideable, Bound.Stride : Integer {
+extension ClosedRangeProtocol 
+  where Bound : _Strideable, Bound.Stride : Integer {
+
   public var count: Bound.Stride {
     return lowerBound.distance(to: upperBound)
   }
@@ -169,7 +170,7 @@ public struct CountableClosedRange<
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : Equatable, RandomAccessCollection,
   CustomStringConvertible, CustomDebugStringConvertible, 
-  _ClosedRange {
+  ClosedRangeProtocol {
 
   public typealias Element = Bound
   public typealias Index = ClosedRangeIndex<Bound>
@@ -225,7 +226,7 @@ public struct CountableClosedRange<
     return "CountableClosedRange(\(String(reflecting: lowerBound))...\(String(reflecting: upperBound)))"
   }
 
-  public // ambiguity resolution between _RangeProtocol and Collection defaults
+  public // ambiguity resolution between RangeProtocol and Collection defaults
   var isEmpty: Bool {
     return false
   }
@@ -285,7 +286,7 @@ public func == <Bound>(
 public struct ClosedRange<
   Bound : Comparable
 > : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
-    _ClosedRange {
+    ClosedRangeProtocol {
 
   /// Construct a range with `lowerBound == start` and `upperBound ==
   /// end`.
