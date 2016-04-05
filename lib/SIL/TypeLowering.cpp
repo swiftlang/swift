@@ -1620,6 +1620,12 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
                             CanGenericSignature(),
                             ResilienceExpansion::Minimal,
                             key.isDependent()).visit(contextType);
+
+  if (key.OrigType.isForeign()) {
+    assert(theInfo->isLoadable() && "Cannot lower address-only type with "
+           "foreign abstraction pattern");
+  }
+
   insert(key, theInfo);
   return *theInfo;
 }
