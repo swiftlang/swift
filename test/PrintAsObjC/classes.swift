@@ -18,8 +18,8 @@
 // RUN: FileCheck %s < %t/classes.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang %t/classes.h
-// RUN: not %check-in-clang -fno-modules %t/classes.h
-// RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h
+// RUN: not %check-in-clang -fno-modules -Qunused-arguments %t/classes.h
+// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
