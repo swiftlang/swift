@@ -250,6 +250,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     auto *IA = cast<InputAction>(context.InputActions[0]);
     const Arg &PrimaryInputArg = IA->getInputArg();
 
+    // FIXME: Remove disabling of -filelist once swift-update can handle it.
     if (context.OI.CompilerMode != OutputInfo::Mode::UpdateCode &&
         (context.Args.hasArg(options::OPT_driver_use_filelists) ||
         context.getTopLevelInputFiles().size() > TOO_MANY_FILES)) {
