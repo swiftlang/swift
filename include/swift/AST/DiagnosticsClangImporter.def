@@ -72,6 +72,10 @@ WARNING(inconsistent_swift_name,none,
         (bool, StringRef, StringRef, DeclName, StringRef, DeclName,
          StringRef))
 
+WARNING(unresolvable_clang_decl,none,
+        "imported declaration '%0' could not be mapped to '%1'",
+        (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

@@ -844,6 +844,25 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
   }
 }
 
+void ClangImporter::Implementation::finalizeLookupTable(
+       clang::ASTContext &clangCtx,
+       clang::Preprocessor &pp,
+       SwiftLookupTable &table) {
+  // Resolve any unresolved entries.
+  SmallVector<SwiftLookupTable::SingleEntry, 4> unresolved;
+  if (table.resolveUnresolvedEntries(unresolved)) {
+    // Complain about unresolved entries that remain.
+    for (auto entry : unresolved) {
+      auto decl = entry.get<clang::NamedDecl *>();
+      auto swiftName = decl->getAttr<clang::SwiftNameAttr>();
+
+      SwiftContext.Diags.diagnose(SourceLoc(), diag::unresolvable_clang_decl,
+                                  decl->getNameAsString(),
+                                  swiftName->getName());
+    }
+  }
+}
+
 bool ClangImporter::Implementation::importHeader(
     Module *adapter, StringRef headerName, SourceLoc diagLoc,
     bool trackParsedSymbols,
@@ -919,6 +938,10 @@ bool ClangImporter::Implementation::importHeader(
       Import = createImportDecl(SwiftContext, adapter, ClangImport, {});
     }
   }
+
+  // Finalize the lookup table, which may fail.
+  finalizeLookupTable(getClangASTContext(), getClangPreprocessor(),
+                      BridgingHeaderLookupTable);
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
@@ -4043,6 +4066,9 @@ ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionWriter(
 
     // Add macros to the lookup table.
     Impl.addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table);
+
+    // Finalize the lookup table, which may fail.
+    Impl.finalizeLookupTable(sema.Context, sema.getPreprocessor(), table);
   };
 
   return std::unique_ptr<clang::ModuleFileExtensionWriter>(
