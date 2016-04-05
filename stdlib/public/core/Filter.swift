@@ -222,9 +222,7 @@ public struct LazyFilterCollection<
 
     var index = i.base
     for _ in stride(from: 0, to: n, by: 1) {
-      if _nextFilteredInPlace(&index) {
-        break
-      }
+      _nextFilteredInPlace(&index)
     }
     return LazyFilterIndex(base: index)
   }
@@ -238,9 +236,10 @@ public struct LazyFilterCollection<
 
     var index = i.base
     for _ in stride(from: 0, to: n, by: 1) {
-      if _nextFilteredInPlace(&index, limitedBy: limit.base) {
+      if index == limit.base {
         break
       }
+      _nextFilteredInPlace(&index)
     }
     return LazyFilterIndex(base: index)
   }
@@ -255,37 +254,17 @@ public struct LazyFilterCollection<
   }
 
   /// Advances `index` until one of the following:
-  ///   `self._predicate` matches on related element
-  ///   `index` equals `self._base.endIndex`
-  /// Returns `true` iff at `self._base.endIndex`
+  /// 
+  /// - an element matches `self._predicate`
+  /// - `index == self._base.endIndex`
+  ///
+  /// - Precondition: `index != endIndex`
   @inline(__always)
-  internal func _nextFilteredInPlace(index: inout Base.Index) -> Bool {
-    while index != _base.endIndex {
-      if _predicate(_base[index]) {
-        return false
-      }
+  internal func _nextFilteredInPlace(index: inout Base.Index) {
+    _precondition(index != _base.endIndex, "can't advance past endIndex")
+    repeat {
       _base.formSuccessor(&index)
-    }
-    return true
-  }
-
-  /// Advances `index` until one of the following:
-  ///   `self._predicate` matches on related element
-  ///   `index` equals `self._base.endIndex`
-  ///   `index` equals `limit`
-  /// Returns `true` iff at `self._base.endIndex` or `limit`
-  @inline(__always)
-  internal func _nextFilteredInPlace(
-    index: inout Base.Index,
-    limitedBy limit: Base.Index
-  ) -> Bool {
-    while index != limit && index != _base.endIndex {
-      if _predicate(_base[index]) {
-        return false
-      }
-      _base.formSuccessor(&index)
-    }
-    return true
+    } while index != _base.endIndex && !_predicate(_base[index])
   }
 
   /// Access the element at `position`.
