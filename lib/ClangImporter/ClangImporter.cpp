@@ -2004,6 +2004,31 @@ hasOrInheritsSwiftBridgeAttr(const clang::ObjCInterfaceDecl *objcClass) {
   return false;
 }
 
+/// Whether the decl is from a module who requested import-as-member inference
+static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
+                                        clang::Sema &clangSema) {
+  clang::Module *submodule;
+  if (auto m = decl->getImportedOwningModule()) {
+    submodule = m;
+  } else if (auto m = decl->getLocalOwningModule()) {
+    submodule = m;
+  } else if (auto m = clangSema.getPreprocessor().getCurrentModule()) {
+    submodule = m;
+  } else if (auto m = clangSema.getPreprocessor().getCurrentSubmodule()) {
+    submodule = m;
+  } else {
+    return false;
+  }
+
+  while (submodule) {
+    if (submodule->IsSwiftInferImportAsMember)
+      return true;
+    submodule = submodule->Parent;
+  }
+
+  return false;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2186,7 +2211,8 @@ auto ClangImporter::Implementation::importFullName(
 
       return result;
     }
-  } else if (InferImportAsMember &&
+  } else if ((InferImportAsMember ||
+              moduleIsInferImportAsMember(D, clangSema)) &&
              (isa<clang::VarDecl>(D) || isa<clang::FunctionDecl>(D)) &&
              dc->isTranslationUnit()) {
     auto inference = IAMResult::infer(SwiftContext, clangSema, D);
