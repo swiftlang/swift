@@ -388,14 +388,13 @@ namespace {
     void initialize(IRGenFunction &IGF, Explosion &e,
                     Address addr) const override {}
     void copy(IRGenFunction &IGF, Explosion &src,
-              Explosion &dest) const override {}
-    void consume(IRGenFunction &IGF, Explosion &src) const override {}
+              Explosion &dest, Atomicity atomicity) const override {}
+    void consume(IRGenFunction &IGF, Explosion &src,
+                 Atomicity atomicity) const override {}
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {}
-    void packIntoEnumPayload(IRGenFunction &IGF,
-                             EnumPayload &payload,
-                             Explosion &src,
-                             unsigned offset) const override {}
+    void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
+                             Explosion &src, unsigned offset) const override {}
     void unpackFromEnumPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
                                Explosion &dest,
@@ -467,19 +466,20 @@ namespace {
     }
     
     void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
-              Explosion &targetExplosion) const override {
+              Explosion &targetExplosion, Atomicity atomicity) const override {
       reexplode(IGF, sourceExplosion, targetExplosion);
     }
-    
-    void consume(IRGenFunction &IGF, Explosion &explosion) const override {
+
+    void consume(IRGenFunction &IGF, Explosion &explosion,
+                 Atomicity atomicity) const override {
       explosion.claimNext();
     }
     
     void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const override {
       explosion.claimNext();
     }
-    
-    void destroy(IRGenFunction &IGF, Address address, SILType T) const override{
+
+    void destroy(IRGenFunction &IGF, Address address, SILType T) const override {
       /* nop */
     }
     

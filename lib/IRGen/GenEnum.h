@@ -344,7 +344,7 @@ public:
   
   virtual void getSchema(ExplosionSchema &schema) const = 0;
   virtual void destroy(IRGenFunction &IGF, Address addr, SILType T) const = 0;
-  
+
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                                     Address dest, SILType T) const;
   
@@ -398,8 +398,9 @@ public:
   virtual void reexplode(IRGenFunction &IGF, Explosion &src,
                          Explosion &dest) const = 0;
   virtual void copy(IRGenFunction &IGF, Explosion &src,
-                    Explosion &dest) const = 0;
-  virtual void consume(IRGenFunction &IGF, Explosion &src) const = 0;
+                    Explosion &dest, Atomicity atomicity) const = 0;
+  virtual void consume(IRGenFunction &IGF, Explosion &src,
+                       Atomicity atomicity) const = 0;
   virtual void fixLifetime(IRGenFunction &IGF, Explosion &src) const = 0;
   virtual void packIntoEnumPayload(IRGenFunction &IGF,
                                    EnumPayload &payload,
