@@ -520,10 +520,50 @@ func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
 #if _runtime(_ObjC)
 @_silgen_name("swift_ClassMirror_quickLookObject")
-public func _getClassPlaygroundQuickLook(
-  _: inout PlaygroundQuickLook?,
-  _: _MagicMirrorData
-)
+public func _swift_ClassMirror_quickLookObject(_: _MagicMirrorData) -> AnyObject
+
+@_silgen_name("swift_isKind")
+func _swift_isKind(object: AnyObject, of: AnyObject) -> Bool
+
+func _isKind(object: AnyObject, of: String) -> Bool {
+  return _swift_isKind(object, of: _bridgeToObjectiveC(of)!)
+}
+
+func _getClassPlaygroundQuickLook(object: AnyObject) -> PlaygroundQuickLook? {
+  if _isKind(object, of: "NSNumber") {
+    let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
+    switch UInt8(number.objCType[0]) {
+    case UInt8(ascii: "d"):
+      return .double(number.doubleValue)
+    case UInt8(ascii: "f"):
+      return .float(number.floatValue)
+    case UInt8(ascii: "Q"):
+      return .uInt(number.unsignedLongLongValue)
+    default:
+      return .int(number.longLongValue)
+    }
+  } else if _isKind(object, of: "NSAttributedString") {
+    return .attributedString(object)
+  } else if _isKind(object, of: "NSImage") ||
+            _isKind(object, of: "UIImage") ||
+            _isKind(object, of: "NSImageView") ||
+            _isKind(object, of: "UIImageView") ||
+            _isKind(object, of: "CIImage") ||
+            _isKind(object, of: "NSBitmapImageRep") {
+    return .image(object)
+  } else if _isKind(object, of: "NSColor") ||
+            _isKind(object, of: "UIColor") {
+    return .color(object)
+  } else if _isKind(object, of: "NSBezierPath") ||
+            _isKind(object, of: "UIBezierPath") {
+    return .bezierPath(object)
+  } else if _isKind(object, of: "NSString") {
+    return .text(_forceBridgeFromObjectiveC(object, String.self))
+  }
+
+  return .none
+}
+
 #endif
 
 struct _ClassMirror : _Mirror {
@@ -545,9 +585,8 @@ struct _ClassMirror : _Mirror {
   }
   var quickLookObject: PlaygroundQuickLook? {
 #if _runtime(_ObjC)
-    var result: PlaygroundQuickLook? = nil
-    _getClassPlaygroundQuickLook(&result, data)
-    return result
+    let object = _swift_ClassMirror_quickLookObject(data)
+    return _getClassPlaygroundQuickLook(object)
 #else
     return nil
 #endif
