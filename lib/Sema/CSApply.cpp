@@ -257,6 +257,44 @@ static VarDecl *findNamedPropertyWitness(TypeChecker &tc, DeclContext *dc,
   return findNamedWitnessImpl<VarDecl>(tc, dc, type, proto, name, diag);
 }
 
+static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
+                                        DeclContext *DC) {
+  // This only matters for stored properties.
+  if (!member->hasStorage())
+    return false;
+
+  // ... referenced from constructors and destructors.
+  auto *AFD = dyn_cast<AbstractFunctionDecl>(DC);
+  if (AFD == nullptr)
+    return false;
+
+  if (!isa<ConstructorDecl>(AFD) && !isa<DestructorDecl>(AFD))
+    return false;
+
+  // ... via a "self.property" reference.
+  auto *DRE = dyn_cast<DeclRefExpr>(base);
+  if (DRE == nullptr)
+    return false;
+
+  if (AFD->getImplicitSelfDecl() != cast<DeclRefExpr>(base)->getDecl())
+    return false;
+
+  // Convenience initializers do not require special handling.
+  // FIXME: This is a language change -- for now, keep the old behavior
+#if 0
+  if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
+    if (!CD->isDesignatedInit())
+      return false;
+#endif
+
+  // Ctor or dtor are for immediate class, not a derived class.
+  if (AFD->getParent()->getDeclaredTypeOfContext()->getCanonicalType() !=
+      member->getDeclContext()->getDeclaredTypeOfContext()->getCanonicalType())
+    return false;
+
+  return true;
+}
+
 /// Return the implicit access kind for a MemberRefExpr with the
 /// specified base and member in the specified DeclContext.
 static AccessSemantics
@@ -265,22 +303,17 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   // Properties that have storage and accessors are frequently accessed through
   // accessors.  However, in the init and destructor methods for the type
   // immediately containing the property, accesses are done direct.
-  if (auto *AFD_DC = dyn_cast<AbstractFunctionDecl>(DC))
-    if (member->hasStorage() &&
-        // In a ctor or dtor.
-        (isa<ConstructorDecl>(AFD_DC) || isa<DestructorDecl>(AFD_DC)) &&
+  if (shouldAccessStorageDirectly(base, member, DC)) {
+    // The storage better not be resilient.
+    assert(member->hasFixedLayout(DC->getParentModule(),
+                                  DC->getResilienceExpansion()) &&
+           "Designated initializers and destructors of resilient types "
+           "cannot be @_transparent or defined in extensions");
 
-        // Ctor or dtor are for immediate class, not a derived class.
-        AFD_DC->getParent()->getDeclaredTypeOfContext()->getCanonicalType() ==
-          member->getDeclContext()->getDeclaredTypeOfContext()->getCanonicalType() &&
-
-        // Is a "self.property" reference.
-        isa<DeclRefExpr>(base) &&
-        AFD_DC->getImplicitSelfDecl() == cast<DeclRefExpr>(base)->getDecl()) {
-      // Access this directly instead of going through (e.g.) observing or
-      // trivial accessors.
-      return AccessSemantics::DirectToStorage;
-    }
+    // Access this directly instead of going through (e.g.) observing or
+    // trivial accessors.
+    return AccessSemantics::DirectToStorage;
+  }
 
   // If the value is always directly accessed from this context, do it.
   return member->getAccessSemanticsFromContext(DC);
