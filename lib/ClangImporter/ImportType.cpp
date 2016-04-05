@@ -1866,6 +1866,8 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
     return ctx.getObjCObjectPointerType(ctx.getObjCInterfaceType(objcClass));
 
   if (auto objcCategory = dyn_cast<clang::ObjCCategoryDecl>(dc)) {
+    if (objcCategory->isInvalidDecl()) return clang::QualType();
+    
     return ctx.getObjCObjectPointerType(
              ctx.getObjCInterfaceType(
                objcCategory->getClassInterface()));
