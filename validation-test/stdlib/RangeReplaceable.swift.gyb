@@ -42,14 +42,16 @@ RangeReplaceableTestSuite.test("remove(at:)/dispatch") {
   expectCustomizable(tester, tester.log.removeAt)
 }
 
-RangeReplaceableTestSuite.test("removeLast/whereIndexIsBidirectional/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+RangeReplaceableTestSuite.test("removeLast/whereSelfIsBidirectionalCollection/dispatch") {
+  var tester = LoggingRangeReplaceableBidirectionalCollection(wrapping:
+    LoggingRangeReplaceableBidirectionalCollection(wrapping: [ OpaqueValue(1) ]))
   _ = tester.removeLast()
   expectCustomizable(tester, tester.log._customRemoveLast)
 }
 
-RangeReplaceableTestSuite.test("removeLast(n: Int)/whereIndexIsBidirectional/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+RangeReplaceableTestSuite.test("removeLast(n: Int)/whereSelfIsBidirectionalCollection/dispatch") {
+  var tester = LoggingRangeReplaceableBidirectionalCollection(wrapping:
+    LoggingRangeReplaceableBidirectionalCollection(wrapping: [ OpaqueValue(1) ]))
   _ = tester.removeLast(1)
   expectCustomizable(tester, tester.log._customRemoveLastN)
 }
