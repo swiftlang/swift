@@ -245,7 +245,7 @@ SILBuilder::emitStrongRelease(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createStrongRelease(Loc, Operand);
+  return createStrongRelease(Loc, Operand, Atomicity::Atomic);
 }
 
 /// Emit a release_value instruction at the current location, attempting to
@@ -272,7 +272,7 @@ SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createReleaseValue(Loc, Operand);
+  return createReleaseValue(Loc, Operand, Atomicity::Atomic);
 }
 
 

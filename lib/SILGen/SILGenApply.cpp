@@ -2322,7 +2322,7 @@ RValue SILGenFunction::emitApply(
       assert(lifetimeExtendedSelf
              && "did not save lifetime-extended self param");
       if (!hasAlreadyLifetimeExtendedSelf) {
-        B.createAutoreleaseValue(loc, lifetimeExtendedSelf);
+        B.createAutoreleaseValue(loc, lifetimeExtendedSelf, Atomicity::Atomic);
         hasAlreadyLifetimeExtendedSelf = true;
       }
       SWIFT_FALLTHROUGH;

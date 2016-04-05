@@ -652,7 +652,7 @@ namespace {
 
     void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue aggValue) const override {
-      B.createRetainValue(loc, aggValue);
+      B.createRetainValue(loc, aggValue, Atomicity::Atomic);
     }
 
     void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
@@ -860,7 +860,7 @@ namespace {
 
     void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
-      B.createRetainValue(loc, value);
+      B.createRetainValue(loc, value, Atomicity::Atomic);
     }
 
     void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
@@ -868,7 +868,7 @@ namespace {
                               LoweringStyle style) const override {
       if (style == LoweringStyle::Shallow ||
           style == LoweringStyle::DeepNoEnum) {
-        B.createRetainValue(loc, value);
+        B.createRetainValue(loc, value, Atomicity::Atomic);
       } else {
         ifNonTrivialElement(B, loc, value,
           [&](SILBuilder &B, SILLocation loc, SILValue child,
@@ -930,7 +930,7 @@ namespace {
     void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
       if (!isa<FunctionRefInst>(value))
-        B.createStrongRetain(loc, value);
+        B.createStrongRetain(loc, value, Atomicity::Atomic);
     }
 
     void emitReleaseValue(SILBuilder &B, SILLocation loc,
@@ -947,12 +947,12 @@ namespace {
 
     void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
-      B.createUnownedRetain(loc, value);
+      B.createUnownedRetain(loc, value, Atomicity::Atomic);
     }
 
     void emitReleaseValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
-      B.createUnownedRelease(loc, value);
+      B.createUnownedRelease(loc, value, Atomicity::Atomic);
     }
   };
 
