@@ -120,6 +120,17 @@ extension RangeProtocol {
 /// upper bounds.
 public protocol HalfOpenRangeProtocol : RangeProtocol {}
 
+@warn_unused_result
+public func == <
+  LHS : HalfOpenRangeProtocol, RHS : HalfOpenRangeProtocol 
+  where LHS.Bound == RHS.Bound
+>(lhs: LHS, rhs: RHS) -> Bool {
+  return
+    lhs.lowerBound == rhs.lowerBound &&
+    lhs.upperBound == rhs.upperBound
+}
+
+
 extension HalfOpenRangeProtocol {
   /// Creates an instance equivalent to `other`.
   @inline(__always)
@@ -334,16 +345,6 @@ extension CountableRange : CustomReflectable {
   }
 }
 
-@warn_unused_result
-public func == <Bound>(
-  lhs: CountableRange<Bound>,
-  rhs: CountableRange<Bound>
-) -> Bool {
-  return
-    lhs.lowerBound == rhs.lowerBound &&
-    lhs.upperBound == rhs.upperBound
-}
-
 /// A collection of consecutive discrete index values.
 ///
 /// - parameter Element: Is both the element type and the index type of the
@@ -496,13 +497,6 @@ Bound._DisabledRangeIndex.Stride : Integer {
   }
 }
 //===--- End 0-based indexing protection ----------------------------------===//
-
-@warn_unused_result
-public func == <Bound>(lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {
-  return
-    lhs.lowerBound == rhs.lowerBound &&
-    lhs.upperBound == rhs.upperBound
-}
 
 /// Returns a half-open range that contains `minimum`, but not
 /// `maximum`.
