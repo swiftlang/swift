@@ -47,6 +47,10 @@ namespace irgen {
                                CastConsumptionKind consumptionKind,
                                CheckedCastMode mode);
 
+  void emitValueCheckedCast(IRGenFunction &IGF, Explosion &value,
+                            SILType valueType, SILType loweredTargetType,
+                            CheckedCastMode mode, Explosion &out);
+
   /// \brief Convert a class object to the given destination type,
   /// using a runtime-checked cast.
   ///
@@ -100,7 +104,6 @@ namespace irgen {
   /// Emit a Protocol* value referencing an ObjC protocol.
   llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,
                                            ProtocolDecl *proto);
-
 } // end namespace irgen
 } // end namespace swift
 

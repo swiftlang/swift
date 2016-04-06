@@ -17,6 +17,7 @@
 #include "GenCast.h"
 
 #include "Explosion.h"
+#include "GenExistential.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "IRGenDebugInfo.h"
@@ -703,4 +704,90 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
       ex.add(phi);
     }
   }
+}
+
+/// Emit a checked cast sequence.
+void irgen::emitValueCheckedCast(IRGenFunction &IGF,
+                                 Explosion &value,
+                                 SILType valueType,
+                                 SILType loweredTargetType,
+                                 CheckedCastMode mode,
+                                 Explosion &out) {
+  assert(valueType.isObject());
+  assert(loweredTargetType.isObject());
+  CanType sourceType = valueType.getSwiftRValueType();
+  CanType targetType = loweredTargetType.getSwiftRValueType();
+
+  if (auto sourceMetaType = dyn_cast<AnyMetatypeType>(sourceType)) {
+    llvm::Value *metatypeVal = nullptr;
+    if (sourceMetaType->getRepresentation() != MetatypeRepresentation::Thin)
+      metatypeVal = value.claimNext();
+    // If the metatype is existential, there may be witness tables in the
+    // value, which we don't need.
+    // TODO: In existential-to-existential casts, we should carry over common
+    // witness tables from the source to the destination.
+    value.claimAll();
+
+    SmallVector<ProtocolDecl*, 1> protocols;
+
+    if (auto existential = dyn_cast<ExistentialMetatypeType>(targetType))
+      emitScalarExistentialDowncast(IGF, metatypeVal,
+                                    valueType, loweredTargetType,
+                                    mode,
+                                    existential->getRepresentation(),
+                                    out);
+    else if (auto destMetaType = dyn_cast<MetatypeType>(targetType))
+      emitMetatypeDowncast(IGF, metatypeVal, destMetaType, mode, out);
+    else if (targetType->isExistentialType(protocols)) {
+      assert(IGF.IGM.ObjCInterop
+             && protocols.size() == 1
+             && *protocols[0]->getKnownProtocolKind()
+                   == KnownProtocolKind::AnyObject
+             && "metatypes can only be cast to AnyObject, with ObjC interop");
+      emitMetatypeToObjectDowncast(IGF, metatypeVal, sourceMetaType, mode, out);
+    }
+    return;
+  }
+
+  if ((isa<ArchetypeType>(sourceType) && !targetType.isExistentialType()) ||
+      (isa<ArchetypeType>(targetType) && !sourceType.isExistentialType())) {
+    llvm::Value *fromValue = value.claimNext();
+    llvm::Value *toValue =
+      emitClassDowncast(IGF, fromValue, loweredTargetType, mode);
+    out.add(toValue);
+    return;
+  }
+
+  if (sourceType.isExistentialType()) {
+    llvm::Value *instance
+      = emitClassExistentialProjection(IGF, value, valueType,
+                                       CanArchetypeType());
+
+    llvm::Value *toValue;
+    if (loweredTargetType.isExistentialType()) {
+      emitScalarExistentialDowncast(IGF, instance, valueType,
+                                    loweredTargetType, mode,
+                                    /*not a metatype*/ None,
+                                    out);
+    } else {
+      toValue = emitClassDowncast(IGF, instance, loweredTargetType, mode);
+      out.add(toValue);
+    }
+
+    return;
+  }
+
+  if (targetType.isExistentialType()) {
+    llvm::Value *fromValue = value.claimNext();
+    emitScalarExistentialDowncast(IGF, fromValue, valueType,
+                                  loweredTargetType, mode,
+                                  /*not a metatype*/ None,
+                                  out);
+    return;
+  }
+
+  llvm::Value *fromValue = value.claimNext();
+  llvm::Value *cast
+    = emitClassDowncast(IGF, fromValue, loweredTargetType, mode);
+  out.add(cast);
 }
