@@ -88,6 +88,49 @@ bb0:
   return %t : $()
 }
 
+// CHECK-LABEL: sil @promote_with_unreachable_block
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: bb1:
+// CHECK-NEXT: unreachable
+// CHECK: bb2:
+// CHECK: strong_release
+// CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: return
+sil @promote_with_unreachable_block : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil @no_return_function
+// Just check that we don't crash on this.
+// It's a corner case, so we don't care if stack promotion is done or not.
+// CHECK: unreachable
+sil @no_return_function : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  br bb1
+
+bb1:
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  unreachable
+}
+
 // CHECK-LABEL: sil @promote_in_loop_with_if
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: {{^}}bb4({{.*}}):
