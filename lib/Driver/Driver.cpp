@@ -2035,7 +2035,7 @@ const ToolChain *Driver::getToolChain(const ArgList &Args) const {
       TC = new toolchains::GenericUnix(*this, Target);
       break;
     case llvm::Triple::Win32:
-      TC = new toolchains::Windows(*this, Target);
+      TC = new toolchains::Cygwin(*this, Target);
       break;
     default:
       TC = nullptr;
