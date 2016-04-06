@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A collection that supports efficient random access index traversal.
+///
+/// - Important: In most cases, it's best to ignore this protocol and use
+///   `RandomAccessCollection` instead, as it has a more complete interface.
 public protocol RandomAccessIndexable : BidirectionalIndexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
@@ -18,7 +22,17 @@ public protocol RandomAccessIndexable : BidirectionalIndexable {
   // library.
 }
 
-// TODO: swift-3-indexing-model - Add in RandomAccessCollection protocol documentation
+/// A collection that supports efficient random access index traversal.
+///
+/// - Note: the fundamental difference between
+///   `RandomAccessCollection` and `BidirectionalCollection` is that
+///   the following are O(N) in `BidirectionalCollection` but O(1) in
+///   `RandomAccessCollection`:
+///
+///   - `c.count`
+///   - `c.index(n, stepsFrom: i)`
+///   - `c.index(n, stepsFrom: i, limitedBy: l)`
+///   - `c.distance(from: i, to: j)`
 public protocol RandomAccessCollection :
   RandomAccessIndexable, BidirectionalCollection
 {

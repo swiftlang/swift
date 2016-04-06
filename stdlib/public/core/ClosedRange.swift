@@ -161,9 +161,9 @@ extension ClosedRangeProtocol
   }
 }
 
-// WORKAROUND: for some reason
-// IndexingIterator<CountableClosedRange> doesn't conform to
-// IteratorProtocol?!
+// WORKAROUND: needed because of rdar://25584401
+/// A position in a closed range whose `Bound` is `Strideable` with
+/// `Integer` `Stride`.
 public struct ClosedRangeIterator<
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : IteratorProtocol, Sequence {
@@ -188,6 +188,8 @@ public struct ClosedRangeIterator<
   internal let _upperBound: Bound
 }
 
+/// A closed range whose `Bound` is `Strideable` with `Integer`
+/// `Stride` and conforms to RandomAccessCollection.
 public struct CountableClosedRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
@@ -195,33 +197,47 @@ public struct CountableClosedRange<
   CustomStringConvertible, CustomDebugStringConvertible, 
   ClosedRangeProtocol {
 
-  public typealias Element = Bound
+  /// A type that represents a position in the range.
   public typealias Index = ClosedRangeIndex<Bound>
+  
+  // WORKAROUND: needed because of rdar://25584401
   public typealias Iterator = ClosedRangeIterator<Bound>
   //public typealias IndexDistance = Int
   // FIXME: swift-3-indexing-model: IndexDistance = Bound.Stride
   
+  // WORKAROUND: needed because of rdar://25584401
   public func makeIterator() -> ClosedRangeIterator<Bound> {
     return ClosedRangeIterator(self)
   }
 
+  /// Returns the position immediately after `i`.
   @warn_unused_result
   public func successor(of i: Index) -> Index {
     return i._successor(upperBound: upperBound)
   }
 
+  /// Returns the position immediately preceding `i`.
   @warn_unused_result
   public func predecessor(of i: Index) -> Index {
     return i._predecessor(upperBound: upperBound)
   }
 
-  public var indices: DefaultRandomAccessIndices<CountableClosedRange<Bound>> {
+  public // WORKAROUND: needed because of rdar://25584401
+  var indices: DefaultRandomAccessIndices<CountableClosedRange<Bound>> {
     return DefaultRandomAccessIndices(
       _elements: self,
       startIndex: self.startIndex,
       endIndex: self.endIndex)
   }
 
+  /// Creates an instance with the given bounds.
+  ///
+  /// - Note: as this initializer does not check its precondition, it
+  ///   should be used as an optimization only, when one is absolutely
+  ///   certain that `lower <= upper`.  In general, the `...`
+  ///   operator is to be preferred for forming closed ranges.
+  ///
+  /// - Precondition: `lower <= upper`
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
@@ -234,13 +250,12 @@ public struct CountableClosedRange<
 
   /// The range's upper bound.
   ///
-  /// `upperBound` is not a valid argument to `subscript`, and is always
-  /// reachable from `lowerBound` by zero or more applications of
-  /// `successor()`.
+  /// `upperBound` is always reachable from `lowerBound` by zero or
+  /// more applications of `successor()`.
   public let upperBound: Bound
   
   @warn_unused_result
-  public func _customContainsEquatableElement(element: Element) -> Bool? {
+  public func _customContainsEquatableElement(element: Bound) -> Bool? {
     return element >= self.lowerBound && element < self.upperBound
   }
 
@@ -254,7 +269,9 @@ public struct CountableClosedRange<
     return false
   }
 
-  public subscript(bounds: Range<Index>) -> RandomAccessSlice<CountableClosedRange> {
+  public subscript(
+    bounds: Range<Index>
+  ) -> RandomAccessSlice<CountableClosedRange> {
     return RandomAccessSlice(base: self, bounds: bounds)
   }
 }
@@ -336,13 +353,15 @@ public struct ClosedRange<
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "ClosedRange(\(String(reflecting: lowerBound))...\(String(reflecting: upperBound)))"
+    return "ClosedRange(\(String(reflecting: lowerBound))"
+    + "...\(String(reflecting: upperBound)))"
   }
 }
 
 extension ClosedRange : CustomReflectable {
   public var customMirror: Mirror {
-    return Mirror(self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
+    return Mirror(
+      self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
 }
 
@@ -354,23 +373,25 @@ extension ClosedRange : CustomReflectable {
 @warn_unused_result
 public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
   -> ClosedRange<Bound> {
-  _precondition(minimum <= maximum, "Can't form Range with end < start")
+  _precondition(
+    minimum <= maximum, "Can't form Range with upperBound < lowerBound")
   return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
-/// Returns a closed range that contains `start` and `end`.
+/// Returns a closed range that contains `minimum` and `maximum`.
 ///
-/// - Precondition: `start <= end`.
+/// - Precondition: `minimum <= maximum`.
 @_transparent
 @warn_unused_result
-// WORKAROUND rdar://25214598 - should be just Bound : Strideable
 public func ... <
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > (
-  start: Bound, end: Bound
+  minimum: Bound, maximum: Bound
 ) -> CountableClosedRange<Bound> {
   // FIXME: swift-3-indexing-model: tests for traps.
-  _precondition(start <= end, "Can't form Range with end < start")
-  return CountableClosedRange(uncheckedBounds: (lower: start, upper: end))
+  _precondition(
+    minimum <= maximum, "Can't form Range with upperBound < lowerBound")
+  return CountableClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 

@@ -22,27 +22,42 @@ public protocol BidirectionalIndexable : Indexable {
   // This protocol is almost an implementation detail of the standard
   // library.
 
+  /// Returns the position immediately preceding `i`.
+  ///
+  /// - If `i >= startIndex && i < endIndex`,
+  ///   `predecessor(of: successor(of: i)) == i`.
+  /// 
+  /// - If `i > startIndex && i <= endIndex`
+  ///   `successor(of: predecessor(of: i)) == i`.
+  ///
+  /// - Precondition: `i > startIndex && i <= endIndex` 
   @warn_unused_result
   func predecessor(of i: Index) -> Index
 
+  /// Replaces `i` with its predecessor.
   func formPredecessor(i: inout Index)
 }
 
-// TODO: swift-3-indexing-model - Add in BidirectionalCollection protocol documentation
+/// A collection that supports backward as well as forward traversal.
+///
+/// - SeeAlso: BidirectionalCollection.predecessor
 public protocol BidirectionalCollection
   : BidirectionalIndexable, Collection {
 
 // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
-  /// Returns the previous consecutive `Index` in a discrete sequence of
-  /// `Index` values.
+  /// Returns the position immediately preceding `i`.
   ///
-  /// If `i` has a well-defined successor, `self.predecessor(of: self.successor(of: i)) == i`.
-  /// If `i` has a well-defined predecessor, `self.successor(of: self.predecessor(of: i)) == i`.
+  /// - If `i >= startIndex && i < endIndex`,
+  ///   `predecessor(of: successor(of: i)) == i`.
+  /// 
+  /// - If `i > startIndex && i <= endIndex`
+  ///   `successor(of: predecessor(of: i)) == i`.
   ///
-  /// - Precondition: `i` has a well-defined predecessor.
+  /// - Precondition: `i > startIndex && i <= endIndex` 
   @warn_unused_result
   func predecessor(of i: Index) -> Index
 
+  /// Replaces `i` with its predecessor.
   func formPredecessor(i: inout Index)
 
   associatedtype SubSequence : BidirectionalIndexable, Collection

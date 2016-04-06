@@ -121,13 +121,13 @@ public protocol IndexableBase {
   /// - Complexity: O(1).
   func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
 
-  /// Returns the next consecutive `Index` in a discrete sequence of
-  /// `Index` values.
+  /// Returns the position immediately after `i`.
   ///
   /// - Precondition: `(startIndex..<endIndex).contains(i)`
   @warn_unused_result
   func successor(of i: Index) -> Index
 
+  /// Replaces `i` with its successor.
   func formSuccessor(i: inout Index)
 }
 
@@ -195,7 +195,7 @@ public struct IndexingIterator<
 /// view.  In other words, the following code binds the same series of
 /// values to `x` as does `for x in self {}`:
 ///
-///     for i in startIndex..<endIndex {
+///     for i in self.indices {
 ///       let x = self[i]
 ///     }
 public protocol Collection : Indexable, Sequence {
@@ -250,13 +250,16 @@ public protocol Collection : Indexable, Sequence {
   /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
-  /// A type for the collection of indices for this collection.
+  /// A collection type whose elements are the indices of `self` that
+  /// are valid for subscripting, in ascending order.
   ///
-  /// An instance of `Indices` can hold a strong reference to the collection
-  /// itself, causing the collection to be non-uniquely referenced.  If you
-  /// need to mutate the collection while iterating over its indices, use the
-  /// `next()` method to produce indices instead.
+  /// - Note: An instance of `Indices` can hold a strong reference to
+  ///   the collection itself, causing the collection to be
+  ///   non-uniquely referenced.  If you need to mutate the collection
+  ///   while iterating over its indices, use the `next()` method to
+  ///   produce indices instead.
   associatedtype Indices : IndexableBase, Sequence = DefaultIndices<Self>
+
   // FIXME(compiler limitation):
   // associatedtype Indices : Collection
   //   where
@@ -265,8 +268,8 @@ public protocol Collection : Indexable, Sequence {
   //   Indices.SubSequence == Indices
   //   = DefaultIndices<Self>
 
-  /// The collection of indices of this collection that can be used for
-  /// subscripting.
+  /// The indices that are valid for subscripting `self`, in ascending
+  /// order.
   var indices: Indices { get }
 
   /// Returns `self[startIndex..<end]`
@@ -292,8 +295,8 @@ public protocol Collection : Indexable, Sequence {
 
   /// Returns the number of elements.
   ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
-  ///   O(N) otherwise.
+  /// - Complexity: O(1) if `Self` conforms to
+  ///   `RandomAccessCollection`; O(N) otherwise.
   var count: IndexDistance { get }
 
   // The following requirement enables dispatching for indexOf when
@@ -311,37 +314,40 @@ public protocol Collection : Indexable, Sequence {
   /// Returns the result of advancing `i` by `n` positions.
   ///
   /// - Returns:
-  ///   - If `n > 0`, returns a new index applying `next` on `i` `n`
-  ///     times.
-  ///   - If `n < 0`, returns a new index by applying `previous` on `i`
-  ///     `-n` times.
+  ///   - If `n > 0`, the `n`th successor of `i`.
+  ///   - If `n < 0`, the `n`th predecessor of `i`.
   ///   - Otherwise, `i` unmodified.
   ///
-  /// - Precondition: `n >= 0` if only conforming to `Collection`
+  /// - Precondition: `n >= 0` unless `Self` conforms to
+  ///   `BidirectionalCollection`.
   ///
   /// - Complexity:
-  ///   - O(1) if conforming to `RandomAccessCollection`
-  ///   - O(`abs(n)`) otherwise
+  ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
+  ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
   func index(n: IndexDistance, stepsFrom i: Index) -> Index
 
-  /// Returns the result of advancing `self` by `n` positions, or until it
+  /// Returns the result of advancing `i` by `n` positions, or until it
   /// equals `limit`.
   ///
   /// - Returns:
-  ///   - If `n > 0`, returns `i` modified by applying `next` on `i` `n`
-  ///     times but not past `limit`.
-  ///   - If `n < 0`, returns `i` modified by applying `previous` on `i`
-  ///     `-n` times but not past `limit`.
-  ///   - Otherwise, return `i` unmodified.
   ///
-  /// - Precondition: `n >= 0` if only conforming to `Collection`.
+  ///   - If `n > 0`, the `n`th successor of `i` or `limit`, whichever
+  ///     is reached first.
+  ///   - If `n > 0`, the `n`th predecessor of `i` or `limit`, whichever
+  ///     is reached first.
+  ///   - Otherwise, `i` unmodified.
+  ///
+  /// - Precondition: `n >= 0` unless `Self` conforms to
+  ///   `BidirectionalCollection`.
   ///
   /// - Complexity:
-  ///   - O(1) if conforming to `RandomAccessCollection`
-  ///   - O(`abs(n)`) otherwise
+  ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
+  ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
-  func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index
+  func index(
+    n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  ) -> Index
 
   /// Measure the distance between `start` and `end` indexes.
   ///

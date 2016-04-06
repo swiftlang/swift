@@ -153,9 +153,10 @@ extension HalfOpenRangeProtocol {
   }
 }
 
-/// Ranges whose `Bound` is `Strideable` with `Integer` `Stride`
-/// have all the capabilities of `RandomAccessCollection`s, where
-/// elements of the collection are the values contained in the range.
+/// Half-open ranges whose `Bound` is `Strideable` with `Integer`
+/// `Stride` have all the capabilities of `RandomAccessCollection`s,
+/// where elements of the collection are the values contained in the
+/// range.
 extension HalfOpenRangeProtocol
   where Bound : _Strideable, Bound.Stride : Integer {
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
@@ -195,8 +196,8 @@ extension HalfOpenRangeProtocol
   }
 }
 
-/// A range whose `Bound` is `Strideable` with `Integer` `Stride`, and
-/// that conforms to `RandomAccessCollection`.
+/// A half-open range whose `Bound` is `Strideable` with `Integer`
+/// `Stride`, and that conforms to `RandomAccessCollection`.
 public struct CountableRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
@@ -504,24 +505,26 @@ Bound._DisabledRangeIndex.Stride : Integer {
 @warn_unused_result
 public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
   -> Range<Bound> {
-  _precondition(minimum <= maximum, "Can't form Range with end < start")
+  _precondition(minimum <= maximum,
+    "Can't form Range with upperBound < lowerBound")
   return Range(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
-/// Returns a half-open range that contains `start`, but not `end`.
+/// Returns a half-open range that contains `minimum`, but not `maximum`.
 ///
-/// - Precondition: `start <= end`.
+/// - Precondition: `minimum <= maximum`.
 @_transparent
 @warn_unused_result
 // WORKAROUND rdar://25214598 - should be just Bound : Strideable
 public func ..< <
   Bound : _Strideable where Bound : Comparable, Bound.Stride : Integer
 > (
-  start: Bound, end: Bound
+  minimum: Bound, maximum: Bound
 ) -> CountableRange<Bound> {
   // FIXME: swift-3-indexing-model: tests for traps.
-  _precondition(start <= end, "Can't form Range with end < start")
-  return CountableRange(uncheckedBounds: (lower: start, upper: end))
+  _precondition(minimum <= maximum,
+    "Can't form Range with upperBound < lowerBound")
+  return CountableRange(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
 @warn_unused_result
