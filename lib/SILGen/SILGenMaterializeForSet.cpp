@@ -363,6 +363,7 @@ public:
         lv.getSubstFormalType()).getObjectType();
     SILType actualTy = lv.getTypeOfRValue().getObjectType();
     assert(expectedTy == actualTy);
+    (void) expectedTy;
 
     // Reabstract back to the requirement pattern.
     if (actualTy != RequirementStorageType) {
