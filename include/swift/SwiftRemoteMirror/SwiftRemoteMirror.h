@@ -1,4 +1,4 @@
-//===--- SwiftReflection.h - Public remote reflection interface -*- C++ -*-===//
+//===--- SwiftRemoteMirror.h - Public remote reflection interf. -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
