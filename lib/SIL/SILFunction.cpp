@@ -517,11 +517,6 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
   if (isFragile())
     return true;
 
-  // If the function is a forward declaration, we may have not deserialized
-  // the body yet.
-  if (isExternalDeclaration())
-    return true;
-
   // Fragile functions can reference 'static inline' functions imported
   // from C.
   if (hasForeignBody())
@@ -536,7 +531,7 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
     return isThunk();
 
   // Otherwise, only public functions can be referenced.
-  return hasPublicVisibility(linkage);
+  return hasPublicVisibility(getLinkage());
 }
 
 /// Helper method which returns true if the linkage of the SILFunction
