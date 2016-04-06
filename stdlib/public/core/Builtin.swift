@@ -340,12 +340,15 @@ internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 internal var _objectPointerSpareBits: UInt {
     @inline(__always) get { return 0x0000_0003 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
     @inline(__always) get { return 0x0000_0002 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
     @inline(__always) get { return 0 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
   @inline(__always) get { return 0 }
 }
@@ -354,12 +357,15 @@ internal var _objCTaggedPointerBits: UInt {
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x7F00_0000_0000_0006 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x4000_0000_0000_0000 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
   @inline(__always) get { return 1 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
   @inline(__always) get { return 0x8000_0000_0000_0001 }
 }
@@ -368,25 +374,32 @@ internal var _objCTaggedPointerBits: UInt {
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x7F00_0000_0000_0007 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x4000_0000_0000_0000 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
     @inline(__always) get { return 0 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
     @inline(__always) get { return 0x8000_0000_0000_0000 }
 }
 #elseif arch(powerpc64) || arch(powerpc64le)
+@_versioned
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x0000_0000_0000_0007 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x0000_0000_0000_0002 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
     @inline(__always) get { return 0 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
     @inline(__always) get { return 0 }
 }
@@ -401,12 +414,14 @@ internal func _bitPattern(x: Builtin.BridgeObject) -> UInt {
 }
 
 /// Extract the raw spare bits of `x`.
+@_versioned
 @inline(__always)
 @warn_unused_result
 internal func _nonPointerBits(x: Builtin.BridgeObject) -> UInt {
   return _bitPattern(x) & _objectPointerSpareBits
 }
 
+@_versioned
 @inline(__always)
 @warn_unused_result
 internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
@@ -421,6 +436,7 @@ internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
 ///
 /// - Precondition: `bits & _objectPointerIsObjCBit == 0`,
 ///   `bits & _objectPointerSpareBits == bits`.
+@_versioned
 @inline(__always)
 @warn_unused_result
 internal func _makeNativeBridgeObject(
@@ -454,6 +470,7 @@ func _makeObjCBridgeObject(
 ///   2. if `object` is a tagged pointer, `bits == 0`.  Otherwise,
 ///      `object` is either a native object, or `bits ==
 ///      _objectPointerIsObjCBit`.
+@_versioned
 @inline(__always)
 @warn_unused_result
 internal func _makeBridgeObject(
