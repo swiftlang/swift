@@ -39,6 +39,8 @@ STATISTIC(FailInferFunction, "# of functions unable to infer");
 // Specifically skipped/avoided
 STATISTIC(SkipLeadingUnderscore,
           "# of globals skipped due to leading underscore");
+STATISTIC(SkipCFMemoryManagement,
+          "# of CF memory management globals skipped");
 
 // Success statistics
 STATISTIC(SuccessImportAsTypeID, "# imported as 'typeID'");
@@ -176,6 +178,7 @@ public:
   }
 
   IAMResult infer(const clang::NamedDecl *);
+  IAMResult inferVar(const clang::VarDecl *);
 
 private:
   // typeID
@@ -536,40 +539,42 @@ static bool roughlyEqual(clang::QualType left, clang::QualType right) {
          right->getUnqualifiedDesugaredType();
 }
 
-bool IAMInference::validToImportAsProperty(
-    const clang::FunctionDecl *originalDecl, StringRef propSpec,
-    Optional<unsigned> selfIndex, const clang::FunctionDecl *&pairedAccessor) {
-  bool isGet = propSpec == "Get";
-  pairedAccessor = findPairedAccessor(originalDecl->getName(), propSpec);
-  if (!pairedAccessor)
-    return isGet;
-
-  auto getterDecl = isGet ? originalDecl : pairedAccessor;
-  auto setterDecl = isGet ? pairedAccessor : originalDecl;
-  auto getterTy = getterDecl->getReturnType();
-
-  // See if this is a static property
-  if (!selfIndex) {
-    // Getter has none, setter has one arg
-    if (getterDecl->getNumParams() != 0 || setterDecl->getNumParams() != 1) {
-      ++InvalidPropertyStaticNumParams;
-      return false;
-    }
-
-    // Setter's arg type should be same as getter's return type
-    if (!roughlyEqual(getterTy, setterDecl->getParamDecl(0)->getType())) {
-      ++InvalidPropertyStaticGetterSetterType;
-      return false;
-    }
-
-    return true;
+static bool
+isValidAsStaticProperty(const clang::FunctionDecl *getterDecl,
+                        const clang::FunctionDecl *setterDecl = nullptr) {
+  // Getter has none, setter has one arg
+  if (getterDecl->getNumParams() != 0 ||
+      (setterDecl && setterDecl->getNumParams() != 1)) {
+    ++InvalidPropertyStaticNumParams;
+    return false;
   }
 
+  // Setter's arg type should be same as getter's return type
+  auto getterTy = getterDecl->getReturnType();
+  if (setterDecl &&
+      !roughlyEqual(getterTy, setterDecl->getParamDecl(0)->getType())) {
+    ++InvalidPropertyStaticGetterSetterType;
+    return false;
+  }
+
+  return true;
+}
+
+static bool
+isValidAsInstanceProperty(const clang::FunctionDecl *getterDecl,
+                          const clang::FunctionDecl *setterDecl = nullptr) {
   // Instance property, look beyond self
-  if (getterDecl->getNumParams() != 1 || setterDecl->getNumParams() != 2) {
+  if (getterDecl->getNumParams() != 1 ||
+      (setterDecl && setterDecl->getNumParams() != 2)) {
     ++InvalidPropertyInstanceNumParams;
     return false;
   }
+
+  if (!setterDecl)
+    return true;
+
+  // Make sure they pair up
+  auto getterTy = getterDecl->getReturnType();
   auto selfTy = getterDecl->getParamDecl(0)->getType();
 
   clang::QualType setterTy = {};
@@ -593,38 +598,64 @@ bool IAMInference::validToImportAsProperty(
   return true;
 }
 
+bool IAMInference::validToImportAsProperty(
+    const clang::FunctionDecl *originalDecl, StringRef propSpec,
+    Optional<unsigned> selfIndex, const clang::FunctionDecl *&pairedAccessor) {
+  bool isGet = propSpec == "Get";
+  pairedAccessor = findPairedAccessor(originalDecl->getName(), propSpec);
+  if (!pairedAccessor) {
+    if (!isGet)
+      return false;
+    if (!selfIndex)
+      return isValidAsStaticProperty(originalDecl);
+    return isValidAsInstanceProperty(originalDecl);
+  }
+
+  auto getterDecl = isGet ? originalDecl : pairedAccessor;
+  auto setterDecl = isGet ? pairedAccessor : originalDecl;
+
+  if (!selfIndex)
+    return isValidAsStaticProperty(getterDecl, setterDecl);
+
+  return isValidAsInstanceProperty(getterDecl, setterDecl);
+}
+
+IAMResult IAMInference::inferVar(const clang::VarDecl *varDecl) {
+  auto fail = [varDecl]() -> IAMResult {
+    DEBUG(llvm::dbgs() << "failed to infer variable: ");
+    DEBUG(varDecl->print(llvm::dbgs()));
+    DEBUG(llvm::dbgs() << "\n");
+    ++FailInferVar;
+    return {};
+  };
+
+  // Try to find a type to add this as a static property to
+  StringRef workingName = varDecl->getName();
+  if (workingName.empty())
+    return fail();
+
+  // Special pattern: constants of the form "kFooBarBaz", extend "FooBar" with
+  // property "Baz"
+  if (*camel_case::getWords(workingName).begin() == "k")
+    workingName = workingName.drop_front(1);
+
+  NameBuffer remainingName;
+  if (auto effectiveDC = findTypeAndMatch(workingName, remainingName))
+
+    return importAsStaticProperty(remainingName, effectiveDC);
+
+  return fail();
+}
+
 IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   if (clangDecl->getName().startswith("_")) {
     ++SkipLeadingUnderscore;
     return {};
   }
 
-  if (auto varDecl = dyn_cast<clang::VarDecl>(clangDecl)) {
-    auto fail = [varDecl]() -> IAMResult {
-      DEBUG(llvm::dbgs() << "failed to infer variable: ");
-      DEBUG(varDecl->print(llvm::dbgs()));
-      DEBUG(llvm::dbgs() << "\n");
-      ++FailInferVar;
-      return {};
-    };
-
-    // Try to find a type to add this as a static property to
-    StringRef workingName = varDecl->getName();
-    if (workingName.empty())
-      return fail();
-
-    // Special pattern: constants of the form "kFooBarBaz", extend "FooBar" with
-    // property "Baz"
-    if (*camel_case::getWords(workingName).begin() == "k")
-      workingName = workingName.drop_front(1);
-
-    NameBuffer remainingName;
-    if (auto effectiveDC = findTypeAndMatch(workingName, remainingName))
-
-      return importAsStaticProperty(remainingName, effectiveDC);
-
-    return fail();
-  }
+  // Try to infer a member variable
+  if (auto varDecl = dyn_cast<clang::VarDecl>(clangDecl))
+    return inferVar(varDecl);
 
   // Try to infer a member function
   auto funcDecl = dyn_cast<clang::FunctionDecl>(clangDecl);
@@ -651,9 +682,11 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   auto retTy = funcDecl->getReturnType();
   unsigned numParams = funcDecl->getNumParams();
 
-  // 0) Special cases are specially handled: *GetTypeID()
+  // 0) Special cases are specially handled
   //
   StringRef getTypeID = "GetTypeID";
+  StringRef cfSpecials[] = {"Release", "Retain", "Autorelease"};
+  // *GetTypeID
   if (numParams == 0 && workingName.endswith(getTypeID)) {
     NameBuffer remainingName;
     if (auto effectiveDC = findTypeAndMatch(
@@ -662,6 +695,19 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
       if (remainingName.empty()) {
 
         return importAsTypeID(retTy, effectiveDC);
+      }
+    }
+    // *Release/*Retain/*Autorelease
+  } else if (numParams == 1 &&
+             std::any_of(std::begin(cfSpecials), std::end(cfSpecials),
+                         [workingName](StringRef suffix) {
+                           return workingName.endswith(suffix);
+                         })) {
+    if (auto type =
+            funcDecl->getParamDecl(0)->getType()->getAs<clang::TypedefType>()) {
+      if (CFPointeeInfo::classifyTypedef(type->getDecl())) {
+        ++SkipCFMemoryManagement;
+        return {};
       }
     }
   }
