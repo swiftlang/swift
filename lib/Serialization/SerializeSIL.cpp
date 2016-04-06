@@ -269,7 +269,7 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
   // function, serialize it too. In practice, it will either be a
   // thunk, or a Clang-emitted 'static inline' function.
   if (F->getLinkage() == SILLinkage::Shared && !DeclOnly) {
-    assert(F->isThunk() || F->hasForeignBody());
+    assert(F->isThunk() == IsReabstractionThunk || F->hasForeignBody());
     FuncsToEmit[F] = false;
     Worklist.push_back(F);
     return;
