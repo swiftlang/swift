@@ -297,7 +297,7 @@ public:
 
       // Try to set the edge to the new node.
       if (std::atomic_compare_exchange_strong_explicit(edge, &node, newNode,
-                                                  std::memory_order_release,
+                                                  std::memory_order_acq_rel,
                                                   std::memory_order_acquire)) {
         // If that succeeded, cache and report that we created a new node.
         LastSearch.store(newNode, std::memory_order_release);
