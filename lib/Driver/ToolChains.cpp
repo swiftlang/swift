@@ -1031,6 +1031,9 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   if (context.OI.SelectedSanitizer == SanitizerKind::Address)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
 
+  if (context.OI.SelectedSanitizer == SanitizerKind::Thread)
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
+
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {
     Arguments.push_back("-bitcode_bundle");
