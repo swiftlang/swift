@@ -477,8 +477,7 @@ extension _ArrayBuffer {
   var _isNative: Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return true
-    }
-    else {
+    } else {
       return _storage.isNative
     }
   }
@@ -487,8 +486,7 @@ extension _ArrayBuffer {
   var _isNativeTypeChecked: Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return true
-    }
-    else {
+    } else {
       return _storage.isNativeWithClearedSpareBits(deferredTypeCheckMask)
     }
   }
@@ -511,11 +509,12 @@ extension _ArrayBuffer {
     return NativeBuffer(_storage.nativeInstance_noSpareBits)
   }
 
+  @_versioned
   var _nonNative: _NSArrayCore {
     @inline(__always)
     get {
       _sanityCheck(_isClassOrObjCExistential(Element.self))
-        return _storage.objCInstance
+      return _storage.objCInstance
     }
   }
 }
