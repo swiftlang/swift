@@ -1324,7 +1324,8 @@ bool DeclContext::lookupQualified(Type type,
 
       // If we didn't visit this nominal type above, add this
       // declaration to the list.
-      if (!visited.count(nominal) && knownDecls.insert(decl).second)
+      if (!visited.count(nominal) && knownDecls.insert(decl).second &&
+          isAcceptableDecl(nominal, decl))
         decls.push_back(decl);
     }
   }
