@@ -232,6 +232,7 @@ public protocol Collection : Indexable, Sequence {
   //   where
   //   Iterator.Element == SubSequence.Iterator.Element,
   //   SubSequence.Index == Index,
+  //   SubSequence.Indices == Indices,
   //   SubSequence.SubSequence == SubSequence
   //
   // (<rdar://problem/20715009> Implement recursive protocol

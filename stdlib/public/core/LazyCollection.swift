@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
-
 /// A collection on which normally-eager operations such as `map` and
 /// `filter` are implemented lazily.
 ///
@@ -39,17 +37,13 @@ extension LazyCollectionProtocol where Elements == Self {
   public var elements: Self { return self }
 }
 
-% for Traversal in TRAVERSALS:
-%   TraversalCollection = collectionForTraversal(Traversal)
-%   Self = 'Lazy' + TraversalCollection
-%   Slice = TraversalCollection.replace('Collection', 'Slice')
-
 /// A collection containing the same elements as a `Base` collection,
 /// but on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`, `LazyCollection`
-public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
+public struct LazyCollection<Base : Collection>
+  : LazyCollectionProtocol {
 
   /// The type of the underlying collection
   public typealias Elements = Base
@@ -74,7 +68,7 @@ public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
 
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
-extension ${Self} : Sequence {
+extension LazyCollection : Sequence {
   
   /// Returns an iterator over the elements of this sequence.
   ///
@@ -107,7 +101,7 @@ extension ${Self} : Sequence {
   }
 }
 
-extension ${Self} : ${TraversalCollection} {
+extension LazyCollection : Collection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -122,10 +116,6 @@ extension ${Self} : ${TraversalCollection} {
   /// `successor()`.
   public var endIndex: Base.Index {
     return _base.endIndex
-  }
-
-  public var indices: Base.Indices {
-    return _base.indices
   }
 
   // TODO: swift-3-indexing-model - add docs
@@ -146,8 +136,8 @@ extension ${Self} : ${TraversalCollection} {
   /// `self`'s elements.
   ///
   /// - Complexity: O(1)
-  public subscript(bounds: Range<Index>) -> ${Self}<${Slice}<Base>> {
-    return ${Slice}(base: _base, bounds: bounds).lazy
+  public subscript(bounds: Range<Index>) -> LazyCollection<Slice<Base>> {
+    return Slice(base: _base, bounds: bounds).lazy
   }
   
   /// Returns `true` iff `self` is empty.
@@ -198,42 +188,19 @@ extension ${Self} : ${TraversalCollection} {
   public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
     return _base.distance(from:start, to: end)
   }
-
-%   if Traversal != 'Forward':
-
-  @warn_unused_result
-  public func predecessor(of i: Base.Index) -> Base.Index {
-    return _base.predecessor(of: i)
-  }
-
-  public var last: Base.Iterator.Element? {
-    return _base.last
-  }
-%   end
 }
 
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.
-extension ${TraversalCollection} {
+extension Collection {
   /// A collection with contents identical to `self`, but on which
   /// normally-eager operations such as `map` and `filter` are
   /// implemented lazily.
   ///
   /// - See Also: `LazySequenceProtocol`, `LazyCollectionProtocol`.
-  public var lazy: ${Self}<Self> {
-    return ${Self}(_base: self)
+  public var lazy: LazyCollection<Self> {
+    return LazyCollection(_base: self)
   }
 }
-
-// Without this specific overload the non-re-wrapping extension on
-// LazyCollectionProtocol (below) is not selected for some reason.
-extension ${TraversalCollection} where Self : LazyCollectionProtocol {
-  /// Identical to `self`.
-  public var lazy: Self { // Don't re-wrap already-lazy collections
-    return self
-  }
-}
-
-% end
 
 extension LazyCollectionProtocol {
   /// Identical to `self`.
