@@ -1,7 +1,10 @@
-// RUN: %target-parse-verify-swift
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-swift-frontend -emit-module %S/Inputs/PrivateObjC.swift -o %t
+// RUN: %target-parse-verify-swift -I %t
 
 // REQUIRES: objc_interop
 import Foundation
+import PrivateObjC
 
 @objc
 class A {
@@ -212,3 +215,7 @@ var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{cannot force unwrap
 // Implicit force of an implicitly unwrapped optional
 let uopt : AnyObject! = nil
 uopt.wibble!()
+
+// Should not be able to see private or internal @objc methods.
+uopt.privateFoo!() // expected-error{{'privateFoo' is inaccessible due to 'private' protection level}}
+uopt.internalFoo!() // expected-error{{'internalFoo' is inaccessible due to 'internal' protection level}}
