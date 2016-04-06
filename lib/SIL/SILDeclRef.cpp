@@ -35,6 +35,10 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
   if (method->hasForcedStaticDispatch())
     return MethodDispatch::Static;
 
+  // Import-as-member declarations are always statically referenced.
+  if (method->isImportAsMember())
+    return MethodDispatch::Static;
+
   // If this declaration is in a class but not marked final, then it is
   // always dynamically dispatched.
   auto dc = method->getDeclContext();
