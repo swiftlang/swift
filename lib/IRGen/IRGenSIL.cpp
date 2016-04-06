@@ -3925,103 +3925,12 @@ void IRGenSILFunction::visitObjCToThickMetatypeInst(
   setLoweredExplosion(i, to);  
 }
 
-/// Emit a checked cast sequence. Returns an Address; this may be either
-/// a proper address or a class reference pointer, depending on the address-
-/// or object-ness of the cast.
-void emitValueCheckedCast(IRGenSILFunction &IGF,
-                          SILValue operand,
-                          SILType loweredTargetType,
-                          CheckedCastMode mode,
-                          Explosion &ex) {
-  CanType sourceType = operand->getType().getSwiftRValueType();
-  CanType targetType = loweredTargetType.getSwiftRValueType();
-
-  if (auto sourceMetaType = dyn_cast<AnyMetatypeType>(sourceType)) {
-    llvm::Value *metatypeVal = nullptr;
-    auto fromEx = IGF.getLoweredExplosion(operand);
-    if (sourceMetaType->getRepresentation() != MetatypeRepresentation::Thin)
-      metatypeVal = fromEx.claimNext();
-    // If the metatype is existential, there may be witness tables in the
-    // value, which we don't need.
-    // TODO: In existential-to-existential casts, we should carry over common
-    // witness tables from the source to the destination.
-    fromEx.claimAll();
-    
-    SmallVector<ProtocolDecl*, 1> protocols;
-    
-    if (auto existential = dyn_cast<ExistentialMetatypeType>(targetType))
-      emitScalarExistentialDowncast(IGF, metatypeVal,
-                                    operand->getType(), loweredTargetType,
-                                    mode,
-                                    existential->getRepresentation(),
-                                    ex);
-    else if (auto destMetaType = dyn_cast<MetatypeType>(targetType))
-      emitMetatypeDowncast(IGF, metatypeVal, destMetaType, mode, ex);
-    else if (targetType->isExistentialType(protocols)) {
-      assert(IGF.IGM.ObjCInterop
-             && protocols.size() == 1
-             && *protocols[0]->getKnownProtocolKind()
-                   == KnownProtocolKind::AnyObject
-             && "metatypes can only be cast to AnyObject, with ObjC interop");
-      emitMetatypeToObjectDowncast(IGF, metatypeVal, sourceMetaType, mode, ex);
-    }
-    return;
-  }
-
-  if ((isa<ArchetypeType>(sourceType) && !targetType.isExistentialType()) ||
-      (isa<ArchetypeType>(targetType) && !sourceType.isExistentialType())) {
-    Explosion archetype = IGF.getLoweredExplosion(operand);
-    llvm::Value *fromValue = archetype.claimNext();
-    llvm::Value *toValue =
-      emitClassDowncast(IGF, fromValue, loweredTargetType, mode);
-    ex.add(toValue);
-    return;
-  }
-
-  if (sourceType.isExistentialType()) {
-    Explosion existential = IGF.getLoweredExplosion(operand);
-    llvm::Value *instance
-      = emitClassExistentialProjection(IGF, existential,
-                                       operand->getType(),
-                                       CanArchetypeType());
-
-    llvm::Value *toValue;
-    if (loweredTargetType.isExistentialType()) {
-      emitScalarExistentialDowncast(IGF, instance,
-                                    operand->getType(),
-                                    loweredTargetType, mode,
-                                    None /*not a metatype*/,
-                                    ex);
-    } else {
-      toValue = emitClassDowncast(IGF, instance, loweredTargetType, mode);
-      ex.add(toValue);
-    }
-    
-    return;
-  }
-
-  if (targetType.isExistentialType()) {
-    Explosion from = IGF.getLoweredExplosion(operand);
-    llvm::Value *fromValue = from.claimNext();
-    emitScalarExistentialDowncast(IGF, fromValue, operand->getType(),
-                                  loweredTargetType, mode,
-                                  None /*not a metatype*/,
-                                  ex);
-    return;
-  }
-
-  Explosion from = IGF.getLoweredExplosion(operand);
-  llvm::Value *fromValue = from.claimNext();
-  llvm::Value *cast
-    = emitClassDowncast(IGF, fromValue, loweredTargetType, mode);
-  ex.add(cast);
-}
-
 void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                                        swift::UnconditionalCheckedCastInst *i) {
+  Explosion value = getLoweredExplosion(i->getOperand());
   Explosion ex;
-  emitValueCheckedCast(*this, i->getOperand(), i->getType(),
-                  CheckedCastMode::Unconditional, ex);
+  emitValueCheckedCast(*this, value, i->getOperand()->getType(), i->getType(),
+                       CheckedCastMode::Unconditional, ex);
   setLoweredExplosion(i, ex);
 }
 
@@ -4180,8 +4089,9 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
     castResult = emitClassIdenticalCast(*this, source.claimNext(),
                                         operand->getType(), destTy);
   } else {
-    emitValueCheckedCast(*this, i->getOperand(), i->getCastType(),
-                         CheckedCastMode::Conditional, ex);
+    Explosion value = getLoweredExplosion(i->getOperand());
+    emitValueCheckedCast(*this, value, i->getOperand()->getType(),
+                         i->getCastType(), CheckedCastMode::Conditional, ex);
     auto val = ex.claimNext();
     castResult.casted = val;
     llvm::Value *nil =
