@@ -1134,7 +1134,7 @@ SILInstruction *ValueLifetimeAnalysis:: findLastUserInBlock(SILBasicBlock *BB) {
 bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
   bool NoCriticalEdges = true;
 
-  // Exit-blocks from the lifetime region. The value if live at the end of
+  // Exit-blocks from the lifetime region. The value is live at the end of
   // a predecessor block but not in the frontier block itself.
   llvm::SmallSetVector<SILBasicBlock *, 16> FrontierBlocks;
 
