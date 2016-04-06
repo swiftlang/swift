@@ -10,23 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+%{
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal
+)
+
+}%
+
 // TODO: swift-3-indexing-model: perform type erasure on the associated
 // `Indices` type.
 
 import SwiftShims
-
-%{
-traversals = ['Forward', 'Bidirectional', 'RandomAccess']
-
-def collectionForTraversal(traversal):
-    if traversal == 'Forward':
-        return 'Collection'
-    if traversal == 'Bidirectional':
-        return 'BidirectionalCollection'
-    if traversal == 'RandomAccess':
-        return 'RandomAccessCollection'
-    assert False, "unknown traversal"
-}%
 
 @noreturn @inline(never)
 internal func _abstract(file: StaticString = #file, line: UInt = #line) {
@@ -610,7 +606,7 @@ public func !== <
   return lhs._underlyingCollectionID != rhs._underlyingCollectionID
 }
 
-% for (ti, Traversal) in enumerate(traversals):
+% for (ti, Traversal) in enumerate(TRAVERSALS):
 %   SelfProtocol = collectionForTraversal(Traversal)
 %   Self = 'Any' + SelfProtocol
 /// A type-erased wrapper over any collection with indices that
@@ -620,11 +616,11 @@ public func !== <
 /// same `Element` type, hiding the specifics of the underlying
 /// `Collection`.
 ///
-/// - SeeAlso: ${', '.join('`Any%s`' % t for t in (2 * traversals)[ti + 1 : ti + 3]) }
+/// - SeeAlso: ${', '.join('`Any%s`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
 public struct ${Self}<Element>
   : AnyCollectionProtocol, ${SelfProtocol} {
 
-%   for SubTraversal in traversals[ti:]:
+%   for SubTraversal in TRAVERSALS[ti:]:
 %     SubProtocol = collectionForTraversal(SubTraversal)
   /// Create an `${Self}` that
   /// stores `base` as its underlying collection.
@@ -667,7 +663,7 @@ public struct ${Self}<Element>
   }
 %   end
 
-%   for SuperTraversal in traversals[:ti]:
+%   for SuperTraversal in TRAVERSALS[:ti]:
   /// If the underlying collection stored by `other` satisfies
   /// `${SelfProtocol}`, create an `${Self}` having the same
   /// underlying collection as `other`.  Otherwise, the result is
