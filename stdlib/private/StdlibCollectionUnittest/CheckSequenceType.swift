@@ -1591,7 +1591,15 @@ self.test("\(testNamePrefix).dropLast/semantics/equivalence") {
       [1010, 2020, 3030, 4040, 5050].map(OpaqueValue.init))
 
     let droppedOnce = s1.dropLast(4)
-    let droppedTwice = s2.dropLast(2).dropLast(2)
+
+    // FIXME: this line should read:
+    //
+    //   let droppedTwice_ = s2.dropLast(2).dropLast(2)
+    //
+    // We can change it when we have real default implementations in protocols
+    // that don't affect regular name lookup.
+    let droppedTwice_ = s2.dropLast(2)
+    let droppedTwice = droppedTwice_.dropLast(2)
 
     expectEqualSequence(droppedOnce, droppedTwice) {
       extractValue($0).value == extractValue($1).value

@@ -534,6 +534,31 @@ ArrayTestSuite.test(
 
 let evilBoundsError = "EvilCollection: index out of range"
 
+final class EvilSequence : Sequence {
+  init(_ growth: Int) {
+    self.growth = growth
+  }
+
+  var growth: Int
+  var _count: Int = 20
+
+  var underestimatedCount: Int {
+    defer { _count += growth }
+    return _count
+  }
+
+  @warn_unused_result
+  func makeIterator() -> AnyIterator<LifetimeTracked> {
+    var i = 0
+    return AnyIterator {
+      if i >= self._count { return nil }
+      let result = LifetimeTracked(i)
+      i += 1
+      return result
+    }
+  }
+}
+
 final class EvilCollection : Collection {
   init(_ growth: Int, boundsChecked: Bool) {
     self.growth = growth
@@ -588,9 +613,22 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
   let boundsChecked = evilBoundsCheck ? "BoundsChecked" : "NoBoundsCheck"
   let testPrefix = "MemorySafety/\(boundsChecked)/Evil\(natureOfEvil)"
 
-  let t = ArrayTestSuite.test("\(testPrefix)/Infrastructure")
+  ArrayTestSuite.test("\(testPrefix)/Infrastructure/EvilSequence") {
+    let evil = EvilSequence(step)
+    let count0 = evil.underestimatedCount
+    let count1 = evil.underestimatedCount
+    expectNotEqual(count0, count1)
+   if step > 0 {
+      expectLE(count0, count1)
+    }
+    else {
+      expectGE(count0, count1)
+    }
+  }
+
+  let t1 = ArrayTestSuite.test("\(testPrefix)/Infrastructure/EvilCollection")
   (evilBoundsCheck && _isDebugAssertConfiguration()
-    ? t.crashOutputMatches(evilBoundsError) : t)
+    ? t1.crashOutputMatches(evilBoundsError) : t1)
   .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
     let count0 = evil.count
@@ -655,12 +693,12 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-    let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+    let evil = EvilSequence(step)
 
     if step < 0 {
       expectCrashLater()
     }
-    let a = AnySequence(evil).map { $0 }
+    let a = evil.map { $0 }
     _blackHole(a)
   }
 
