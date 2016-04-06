@@ -1075,9 +1075,8 @@ public func ^= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
 public protocol Hashable : Equatable {
   /// The hash value.
   ///
-  /// - Important: Hash values are not guaranteed to be equal across different
-  ///   executions of your program. Do not save hash values to use during a
-  ///   future execution.
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
 }
 

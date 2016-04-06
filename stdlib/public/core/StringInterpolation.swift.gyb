@@ -35,7 +35,20 @@ for int_ty in all_integer_types(word_bits):
 }%
 
 extension String : StringInterpolationConvertible {
-  /// Create an instance by concatenating the elements of `strings`.
+  /// Creates a new string by concatenating the given interpolations.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you create a string using string interpolation. Instead, use string
+  /// interpolation to create a new string by including values, literals,
+  /// variables, or expressions enclosed in parentheses, prefixed by a
+  /// backslash (`\(`...`)`).
+  ///
+  ///     let price = 2
+  ///     let number = 3
+  ///     let message = "If one cookie costs \(price) dollars, " +
+  ///                   "\(number) cookies cost \(price * number) dollars."
+  ///     print(message)
+  ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @effects(readonly)
   public init(stringInterpolation strings: String...) {
     self.init()
@@ -44,18 +57,36 @@ extension String : StringInterpolationConvertible {
     }
   }
 
-  /// Create an instance containing `expr`'s `print` representation.
+  /// Creates a string containing the given expression's textual
+  /// representation.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// interpreting string interpolations.
+  ///
+  /// - SeeAlso: `StringInterpolationConvertible`
   public init<T>(stringInterpolationSegment expr: T) {
     self = String(expr)
   }
 
 % for Type in StreamableTypes:
+  /// Creates a string containing the given value's textual representation.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// interpreting string interpolations.
+  ///
+  /// - SeeAlso: `StringInterpolationConvertible`
   public init(stringInterpolationSegment expr: ${Type}) {
     self = _toStringReadOnlyStreamable(expr)
   }
 % end
 
 % for Type in PrintableTypes:
+  /// Creates a string containing the given value's textual representation.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// interpreting string interpolations.
+  ///
+  /// - SeeAlso: `StringInterpolationConvertible`
   public init(stringInterpolationSegment expr: ${Type}) {
     self = _toStringReadOnlyPrintable(expr)
   }
