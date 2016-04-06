@@ -302,7 +302,7 @@ extension ${Self} {
     get {
       return self[
         Range(
-          _uncheckedBounds: (
+          uncheckedBounds: (
             lower: bounds.lowerBound,
             upper: successor(of: bounds.upperBound)))
       ]
@@ -311,7 +311,7 @@ extension ${Self} {
     set {
       self[
         Range(
-          _uncheckedBounds: (
+          uncheckedBounds: (
             lower: bounds.lowerBound,
             upper: successor(of: bounds.upperBound)))
       ] = newValue

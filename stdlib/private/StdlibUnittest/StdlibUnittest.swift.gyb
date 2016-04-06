@@ -2132,7 +2132,7 @@ public func expectEqualsUnordered<
   expected: Range<T>, _ actual: [T], ${TRACE}
 ) {
   expectEqualsUnordered(
-    CountableRange(_uncheckedBounds:
+    CountableRange(uncheckedBounds:
       (lower: expected.lowerBound, upper: expected.upperBound)),
     actual,
     ${trace},
@@ -2147,7 +2147,7 @@ public func expectEqualsUnordered<T : Strideable>(
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
   }
-  let r = Range(_uncheckedBounds:
+  let r = Range(uncheckedBounds:
     (lower: expected.lowerBound, upper: expected.upperBound))
   for e in actual {
     if !r.contains(e) {

@@ -275,7 +275,7 @@ extension RangeReplaceableCollection {
     R : RangeProtocol where R.Bound == Index
   >(r: R) -> Range<Index> {
     return Range(
-      _uncheckedBounds: (
+      uncheckedBounds: (
         lower: r.lowerBound,
         upper: r.contains(r.upperBound) ? successor(of: r.upperBound) : r.upperBound))
   }

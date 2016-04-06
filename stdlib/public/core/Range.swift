@@ -17,7 +17,7 @@ public enum _DisabledRangeIndex_ {}
 public protocol RangeProtocol : Equatable {
   associatedtype Bound : Comparable
   
-  init(_uncheckedBounds: (lower: Bound, upper: Bound))
+  init(uncheckedBounds: (lower: Bound, upper: Bound))
   func contains(value: Bound) -> Bool
   func overlaps(other: Self) -> Bool
   var isEmpty: Bool { get }
@@ -58,7 +58,7 @@ extension RangeProtocol {
   @inline(__always)
   public func clamped(to limits: Self) -> Self {
     return Self(
-      _uncheckedBounds: (
+      uncheckedBounds: (
         lower:
         limits.lowerBound > self.lowerBound ? limits.lowerBound
           : limits.upperBound < self.lowerBound ? limits.upperBound
@@ -80,7 +80,7 @@ extension HalfOpenRangeProtocol {
     Other: HalfOpenRangeProtocol where Other.Bound == Bound
   >(_ other: Other) {
     self.init(
-      _uncheckedBounds: (lower: other.lowerBound, upper: other.upperBound)
+      uncheckedBounds: (lower: other.lowerBound, upper: other.upperBound)
     )
   }
   
@@ -160,7 +160,7 @@ public struct CountableRange<
     return i.advanced(by: -1)
   }
 
-  public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+  public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
@@ -327,7 +327,7 @@ public struct Range<
   /// Construct a range with `lowerBound == start` and `upperBound ==
   /// end`.
   @inline(__always)
-  public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+  public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
@@ -457,7 +457,7 @@ public func == <Bound>(lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {
 public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
   -> Range<Bound> {
   _precondition(minimum <= maximum, "Can't form Range with end < start")
-  return Range(_uncheckedBounds: (lower: minimum, upper: maximum))
+  return Range(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
 /// Returns a half-open range that contains `start`, but not `end`.
@@ -473,7 +473,7 @@ public func ..< <
 ) -> CountableRange<Bound> {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
-  return CountableRange(_uncheckedBounds: (lower: start, upper: end))
+  return CountableRange(uncheckedBounds: (lower: start, upper: end))
 }
 
 @warn_unused_result

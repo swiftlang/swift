@@ -21,7 +21,7 @@ extension ClosedRangeProtocol {
     Other: ClosedRangeProtocol where Other.Bound == Bound
   >(_ other: Other) {
     self.init(
-      _uncheckedBounds: (lower: other.lowerBound, upper: other.upperBound)
+      uncheckedBounds: (lower: other.lowerBound, upper: other.upperBound)
     )
   }
   
@@ -199,7 +199,7 @@ public struct CountableClosedRange<
       endIndex: self.endIndex)
   }
 
-  public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+  public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
@@ -291,7 +291,7 @@ public struct ClosedRange<
   /// Construct a range with `lowerBound == start` and `upperBound ==
   /// end`.
   @inline(__always)
-  public init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+  public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
@@ -351,7 +351,7 @@ public func == <Bound>(
 public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
   -> ClosedRange<Bound> {
   _precondition(minimum <= maximum, "Can't form Range with end < start")
-  return ClosedRange(_uncheckedBounds: (lower: minimum, upper: maximum))
+  return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
 /// Returns a closed range that contains `start` and `end`.
@@ -367,6 +367,6 @@ public func ... <
 ) -> CountableClosedRange<Bound> {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(start <= end, "Can't form Range with end < start")
-  return CountableClosedRange(_uncheckedBounds: (lower: start, upper: end))
+  return CountableClosedRange(uncheckedBounds: (lower: start, upper: end))
 }
 
