@@ -14,19 +14,54 @@
 // ambiguity indexing CountableRange<T> outside a generic context.
 public enum _DisabledRangeIndex_ {}
 
+/// A type that represents a contiguous range of any comparable value.
+///
+/// - Note: not all empty ranges are equal; it depends on their bounds.
+///
+/// - IXMEFAY: need a more formal description of containment and its
+///   relationship to bounds.  We *can* say that any x > lowerBound
+///   and < upperBound is contained, and containment of the bounds
+///   themselves are up to the model.
 public protocol RangeProtocol : Equatable {
-  associatedtype Bound : Comparable
   
+  /// The representation of the range's endpoints and the values
+  /// contained in it.
+  associatedtype Bound : Comparable
+
+  /// Creates an instance with the given bounds.
+  ///
+  /// - Note: as this initializer does not check its precondition, it
+  ///   should be used as an optimization only, when one is absolutely
+  ///   certain that `lower <= upper`.  In general, the `..<` and `...`
+  ///   operators are to be preferred for forming ranges.
+  ///
+  /// - Precondition: `lower <= upper`
   init(uncheckedBounds: (lower: Bound, upper: Bound))
+
+  /// Returns `true` if the range contains the `value`.
+  ///
+  /// - IXMEFAY: need a caveat that this protocol doesn't fully define
+  ///   containment and its relationship to bounds.  
   func contains(value: Bound) -> Bool
+  
+  /// Returns `true` iff `self` and `other` contain a value in common.
   func overlaps(other: Self) -> Bool
+
+  /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
   var isEmpty: Bool { get }
   
-  // Note: it is crucial to enforce the invariant that lowerBound <=
-  // upperBound, or when Range has a Stridable Bound, and is thus a
-  // collection, it may be empty with startIndex != endIndex.  Thus,
-  // make sure lowerBound and upperBound are not settable in concrete models.
+  // Note: When the range is also a collection, it is crucial to
+  // enforce the invariant that lowerBound <= upperBound, or it may be
+  // empty with startIndex != endIndex.
+
+  /// The range's lower bound.
+  ///
+  /// - IXMEFAY: vacuous comment
   var lowerBound: Bound { get }
+  
+  /// The range's upper bound.
+  ///
+  /// - IXMEFAY: vacuous comment
   var upperBound: Bound { get }
   
   /// Returns `self` clamped to `limits`.
@@ -37,12 +72,13 @@ public protocol RangeProtocol : Equatable {
 }
 
 extension RangeProtocol {
-
+  /// Creates a copy of `other`.
   @inline(__always)
   public init(_ other: Self) {
     self = other
   }
   
+  /// Returns `true` iff `self` and `other` contain a value in common.
   @inline(__always)
   public func overlaps<
     Other: RangeProtocol where Other.Bound == Bound
@@ -51,10 +87,17 @@ extension RangeProtocol {
         || (!self.isEmpty && other.contains(lowerBound))
   }
   
+  /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
   public var isEmpty: Bool {
+    // Note: this default implementation is not suitable for a range
+    // that has an open lower bound.
     return !self.contains(self.lowerBound)
   }
   
+  /// Returns `self` clamped to `limits`.
+  ///
+  /// The bounds of the result, even if it is empty, are always
+  /// limited to the bounds of `limits`.
   @inline(__always)
   public func clamped(to limits: Self) -> Self {
     return Self(
@@ -72,9 +115,13 @@ extension RangeProtocol {
   }
 }
 
+/// A type that represents a contiguous range of any comparable value,
+/// with non-empty ranges containing their lower bounds but not their
+/// upper bounds.
 public protocol HalfOpenRangeProtocol : RangeProtocol {}
 
 extension HalfOpenRangeProtocol {
+  /// Creates an instance equivalent to `other`.
   @inline(__always)
   public init<
     Other: HalfOpenRangeProtocol where Other.Bound == Bound
@@ -95,9 +142,14 @@ extension HalfOpenRangeProtocol {
   }
 }
 
-// WORKAROUND rdar://25214598 - should be Bound : Strideable
+/// Ranges whose `Bound` is `Strideable` with `Integer` `Stride`
+/// have all the capabilities of `RandomAccessCollection`s, where
+/// elements of the collection are the values contained in the range.
 extension HalfOpenRangeProtocol
-where Bound : _Strideable, Bound.Stride : Integer {
+  where Bound : _Strideable, Bound.Stride : Integer {
+  // WORKAROUND rdar://25214598 - should be Bound : Strideable
+
+  /// The number of values contained in the range. 
   public var count: Bound.Stride {
     return lowerBound.distance(to: upperBound)
   }
@@ -132,6 +184,8 @@ where Bound : _Strideable, Bound.Stride : Integer {
   }
 }
 
+/// A range whose `Bound` is `Strideable` with `Integer` `Stride`, and
+/// that conforms to `RandomAccessCollection`.
 public struct CountableRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
