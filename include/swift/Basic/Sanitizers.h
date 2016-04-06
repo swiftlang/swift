@@ -18,6 +18,7 @@ namespace swift {
 enum class SanitizerKind : unsigned {
   None = 0,
   Address,
+  Thread,
 };
 
 } // end namespace swift
