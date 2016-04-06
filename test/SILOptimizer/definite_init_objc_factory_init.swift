@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../IDE/Inputs/custom-modules %s -emit-sil | FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
+import ImportAsMember.Class
 
 // CHECK-LABEL: sil shared [thunk] @_TTOFCSo4HiveCfT5queenGSQCSo3Bee__GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Bee>, @thick Hive.Type) -> @owned ImplicitlyUnwrappedOptional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
@@ -37,5 +38,16 @@ extension Hive {
 
   convenience init(otherFlakyQueen other: Bee) throws {
     try self.init(flakyQueen: other)
+  }
+}
+
+extension SomeClass {
+  // SIL-LABEL: sil hidden @_TFE16import_as_memberCSo9SomeClasscfT6doubleSd_S0_
+  // SIL: bb0([[DOUBLE:%[0-9]+]] : $Double
+  // SIL-NOT: value_metatype
+  // SIL: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass
+  // SIL: apply [[FNREF]]([[DOUBLE]])
+  convenience init(double: Double) {
+    self.init(value: double)
   }
 }

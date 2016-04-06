@@ -39,6 +39,7 @@ public func useClass(d: Double, opts: SomeClass.Options) {
 extension SomeClass {
   // SIL-LABEL: sil hidden @_TFE16import_as_memberCSo9SomeClasscfT6doubleSd_S0_
   // SIL: bb0([[DOUBLE:%[0-9]+]] : $Double
+  // SIL-NOT: value_metatype
   // SIL: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass
   // SIL: apply [[FNREF]]([[DOUBLE]])
   convenience init(double: Double) {
