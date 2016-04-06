@@ -90,6 +90,11 @@ static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
   PM.add(createAddressSanitizerModulePass());
 }
 
+static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+  PM.add(createThreadSanitizerPass());
+}
+
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
 swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
@@ -152,6 +157,13 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                            addAddressSanitizerPasses);
   }
   
+  if (Opts.Sanitize == SanitizerKind::Thread) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addThreadSanitizerPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addThreadSanitizerPass);
+  }
+
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(createTargetTransformInfoWrapperPass(
