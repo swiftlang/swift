@@ -179,6 +179,28 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
   attrs = attrs.addAttributes(IGM.LLVMContext, paramIndex + 1, resultAttrs);
 }
 
+static void addSwiftSelfAttributes(IRGenModule &IGM,
+                                   llvm::AttributeSet &attrs,
+                                   unsigned argIndex) {
+  static const llvm::Attribute::AttrKind attrKinds[] = {
+    llvm::Attribute::SwiftSelf,
+  };
+  auto argAttrs =
+      llvm::AttributeSet::get(IGM.LLVMContext, argIndex + 1, attrKinds);
+  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex + 1, argAttrs);
+}
+
+static void addSwiftErrorAttributes(IRGenModule &IGM,
+                                    llvm::AttributeSet &attrs,
+                                    unsigned argIndex) {
+  static const llvm::Attribute::AttrKind attrKinds[] = {
+    llvm::Attribute::SwiftError,
+  };
+  auto argAttrs =
+      llvm::AttributeSet::get(IGM.LLVMContext, argIndex + 1, attrKinds);
+  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex + 1, argAttrs);
+}
+
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
                                        llvm::AttributeSet &attrs,
                                        unsigned argIndex,
@@ -721,8 +743,9 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
   }
 
   // If we return indirectly, that is the first parameter type.
-  if (returnInfo.isIndirect())
+  if (returnInfo.isIndirect()) {
     addIndirectResult();
+  }
 
   size_t firstParamToLowerNormally = 0;
 
@@ -750,6 +773,20 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
       SWIFT_FALLTHROUGH;
     }
     case clang::CodeGen::ABIArgInfo::Direct: {
+      switch (FI.getExtParameterInfo(i).getABI()) {
+      case clang::ParameterABI::Ordinary:
+        break;
+      case clang::ParameterABI::SwiftContext:
+        addSwiftSelfAttributes(IGM, Attrs, getCurParamIndex());
+        break;
+      case clang::ParameterABI::SwiftErrorResult:
+        addSwiftErrorAttributes(IGM, Attrs, getCurParamIndex());
+        break;
+      case clang::ParameterABI::SwiftIndirectResult:
+        addIndirectResultAttributes(IGM, Attrs, getCurParamIndex(),claimSRet());
+        break;
+      }
+
       // If the coercion type is a struct, we need to expand it.
       auto type = AI.getCoerceToType();
       if (auto expandedType = dyn_cast<llvm::StructType>(type)) {
@@ -758,6 +795,11 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
       } else {
         ParamIRTypes.push_back(type);
       }
+      break;
+    }
+    case clang::CodeGen::ABIArgInfo::CoerceAndExpand: {
+      auto types = AI.getCoerceAndExpandTypeSequence();
+      ParamIRTypes.append(types.begin(), types.end());
       break;
     }
     case clang::CodeGen::ABIArgInfo::Indirect: {
@@ -1276,6 +1318,102 @@ bool irgen::canCoerceToSchema(IRGenModule &IGM,
   return true;
 }
 
+static llvm::Type *getOutputType(TranslationDirection direction, unsigned index,
+                                 const ExplosionSchema &nativeSchema,
+                                 ArrayRef<llvm::Type*> expandedForeignTys) {
+  assert(nativeSchema.size() == expandedForeignTys.size());
+  return (direction == TranslationDirection::ToForeign
+            ? expandedForeignTys[index]
+            : nativeSchema[index].getScalarType());
+}
+
+
+static void emitCoerceAndExpand(IRGenFunction &IGF,
+                                Explosion &in, Explosion &out, SILType paramTy,
+                                const LoadableTypeInfo &paramTI,
+                                llvm::StructType *coercionTy,
+                                ArrayRef<llvm::Type*> expandedTys,
+                                TranslationDirection direction) {
+  // If we can directly coerce the scalar values, avoid going through memory.
+  auto schema = paramTI.getSchema();
+  if (canCoerceToSchema(IGF.IGM, expandedTys, schema)) {
+    for (auto index : indices(expandedTys)) {
+      llvm::Value *arg = in.claimNext();
+      assert(arg->getType() ==
+               getOutputType(reverse(direction), index, schema, expandedTys));
+      auto outputTy = getOutputType(direction, index, schema, expandedTys);
+
+      if (arg->getType() != outputTy)
+        arg = IGF.coerceValue(arg, outputTy, IGF.IGM.DataLayout);
+      out.add(arg);
+    }
+    return;
+  }
+
+  // Otherwise, materialize to a temporary.
+  Address temporary =
+    paramTI.allocateStack(IGF, paramTy, "coerce-and-expand.temp").getAddress();
+
+  auto coercionTyLayout = IGF.IGM.DataLayout.getStructLayout(coercionTy);
+
+  // Make the alloca at least as aligned as the coercion struct, just
+  // so that the element accesses we make don't end up under-aligned.
+  Alignment coercionTyAlignment = Alignment(coercionTyLayout->getAlignment());
+  auto alloca = cast<llvm::AllocaInst>(temporary.getAddress());
+  if (alloca->getAlignment() < coercionTyAlignment.getValue()) {
+    alloca->setAlignment(coercionTyAlignment.getValue());
+    temporary = Address(temporary.getAddress(), coercionTyAlignment);
+  }
+
+  // If we're translating *to* the foreign expansion, do an ordinary
+  // initialization from the input explosion.
+  if (direction == TranslationDirection::ToForeign) {
+    paramTI.initialize(IGF, in, temporary);
+  }
+
+  Address coercedTemporary =
+    IGF.Builder.CreateElementBitCast(temporary, coercionTy);
+
+#ifndef NDEBUG
+  size_t expandedTyIndex = 0;
+#endif
+
+  for (auto eltIndex : indices(coercionTy->elements())) {
+    auto eltTy = coercionTy->getElementType(eltIndex);
+
+    // Skip padding fields.
+    if (eltTy->isArrayTy()) continue;
+    assert(expandedTys[expandedTyIndex++] == eltTy);
+
+    // Project down to the field.
+    Address eltAddr =
+      IGF.Builder.CreateStructGEP(coercedTemporary, eltIndex, coercionTyLayout);
+
+    // If we're translating *to* the foreign expansion, pull the value out
+    // of the field and add it to the output.
+    if (direction == TranslationDirection::ToForeign) {
+      llvm::Value *value = IGF.Builder.CreateLoad(eltAddr);
+      out.add(value);
+
+    // Otherwise, claim the next value from the input and store that
+    // in the field.
+    } else {
+      llvm::Value *value = in.claimNext();
+      IGF.Builder.CreateStore(value, eltAddr);
+    }
+  }
+
+  assert(expandedTyIndex == expandedTys.size());
+
+  // If we're translating *from* the foreign expansion, do an ordinary
+  // load into the output explosion.
+  if (direction == TranslationDirection::ToNative) {
+    paramTI.loadAsTake(IGF, temporary, out);
+  }
+
+  paramTI.deallocateStack(IGF, temporary, paramTy);
+}
+
 static void emitDirectExternalArgument(IRGenFunction &IGF,
                                        SILType argType, llvm::Type *toTy,
                                        Explosion &in, Explosion &out) {
@@ -1448,6 +1586,11 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     auto clangParamTy = FI.arg_begin()[i].type;
     auto &AI = FI.arg_begin()[i].info;
 
+    // We don't need to do anything to handle the Swift parameter-ABI
+    // attributes here because we shouldn't be trying to round-trip
+    // swiftcall function pointers through SIL as C functions anyway.
+    assert(FI.getExtParameterInfo(i).getABI() == clang::ParameterABI::Ordinary);
+
     // Add a padding argument if required.
     if (auto *padType = AI.getPaddingType())
       out.add(llvm::UndefValue::get(padType));
@@ -1485,6 +1628,14 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       ti.initialize(IGF, in, addr);
 
       out.add(addr.getAddress());
+      break;
+    }
+    case clang::CodeGen::ABIArgInfo::CoerceAndExpand: {
+      auto &paramTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
+      emitCoerceAndExpand(IGF, in, out, paramType, paramTI,
+                          AI.getCoerceAndExpandType(),
+                          AI.getCoerceAndExpandTypeSequence(),
+                          TranslationDirection::ToForeign);
       break;
     }
     case clang::CodeGen::ABIArgInfo::Expand:
@@ -1614,6 +1765,12 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
   auto clangArgTy = FI.arg_begin()[foreignParamIndex].type;
   auto AI = FI.arg_begin()[foreignParamIndex].info;
 
+  // We don't need to do anything to handle the Swift parameter-ABI
+  // attributes here because we shouldn't be trying to round-trip
+  // swiftcall function pointers through SIL as C functions anyway.
+  assert(FI.getExtParameterInfo(foreignParamIndex).getABI()
+           == clang::ParameterABI::Ordinary);
+
   // Drop padding arguments.
   if (AI.getPaddingType())
     params.claimNext();
@@ -1634,6 +1791,14 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
     emitClangExpandedParameter(IGF, params, paramExplosion, clangArgTy,
                                paramTy, paramTI);
     return;
+  }
+  case clang::CodeGen::ABIArgInfo::CoerceAndExpand: {
+    auto &paramTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramTy));
+    emitCoerceAndExpand(IGF, params, paramExplosion, paramTy, paramTI,
+                        AI.getCoerceAndExpandType(),
+                        AI.getCoerceAndExpandTypeSequence(),
+                        TranslationDirection::ToNative);
+    break;
   }
 
   case clang::CodeGen::ABIArgInfo::Ignore:

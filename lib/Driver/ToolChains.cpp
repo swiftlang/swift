@@ -1190,11 +1190,52 @@ getSectionMagicArch(const llvm::Triple &Triple) {
   }
 }
 
+std::string toolchains::GenericUnix::getDefaultLinker() const {
+  switch(getTriple().getArch()) {
+  case llvm::Triple::arm:
+  case llvm::Triple::armeb:
+  case llvm::Triple::thumb:
+  case llvm::Triple::thumbeb:
+    // BFD linker has issues wrt relocation of the protocol conformance
+    // section on these targets, it also generates COPY relocations for
+    // final executables, as such, unless specified, we default to gold
+    // linker.
+    return "gold";
+  default:
+    // Otherwise, use the default BFD linker.
+    return "";
+  }
+}
+
+bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
+  return true;
+}
+
+bool toolchains::GenericUnix::shouldSpecifyTargetTripleToLinker() const {
+  return true;
+}
+
+std::string toolchains::GenericUnix::getPreInputObjectPath(
+    StringRef RuntimeLibraryPath) const {
+  // On Linux and FreeBSD (really, ELF binaries) we need to add objects
+  // to provide markers and size for the metadata sections.
+  SmallString<128> PreInputObjectPath = RuntimeLibraryPath;
+  llvm::sys::path::append(PreInputObjectPath, getSectionMagicArch(getTriple()));
+  llvm::sys::path::append(PreInputObjectPath, "swift_begin.o");
+  return PreInputObjectPath.str();
+}
+
+std::string toolchains::GenericUnix::getPostInputObjectPath(
+    StringRef RuntimeLibraryPath) const {
+  SmallString<128> PostInputObjectPath = RuntimeLibraryPath;
+  llvm::sys::path::append(PostInputObjectPath, getSectionMagicArch(getTriple()));
+  llvm::sys::path::append(PostInputObjectPath, "swift_end.o");
+  return PostInputObjectPath.str();
+}
+
 ToolChain::InvocationInfo
 toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
                                              const JobContext &context) const {
-  const Driver &D = getDriver();
-
   assert(context.Output.getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
 
@@ -1212,52 +1253,38 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
 
   // Select the linker to use
-  StringRef Linker;
-
+  std::string Linker;
   if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
     Linker = A->getValue();
   } else {
-    switch(getTriple().getArch()) {
-    default:
-      break;
-    case llvm::Triple::arm:
-    case llvm::Triple::armeb:
-    case llvm::Triple::thumb:
-    case llvm::Triple::thumbeb:
-    // BFD linker has issues wrt relocation of the protocol conformance
-    // section on these targets, it also generates COPY relocations for
-    // final executables, as such, unless specified, we default to gold
-    // linker.
-      Linker = "gold";
-    }
+    Linker = getDefaultLinker();
   }
-
   if (!Linker.empty()) {
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
   }
 
+  // Explicitly pass the target to the linker
+  if (shouldSpecifyTargetTripleToLinker()) {
+    Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
+  }
+
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
-  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
-  // library link path and the standard library module import path don't
-  // need to be the same.
   llvm::SmallString<128> RuntimeLibPath;
-
-  if (const Arg *A = context.Args.getLastArg(options::OPT_resource_dir)) {
-    RuntimeLibPath = A->getValue();
-  } else {
-    RuntimeLibPath = D.getSwiftProgramPath();
-    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /swift
-    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /bin
-    llvm::sys::path::append(RuntimeLibPath, "lib", "swift");
+  getRuntimeLibraryPath(RuntimeLibPath, context.Args, *this);
+  if (shouldProvideRPathToLinker()) {
+    // FIXME: We probably shouldn't be adding an rpath here unless we know
+    //        ahead of time the standard library won't be copied.
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("-rpath");
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
   }
-  llvm::sys::path::append(RuntimeLibPath,
-                          getPlatformNameForTriple(getTriple()));
 
- // On Linux and FreeBSD (really, ELF binaries) we need to add objects
- // to provide markers and size for the metadata sections.
-  Arguments.push_back(context.Args.MakeArgString(
-    Twine(RuntimeLibPath) + "/" + getSectionMagicArch(getTriple()) + "/swift_begin.o"));
+  auto PreInputObjectPath = getPreInputObjectPath(RuntimeLibPath);
+  if (!PreInputObjectPath.empty()) {
+    Arguments.push_back(context.Args.MakeArgString(PreInputObjectPath));
+  }
   addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
@@ -1272,9 +1299,6 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   Arguments.push_back("-L");
   Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
-
-  // Explicitly pass the target to the linker
-  Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
     SmallString<128> LibProfile(RuntimeLibPath);
@@ -1288,13 +1312,6 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
   }
 
-  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
-  // of time the standard library won't be copied.
-  Arguments.push_back("-Xlinker");
-  Arguments.push_back("-rpath");
-  Arguments.push_back("-Xlinker");
-  Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
-
   // Always add the stdlib
   Arguments.push_back("-lswiftCore");
 
@@ -1306,128 +1323,11 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
         Twine("@") + OutputInfo.getPrimaryOutputFilename()));
   }
 
-  // It is important that swift_end.o be the last object on the link line
-  // therefore, it is included just before the output filename.
-  Arguments.push_back(context.Args.MakeArgString(
-    Twine(RuntimeLibPath) + "/" + getSectionMagicArch(getTriple()) + "/swift_end.o"));
-
-  // This should be the last option, for convenience in checking output.
-  Arguments.push_back("-o");
-  Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
-
-  return {"clang++", Arguments};
-}
-
-ToolChain::InvocationInfo
-toolchains::Windows::constructInvocation(const InterpretJobAction &job,
-                                         const JobContext &context) const {
-  InvocationInfo II = ToolChain::constructInvocation(job, context);
-
-  SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this);
-
-  addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
-                                     ":", options::OPT_L, context.Args,
-                                     runtimeLibraryPath);
-  return II;
-}
-
-ToolChain::InvocationInfo
-toolchains::Windows::constructInvocation(const AutolinkExtractJobAction &job,
-                                         const JobContext &context) const {
-  assert(context.Output.getPrimaryOutputType() == types::TY_AutolinkFile);
-
-  ArgStringList Arguments;
-  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
-  addInputsOfType(Arguments, context.InputActions, types::TY_Object);
-
-  Arguments.push_back("-o");
-  Arguments.push_back(
-      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
-
-  return {"swift-autolink-extract", Arguments};
-}
-
-ToolChain::InvocationInfo
-toolchains::Windows::constructInvocation(const LinkJobAction &job,
-                                         const JobContext &context) const {
-  const Driver &D = getDriver();
-
-  assert(context.Output.getPrimaryOutputType() == types::TY_Image &&
-         "Invalid linker output type.");
-
-  ArgStringList Arguments;
-
-  switch (job.getKind()) {
-  case LinkKind::None:
-    llvm_unreachable("invalid link kind");
-  case LinkKind::Executable:
-    // Default case, nothing extra needed
-    break;
-  case LinkKind::DynamicLibrary:
-    Arguments.push_back("-shared");
-    break;
-  }
-
-  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
-  addInputsOfType(Arguments, context.InputActions, types::TY_Object);
-
-  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
-  context.Args.AddAllArgs(Arguments, options::OPT_F);
-
-  if (!context.OI.SDKPath.empty()) {
-    Arguments.push_back("--sysroot");
-    Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
-  }
-
-  // Add the runtime library link path, which is platform-specific and found
-  // relative to the compiler.
-  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
-  // library link path and the standard library module import path don't
-  // need to be the same.
-  llvm::SmallString<128> RuntimeLibPath;
-
-  if (const Arg *A = context.Args.getLastArg(options::OPT_resource_dir)) {
-    RuntimeLibPath = A->getValue();
-  } else {
-    RuntimeLibPath = D.getSwiftProgramPath();
-    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /swift
-    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /bin
-    llvm::sys::path::append(RuntimeLibPath, "lib", "swift");
-  }
-  llvm::sys::path::append(RuntimeLibPath,
-                          getPlatformNameForTriple(getTriple()));
-  Arguments.push_back("-L");
-  Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
-
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(RuntimeLibPath);
-    llvm::sys::path::remove_filename(LibProfile); // remove platform name
-    llvm::sys::path::append(LibProfile, "clang", CLANG_VERSION_STRING);
-
-    llvm::sys::path::append(LibProfile, "lib", getTriple().getOSName(),
-                            Twine("libclang_rt.profile-") +
-                                getTriple().getArchName() + ".a");
-    Arguments.push_back(context.Args.MakeArgString(LibProfile));
-  }
-
-  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
-  // of time the standard library won't be copied.
-  Arguments.push_back("-Xlinker");
-  Arguments.push_back("-rpath");
-  Arguments.push_back("-Xlinker");
-  Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
-
-  // Always add the stdlib
-  Arguments.push_back("-lswiftCore");
-
-  // Add any autolinking scripts to the arguments
-  for (const Job *Cmd : context.Inputs) {
-    auto &OutputInfo = Cmd->getOutput();
-    if (OutputInfo.getPrimaryOutputType() == types::TY_AutolinkFile)
-      Arguments.push_back(context.Args.MakeArgString(
-          Twine("@") + OutputInfo.getPrimaryOutputFilename()));
+  // Just before the output option, allow GenericUnix toolchains to add
+  // additional inputs.
+  auto PostInputObjectPath = getPostInputObjectPath(RuntimeLibPath);
+  if (!PostInputObjectPath.empty()) {
+    Arguments.push_back(context.Args.MakeArgString(PostInputObjectPath));
   }
 
   // This should be the last option, for convenience in checking output.
@@ -1435,4 +1335,25 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
 
   return {"clang++", Arguments};
+}
+
+std::string toolchains::Cygwin::getDefaultLinker() const {
+  // Cygwin uses the default BFD linker, even on ARM.
+  return "";
+}
+
+bool toolchains::Cygwin::shouldSpecifyTargetTripleToLinker() const {
+  return false;
+}
+
+std::string toolchains::Cygwin::getPreInputObjectPath(
+    StringRef RuntimeLibraryPath) const {
+  // Cygwin does not add "begin" and "end" objects.
+  return "";
+}
+
+std::string toolchains::Cygwin::getPostInputObjectPath(
+    StringRef RuntimeLibraryPath) const {
+  // Cygwin does not add "begin" and "end" objects.
+  return "";
 }

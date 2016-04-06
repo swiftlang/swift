@@ -53,6 +53,14 @@ namespace irgen {
   class Size;
   class TypeInfo;
 
+  enum class TranslationDirection : bool {
+    ToForeign,
+    ToNative
+  };
+  inline TranslationDirection reverse(TranslationDirection direction) {
+    return TranslationDirection(!bool(direction));
+  }
+
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention);
 
