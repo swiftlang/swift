@@ -683,7 +683,11 @@ endif()
 #
 # Set up global CMake variables for API notes.
 #
-
+# API notes version 1.0.0
+#
+# Change the above comment to 'touch' this file and keep incremental builds
+# working when adding a new apinotes file.
+#
 set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
 if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
   message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")

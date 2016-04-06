@@ -1,0 +1,65 @@
+---
+Name: CoreGraphics
+SwiftInferImportAsMember: true
+# The below are inline functions that are irrelevant due to memberwise inits
+Functions:
+- Name: CGPointMake
+  Availability: nonswift
+- Name: CGSizeMake
+  Availability: nonswift
+- Name: CGVectorMake
+  Availability: nonswift
+- Name: CGRectMake
+  Availability: nonswift
+- Name: CGAffineTransformMake
+  Availability: nonswift
+# The below are fixups that inference didn't quite do what we wanted, and are 
+# pulled over from what used to be in the overlays
+- Name: CGRectIsNull
+  SwiftName: "getter:CGRect.isNull(self:)"
+- Name: CGRectIsEmpty
+  SwiftName: "getter:CGRect.isEmpty(self:)"
+- Name: CGRectIsInfinite
+  SwiftName: "getter:CGRect.isInfinite(self:)"
+- Name: CGRectStandardize
+  SwiftName: "getter:CGRect.standardized(self:)"
+- Name: CGRectIntegral
+  SwiftName: "getter:CGRect.integral(self:)"
+- Name: CGRectInset
+  SwiftName: "CGRect.insetBy(self:dx:dy:)"
+- Name: CGRectOffset
+  SwiftName: "CGRect.offsetBy(self:dx:dy:)"
+- Name: CGRectUnion
+  SwiftName: "CGRect.union(self:_:)"
+- Name: CGRectIntersection
+  SwiftName: "CGRect.intersect(self:_:)"
+- Name: CGRectContainsRect
+  SwiftName: "CGRect.contains(self:_:)"
+- Name: CGRectContainsPoint
+  SwiftName: "CGRect.contains(self:_:)"
+- Name: CGRectIntersectsRect
+  SwiftName: "CGRect.intersects(self:_:)"
+# The below are left alone, due to an unknown bug
+# FIXME: fix me
+- Name: CGColorSpaceCreateDeviceRGB
+  SwiftName: "CGColorSpaceCreateDeviceRGB()"
+
+# The below are globals that are defined as opaque C constants for no good
+# reason.
+Globals:
+- Name: CGPointZero
+  Availability: nonswift
+- Name: CGSizeZero
+  Availability: nonswift
+- Name: CGVectorZero
+  Availability: nonswift
+- Name: CGRectZero
+  Availability: nonswift
+- Name: CGAffineTransformIdentity
+  Availability: nonswift
+# The below are left alone, due to an unknown bug
+# FIXME: fix me
+- Name: kCGColorBlack
+  SwiftName: "kCGColorBlack"
+- Name: kCGColorWhite
+  SwiftName: "kCGColorWhite"
