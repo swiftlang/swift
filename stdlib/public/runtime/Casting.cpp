@@ -22,6 +22,7 @@
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "swift/Runtime/Debug.h"
@@ -33,10 +34,6 @@
 
 #include <cstring>
 #include <type_traits>
-
-// FIXME: SR-946 - we ideally want to switch off of using pthread_rwlock
-//                 directly and instead expand Mutex.h to support rwlocks.
-#include <mutex>
 
 // FIXME: Clang defines max_align_t in stddef.h since 3.6.
 // Remove this hack when we don't care about older Clangs on all platforms.
@@ -349,42 +346,38 @@ TwoWordPair<const char *, uintptr_t>::Return
 swift_getTypeName(const Metadata *type, bool qualified) {
   using Pair = TwoWordPair<const char *, uintptr_t>;
   using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
-  
-  static pthread_rwlock_t TypeNameCacheLock = PTHREAD_RWLOCK_INITIALIZER;
+
+  static StaticReadWriteLock TypeNameCacheLock;
   static Lazy<llvm::DenseMap<Key, std::pair<const char *, size_t>>>
     TypeNameCache;
   
   Key key(type, qualified);
   auto &cache = TypeNameCache.get();
-  
-  pthread_rwlock_rdlock(&TypeNameCacheLock);
-  auto found = cache.find(key);
-  if (found != cache.end()) {
-    auto result = found->second;
-    pthread_rwlock_unlock(&TypeNameCacheLock);
-    return Pair{result.first, result.second};
-  }
-  
-  pthread_rwlock_unlock(&TypeNameCacheLock);
-  pthread_rwlock_wrlock(&TypeNameCacheLock);
-  // Someone may have beaten us to the write lock.
-  found = cache.find(key);
-  if (found != cache.end()) {
-    auto result = found->second;
-    pthread_rwlock_unlock(&TypeNameCacheLock);
-    return Pair{result.first, result.second};
-  }
-  
-  // Build the metadata name.
-  auto name = nameForMetadata(type, qualified);
-  // Copy it to memory we can reference forever.
-  auto size = name.size();
-  auto result = (char*)malloc(size + 1);
-  memcpy(result, name.data(), size);
-  result[size] = 0;
-  cache.insert({key, {result, size}});
-  pthread_rwlock_unlock(&TypeNameCacheLock);
-  return Pair{result, size};
+
+  Pair pair;
+  TypeNameCacheLock.readWriteLock(
+      [&] {
+        auto found = cache.find(key);
+        if (found != cache.end()) {
+          auto result = found->second;
+          pair = Pair{result.first, result.second};
+          return true; // Cache hit, return true (e.g. done)
+        }
+        return false; // Cache missed, return false to move to write lock.
+      },
+      [&] {
+        // Build the metadata name.
+        auto name = nameForMetadata(type, qualified);
+        // Copy it to memory we can reference forever.
+        auto size = name.size();
+        auto result = (char *)malloc(size + 1);
+        memcpy(result, name.data(), size);
+        result[size] = 0;
+        cache.insert({key, {result, size}});
+        pair = Pair{result, size};
+      });
+
+  return pair;
 }
 
 /// Report a dynamic cast failure.

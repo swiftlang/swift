@@ -279,7 +279,7 @@ template <class ValueTy> class MetadataCache {
 
   struct ConcurrencyControl {
     Mutex Lock;
-    Condition Queue;
+    ConditionVariable Queue;
   };
   std::unique_ptr<ConcurrencyControl> Concurrency;
 
@@ -339,7 +339,7 @@ public:
       auto concurrency = Concurrency.get();
       concurrency->Lock.lockOrWait(concurrency->Queue, [&value, &entry, this] {
         if ((value = entry->getValue())) {
-          return false; // found a value, done waiting
+          return true; // found a value, done waiting
         }
 
         // As a QoI safe-guard against the simplest form of cyclic
@@ -352,7 +352,7 @@ public:
           abort();
         }
 
-        return true; // don't have a value, continue waiting
+        return false; // don't have a value, continue waiting
       });
 
       return value;
