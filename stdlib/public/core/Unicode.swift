@@ -16,11 +16,19 @@
 
 /// The result of one Unicode decoding step.
 ///
-/// A unicode scalar value, an indication that no more unicode scalars
-/// are available, or an indication of a decoding error.
+/// Each `UnicodeDecodingResult` instance can represent a Unicode scalar value,
+/// an indication that no more Unicode scalars are available, or an indication
+/// of a decoding error.
+/// 
+/// - SeeAlso: `UnicodeCodec.decode(next:)`
 public enum UnicodeDecodingResult : Equatable {
+  /// A decoded Unicode scalar value.
   case scalarValue(UnicodeScalar)
+  
+  /// An indication that no more Unicode scalars are available in the input.
   case emptyInput
+  
+  /// An indication of a decoding error.
   case error
 }
 
@@ -40,56 +48,102 @@ public func == (
   }
 }
 
-/// A Unicode [encoding scheme](http://www.unicode.org/glossary/#character_encoding_scheme).
+/// A Unicode encoding form that translates between Unicode scalar values and
+/// form-specific code units.
 ///
-/// Consists of an underlying [code unit](http://www.unicode.org/glossary/#code_unit)
-/// and functions to translate between sequences of these code units and
-/// [unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value).
+/// The `UnicodeCodec` protocol declares methods that decode code unit
+/// sequences into Unicode scalar values and encode Unicode scalar values
+/// into code unit sequences. The standard library implements codecs for the
+/// UTF-8, UTF-16, and UTF-32 encoding schemes as the `UTF8`, `UTF16`, and
+/// `UTF32` types, respectively. Use the `UnicodeScalar` type to work with
+/// decoded Unicode scalar values.
+///
+/// - SeeAlso: `UTF8`, `UTF16`, `UTF32`, `UnicodeScalar`
 public protocol UnicodeCodec {
 
-  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit)
-  /// values for this encoding.
+  /// A type that can hold code unit values for this encoding.
   associatedtype CodeUnit
 
+  /// Creates an instance of the codec.
   init()
 
-  /// Start or continue decoding a UTF sequence.
+  /// Starts or continues decoding a code unit sequence into Unicode scalar
+  /// values.
   ///
-  /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
-  /// Checking that the iterator was exhausted is not sufficient.  The decoder
-  /// can have an internal buffer that is pre-filled with data from the input
-  /// iterator.
+  /// To decode a code unit sequence completely, call this method repeatedly
+  /// until it returns `UnicodeDecodingResult.emptyInput`. Checking that the
+  /// iterator was exhausted is not sufficient, because the decoder can store
+  /// buffered data from the input iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - Parameter next: An iterator of code units to be decoded.  Repeated
-  ///   calls to this method on the same instance should always pass the same
-  ///   iterator and the iterator or copies thereof should not be used for
-  ///   anything else between calls.  Failing to do so will yield unspecified
-  ///   results.
+  /// The following example decodes the UTF-8 encoded bytes of a string into an
+  /// array of `UnicodeScalar` instances:
+  ///
+  ///     let str = "✨Unicode✨"
+  ///     print(Array(str.utf8))
+  ///     // Prints "[226, 156, 168, 85, 110, 105, 99, 111, 100, 101, 226, 156, 168]"
+  ///
+  ///     var bytesIterator = str.utf8.makeIterator()
+  ///     var scalars: [UnicodeScalar] = []
+  ///     var utf8Decoder = UTF8()
+  ///     Decode: while true {
+  ///         switch utf8Decoder.decode(&bytesIterator) {
+  ///         case .scalarValue(let v): scalars.append(v)
+  ///         case .emptyInput: break Decode
+  ///         case .error:
+  ///             print("Decoding error")
+  ///             break Decode
+  ///         }
+  ///     }
+  ///     print(scalars)
+  ///     // Prints "["\u{2728}", "U", "n", "i", "c", "o", "d", "e", "\u{2728}"]"
+  ///
+  /// - Parameter next: An iterator of code units to be decoded. `next` must be
+  ///   the same iterator instance in repeated calls to this method. Do not
+  ///   advance the iterator or any copies of the iterator outside this
+  ///   method.
+  /// - Returns: A `UnicodeDecodingResult` instance, representing the next
+  ///   Unicode scalar, an indication of an error, or an indication that the
+  ///   UTF sequence has been fully decoded.
   mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(_ next: inout I) -> UnicodeDecodingResult
 
-  /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// calling `processCodeUnit` on each `CodeUnit`.
+  /// Encodes a Unicode scalar as a series of code units by calling the given
+  /// closure on each code unit.
+  ///
+  /// For example, the musical fermata symbol ("𝄐") is a single Unicode scalar
+  /// value (`\u{1D110}`) but requires four code units for its UTF-8
+  /// representation. The following code uses the `UTF8` codec to encode a
+  /// fermata in UTF-8:
+  ///
+  ///     var bytes: [UTF8.CodeUnit] = []
+  ///     UTF8.encode("𝄐", sendingOutputTo: { bytes.append($0) })
+  ///     print(bytes)
+  ///     // Prints "[240, 157, 132, 144]"
+  ///
+  /// - Parameters:
+  ///   - input: The Unicode scalar value to encode.
+  ///   - processCodeUnit: A closure that processes one code unit argument at a
+  ///     time.
   static func encode(
     _ input: UnicodeScalar,
     sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
   )
 }
 
-/// A codec for [UTF-8](http://www.unicode.org/glossary/#UTF_8).
+/// A codec for translating between Unicode scalar values and UTF-8 code
+/// units.
 public struct UTF8 : UnicodeCodec {
   // See Unicode 8.0.0, Ch 3.9, UTF-8.
   // http://www.unicode.org/versions/Unicode8.0.0/ch03.pdf
 
-  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit)
-  /// values for this encoding.
+  /// A type that can hold code unit values for this encoding.
   public typealias CodeUnit = UInt8
 
+  /// Creates an instance of the UTF-8 codec.
   public init() {}
 
   /// Lookahead buffer used for UTF-8 decoding.  New bytes are inserted at MSB,
@@ -105,22 +159,47 @@ public struct UTF8 : UnicodeCodec {
   /// we are done decoding, as there might still be bytes left in the buffer.
   internal var _didExhaustIterator: Bool = false
 
-  /// Start or continue decoding a UTF-8 sequence.
+  /// Starts or continues decoding a UTF-8 sequence.
   ///
-  /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
-  /// Checking that the iterator was exhausted is not sufficient.  The decoder
-  /// can have an internal buffer that is pre-filled with data from the input
-  /// iterator.
+  /// To decode a code unit sequence completely, call this method repeatedly
+  /// until it returns `UnicodeDecodingResult.emptyInput`. Checking that the
+  /// iterator was exhausted is not sufficient, because the decoder can store
+  /// buffered data from the input iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - Parameter next: An iterator of code units to be decoded.  Repeated
-  ///   calls to this method on the same instance should always pass the same
-  ///   iterator and the iterator or copies thereof should not be used for
-  ///   anything else between calls.  Failing to do so will yield unspecified
-  ///   results.
+  /// The following example decodes the UTF-8 encoded bytes of a string into an
+  /// array of `UnicodeScalar` instances. This is a demonstration only---if
+  /// you need the Unicode scalar representation of a string, use its
+  /// `unicodeScalars` view.
+  ///
+  ///     let str = "✨Unicode✨"
+  ///     print(Array(str.utf8))
+  ///     // Prints "[226, 156, 168, 85, 110, 105, 99, 111, 100, 101, 226, 156, 168]"
+  ///
+  ///     var bytesIterator = str.utf8.makeIterator()
+  ///     var scalars: [UnicodeScalar] = []
+  ///     var utf8Decoder = UTF8()
+  ///     Decode: while true {
+  ///         switch utf8Decoder.decode(&bytesIterator) {
+  ///         case .scalarValue(let v): scalars.append(v)
+  ///         case .emptyInput: break Decode
+  ///         case .error:
+  ///             print("Decoding error")
+  ///             break Decode
+  ///         }
+  ///     }
+  ///     print(scalars)
+  ///     // Prints "["\u{2728}", "U", "n", "i", "c", "o", "d", "e", "\u{2728}"]"
+  ///
+  /// - Parameter next: An iterator of code units to be decoded. `next` must be
+  ///   the same iterator instance in repeated calls to this method. Do not
+  ///   advance the iterator or any copies of the iterator outside this
+  ///   method.
+  /// - Returns: A `UnicodeDecodingResult` instance, representing the next
+  ///   Unicode scalar, an indication of an error, or an indication that the
+  ///   UTF sequence has been fully decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(_ next: inout I) -> UnicodeDecodingResult {
@@ -280,8 +359,22 @@ public struct UTF8 : UnicodeCodec {
     }
   }
 
-  /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// calling `processCodeUnit` on each `CodeUnit`.
+  /// Encodes a Unicode scalar as a series of code units by calling the given
+  /// closure on each code unit.
+  ///
+  /// For example, the musical fermata symbol ("𝄐") is a single Unicode scalar
+  /// value (`\u{1D110}`) but requires four code units for its UTF-8
+  /// representation. The following code encodes a fermata in UTF-8:
+  ///
+  ///     var bytes: [UTF8.CodeUnit] = []
+  ///     UTF8.encode("𝄐", sendingOutputTo: { bytes.append($0) })
+  ///     print(bytes)
+  ///     // Prints "[240, 157, 132, 144]"
+  ///
+  /// - Parameters:
+  ///   - input: The Unicode scalar value to encode.
+  ///   - processCodeUnit: A closure that processes one code unit argument at a
+  ///     time.
   public static func encode(
     _ input: UnicodeScalar,
     sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
@@ -315,19 +408,35 @@ public struct UTF8 : UnicodeCodec {
     processCodeUnit(buf3)
   }
 
-  /// Returns `true` if `byte` is a continuation byte of the form
-  /// `0b10xxxxxx`.
+  /// Returns a Boolean value indicating whether the specified code unit is a
+  /// UTF-8 continuation byte.
+  ///
+  /// Continuation bytes take the form `0b10xxxxxx`. For example, a lowercase
+  /// "e" with an acute accent above it (`"é"`) uses 2 bytes for its UTF-8
+  /// representation: `0b11000011` (195) and `0b10101001` (169). The second
+  /// byte is a continuation byte.
+  ///
+  ///     let eAcute = "é"
+  ///     for codePoint in eAcute.utf8 {
+  ///         print(codePoint, UTF8.isContinuation(codePoint))
+  ///     }
+  ///     // Prints "195 false"
+  ///     // Prints "169 true"
+  ///
+  /// - Parameter byte: A UTF-8 code unit.
+  /// - Returns: `true` if `byte` is a continuation byte; otherwise, `false`.
   public static func isContinuation(_ byte: CodeUnit) -> Bool {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
 }
 
-/// A codec for [UTF-16](http://www.unicode.org/glossary/#UTF_16).
+/// A codec for translating between Unicode scalar values and UTF-16 code
+/// units.
 public struct UTF16 : UnicodeCodec {
-  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit)
-  /// values for this encoding.
+  /// A type that can hold code unit values for this encoding.
   public typealias CodeUnit = UInt16
 
+  /// Creates an instance of the UTF-16 codec.
   public init() {}
 
   /// A lookahead buffer for one UTF-16 code unit.
@@ -340,22 +449,47 @@ public struct UTF16 : UnicodeCodec {
   /// `x` is set when `_decodeLookahead` contains a code unit.
   internal var _lookaheadFlags: UInt8 = 0
 
-  /// Start or continue decoding a UTF sequence.
+  /// Starts or continues decoding a UTF-16 sequence.
   ///
-  /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
-  /// Checking that the iterator was exhausted is not sufficient.  The decoder
-  /// can have an internal buffer that is pre-filled with data from the input
-  /// iterator.
+  /// To decode a code unit sequence completely, call this method repeatedly
+  /// until it returns `UnicodeDecodingResult.emptyInput`. Checking that the
+  /// iterator was exhausted is not sufficient, because the decoder can store
+  /// buffered data from the input iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - Parameter next: An iterator of code units to be decoded.  Repeated
-  ///   calls to this method on the same instance should always pass the same
-  ///   iterator and the iterator or copies thereof should not be used for
-  ///   anything else between calls.  Failing to do so will yield unspecified
-  ///   results.
+  /// The following example decodes the UTF-16 encoded bytes of a string into an
+  /// array of `UnicodeScalar` instances. This is a demonstration only---if
+  /// you need the Unicode scalar representation of a string, use its
+  /// `unicodeScalars` view.
+  ///
+  ///     let str = "✨Unicode✨"
+  ///     print(Array(str.utf16))
+  ///     // Prints "[10024, 85, 110, 105, 99, 111, 100, 101, 10024]"
+  ///
+  ///     var codeUnitIterator = str.utf16.makeIterator()
+  ///     var scalars: [UnicodeScalar] = []
+  ///     var utf16Decoder = UTF16()
+  ///     Decode: while true {
+  ///         switch utf16Decoder.decode(&codeUnitIterator) {
+  ///         case .scalarValue(let v): scalars.append(v)
+  ///         case .emptyInput: break Decode
+  ///         case .error:
+  ///             print("Decoding error")
+  ///             break Decode
+  ///         }
+  ///     }
+  ///     print(scalars)
+  ///     // Prints "["\u{2728}", "U", "n", "i", "c", "o", "d", "e", "\u{2728}"]"
+  ///
+  /// - Parameter next: An iterator of code units to be decoded. `next` must be
+  ///   the same iterator instance in repeated calls to this method. Do not
+  ///   advance the iterator or any copies of the iterator outside this
+  ///   method.
+  /// - Returns: A `UnicodeDecodingResult` instance, representing the next
+  ///   Unicode scalar, an indication of an error, or an indication that the
+  ///   UTF sequence has been fully decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(_ input: inout I) -> UnicodeDecodingResult {
@@ -451,8 +585,22 @@ public struct UTF16 : UnicodeCodec {
     }
   }
 
-  /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// calling `processCodeUnit` on each `CodeUnit`.
+  /// Encodes a Unicode scalar as a series of code units by calling the given
+  /// closure on each code unit.
+  ///
+  /// For example, the musical fermata symbol ("𝄐") is a single Unicode scalar
+  /// value (`\u{1D110}`) but requires two code units for its UTF-16
+  /// representation. The following code encodes a fermata in UTF-16:
+  ///
+  ///     var codeUnits: [UTF16.CodeUnit] = []
+  ///     UTF16.encode("𝄐", sendingOutputTo: { codeUnits.append($0) })
+  ///     print(codeUnits)
+  ///     // Prints "[55348, 56592]"
+  ///
+  /// - Parameters:
+  ///   - input: The Unicode scalar value to encode.
+  ///   - processCodeUnit: A closure that processes one code unit argument at a
+  ///     time.
   public static func encode(
     _ input: UnicodeScalar,
     sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
@@ -470,30 +618,56 @@ public struct UTF16 : UnicodeCodec {
   }
 }
 
-/// A codec for [UTF-32](http://www.unicode.org/glossary/#UTF_32).
+/// A codec for translating between Unicode scalar values and UTF-32 code
+/// units.
 public struct UTF32 : UnicodeCodec {
-  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit)
-  /// values for this encoding.
+  /// A type that can hold code unit values for this encoding.
   public typealias CodeUnit = UInt32
 
+  /// Creates an instance of the UTF-32 codec.
   public init() {}
 
-  /// Start or continue decoding a UTF sequence.
+  /// Starts or continues decoding a UTF-32 sequence.
   ///
-  /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
-  /// Checking that the iterator was exhausted is not sufficient.  The decoder
-  /// can have an internal buffer that is pre-filled with data from the input
-  /// iterator.
+  /// To decode a code unit sequence completely, call this method repeatedly
+  /// until it returns `UnicodeDecodingResult.emptyInput`. Checking that the
+  /// iterator was exhausted is not sufficient, because the decoder can store
+  /// buffered data from the input iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - Parameter next: An iterator of code units to be decoded.  Repeated
-  ///   calls to this method on the same instance should always pass the same
-  ///   iterator and the iterator or copies thereof should not be used for
-  ///   anything else between calls.  Failing to do so will yield unspecified
-  ///   results.
+  /// The following example decodes the UTF-16 encoded bytes of a string
+  /// into an array of `UnicodeScalar` instances. This is a demonstration
+  /// only---if you need the Unicode scalar representation of a string, use
+  /// its `unicodeScalars` view.
+  ///
+  ///     // UTF-32 representation of "✨Unicode✨"
+  ///     let codeUnits: [UTF32.CodeUnit] =
+  ///             [10024, 85, 110, 105, 99, 111, 100, 101, 10024]
+  ///
+  ///     var codeUnitIterator = codeUnits.makeIterator()
+  ///     var scalars: [UnicodeScalar] = []
+  ///     var utf32Decoder = UTF32()
+  ///     Decode: while true {
+  ///         switch utf32Decoder.decode(&codeUnitIterator) {
+  ///         case .scalarValue(let v): scalars.append(v)
+  ///         case .emptyInput: break Decode
+  ///         case .error:
+  ///             print("Decoding error")
+  ///             break Decode
+  ///         }
+  ///     }
+  ///     print(scalars)
+  ///     // Prints "["\u{2728}", "U", "n", "i", "c", "o", "d", "e", "\u{2728}"]"
+  ///
+  /// - Parameter next: An iterator of code units to be decoded. `next` must be
+  ///   the same iterator instance in repeated calls to this method. Do not
+  ///   advance the iterator or any copies of the iterator outside this
+  ///   method.
+  /// - Returns: A `UnicodeDecodingResult` instance, representing the next
+  ///   Unicode scalar, an indication of an error, or an indication that the
+  ///   UTF sequence has been fully decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(_ input: inout I) -> UnicodeDecodingResult {
@@ -511,8 +685,22 @@ public struct UTF32 : UnicodeCodec {
     }
   }
 
-  /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// calling `processCodeUnit` on each `CodeUnit`.
+  /// Encodes a Unicode scalar as a UTF-32 code unit by calling the given
+  /// closure.
+  ///
+  /// For example, like every Unicode scalar, the musical fermata symbol ("𝄐")
+  /// can be represented in UTF-32 as a single code unit. The following code
+  /// encodes a fermata in UTF-32:
+  ///
+  ///     var codeUnit: UTF32.CodeUnit = 0
+  ///     UTF32.encode("𝄐", sendingOutputTo: { codeUnit = $0 })
+  ///     print(codeUnit)
+  ///     // Prints "119056"
+  ///
+  /// - Parameters:
+  ///   - input: The Unicode scalar value to encode.
+  ///   - processCodeUnit: A closure that processes one code unit argument at a
+  ///     time.
   public static func encode(
     _ input: UnicodeScalar,
     sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
@@ -521,12 +709,41 @@ public struct UTF32 : UnicodeCodec {
   }
 }
 
-/// Translate `input`, in the given `InputEncoding`, into `processCodeUnit`, in
-/// the given `OutputEncoding`.
+/// Translates the given input from one Unicode encoding to another by calling
+/// the given closure.
 ///
-/// - Parameter stopOnError: Causes encoding to stop when an encoding
-///   error is detected in `input`, if `true`.  Otherwise, U+FFFD
-///   replacement characters are inserted for each detected error.
+/// The following example transcodes the UTF-8 representation of the string
+/// `"Fermata 𝄐"` into UTF-32.
+///
+///     let fermata = "Fermata 𝄐"
+///     let bytes = fermata.utf8
+///     print(Array(bytes))
+///     // Prints "[70, 101, 114, 109, 97, 116, 97, 32, 240, 157, 132, 144]"
+///
+///     var codeUnits: [UTF32.CodeUnit] = []
+///     let sink = { codeUnits.append($0) }
+///     transcode(bytes.makeIterator(), from: UTF8.self, to: UTF32.self,
+///               stoppingOnError: false, sendingOutputTo: sink)
+///     print(codeUnits)
+///     // Prints "[70, 101, 114, 109, 97, 116, 97, 32, 119056]"
+///
+/// The `sink` closure is called with each resulting UTF-32 code unit as the
+/// function iterates over its input.
+///
+/// - Parameters:
+///   - input: An iterator of code units to be translated, encoded as
+///     `inputEncoding`. If `stopOnError` is `false`, the entire iterator will
+///     be exhausted. Otherwise, iteration will stop if an encoding error is
+///     detected.
+///   - inputEncoding: The Unicode encoding of `input`.
+///   - outputEncoding: The destination Unicode encoding.
+///   - stopOnError: Pass `true` to stop translation when an encoding error is
+///     detected in `input`. Otherwise, a Unicode replacement character
+///     (`"\u{FFFD}"`) is inserted for each detected error.
+///   - processCodeUnit: A closure that processes one `outputEncoding` code
+///     unit at a time.
+/// - Returns: `true` if the translation detected encoding errors in `input`;
+///   otherwise, `false`.
 public func transcode<
   Input : IteratorProtocol,
   InputEncoding : UnicodeCodec,
@@ -697,24 +914,76 @@ extension UTF8.CodeUnit : _StringElement {
 }
 
 extension UTF16 {
-  /// Returns the number of code units required to encode `x`.
+  /// Returns the number of code units required to encode the given Unicode
+  /// scalar.
+  ///
+  /// Because a Unicode scalar value can require up to 21 bits to store its
+  /// value, some Unicode scalars are represented in UTF-16 by a pair of
+  /// 16-bit code units. The first and second code units of the pair,
+  /// designated *leading* and *trailing* surrogates, make up a *surrogate
+  /// pair*.
+  ///
+  ///     let anA: UnicodeScalar = "A"
+  ///     print(anA.value)
+  ///     // Prints "65"
+  ///     print(UTF16.width(anA))
+  ///     // Prints "1"
+  ///
+  ///     let anApple: UnicodeScalar = "🍎"
+  ///     print(anApple.value)
+  ///     // Prints "127822"
+  ///     print(UTF16.width(anApple))
+  ///     // Prints "2"
+  ///
+  /// - Parameter x: A Unicode scalar value.
+  /// - Returns: The width of `x` when encoded in UTF-16, either `1` or `2`.
   public static func width(_ x: UnicodeScalar) -> Int {
     return x.value <= 0xFFFF ? 1 : 2
   }
 
-  /// Returns the high surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
-  /// `x`.
+  /// Returns the high-surrogate code unit of the surrogate pair representing
+  /// the specifed Unicode scalar.
   ///
-  /// - Precondition: `width(x) == 2`.
+  /// Because a Unicode scalar value can require up to 21 bits to store its
+  /// value, some Unicode scalars are represented in UTF-16 by a pair of
+  /// 16-bit code units. The first and second code units of the pair,
+  /// designated *leading* and *trailing* surrogates, make up a *surrogate
+  /// pair*.
+  ///
+  ///     let apple: UnicodeScalar = "🍎"
+  ///     print(UTF16.leadSurrogate(apple)
+  ///     // Prints "55356"
+  ///
+  /// - Parameter x: A Unicode scalar value. `x` must be represented by a
+  ///   surrogate pair when encoded in UTF-16. To check whether `x` is
+  ///   represented by a surrogate pair, use `UTF16.width(x) == 2`.
+  /// - Returns: The leading surrogate code unit of `x` when encoded in UTF-16.
+  ///
+  /// - SeeAlso: `UTF16.width(_:)`, `UTF16.trailSurrogate(_:)`
   public static func leadSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit((x.value - 0x1_0000) >> (10 as UInt32)) + 0xD800
   }
 
-  /// Returns the low surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
-  /// `x`.
+  /// Returns the low-surrogate code unit of the surrogate pair representing
+  /// the specifed Unicode scalar.
   ///
-  /// - Precondition: `width(x) == 2`.
+  /// Because a Unicode scalar value can require up to 21 bits to store its
+  /// value, some Unicode scalars are represented in UTF-16 by a pair of
+  /// 16-bit code units. The first and second code units of the pair,
+  /// designated *leading* and *trailing* surrogates, make up a *surrogate
+  /// pair*.
+  ///
+  ///     let apple: UnicodeScalar = "🍎"
+  ///     print(UTF16.trailSurrogate(apple)
+  ///     // Prints "57166"
+  ///
+  /// - Parameter x: A Unicode scalar value. `x` must be represented by a
+  ///   surrogate pair when encoded in UTF-16. To check whether `x` is
+  ///   represented by a surrogate pair, use `UTF16.width(x) == 2`.
+  /// - Returns: The trailing surrogate code unit of `x` when encoded in UTF-16.
+  ///
+  /// - SeeAlso: `UTF16.width(_:)`, `UTF16.leadSurrogate(_:)`
   public static func trailSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit(
@@ -722,10 +991,57 @@ extension UTF16 {
     ) + 0xDC00
   }
 
+  /// Returns a Boolean value indicating whether the specified code unit is a
+  /// high-surrogate code unit.
+  ///
+  /// Here's an example of checking whether each code unit in a string's
+  /// `utf16` view is a lead surrogate. The `apple` string contains a single
+  /// emoji character made up of a surrogate pair when encoded in UTF-16.
+  ///
+  ///     let apple = "🍎"
+  ///     for unit in apple.utf16 {
+  ///         print(UTF16.isLeadSurrogate(unit))
+  ///     }
+  ///     // Prints "true"
+  ///     // Prints "false"
+  ///
+  /// This method does not validate the encoding of a UTF-16 sequence beyond
+  /// the specified code unit. Specifically, it does not validate that a
+  /// low-surrogate code unit follows `x`.
+  ///
+  /// - Parameter x: A UTF-16 code unit.
+  /// - Returns: `true` if `x` is a high-surrogate code unit; otherwise,
+  ///   `false`.
+  ///
+  /// - SeeAlso: `UTF16.width(_:)`, `UTF16.leadSurrogate(_:)`
   public static func isLeadSurrogate(_ x: CodeUnit) -> Bool {
     return 0xD800...0xDBFF ~= x
   }
 
+  /// Returns a Boolean value indicating whether the specified code unit is a
+  /// low-surrogate code unit.
+  ///
+  /// Here's an example of checking whether each code unit in a string's
+  /// `utf16` view is a trailing surrogate. The `apple` string contains a
+  /// single emoji character made up of a surrogate pair when encoded in
+  /// UTF-16.
+  ///
+  ///     let apple = "🍎"
+  ///     for unit in apple.utf16 {
+  ///         print(UTF16.isTrailSurrogate(unit))
+  ///     }
+  ///     // Prints "false"
+  ///     // Prints "true"
+  ///
+  /// This method does not validate the encoding of a UTF-16 sequence beyond
+  /// the specified code unit. Specifically, it does not validate that a
+  /// high-surrogate code unit precedes `x`.
+  ///
+  /// - Parameter x: A UTF-16 code unit.
+  /// - Returns: `true` if `x` is a low-surrogate code unit; otherwise,
+  ///   `false`.
+  ///
+  /// - SeeAlso: `UTF16.width(_:)`, `UTF16.leadSurrogate(_:)`
   public static func isTrailSurrogate(_ x: CodeUnit) -> Bool {
     return 0xDC00...0xDFFF ~= x
   }
@@ -751,12 +1067,39 @@ extension UTF16 {
   }
 
   /// Returns the number of UTF-16 code units required for the given code unit
-  /// sequence when transcoded to UTF-16, and a bit describing if the sequence
-  /// was found to contain only ASCII characters.
+  /// sequence when transcoded to UTF-16, and a Boolean value indicating
+  /// whether the sequence was found to contain only ASCII characters.
   ///
-  /// If `repairIllFormedSequences` is `true`, the function always succeeds.
-  /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
-  /// found in `input`.
+  /// The following example finds the length of the UTF-16 encoding of the
+  /// string `"Fermata 𝄐"`, starting with its UTF-8 representation.
+  ///
+  ///     let fermata = "Fermata 𝄐"
+  ///     let bytes = fermata.utf8
+  ///     print(Array(bytes))
+  ///     // Prints "[70, 101, 114, 109, 97, 116, 97, 32, 240, 157, 132, 144]"
+  ///
+  ///     let result = transcodedLength(of: bytes.makeIterator(),
+  ///                                   decodedAs: UTF8.self,
+  ///                                   repairingIllFormedSequences: false)
+  ///     print(result)
+  ///     // Prints "Optional((10, false))"
+  ///
+  /// - Parameters:
+  ///   - input: An iterator of code units to be translated, encoded as
+  ///     `sourceEncoding`. If `repairingIllFormedSequences` is `true`, the
+  ///     entire iterator will be exhausted. Otherwise, iteration will stop if
+  ///     an ill-formed sequence is detected.
+  ///   - sourceEncoding: The Unicode encoding of `input`.
+  ///   - repairingIllFormedSequences: Pass `true` to measure the length of
+  ///     `input` even when `input` contains ill-formed sequences. Each
+  ///     ill-formed sequence is replaced with a Unicode replacement character
+  ///     (`"\u{FFFD}"`) and is measured as such. Pass `false` to immediately
+  ///     stop measuring `input` when an ill-formed sequence is encountered.
+  /// - Returns: A tuple containing the number of UTF-16 code units required to
+  ///   encode `input` and a Boolean value that indicates whether the `input`
+  ///   contained only ASCII characters. If `repairingIllFormedSequences` is
+  ///   `false` and an ill-formed sequence is detected, this method returns
+  ///   `nil`.
   public static func transcodedLength<
     Encoding : UnicodeCodec, Input : IteratorProtocol
     where Encoding.CodeUnit == Input.Element
@@ -792,7 +1135,7 @@ extension UTF16 {
   }
 }
 
-// Unchecked init to avoid precondition branches in hot code paths were we
+// Unchecked init to avoid precondition branches in hot code paths where we
 // already know the value is a valid unicode scalar.
 extension UnicodeScalar {
   /// Create an instance with numeric value `value`, bypassing the regular

@@ -36,8 +36,8 @@ public protocol MutableIndexable : Indexable {
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
   var startIndex: Index { get }
 
-  /// The collection's "past the end" position, or one greater than the last
-  /// valid subscript argument.
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
   /// When you need a range that includes the last element of a collection, use
   /// the half-open range operator (`..<`) with `endIndex`. The `..<` operator
