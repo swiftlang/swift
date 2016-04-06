@@ -276,7 +276,7 @@ extension LazyCollectionProtocol
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func reversed() -> LazyBidirectionalCollection<
+  public func reversed() -> LazyCollection<
     ReversedCollection<Elements>
   > {
     return ReversedCollection(_base: elements).lazy
@@ -292,7 +292,7 @@ extension LazyCollectionProtocol
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func reversed() -> LazyRandomAccessCollection<
+  public func reversed() -> LazyCollection<
     ReversedRandomAccessCollection<Elements>
   > {
     return ReversedRandomAccessCollection(_base: elements).lazy

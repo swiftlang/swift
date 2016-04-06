@@ -62,7 +62,7 @@ set(SWIFTLIB_ESSENTIAL
   IntegerArithmetic.swift.gyb
   IntegerParsing.swift.gyb
   Join.swift
-  LazyCollection.swift.gyb
+  LazyCollection.swift
   LazySequence.swift
   LifetimeManager.swift
   ManagedBuffer.swift

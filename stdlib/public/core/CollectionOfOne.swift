@@ -35,7 +35,7 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
 }
 
 /// A collection containing a single element of type `Element`.
-public struct CollectionOfOne<Element> : RandomAccessCollection {
+public struct CollectionOfOne<Element> : Collection {
 
   /// Construct an instance containing just `element`.
   public init(_ element: Element) {
