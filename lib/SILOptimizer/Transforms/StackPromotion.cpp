@@ -17,6 +17,9 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/CFG.h"
+#include "llvm/Support/GenericDomTree.h"
+#include "llvm/Support/GenericDomTreeConstruction.h"
 #include "llvm/ADT/Statistic.h"
 
 STATISTIC(NumStackPromoted, "Number of objects promoted to the stack");
@@ -48,8 +51,22 @@ class StackPromoter {
   SILFunction *F;
   EscapeAnalysis::ConnectionGraph *ConGraph;
   DominanceInfo *DT;
-  PostDominanceInfo *PDT;
   EscapeAnalysis *EA;
+
+  // We use our own post-dominator tree instead of PostDominatorAnalysis,
+  // because we ignore unreachable blocks (actually all unreachable sub-graphs).
+  // Example:
+  //              |
+  //             bb1
+  //            /   \
+  //   unreachable  bb2
+  //                  \
+  //
+  // We want to get bb2 as immediate post-domiator of bb1. This is not the case
+  // with the regualar post-dominator tree.
+  llvm::DominatorTreeBase<SILBasicBlock> PostDomTree;
+
+  bool PostDomTreeValid;
 
   // Pseudo-functions for (de-)allocating array buffers on the stack.
 
@@ -125,11 +142,18 @@ class StackPromoter {
   }
 
   bool strictlyPostDominates(SILBasicBlock *A, SILBasicBlock *B) {
-    return A != B && PDT->dominates(A, B);
+    calculatePostDomTree();
+    return A != B && PostDomTree.dominates(A, B);
+  }
+
+  bool postDominates(SILBasicBlock *A, SILBasicBlock *B) {
+    calculatePostDomTree();
+    return PostDomTree.dominates(A, B);
   }
 
   SILBasicBlock *getImmediatePostDom(SILBasicBlock *BB) {
-    auto *Node = PDT->getNode(BB);
+    calculatePostDomTree();
+    auto *Node = PostDomTree.getNode(BB);
     if (!Node)
       return nullptr;
     auto *IDomNode = Node->getIDom();
@@ -137,13 +161,22 @@ class StackPromoter {
       return nullptr;
     return IDomNode->getBlock();
   }
+  
+  void calculatePostDomTree() {
+    if (!PostDomTreeValid) {
+      // The StackPromoter acts as a "graph" for which the post-dominator-tree
+      // is calculated.
+      PostDomTree.recalculate(*this);
+      PostDomTreeValid = true;
+    }
+  }
 
 public:
 
   StackPromoter(SILFunction *F, EscapeAnalysis::ConnectionGraph *ConGraph,
-                DominanceInfo *DT, PostDominanceInfo *PDT,
-                EscapeAnalysis *EA) :
-    F(F), ConGraph(ConGraph), DT(DT), PDT(PDT), EA(EA) { }
+                DominanceInfo *DT, EscapeAnalysis *EA) :
+    F(F), ConGraph(ConGraph), DT(DT), EA(EA), PostDomTree(true),
+    PostDomTreeValid(false) { }
 
   /// What did the optimization change?
   enum class ChangeState {
@@ -151,6 +184,8 @@ public:
     Insts,
     Calls
   };
+
+  SILFunction *getFunction() const { return F; }
 
   /// The main entry point for the optimization.
   ChangeState promote();
@@ -284,6 +319,87 @@ SILFunction *StackPromoter::getBufferDeallocFunc(SILFunction *OrigFunc,
   return BufferDeallocFunc;
 }
 
+namespace {
+
+/// Iterator which iterates over all basic blocks of a function which are not
+/// terminated by an unreachable inst.
+class NonUnreachableBlockIter :
+public std::iterator<std::forward_iterator_tag, SILBasicBlock, ptrdiff_t> {
+
+  SILFunction::iterator BaseIterator;
+  SILFunction::iterator End;
+
+  void skipUnreachables() {
+    while (true) {
+      if (BaseIterator == End)
+        return;
+      if (!isa<UnreachableInst>(BaseIterator->getTerminator()))
+        return;
+      BaseIterator++;
+    }
+  }
+
+public:
+  NonUnreachableBlockIter(SILFunction::iterator BaseIterator,
+                          SILFunction::iterator End) :
+      BaseIterator(BaseIterator), End(End) {
+    skipUnreachables();
+  }
+
+  NonUnreachableBlockIter() = default;
+  
+  SILBasicBlock &operator*() const { return *BaseIterator; }
+  SILBasicBlock &operator->() const { return *BaseIterator; }
+  
+  NonUnreachableBlockIter &operator++() {
+    BaseIterator++;
+    skipUnreachables();
+    return *this;
+  }
+  
+  NonUnreachableBlockIter operator++(int unused) {
+    NonUnreachableBlockIter Copy = *this;
+    ++*this;
+    return Copy;
+  }
+
+  friend bool operator==(NonUnreachableBlockIter lhs,
+                         NonUnreachableBlockIter rhs) {
+    return lhs.BaseIterator == rhs.BaseIterator;
+  }
+  friend bool operator!=(NonUnreachableBlockIter lhs,
+                         NonUnreachableBlockIter rhs) {
+    return !(lhs == rhs);
+  }
+};
+}
+
+namespace llvm {
+
+/// Use the StackPromoter as a wrapper for the function. It holds the list of
+/// basic blocks excluding all unreachable blocks.
+template <> struct GraphTraits<StackPromoter *>
+    : public GraphTraits<swift::SILBasicBlock*> {
+  typedef StackPromoter *GraphType;
+
+  static NodeType *getEntryNode(GraphType SP) {
+    return &SP->getFunction()->front();
+  }
+
+  typedef NonUnreachableBlockIter nodes_iterator;
+  static nodes_iterator nodes_begin(GraphType SP) {
+    return nodes_iterator(SP->getFunction()->begin(), SP->getFunction()->end());
+  }
+  static nodes_iterator nodes_end(GraphType SP) {
+    return nodes_iterator(SP->getFunction()->end(), SP->getFunction()->end());
+  }
+  static unsigned size(GraphType SP) {
+    return std::distance(nodes_begin(SP), nodes_end(SP));
+  }
+};
+
+}
+
 bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
                                     SILInstruction *&AllocInsertionPoint,
                                     SILInstruction *&DeallocInsertionPoint) {
@@ -394,7 +510,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
           if (!Alloc)
             return false;
           // This should always be the case, but let's be on the safe side.
-          if (!PDT->dominates(StartBlock, Alloc->getParent()))
+          if (!postDominates(StartBlock, Alloc->getParent()))
             return false;
           AllocInsertionPoint = Alloc;
           StackDepth++;
@@ -466,20 +582,18 @@ private:
 
     auto *EA = PM->getAnalysis<EscapeAnalysis>();
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
 
     SILFunction *F = getFunction();
     if (auto *ConGraph = EA->getConnectionGraph(F)) {
-      StackPromoter promoter(F, ConGraph, DA->get(F), PDA->get(F), EA);
+      StackPromoter promoter(F, ConGraph, DA->get(F), EA);
       switch (promoter.promote()) {
         case StackPromoter::ChangeState::None:
           break;
         case StackPromoter::ChangeState::Insts:
           invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
           break;
-        case StackPromoter::ChangeState::Calls: {
+        case StackPromoter::ChangeState::Calls:
           invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
-        }
           break;
       }
     }
