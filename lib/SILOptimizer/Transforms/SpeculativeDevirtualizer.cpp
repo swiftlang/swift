@@ -154,12 +154,19 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   }
 
   // Remove the old Apply instruction.
-  if (!isa<TryApplyInst>(AI))
+  assert(AI.getInstruction() == &Continue->front() &&
+         "AI should be the first instruction in the split Continue block");
+  if (!isa<TryApplyInst>(AI)) {
     AI.getInstruction()->replaceAllUsesWith(Arg);
-  auto *OriginalBB = AI.getParent();
-  AI.getInstruction()->eraseFromParent();
-  if (OriginalBB->empty())
-    OriginalBB->removeFromParent();
+    AI.getInstruction()->eraseFromParent();
+    assert(!Continue->empty() &&
+           "There should be at least a terminator after AI");
+  } else {
+    AI.getInstruction()->eraseFromParent();
+    assert(Continue->empty() &&
+           "There should not be an instruction after try_apply");
+    Continue->eraseFromParent();
+  }
 
   // Update the stats.
   NumTargetsPredicted++;
