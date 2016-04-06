@@ -15,6 +15,16 @@
 
 public protocol ClosedRangeProtocol : RangeProtocol {}
 
+@warn_unused_result
+public func == <
+  LHS : ClosedRangeProtocol, RHS : ClosedRangeProtocol 
+  where LHS.Bound == RHS.Bound
+>(lhs: LHS, rhs: RHS) -> Bool {
+  return
+    lhs.lowerBound == rhs.lowerBound &&
+    lhs.upperBound == rhs.upperBound
+}
+
 extension ClosedRangeProtocol {
   @inline(__always)
   public init<
@@ -244,16 +254,6 @@ extension CountableClosedRange : CustomReflectable {
   }
 }
 
-@warn_unused_result
-public func == <Bound>(
-  lhs: CountableClosedRange<Bound>,
-  rhs: CountableClosedRange<Bound>
-) -> Bool {
-  return
-    lhs.lowerBound == rhs.lowerBound &&
-    lhs.upperBound == rhs.upperBound
-}
-
 /// A collection of consecutive discrete index values.
 ///
 /// - parameter Element: Is both the element type and the index type of the
@@ -331,15 +331,6 @@ extension ClosedRange : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
-}
-
-@warn_unused_result
-public func == <Bound>(
-  lhs: ClosedRange<Bound>, rhs: ClosedRange<Bound>
-) -> Bool {
-  return
-    lhs.lowerBound == rhs.lowerBound &&
-    lhs.upperBound == rhs.upperBound
 }
 
 /// Returns a closed range that contains `minimum` and
