@@ -146,4 +146,47 @@ ImportedObjCGenerics.test("InheritanceFromNongeneric") {
   expectTrue(Container<NSObject>.self == Container<NSString>.self)
 }
 
+public class InheritInSwift: Container<NSString> {
+  public override init(object: NSString) {
+    super.init(object: object.lowercase)
+  }
+  public override var object: NSString {
+    get {
+      return super.object.uppercase
+    }
+    set {
+      super.object = newValue.lowercase
+    }
+  }
+
+  public var superObject: NSString {
+    get {
+      return super.object
+    }
+  }
+}
+
+ImportedObjCGenerics.test("InheritInSwift") {
+  let s = InheritInSwift(object: "HEllo")
+  let sup: Container = s
+
+  expectEqual(s.superObject, "hello")
+  expectEqual(s.object, "HELLO")
+  expectEqual(sup.object, "HELLO")
+
+  s.object = "GOodbye"
+  expectEqual(s.superObject, "goodbye")
+  expectEqual(s.object, "GOODBYE")
+  expectEqual(sup.object, "GOODBYE")
+
+  s.processObject { o in
+    expectEqual(o, "GOODBYE")
+  }
+
+  s.updateObject { "Aloha" }
+  expectEqual(s.superObject, "aloha")
+  expectEqual(s.object, "ALOHA")
+  expectEqual(sup.object, "ALOHA")
+}
+
 runAllTests()

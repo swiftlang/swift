@@ -857,7 +857,7 @@ namespace {
     }
 
     llvm::Constant *getMetaclassRefOrNull(ClassDecl *theClass) {
-      if (theClass->isGenericContext()) {
+      if (theClass->isGenericContext() && !theClass->hasClangNode()) {
         return llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
       } else {
         return IGM.getAddrOfMetaclassObject(theClass, NotForDefinition);

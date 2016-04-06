@@ -8,6 +8,14 @@ import Swift
 import Foundation
 import objc_generics
 
+// CHECK-LABEL: @"OBJC_METACLASS_$__TtC27objc_generic_class_metadata8Subclass" = hidden global %objc_class
+// CHECK:         %objc_class* @"OBJC_METACLASS_$_NSObject"
+// CHECK:         %objc_class* @"OBJC_METACLASS_$_GenericClass"
+// CHECK-LABEL: @_TMfC27objc_generic_class_metadata8Subclass = internal global
+// CHECK:         %objc_class* @"OBJC_METACLASS_$__TtC27objc_generic_class_metadata8Subclass"
+// CHECK:         %objc_class* @"OBJC_CLASS_$_GenericClass"
+class Subclass: GenericClass<NSString> {}
+
 sil @metatype_sink : $@convention(thin) <T> (@thick T.Type) -> ()
 sil @objc_class_sink : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
 

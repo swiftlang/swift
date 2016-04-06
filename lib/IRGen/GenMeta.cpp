@@ -241,6 +241,31 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   requirements.bindFromBuffer(IGF, array, getInContext);
 }
 
+static bool isTypeErasedGenericClass(NominalTypeDecl *ntd) {
+  // ObjC classes are type erased.
+  // TODO: Unless they have magic methods...
+  if (auto clas = dyn_cast<ClassDecl>(ntd))
+    return clas->hasClangNode() && clas->isGenericContext();
+  return false;
+}
+
+static bool isTypeErasedGenericClassType(CanType type) {
+  if (auto nom = type->getAnyNominal())
+    return isTypeErasedGenericClass(nom);
+  return false;
+}
+
+// Get the type that exists at runtime to represent a compile-time type.
+static CanType
+getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
+  return CanType(type.transform([&](Type t) -> Type {
+    if (isTypeErasedGenericClassType(CanType(t))) {
+      return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
+    }
+    return t;
+  }));
+}
+
 /// Attempts to return a constant heap metadata reference for a
 /// class type.  This is generally only valid for specific kinds of
 /// ObjC reference, like superclasses or category references.
@@ -257,8 +282,9 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
       return nullptr;
 
   // Otherwise, just respect genericity and Objective-C runtime visibility.
-  } else if (theDecl->isGenericContext() ||
-             theDecl->isOnlyObjCRuntimeVisible()) {
+  } else if ((theDecl->isGenericContext()
+              && !isTypeErasedGenericClass(theDecl))
+             || theDecl->isOnlyObjCRuntimeVisible()) {
     return nullptr;
   }
 
@@ -1323,31 +1349,6 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
 
 using MetadataAccessGenerator =
   llvm::function_ref<llvm::Value*(IRGenFunction &IGF, llvm::Constant *cache)>;
-
-static bool isTypeErasedGenericClass(NominalTypeDecl *ntd) {
-  // ObjC classes are type erased.
-  // TODO: Unless they have magic methods...
-  if (auto clas = dyn_cast<ClassDecl>(ntd))
-    return clas->hasClangNode() && clas->isGenericContext();
-  return false;
-}
-
-static bool isTypeErasedGenericClassType(CanType type) {
-  if (auto nom = type->getAnyNominal())
-    return isTypeErasedGenericClass(nom);
-  return false;
-}
-
-// Get the type that exists at runtime to represent a compile-time type.
-static CanType
-getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
-  return CanType(type.transform([&](Type t) -> Type {
-    if (isTypeErasedGenericClassType(CanType(t))) {
-      return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
-    }
-    return t;
-  }));
-}
 
 /// Get or create an accessor function to the given non-dependent type.
 static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,

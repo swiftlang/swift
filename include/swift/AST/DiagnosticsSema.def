@@ -1457,8 +1457,9 @@ NOTE(class_here,none,
      "class %0 declared here", (Identifier))
 ERROR(inheritance_from_final_class,none,
       "inheritance from a final class %0", (Identifier))
-ERROR(inheritance_from_objc_generic_class,none,
-      "inheritance from a generic Objective-C class %0", (Identifier))
+ERROR(inheritance_from_unspecialized_objc_generic_class,none,
+      "inheritance from a generic Objective-C class %0 must bind "
+      "type parameters of %0 to specific concrete types", (Identifier))
 ERROR(inheritance_from_objc_runtime_visible_class,none,
       "inheritance from an Objective-C class %0 only visible via the runtime", (Identifier))
 
