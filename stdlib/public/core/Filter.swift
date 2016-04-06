@@ -192,7 +192,11 @@ public struct LazyFilterCollection<
   /// - Complexity: O(N), where N is the ratio between unfiltered and
   ///   filtered collection counts.
   public var startIndex: Index {
-    return LazyFilterIndex(base: _nextFiltered(_base.startIndex))
+    var index = _base.startIndex
+    while index != _base.endIndex && !_predicate(_base[index]) {
+      _base.formSuccessor(&index)
+    }
+    return LazyFilterIndex(base: index)
   }
 
   /// The collection's "past the end" position.
@@ -253,12 +257,11 @@ public struct LazyFilterCollection<
     return index
   }
 
-  /// Advances `index` until one of the following:
-  /// 
-  /// - an element matches `self._predicate`
-  /// - `index == self._base.endIndex`
+  /// Returns the first index `i` following `index` where either
+  /// `_predicate(base[i]) == true` or `i == _base.endIndex`.
   ///
   /// - Precondition: `index != endIndex`
+  /// - Postcondition: `i > index`
   @inline(__always)
   internal func _nextFilteredInPlace(index: inout Base.Index) {
     _precondition(index != _base.endIndex, "can't advance past endIndex")
