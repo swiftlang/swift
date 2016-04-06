@@ -35,11 +35,6 @@ foreach(sdk ${SWIFT_SDKS})
       set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
       set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
 
-      set(glibc_modulemap_source "glibc.${SWIFT_SDK_${sdk}_TRIPLE_NAME}.modulemap.in")
-      if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${glibc_modulemap_source}")
-        set(glibc_modulemap_source "glibc.modulemap.in")
-      endif()
-
       # Determine the location of glibc headers based on the target.
       set(GLIBC_INCLUDE_PATH "/usr/include")
       set(GLIBC_ARCH_INCLUDE_PATH ${GLIBC_INCLUDE_PATH})
@@ -55,11 +50,24 @@ foreach(sdk ${SWIFT_SDKS})
 
       # Configure the module map based on the target. Each platform needs to
       # reference different headers, based on what's available in their glibc.
+      set(glibc_modulemap_gyb_source "glibc.modulemap.in.gyb")
+      set(glibc_modulemap_gyb_configured
+          "${CMAKE_CURRENT_BINARY_DIR}/${arch_subdir}/glibc.modulemap.gyb")
+      configure_file(
+          ${glibc_modulemap_gyb_source}
+          ${glibc_modulemap_gyb_configured}
+          @ONLY)
+
+      set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
       set(glibc_modulemap_configured
           "${CMAKE_CURRENT_BINARY_DIR}/${arch_subdir}/glibc.modulemap")
-      configure_file(${glibc_modulemap_source} ${glibc_modulemap_configured} @ONLY)
-
       add_custom_command_target(glibc_modulemap_target
+          # We can't use handle_gyb_sources() here because we need to ensure
+          # gyb is invoked before we copy glibc.modulemap into the module dir.
+          # FIXME: Instead of using a combination of configure_file() and gyb,
+          #        we should use just gyb--it'd be simpler.
+          COMMAND
+              ${gyb_tool} "-DCMAKE_SDK=${sdk}" -o ${glibc_modulemap_configured} ${glibc_modulemap_gyb_configured}
           COMMAND
               ${CMAKE_COMMAND} -E make_directory ${module_dir}
           COMMAND
