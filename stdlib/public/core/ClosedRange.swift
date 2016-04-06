@@ -13,6 +13,10 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range and [Closed]CountableRange.
 
+/// A type that represents a contiguous range of any comparable value,
+/// containing both their lower bounds and upper bounds.
+///
+/// A closed range is never empty.
 public protocol ClosedRangeProtocol : RangeProtocol {}
 
 @warn_unused_result
@@ -54,11 +58,16 @@ case pastEnd
 case inRange(Bound)
 }
 
+/// A position in a closed range whose `Bound` is `Strideable` with
+/// `Integer` `Stride`.
 public struct ClosedRangeIndex<
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : Comparable {
+  /// Creates the past-the-end position
   internal init() { _value = .pastEnd }
+
+  /// Creates a position `p` for which `r[p] == x`.
   internal init(_ x: Bound) { _value = .inRange(x) }
   
   internal func _successor(upperBound limit: Bound) -> ClosedRangeIndex {
@@ -123,10 +132,14 @@ public func < <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
   }
 }
 
-// WORKAROUND rdar://25214598 - should be Bound : Strideable
+/// Closed ranges whose `Bound` is `Strideable` with `Integer` `Stride`
+/// have all the capabilities of `RandomAccessCollection`s, where
+/// elements of the collection are the values contained in the range.
 extension ClosedRangeProtocol 
+// WORKAROUND rdar://25214598 - should be Bound : Strideable
   where Bound : _Strideable, Bound.Stride : Integer {
 
+  /// The number of values contained in `self`. 
   public var count: Bound.Stride {
     return lowerBound.distance(to: upperBound)
   }
