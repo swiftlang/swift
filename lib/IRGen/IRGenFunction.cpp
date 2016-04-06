@@ -53,6 +53,8 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
   // file or via annotations.
   if (IGM.Opts.Sanitize == SanitizerKind::Address)
     Fn->addFnAttr(llvm::Attribute::SanitizeAddress);
+  if (IGM.Opts.Sanitize == SanitizerKind::Thread)
+    Fn->addFnAttr(llvm::Attribute::SanitizeThread);
 
   emitPrologue();
 }
