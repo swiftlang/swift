@@ -375,20 +375,20 @@ extension Indexable {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
       bounds.lowerBound <= index,
-      "index is out of bounds: index designates a position before bounds.lowerBound")
+      "out of bounds: index < startIndex")
     _precondition(
       index < bounds.upperBound,
-      "index is out of bounds: index designates the bounds.upperBound position or a position after it")
+      "out of bounds: index >= endIndex")
   }
 
   public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
       bounds.lowerBound <= range.lowerBound,
-      "range.lowerBound is out of bounds: index designates a position before bounds.lowerBound")
+      "out of bounds: range begins before startIndex")
     _precondition(
       range.lowerBound <= bounds.upperBound,
-      "range.lowerBound is out of bounds: index designates a position after bounds.upperBound")
+      "out of bounds: range ends after endIndex")
   }
 
   @warn_unused_result
