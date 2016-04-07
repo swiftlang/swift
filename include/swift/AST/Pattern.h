@@ -571,7 +571,7 @@ public:
     : Pattern(PatternKind::EnumElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
       ElementDecl(Element), SubPattern(SubPattern) {
-    if (Implicit.hasValue() ? *Implicit : !ParentType.hasLocation())
+    if (Implicit.hasValue() && *Implicit)
       setImplicit();
   }
 
@@ -583,6 +583,10 @@ public:
   
   Pattern *getSubPattern() {
     return SubPattern;
+  }
+
+  bool isParentTypeImplicit() {
+    return !ParentType.hasLocation();
   }
   
   void setSubPattern(Pattern *p) { SubPattern = p; }
