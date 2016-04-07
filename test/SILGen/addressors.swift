@@ -66,7 +66,7 @@ func test0() {
 func test1() -> Int32 {
 // CHECK: [[CTOR:%.*]] = function_ref @_TFV10addressors1AC
 // CHECK: [[T0:%.*]] = metatype $@thin A.Type
-// CHECK: [[A:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(thin) (@thin A.Type) -> A
+// CHECK: [[A:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(method) (@thin A.Type) -> A
 // CHECK: [[ACCESSOR:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVs5Int32S1_ : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[PTR:%.*]] = apply [[ACCESSOR]]({{%.*}}, [[A]]) : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[T0:%.*]] = struct_extract [[PTR]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue

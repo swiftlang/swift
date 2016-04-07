@@ -11,7 +11,7 @@ enum HomeworkError : ErrorProtocol {
 }
 
 // CHECK: sil hidden @_TF6errors10make_a_cat{{.*}} : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol) {
-// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(thin) (@thick Cat.Type) -> @owned Cat
+// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type 
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: return [[T2]] : $Cat
@@ -115,7 +115,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 
 //   Catch all.
 // CHECK:    [[CATCHALL]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(thin) (@thick Cat.Type) -> @owned Cat
+// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: strong_release [[ERROR]] : $ErrorProtocol
@@ -143,7 +143,7 @@ func all_together_now(_ flag: Bool) -> Cat {
 //   Catch in non-throwing context.
 // CHECK-LABEL: sil hidden @_TF6errors11catch_a_catFT_CS_3Cat : $@convention(thin) () -> @owned Cat
 // CHECK-NEXT: bb0:
-// CHECK:      [[F:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(thin) (@thick Cat.Type) -> @owned Cat
+// CHECK:      [[F:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[M:%.*]] = metatype $@thick Cat.Type
 // CHECK-NEXT: [[V:%.*]] = apply [[F]]([[M]])
 // CHECK-NEXT: return [[V]] : $Cat
@@ -166,7 +166,7 @@ class HasThrowingInit {
 // CHECK-NEXT: assign %0 to [[T1]] : $*Int
 // CHECK-NEXT: return [[T0]] : $HasThrowingInit
 
-// CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitC{{.*}} : $@convention(thin) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error ErrorProtocol)
+// CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitC{{.*}} : $@convention(method) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error ErrorProtocol)
 // CHECK:      [[SELF:%.*]] = alloc_ref $HasThrowingInit
 // CHECK:      [[T0:%.*]] = function_ref @_TFC6errors15HasThrowingInitc{{.*}} : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error ErrorProtocol)
 // CHECK-NEXT: try_apply [[T0]](%0, [[SELF]]) : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error ErrorProtocol), normal bb1, error bb2

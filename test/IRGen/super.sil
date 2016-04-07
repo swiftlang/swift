@@ -34,7 +34,7 @@ public extension ResilientOutsideChild {
 sil @_TFC15resilient_class22ResilientOutsideParent6methodfT_T_ : $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
 
 // static resilient_class.ResilientOutsideParent.classMethod () -> ()
-sil @_TZFC15resilient_class22ResilientOutsideParent11classMethodfT_T_ : $@convention(thin) (@thick ResilientOutsideParent.Type) -> ()
+sil @_TZFC15resilient_class22ResilientOutsideParent11classMethodfT_T_ : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
 
 // super.ChildToResilientParent.method () -> ()
 sil @_TFC5super22ChildToResilientParent6methodfT_T_ : $@convention(method) (@guaranteed ChildToResilientParent) -> () {
@@ -59,12 +59,12 @@ bb0(%0 : $ChildToResilientParent):
 // CHECK: call void
 
 // static super.ChildToResilientParent.classMethod () -> ()
-sil @_TZFC5super22ChildToResilientParent11classMethodfT_T_ : $@convention(thin) (@thick ChildToResilientParent.Type) -> () {
+sil @_TZFC5super22ChildToResilientParent11classMethodfT_T_ : $@convention(method) (@thick ChildToResilientParent.Type) -> () {
 bb0(%0 : $@thick ChildToResilientParent.Type):
   debug_value %0 : $@thick ChildToResilientParent.Type, let, name "self", argno 1
   %2 = upcast %0 : $@thick ChildToResilientParent.Type to $@thick ResilientOutsideParent.Type
-  %3 = super_method %0 : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : ResilientOutsideParent.Type -> () -> () , $@convention(thin) (@thick ResilientOutsideParent.Type) -> ()
-  %4 = apply %3(%2) : $@convention(thin) (@thick ResilientOutsideParent.Type) -> ()
+  %3 = super_method %0 : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : ResilientOutsideParent.Type -> () -> () , $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
+  %4 = apply %3(%2) : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %5 = tuple ()
   return %5 : $()
 }
@@ -105,13 +105,13 @@ bb0(%0 : $ChildToFixedParent):
 // CHECK: call void
 
 // static super.ChildToFixedParent.classMethod () -> ()
-sil @_TZFC5super18ChildToFixedParent11classMethodfT_T_ : $@convention(thin) (@thick ChildToFixedParent.Type) -> () {
+sil @_TZFC5super18ChildToFixedParent11classMethodfT_T_ : $@convention(method) (@thick ChildToFixedParent.Type) -> () {
 // %0
 bb0(%0 : $@thick ChildToFixedParent.Type):
   debug_value %0 : $@thick ChildToFixedParent.Type, let, name "self", argno 1
   %2 = upcast %0 : $@thick ChildToFixedParent.Type to $@thick OutsideParent.Type
-  %3 = super_method %0 : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : OutsideParent.Type -> () -> () , $@convention(thin) (@thick OutsideParent.Type) -> ()
-  %4 = apply %3(%2) : $@convention(thin) (@thick OutsideParent.Type) -> ()
+  %3 = super_method %0 : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : OutsideParent.Type -> () -> () , $@convention(method) (@thick OutsideParent.Type) -> ()
+  %4 = apply %3(%2) : $@convention(method) (@thick OutsideParent.Type) -> ()
   %5 = tuple ()
   return %5 : $()
 }
@@ -150,13 +150,13 @@ bb0(%0 : $ResilientOutsideChild):
 // CHECK: call void
 
 // static ext.super.resilient_class.ResilientOutsideChild.callSuperClassMethod () -> ()
-sil @_TZFE5superC15resilient_class21ResilientOutsideChild20callSuperClassMethodfT_T_ : $@convention(thin) (@thick ResilientOutsideChild.Type) -> () {
+sil @_TZFE5superC15resilient_class21ResilientOutsideChild20callSuperClassMethodfT_T_ : $@convention(method) (@thick ResilientOutsideChild.Type) -> () {
 // %0
 bb0(%0 : $@thick ResilientOutsideChild.Type):
   debug_value %0 : $@thick ResilientOutsideChild.Type, let, name "self", argno 1
   %2 = upcast %0 : $@thick ResilientOutsideChild.Type to $@thick ResilientOutsideParent.Type
-  %3 = super_method %0 : $@thick ResilientOutsideChild.Type, #ResilientOutsideParent.classMethod!1 : ResilientOutsideParent.Type -> () -> () , $@convention(thin) (@thick ResilientOutsideParent.Type) -> ()
-  %4 = apply %3(%2) : $@convention(thin) (@thick ResilientOutsideParent.Type) -> ()
+  %3 = super_method %0 : $@thick ResilientOutsideChild.Type, #ResilientOutsideParent.classMethod!1 : ResilientOutsideParent.Type -> () -> () , $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
+  %4 = apply %3(%2) : $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   %5 = tuple ()
   return %5 : $()
 }

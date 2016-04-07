@@ -86,9 +86,9 @@ public struct MySize {
 
   // Static computed property
 
-// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizeg10expirationSi : $@convention(thin) (@thin MySize.Type) -> Int
-// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizes10expirationSi : $@convention(thin) (Int, @thin MySize.Type) -> ()
-// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem10expirationSi : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizeg10expirationSi : $@convention(method) (@thin MySize.Type) -> Int
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizes10expirationSi : $@convention(method) (Int, @thin MySize.Type) -> ()
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem10expirationSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public static var expiration: Int {
     get { return copyright + 70 }
     set { copyright = newValue - 70 }
@@ -118,9 +118,9 @@ public struct MySize {
 
   // Static stored property
 
-// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizeg9copyrightSi : $@convention(thin) (@thin MySize.Type) -> Int
-// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizes9copyrightSi : $@convention(thin) (Int, @thin MySize.Type) -> ()
-// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem9copyrightSi : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizeg9copyrightSi : $@convention(method) (@thin MySize.Type) -> Int
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizes9copyrightSi : $@convention(method) (Int, @thin MySize.Type) -> ()
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem9copyrightSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public static var copyright: Int = 0
 }
 

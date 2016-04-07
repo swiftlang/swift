@@ -116,9 +116,9 @@ class C {
 
 // CHECK-LABEL: sil hidden @_TF11expressions7classesFT_T_
 func classes() {
-  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(thin) (@thick C.Type) -> @owned C
+  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(method) (@thick C.Type) -> @owned C
   var a = C()
-  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(thin) (Int, @thick C.Type) -> @owned C
+  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(method) (Int, @thick C.Type) -> @owned C
   var b = C(x: 0)
 }
 
@@ -134,9 +134,9 @@ struct S {
 
 // CHECK-LABEL: sil hidden @_TF11expressions7structsFT_T_
 func structs() {
-  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(thin) (@thin S.Type) -> S
+  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(method) (@thin S.Type) -> S
   var a = S()
-  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(thin) (Int, @thin S.Type) -> S
+  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(method) (Int, @thin S.Type) -> S
   var b = S(x: 0)
 }
 

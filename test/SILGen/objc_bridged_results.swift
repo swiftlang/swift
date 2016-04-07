@@ -103,7 +103,7 @@ func testNonnullString(_ obj: Test) -> String {
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
   // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(thin) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
   // CHECK: strong_release %0 : $Test
   // CHECK: return [[RESULT]] : $String
   return obj.nonnullString
@@ -117,7 +117,7 @@ func testClassProp() -> String {
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[OBJC_CLASS]]) : $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
   // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(thin) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
   // CHECK: return [[RESULT]] : $String
   return Test.nonnullSharedString
 } // CHECK: {{^}$}}
