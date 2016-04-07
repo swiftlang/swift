@@ -839,6 +839,7 @@ public:
                                               llvm::Type *definitionType);
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
+  Address getAddrOfObjCClassRef(ClassDecl *D);
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D,
                                          ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D,

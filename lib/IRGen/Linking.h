@@ -104,6 +104,9 @@ class LinkEntity {
     /// An Objective-C class reference.  The pointer is a ClassDecl*.
     ObjCClass,
 
+    /// An Objective-C class reference reference.  The pointer is a ClassDecl*.
+    ObjCClassRef,
+
     /// An Objective-C metaclass reference.  The pointer is a ClassDecl*.
     ObjCMetaclass,
 
@@ -317,6 +320,12 @@ public:
     entity.SecondaryPointer = nullptr;
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::FieldOffset))
                 | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect));
+    return entity;
+  }
+
+  static LinkEntity forObjCClassRef(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ObjCClassRef, decl, 0);
     return entity;
   }
 
