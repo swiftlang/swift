@@ -15,7 +15,7 @@ private func printDevice(_ o: UIDeviceOrientation) -> String {
   return s
 }
 
-private func printInterface(o: UIInterfaceOrientation) -> String {
+private func printInterface(_ o: UIInterfaceOrientation) -> String {
   return "\(o.isPortrait) \(UIInterfaceOrientationIsPortrait(o)), " +
     "\(o.isLandscape) \(UIInterfaceOrientationIsLandscape(o))"
 }
