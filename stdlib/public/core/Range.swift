@@ -16,12 +16,27 @@ public enum _DisabledRangeIndex_ {}
 
 /// A type that represents a contiguous range of any comparable value.
 ///
-/// - Note: not all empty ranges are equal; it depends on their bounds.
+/// A range contains at least every value `x` where
+/// `lowerBound < x < upperBound`. Individual types that conform to
+/// `RangeProtocol` must specify their containment rules for the bounds of the
+/// range.
 ///
-/// - IXMEFAY: need a more formal description of containment and its
-///   relationship to bounds.  We *can* say that any x > lowerBound
-///   and < upperBound is contained, and containment of the bounds
-///   themselves are up to the model.
+/// The standard library defines two kinds of ranges: closed ranges,
+/// represented by `ClosedRangeProtocol`, and half-open ranges, represented by
+/// `HalfOpenRangeProtocol`. A closed range contains both its lower and upper
+/// bound, and therefore cannot be empty. A half-open range, on the other
+/// hand, contains its lower bound when nonempty but never its upper bound.
+///
+///     let closed: ClosedRange = 5...10
+///     closed.contains(5)      // true
+///     closed.contains(10)     // true
+///
+///     let halfOpen: Range = 5..<10
+///     halfOpen.contains(5)    // true
+///     halfOpen.contains(10)   // false
+///
+/// Not all empty ranges are equal; the bounds of two empty ranges must also be
+/// equal for the ranges to be equal.
 public protocol RangeProtocol : Equatable {
   
   /// The representation of the range's endpoints and the values
@@ -30,7 +45,7 @@ public protocol RangeProtocol : Equatable {
 
   /// Creates an instance with the given bounds.
   ///
-  /// - Note: as this initializer does not check its precondition, it
+  /// - Note: As this initializer does not check its precondition, it
   ///   should be used as an optimization only, when one is absolutely
   ///   certain that `lower <= upper`.  In general, the `..<` and `...`
   ///   operators are to be preferred for forming ranges.
@@ -40,11 +55,18 @@ public protocol RangeProtocol : Equatable {
 
   /// Returns `true` if the range contains the `value`.
   ///
-  /// - IXMEFAY: need a caveat that this protocol doesn't fully define
-  ///   containment and its relationship to bounds.  
+  /// Any type of range contains every value `x` where
+  /// `lowerBound < x < upperBound`. `RangeProtocol` makes no requirement as
+  /// to whether individual range types must contain either their lower or
+  /// upper bound.
   func contains(value: Bound) -> Bool
   
   /// Returns `true` iff `self` and `other` contain a value in common.
+  /// 
+  /// Any type of range contains every value `x` where
+  /// `lowerBound < x < upperBound`. `RangeProtocol` makes no requirement as
+  /// to whether individual range types must contain either their lower or
+  /// upper bound.
   func overlaps(other: Self) -> Bool
 
   /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
@@ -56,12 +78,14 @@ public protocol RangeProtocol : Equatable {
 
   /// The range's lower bound.
   ///
-  /// - IXMEFAY: vacuous comment
+  /// Depending on the concrete type of the range, `lowerBound` may or may not
+  /// be contained in the range.
   var lowerBound: Bound { get }
   
   /// The range's upper bound.
   ///
-  /// - IXMEFAY: vacuous comment
+  /// Depending on the concrete type of the range, `upperBound` may or may not
+  /// be contained in the range.
   var upperBound: Bound { get }
   
   /// Returns `self` clamped to `limits`.
@@ -116,8 +140,10 @@ extension RangeProtocol {
 }
 
 /// A type that represents a contiguous range of any comparable value,
-/// with non-empty ranges containing their lower bounds but not their
+/// with nonempty ranges containing their lower bounds but not their
 /// upper bounds.
+/// 
+/// A half-open range can represent an empty range.
 public protocol HalfOpenRangeProtocol : RangeProtocol {}
 
 @warn_unused_result
@@ -142,6 +168,7 @@ extension HalfOpenRangeProtocol {
     )
   }
   
+  /// Returns `true` iff `lowerBound <= value && upperBound > value`.
   @inline(__always)
   public func contains(value: Bound) -> Bool {
     return lowerBound <= value && upperBound > value
@@ -166,7 +193,7 @@ extension HalfOpenRangeProtocol
     return lowerBound.distance(to: upperBound)
   }
   
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != upperBound`.
@@ -196,8 +223,41 @@ extension HalfOpenRangeProtocol
   }
 }
 
-/// A half-open range whose `Bound` is `Strideable` with `Integer`
-/// `Stride`, and that conforms to `RandomAccessCollection`.
+/// A half-open range that forms a collection of consecutive strideable
+/// comparable values.
+///
+/// A `CountableRange` instance contains its `lowerBound` but not its upper
+/// bound. Like other collections, a `CountableRange` containing one element
+/// has an `upperBound` that is the successor of its `lowerBound` and an empty
+/// `CountableRange` has `lowerBound == upperBound`.
+///
+/// The associated `Bound` type is both the element type
+/// and the index type of `CountableRange`. Each element of the range is its own
+/// corresponding index, so for any countable range `r`, `r[i] == i`.
+///
+/// Therefore, if `Bound` has a maximal value, it can serve as an `upperBound`,
+/// but can never be contained in a `CountableRange<Bound>`.
+///
+///     let maximumRange = Int8.min..<Int8.max
+///     maximumRange.contains(Int8.max)   // false
+///
+/// It also follows from the requirement above that `(-99..<100)[0] == 0`. To
+/// prevent confusion (because some might expect the result to be `-99`), in a
+/// context where `Bound` is known to be an integer type, subscripting with
+/// `Bound` is a compile-time error:
+///
+///     // error: ambiguous use of 'subscript'
+///     print(CountableRange<Int>(uncheckedBounds: (-99, 100))[0])
+///
+/// However, subscripting that range still works in a generic context:
+///
+///     func brackets<T>(x: CountableRange<T>, _ i: T) -> T {
+///         return x[i] // Just forward to subscript
+///     }
+///     print(brackets(CountableRange<Int>(uncheckedBounds: (-99, 100)), 0))
+///     // Prints "0"
+///     
+/// - SeeAlso: `CountableClosedRange`, `Range`, `ClosedRange`
 public struct CountableRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
@@ -226,6 +286,13 @@ public struct CountableRange<
     return i.advanced(by: -1)
   }
 
+  /// Creates an instance with the given bounds.
+  ///
+  /// - Note: As this initializer does not check its precondition, it should be
+  ///   used as an optimization only, when one is absolutely certain that
+  ///   `lower <= upper`. Using the `..<` operator to form `CountableRange`
+  ///   instances is preferred.
+  /// - Precondition: `lower <= upper`
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
@@ -346,42 +413,18 @@ extension CountableRange : CustomReflectable {
   }
 }
 
-/// A collection of consecutive discrete index values.
-///
-/// - parameter Element: Is both the element type and the index type of the
-///   collection.
-///
-/// Like other collections, a range containing one element has an
-/// `upperBound` that is the successor of its `lowerBound`; and an empty
-/// range has `lowerBound == upperBound`.
-///
-/// Axiom: for any `Range` `r`, `r[i] == i`.
-///
-/// Therefore, if `Element` has a maximal value, it can serve as an
-/// `upperBound`, but can never be contained in a `Range<Element>`.
-///
-/// It also follows from the axiom above that `(-99..<100)[0] == 0`.
-/// To prevent confusion (because some expect the result to be `-99`),
-/// in a context where `Element` is known to be an integer type,
-/// subscripting with `Element` is a compile-time error:
-///
-///     // error: could not find an overload for 'subscript'...
-///     print(Range<Int>(start: -99, end: 100)[0])
-///
-/// However, subscripting that range still works in a generic context:
-///
-///     func brackets<Element : ForwardIndex>(x: Range<Element>, i: Element) -> Element {
-///       return x[i] // Just forward to subscript
-///     }
-///     print(brackets(Range<Int>(start: -99, end: 100), 0))
-///     // Prints "0"
+/// A half-open range that contains its lower bound but not its upper bound.
+/// 
+/// `Range` can represent an empty range.
 public struct Range<
   Bound : Comparable
 > : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
     HalfOpenRangeProtocol {
 
-  /// Construct a range with `lowerBound == start` and `upperBound ==
-  /// end`.
+  /// Creates a range with `lowerBound == lower` and `upperBound ==
+  /// upper`.
+  /// 
+  /// - Precondition: `lower <= upper`
   @inline(__always)
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
@@ -391,19 +434,15 @@ public struct Range<
   /// The range's lower bound.
   ///
   /// Identical to `upperBound` in an empty range.
-  // FIXME: swift-3-indexing-model: rename to `start`.
   public let lowerBound: Bound
 
   /// The range's upper bound.
   ///
-  /// `upperBound` is not a valid argument to `subscript`, and is always
-  /// reachable from `lowerBound` by zero or more applications of
-  /// `successor()`.
-  // FIXME: swift-3-indexing-model: rename to `end`.
+  /// Identical to `lowerBound` in an empty range. A `Range` instance
+  /// does not contain its `upperBound`.
   public let upperBound: Bound
 
-  // FIXME: does not implement a requirement in `Collection`.
-  // We need to implement `_customContainsEquatableElement` instead.
+  /// Returns `true` iff `lowerBound <= element && element < upperBound`.
   @warn_unused_result
   public func contains(element: Bound) -> Bool {
     return element >= self.lowerBound && element < self.upperBound
