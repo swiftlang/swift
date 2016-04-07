@@ -78,7 +78,8 @@ addReleasesForConvertedOwnedParameter(SILBuilder &Builder,
   for (auto &ArgDesc : ArgDescs) {
     if (ArgDesc.CalleeRelease.empty())
       continue;
-    Builder.createReleaseValue(Loc, Parameters[ArgDesc.Index]);
+    Builder.createReleaseValue(Loc, Parameters[ArgDesc.Index],
+                               Atomicity::Atomic);
   }
 }
 
@@ -95,12 +96,14 @@ addReleasesForConvertedOwnedParameter(SILBuilder &Builder,
     if (ArgDesc.IsEntirelyDead && 
         ArgDesc.Arg->getKnownParameterInfo().getConvention() ==
         ParameterConvention::Direct_Owned) {
-       Builder.createReleaseValue(Loc, Parameters[ArgDesc.Index]);
-       continue;
+      Builder.createReleaseValue(Loc, Parameters[ArgDesc.Index],
+                                 Atomicity::Atomic);
+      continue;
     }
     if (ArgDesc.CalleeRelease.empty())
       continue;
-    Builder.createReleaseValue(Loc, Parameters[ArgDesc.Index]);
+    Builder.createReleaseValue(Loc, Parameters[ArgDesc.Index],
+                               Atomicity::Atomic);
   }
 }
 
@@ -128,7 +131,7 @@ addRetainsForConvertedDirectResults(SILBuilder &Builder,
     if (DirectResults.size() != 1)
       SpecificResultValue = Builder.createTupleExtract(Loc, ReturnValue, I);
 
-    Builder.createRetainValue(Loc, SpecificResultValue);
+    Builder.createRetainValue(Loc, SpecificResultValue, Atomicity::Atomic);
   }
 }
 
@@ -399,5 +402,3 @@ std::string FunctionSignatureInfo::getOptimizedName() const {
 
   return M.finalize();
 }
-
-
