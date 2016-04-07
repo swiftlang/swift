@@ -149,31 +149,17 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/NonEmpty/Set") {
     var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-      c[index] = wrapValue(OpaqueValue(9999))
-    } else {
-      expectFailure {
-        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-        c[index] = wrapValue(OpaqueValue(9999))
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    c[index] = wrapValue(OpaqueValue(9999))
   }
 
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/Empty/Set") {
     var c = makeWrappedCollection([])
     var index = c.endIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-      c[index] = wrapValue(OpaqueValue(9999))
-    } else {
-      expectFailure {
-        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-        c[index] = wrapValue(OpaqueValue(9999))
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    c[index] = wrapValue(OpaqueValue(9999))
   }
 
   let tests = _product(
@@ -233,14 +219,8 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       index = sliceEndIndex
     }
 
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      slice[index] = wrapValue(OpaqueValue(9999))
-    } else {
-      expectFailure {
-        slice[index] = wrapValue(OpaqueValue(9999))
-      }
-    }
+    expectCrashLater()
+    slice[index] = wrapValue(OpaqueValue(9999))
   }
 }
 
@@ -440,14 +420,8 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     let newValues = makeWrappedCollection(Array(elements[0..<count]))
     let newSlice = newValues[newValues.startIndex..<newValues.endIndex]
 
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      slice[bounds] = newSlice
-    } else {
-      expectFailure {
-        slice[bounds] = newSlice
-      }
-    }
+    expectCrashLater()
+    slice[bounds] = newSlice
   }
 }
 
@@ -697,31 +671,17 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/NonEmpty/Set") {
     var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-      c[index] = wrapValue(OpaqueValue(9999))
-    } else {
-      expectFailure {
-        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-        c[index] = wrapValue(OpaqueValue(9999))
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    c[index] = wrapValue(OpaqueValue(9999))
   }
 
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/Empty/Set") {
     var c = makeWrappedCollection([])
     var index = c.startIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-      c[index] = wrapValue(OpaqueValue(9999))
-    } else {
-      expectFailure {
-        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-        c[index] = wrapValue(OpaqueValue(9999))
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    c[index] = wrapValue(OpaqueValue(9999))
   }
 }
 

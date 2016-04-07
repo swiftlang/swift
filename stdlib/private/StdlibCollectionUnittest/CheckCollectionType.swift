@@ -453,27 +453,15 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).Index/OutOfBounds/Right/NonEmpty") {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     let index = c.endIndex
-    if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
-    } else {
-      expectFailure {
-        _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
-      }
-    }
+    expectCrashLater()
+    _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
   }
 
   self.test("\(testNamePrefix).Index/OutOfBounds/Right/Empty") {
     let c = makeWrappedCollection([])
     let index = c.endIndex
-    if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
-    } else {
-      expectFailure {
-        _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
-      }
-    }
+    expectCrashLater()
+    _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
   }
 }
 
@@ -485,31 +473,17 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/NonEmpty/Get") {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-      _blackHole(c[index])
-    } else {
-      expectFailure {
-        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-        _blackHole(c[index])
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    _blackHole(c[index])
   }
 
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/Empty/Get") {
     let c = makeWrappedCollection([])
     var index = c.endIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-      _blackHole(c[index])
-    } else {
-      expectFailure {
-        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-        _blackHole(c[index])
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    _blackHole(c[index])
   }
 
   let tests = _product(
@@ -564,14 +538,8 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       index = sliceEndIndex
     }
 
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      _blackHole(slice[index])
-    } else {
-      expectFailure {
-        _blackHole(slice[index])
-      }
-    }
+    expectCrashLater()
+    _blackHole(slice[index])
   }
 }
 
@@ -604,31 +572,17 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Range)/OutOfBounds/Right/NonEmpty/Get") {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
-    if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-      _blackHole(c[index..<index])
-    } else {
-      expectFailure {
-        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-        _blackHole(c[index..<index])
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    _blackHole(c[index..<index])
   }
 
   self.test("\(testNamePrefix).subscript(_: Range)/OutOfBounds/Right/Empty/Get") {
     let c = makeWrappedCollection([])
     var index = c.endIndex
-    if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-      _blackHole(c[index..<index])
-    } else {
-      expectFailure {
-        index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
-        _blackHole(c[index..<index])
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    _blackHole(c[index..<index])
   }
 
   let tests = _product(
@@ -723,14 +677,8 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
       break
     }
 
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      _blackHole(slice[bounds])
-    } else {
-      expectFailure {
-        _blackHole(slice[bounds])
-      }
-    }
+    expectCrashLater()
+    _blackHole(slice[bounds])
   }
 }
 
@@ -1330,27 +1278,15 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).Index/OutOfBounds/Left/NonEmpty") {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     let index = c.startIndex
-    if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
-    } else {
-      expectFailure {
-        _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
-      }
-    }
+    expectCrashLater()
+    _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
   }
 
   self.test("\(testNamePrefix).Index/OutOfBounds/Left/Empty") {
     let c = makeWrappedCollection([])
     let index = c.startIndex
-    if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
-    } else {
-      expectFailure {
-        _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
-      }
-    }
+    expectCrashLater()
+    _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
   }
 }
 
@@ -1362,31 +1298,17 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/NonEmpty/Get") {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-      _blackHole(c[index])
-    } else {
-      expectFailure {
-        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-        _blackHole(c[index])
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    _blackHole(c[index])
   }
 
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/Empty/Get") {
     let c = makeWrappedCollection([])
     var index = c.startIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-      _blackHole(c[index])
-    } else {
-      expectFailure {
-        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-        _blackHole(c[index])
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    _blackHole(c[index])
   }
 }
 
@@ -1398,31 +1320,17 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Range)/OutOfBounds/Left/NonEmpty/Get") {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
-    if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-      _blackHole(c[index..<index])
-    } else {
-      expectFailure {
-        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-        _blackHole(c[index..<index])
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    _blackHole(c[index..<index])
   }
 
   self.test("\(testNamePrefix).subscript(_: Range)/OutOfBounds/Left/Empty/Get") {
     let c = makeWrappedCollection([])
     var index = c.startIndex
-    if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .trap {
-      expectCrashLater()
-      index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-      _blackHole(c[index..<index])
-    } else {
-      expectFailure {
-        index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
-        _blackHole(c[index..<index])
-      }
-    }
+    expectCrashLater()
+    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    _blackHole(c[index..<index])
   }
 }
 

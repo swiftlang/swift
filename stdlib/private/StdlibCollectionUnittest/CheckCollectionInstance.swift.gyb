@@ -21,7 +21,6 @@ public struct CollectionMisuseResiliencyChecks {
   public enum FailureKind {
     case none
     case trap
-    case expectationFailure
   }
 
   public var callNextOnExhaustedGenerator: Bool = true
