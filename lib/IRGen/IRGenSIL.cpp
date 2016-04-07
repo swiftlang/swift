@@ -3929,8 +3929,8 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                                        swift::UnconditionalCheckedCastInst *i) {
   Explosion value = getLoweredExplosion(i->getOperand());
   Explosion ex;
-  emitValueCheckedCast(*this, value, i->getOperand()->getType(), i->getType(),
-                       CheckedCastMode::Unconditional, ex);
+  emitScalarCheckedCast(*this, value, i->getOperand()->getType(), i->getType(),
+                        CheckedCastMode::Unconditional, ex);
   setLoweredExplosion(i, ex);
 }
 
@@ -4090,12 +4090,12 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
                                         operand->getType(), destTy);
   } else {
     Explosion value = getLoweredExplosion(i->getOperand());
-    emitValueCheckedCast(*this, value, i->getOperand()->getType(),
-                         i->getCastType(), CheckedCastMode::Conditional, ex);
+    emitScalarCheckedCast(*this, value, i->getOperand()->getType(),
+                          i->getCastType(), CheckedCastMode::Conditional, ex);
     auto val = ex.claimNext();
     castResult.casted = val;
     llvm::Value *nil =
-    llvm::ConstantPointerNull::get(cast<llvm::PointerType>(val->getType()));
+      llvm::ConstantPointerNull::get(cast<llvm::PointerType>(val->getType()));
     castResult.succeeded = Builder.CreateICmpNE(val, nil);
   }
   
