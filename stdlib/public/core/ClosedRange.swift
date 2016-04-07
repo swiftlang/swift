@@ -14,9 +14,9 @@
 // [Closed]Range and [Closed]CountableRange.
 
 /// A type that represents a contiguous range of any comparable value,
-/// containing both their lower bounds and upper bounds.
+/// containing both its lower and upper bounds.
 ///
-/// A closed range is never empty.
+/// A closed range cannot represent an empty range.
 public protocol ClosedRangeProtocol : RangeProtocol {}
 
 @warn_unused_result
@@ -58,13 +58,12 @@ case pastEnd
 case inRange(Bound)
 }
 
-/// A position in a closed range whose `Bound` is `Strideable` with
-/// `Integer` `Stride`.
+/// A position in a `CountableClosedRange` instance.
 public struct ClosedRangeIndex<
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : Comparable {
-  /// Creates the past-the-end position
+  /// Creates the past-the-end position.
   internal init() { _value = .pastEnd }
 
   /// Creates a position `p` for which `r[p] == x`.
@@ -162,8 +161,7 @@ extension ClosedRangeProtocol
 }
 
 // WORKAROUND: needed because of rdar://25584401
-/// A position in a closed range whose `Bound` is `Strideable` with
-/// `Integer` `Stride`.
+/// An iterator over the elements of a `CountableClosedRange` instance.
 public struct ClosedRangeIterator<
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > : IteratorProtocol, Sequence {
@@ -188,8 +186,15 @@ public struct ClosedRangeIterator<
   internal let _upperBound: Bound
 }
 
-/// A closed range whose `Bound` is `Strideable` with `Integer`
-/// `Stride` and conforms to RandomAccessCollection.
+/// A closed range that forms a collection of consecutive strideable comparable
+/// values.
+///
+/// A `CountableClosedRange` contains both its `lowerBound` and its
+/// `upperBound`. A `CountableClosedRange` with one element has
+/// `lowerBound == upperBound`. `CountableClosedRange` instances are never
+/// empty.
+///
+/// - SeeAlso: `CountableRange`, `ClosedRange`, `Range`
 public struct CountableClosedRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
@@ -284,42 +289,18 @@ extension CountableClosedRange : CustomReflectable {
   }
 }
 
-/// A collection of consecutive discrete index values.
-///
-/// - parameter Element: Is both the element type and the index type of the
-///   collection.
-///
-/// Like other collections, a range containing one element has an
-/// `upperBound` that is the successor of its `lowerBound`; and an empty
-/// range has `lowerBound == upperBound`.
-///
-/// Axiom: for any `Range` `r`, `r[i] == i`.
-///
-/// Therefore, if `Element` has a maximal value, it can serve as an
-/// `upperBound`, but can never be contained in a `Range<Element>`.
-///
-/// It also follows from the axiom above that `(-99..<100)[0] == 0`.
-/// To prevent confusion (because some expect the result to be `-99`),
-/// in a context where `Element` is known to be an integer type,
-/// subscripting with `Element` is a compile-time error:
-///
-///     // error: could not find an overload for 'subscript'...
-///     print(Range<Int>(start: -99, end: 100)[0])
-///
-/// However, subscripting that range still works in a generic context:
-///
-///     func brackets<Element : ForwardIndex>(x: Range<Element>, i: Element) -> Element {
-///       return x[i] // Just forward to subscript
-///     }
-///     print(brackets(Range<Int>(start: -99, end: 100), 0))
-///     // Prints "0"
+/// A closed range that contains both its lower and upper bound.
+/// 
+/// `ClosedRange` cannot represent an empty range.
 public struct ClosedRange<
   Bound : Comparable
 > : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
     ClosedRangeProtocol {
 
-  /// Construct a range with `lowerBound == start` and `upperBound ==
-  /// end`.
+  /// Creates a range with `lowerBound == lower` and `upperBound ==
+  /// upper`.
+  ///
+  /// - Precondition: `lower <= upper`
   @inline(__always)
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
@@ -327,20 +308,12 @@ public struct ClosedRange<
   }
 
   /// The range's lower bound.
-  ///
-  /// Identical to `upperBound` in an empty range.
-  // FIXME: swift-3-indexing-model: rename to `start`.
   public let lowerBound: Bound
 
   /// The range's upper bound.
-  ///
-  /// `upperBound` is not a valid argument to `subscript`, and is always
-  /// reachable from `lowerBound` by zero or more applications of
-  /// `successor()`.
   public let upperBound: Bound
 
-  // FIXME: does not implement a requirement in `Collection`.
-  // We need to implement `_customContainsEquatableElement` instead.
+  /// Returns `true` iff `lowerBound <= element && element <= upperBound`.
   @warn_unused_result
   public func contains(element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
@@ -365,8 +338,7 @@ extension ClosedRange : CustomReflectable {
   }
 }
 
-/// Returns a closed range that contains `minimum` and
-/// `maximum`.
+/// Returns a closed range that contains `minimum` and `maximum`.
 ///
 /// - Precondition: `minimum <= maximum`.
 @_transparent
