@@ -192,7 +192,11 @@ public struct LazyFilterCollection<
   /// - Complexity: O(N), where N is the ratio between unfiltered and
   ///   filtered collection counts.
   public var startIndex: Index {
-    return LazyFilterIndex(base: _nextFiltered(_base.startIndex))
+    var index = _base.startIndex
+    while index != _base.endIndex && !_predicate(_base[index]) {
+      _base.formSuccessor(&index)
+    }
+    return LazyFilterIndex(base: index)
   }
 
   /// The collection's "past the end" position.
@@ -222,9 +226,7 @@ public struct LazyFilterCollection<
 
     var index = i.base
     for _ in stride(from: 0, to: n, by: 1) {
-      if _nextFilteredInPlace(&index) {
-        break
-      }
+      _nextFilteredInPlace(&index)
     }
     return LazyFilterIndex(base: index)
   }
@@ -238,9 +240,10 @@ public struct LazyFilterCollection<
 
     var index = i.base
     for _ in stride(from: 0, to: n, by: 1) {
-      if _nextFilteredInPlace(&index, limitedBy: limit.base) {
+      if index == limit.base {
         break
       }
+      _nextFilteredInPlace(&index)
     }
     return LazyFilterIndex(base: index)
   }
@@ -254,38 +257,17 @@ public struct LazyFilterCollection<
     return index
   }
 
-  /// Advances `index` until one of the following:
-  ///   `self._predicate` matches on related element
-  ///   `index` equals `self._base.endIndex`
-  /// Returns `true` iff at `self._base.endIndex`
+  /// Returns the first index `i` following `index` where either
+  /// `_predicate(base[i]) == true` or `i == _base.endIndex`.
+  ///
+  /// - Precondition: `index != endIndex`
+  /// - Postcondition: `i > index`
   @inline(__always)
-  internal func _nextFilteredInPlace(index: inout Base.Index) -> Bool {
-    while index != _base.endIndex {
-      if _predicate(_base[index]) {
-        return false
-      }
+  internal func _nextFilteredInPlace(index: inout Base.Index) {
+    _precondition(index != _base.endIndex, "can't advance past endIndex")
+    repeat {
       _base.formSuccessor(&index)
-    }
-    return true
-  }
-
-  /// Advances `index` until one of the following:
-  ///   `self._predicate` matches on related element
-  ///   `index` equals `self._base.endIndex`
-  ///   `index` equals `limit`
-  /// Returns `true` iff at `self._base.endIndex` or `limit`
-  @inline(__always)
-  internal func _nextFilteredInPlace(
-    index: inout Base.Index,
-    limitedBy limit: Base.Index
-  ) -> Bool {
-    while index != limit && index != _base.endIndex {
-      if _predicate(_base[index]) {
-        return false
-      }
-      _base.formSuccessor(&index)
-    }
-    return true
+    } while index != _base.endIndex && !_predicate(_base[index])
   }
 
   /// Access the element at `position`.
