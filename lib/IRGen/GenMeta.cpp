@@ -1025,7 +1025,7 @@ namespace {
 
     /// Set the metatype in local data.
     llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
-      IGF.setScopedLocalTypeData(type,  LocalTypeDataKind::forTypeMetadata(),
+      IGF.setScopedLocalTypeData(type, LocalTypeDataKind::forTypeMetadata(),
                                  metatype);
       return metatype;
     }

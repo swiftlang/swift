@@ -63,10 +63,10 @@ var simdTestSuite = TestSuite("simd")
 
 simdTestSuite.test("sizes") {
 //  C interop requires that vector be the right size.
-  expectEqual(8,  sizeof(float2.self))
+  expectEqual(8, sizeof(float2.self))
   expectEqual(16, sizeof(float3.self))
   expectEqual(16, sizeof(float4.self))
-  expectEqual(8,  sizeof(int2.self))
+  expectEqual(8, sizeof(int2.self))
   expectEqual(16, sizeof(int3.self))
   expectEqual(16, sizeof(int4.self))
   expectEqual(16, sizeof(double2.self))
