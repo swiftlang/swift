@@ -36,9 +36,9 @@ using namespace Lowering;
 // SILGenModule Class implementation
 //===----------------------------------------------------------------------===//
 
-SILGenModule::SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile)
+SILGenModule::SILGenModule(SILModule &M, Module *SM)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
-    Profiler(nullptr), makeModuleFragile(makeModuleFragile) {
+    Profiler(nullptr) {
 }
 
 SILGenModule::~SILGenModule() {
@@ -342,9 +342,6 @@ SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
       if (isAvailableExternally(F->getLinkage())) {
         F->setLinkage(constant.getLinkage(ForDefinition));
       }
-      if (makeModuleFragile) {
-        F->setFragile(IsFragile);
-      }
     }
     return F;
   }
@@ -386,13 +383,6 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   auto *F = M.getOrCreateFunction((Decl*)nullptr, constant, forDefinition);
 
   assert(F && "SILFunction should have been defined");
-
-  if (makeModuleFragile) {
-    SILLinkage linkage = constant.getLinkage(forDefinition);
-    if (linkage != SILLinkage::PublicExternal) {
-      F->setFragile(IsFragile);
-    }
-  }
 
   emittedFunctions[constant] = F;
 
@@ -600,6 +590,8 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   assert(!thunk.isForeign && "foreign-to-native thunks only");
   SILFunction *f = getFunction(thunk, ForDefinition);
   f->setThunk(IsThunk);
+  if (thunk.asForeign().isClangGenerated())
+    f->setFragile(IsFragile);
   preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
   SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
@@ -853,10 +845,16 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                       .withRepresentation(FunctionType::Representation::Thin));
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
+  SILLinkage linkage = SILLinkage::Private;
+  if (M.getSwiftModule()->getResilienceStrategy()
+      == ResilienceStrategy::Fragile) {
+    linkage = SILLinkage::Public;
+  }
+
   auto *f =
-      M.getOrCreateFunction(SILLinkage::Private, funcName, initSILType, nullptr,
+      M.getOrCreateFunction(linkage, funcName, initSILType, nullptr,
                             SILLocation(binding), IsNotBare, IsNotTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile);
+                            IsNotFragile);
   f->setDebugScope(
       new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
   f->setLocation(binding);
@@ -1291,8 +1289,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
-                        Optional<unsigned> startElem, bool makeModuleFragile,
-                        bool isWholeModule) {
+                        Optional<unsigned> startElem, bool isWholeModule) {
   SharedTimer timer("SILGen");
   const DeclContext *DC;
   if (startElem) {
@@ -1307,7 +1304,7 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
   }
 
   std::unique_ptr<SILModule> M(new SILModule(mod, options, DC, isWholeModule));
-  SILGenModule SGM(*M, mod, makeModuleFragile);
+  SILGenModule SGM(*M, mod);
 
   if (SF) {
     if (auto *file = dyn_cast<SourceFile>(SF)) {
@@ -1365,16 +1362,14 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
 std::unique_ptr<SILModule>
 swift::performSILGeneration(Module *mod,
                             SILOptions &options,
-                            bool makeModuleFragile,
                             bool wholeModuleCompilation) {
-  return SILModule::constructSIL(mod, options, nullptr, None, makeModuleFragile,
+  return SILModule::constructSIL(mod, options, nullptr, None,
                                  wholeModuleCompilation);
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, SILOptions &options,
-                            Optional<unsigned> startElem,
-                            bool makeModuleFragile) {
+                            Optional<unsigned> startElem) {
   return SILModule::constructSIL(sf.getParentModule(), options, &sf, startElem,
-                                 makeModuleFragile, false);
+                                 false);
 }

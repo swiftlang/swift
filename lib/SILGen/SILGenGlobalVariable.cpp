@@ -47,7 +47,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   SILType silTy = M.Types.getLoweredTypeOfGlobal(gDecl);
 
   auto *silGlobal = SILGlobalVariable::create(M, link,
-                                              makeModuleFragile ? IsFragile : IsNotFragile,
+                                              IsNotFragile,
                                               mangledName, silTy,
                                               None, gDecl);
   silGlobal->setDeclaration(!forDef);
@@ -222,10 +222,15 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   auto onceSILTy
     = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
 
+  SILLinkage linkage = SILLinkage::Private;
+  if (M.getSwiftModule()->getResilienceStrategy()
+      == ResilienceStrategy::Fragile) {
+    linkage = SILLinkage::Public;
+  }
+
   // TODO: include the module in the onceToken's name mangling.
   // Then we can make it fragile.
-  auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
-                                             makeModuleFragile,
+  auto onceToken = SILGlobalVariable::create(M, linkage, IsNotFragile,
                                              onceTokenBuffer, onceSILTy);
   onceToken->setDeclaration(false);
 

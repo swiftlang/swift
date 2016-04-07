@@ -12,9 +12,11 @@ import Swift
 // CHECK: function_ref @{{.*}}_TTSg5Bi32____TFVs9ContainerCfT_GS_x_
 // CHECK: function_ref @{{.*}}_TTSg5Bi32____TFVs9Container11doSomethingfT_T_ 
 
-// CHECK-LABEL: sil shared [fragile] [noinline] @_TTSf4d___TTSg5Bi32____TFVs9ContainerCfT_GS_x_
+// CHECK-LABEL: sil shared [noinline] @_TTSf4d___TTSg5Bi32____TFVs9ContainerCfT_GS_x_ : $@convention(thin) () -> Container<Builtin.Int32> {
+// CHECK: }
 
-// CHECK-LABEL: sil shared [fragile] [noinline] @_TTSf4d___TTSg5Bi32____TFVs9Container11doSomethingfT_T_
+// CHECK-LABEL: sil shared [noinline] @_TTSf4d___TTSg5Bi32____TFVs9Container11doSomethingfT_T_ : $@convention(thin) () -> () {
+// CHECK: }
 
 var c = Container<Int>()
 c.doSomething()
