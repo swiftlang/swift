@@ -147,7 +147,7 @@ extension LazyCollection : Collection {
 
   /// Returns the number of elements.
   ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
+  /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
   ///   O(N) otherwise.
   public var count: Base.IndexDistance {
     return _base.count

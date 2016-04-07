@@ -40,24 +40,26 @@ public protocol BidirectionalIndexable : Indexable {
 
 /// A collection that supports backward as well as forward traversal.
 ///
-/// - SeeAlso: BidirectionalCollection.predecessor
+/// For any index `i` into a bidirectional collection `c`:
+///
+/// - If `i >= c.startIndex && i < c.endIndex`,
+///   `c.predecessor(of: c.successor(of: i)) == i`.
+///
+/// - If `i > c.startIndex && i <= c.endIndex`
+///   `c.successor(of: c.predecessor(of: i)) == i`.
 public protocol BidirectionalCollection
   : BidirectionalIndexable, Collection {
 
 // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   /// Returns the position immediately preceding `i`.
   ///
-  /// - If `i >= startIndex && i < endIndex`,
-  ///   `predecessor(of: successor(of: i)) == i`.
-  /// 
-  /// - If `i > startIndex && i <= endIndex`
-  ///   `successor(of: predecessor(of: i)) == i`.
-  ///
   /// - Precondition: `i > startIndex && i <= endIndex` 
   @warn_unused_result
   func predecessor(of i: Index) -> Index
 
   /// Replaces `i` with its predecessor.
+  ///
+  /// - Precondition: `i > startIndex && i <= endIndex`
   func formPredecessor(i: inout Index)
 
   associatedtype SubSequence : BidirectionalIndexable, Collection
@@ -71,6 +73,7 @@ public protocol BidirectionalCollection
   // associatedtype Indices : BidirectionalCollection
 
   // TODO: swift-3-indexing-model: tests.
+  /// The last element of `self`, or `nil` if `self` is empty.
   var last: Iterator.Element? { get }
 }
 
@@ -209,7 +212,7 @@ extension BidirectionalCollection where SubSequence == Self {
   /// Remove the last `n` elements.
   ///
   /// - Complexity:
-  ///   - O(1) if `Index` conforms to `RandomAccessIndex`
+  ///   - O(1) if `Self` conforms to `RandomAccessCollection`
   ///   - O(n) otherwise
   /// - Precondition: `n >= 0 && self.count >= n`.
   public mutating func removeLast(n: Int) {
