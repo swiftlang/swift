@@ -238,7 +238,7 @@ struct Aleph {
   var b:Val
 
   // -- loadable value constructor:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime5AlephC{{.*}} : $@convention(thin) (@owned Ref, Val, @thin Aleph.Type) -> @owned Aleph
+  // CHECK-LABEL: sil hidden @_TFV8lifetime5AlephC{{.*}} : $@convention(method) (@owned Ref, Val, @thin Aleph.Type) -> @owned Aleph
   // CHECK: bb0([[A:%.*]] : $Ref, [[B:%.*]] : $Val, {{%.*}} : $@thin Aleph.Type):
   // CHECK-NEXT:   [[RET:%.*]] = struct $Aleph ([[A]] : {{.*}}, [[B]] : {{.*}})
   // CHECK-NEXT:   return [[RET]]
@@ -260,7 +260,7 @@ struct Daleth {
   var c:Unloadable
 
   // -- address-only value constructor:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime6DalethC{{.*}} : $@convention(thin) (@owned Aleph, @owned Beth, @in Unloadable, @thin Daleth.Type) -> @out Daleth {
+  // CHECK-LABEL: sil hidden @_TFV8lifetime6DalethC{{.*}} : $@convention(method) (@owned Aleph, @owned Beth, @in Unloadable, @thin Daleth.Type) -> @out Daleth {
   // CHECK: bb0([[THIS:%.*]] : $*Daleth, [[A:%.*]] : $Aleph, [[B:%.*]] : $Beth, [[C:%.*]] : $*Unloadable, {{%.*}} : $@thin Daleth.Type):
   // CHECK-NEXT:   [[A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.a
   // CHECK-NEXT:   store [[A]] to [[A_ADDR]]
@@ -282,7 +282,7 @@ class He {
   // CHECK: }
 
   // -- default allocator:
-  // CHECK-LABEL: sil hidden @_TFC8lifetime2HeC{{.*}} : $@convention(thin) (@thick He.Type) -> @owned He {
+  // CHECK-LABEL: sil hidden @_TFC8lifetime2HeC{{.*}} : $@convention(method) (@thick He.Type) -> @owned He {
   // CHECK: bb0({{%.*}} : $@thick He.Type):
   // CHECK-NEXT:   [[THIS:%.*]] = alloc_ref $He
   // CHECK-NEXT:   // function_ref lifetime.He.init
@@ -298,7 +298,7 @@ struct Waw {
   var b:Val
 
   // -- loadable value initializer with tuple destructuring:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime3WawC{{.*}} : $@convention(thin) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
+  // CHECK-LABEL: sil hidden @_TFV8lifetime3WawC{{.*}} : $@convention(method) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
   // CHECK: bb0([[A0:%.*]] : $Ref, [[A1:%.*]] : $Val, [[B:%.*]] : $Val, {{%.*}} : $@thin Waw.Type):
   // CHECK-NEXT:   [[A:%.*]] = tuple ([[A0]] : {{.*}}, [[A1]] : {{.*}})
   // CHECK-NEXT:   [[RET:%.*]] = struct $Waw ([[A]] : {{.*}}, [[B]] : {{.*}})
@@ -310,7 +310,7 @@ struct Zayin {
   var b:Unloadable
 
   // -- address-only value initializer with tuple destructuring:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime5ZayinC{{.*}} : $@convention(thin) (@in Unloadable, Val, @in Unloadable, @thin Zayin.Type) -> @out Zayin
+  // CHECK-LABEL: sil hidden @_TFV8lifetime5ZayinC{{.*}} : $@convention(method) (@in Unloadable, Val, @in Unloadable, @thin Zayin.Type) -> @out Zayin
   // CHECK: bb0([[THIS:%.*]] : $*Zayin, [[A0:%.*]] : $*Unloadable, [[A1:%.*]] : $Val, [[B:%.*]] : $*Unloadable, {{%.*}} : $@thin Zayin.Type):
   // CHECK-NEXT:   [[THIS_A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Zayin, #Zayin.a
   // CHECK-NEXT:   [[THIS_A0_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 0
@@ -406,7 +406,7 @@ class Foo<T> {
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
     // initialization for y
-    // CHECK: [[INTCTOR:%[0-9]+]] = function_ref @_TFSiC{{.*}} : $@convention(thin) (@thin Int.Type) -> Int
+    // CHECK: [[INTCTOR:%[0-9]+]] = function_ref @_TFSiC{{.*}} : $@convention(method) (@thin Int.Type) -> Int
     // CHECK: [[INTMETA:%[0-9]+]] = metatype $@thin Int.Type
     // CHECK: [[INTVAL:%[0-9]+]] = apply [[INTCTOR]]([[INTMETA]])
 
