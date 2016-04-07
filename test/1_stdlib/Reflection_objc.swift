@@ -258,7 +258,7 @@ class HasStringQLO : CanaryBase {
   }
 }
 
-func testQLO<T : CanaryBase>(type: T.Type) {
+func testQLO<T : CanaryBase>(_ type: T.Type) {
   autoreleasepool {
     _ = PlaygroundQuickLook(reflecting: type.init())
   }

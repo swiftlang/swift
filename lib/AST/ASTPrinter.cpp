@@ -1205,7 +1205,7 @@ private:
                          bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL, bool isCurried,
-                          std::function<bool(unsigned)> isAPINameByDefault);
+                          std::function<bool()> isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -2626,13 +2626,13 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
 }
 
 void PrintAST::printParameterList(ParameterList *PL, bool isCurried,
-                            std::function<bool(unsigned)> isAPINameByDefault) {
+                            std::function<bool()> isAPINameByDefault) {
   Printer << "(";
   for (unsigned i = 0, e = PL->size(); i != e; ++i) {
     if (i > 0)
       Printer << ", ";
 
-    printOneParameter(PL->get(i), isCurried, isAPINameByDefault(i));
+    printOneParameter(PL->get(i), isCurried, isAPINameByDefault());
   }
   Printer << ")";
 }
@@ -2647,8 +2647,8 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   for (unsigned CurrPattern = 0, NumPatterns = BodyParams.size();
        CurrPattern != NumPatterns; ++CurrPattern) {
     printParameterList(BodyParams[CurrPattern], /*Curried=*/CurrPattern > 0,
-                       [&](unsigned argNo)->bool {
-      return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault(argNo);
+                       [&]()->bool {
+      return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
     });
   }
 
@@ -2873,7 +2873,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer << "subscript";
   }, [&] { // Parameters
     printParameterList(decl->getIndices(), /*Curried=*/false,
-                       /*isAPINameByDefault*/[](unsigned)->bool{return false;});
+                       /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";
 

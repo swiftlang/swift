@@ -33,25 +33,25 @@
 import Foundation
 
 class Bar : Foo {
-  @objc(method2WithValue:) override func method2(value: Int) { }
+  @objc(method2WithValue:) override func method2(_ value: Int) { }
 
-  @objc(overloadedWithInt:) func overloaded(x: Int) { }
-  @objc(overloadedWithString:) func overloaded(x: String) { }
+  @objc(overloadedWithInt:) func overloaded(_ x: Int) { }
+  @objc(overloadedWithString:) func overloaded(_ x: String) { }
 
-  @objc(staticOverloadedWithInt:) static func staticOverloaded(x: Int) { }
-  @objc(staticOverloadedWithString:) static func staticOverloaded(x: String) { }
+  @objc(staticOverloadedWithInt:) static func staticOverloaded(_ x: Int) { }
+  @objc(staticOverloadedWithString:) static func staticOverloaded(_ x: String) { }
 
-  @objc(staticOrNonStatic:) func staticOrNonStatic(x: Int) { }
-  @objc(staticOrNonStatic:) static func staticOrNonStatic(x: Int) { }
+  @objc(staticOrNonStatic:) func staticOrNonStatic(_ x: Int) { }
+  @objc(staticOrNonStatic:) static func staticOrNonStatic(_ x: Int) { }
 
-  @objc(theInstanceOne:) func staticOrNonStatic2(x: Int) { }
-  @objc(theStaticOne:) static func staticOrNonStatic2(x: Int) { }
+  @objc(theInstanceOne:) func staticOrNonStatic2(_ x: Int) { }
+  @objc(theStaticOne:) static func staticOrNonStatic2(_ x: Int) { }
 }
 
 class Foo {
-  @objc(methodWithValue:label:) func method(value: Int, label: String) { }
+  @objc(methodWithValue:label:) func method(_ value: Int, label: String) { }
 
-  @objc(method2WithValue:) func method2(value: Int) { }
+  @objc(method2WithValue:) func method2(_ value: Int) { }
 
   @objc func method3() { }
 

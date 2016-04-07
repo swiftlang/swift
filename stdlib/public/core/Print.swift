@@ -24,7 +24,7 @@
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func print(
-  items: Any...,
+  _ items: Any...,
   separator: String = " ",
   terminator: String = "\n"
 ) {
@@ -60,7 +60,7 @@ public func print(
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func debugPrint(
-  items: Any...,
+  _ items: Any...,
   separator: String = " ",
   terminator: String = "\n") {
   if let hook = _playgroundPrintHook {
@@ -88,7 +88,7 @@ public func debugPrint(
 ///   `CustomDebugStringConvertible`
 @inline(__always)
 public func print<Target : OutputStream>(
-  items: Any...,
+  _ items: Any...,
   separator: String = " ",
   terminator: String = "\n",
   to output: inout Target
@@ -109,7 +109,7 @@ public func print<Target : OutputStream>(
 ///   `CustomDebugStringConvertible`
 @inline(__always)
 public func debugPrint<Target : OutputStream>(
-  items: Any...,
+  _ items: Any...,
   separator: String = " ",
   terminator: String = "\n",
   to output: inout Target
@@ -122,7 +122,7 @@ public func debugPrint<Target : OutputStream>(
 @inline(never)
 @_semantics("stdlib_binary_only")
 internal func _print<Target : OutputStream>(
-  items: [Any],
+  _ items: [Any],
   separator: String = " ",
   terminator: String = "\n",
   to output: inout Target
@@ -142,7 +142,7 @@ internal func _print<Target : OutputStream>(
 @inline(never)
 @_semantics("stdlib_binary_only")
 internal func _debugPrint<Target : OutputStream>(
-  items: [Any],
+  _ items: [Any],
   separator: String = " ",
   terminator: String = "\n",
   to output: inout Target

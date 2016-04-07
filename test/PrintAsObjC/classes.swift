@@ -51,11 +51,11 @@ import CoreFoundation
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class BridgedTypes {
-  func dictBridge(x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> {
+  func dictBridge(_ x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> {
     return x
   }
 
-  func setBridge(x: Set<NSObject>) -> Set<NSObject> {
+  func setBridge(_ x: Set<NSObject>) -> Set<NSObject> {
     return x
   }
 }
@@ -166,20 +166,20 @@ class NotObjC {}
   func test() {}
   class func test2() {}
 
-  func testPrimitives(b: Bool, i: Int, f: Float, d: Double, u: UInt)
+  func testPrimitives(_ b: Bool, i: Int, f: Float, d: Double, u: UInt)
     -> OpaquePointer { return nil }
-  func testString(s: String) {}
-  func testSelector(sel: Selector, boolean b: ObjCBool) {}
+  func testString(_ s: String) {}
+  func testSelector(_ sel: Selector, boolean b: ObjCBool) {}
 
-  func testCSignedTypes(a: CSignedChar, b: CShort, c: CInt, d: CLong, e: CLongLong) {}
-  func testCUnsignedTypes(a: CUnsignedChar, b: CUnsignedShort, c: CUnsignedInt, d: CUnsignedLong, e: CUnsignedLongLong) {}
-  func testCChars(basic: CChar, wchar wide: CWideChar, char16: CChar16, char32: CChar32) {}
-  func testCFloats(a: CFloat, b: CDouble) {}
-  func testCBool(a: CBool) {}
+  func testCSignedTypes(_ a: CSignedChar, b: CShort, c: CInt, d: CLong, e: CLongLong) {}
+  func testCUnsignedTypes(_ a: CUnsignedChar, b: CUnsignedShort, c: CUnsignedInt, d: CUnsignedLong, e: CUnsignedLongLong) {}
+  func testCChars(_ basic: CChar, wchar wide: CWideChar, char16: CChar16, char32: CChar32) {}
+  func testCFloats(_ a: CFloat, b: CDouble) {}
+  func testCBool(_ a: CBool) {}
 
-  func testSizedSignedTypes(a: Int8, b: Int16, c: Int32, d: Int64) {}
-  func testSizedUnsignedTypes(a: UInt8, b: UInt16, c: UInt32, d: UInt64) {}
-  func testSizedFloats(a: Float32, b: Float64) {}
+  func testSizedSignedTypes(_ a: Int8, b: Int16, c: Int32, d: Int64) {}
+  func testSizedUnsignedTypes(_ a: UInt8, b: UInt16, c: UInt32, d: UInt64) {}
+  func testSizedFloats(_ a: Float32, b: Float64) {}
 
   func getDynamicSelf() -> Self { return self }
   class func getSelf() -> Methods.Type { return self }
@@ -193,24 +193,24 @@ class NotObjC {}
     return ClassWithCustomName.self
   }
 
-  func testParens(a: ((Int))) {}
+  func testParens(_ a: ((Int))) {}
 
   func testIgnoredParam(_: Int) {}
   func testIgnoredParams(_: Int, again _: Int) {}
 
-  func testArrayBridging(a: [Methods]) {}
-  func testArrayBridging2(a: [AnyObject]) {}
-  func testArrayBridging3(a: [String]) {}
+  func testArrayBridging(_ a: [Methods]) {}
+  func testArrayBridging2(_ a: [AnyObject]) {}
+  func testArrayBridging3(_ a: [String]) {}
 
-  func testDictionaryBridging(a: [NSObject : AnyObject]) {}
-  func testDictionaryBridging2(a: [NSNumber : Methods]) {}
-  func testDictionaryBridging3(a: [String : String]) {}
+  func testDictionaryBridging(_ a: [NSObject : AnyObject]) {}
+  func testDictionaryBridging2(_ a: [NSNumber : Methods]) {}
+  func testDictionaryBridging3(_ a: [String : String]) {}
 
-  func testSetBridging(a: Set<NSObject>) {}
+  func testSetBridging(_ a: Set<NSObject>) {}
 
   @IBAction func actionMethod(_: AnyObject) {}
 
-  func methodWithReservedParameterNames(long: AnyObject, protected: AnyObject) {}
+  func methodWithReservedParameterNames(_ long: AnyObject, protected: AnyObject) {}
 
   func honorRenames(_: ClassWithCustomName) {}
 
@@ -235,9 +235,9 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithImports {
-  func getOrigin(r: NSRect) -> NSPoint { return r.origin }
-  func getOriginX(r: AliasForNSRect) -> CGFloat { return r.origin.x }
-  func getOriginY(r: CGRect) -> CGFloat { return r.origin.y }
+  func getOrigin(_ r: NSRect) -> NSPoint { return r.origin }
+  func getOriginX(_ r: AliasForNSRect) -> CGFloat { return r.origin.x }
+  func getOriginY(_ r: CGRect) -> CGFloat { return r.origin.y }
 
   func emptyArray() -> NSArray { return NSArray() }
   func maybeArray() -> NSArray? { return nil }
@@ -246,7 +246,7 @@ typealias AliasForNSRect = NSRect
 
   func zone() -> NSZone { return nil }
 
-  func cf(x: CFTree, str: CFString, str2: CFMutableString, obj: CFAliasForType) -> CFTypeRef? { return nil }
+  func cf(_ x: CFTree, str: CFString, str2: CFMutableString, obj: CFAliasForType) -> CFTypeRef? { return nil }
 
   func appKitInImplementation() {
     let _ : NSResponder? = nil
@@ -263,12 +263,12 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
-  func test(a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> { return nil }
+  func test(_ a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> { return nil }
 
-  func testNested(a: UnsafeMutablePointer<UnsafeMutablePointer<Int>>) {}
+  func testNested(_ a: UnsafeMutablePointer<UnsafeMutablePointer<Int>>) {}
 
-  func testBridging(a: UnsafePointer<Int>, b: UnsafeMutablePointer<Int>, c: AutoreleasingUnsafeMutablePointer<Methods>) {}
-  func testBridgingVoid(a: UnsafeMutablePointer<Void>, b: UnsafePointer<Void>) {}
+  func testBridging(_ a: UnsafePointer<Int>, b: UnsafeMutablePointer<Int>, c: AutoreleasingUnsafeMutablePointer<Methods>) {}
+  func testBridgingVoid(_ a: UnsafeMutablePointer<Void>, b: UnsafePointer<Void>) {}
 }
 
 // CHECK-LABEL: @interface MyObject : NSObject
@@ -583,7 +583,7 @@ public class NonObjCClass { }
 @objc class Throwing1 {
   func method1() throws { }
   func method2() throws -> Throwing1 { return self }
-  func method3(x: Int) throws -> [String] { return [] }
+  func method3(_ x: Int) throws -> [String] { return [] }
   func method4() throws -> Self { return self }
 
   init() throws { }
@@ -597,9 +597,9 @@ public class NonObjCClass { }
 // CHECK-LABEL: @interface UsesImportedGenerics
 @objc class UsesImportedGenerics {
   // CHECK: - (GenericClass<id> * _Nonnull)takeAndReturnGenericClass:(GenericClass<NSString *> * _Nullable)x;
-  @objc func takeAndReturnGenericClass(x: GenericClass<NSString>?) -> GenericClass<AnyObject> { fatalError("") }
+  @objc func takeAndReturnGenericClass(_ x: GenericClass<NSString>?) -> GenericClass<AnyObject> { fatalError("") }
   // CHECK: - (PettableContainer<id <Pettable>> * _Null_unspecified)takeAndReturnPettableContainer:(PettableContainer<Pet *> * _Nonnull)x;
-  @objc func takeAndReturnPettableContainer(x: PettableContainer<Pet>) -> PettableContainer<Pettable>! { fatalError("") }
+  @objc func takeAndReturnPettableContainer(_ x: PettableContainer<Pet>) -> PettableContainer<Pettable>! { fatalError("") }
 }
 // CHECK: @end
 

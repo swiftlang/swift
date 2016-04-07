@@ -1017,14 +1017,14 @@ var stringBenchmarkWords: [String] = [
 
 
 @inline(never)
-func benchSortStrings(words: [String]) {
+func benchSortStrings(_ words: [String]) {
   // Notice that we _copy_ the array of words before we sort it.
   // Pass an explicit '<' predicate to benchmark reabstraction thunks.
   var tempwords = words
   tempwords.sort(isOrderedBefore: <)
 }
 
-public func run_SortStrings(N: Int) {
+public func run_SortStrings(_ N: Int) {
   for _ in 1...5*N {
     benchSortStrings(stringBenchmarkWords)
   }

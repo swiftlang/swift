@@ -3,7 +3,7 @@
 
 // CHECK-LABEL: (func_decl "foo(_:)"
 // CHECK-AST-LABEL: (func_decl "foo(_:)"
-func foo(n: Int) -> Int {
+func foo(_ n: Int) -> Int {
   // CHECK:   (brace_stmt
   // CHECK:     (return_stmt
   // CHECK:       (integer_literal_expr type='<null>' value=42)))

@@ -88,7 +88,7 @@ inheritance to hide the concrete implementing type behind an abstract base::
     var startIndex: Int { fatal() }
     var endIndex: Int { fatal() }
 
-    func __getitem__(i: Int) -> T { fatal() }
+    func __getitem__(_ i: Int) -> T { fatal() }
 
     // For COW
     func _clone() -> Self { fatal() }
@@ -101,7 +101,7 @@ inheritance to hide the concrete implementing type behind an abstract base::
     var value: ArrayT
     var startIndex: Int { return value.startIndex }
     var endIndex: Int { return value.endIndex }
-    func __getitem__(i: Int) -> T { return __getitem__(i) }
+    func __getitem__(_ i: Int) -> T { return __getitem__(i) }
 
     // For COW
     func _clone() -> Self { return self(value) }
@@ -114,7 +114,7 @@ inheritance to hide the concrete implementing type behind an abstract base::
 
     var startIndex: Int { return value.startIndex }
     var endIndex: Int { return value.endIndex }
-    func __getitem__(i: Int) -> T { return value.__getitem__(i) }
+    func __getitem__(_ i: Int) -> T { return value.__getitem__(i) }
 
     init<ArrayT : Array where ArrayT.Element == T>(arr: ArrayT) {
       value = ArrayOfImpl<T, ArrayT>(arr)
@@ -126,7 +126,7 @@ The mutable variant can use COW optimization to preserve value semantics::
   struct MutableArrayOf<T> : MutableArray {
     /* ...other forwarding methods... */
 
-    func __setitem__(i: Int, x: T) {
+    func __setitem__(_ i: Int, x: T) {
       if !isUniquelyReferenced(value) {
         value = value._clone()
       }

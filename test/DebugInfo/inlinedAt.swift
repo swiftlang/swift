@@ -4,25 +4,25 @@
 
 #sourceLocation(file: "abc.swift", line: 100)
 @inline(__always)
-func h(k : Int) -> Int {        // 101
+func h(_ k : Int) -> Int {        // 101
   return k                      // 102
 }
 
 #sourceLocation(file: "abc.swift", line: 200)
 @inline(__always)
-func g(j : Int) -> Int {        // 201
+func g(_ j : Int) -> Int {        // 201
   return h(j)                   // 202
 }
 
 #sourceLocation(file: "abc.swift", line: 301)
-public func f(i : Int) -> Int { // 301
+public func f(_ i : Int) -> Int { // 301
   return g(i)                   // 302
 }
 
 // CHECK-SIL: sil {{.*}}@_TF9inlinedAt1fFSiSi :
 // CHECK-SIL-NOT: return
 // CHECK-SIL: debug_value %0 : $Int, let, name "k", argno 1
-// CHECK-SIL-SAME: line:101:8:in_prologue
+// CHECK-SIL-SAME: line:101:10:in_prologue
 // CHECK-SIL-SAME: perf_inlined_at line:202:10
 // CHECK-SIL-SAME: perf_inlined_at line:302:10
 
@@ -39,10 +39,10 @@ public func f(i : Int) -> Int { // 301
 // CHECK: ![[L3:.*]] = !DILocation(line: 302, column: 13,
 // CHECK-SAME:                     scope: ![[F_SCOPE:.*]])
 // CHECK: ![[F_SCOPE]] = distinct !DILexicalBlock(scope: ![[F]],
-// CHECK-SAME:                                    line: 301, column: 31)
+// CHECK-SAME:                                    line: 301, column: 33)
 // CHECK: ![[L1]] = !DILocation(line: 101, column: 8, scope: ![[H]],
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
 // CHECK: ![[L2]] = !DILocation(line: 202, column: 13, scope: ![[G_SCOPE:.*]],
 // CHECK-SAME:                  inlinedAt: ![[L3]])
 // CHECK: ![[G_SCOPE]] = distinct !DILexicalBlock(scope: ![[G]],
-// CHECK-SAME:                                    line: 201, column: 24)
+// CHECK-SAME:                                    line: 201, column: 26)

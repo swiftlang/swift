@@ -86,7 +86,7 @@ func genRefStructArray() {
 }
 
 @inline(never)
-public func run_ArrayOfGenericRef(N: Int) {
+public func run_ArrayOfGenericRef(_ N: Int) {
   for _ in 0...N {
     genPODRefArray()
     genCommonRefArray()

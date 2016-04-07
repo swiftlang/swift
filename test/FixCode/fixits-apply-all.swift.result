@@ -14,6 +14,6 @@ func foo() -> Int {
     goo(err)
   }
 }
-func goo(e: ErrorProtocol) {
+func goo(_ e: ErrorProtocol) {
 	
 }

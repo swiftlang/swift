@@ -18,7 +18,7 @@ func _getObjCCount(_: _MagicMirrorData) -> Int
 @_silgen_name("swift_ObjCMirror_subscript") 
 func _getObjCChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
-func _getObjCSummary(data: _MagicMirrorData) -> String {
+func _getObjCSummary(_ data: _MagicMirrorData) -> String {
   let theDescription = _swift_stdlib_objcDebugDescription(data._loadValue())
   return _cocoaStringToSwiftString_NonASCII(theDescription)
 }

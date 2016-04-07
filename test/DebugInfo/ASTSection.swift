@@ -20,7 +20,7 @@ var foo: Foo = Foo()
 Double(foo.bar())
 
 #if OBJC
-func objCUser(obj: ObjCClass) {}
+func objCUser(_ obj: ObjCClass) {}
 #endif
 
 // CHECK: Loaded module ASTSection from

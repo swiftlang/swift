@@ -2,7 +2,7 @@
 
 protocol Fooable {
   init()
-  func foo(x: Int)
+  func foo(_ x: Int)
   mutating func bar()
   mutating func bas()
 
@@ -13,7 +13,7 @@ protocol Fooable {
 
 protocol Barrable: class {
   init()
-  func foo(x: Int)
+  func foo(_ x: Int)
   func bar()
   func bas()
 
@@ -32,11 +32,11 @@ struct S: Fooable {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
   // CHECK-NOT:     retain_value [[SELF]]
   // CHECK-NOT:     release_value [[SELF]]
-  func foo(x: Int) {
+  func foo(_ x: Int) {
     self.foo(x)
   }
 
-  func foooo(x: (Int, Bool)) {
+  func foooo(_ x: (Int, Bool)) {
     self.foooo(x)
   }
 
@@ -211,7 +211,7 @@ struct AO<T>: Fooable {
   // CHECK:         apply {{.*}} [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
   // CHECK:       }
-  func foo(x: Int) {
+  func foo(_ x: Int) {
     self.foo(x)
   }
   mutating func bar() {
@@ -308,7 +308,7 @@ class C: Fooable, Barrable {
   // CHECK:         apply {{.*}} [[SELF]]
   // CHECK:         release{{.*}} [[SELF]]
   // CHECK-NOT:     release{{.*}} [[SELF]]
-  @objc func foo(x: Int) {
+  @objc func foo(_ x: Int) {
     self.foo(x)
   }
   @objc func bar() {
@@ -385,16 +385,16 @@ class D: C {
   // CHECK:         release{{.*}} [[SELF]]
   // CHECK-NOT:     release{{.*}} [[SELF]]
   // CHECK:       }
-  dynamic override func foo(x: Int) {
+  dynamic override func foo(_ x: Int) {
     self.foo(x)
   }
 }
 
-func S_curryThunk(s: S) -> (S -> Int -> ()/*, Int -> ()*/) {
+func S_curryThunk(_ s: S) -> (S -> Int -> ()/*, Int -> ()*/) {
   return (S.foo /*, s.foo*/)
 }
 
-func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
+func AO_curryThunk<T>(_ ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
   return (AO.foo /*, ao.foo*/)
 }
 
@@ -459,7 +459,7 @@ class Kraken {
   func enrage() {}
 }
 
-func destroyShip(k: Kraken) {}
+func destroyShip(_ k: Kraken) {}
 
 class LetFieldClass {
   let letk = Kraken()
@@ -549,7 +549,7 @@ class ClassIntTreeNode {
   // CHECK-NOT: strong_retain
   // CHECK-NOT: strong_release
   // CHECK: return
-  func find(v : Int) -> ClassIntTreeNode {
+  func find(_ v : Int) -> ClassIntTreeNode {
     if v == value { return self }
     if v < value { return left.find(v) }
     return right.find(v)

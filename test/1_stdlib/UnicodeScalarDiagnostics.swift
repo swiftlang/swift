@@ -1,8 +1,8 @@
 // RUN: %target-parse-verify-swift
 
-func isString(s: inout String) {}
+func isString(_ s: inout String) {}
 
-func test_UnicodeScalarDoesNotImplementArithmetic(us: UnicodeScalar, i: Int) {
+func test_UnicodeScalarDoesNotImplementArithmetic(_ us: UnicodeScalar, i: Int) {
   var a1 = "a" + "b" // OK
   isString(&a1)
   let a2 = "a" - "b" // expected-error {{binary operator '-' cannot be applied to two 'String' operands}}

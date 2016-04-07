@@ -9,7 +9,7 @@ import Foundation
 @objc protocol P1 {}
 @objc protocol P2 {}
 @objc protocol Work {
-  func doStuff(x: Int64)
+  func doStuff(_ x: Int64)
 }
 
 // arm64-ios: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
@@ -46,7 +46,7 @@ class Foo {
   // armv7-ios: define hidden double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr {{.*}} {
   // armv7k-watchos: define hidden double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(%VSC6CGRect* noalias nocapture dereferenceable(16), %C8abitypes3Foo*) {{.*}} {
   // armv7k-watchos: define hidden double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, [4 x float]) unnamed_addr {{.*}} {
-  dynamic func getXFromNSRect(r: NSRect) -> Double {
+  dynamic func getXFromNSRect(_ r: NSRect) -> Double {
     return Double(r.origin.x)
   }
 
@@ -56,7 +56,7 @@ class Foo {
   // armv7-ios: define hidden float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, [4 x i32]) unnamed_addr {{.*}} {
   // armv7k-watchos: define hidden float @_TFC8abitypes3Foo12getXFromRect{{.*}}(%VSC6MyRect* noalias nocapture dereferenceable(16), %C8abitypes3Foo*) {{.*}} {
   // armv7k-watchos: define hidden float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, [4 x float]) unnamed_addr {{.*}} {
-  dynamic func getXFromRect(r: MyRect) -> Float {
+  dynamic func getXFromRect(_ r: MyRect) -> Float {
     return r.x
   }
 
@@ -86,7 +86,7 @@ class Foo {
   // armv7k-watchos: [[LOADED:%.*]] = load [4 x float], [4 x float]* [[CAST]]
   // armv7k-watchos: [[SELFCAST:%.*]] = bitcast [[SELF]]* %1 to i8*
   // armv7k-watchos: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, [4 x float])*)(i8* [[SELFCAST]], i8* [[SEL]], [4 x float] [[LOADED]])
-  func getXFromRectSwift(r: MyRect) -> Float {
+  func getXFromRectSwift(_ r: MyRect) -> Float {
     return getXFromRect(r)
   }
 
@@ -102,7 +102,7 @@ class Foo {
 
   // Make sure the caller-side from Swift also uses indirect-byval for the argument
   // x86_64-macosx: define hidden float @_TFC8abitypes3Foo25getXFromRectIndirectSwift{{.*}}(%VSC6MyRect* noalias nocapture dereferenceable({{.*}}), %C8abitypes3Foo*) {{.*}} {
-  func getXFromRectIndirectSwift(r: MyRect) -> Float {
+  func getXFromRectIndirectSwift(_ r: MyRect) -> Float {
     let f : Float = 1.0
     // x86_64-macosx: [[TEMP:%.*]] = alloca [[TEMPTYPE:%.*]], align 4
     // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, float, float, float, float, float, float, float, [[TEMPTYPE]]*)*)(i8* %{{.*}}, i8* %{{.*}}, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, [[TEMPTYPE]]* byval align 4 [[TEMP]])
@@ -137,7 +137,7 @@ class Foo {
   // armv7k-watchos:      [[CAST:%.*]] = bitcast [[ARMV7K_MYRECT]]*
   // armv7k-watchos:      load { float, float, float, float }, { float, float, float, float }* [[CAST]]
   // armv7k-watchos:      ret float
-  func barc(p: StructReturns) -> Float {
+  func barc(_ p: StructReturns) -> Float {
     return p.newRect().y
   }
 
@@ -151,7 +151,7 @@ class Foo {
   // x86_64-macosx:      load i8*, i8** @"\01L_selector(newTrio)", align 8
   // x86_64-macosx:      [[CAST:%[0-9]+]] = bitcast {{%.*}}* %0
   // x86_64-macosx:      call void bitcast (void ()* @objc_msgSend_stret to void (%VSC4Trio*, [[OPAQUE:.*]]*, i8*)*)
-  func bazc(p: StructReturns) -> Double {
+  func bazc(_ p: StructReturns) -> Double {
     return p.newTrio().j
   }
 
@@ -161,12 +161,12 @@ class Foo {
   // x86_64-macosx:      [[CAST:%.*]] = bitcast i64* {{%.*}} to { i32, i32 }*
   // x86_64-macosx:      load { i32, i32 }, { i32, i32 }* [[CAST]]
   // x86_64-macosx:      ret { i32, i32 }
-  func getpair(p: StructReturns) -> IntPair {
+  func getpair(_ p: StructReturns) -> IntPair {
     return p.newPair()
   }
 
   // x86_64-macosx:      define hidden i64 @_TToFC8abitypes3Foo8takepair{{.*}}(i8*, i8*, i64) unnamed_addr {{.*}} {
-  dynamic func takepair(p: IntPair) -> IntPair {
+  dynamic func takepair(_ p: IntPair) -> IntPair {
     return p
   }
 
@@ -180,7 +180,7 @@ class Foo {
   // x86_64-macosx-NEXT: bitcast
   // x86_64-macosx-NEXT: llvm.lifetime.end
   // x86_64-macosx:      ret { i32, i32 }
-  func getnested(p: StructReturns) -> NestedInts {
+  func getnested(_ p: StructReturns) -> NestedInts {
     return p.newNestedInts()
   }
 
@@ -190,7 +190,7 @@ class Foo {
   // x86_64-macosx:      [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[OBJC:%objc_class]]*
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[OBJC]]* [[T1]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  dynamic func copyClass(a: AnyClass) -> AnyClass {
+  dynamic func copyClass(_ a: AnyClass) -> AnyClass {
     return a
   }
 
@@ -198,7 +198,7 @@ class Foo {
   // x86_64-macosx:      [[VALUE:%[0-9]+]] = call [[TYPE:%.*]] @_TFC8abitypes3Foo9copyProt
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE]] [[VALUE]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  dynamic func copyProto(a: AnyObject) -> AnyObject {
+  dynamic func copyProto(_ a: AnyObject) -> AnyObject {
     return a
   }
 
@@ -206,7 +206,7 @@ class Foo {
   // x86_64-macosx:      [[VALUE:%[0-9]+]] = call [[TYPE:%.*]] @_TFC8abitypes3Foo13copyProtoComp
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE]] [[VALUE]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  dynamic func copyProtoComp(a: protocol<P1, P2>) -> protocol<P1, P2> {
+  dynamic func copyProtoComp(_ a: protocol<P1, P2>) -> protocol<P1, P2> {
     return a
   }
 
@@ -262,7 +262,7 @@ class Foo {
   // i386-watchos:  [[R3:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBoolFSbVS_8ObjCBool(i1 [[R2]])
   // i386-watchos:  ret i1 [[R3]]
 
-  dynamic func negate(b: Bool) -> Bool {
+  dynamic func negate(_ b: Bool) -> Bool {
     return !b
   }
 
@@ -365,13 +365,13 @@ class Foo {
   // armv7k-watchos: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // armv7k-watchos: ret i1 [[TOOBJCBOOL]]
   //
-  dynamic func negate2(b: Bool) -> Bool {
+  dynamic func negate2(_ b: Bool) -> Bool {
     var g = Gadget()
     return g.negate(b)
   }
 
   // x86_64-macosx: define hidden i32* @_TToFC8abitypes3Foo24copyUnsafeMutablePointer{{.*}}(i8*, i8*, i32*) unnamed_addr {{.*}} {
-  dynamic func copyUnsafeMutablePointer(p: UnsafeMutablePointer<Int32>) -> UnsafeMutablePointer<Int32> {
+  dynamic func copyUnsafeMutablePointer(_ p: UnsafeMutablePointer<Int32>) -> UnsafeMutablePointer<Int32> {
     return p
   }
 
@@ -381,7 +381,7 @@ class Foo {
   }
 
   // x86_64-macosx: define hidden zeroext i16 @_TToFC8abitypes3Foo20returnOtherEnumValue{{.*}}(i8*, i8*, i16 zeroext) unnamed_addr {{.*}} {
-  dynamic func returnOtherEnumValue(choice: ChooseTo) -> ChooseTo {
+  dynamic func returnOtherEnumValue(_ choice: ChooseTo) -> ChooseTo {
     switch choice {
       case .takeIt: return .leaveIt
       case .leaveIt: return .takeIt
@@ -400,20 +400,20 @@ class Foo {
   }
 
   // x86_64-macosx: define hidden void @_TToFC8abitypes3Foo13testArchetypef{{.*}}(i8*, i8*, i8*) unnamed_addr {{.*}} {
-  dynamic func testArchetype(work: Work) {
+  dynamic func testArchetype(_ work: Work) {
     work.doStuff(1)
     // x86_64-macosx: [[OBJCPTR:%.*]] = bitcast i8* %2 to %objc_object*
     // x86_64-macosx: call void @_TFC8abitypes3Foo13testArchetype{{.*}}(%objc_object* [[OBJCPTR]], %C8abitypes3Foo* %{{.*}})
   }
 
-  dynamic func foo(x: @convention(block) (Int) -> Int) -> Int {
+  dynamic func foo(_ x: @convention(block) (Int) -> Int) -> Int {
     // FIXME: calling blocks is currently unimplemented
     // return x(5)
     return 1
   }
 
   // x86_64-macosx: define hidden void @_TFC8abitypes3Foo20testGenericTypeParam{{.*}}(%objc_object*, %swift.type* %T, %C8abitypes3Foo*) {{.*}} {
-  func testGenericTypeParam<T: Pasta>(x: T) {
+  func testGenericTypeParam<T: Pasta>(_ x: T) {
     // x86_64-macosx: [[CAST:%.*]] = bitcast %objc_object* %0 to i8*
     // x86_64-macosx: call void bitcast (void ()* @objc_msgSend to void (i8*, i8*)*)(i8* [[CAST]], i8* %{{.*}})
     x.alDente()
@@ -424,7 +424,7 @@ class Foo {
   //
   // arm64-tvos: define hidden void @_TFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias nocapture sret, %CSo13StructReturns*, %VSC9BigStruct* noalias nocapture dereferenceable({{.*}}), %C8abitypes3Foo*) {{.*}} {
   // arm64-tvos: define hidden void @_TToFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %VSC9BigStruct*) unnamed_addr {{.*}} {
-  dynamic func callJustReturn(r: StructReturns, with v: BigStruct) -> BigStruct {
+  dynamic func callJustReturn(_ r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }
 
@@ -452,6 +452,6 @@ class Foo {
 // x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]], align 4
 // x86_64-macosx: [[RESULT:%.*]] = call float @MyRect_Area(<2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
 // x86_64-macosx: ret float [[RESULT]]
-public func testInlineAgg(rect: MyRect) -> Float {
+public func testInlineAgg(_ rect: MyRect) -> Float {
   return MyRect_Area(rect)
 }

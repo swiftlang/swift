@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-func foo(x: inout Int64) {
+func foo(_ x: inout Int64) {
   // Make sure the shadow copy is being made in the prologue or (at
   // line 0), but the code to load the value from the inout storage is
   // not.

@@ -42,7 +42,7 @@ protocol _ArrayProtocol
   ///   mutable contiguous storage.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func reserveCapacity(minimumCapacity: Int)
+  mutating func reserveCapacity(_ minimumCapacity: Int)
 
   /// Operator form of `append(contentsOf:)`.
   func += <
@@ -56,7 +56,7 @@ protocol _ArrayProtocol
   /// - Complexity: O(`self.count`).
   ///
   /// - Precondition: `i <= count`.
-  mutating func insert(newElement: Iterator.Element, at i: Int)
+  mutating func insert(_ newElement: Iterator.Element, at i: Int)
 
   /// Remove and return the element at the given index.
   ///

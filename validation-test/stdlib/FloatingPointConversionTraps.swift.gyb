@@ -31,7 +31,7 @@ extension Float80 {
 }
 #endif
 
-func getInfiniteOrNaNMessage(floatType: String) -> String {
+func getInfiniteOrNaNMessage(_ floatType: String) -> String {
   // FIXME: <rdar://problem/17958458> Int(Float80.quietNaN) is garbage
   if floatType == "Float80" {
     return ""

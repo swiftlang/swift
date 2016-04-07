@@ -294,7 +294,7 @@ JoinTestSuite.test("${Base}.join()/_copyToNativeArrayBuffer()") {
 
 % end
 
-func join(separator: String, _ elements: [String]) -> String {
+func join(_ separator: String, _ elements: [String]) -> String {
   return elements.joined(separator: separator)
 }
 

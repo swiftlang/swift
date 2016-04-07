@@ -180,7 +180,7 @@ struct MissingGetterSubscript2 {
   }
 }
 
-func test_subscript(x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubscript,
+func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubscript,
                     ovl: inout OverloadedSubscript, ret: inout RetOverloadedSubscript) {
   no[i] = value // expected-error{{type 'NoSubscript' has no subscript members}}
 
@@ -201,11 +201,11 @@ func test_subscript(x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubscr
   ret[i] = value
 }
 
-func subscript_rvalue_materialize(i: inout Int) {
+func subscript_rvalue_materialize(_ i: inout Int) {
   i = X1(stored: 0)[i]
 }
 
-func subscript_coerce(fn: ([UnicodeScalar], [UnicodeScalar]) -> Bool) {}
+func subscript_coerce(_ fn: ([UnicodeScalar], [UnicodeScalar]) -> Bool) {}
 func test_subscript_coerce() {
   subscript_coerce({ $0[$0.count-1] < $1[$1.count-1] })
 }
@@ -231,7 +231,7 @@ struct SubscriptTest1 {
   subscript(keyword:String) -> String? {return nil }  // expected-note 2 {{found this candidate}}
 }
 
-func testSubscript1(s1 : SubscriptTest1) {
+func testSubscript1(_ s1 : SubscriptTest1) {
   let _ : Int = s1["hello"]  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
   
   if s1["hello"] {}
@@ -245,7 +245,7 @@ struct SubscriptTest2 {
   subscript(a : String, b : String) -> Int { return 0 }
 }
 
-func testSubscript1(s2 : SubscriptTest2) {
+func testSubscript1(_ s2 : SubscriptTest2) {
   _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type 'String'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
   

@@ -3,6 +3,26 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 -------
 
+* [SE-0046] (https://github.com/apple/swift-evolution/blob/master/proposals/0046-first-label.md) Function parameters now have consistent labelling across all function parameters. With this update the first parameter declarations will now match the existing behavior of the second and later parameters. This change makes the language simpler. 
+
+    Functions that were written and called as follows 
+    ```swift
+      func foo(x: Int, y: Int) {
+      }
+      foo(1, y: 2)
+      
+      func bar(a a: Int, b: Int) {
+      } 
+      bar(a: 3, b: 4)
+    ```
+    will now be written as (to achieve the same behavior):
+    ```swift
+        func foo(_ x: Int, y: Int) {}
+        foo(1, y: 2)
+        func bar(a: Int, b: Int) {} 
+        bar(a: 3, b: 4)
+    ```
+
 * [SE-0037](https://github.com/apple/swift-evolution/blob/master/proposals/0037-clarify-comments-and-operators.md)
   Comments are now treated as whitespace when determining whether an operator is
   prefix, postfix, or binary. For example, these now work:

@@ -23,7 +23,7 @@ extension Sub {
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_extensions20testOverridePropertyFCS_3SubT_
-func testOverrideProperty(obj: Sub) {
+func testOverrideProperty(_ obj: Sub) {
   // CHECK: = function_ref @_TFC15objc_extensions3Subs4propGSQSS_
   obj.prop = "abc"
 } // CHECK: }
@@ -34,7 +34,7 @@ testOverrideProperty(Sub())
 // CHECK:         function_ref @_TTDFC15objc_extensions3Sub3foofT_T_
 // CHECK:       sil shared [transparent] [thunk] @_TTDFC15objc_extensions3Sub3foofT_T_
 // CHECK:         class_method [volatile] %0 : $Sub, #Sub.foo!1.foreign
-func testCurry(x: Sub) {
+func testCurry(_ x: Sub) {
   _ = x.foo
 }
 

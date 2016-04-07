@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil -enable-testing %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
 @_silgen_name("action")
-func action(n:Int) -> ()
+func action(_ n:Int) -> ()
 
 // public class
 public class Base1 {
@@ -45,7 +45,7 @@ private class Derived2 : Base2 {
 // CHECK: function_ref @{{.*}}TFC19devirt_default_caseP33_77424841540E67CC820F5E5F7940DCB08Derived26middle
 // CHECK-NOT: class_method
 // CHECK: return
-public func callOuter(x: Int) -> Int {
+public func callOuter(_ x: Int) -> Int {
 
   var o:Base2
   
@@ -105,7 +105,7 @@ class E3 :C3 {}
 // A, C,D,E all use the same implementation. 
 // B has its own implementation.
 @inline(never)
-func foo(a: A3) -> Int {
+func foo(_ a: A3) -> Int {
 // Check that call to A3.f() can be devirtualized.
 //
 // CHECK-NORMAL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
@@ -163,7 +163,7 @@ class D6 : C6 {
 }
 
 @inline(never)
-func check_static_class_devirt(c: C6) -> Int { 
+func check_static_class_devirt(_ c: C6) -> Int { 
 // Check that C.bar() and D.bar() are devirtualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TTSf4g___TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
@@ -187,7 +187,7 @@ public func test_check_call_on_downcasted_instance() -> Bool {
 }
 
 @inline(never)
-func callIt(b3: Base3, _ b4: Base4, _ b5: Base5) {
+func callIt(_ b3: Base3, _ b4: Base4, _ b5: Base5) {
   b3.outer()
   b4.test()
   b5.test()
@@ -253,18 +253,18 @@ internal class M33: M3 {
 // the static type of the instance.
 
 @inline(never)
-public func testSpeculativeDevirtualizationWithTooManyAlternatives(c:M1) -> Int32{
+public func testSpeculativeDevirtualizationWithTooManyAlternatives(_ c:M1) -> Int32{
   return c.foo()
 }
 
 
 @inline(never)
-func foo(a: A2) -> Int {
+func foo(_ a: A2) -> Int {
   return a.f()
 }
 
 @inline(never)
-func check_call_on_downcasted_instance(a: A7) -> Bool {
+func check_call_on_downcasted_instance(_ a: A7) -> Bool {
   if a is B7 {
     return (a as! B7).foo()
   }

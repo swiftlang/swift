@@ -82,12 +82,12 @@ class B3<T> : B2<T> {
   }
 }
 
-func WhatShouldIDo<T>(b : B<T>) -> B<T> {
+func WhatShouldIDo<T>(_ b : B<T>) -> B<T> {
   b.doSomething().doSomethingElse()
   return b
 }
 
-func doSomethingWithB<T>(b : B<T>) {
+func doSomethingWithB<T>(_ b : B<T>) {
   
 }
 
@@ -185,7 +185,7 @@ final class C2:C {
 // CHECK-NOT: class_method
 // CHECK-NOT: function_ref
 // CHECK: return
-func driver1(c: C1) -> Int32 {
+func driver1(_ c: C1) -> Int32 {
   return c.doSomething().getValue()
 }
 
@@ -199,7 +199,7 @@ func driver1(c: C1) -> Int32 {
 // CHECK: enum $Optional
 // CHECK-NEXT: upcast
 // CHECK: return
-func driver3(c: C) -> Int32 {
+func driver3(_ c: C) -> Int32 {
   return c.doSomething()!.getValue()
 }
 
@@ -242,7 +242,7 @@ public class D2: D1 {
 // CHECK: bb3
 // CHECK: class_method
 // CHECK: }
-func driver2(d: D2) -> Int32 {
+func driver2(_ d: D2) -> Int32 {
   return d.boo()
 }
 
@@ -254,14 +254,14 @@ class BB : AA {
 
 class CCC {
   @inline(never)
-  func foo(b: BB) -> (AA, AA) {
+  func foo(_ b: BB) -> (AA, AA) {
     return (b, b)
   }
 }
 
 class DDD : CCC {
   @inline(never)
-  override func foo(b: BB) -> (BB, BB) {
+  override func foo(_ b: BB) -> (BB, BB) {
     return (b, b)
   }
 }
@@ -269,7 +269,7 @@ class DDD : CCC {
 
 class EEE : CCC {
   @inline(never)
-  override func foo(b: BB) -> (AA, AA) {
+  override func foo(_ b: BB) -> (AA, AA) {
     return (b, b)
   }
 }
@@ -282,7 +282,7 @@ class EEE : CCC {
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $EEE
 // CHECK: class_method
 // CHECK: }
-func testDevirtOfMethodReturningTupleTypes(c: CCC, b: BB) -> (AA, AA) {
+func testDevirtOfMethodReturningTupleTypes(_ c: CCC, b: BB) -> (AA, AA) {
   return c.foo(b)
 }
 
@@ -321,7 +321,7 @@ class DDDD : CCCC {
 // CHECK: switch_enum
 // CHECK: checked_cast_br [exact] %{{.*}} : $F to $H
 // CHECK: switch_enum
-public func testOverridingMethodWithOptionalResult(f: F) -> (F?, Int)? {
+public func testOverridingMethodWithOptionalResult(_ f: F) -> (F?, Int)? {
   return f.foo()
 }
 

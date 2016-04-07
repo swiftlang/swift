@@ -112,7 +112,7 @@ import Swift
 class A<T> {
   var x = 0
 
-  func run(t: T) {}
+  func run(_ t: T) {}
   init(y : Int) {}
 }
 
@@ -126,7 +126,7 @@ class B<T> {
 class C<T> : A<Int> {}
 
 class D<T> : A<Int> {
-  override func run(t: Int) {}
+  override func run(_ t: Int) {}
 }
 
 struct E<T> {

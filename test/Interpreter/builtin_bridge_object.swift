@@ -39,11 +39,11 @@ let OBJC_TAGGED_POINTER_BITS: UInt = 0
 
 #endif
 
-func bitPattern(x: Builtin.BridgeObject) -> UInt {
+func bitPattern(_ x: Builtin.BridgeObject) -> UInt {
   return UInt(Builtin.castBitPatternFromBridgeObject(x))
 }
 
-func nonPointerBits(x: Builtin.BridgeObject) -> UInt {
+func nonPointerBits(_ x: Builtin.BridgeObject) -> UInt {
   return bitPattern(x) & NATIVE_SPARE_BITS
 }
 
@@ -105,7 +105,7 @@ if true {
 
 import Foundation
 
-func nonNativeBridgeObject(o: AnyObject) -> Builtin.BridgeObject {
+func nonNativeBridgeObject(_ o: AnyObject) -> Builtin.BridgeObject {
   let tagged = ((Builtin.reinterpretCast(o) as UInt) & OBJC_TAGGED_POINTER_BITS) != 0
   return Builtin.castToBridgeObject(
     o, tagged ? 0._builtinWordValue : NATIVE_SPARE_BITS._builtinWordValue)
@@ -153,7 +153,7 @@ if true {
 }
 
 
-func hitOptionalGenerically<T>(x: T?) {
+func hitOptionalGenerically<T>(_ x: T?) {
   switch x {
   case .some:
     print("some")
@@ -162,7 +162,7 @@ func hitOptionalGenerically<T>(x: T?) {
   }
 }
 
-func hitOptionalSpecifically(x: Builtin.BridgeObject?) {
+func hitOptionalSpecifically(_ x: Builtin.BridgeObject?) {
   switch x {
   case .some:
     print("some")

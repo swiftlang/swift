@@ -17,7 +17,7 @@ func gen<R>() -> R {
 
 extension C {
   @inline(__always)
-  class func factory(z: Int) -> Self {
+  class func factory(_ z: Int) -> Self {
     return gen()
   }
 }

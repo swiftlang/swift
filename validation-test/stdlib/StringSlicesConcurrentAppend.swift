@@ -39,7 +39,7 @@ func barrier() {
   expectTrue(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD)
 }
 
-func sliceConcurrentAppendThread(tid: ThreadID) {
+func sliceConcurrentAppendThread(_ tid: ThreadID) {
   for i in 0..<100 {
     barrier()
     if tid == .Primary {

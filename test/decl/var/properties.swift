@@ -1,14 +1,14 @@
 // RUN: %target-parse-verify-swift
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 struct X { }
 var _x: X
 
 class SomeClass {}
 
-func takeTrailingClosure(fn: () -> ()) -> Int {}
-func takeIntTrailingClosure(fn: () -> Int) -> Int {}
+func takeTrailingClosure(_ fn: () -> ()) -> Int {}
+func takeIntTrailingClosure(_ fn: () -> Int) -> Int {}
 
 //===---
 // Stored properties
@@ -65,10 +65,10 @@ var a5: X {
 }
 
 // Reading/writing properties
-func accept_x(x: X) { }
-func accept_x_inout(x: inout X) { }
+func accept_x(_ x: X) { }
+func accept_x_inout(_ x: inout X) { }
 
-func test_global_properties(x: X) {
+func test_global_properties(_ x: X) {
   accept_x(a1)
   accept_x(a2)
   accept_x(a3)
@@ -138,7 +138,7 @@ var disambiguateGetSet1d: Int = 0 {
 
 // Disambiguated as stored property with a trailing closure in the initializer.
 func disambiguateGetSet2() {
-  func get(fn: () -> ()) {}
+  func get(_ fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
     get {}
   }
@@ -146,7 +146,7 @@ func disambiguateGetSet2() {
   a = a + 42
 }
 func disambiguateGetSet2Attr() {
-  func get(fn: () -> ()) {}
+  func get(_ fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
     @noreturn
     func foo() {}
@@ -158,7 +158,7 @@ func disambiguateGetSet2Attr() {
 
 // Disambiguated as stored property with a trailing closure in the initializer.
 func disambiguateGetSet3() {
-  func set(fn: () -> ()) {}
+  func set(_ fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
     set {}
   }
@@ -166,7 +166,7 @@ func disambiguateGetSet3() {
   a = a + 42
 }
 func disambiguateGetSet3Attr() {
-  func set(fn: () -> ()) {}
+  func set(_ fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
     @noreturn
     func foo() {}
@@ -178,7 +178,7 @@ func disambiguateGetSet3Attr() {
 
 // Disambiguated as stored property with a trailing closure in the initializer.
 func disambiguateGetSet4() {
-  func set(x: Int, fn: () -> ()) {}
+  func set(_ x: Int, fn: () -> ()) {}
   let newValue: Int = 0
   var a: Int = takeTrailingClosure {
     set(newValue) {}
@@ -187,7 +187,7 @@ func disambiguateGetSet4() {
   a = a + 42
 }
 func disambiguateGetSet4Attr() {
-  func set(x: Int, fn: () -> ()) {}
+  func set(_ x: Int, fn: () -> ()) {}
   var newValue: Int = 0
   var a: Int = takeTrailingClosure {
     @noreturn
@@ -479,7 +479,7 @@ func getS() -> S {
   return s
 }
 
-func test_extension_properties(s: inout S, x: inout X) {
+func test_extension_properties(_ s: inout S, x: inout X) {
   accept_x(s.x)
   accept_x(s.x2)
   accept_x(s.x3)
@@ -536,10 +536,10 @@ struct Beth {
   var c: Int
 }
 
-func accept_int_inout(c: inout Int) { }
-func accept_int(c: Int) { }
+func accept_int_inout(_ c: inout Int) { }
+func accept_int(_ c: Int) { }
 
-func test_settable_of_nonsettable(a: Aleph) {
+func test_settable_of_nonsettable(_ a: Aleph) {
   a.b.c = 1 // expected-error{{cannot assign}}
   let x:Int = a.b.c
   _ = x
@@ -600,7 +600,7 @@ func staticPropRefs() -> (Int, Int, String, UnicodeScalar, UInt8) {
           MonoStruct.zim)
 }
 
-func staticPropRefThroughInstance(foo: MonoStruct) -> Int {
+func staticPropRefThroughInstance(_ foo: MonoStruct) -> Int {
   return foo.foo //expected-error{{static member 'foo' cannot be used on instance of type 'MonoStruct'}}
 }
 
@@ -884,7 +884,7 @@ class Box {
   }
 }
 
-func double(val: inout Int) {
+func double(_ val: inout Int) {
   val *= 2
 }
 
@@ -919,7 +919,7 @@ class ObservingPropertiesNotMutableInWillSet {
   }
 }
 
-func doLater(fn : () -> ()) {}
+func doLater(_ fn : () -> ()) {}
 
 // rdar://<rdar://problem/16264989> property not mutable in closure inside of its willSet
 class MutableInWillSetInClosureClass {

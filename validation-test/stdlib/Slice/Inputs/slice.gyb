@@ -9,7 +9,7 @@ do {
   let prefix: [Int] = ${prefix}
   let suffix: [Int] = ${suffix}
 
-  func makeCollection(elements: [OpaqueValue<Int>])
+  func makeCollection(_ elements: [OpaqueValue<Int>])
     -> ${Wrapper}<${Base}<OpaqueValue<Int>>> {
     var baseElements = prefix.map(OpaqueValue.init)
     baseElements.append(contentsOf: elements)
@@ -23,7 +23,7 @@ do {
       bounds: startIndex..<endIndex)
   }
 
-  func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
+  func makeCollectionOfEquatable(_ elements: [MinimalEquatableValue])
     -> ${Wrapper}<${Base}<MinimalEquatableValue>> {
     var baseElements = prefix.map(MinimalEquatableValue.init)
     baseElements.append(contentsOf: elements)
@@ -37,7 +37,7 @@ do {
       bounds: startIndex..<endIndex)
   }
 
-  func makeCollectionOfComparable(elements: [MinimalComparableValue])
+  func makeCollectionOfComparable(_ elements: [MinimalComparableValue])
     -> ${Wrapper}<${Base}<MinimalComparableValue>> {
     var baseElements = prefix.map(MinimalComparableValue.init)
     baseElements.append(contentsOf: elements)

@@ -68,11 +68,11 @@ public struct Zone: NilLiteralConvertible {
   }
 }
 
-internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+internal func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
 
-internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+internal func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
   return Bool(x)
 }
 

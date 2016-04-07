@@ -48,7 +48,7 @@ StructAddPropertyTest.test("ChangeEmptyToNonEmpty") {
   }
 
   do {
-    func increment(t: inout Int) {
+    func increment(_ t: inout Int) {
       t += 1
     }
 

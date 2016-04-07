@@ -55,7 +55,7 @@ Once a module has been imported, its declarations are available for use within
 the current source file. These declarations can be referred to by name, or
 by `qualifying <qualified name>` them with the name of the module::
 
-  func playChess(blackPlayer : Chess.Player, whitePlayer : Chess.Player) {
+  func playChess(_ blackPlayer : Chess.Player, whitePlayer : Chess.Player) {
     var board = Board() // refers to Chess.Board
   }
 

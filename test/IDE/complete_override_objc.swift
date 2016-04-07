@@ -12,7 +12,7 @@ class Sub : FooClassBase {
 
 // CHECK1: Begin completions, 8 items
 // CHECK1: Decl[InstanceMethod]/Super:         override func fooBaseInstanceFunc0() {|}
-// CHECK1: Decl[InstanceMethod]/Super:         override func fooBaseInstanceFunc1(anObject: AnyObject!) -> FooClassBase! {|}
+// CHECK1: Decl[InstanceMethod]/Super:         override func fooBaseInstanceFunc1(_ anObject: AnyObject!) -> FooClassBase! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func fooBaseInstanceFuncOverridden() {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth3() -> AnyObject! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth2() -> AnyObject! {|}

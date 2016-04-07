@@ -50,7 +50,7 @@ public let partitionExhaustiveTests = [
   PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60, 70 ]),
 ]
 
-public func withInvalidOrderings(body: ((Int,Int) -> Bool) -> Void) {
+public func withInvalidOrderings(_ body: ((Int,Int) -> Bool) -> Void) {
   // Test some ordering predicates that don't create strict weak orderings
   body { (_,_) in true }
   body { (_,_) in false }
@@ -61,7 +61,7 @@ public func withInvalidOrderings(body: ((Int,Int) -> Bool) -> Void) {
 }
 
 internal func _mapInPlace<C : MutableCollection>(
-  elements: inout C,
+  _ elements: inout C,
   @noescape transform: (C.Iterator.Element) -> C.Iterator.Element
 ) {
   for i in elements.indices {
@@ -81,7 +81,7 @@ extension TestSuite {
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Iterator.Element : Comparable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -121,12 +121,12 @@ extension TestSuite {
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
     func makeWrappedCollectionWithComparableElement(
-      elements: [MinimalComparableValue]
+      _ elements: [MinimalComparableValue]
     ) -> CollectionWithComparableElement {
       return makeCollectionOfComparable(elements.map(wrapValueIntoComparable))
     }
@@ -315,7 +315,7 @@ self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPoi
 }
 
 func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
-  sequence sequence: [Int],
+  sequence: [Int],
   equalImpl: ((Int, Int) -> Bool),
   lessImpl: ((Int, Int) -> Bool),
   verifyOrder: Bool
@@ -420,7 +420,7 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
     CollectionWithComparableElement.Index : BidirectionalIndex,
     CollectionWithComparableElement.Iterator.Element : Comparable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -479,7 +479,7 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
@@ -540,7 +540,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     CollectionWithComparableElement.Index : RandomAccessIndex,
     CollectionWithComparableElement.Iterator.Element : Comparable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -599,12 +599,12 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
     func makeWrappedCollectionWithComparableElement(
-      elements: [MinimalComparableValue]
+      _ elements: [MinimalComparableValue]
     ) -> CollectionWithComparableElement {
       return makeCollectionOfComparable(elements.map(wrapValueIntoComparable))
     }
@@ -618,7 +618,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
 % for predicate in [ False, True ]:
 
 func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'}(
-  sequence sequence: [Int],
+  sequence: [Int],
   equalImpl: ((Int, Int) -> Bool),
   lessImpl: ((Int, Int) -> Bool),
   verifyOrder: Bool
@@ -708,7 +708,7 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
 % for predicate in [ False, True ]:
 
 func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
-  sequence sequence: [Int],
+  sequence: [Int],
   equalImpl: ((Int, Int) -> Bool),
   lessImpl: ((Int, Int) -> Bool),
   verifyOrder: Bool

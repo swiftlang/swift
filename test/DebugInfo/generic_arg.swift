@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 import StdlibUnittest
-func foo<T>(x: T) -> () {
+func foo<T>(_ x: T) -> () {
   // CHECK: define {{.*}} @_TF11generic_arg3foourFxT_
   // CHECK: %[[T:.*]] = alloca %swift.type*
   // CHECK: %[[X:.*]] = alloca %swift.opaque*

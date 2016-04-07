@@ -172,7 +172,7 @@ extension SCNGeometryElement {
 @warn_unused_result
 @_silgen_name("SCN_Swift_SCNSceneSource_entryWithIdentifier")
 internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
-  self_: AnyObject,
+  _ self_: AnyObject,
   _ uid: NSString,
   _ entryClass: AnyObject) -> AnyObject?
 
@@ -180,7 +180,7 @@ internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
 @available(OSX, introduced: 10.8)
 extension SCNSceneSource {
   @warn_unused_result
-  public func entryWithIdentifier<T>(uid: String, withClass entryClass: T.Type) -> T? {
+  public func entryWithIdentifier<T>(_ uid: String, withClass entryClass: T.Type) -> T? {
     return SCN_Swift_SCNSceneSource_entryWithIdentifier(
       self, uid, entryClass as! AnyObject) as! T?
   }

@@ -38,8 +38,8 @@ var world : String = "world";
 var i : Int
 var z : Z = .none
 
-func acceptZ(z: Z) {}
-func acceptString(s: String) {}
+func acceptZ(_ z: Z) {}
+func acceptString(_ s: String) {}
 
 Point(1, 2)
 var db : Base = d
@@ -122,8 +122,8 @@ struct S2 {
   init(i: Int) { }
 }
 
-func getMetatype(i: Int) -> S1.Type { return S1.self }
-func getMetatype(d: Double) -> S2.Type { return S2.self }
+func getMetatype(_ i: Int) -> S1.Type { return S1.self }
+func getMetatype(_ d: Double) -> S2.Type { return S2.self }
 
 var s1 = getMetatype(1).init(i: 5)
 s1 = S1(i: 5)

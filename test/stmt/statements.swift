@@ -3,9 +3,9 @@
 /* block comments */
 /* /* nested too */ */
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-func f1(a: Int, _ y: Int) {}
+func f1(_ a: Int, _ y: Int) {}
 func f2() {}
 func f3() -> Int {}
 
@@ -13,17 +13,17 @@ func invalid_semi() {
   ; // expected-error {{';' statements are not allowed}} {{3-5=}}
 }
 
-func nested1(x: Int) {
+func nested1(_ x: Int) {
   var y : Int
   
-  func nested2(z: Int) -> Int {
+  func nested2(_ z: Int) -> Int {
     return x+y+z
   }
   
   nested2(1)
 }
 
-func funcdecl5(a: Int, y: Int) {
+func funcdecl5(_ a: Int, y: Int) {
   var x : Int
 
   // a few statements
@@ -274,14 +274,14 @@ func RepeatWhileStmt4() {
   } while + // expected-error {{unary operator cannot be separated from its operand}} {{12-1=}} expected-error {{expected expression in 'repeat-while' condition}}
 }
 
-func brokenSwitch(x: Int) -> Int {
+func brokenSwitch(_ x: Int) -> Int {
   switch x {
   case .Blah(var rep): // expected-error{{enum case 'Blah' not found in type 'Int'}}
     return rep
   }
 }
 
-func switchWithVarsNotMatchingTypes(x: Int, y: Int, z: String) -> Int {
+func switchWithVarsNotMatchingTypes(_ x: Int, y: Int, z: String) -> Int {
   switch (x,y,z) {
   case (let a, 0, _), (0, let a, _): // OK
     return a
@@ -290,7 +290,7 @@ func switchWithVarsNotMatchingTypes(x: Int, y: Int, z: String) -> Int {
   }
 }
 
-func breakContinue(x : Int) -> Int {
+func breakContinue(_ x : Int) -> Int {
 
 Outer:
   for _ in 0...1000 {
@@ -340,7 +340,7 @@ enum MyEnumWithCaseLabels {
   case Case(one: String, two: Int)
 }
 
-func testMyEnumWithCaseLabels(a : MyEnumWithCaseLabels) {
+func testMyEnumWithCaseLabels(_ a : MyEnumWithCaseLabels) {
   // <rdar://problem/20135489> Enum case labels are ignored in "case let" statements
   switch a {
   case let .Case(one: _, two: x): break // ok
@@ -354,7 +354,7 @@ func testMyEnumWithCaseLabels(a : MyEnumWithCaseLabels) {
 
 // "defer"
 
-func test_defer(a : Int) {
+func test_defer(_ a : Int) {
   
   defer { VoidReturn1() }
   defer { breakContinue(1)+42 }
@@ -376,7 +376,7 @@ class SomeTestClass {
 }
 
 
-func test_require(x : Int, y : Int??, cond : Bool) {
+func test_require(_ x : Int, y : Int??, cond : Bool) {
   
   // These are all ok.
   guard let a = y else {}
@@ -419,7 +419,7 @@ func matching_pattern_recursion() {
 }
 
 // <rdar://problem/18776073> Swift's break operator in switch should be indicated in errors
-func r18776073(a : Int?) {
+func r18776073(_ a : Int?) {
   switch a {
     case nil:   // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{14-14= break}}
     case _?: break
@@ -450,7 +450,7 @@ func for_loop_multi_iter() {
 // rdar://problem/23684220
 // Even if the condition fails to typecheck, save it in the AST anyway; the old
 // condition may have contained a SequenceExpr.
-func r23684220(b: Any) {
+func r23684220(_ b: Any) {
   if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any' (aka 'protocol<>')}}
 }
 
@@ -470,7 +470,7 @@ func f21080671() {
 
 // <rdar://problem/24467411> QoI: Using "&& #available" should fixit to comma
 // https://twitter.com/radexp/status/694561060230184960
-func f(x : Int, y : Int) {
+func f(_ x : Int, y : Int) {
   if x == y && #available(iOS 52, *) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
   if #available(iOS 52, *) && x == y {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{28-30=,}}
 
@@ -485,7 +485,7 @@ enum Type {
   case Foo
   case Bar
 }
-func r25178926(a : Type) {
+func r25178926(_ a : Type) {
   switch a {
   case .Foo, .Bar where 1 != 100:
     // expected-warning @-1 {{'where' only applies to the second pattern match in this case}}

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil | FileCheck %s
 
-func closure(a: Int, b: Int) -> Bool {
+func closure(_ a: Int, b: Int) -> Bool {
   return a < b
 }
 
@@ -13,7 +13,7 @@ func closure(a: Int, b: Int) -> Bool {
 // CHECK-NOT: apply
 // CHECK: return
 @inline(never)
-func call_closure(a: Int, _ b: Int, _ f: (Int , Int) -> Bool) -> Bool {
+func call_closure(_ a: Int, _ b: Int, _ f: (Int , Int) -> Bool) -> Bool {
   return f(a, b)
 }
 

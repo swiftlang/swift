@@ -48,20 +48,20 @@ extension Sequence
 
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Base.Iterator.Element) throws -> T
+    @noescape _ transform: (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
 
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Base.Iterator.Element) throws -> Bool
+    @noescape _ includeElement: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
     return try _base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Iterator.Element
+    _ element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
@@ -69,7 +69,7 @@ extension Sequence
   /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
-  public func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R? {
+  public func _preprocessingPass<R>(@noescape _ preprocess: () -> R) -> R? {
     return _base._preprocessingPass(preprocess)
   }
 

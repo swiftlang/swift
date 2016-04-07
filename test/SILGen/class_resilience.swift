@@ -8,7 +8,7 @@ import resilient_class
 // CHECK-LABEL: sil @_TF16class_resilience20finalPropertyOfOtherFC15resilient_class22ResilientOutsideParentT_
 // CHECK: function_ref @_TFC15resilient_class22ResilientOutsideParentg13finalPropertySS
 
-public func finalPropertyOfOther(other: ResilientOutsideParent) {
+public func finalPropertyOfOther(_ other: ResilientOutsideParent) {
   _ = other.finalProperty
 }
 
@@ -22,7 +22,7 @@ public class MyResilientClass {
 // CHECK-LABEL: sil @_TF16class_resilience19finalPropertyOfMineFCS_16MyResilientClassT_
 // CHECK: ref_element_addr %0 : $MyResilientClass, #MyResilientClass.finalProperty
 
-public func finalPropertyOfMine(other: MyResilientClass) {
+public func finalPropertyOfMine(_ other: MyResilientClass) {
   _ = other.finalProperty
 }
 

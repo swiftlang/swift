@@ -21,10 +21,10 @@ extension CIFilter {
 #if os(OSX)
   // - (CIImage *)apply:(CIKernel *)k, ...
   // @objc(apply:arguments:options:)
-  // func apply(k: CIKernel,
+  // func apply(_ k: CIKernel,
   //            arguments args: [AnyObject]?,
   //            options dict: Dictionary<NSObject, AnyObject>?) -> CIImage?
-  func apply(k: CIKernel, args: [AnyObject], options: (String, AnyObject)...) -> CIImage? {
+  func apply(_ k: CIKernel, args: [AnyObject], options: (String, AnyObject)...) -> CIImage? {
     var dict: [String : AnyObject] = [:]
     for (key, value) in options {
       dict[key] = value
