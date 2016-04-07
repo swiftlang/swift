@@ -419,26 +419,33 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
   let rt = RT()
 
   sharedState.raceData.removeAll(keepingCapacity: true)
-  sharedState.raceData.append(contentsOf:
-    (0..<raceDataCount).lazy.map { i in rt.makeRaceData() })
+
+  do {
+    let range = (0..<raceDataCount).lazy
+    sharedState.raceData.append(contentsOf: range.map { i in
+      rt.makeRaceData()
+    })
+  }
 
   let identityShuffle = Array(0..<sharedState.raceData.count)
   sharedState.workerStates.removeAll(keepingCapacity: true)
-  sharedState.workerStates.append(contentsOf:
-    (0..<racingThreadCount).lazy.map {
-      i in
-      let workerState = _RaceTestWorkerState<RT>()
+  
+  do {
+    let range = (0..<racingThreadCount).lazy
+    sharedState.workerStates.append(contentsOf: range.map { i in
+        let workerState = _RaceTestWorkerState<RT>()
 
-      // Shuffle the data so that threads process it in different order.
-      let shuffle = randomShuffle(identityShuffle)
-      workerState.raceData = scatter(sharedState.raceData, shuffle)
-      workerState.raceDataShuffle = shuffle
+        // Shuffle the data so that threads process it in different order.
+        let shuffle = randomShuffle(identityShuffle)
+        workerState.raceData = scatter(sharedState.raceData, shuffle)
+        workerState.raceDataShuffle = shuffle
 
-      workerState.observations = []
-      workerState.observations.reserveCapacity(sharedState.raceData.count)
+        workerState.observations = []
+        workerState.observations.reserveCapacity(sharedState.raceData.count)
 
-      return workerState
-    })
+        return workerState
+      })
+  }
 
   sharedState.trialSpinBarrier.store(0)
   sharedState.trialBarrier.wait()
