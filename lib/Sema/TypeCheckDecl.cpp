@@ -3836,8 +3836,10 @@ public:
           return;
         }
 
-        if (Super->hasClangNode() && Super->getGenericParams()) {
-          TC.diagnose(CD, diag::inheritance_from_objc_generic_class,
+        if (Super->hasClangNode() && Super->getGenericParams()
+            && superclassTy->hasTypeParameter()) {
+          TC.diagnose(CD,
+                      diag::inheritance_from_unspecialized_objc_generic_class,
                       Super->getName());
         }
 

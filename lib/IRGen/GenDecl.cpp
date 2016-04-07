@@ -2285,7 +2285,7 @@ llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass,
 /// on whether the class is published as an ObjC class.
 llvm::Constant *IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
                                                 ForDefinition_t forDefinition) {
-  assert(!decl->isGenericContext()
+  assert((!decl->isGenericContext() || decl->hasClangNode())
          && "generic classes do not have a static metaclass object");
   if (decl->checkObjCAncestry() != ObjCClassKind::NonObjC ||
       decl->hasClangNode()) {
