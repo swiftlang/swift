@@ -1,8 +1,12 @@
 ---
 Name: CoreGraphics
 SwiftInferImportAsMember: true
-# The below are inline functions that are irrelevant due to memberwise inits
+
+#
+# Global functions
+#
 Functions:
+# The below are inline functions that are irrelevant due to memberwise inits
 - Name: CGPointMake
   Availability: nonswift
 - Name: CGSizeMake
@@ -13,7 +17,7 @@ Functions:
   Availability: nonswift
 - Name: CGAffineTransformMake
   Availability: nonswift
-# The below are fixups that inference didn't quite do what we wanted, and are 
+# The below are fixups that inference didn't quite do what we wanted, and are
 # pulled over from what used to be in the overlays
 - Name: CGRectIsNull
   SwiftName: "getter:CGRect.isNull(self:)"
@@ -39,14 +43,20 @@ Functions:
   SwiftName: "CGRect.contains(self:_:)"
 - Name: CGRectIntersectsRect
   SwiftName: "CGRect.intersects(self:_:)"
-# The below are left alone, due to an unknown bug
-# FIXME: fix me
+# The below are not available in Swift
+- Name: CGColorSpaceCreateDeviceGray
+  Availability: nonswift
 - Name: CGColorSpaceCreateDeviceRGB
-  SwiftName: "CGColorSpaceCreateDeviceRGB()"
+  Availability: nonswift
+- Name: CGColorSpaceCreateDeviceCMYK
+  Availability: nonswift
 
+#
+# Global variables
+#
+Globals:
 # The below are globals that are defined as opaque C constants for no good
 # reason.
-Globals:
 - Name: CGPointZero
   Availability: nonswift
 - Name: CGSizeZero
@@ -57,9 +67,24 @@ Globals:
   Availability: nonswift
 - Name: CGAffineTransformIdentity
   Availability: nonswift
+# The below are not available in Swift
+- Name: kCGColorSpaceGenericGray
+  Availability: nonswift
+- Name: kCGColorSpaceGenericRGB
+  Availability: nonswift
 # The below are left alone, due to an unknown bug
 # FIXME: fix me
 - Name: kCGColorBlack
   SwiftName: "kCGColorBlack"
 - Name: kCGColorWhite
   SwiftName: "kCGColorWhite"
+- Name: kCGColorSpaceSRGB
+  SwiftName: "kCGColorSpaceSRGB"
+
+#
+# Tags
+#
+Tags:
+# The below are not available in Swift
+- Name: CGGlypDeprecatedEnum
+  Availability: nonswift

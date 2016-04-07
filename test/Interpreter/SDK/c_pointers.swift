@@ -22,7 +22,7 @@ typealias XXColor = UIColor
 // Typed C pointers
 //
 
-let rgb = CGColorSpaceCreateDeviceRGB()
+let rgb = CGColorSpace(withName: kCGColorSpaceSRGB)
 let cgRed = CGColor(space: rgb, components: [1.0, 0.0, 0.0, 1.0])!
 
 let nsRed = XXColor(cgColor: cgRed)
