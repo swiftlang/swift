@@ -38,7 +38,7 @@
 ///
 /// Since the stdlib is currently fully fragile, runtime-stdlib SPI currently
 /// needs to be exported from the core dylib. When the stdlib admits more
-//resilience we may be able to make this hidden.
+/// resilience we may be able to make this hidden.
 #define SWIFT_RUNTIME_STDLIB_INTERFACE SWIFT_RUNTIME_EXPORT
 
 #endif
