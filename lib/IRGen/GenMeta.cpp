@@ -301,7 +301,8 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
     return IGF.Builder.CreateCall(IGF.IGM.getLookUpClassFn(), className);
   }
 
-  auto classObject = IGF.IGM.getAddrOfObjCClass(theClass, NotForDefinition);
+  Address classRef = IGF.IGM.getAddrOfObjCClassRef(theClass);
+  auto classObject = IGF.Builder.CreateLoad(classRef);
   if (allowUninitialized) return classObject;
 
   // TODO: memoize this the same way that we memoize Swift type metadata?

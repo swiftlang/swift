@@ -1102,6 +1102,9 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
     }
     llvm_unreachable("bad metadata access kind");
 
+  case Kind::ObjCClassRef:
+    return SILLinkage::Private;
+
   case Kind::WitnessTableOffset:
   case Kind::Function:
   case Kind::Other:
@@ -1183,6 +1186,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::DirectProtocolWitnessTable:
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
+  case Kind::ObjCClassRef:
   case Kind::TypeMangling:
   case Kind::ValueWitness:
   case Kind::WitnessTableOffset:
@@ -2208,6 +2212,33 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   var->setAlignment(getPointerAlignment().getValue());
   addUsedGlobal(var);
   return var;
+}
+
+/// Fetch a global reference to a reference to the given Objective-C class.
+/// The result is of type ObjCClassPtrTy->getPointerTo().
+Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
+  assert(ObjCInterop && "getting address of ObjC class ref in no-interop mode");
+
+  Alignment alignment = getPointerAlignment();
+
+  LinkEntity entity = LinkEntity::forObjCClassRef(theClass);
+  DebugTypeInfo DbgTy(theClass, ObjCClassPtrTy->getPointerTo(),
+                      getPointerSize(), alignment);
+  auto addr = getAddrOfLLVMVariable(entity, alignment, NotForDefinition,
+                                    ObjCClassPtrTy, DbgTy);
+
+  // Define it lazily.
+  if (auto global = dyn_cast<llvm::GlobalVariable>(addr)) {
+    if (global->isDeclaration()) {
+      global->setSection("__DATA,__objc_classrefs,regular,no_dead_strip");
+      global->setLinkage(llvm::GlobalVariable::PrivateLinkage);
+      global->setExternallyInitialized(true);
+      global->setInitializer(getAddrOfObjCClass(theClass, NotForDefinition));
+      addCompilerUsedGlobal(global);
+    }
+  }
+
+  return Address(addr, alignment);
 }
 
 /// Fetch a global reference to the given Objective-C class.  The
