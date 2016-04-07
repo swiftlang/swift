@@ -708,9 +708,8 @@ endif()
 add_subdirectory(utils)
 add_subdirectory(stdlib)
 
-if(SWIFT_BUILD_TOOLS)
+if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
   add_subdirectory(tools/swift-reflection-test)
-  add_subdirectory(tools/swift-reflection-dump)
 endif()
 
 if(SWIFT_BUILD_PERF_TESTSUITE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
