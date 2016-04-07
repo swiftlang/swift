@@ -28,7 +28,7 @@ class TowersOfHanoi {
   // Record all moves made.
   var moves : [Move] = [Move]()
 
-  func solve(_ n: Int,  start: String,  auxiliary: String,  end: String) {
+  func solve(_ n: Int, start: String, auxiliary: String, end: String) {
     if (n == 1) {
       moves.append(Move(from:start, to:end))
     } else {

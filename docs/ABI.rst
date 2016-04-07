@@ -1177,7 +1177,7 @@ associated substitution index. Otherwise, the entity is mangled normally, and
 it is then added to the substitution map and associated with the next
 available substitution index.
 
-For example,  in mangling a function type
+For example, in mangling a function type
 ``(zim.zang.zung, zim.zang.zung, zim.zippity) -> zim.zang.zoo`` (with module
 ``zim`` and class ``zim.zang``),
 the recurring contexts ``zim``, ``zim.zang``, and ``zim.zang.zung``
