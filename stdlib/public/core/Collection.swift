@@ -389,6 +389,12 @@ extension Indexable {
     _precondition(
       range.lowerBound <= bounds.upperBound,
       "out of bounds: range ends after endIndex")
+    _precondition(
+      bounds.lowerBound <= range.upperBound,
+      "out of bounds: range ends before bounds.lowerBound")
+    _precondition(
+      range.upperBound <= bounds.upperBound,
+      "out of bounds: range begins after bounds.upperBound")
   }
 
   @warn_unused_result
