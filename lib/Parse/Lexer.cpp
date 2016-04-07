@@ -1627,14 +1627,14 @@ Restart:
     return formToken(tok::l_square, TokStart);
   }
   case '(': return formToken(tok::l_paren, TokStart);
-  case '}': return formToken(tok::r_brace,  TokStart);
+  case '}': return formToken(tok::r_brace, TokStart);
   case ']': return formToken(tok::r_square, TokStart);
   case ')':
-    return formToken(tok::r_paren,  TokStart);
+    return formToken(tok::r_paren, TokStart);
 
-  case ',': return formToken(tok::comma,    TokStart);
-  case ';': return formToken(tok::semi,     TokStart);
-  case ':': return formToken(tok::colon,    TokStart);
+  case ',': return formToken(tok::comma, TokStart);
+  case ';': return formToken(tok::semi, TokStart);
+  case ':': return formToken(tok::colon, TokStart);
 
   case '#':
     return lexHash();

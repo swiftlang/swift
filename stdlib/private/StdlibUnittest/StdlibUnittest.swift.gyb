@@ -1867,7 +1867,7 @@ public func checkComparable<T : Comparable>(
 ) {
   checkComparable(
     [lhs, rhs],
-    oracle: { [[ .eq,  expected], [ expected.flip(), .eq]][$0][$1] },
+    oracle: { [[ .eq, expected], [ expected.flip(), .eq]][$0][$1] },
     ${trace})
 }
 

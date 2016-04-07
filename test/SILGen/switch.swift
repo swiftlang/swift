@@ -861,21 +861,21 @@ func test_switch_two_unions(x x: Foo, y: Foo) {
 
   switch (x, y) {
   // CHECK: [[IS_CASE1]]:
-  case (_,     Foo.A):
+  case (_, Foo.A):
   // CHECK:   function_ref @_TF6switch1aFT_T_
     a()
 
   // CHECK: [[IS_NOT_CASE1]]:
   // CHECK:   switch_enum [[X]] : $Foo, case #Foo.B!enumelt: [[IS_CASE2:bb[0-9]+]], default [[IS_NOT_CASE2:bb[0-9]+]]
   // CHECK: [[IS_CASE2]]:
-  case (Foo.B, _    ):
+  case (Foo.B, _):
   // CHECK:   function_ref @_TF6switch1bFT_T_
     b()
 
   // CHECK: [[IS_NOT_CASE2]]:
   // CHECK:   switch_enum [[Y]] : $Foo, case #Foo.B!enumelt: [[IS_CASE3:bb[0-9]+]], default [[UNREACHABLE:bb[0-9]+]]
   // CHECK: [[IS_CASE3]]:
-  case (_,     Foo.B):
+  case (_, Foo.B):
   // CHECK:   function_ref @_TF6switch1cFT_T_
     c()
 
