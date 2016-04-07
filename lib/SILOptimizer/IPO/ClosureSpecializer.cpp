@@ -201,6 +201,8 @@ public:
 
   FullApplySite getApplyInst() const { return AI; }
 
+  IsFragile_t isFragile() const;
+
   std::string createName() const;
 
   OperandValueArrayRef getArguments() const {
@@ -386,10 +388,18 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   // AI from parent?
 }
 
+IsFragile_t CallSiteDescriptor::isFragile() const {
+  if (getClosure()->getFunction()->isFragile() &&
+      getApplyCallee()->isFragile())
+    return IsFragile;
+  return IsNotFragile;
+}
+
 std::string CallSiteDescriptor::createName() const {
   Mangle::Mangler M;
   auto P = SpecializationPass::ClosureSpecializer;
-  FunctionSignatureSpecializationMangler FSSM(P, M, getApplyCallee());
+  FunctionSignatureSpecializationMangler FSSM(P, M, isFragile(),
+                                              getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
     FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
@@ -559,7 +569,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()),
       ClonedName, ClonedTy,
       ClosureUser->getContextGenericParams(), ClosureUser->getLocation(),
-      IsBare, ClosureUser->isTransparent(), ClosureUser->isFragile(),
+      IsBare, ClosureUser->isTransparent(), CallSiteDesc.isFragile(),
       ClosureUser->isThunk(), ClosureUser->getClassVisibility(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
