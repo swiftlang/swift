@@ -317,7 +317,7 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure _ expression1: () throws 
   }
 }
 
-public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () throws -> ContiguousArray<T>, @autoclosure _ expression2: () throws -> ContiguousArray<T>, @autoclosure _ message: () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure _ expression1: () throws -> ContiguousArray<T>, @autoclosure _ expression2: () throws -> ContiguousArray<T>, @autoclosure _ message: () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
   let assertionType = _XCTAssertionType.equal
   
   // evaluate each expression exactly once
@@ -355,7 +355,7 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () throws ->
   }
 }
 
-public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () throws -> [T], @autoclosure _ expression2: () throws -> [T], @autoclosure _ message: () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure _ expression1: () throws -> [T], @autoclosure _ expression2: () throws -> [T], @autoclosure _ message: () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
   let assertionType = _XCTAssertionType.equal
   
   // evaluate each expression exactly once
@@ -393,7 +393,7 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () throws ->
   }
 }
 
-public func XCTAssertEqual<T, U : Equatable>(@autoclosure expression1: () throws -> [T: U], @autoclosure _ expression2: () throws -> [T: U], @autoclosure _ message: () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
+public func XCTAssertEqual<T, U : Equatable>(@autoclosure _ expression1: () throws -> [T: U], @autoclosure _ expression2: () throws -> [T: U], @autoclosure _ message: () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
   let assertionType = _XCTAssertionType.equal
   
   // evaluate each expression exactly once
