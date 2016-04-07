@@ -243,7 +243,7 @@ public func modf(_ value: ${T}) -> (${T}, ${T}) {
 @_transparent
 @warn_unused_result
 public func ldexp(_ x: ${T}, _ n: Int) -> ${T} {
-  return ${T}(ldexp${f}(${CT}(x), CInt(n)))
+  return ${T}(ldexp${f}(${CT}(x), Int32(n)))
 }
 
 % end
@@ -253,7 +253,7 @@ public func ldexp(_ x: ${T}, _ n: Int) -> ${T} {
 @_transparent
 @warn_unused_result
 public func frexp(_ value: ${T}) -> (${T}, Int) {
-  var exp = CInt(0)
+  var exp = Int32(0)
   let frac = frexp${f}(${CT}(value), &exp)
   return (${T}(frac), Int(exp))
 }
@@ -265,7 +265,7 @@ public func frexp(_ value: ${T}) -> (${T}, Int) {
 @_transparent
 @warn_unused_result
 public func ilogb(_ x: ${T}) -> Int {
-  return Int(ilogb${f}(${CT}(x)) as CInt)
+  return Int(ilogb${f}(${CT}(x)) as Int32)
 }
 
 % end
@@ -275,7 +275,7 @@ public func ilogb(_ x: ${T}) -> Int {
 @_transparent
 @warn_unused_result
 public func scalbn(_ x: ${T}, _ n: Int) -> ${T} {
-  return ${T}(scalbn${f}(${CT}(x), CInt(n)))
+  return ${T}(scalbn${f}(${CT}(x), Int32(n)))
 }
 
 % end
@@ -286,7 +286,7 @@ public func scalbn(_ x: ${T}, _ n: Int) -> ${T} {
 @_transparent
 @warn_unused_result
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
-  var sign = CInt(0)
+  var sign = Int32(0)
   let value = lgamma${f}_r(${CT}(x), &sign)
   return (${T}(value), Int(sign))
 }
@@ -297,14 +297,14 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 @warn_unused_result
 @_silgen_name("_swift_Darwin_lgamma${f}_r")
 func _swift_Darwin_lgamma${f}_r(_: ${CT},
-                                _: UnsafeMutablePointer<CInt>) -> ${CT}
+                                _: UnsafeMutablePointer<Int32>) -> ${CT}
 
 @_transparent
 @warn_unused_result
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
-  var sign = CInt(0)
+  var sign = Int32(0)
   let value = withUnsafeMutablePointer(&sign) { 
-    (signp: UnsafeMutablePointer<CInt>) -> ${CT} in
+    (signp: UnsafeMutablePointer<Int32>) -> ${CT} in
     return _swift_Darwin_lgamma${f}_r(${CT}(x), signp)
   }
   return (${T}(value), Int(sign))
@@ -318,7 +318,7 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 @_transparent
 @warn_unused_result
 public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
-  var quo = CInt(0)
+  var quo = Int32(0)
   let rem = remquo${f}(${CT}(x), ${CT}(y), &quo)
   return (${T}(rem), Int(quo))
 }
@@ -347,13 +347,13 @@ public func fma(_ x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} {
 @_transparent
 @warn_unused_result
 public func jn(_ n: Int, _ x: Double) -> Double {
-  return jn(CInt(n), x)
+  return jn(Int32(n), x)
 }
 
 @_transparent
 @warn_unused_result
 public func yn(_ n: Int, _ x: Double) -> Double {
-  return yn(CInt(n), x)
+  return yn(Int32(n), x)
 }
 
 % end

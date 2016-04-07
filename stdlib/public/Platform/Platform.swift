@@ -159,94 +159,94 @@ public var stderr : UnsafeMutablePointer<FILE> {
 @_silgen_name("_swift_Platform_open")
 func _swift_Platform_open(
   _ path: UnsafePointer<CChar>,
-  _ oflag: CInt,
+  _ oflag: Int32,
   _ mode: mode_t
-) -> CInt
+) -> Int32
 
 @warn_unused_result
 @_silgen_name("_swift_Platform_openat")
 func _swift_Platform_openat(
-  _ fd: CInt,
+  _ fd: Int32,
   _ path: UnsafePointer<CChar>,
-  _ oflag: CInt,
+  _ oflag: Int32,
   _ mode: mode_t
-) -> CInt
+) -> Int32
 
 @warn_unused_result
 public func open(
   _ path: UnsafePointer<CChar>,
-  _ oflag: CInt
-) -> CInt {
+  _ oflag: Int32
+) -> Int32 {
   return _swift_Platform_open(path, oflag, 0)
 }
 
 @warn_unused_result
 public func open(
   _ path: UnsafePointer<CChar>,
-  _ oflag: CInt,
+  _ oflag: Int32,
   _ mode: mode_t
-) -> CInt {
+) -> Int32 {
   return _swift_Platform_open(path, oflag, mode)
 }
 
 @warn_unused_result
 public func openat(
-  _ fd: CInt,
+  _ fd: Int32,
   _ path: UnsafePointer<CChar>,
-  _ oflag: CInt
-) -> CInt {
+  _ oflag: Int32
+) -> Int32 {
   return _swift_Platform_openat(fd, path, oflag, 0)
 }
 
 @warn_unused_result
 public func openat(
-  _ fd: CInt,
+  _ fd: Int32,
   _ path: UnsafePointer<CChar>,
-  _ oflag: CInt,
+  _ oflag: Int32,
   _ mode: mode_t
-) -> CInt {
+) -> Int32 {
   return _swift_Platform_openat(fd, path, oflag, mode)
 }
 
 @warn_unused_result
 @_silgen_name("_swift_Platform_fcntl")
 internal func _swift_Platform_fcntl(
-  _ fd: CInt,
-  _ cmd: CInt,
-  _ value: CInt
-) -> CInt
+  _ fd: Int32,
+  _ cmd: Int32,
+  _ value: Int32
+) -> Int32
 
 @warn_unused_result
 @_silgen_name("_swift_Platform_fcntlPtr")
 internal func _swift_Platform_fcntlPtr(
-  _ fd: CInt,
-  _ cmd: CInt,
+  _ fd: Int32,
+  _ cmd: Int32,
   _ ptr: UnsafeMutablePointer<Void>
-) -> CInt
+) -> Int32
 
 @warn_unused_result
 public func fcntl(
-  _ fd: CInt,
-  _ cmd: CInt
-) -> CInt {
+  _ fd: Int32,
+  _ cmd: Int32
+) -> Int32 {
   return _swift_Platform_fcntl(fd, cmd, 0)
 }
 
 @warn_unused_result
 public func fcntl(
-  _ fd: CInt,
-  _ cmd: CInt,
-  _ value: CInt
-) -> CInt {
+  _ fd: Int32,
+  _ cmd: Int32,
+  _ value: Int32
+) -> Int32 {
   return _swift_Platform_fcntl(fd, cmd, value)
 }
 
 @warn_unused_result
 public func fcntl(
-  _ fd: CInt,
-  _ cmd: CInt,
+  _ fd: Int32,
+  _ cmd: Int32,
   _ ptr: UnsafeMutablePointer<Void>
-) -> CInt {
+) -> Int32 {
   return _swift_Platform_fcntlPtr(fd, cmd, ptr)
 }
 
@@ -351,14 +351,14 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
 @_silgen_name("_swift_Platform_sem_open2")
 internal func _swift_Platform_sem_open2(
   _ name: UnsafePointer<CChar>,
-  _ oflag: CInt
+  _ oflag: Int32
 ) -> UnsafeMutablePointer<sem_t>
 
 @warn_unused_result
 @_silgen_name("_swift_Platform_sem_open4")
 internal func _swift_Platform_sem_open4(
   _ name: UnsafePointer<CChar>,
-  _ oflag: CInt,
+  _ oflag: Int32,
   _ mode: mode_t,
   _ value: CUnsignedInt
 ) -> UnsafeMutablePointer<sem_t>
@@ -366,7 +366,7 @@ internal func _swift_Platform_sem_open4(
 @warn_unused_result
 public func sem_open(
   _ name: UnsafePointer<CChar>,
-  _ oflag: CInt
+  _ oflag: Int32
 ) -> UnsafeMutablePointer<sem_t> {
   return _swift_Platform_sem_open2(name, oflag)
 }
@@ -374,7 +374,7 @@ public func sem_open(
 @warn_unused_result
 public func sem_open(
   _ name: UnsafePointer<CChar>,
-  _ oflag: CInt,
+  _ oflag: Int32,
   _ mode: mode_t,
   _ value: CUnsignedInt
 ) -> UnsafeMutablePointer<sem_t> {

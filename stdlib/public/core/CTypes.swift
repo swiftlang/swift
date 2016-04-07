@@ -40,7 +40,7 @@ public typealias CSignedChar = Int8
 public typealias CShort = Int16
 
 /// The C 'int' type.
-public typealias CInt = Int32
+public typealias Int32 = Int32
 
 /// The C 'long' type.
 public typealias CLong = Int
