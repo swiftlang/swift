@@ -12,6 +12,11 @@
 
 import StdlibUnittest
 
+internal enum TestError : ErrorProtocol {
+  case error1
+  case error2
+}
+
 public struct DropFirstTest {
   public var sequence: [Int]
   public let dropElements: Int
@@ -667,6 +672,12 @@ public let dropLastTests = [
     dropElements: 0,
     expected: [1010, 2020, 3030]
   ),
+]
+
+internal let forEachTests = [
+  ForEachTest([]),
+  ForEachTest([1010]),
+  ForEachTest([1010, 2020, 3030, 4040, 5050]),
 ]
 
 public let lexicographicallyPrecedesTests = [
@@ -1738,13 +1749,7 @@ self.test("\(testNamePrefix).split/semantics/separator/negativeMaxSplit") {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).forEach/semantics") {
-  let tests: [ForEachTest] = [
-    ForEachTest([]),
-    ForEachTest([1010]),
-    ForEachTest([1010, 2020, 3030, 4040, 5050]),
-  ]
-
-  for test in tests {
+  for test in forEachTests {
     var elements: [Int] = []
     let closureLifetimeTracker = LifetimeTracked(0)
     let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
@@ -1756,6 +1761,52 @@ self.test("\(testNamePrefix).forEach/semantics") {
     expectEqualSequence(
       test.sequence, elements,
       stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// _preprocessingPass()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix)._preprocessingPass/semantics") {
+  for test in forEachTests {
+    let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
+    var wasInvoked = false
+    let result = s._preprocessingPass {
+      (sequence) -> OpaqueValue<Int> in
+      wasInvoked = true
+
+      expectEqualSequence(
+        test.sequence,
+        s.map { extractValue($0).value })
+
+      return OpaqueValue(42)
+    }
+    if wasInvoked {
+      expectOptionalEqual(42, result?.value)
+    } else {
+      expectEmpty(result)
+    }
+  }
+
+  for test in forEachTests {
+    let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
+    var wasInvoked = false
+    var caughtError: ErrorProtocol? = nil
+    var result: OpaqueValue<Int>? = nil
+    do {
+      result = try s._preprocessingPass {
+        (sequence) -> OpaqueValue<Int> in
+        wasInvoked = true
+        throw TestError.error2
+      }
+    } catch {
+      caughtError = error
+    }
+    expectEmpty(result)
+    if wasInvoked {
+      expectOptionalEqual(TestError.error2, caughtError as? TestError)
+    }
   }
 }
 

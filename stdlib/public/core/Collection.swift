@@ -878,10 +878,11 @@ extension Sequence
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
 extension Collection {
-  public func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R? {
-    return preprocess()
+  public func _preprocessingPass<R>(
+    @noescape preprocess: () throws -> R
+  ) rethrows -> R? {
+    return try preprocess()
   }
 }
 
