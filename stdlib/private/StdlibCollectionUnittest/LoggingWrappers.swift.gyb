@@ -292,7 +292,7 @@ public struct ${Self}<
     @noescape preprocess: () throws -> R
   ) rethrows -> R? {
     Log._preprocessingPass[selfType] += 1
-    return try base._preprocessingPass { try preprocess() }
+    return try base._preprocessingPass(preprocess)
   }
 
   /// Create a native array buffer containing the elements of `self`,
