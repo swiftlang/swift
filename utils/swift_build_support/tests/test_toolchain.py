@@ -33,29 +33,24 @@ class HostToolchainTestCase(unittest.TestCase):
     def test_found_executables_match(self):
         # Test that the raw invocation of _first_common_executables
         # either returns None or matching paths.
-        suffixes = ['', '-3.8', '-3.7', '-3.6']
-        toolchain = host_toolchain(suffixes=suffixes)
-        self.assertTrue(len(toolchain.tools) == 2)
+        toolchain = host_toolchain()
+        self.assertEqual(len(toolchain.tools), 2)
 
         exec_names = {'foo': 'a-tool-that-does-not-exist'}
-        toolchain = host_toolchain(tools=exec_names,
-                                   suffixes=suffixes)
+        toolchain = host_toolchain(tools=exec_names)
         self.assertIsNone(toolchain)
 
     @unittest.skipUnless(platform.system() == 'Darwin',
                          'llvm-cov is only guaranteed to exist on OS X')
     def test_can_find_llvm_cov(self):
-        suffixes = ['', '-3.8', '-3.7', '-3.6']
         exec_names = {'llvm_cov': 'llvm-cov'}
-        toolchain = host_toolchain(tools=exec_names, suffixes=suffixes)
+        toolchain = host_toolchain(tools=exec_names)
 
-        # must have clang, clang++, and llvm-cov
-        self.assertTrue(len(toolchain.tools) == 3)
-
-        try:
-            toolchain.llvm_cov
-        except AttributeError:
-            self.fail("toolchain does not have llvm_cov")
+        # must have clang, clang++, llvm-cov, and nothing else.
+        self.assertTrue(hasattr(toolchain, 'clang'))
+        self.assertTrue(hasattr(toolchain, 'cxx'))
+        self.assertTrue(hasattr(toolchain, 'llvm_cov'))
+        self.assertEqual(len(toolchain.tools), 3)
 
 
 if __name__ == '__main__':

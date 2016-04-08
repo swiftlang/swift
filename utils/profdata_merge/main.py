@@ -28,9 +28,6 @@ SERVER_ADDRESS = ('localhost', 12400)
 TESTS_FINISHED_SENTINEL = "PROFDATA_MERGE_WORKER_TESTS_FINISHED_SENTINEL"
 
 if __name__ == "__main__":
-    if sys.platform != "darwin":
-        sys.exit("Error: The profile data merge worker requires OS X.")
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--log-file",
                         help="The file to write logs in debug mode.")
