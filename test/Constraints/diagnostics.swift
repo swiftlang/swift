@@ -599,7 +599,7 @@ func r18397777(_ d : r21447318?) {
   if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
   }
 
-  if !Optional(c) { // expected-error {{optional type '_' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
+  if !Optional(c) { // expected-error {{optional type 'Optional<_>' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
   }
 }
 
