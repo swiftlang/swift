@@ -17,8 +17,8 @@ func test() {
   var excuse: HomeworkExcuse = .dogAteIt
   excuse = .overslept // FIXME: should provide Fix-It  expected-error{{type 'HomeworkExcuse' has no member 'overslept'}}
   excuse = .tired
-  excuse = .tooHard
-  excuse = .challenging // expected-error{{type 'HomeworkExcuse' has no member 'challenging'}}
+  excuse = .tooHard // FIXME: should provide Fix-It expected-error{{type 'HomeworkExcuse' has no member 'tooHard'}}
+  excuse = .challenging
 
   // Typedef-of-anonymous-type-name renaming
   var p = Point()
