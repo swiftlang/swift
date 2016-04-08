@@ -4,9 +4,15 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -I %t -linker -inline %s -o - | FileCheck %s
 
 // CHECK: sil private @top_level_code 
-// CHECK: sil public_external [fragile] @{{.*}}_TFVs1XCfT_S_ 
-// CHECK: sil public_external [fragile] @{{.*}}_TFs17the_thing_it_doesFT1xVs1X_T_ 
-// CHECK: sil shared_external [fragile] [noinline] @{{.*}}_TTSgq5Vs1X___TFs9the_thingurFT1tx_T_
+
+// Make sure the specializations have bodies:
+
+// CHECK: sil public_external @{{.*}}_TFVs1XCfT_S_ {{.*}} {
+// CHECK: }
+// CHECK: sil public_external @{{.*}}_TFs17the_thing_it_doesFT1xVs1X_T_ {{.*}} {
+// CHECK: }
+// CHECK: sil shared_external [noinline] @{{.*}}_TTSg5Vs1X___TFs9the_thingurFT1tx_T_ {{.*}} {
+// CHECK: }
 
 sil_stage canonical
 
