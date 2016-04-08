@@ -235,13 +235,6 @@ extension ${TraversalCollection} where Self : LazyCollectionProtocol {
 
 % end
 
-extension LazyCollectionProtocol {
-  /// Identical to `self`.
-  public var lazy: Self { // Don't re-wrap already-lazy collections
-    return self
-  }
-}
-
 @available(*, unavailable, renamed: "LazyCollectionProtocol")
 public typealias LazyCollectionType = LazyCollectionProtocol
 

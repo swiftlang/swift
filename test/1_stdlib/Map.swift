@@ -36,21 +36,25 @@ extension LazyMapCollection where Base : TestProtocol1, Element : TestProtocol1 
 // CHECK: testing...
 print("testing...")
 
-// Test mapping a collection
-// CHECK-NEXT: [6, 9, 12, 15, 18, 21]
-let a = Array((2..<8).lazy.map { $0 * 3 })
-print(a)
+do {
+  // Test mapping a collection
+  // CHECK-NEXT: [6, 9, 12, 15, 18, 21]
+  let lazyRange = (2..<8).lazy
+  let a = Array(lazyRange.map { $0 * 3 })
+  print(a)
 
-// Test mapping a sequence
-let s = a.makeIterator().lazy.map { $0 / 3 }
-// CHECK-NEXT: <2, 3, 4, 5, 6, 7>
-print("<", terminator: "")
-var prefix = ""
-for x in s {
-  print("\(prefix)\(x)", terminator: "")
-  prefix = ", "
+  // Test mapping a sequence
+  let lazySeq = a.makeIterator().lazy
+  let s = lazySeq.map { $0 / 3 }
+  // CHECK-NEXT: <2, 3, 4, 5, 6, 7>
+  print("<", terminator: "")
+  var prefix = ""
+  for x in s {
+    print("\(prefix)\(x)", terminator: "")
+    prefix = ", "
+  }
+  print(">")
 }
-print(">")
 
 //===--- Avoid creating gratuitously self-destructive sequences -----------===//
 

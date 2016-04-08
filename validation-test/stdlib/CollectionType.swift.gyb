@@ -716,9 +716,11 @@ CollectionTypeTests.test("index(of:)/ContinueSearch") {
     let c = MinimalCollection(
       elements: [1, 2, 1, 3, 1].map(MinimalEquatableValue.init))
     let foundIndices = c._test_indicesOf(MinimalEquatableValue(1))
+    let actual = foundIndices.map { c.distance(from: c.startIndex, to: $0) }
     expectEqualSequence(
       [ 0, 2, 4 ],
-      foundIndices.map { c.distance(from: c.startIndex, to: $0) })
+      actual
+      )
   }
 }
 

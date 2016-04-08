@@ -244,9 +244,15 @@ func checkHasPrefixHasSuffix(
     }
   let expectHasPrefix = lhsNFDGraphemeClusters.starts(
     with: rhsNFDGraphemeClusters, isEquivalent: (==))
+
+  let lazyLhs = lhsNFDGraphemeClusters.lazy
+  let reversedLhs = lazyLhs.reversed()
+
+  let lazyRhs = rhsNFDGraphemeClusters.lazy
+  let reversedRhs = lazyRhs.reversed()
+
   let expectHasSuffix =
-    lhsNFDGraphemeClusters.lazy.reversed().starts(
-      with: rhsNFDGraphemeClusters.lazy.reversed(), isEquivalent: (==))
+    reversedLhs.starts(with: reversedRhs, isEquivalent: (==))
 
   expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(
