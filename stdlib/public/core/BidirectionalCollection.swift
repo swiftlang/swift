@@ -98,7 +98,9 @@ extension BidirectionalIndexable {
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(
+    n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  ) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n, limitedBy: limit)
     }

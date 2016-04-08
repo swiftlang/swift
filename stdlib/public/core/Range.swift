@@ -230,9 +230,9 @@ extension HalfOpenRangeProtocol
 /// has an `upperBound` that is the successor of its `lowerBound` and an empty
 /// `CountableRange` has `lowerBound == upperBound`.
 ///
-/// The associated `Bound` type is both the element type
-/// and the index type of `CountableRange`. Each element of the range is its own
-/// corresponding index, so for any countable range `r`, `r[i] == i`.
+/// The associated `Bound` type is both the element type and the index type of
+/// `CountableRange`. Each element of the range is its own corresponding
+/// index, so for any countable range `r`, `r[i] == i`.
 ///
 /// Therefore, if `Bound` has a maximal value, it can serve as an `upperBound`,
 /// but can never be contained in a `CountableRange<Bound>`.
@@ -350,7 +350,7 @@ public struct CountableRange<
 // such as x = r[0], which will trap unless 0 happens to be contained in the
 // range r.
 extension CountableRange {
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != upperBound`.
@@ -393,10 +393,20 @@ Bound._DisabledRangeIndex.Stride : Integer {
     fatalError("uncallable")
   }
 
+  /// Accesses the subsequence bounded by `bounds`.
+  ///
+  /// - Complexity: O(1)
+  /// - Precondition: `(startIndex...endIndex).contains(bounds.lowerBound)`
+  ///   and `(startIndex...endIndex).contains(bounds.upperBound)`
   public subscript(bounds: ClosedRange<Bound>) -> CountableRange<Bound> {
     return self[bounds.lowerBound..<(bounds.upperBound.advanced(by: 1))]
   }
 
+  /// Accesses the subsequence bounded by `bounds`.
+  ///
+  /// - Complexity: O(1)
+  /// - Precondition: `(startIndex...endIndex).contains(bounds.lowerBound)`
+  ///   and `(startIndex...endIndex).contains(bounds.upperBound)`
   public subscript(
     bounds: CountableClosedRange<Bound>
   ) -> CountableRange<Bound> {
@@ -414,8 +424,8 @@ extension CountableRange : CustomReflectable {
   }
 }
 
-/// A span over a range of `Comparable` values, from a lower bound up to, but
-/// not including, an upper bound. Can represent an empty range.
+/// An interval over a `Comparable` type, from a lower bound up to, but not
+/// including, an upper bound. Can represent an empty interval.
 ///
 /// Use a `Range` to quickly check if a `Comparable` value is contained in a
 /// particular range of values. For example:

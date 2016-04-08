@@ -31,20 +31,17 @@ public protocol ${Self} : ${Conformance} {
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
   ///
-  /// - Complexity: O(1).
+  /// If `Stride` conforms to `Integer`, then `self.advanced(by: x) == other`.
   ///
-  /// - SeeAlso: `RandomAccessIndex`'s `distance(to:)`, which provides a
-  ///   stronger semantic guarantee.
+  /// - Complexity: O(1).
   @warn_unused_result
   func distance(to other: Self) -> Stride
 
-  /// Returns a `Self` `x` such that `self.distance(to: x)` approximates
-  /// `n`.
+  /// Returns a `Self` `x` such that `self.distance(to: x)` approximates `n`.
+  ///
+  /// If `Stride` conforms to `Integer`, then `self.distance(to: x) == n`.
   ///
   /// - Complexity: O(1).
-  ///
-  /// - SeeAlso: `RandomAccessIndex`'s `advanced(by:)`, which
-  ///   provides a stronger semantic guarantee.
   @warn_unused_result
   func advanced(by n: Stride) -> Self
 

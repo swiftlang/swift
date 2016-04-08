@@ -288,8 +288,8 @@ extension CountableClosedRange : CustomReflectable {
   }
 }
 
-/// A span over a range of `Comparable` values, from a lower bound up to and
-/// including an upper bound. Cannot represent an empty range.
+/// An interval over a `Comparable` type, from a lower bound up to and
+/// including an upper bound. Cannot represent an empty interval.
 ///
 /// Use a `ClosedRange` to quickly check if a `Comparable` value is contained
 /// in a particular range of values. For example:
