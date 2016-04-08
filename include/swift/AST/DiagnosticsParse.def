@@ -1284,11 +1284,11 @@ ERROR(unsupported_conditional_compilation_integer,none,
 ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
-			"compiler version must not have more than five components", ())
+      "compiler version must not have more than five components", ())
 WARNING(unused_compiler_version_component,none,
-			"the second version component is not used for comparison", ())
+      "the second version component is not used for comparison", ())
 ERROR(empty_version_component,none,
-			"found empty version component", ())
+      "found empty version component", ())
 ERROR(compiler_version_component_out_of_range,none,
       "compiler version component out of range: must be in [0, %0]",
       (unsigned))
