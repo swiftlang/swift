@@ -485,6 +485,10 @@ void Remangler::mangleSpecializationPassID(Node *node) {
   Out << node->getIndex();
 }
 
+void Remangler::mangleSpecializationIsFragile(Node *node) {
+  Out << "q";
+}
+
 void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
   if (!node->hasChildren()) {
     Out << "n_";
