@@ -35,7 +35,7 @@ namespace swift {
   bool canBeArgumentLabel(StringRef identifier);
   
   /// Escapes an identifier with backticks if it cannot
-  /// be used as an identifier.
+  /// be used as an argument label itself.
   ///
   /// \seealso swift::canBeArgumentLabel()
   StringRef formattedArgumentLabel(StringRef identifier);
