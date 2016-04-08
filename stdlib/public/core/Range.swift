@@ -359,7 +359,7 @@ extension CountableRange {
     return position
   }
 
-  public subscript(_: Bound._DisabledRangeIndex) -> Bound {
+  public subscript(_position: Bound._DisabledRangeIndex) -> Bound {
     fatalError("uncallable")
   }
 }
@@ -370,25 +370,25 @@ Bound._DisabledRangeIndex : Strideable,
 Bound._DisabledRangeIndex.Stride : Integer {
   
   public subscript(
-    bounds: Range<Bound._DisabledRangeIndex>
+    _bounds: Range<Bound._DisabledRangeIndex>
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: CountableRange<Bound._DisabledRangeIndex>
+    _bounds: CountableRange<Bound._DisabledRangeIndex>
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
   
   public subscript(
-    bounds: ClosedRange<Bound._DisabledRangeIndex>
+    _bounds: ClosedRange<Bound._DisabledRangeIndex>
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: CountableClosedRange<Bound._DisabledRangeIndex>
+    _bounds: CountableClosedRange<Bound._DisabledRangeIndex>
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
@@ -504,7 +504,7 @@ extension Range where Bound : _Strideable, Bound.Stride : Integer {
     return position
   }
 
-  public subscript(_: Bound._DisabledRangeIndex) -> Bound {
+  public subscript(_position: Bound._DisabledRangeIndex) -> Bound {
     fatalError("uncallable")
   }
 }
@@ -515,46 +515,46 @@ Bound : Strideable,
 Bound.Stride : Integer, 
 Bound._DisabledRangeIndex : Strideable,
 Bound._DisabledRangeIndex.Stride : Integer {
-  public subscript(bounds: Range<Bound>) -> Range {
+  public subscript(_bounds: Range<Bound>) -> Range {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: Range<Bound._DisabledRangeIndex>
+    _bounds: Range<Bound._DisabledRangeIndex>
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: CountableRange<Bound>
+    _bounds: CountableRange<Bound>
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: CountableRange<Bound._DisabledRangeIndex>
+    _bounds: CountableRange<Bound._DisabledRangeIndex>
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
-  public subscript(bounds: ClosedRange<Bound>) -> Range {
+  public subscript(_bounds: ClosedRange<Bound>) -> Range {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: ClosedRange<Bound._DisabledRangeIndex>
-  ) -> CountableRange<Bound> {
-    fatalError("uncallable")
-  }
-
-  public subscript(
-    bounds: CountableClosedRange<Bound>
+    _bounds: ClosedRange<Bound._DisabledRangeIndex>
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
 
   public subscript(
-    bounds: CountableClosedRange<Bound._DisabledRangeIndex>
+    _bounds: CountableClosedRange<Bound>
+  ) -> CountableRange<Bound> {
+    fatalError("uncallable")
+  }
+
+  public subscript(
+    _bounds: CountableClosedRange<Bound._DisabledRangeIndex>
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
