@@ -540,7 +540,7 @@ extension _ContiguousArrayBuffer : Collection {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
+  /// `successor(of:)`.
   public var endIndex: Int {
     return count
   }

@@ -118,7 +118,7 @@ public protocol RangeReplaceableCollection
 
   /// Append `x` to `self`.
   ///
-  /// Applying `successor()` to the index of the new element yields
+  /// Applying `successor(of:)` to the index of the new element yields
   /// `self.endIndex`.
   ///
   /// - Complexity: Amortized O(1).

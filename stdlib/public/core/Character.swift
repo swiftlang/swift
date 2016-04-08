@@ -155,7 +155,7 @@ public struct Character :
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
-    /// `successor()`.
+    /// `successor(of:)`.
     var endIndex: Int {
       return Int(count)
     }

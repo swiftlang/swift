@@ -133,7 +133,7 @@ public func -= <T : UnsignedInteger>(
 
 //===----------------------------------------------------------------------===//
 
-/// An iterator for the result of `stride(to:...)`.
+/// An iterator for the result of `stride(from:to:)`.
 public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
   internal var _current: Element
   internal let _end: Element

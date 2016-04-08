@@ -48,7 +48,7 @@ public struct CollectionOfOne<Element> : Collection {
   }
 
   /// The "past the end" position; always identical to
-  /// `startIndex.successor()`.
+  /// `successor(of: startIndex)`.
   ///
   /// - Note: `endIndex` is not a valid argument to `subscript`.
   public var endIndex: Int {

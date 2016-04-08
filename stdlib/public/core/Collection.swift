@@ -357,7 +357,7 @@ public protocol Collection : Indexable, Sequence {
   @warn_unused_result
   func suffix(from start: Index) -> SubSequence
 
-  /// Returns `prefix(upTo: position.successor())`
+  /// Returns `prefix(upTo: successor(of: position)`
   ///
   /// - Precondition: `position >= self.startIndex && position < self.endIndex`
   /// - Complexity: O(1)
@@ -798,7 +798,7 @@ extension Collection {
     return self[start..<endIndex]
   }
 
-  /// Returns `prefix(upTo: position.successor())`
+  /// Returns `prefix(upTo: successor(of: position))`
   ///
   /// - Precondition: `position >= self.startIndex && position < self.endIndex`
   /// - Complexity: O(1)

@@ -39,7 +39,7 @@ extension String {
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
-    /// `successor()`.
+    /// `successor(of:)`.
     public var endIndex: Index {
       return Index(_offset: _length)
     }
