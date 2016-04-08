@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 public protocol IGiveOutInts {
   func callMe() -> Int64
@@ -16,7 +16,7 @@ public protocol IGiveOutInts {
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "IGiveOutInts"
 // CHECK-SAME:             identifier: [[PT:"[^"]+"]]
 
-public func printSomeNumbers(gen: IGiveOutInts) {
+public func printSomeNumbers(_ gen: IGiveOutInts) {
   var gen = gen
   // CHECK: ![[EMPTY]] = !DIExpression()
   // CHECK: ![[VAR]] = !DILocalVariable(name: "gen", {{.*}} line: [[@LINE-2]]

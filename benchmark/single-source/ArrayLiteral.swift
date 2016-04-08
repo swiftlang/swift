@@ -21,7 +21,7 @@ func makeArray() -> [Int] {
 }
 
 @inline(never)
-public func run_ArrayLiteral(N: Int) {
+public func run_ArrayLiteral(_ N: Int) {
   for _ in 1...10000*N {
     makeArray()
   }
@@ -34,7 +34,7 @@ func addLiteralArray() -> Int {
 }
 
 @inline(never)
-public func run_ArrayValueProp(N: Int) {
+public func run_ArrayValueProp(_ N: Int) {
   var res = 123
   for _ in 1...10000*N {
     res += addLiteralArray()
@@ -75,7 +75,7 @@ func addLiteralArray4() -> Int {
 }
 
 @inline(never)
-public func run_ArrayValueProp2(N: Int) {
+public func run_ArrayValueProp2(_ N: Int) {
   var res = 123
   for _ in 1...10000*N {
     res += addLiteralArray2()
@@ -85,7 +85,7 @@ public func run_ArrayValueProp2(N: Int) {
 }
 
 @inline(never)
-public func run_ArrayValueProp3(N: Int) {
+public func run_ArrayValueProp3(_ N: Int) {
   var res = 123
   for _ in 1...10000*N {
     res += addLiteralArray3()
@@ -95,7 +95,7 @@ public func run_ArrayValueProp3(N: Int) {
 }
 
 @inline(never)
-public func run_ArrayValueProp4(N: Int) {
+public func run_ArrayValueProp4(_ N: Int) {
   var res = 123
   for _ in 1...10000*N {
     res += addLiteralArray4()

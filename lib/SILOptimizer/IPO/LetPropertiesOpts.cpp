@@ -415,6 +415,7 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
             (isa<StructElementAddrInst>(Dest) &&
              cast<StructElementAddrInst>(Dest)->getField() == Property)) &&
            "Store instruction should store into a proper let property");
+    (void) Dest;
     ValueOfProperty = SI->getSrc();
   }
 
@@ -491,6 +492,7 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
       DEBUG(llvm::dbgs() << "The value of a let property '" << *Prop
                          << "' is not statically known\n");
     }
+    (void) PropValue;
   }
 }
 

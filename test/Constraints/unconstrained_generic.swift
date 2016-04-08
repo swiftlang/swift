@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 // RUN: %target-parse-verify-swift
 
-func unconstrained<T>(x: T) {}
+func unconstrained<T>(_ x: T) {}
 
 var x = 0
 var y = "one"

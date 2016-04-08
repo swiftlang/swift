@@ -6,7 +6,7 @@
 
 import ObjCIRExtras
 
-func test(i: Int) {
+func test(_ i: Int) {
   let t = SwiftNameTest()
   
   t.theMethod(number: i)

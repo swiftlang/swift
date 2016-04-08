@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
 
 @objc protocol P1 {
-  optional func method(x: Int)
+  optional func method(_ x: Int)
 
   optional var prop: Int { get }
 
@@ -54,7 +54,7 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSiC
   // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK-NEXT: [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
-  // CHECK-NEXT: [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  // CHECK-NEXT: [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
   // CHECK-NEXT: alloc_stack $Optional<Int>
   // CHECK-NEXT: dynamic_method_br [[T]] : $T, #P1.subscript!getter.1.foreign
   var subscriptRef = t[5]

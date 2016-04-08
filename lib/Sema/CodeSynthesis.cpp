@@ -2062,9 +2062,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   configureConstructorType(ctor, selfType, bodyParams->getType(ctx),
                            superclassCtor->isBodyThrowing());
   if (superclassCtor->isObjC()) {
-    auto errorConvention = superclassCtor->getForeignErrorConvention();
-    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
-
     // Inherit the @objc name from the superclass initializer, if it
     // has one.
     if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
@@ -2075,6 +2072,9 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
         ctor->getAttrs().add(clonedAttr);
       }
     }
+
+    auto errorConvention = superclassCtor->getForeignErrorConvention();
+    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
   }
   if (superclassCtor->isRequired())
     ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*implicit=*/true));

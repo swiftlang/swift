@@ -1000,6 +1000,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = (unsigned)MUI->getKind();
     else if (auto *DRI = dyn_cast<DeallocRefInst>(&SI))
       Attr = (unsigned)DRI->canAllocOnStack();
+    else if (auto *RCI = dyn_cast<RefCountingInst>(&SI))
+      Attr = RCI->isNonAtomic();
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }

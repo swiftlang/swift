@@ -29,12 +29,12 @@ class G : K {
   override func buzz() throws -> Int { return 0 }
 }
 
-func caller(x : P) throws {
+func caller(_ x: P) throws {
   try x.buzz()
 }
 
 @inline(never)
-public func run_NSError(N: Int) {
+public func run_NSError(_ N: Int) {
   for _ in 1...N*1000 {
       let k = K()
       let g = G()

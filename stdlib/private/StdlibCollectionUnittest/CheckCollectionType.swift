@@ -21,7 +21,7 @@ public struct SubscriptRangeTest {
 
   public var isEmpty: Bool { return count == 0 }
 
-  public func boundsIn<C : Collection>(c: C) -> Range<C.Index> {
+  public func boundsIn<C : Collection>(_ c: C) -> Range<C.Index> {
     let i = c.startIndex
     return i.advanced(by: numericCast(bounds.startIndex)) ..<
            i.advanced(by: numericCast(bounds.endIndex))
@@ -288,7 +288,7 @@ extension TestSuite {
     C.SubSequence.SubSequence == C.SubSequence,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -320,12 +320,12 @@ extension TestSuite {
       checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
     func makeWrappedCollectionWithEquatableElement(
-      elements: [MinimalEquatableValue]
+      _ elements: [MinimalEquatableValue]
     ) -> CollectionWithEquatableElement {
       return makeCollectionOfEquatable(elements.map(wrapValueIntoEquatable))
     }
@@ -828,7 +828,7 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
     CollectionWithEquatableElement.Index : BidirectionalIndex,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -861,7 +861,7 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
@@ -1176,7 +1176,7 @@ self.test("\(testNamePrefix).suffix/semantics") {
     CollectionWithEquatableElement.Index : RandomAccessIndex,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -1212,7 +1212,7 @@ self.test("\(testNamePrefix).suffix/semantics") {
 
     testNamePrefix += String(C.Type)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 

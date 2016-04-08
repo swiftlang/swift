@@ -37,7 +37,7 @@ final class D {
 // --------------------------------------------------------------------------
 // Construction from Type values
 // --------------------------------------------------------------------------
-func getMetatype<T>(m : T.Type) -> T.Type { return m }
+func getMetatype<T>(_ m : T.Type) -> T.Type { return m }
 
 // Construction from a struct Type value
 func constructStructMetatypeValue() {
@@ -66,7 +66,7 @@ protocol P {
   init()
 }
 
-func constructArchetypeValue<T: P>(t: T, tm: T.Type) {
+func constructArchetypeValue<T: P>(_ t: T, tm: T.Type) {
   var t = t
   var t1 = T()
   t = t1
@@ -84,13 +84,13 @@ protocol P2 {
   init(int: Int)
 }
 
-func constructExistentialValue(pm: P.Type) {
+func constructExistentialValue(_ pm: P.Type) {
   _ = pm.init()
   _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
 }
 
 typealias P1_and_P2 = protocol<P, P2>
-func constructExistentialCompositionValue(pm: protocol<P, P2>.Type) {
+func constructExistentialCompositionValue(_ pm: protocol<P, P2>.Type) {
   _ = pm.init(int: 5)
   _ = P1_and_P2(int: 5) // expected-error{{protocol type 'P1_and_P2' (aka 'protocol<P, P2>') cannot be instantiated}}
 }

@@ -17,7 +17,7 @@
 @_transparent
 @warn_unused_result
 public // @testable
-func _countLeadingZeros(value: Int64) -> Int64 {
+func _countLeadingZeros(_ value: Int64) -> Int64 {
     return Int64(Builtin.int_ctlz_Int64(value._value, false._value))
 }
 
@@ -25,7 +25,7 @@ func _countLeadingZeros(value: Int64) -> Int64 {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isPowerOf2(x: UInt) -> Bool {
+func _isPowerOf2(_ x: UInt) -> Bool {
   if x == 0 {
     return false
   }
@@ -38,7 +38,7 @@ func _isPowerOf2(x: UInt) -> Bool {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isPowerOf2(x: Int) -> Bool {
+func _isPowerOf2(_ x: Int) -> Bool {
   if x <= 0 {
     return false
   }
@@ -49,7 +49,7 @@ func _isPowerOf2(x: Int) -> Bool {
 
 #if _runtime(_ObjC)
 @_transparent
-public func _autorelease(x: AnyObject) {
+public func _autorelease(_ x: AnyObject) {
   Builtin.retain(x)
   Builtin.autorelease(x)
 }
@@ -61,7 +61,7 @@ public func _autorelease(x: AnyObject) {
 /// This function is primarily useful to call various runtime functions
 /// written in C++.
 func _withUninitializedString<R>(
-  body: (UnsafeMutablePointer<String>) -> R
+  _ body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {
   let stringPtr = UnsafeMutablePointer<String>(allocatingCapacity: 1)
   let bodyResult = body(stringPtr)
@@ -71,13 +71,13 @@ func _withUninitializedString<R>(
 }
 
 @_silgen_name("swift_getTypeName")
-public func _getTypeName(type: Any.Type, qualified: Bool)
+public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
 @warn_unused_result
 public // @testable
-func _typeName(type: Any.Type, qualified: Bool = true) -> String {
+func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
   return ._fromWellFormedCodeUnitSequence(UTF8.self,
     input: UnsafeBufferPointer(start: stringPtr, count: count))
@@ -85,7 +85,7 @@ func _typeName(type: Any.Type, qualified: Bool = true) -> String {
 
 @_silgen_name("swift_getTypeByMangledName")
 func _getTypeByMangledName(
-    name: UnsafePointer<UInt8>,
+    _ name: UnsafePointer<UInt8>,
     _ nameLength: UInt)
   -> Any.Type?
 
@@ -93,7 +93,7 @@ func _getTypeByMangledName(
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
 @warn_unused_result
 public // SPI(Foundation)
-func _typeByName(name: String) -> Any.Type? {
+func _typeByName(_ name: String) -> Any.Type? {
   let components = name.characters.split{$0 == "."}.map(String.init)
   guard components.count == 2 else {
     return nil
@@ -122,7 +122,7 @@ func _typeByName(name: String) -> Any.Type? {
 @warn_unused_result
 @_silgen_name("swift_stdlib_demangleName")
 func _stdlib_demangleNameImpl(
-  mangledName: UnsafePointer<UInt8>,
+  _ mangledName: UnsafePointer<UInt8>,
   _ mangledNameLength: UInt,
   _ demangledName: UnsafeMutablePointer<String>)
 
@@ -130,7 +130,7 @@ func _stdlib_demangleNameImpl(
 // exported for Xcode support. Please coordinate before changing.
 @warn_unused_result
 public // @testable
-func _stdlib_demangleName(mangledName: String) -> String {
+func _stdlib_demangleName(_ mangledName: String) -> String {
   let mangledNameUTF8 = Array(mangledName.utf8)
   return mangledNameUTF8.withUnsafeBufferPointer {
     (mangledNameUTF8) in
@@ -158,7 +158,7 @@ func _stdlib_demangleName(mangledName: String) -> String {
 @warn_unused_result
 @_transparent
 public // @testable
-func _floorLog2(x: Int64) -> Int {
+func _floorLog2(_ x: Int64) -> Int {
   _sanityCheck(x > 0, "_floorLog2 operates only on non-negative integers")
   // Note: use unchecked subtraction because we this expression cannot
   // overflow.

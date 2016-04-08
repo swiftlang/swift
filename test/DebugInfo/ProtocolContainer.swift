@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 protocol AProtocol {
   func print()
@@ -17,7 +17,7 @@ class AClass : AProtocol {
 // CHECK:      call void @llvm.dbg.declare(metadata %P17ProtocolContainer9AProtocol_* %[[X]], metadata ![[XMD:.*]], metadata !{{[0-9]+}})
 // CHECK-NOT: !DILocalVariable({{.*}} name: "x"
 // CHECK-NOT: !DILocalVariable({{.*}} name: "x"
-func foo (x : AProtocol) {
+func foo (_ x : AProtocol) {
   var x = x
 	x.print() // Set breakpoint here
 }

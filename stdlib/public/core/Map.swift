@@ -134,7 +134,7 @@ extension LazySequenceProtocol {
   /// calling `transform` function on a base element.
   @warn_unused_result
   public func map<U>(
-    transform: (Elements.Iterator.Element) -> U
+    _ transform: (Elements.Iterator.Element) -> U
   ) -> LazyMapSequence<Self.Elements, U> {
     return LazyMapSequence(_base: self.elements, transform: transform)
   }
@@ -146,7 +146,7 @@ extension LazyCollectionProtocol {
   /// calling `transform` function on a base element.
   @warn_unused_result
   public func map<U>(
-    transform: (Elements.Iterator.Element) -> U
+    _ transform: (Elements.Iterator.Element) -> U
   ) -> LazyMapCollection<Self.Elements, U> {
     return LazyMapCollection(_base: self.elements, transform: transform)
   }

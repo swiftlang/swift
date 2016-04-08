@@ -8,15 +8,15 @@ protocol CP : class { }
   static func createNewOne() -> SP
 }
 
-func fP<T : P>(t: T) { }
-func fOP<T : OP>(t: T) { }
-func fOPE(t: OP) { }
-func fSP<T : SP>(t: T) { }
-func fAO<T : AnyObject>(t: T) { }
-func fAOE(t: AnyObject) { }
-func fT<T>(t: T) { }
+func fP<T : P>(_ t: T) { }
+func fOP<T : OP>(_ t: T) { }
+func fOPE(_ t: OP) { }
+func fSP<T : SP>(_ t: T) { }
+func fAO<T : AnyObject>(_ t: T) { }
+func fAOE(_ t: AnyObject) { }
+func fT<T>(_ t: T) { }
 
-func testPassExistential(p: P, op: OP, opp: protocol<OP, P>, cp: CP, sp: SP, any: Any, ao: AnyObject) {
+func testPassExistential(_ p: P, op: OP, opp: protocol<OP, P>, cp: CP, sp: SP, any: Any, ao: AnyObject) {
   fP(p) // expected-error{{cannot invoke 'fP' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
   fAO(p) // expected-error{{cannot invoke 'fAO' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
   fAOE(p) // expected-error{{argument type 'P' does not conform to expected type 'AnyObject'}}
@@ -55,7 +55,7 @@ class GCP<T : CP> {}
 class GSP<T : SP> {}
 class GAO<T : AnyObject> {}
 
-func blackHole(t: Any) {}
+func blackHole(_ t: Any) {}
 
 func testBindExistential() {
   blackHole(GP<P>()) // expected-error{{using 'P' as a concrete type conforming to protocol 'P' is not supported}}

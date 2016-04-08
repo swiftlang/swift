@@ -6,7 +6,7 @@ import gizmo
 import ansible
 
 class Hoozit : Gizmo {
-  func typical(x: Int, y: Gizmo) -> Gizmo { return y }
+  func typical(_ x: Int, y: Gizmo) -> Gizmo { return y }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozit7typical{{.*}} : $@convention(objc_method) (Int, Gizmo, Hoozit) -> @autoreleased Gizmo {
   // CHECK: bb0([[X:%.*]] : $Int, [[Y:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[Y]]
@@ -30,11 +30,11 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // NS_CONSUMED 'gizmo' argument by inheritance
-  override class func consume(gizmo: Gizmo?) { }
+  override class func consume(_ gizmo: Gizmo?) { }
    // CHECK-LABEL: sil hidden [thunk] @_TToZFC11objc_thunks6Hoozit7consume{{.*}} : $@convention(objc_method) (@owned Optional<Gizmo>, @objc_metatype Hoozit.Type) -> () {
   // CHECK: bb0([[GIZMO:%.*]] : $Optional<Gizmo>, [[THIS:%.*]] : $@objc_metatype Hoozit.Type):
   // CHECK-NEXT: [[THICK_THIS:%[0-9]+]] = objc_to_thick_metatype [[THIS]] : $@objc_metatype Hoozit.Type to $@thick Hoozit.Type
-  // CHECK:   [[NATIVE:%.*]] = function_ref @_TZFC11objc_thunks6Hoozit7consume{{.*}} : $@convention(thin) (@owned Optional<Gizmo>, @thick Hoozit.Type) -> ()
+  // CHECK:   [[NATIVE:%.*]] = function_ref @_TZFC11objc_thunks6Hoozit7consume{{.*}} : $@convention(method) (@owned Optional<Gizmo>, @thick Hoozit.Type) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[GIZMO]], [[THICK_THIS]])
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
@@ -189,7 +189,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // Don't export generics to ObjC yet
-  func generic<T>(x: T) {}
+  func generic<T>(_ x: T) {}
   // CHECK-NOT: sil hidden [thunk] @_TToFC11objc_thunks6Hoozit7generic{{.*}}
 
   // Constructor.
@@ -248,7 +248,7 @@ class Wotsit<T> : Gizmo {
   // CHECK-NEXT: }
   func plain() { }
 
-  func generic<U>(x: U) {}
+  func generic<U>(_ x: U) {}
 
   var property : T
 
@@ -322,7 +322,7 @@ extension Hoozit {
 }
 
 // Calling objc methods of subclass should go through native entry points
-func useHoozit(h: Hoozit) {
+func useHoozit(_ h: Hoozit) {
 // sil @_TF11objc_thunks9useHoozitFT1hC11objc_thunks6Hoozit_T_
   // In the class decl, gets dynamically dispatched
   h.fork()
@@ -333,7 +333,7 @@ func useHoozit(h: Hoozit) {
   // CHECK: class_method [volatile] {{%.*}} : {{.*}}, #Hoozit.foof!1.foreign
 }
 
-func useWotsit(w: Wotsit<String>) {
+func useWotsit(_ w: Wotsit<String>) {
 // sil @_TF11objc_thunks9useWotsitFT1wGCSo6WotsitSS__T_
   w.plain()
   // CHECK: class_method {{%.*}} : {{.*}}, #Wotsit.plain!1 :
@@ -350,13 +350,13 @@ func other() { }
 class X { }
 
 // CHECK-LABEL: sil hidden @_TF11objc_thunks8property
-func property(g: Gizmo) -> Int {
+func property(_ g: Gizmo) -> Int {
   // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.count!getter.1.foreign
   return g.count
 }
 
 // CHECK-LABEL: sil hidden @_TF11objc_thunks13blockProperty
-func blockProperty(g: Gizmo) {
+func blockProperty(_ g: Gizmo) {
   // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.block!setter.1.foreign
   g.block = { }
   // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.block!getter.1.foreign

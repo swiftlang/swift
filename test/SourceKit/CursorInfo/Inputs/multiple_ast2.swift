@@ -1,1 +1,1 @@
-func foo2(x: Int) {}
+func foo2(_ x: Int) {}

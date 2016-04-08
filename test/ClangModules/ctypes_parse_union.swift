@@ -2,7 +2,7 @@
 
 import ctypes
 
-func useStructWithUnion(vec: GLKVector4) -> GLKVector4 {
+func useStructWithUnion(_ vec: GLKVector4) -> GLKVector4 {
   var vec = vec
   _ = vec.v.0
   _ = vec.v.1
@@ -12,7 +12,7 @@ func useStructWithUnion(vec: GLKVector4) -> GLKVector4 {
   vec.v = (0, 0, 0, 0)
 }
 
-func useUnionIndirectFields(vec: GLKVector4) -> GLKVector4 {
+func useUnionIndirectFields(_ vec: GLKVector4) -> GLKVector4 {
   // TODO: Make indirect fields from anonymous structs in unions
   // accessible.
   // Anonymous indirect fields
@@ -39,7 +39,7 @@ func useUnionIndirectFields(vec: GLKVector4) -> GLKVector4 {
   return vec
 }
 
-func useStructWithNamedUnion(u: NamedUnion) -> NamedUnion {
+func useStructWithNamedUnion(_ u: NamedUnion) -> NamedUnion {
   var u1 = NamedUnion()
   u1.a = u.a
   u1.b = u.b
@@ -47,7 +47,7 @@ func useStructWithNamedUnion(u: NamedUnion) -> NamedUnion {
   return u1
 }
 
-func useStructWithAnonymousUnion(u: AnonUnion) -> AnonUnion {
+func useStructWithAnonymousUnion(_ u: AnonUnion) -> AnonUnion {
   // TODO: Make union indirect fields from anonymous structs in unions
   // accessible.
   let a: CFloat = u.a // expected-error{{}}
@@ -58,7 +58,7 @@ func useStructWithAnonymousUnion(u: AnonUnion) -> AnonUnion {
   return u
 }
 
-func useStructWithUnnamedUnion(u: UnnamedUnion) -> UnnamedUnion {
+func useStructWithUnnamedUnion(_ u: UnnamedUnion) -> UnnamedUnion {
   var u = u
   u.u.i = 100
   u.u.f = 1.0

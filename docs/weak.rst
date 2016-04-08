@@ -611,7 +611,7 @@ conversions in the right places.
 These implicit conversions require some thought.  Consider code like
 the following::
 
-  func moveToWindow(newWindow : Window) {
+  func moveToWindow(_ newWindow : Window) {
     var oldWindow = self.window   // an @unowned back reference
     oldWindow.hide()              // might remove the UI's strong reference
     oldWindow.remove(self)

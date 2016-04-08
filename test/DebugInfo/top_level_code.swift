@@ -2,7 +2,7 @@
 
 // XFAIL: linux
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 var a = 1
 var b = 2
 markUsed(a+b)

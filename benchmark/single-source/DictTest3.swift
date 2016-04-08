@@ -13,7 +13,7 @@
 import TestsUtils
 
 @inline(never)
-public func run_Dictionary3(N: Int) {
+public func run_Dictionary3(_ N: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 20 1980"
@@ -59,12 +59,12 @@ class Box<T : Hashable where T : Equatable> : Hashable {
 extension Box : Equatable {
 }
 
-func ==<T: Equatable>(lhs: Box<T>,  rhs: Box<T>) -> Bool {
+func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
   return lhs.value == rhs.value
 }
 
 @inline(never)
-public func run_Dictionary3OfObjects(N: Int) {
+public func run_Dictionary3OfObjects(_ N: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 20 1980"

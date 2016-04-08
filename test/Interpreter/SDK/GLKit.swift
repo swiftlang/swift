@@ -8,7 +8,7 @@
 
 import GLKit
 
-func printV4(v: GLKVector4) {
+func printV4(_ v: GLKVector4) {
   print("<\(v.x) \(v.y) \(v.z) \(v.w)>")
 }
 
@@ -40,7 +40,7 @@ func ==(x: GLKVector4, y: GLKVector4) -> Bool {
 print(x • y) // CHECK-NEXT: 0.0
 print(x ⨉ y == z) // CHECK-NEXT: true
 
-func printM4(m: GLKMatrix4) {
+func printM4(_ m: GLKMatrix4) {
   print("⎡\(m.m00) \(m.m01) \(m.m02) \(m.m03)⎤")
   print("⎢\(m.m10) \(m.m11) \(m.m12) \(m.m13)⎥")
   print("⎢\(m.m20) \(m.m21) \(m.m22) \(m.m23)⎥")

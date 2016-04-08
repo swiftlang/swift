@@ -205,7 +205,7 @@ extension ${Self} : CustomDebugStringConvertible {
 extension ${Self} : FloatingPoint {
   public typealias _BitsType = UInt${bits}
 
-  public static func _fromBitPattern(bits: _BitsType) -> ${Self} {
+  public static func _fromBitPattern(_ bits: _BitsType) -> ${Self} {
     return ${Self}(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits._value))
   }
 
@@ -497,7 +497,7 @@ extension ${Self} : AbsoluteValuable {
   /// Returns the absolute value of `x`.
   @_transparent
   @warn_unused_result
-  public static func abs(x: ${Self}) -> ${Self} {
+  public static func abs(_ x: ${Self}) -> ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x._value))
   }
 }

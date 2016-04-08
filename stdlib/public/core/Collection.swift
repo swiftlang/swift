@@ -181,7 +181,7 @@ public protocol Collection : Indexable, Sequence {
   ///
   /// - Complexity: O(N).
   @warn_unused_result
-  func _customIndexOfEquatableElement(element: Iterator.Element) -> Index??
+  func _customIndexOfEquatableElement(_ element: Iterator.Element) -> Index??
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   var first: Iterator.Element? { get }
@@ -303,7 +303,7 @@ extension Collection {
   /// - Complexity: O(N).
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Iterator.Element) throws -> T
+    @noescape _ transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     let count: Int = numericCast(self.count)
     if count == 0 {
@@ -329,7 +329,7 @@ extension Collection {
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
-  public func dropFirst(n: Int) -> SubSequence {
+  public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let start = startIndex.advanced(by: numericCast(n), limit: endIndex)
     return self[start..<endIndex]
@@ -340,7 +340,7 @@ extension Collection {
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
-  public func dropLast(n: Int) -> SubSequence {
+  public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
@@ -357,7 +357,7 @@ extension Collection {
   /// - Precondition: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
-  public func prefix(maxLength: Int) -> SubSequence {
+  public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
@@ -374,7 +374,7 @@ extension Collection {
   /// - Precondition: `maxLength >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
-  public func suffix(maxLength: Int) -> SubSequence {
+  public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
@@ -425,7 +425,7 @@ extension Collection {
   /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    maxSplits maxSplits: Int = Int.max,
+    maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
@@ -434,7 +434,7 @@ extension Collection {
     var result: [SubSequence] = []
     var subSequenceStart: Index = startIndex
 
-    func appendSubsequence(end end: Index) -> Bool {
+    func appendSubsequence(end: Index) -> Bool {
       if subSequenceStart == end && omittingEmptySubsequences {
         return false
       }
@@ -489,7 +489,7 @@ extension Collection where Iterator.Element : Equatable {
   /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    separator separator: Iterator.Element,
+    separator: Iterator.Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true
   ) -> [SubSequence] {
@@ -506,7 +506,7 @@ extension Collection where Index : BidirectionalIndex {
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
-  public func dropLast(n: Int) -> SubSequence {
+  public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let end = endIndex.advanced(by: numericCast(-n), limit: startIndex)
@@ -522,7 +522,7 @@ extension Collection where Index : BidirectionalIndex {
   /// - Precondition: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
-  public func suffix(maxLength: Int) -> SubSequence {
+  public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
@@ -549,7 +549,7 @@ extension Collection where SubSequence == Self {
   ///   - O(1) if `Index` conforms to `RandomAccessIndex`
   ///   - O(n) otherwise
   /// - Precondition: `n >= 0 && self.count >= n`.
-  public mutating func removeFirst(n: Int) {
+  public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -579,7 +579,7 @@ extension Collection
   ///   - O(1) if `Index` conforms to `RandomAccessIndex`
   ///   - O(n) otherwise
   /// - Precondition: `n >= 0 && self.count >= n`.
-  public mutating func removeLast(n: Int) {
+  public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -612,7 +612,7 @@ extension Sequence
 }
 
 extension Collection {
-  public func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R? {
+  public func _preprocessingPass<R>(@noescape _ preprocess: () -> R) -> R? {
     return preprocess()
   }
 }
@@ -662,7 +662,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    @noescape _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R?
   // FIXME: the signature should use UnsafeMutableBufferPointer, but the
   // compiler can't handle that.
@@ -674,7 +674,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
 
 extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    @noescape _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     return nil
   }
@@ -700,7 +700,7 @@ internal func _writeBackMutableSlice<
   where
   C._Element == Slice_.Iterator.Element,
   C.Index == Slice_.Index
->(self_: inout C, bounds: Range<C.Index>, slice: Slice_) {
+>(_ self_: inout C, bounds: Range<C.Index>, slice: Slice_) {
   C.Index._failEarlyRangeCheck2(
     rangeStart: bounds.startIndex,
     rangeEnd: bounds.endIndex,
@@ -754,9 +754,9 @@ extension Collection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message: "Please use split(_:omittingEmptySubsequences:isSeparator:) instead")
+  @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:isSeparator:) instead")
   public func split(
-    maxSplit: Int = Int.max,
+    _ maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
@@ -767,7 +767,7 @@ extension Collection {
 extension Collection where Iterator.Element : Equatable {
   @available(*, unavailable, message: "Please use split(separator:maxSplits:omittingEmptySubsequences:) instead")
   public func split(
-    separator: Iterator.Element,
+    _ separator: Iterator.Element,
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
   ) -> [SubSequence] {

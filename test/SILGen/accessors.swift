@@ -19,7 +19,7 @@ func index1() -> Int { return 1 }
 
 // Verify that there is no unnecessary extra retain of ref.array.
 // rdar://19002913
-func test0(ref: A) {
+func test0(_ ref: A) {
   ref.array[index0()] = ref.array[index1()]
 }
 // CHECK: sil hidden @_TF9accessors5test0FCS_1AT_ : $@convention(thin) (@owned A) -> () {
@@ -85,7 +85,7 @@ struct MutatingSub {
 }
 class B { var array = MutatingSub() }
 
-func test1(ref: B) {
+func test1(_ ref: B) {
   ref.array[index0()] = ref.array[index1()]
 }
 // CHECK-LABEL: sil hidden @_TF9accessors5test1FCS_1BT_ : $@convention(thin) (@owned B) -> () {
@@ -167,7 +167,7 @@ struct RecOuter {
     unsafeMutableAddress { return nil }
   }
 }
-func test_rec(outer: inout RecOuter) -> Int {
+func test_rec(_ outer: inout RecOuter) -> Int {
   return outer.inner[0]
 }
 // This uses the immutable addressor.
@@ -185,7 +185,7 @@ struct Rec2Outer {
     unsafeMutableAddress { return nil }
   }
 }
-func test_rec2(outer: inout Rec2Outer) -> Int {
+func test_rec2(_ outer: inout Rec2Outer) -> Int {
   return outer.inner[0]
 }
 // This uses the mutable addressor.

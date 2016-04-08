@@ -14,7 +14,7 @@
 import TestsUtils
 
 @inline(__always)
-func debug(m:String) {}
+func debug(_ m:String) {}
 
 private var Count = 0
 
@@ -22,7 +22,7 @@ private var Count = 0
 func bar() { Count += 1 }
 
 @inline(never)
-func runLoop(var1: Int, var2: Int) {
+func runLoop(_ var1: Int, var2: Int) {
   for _ in 0..<100_000 {
     debug("Var1: \(var1) Var2: \(var2)")
     bar()
@@ -30,7 +30,7 @@ func runLoop(var1: Int, var2: Int) {
 }
 
 @inline(never)
-public func run_DeadArray(N: Int) {
+public func run_DeadArray(_ N: Int) {
   for _ in 1...N {
     Count = 0
     runLoop(0, var2: 0)

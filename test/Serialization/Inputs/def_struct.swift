@@ -41,7 +41,7 @@ public typealias VoidPairTuple = ((), ())
 public struct GenericCtor<U> {
   public init<T>(_ t : T) {}
 
-  public func doSomething<T>(t: T) {}
+  public func doSomething<T>(_ t: T) {}
 }
 
 // Protocols
@@ -90,7 +90,7 @@ public struct ResettableWrapper<T : Resettable> : AnotherAssociated {
 public func cacheViaWrappers<
   T : HasAssociatedType, U : AnotherAssociated
     where T.ComputableType == U.ResettableType
->(computable : T, _ resettable : U) {}
+>(_ computable : T, _ resettable : U) {}
 
 
 // Subscripts

@@ -10,7 +10,7 @@
 // CHECK: }
 // CHECK: typealias IPSub_t = IPSub
 // CHECK: typealias Dummy = IPSub
-// CHECK: func takesIPSub(in: IPSub_t!)
+// CHECK: func takesIPSub(_ in: IPSub_t!)
 
 import ImportedProtocols
-func noop(p: ImportedProtocolSub) {}
+func noop(_ p: ImportedProtocolSub) {}

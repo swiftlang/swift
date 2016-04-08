@@ -26,7 +26,7 @@ import ArrayBridgeObjC
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
     var result: Self? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -117,7 +117,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: BridgedObjC,
+    _ x: BridgedObjC,
     result: inout BridgedSwift?
   ) {
     assert(x.value >= 0, "not bridged")
@@ -126,7 +126,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    x: BridgedObjC,
+    _ x: BridgedObjC,
     result: inout BridgedSwift?
   ) -> Bool {
     if x.value >= 0 {
@@ -167,15 +167,15 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
 
 // A class used to test various Objective-C thunks.
 class Thunks : NSObject {
-  func createBridgedObjC(value: Int) -> AnyObject {
+  func createBridgedObjC(_ value: Int) -> AnyObject {
     return BridgedObjC(value)
   }
   
-  @objc func acceptBridgedObjCArray(x: [BridgedObjC]) {
+  @objc func acceptBridgedObjCArray(_ x: [BridgedObjC]) {
     print("acceptBridgedObjCArray(\(x))")
   }
 
-  @objc func produceBridgedObjCArray(numItems: Int) -> [BridgedObjC] {
+  @objc func produceBridgedObjCArray(_ numItems: Int) -> [BridgedObjC] {
     var array: [BridgedObjC] = []
     for i in 0..<numItems {
       array.append(BridgedObjC(i))
@@ -184,12 +184,12 @@ class Thunks : NSObject {
     return array
   }
 
-  @objc func acceptBridgedSwiftArray(raw: NSArray) {
+  @objc func acceptBridgedSwiftArray(_ raw: NSArray) {
     let x = raw as! [BridgedSwift]
     print("acceptBridgedSwiftArray(\(x))")
   }
 
-  @objc func produceBridgedSwiftArray(numItems: Int) -> NSArray {
+  @objc func produceBridgedSwiftArray(_ numItems: Int) -> NSArray {
     var array: [BridgedSwift] = []
     for i in 0..<numItems {
       array.append(BridgedSwift(i))
@@ -366,7 +366,7 @@ func testExplicitlyBridged() {
   // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]
   print("bridgedBackSwifts      = \(bridgedBackSwifts)")
   
-  // all: verbatim,  not, and doesn't bridge
+  // all: verbatim, not, and doesn't bridge
   // implicit conversions to/from NSArray 
   // [Base] -> [Derived] and [Derived] -> [Base] where Base can be AnyObject
   // defining @objc method taking [T] and returning [T]
@@ -518,7 +518,7 @@ testExplicitlyBridged()
 
 func testRoundTrip() {
   class Test : NSObject {
-    @objc dynamic func call(array: NSArray) -> NSArray {
+    @objc dynamic func call(_ array: NSArray) -> NSArray {
 
       // CHECK-NEXT: ---Passed array---
       print("---Passed array---")
@@ -536,7 +536,7 @@ func testRoundTrip() {
   let test = Test()
   
   let array = [
-    BridgedSwift(10), BridgedSwift(20),  BridgedSwift(30),
+    BridgedSwift(10), BridgedSwift(20), BridgedSwift(30),
     BridgedSwift(40), BridgedSwift(50) ]
   
   BridgedSwift.resetStats()

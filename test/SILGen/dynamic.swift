@@ -284,7 +284,7 @@ func dynamicMethodDispatch() {
 }
 
 // CHECK-LABEL: sil hidden @_TF7dynamic15managedDispatchFCS_3FooT_
-func managedDispatch(c: Foo) {
+func managedDispatch(_ c: Foo) {
   // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign 
   let x = c.managedProp
   // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!setter.1.foreign
@@ -333,7 +333,7 @@ extension Gizmo {
 }
 
 // CHECK-LABEL: sil hidden @_TF7dynamic24foreignExtensionDispatchFCSo5GizmoT_
-func foreignExtensionDispatch(g: Gizmo) {
+func foreignExtensionDispatch(_ g: Gizmo) {
   // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : (Gizmo)
   g.foreignObjCExtension()
   // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.foreignDynamicExtension!1.foreign
@@ -390,7 +390,7 @@ func dynamicMethodDispatchFromOtherFile() {
 }
 
 // CHECK-LABEL: sil hidden @_TF7dynamic28managedDispatchFromOtherFileFCS_13FromOtherFileT_
-func managedDispatchFromOtherFile(c: FromOtherFile) {
+func managedDispatchFromOtherFile(_ c: FromOtherFile) {
   // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.managedProp!getter.1.foreign
   let x = c.managedProp
   // CHECK: class_method [volatile] {{%.*}} : $FromOtherFile, #FromOtherFile.managedProp!setter.1.foreign
@@ -398,7 +398,7 @@ func managedDispatchFromOtherFile(c: FromOtherFile) {
 }
 
 // CHECK-LABEL: sil hidden @_TF7dynamic23dynamicExtensionMethodsFCS_13ObjCOtherFileT_
-func dynamicExtensionMethods(obj: ObjCOtherFile) {
+func dynamicExtensionMethods(_ obj: ObjCOtherFile) {
   // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionMethod!1.foreign
   obj.extensionMethod()
   // CHECK: class_method [volatile] {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionProp!getter.1.foreign

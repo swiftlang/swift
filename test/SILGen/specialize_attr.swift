@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
 
 // CHECK-LABEL: @_specialize(Int, Float)
-// CHECK-NEXT: func specializeThis<T, U>(t: T, u: U)
+// CHECK-NEXT: func specializeThis<T, U>(_ t: T, u: U)
 @_specialize(Int, Float)
-func specializeThis<T, U>(t: T, u: U) {}
+func specializeThis<T, U>(_ t: T, u: U) {}
 
 public protocol PP {
   associatedtype PElt
@@ -23,11 +23,11 @@ public struct GG<T : PP> {}
 
 // CHECK-LABEL: public class CC<T : PP> {
 // CHECK-NEXT: @_specialize(RR, SS)
-// CHECK-NEXT: @inline(never) public func foo<U : QQ>(u: U, g: GG<T>) -> (U, GG<T>)
+// CHECK-NEXT: @inline(never) public func foo<U : QQ>(_ u: U, g: GG<T>) -> (U, GG<T>)
 public class CC<T : PP> {
   @inline(never)
   @_specialize(RR, SS)
-  public func foo<U : QQ>(u: U, g: GG<T>) -> (U, GG<T>) {
+  public func foo<U : QQ>(_ u: U, g: GG<T>) -> (U, GG<T>) {
     return (u, g)
   }
 }

@@ -17,12 +17,12 @@ public protocol Interval {
 
   /// Returns `true` iff the interval contains `value`.
   @warn_unused_result
-  func contains(value: Bound) -> Bool
+  func contains(_ value: Bound) -> Bool
 
   /// Returns `rhs` clamped to `self`.  The bounds of the result, even
   /// if it is empty, are always within the bounds of `self`.
   @warn_unused_result
-  func clamp(intervalToClamp: Self) -> Self
+  func clamp(_ intervalToClamp: Self) -> Self
 
   /// `true` iff `self` is empty.
   var isEmpty: Bool { get }
@@ -103,7 +103,7 @@ public struct ${Self}<Bound : Comparable>
 
   /// Returns `true` iff the `Interval` contains `x`.
   @warn_unused_result
-  public func contains(x: Bound) -> Bool {
+  public func contains(_ x: Bound) -> Bool {
     return x >= start && x ${upperBoundCompare} end
   }
 
@@ -112,7 +112,7 @@ public struct ${Self}<Bound : Comparable>
   /// The bounds of the result, even if it is empty, are always limited to the bounds of
   /// `self`.
   @warn_unused_result
-  public func clamp(intervalToClamp: ${Self}) -> ${Self} {
+  public func clamp(_ intervalToClamp: ${Self}) -> ${Self} {
     return ${Self}(
       _start:
         self.start > intervalToClamp.start ? self.start
@@ -168,7 +168,7 @@ extension Interval {
   @warn_unused_result
   public func overlaps<
     I: Interval where I.Bound == Bound
-  >(other: I) -> Bool {
+  >(_ other: I) -> Bool {
     return (!other.isEmpty && contains(other.start))
       || (!isEmpty && other.contains(start))
   }

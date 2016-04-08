@@ -355,7 +355,7 @@ example using methods::
     }
 
     extension Point2D {
-      @inlineable public func distanceTo(other: Point2D) -> Double {
+      @inlineable public func distanceTo(_ other: Point2D) -> Double {
         let deltaX = self.x - other.x
         let deltaY = self.y - other.y
         return sqrt(deltaX*deltaX + deltaY*deltaY)
@@ -1618,7 +1618,7 @@ Recompiling changes a protocol's implementation
     // Library, version 1
     protocol MagicType {}
     protocol Wearable {}
-    func use<T: MagicType>(item: T) {}
+    func use<T: MagicType>(_ item: T) {}
 
 ::
 
@@ -1639,7 +1639,7 @@ Recompiling changes a protocol's implementation
       func equip() { print("You put it on.") }
     }
 
-    func use<T: MagicType>(item: T) { item.equip() }
+    func use<T: MagicType>(_ item: T) { item.equip() }
 
 Before the client is recompiled, the implementation of ``equip()`` used for
 ``Amulet`` instances can only be the default implementation, i.e. the one that

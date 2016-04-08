@@ -273,6 +273,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     ++SubIt;
   }
   assert(SubIt == SubEnd && "Too many substitutions.");
+  (void) SubEnd;
 
   // 2. Convert call arguments, casting and adjusting for calling convention.
 

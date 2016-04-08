@@ -6,7 +6,7 @@
 @objc class ObjCClass { }
 
 @objc protocol P1 {
-  optional func method(x: Int) // expected-note 2{{requirement 'method' declared here}}
+  optional func method(_ x: Int) // expected-note 2{{requirement 'method' declared here}}
 
   optional var prop: Int { get } // expected-note 2{{requirement 'prop' declared here}}
 
@@ -22,7 +22,7 @@ class C1 : P1 { }
 
 // ... but it's okay to do so.
 class C2 : P1 {
-  @objc func method(x: Int) { }
+  @objc func method(_ x: Int) { }
 
   @objc var prop: Int = 0
 
@@ -39,7 +39,7 @@ class C2 : P1 {
 // -----------------------------------------------------------------------
 
 class C3 : P1 {
-  func method(x: Int) { } 
+  func method(_ x: Int) { } 
   // expected-warning@-1{{non-@objc method 'method' cannot satisfy optional requirement of @objc protocol 'P1'}}{{3-3=@objc }}
 
   var prop: Int = 0
@@ -57,7 +57,7 @@ class C3 : P1 {
 class C4 { }
 
 extension C4 : P1 {
-  func method(x: Int) { } 
+  func method(_ x: Int) { } 
   // expected-warning@-1{{non-@objc method 'method' cannot satisfy optional requirement of @objc protocol 'P1'}}{{3-3=@objc }}
 
   var prop: Int { return 5 }
@@ -75,7 +75,7 @@ extension C4 : P1 {
 class C5 : P1 { }
 
 extension C5 {
-  func method(x: Int) { } 
+  func method(_ x: Int) { } 
 
   var prop: Int { return 5 }
 
@@ -90,7 +90,7 @@ extension C5 {
 class C6 { }
 
 extension C6 : P1 {
-  @nonobjc func method(x: Int) { } 
+  @nonobjc func method(_ x: Int) { } 
 
   @nonobjc var prop: Int { return 5 }
 
@@ -107,7 +107,7 @@ extension C6 : P1 {
 // -----------------------------------------------------------------------
 
 // Optional method references in generics.
-func optionalMethodGeneric<T : P1>(t: T) {
+func optionalMethodGeneric<T : P1>(_ t: T) {
   // Infers a value of optional type.
   var methodRef = t.method
 
@@ -119,7 +119,7 @@ func optionalMethodGeneric<T : P1>(t: T) {
 }
 
 // Optional property references in generics.
-func optionalPropertyGeneric<T : P1>(t: T) {
+func optionalPropertyGeneric<T : P1>(_ t: T) {
   // Infers a value of optional type.
   var propertyRef = t.prop
 
@@ -132,7 +132,7 @@ func optionalPropertyGeneric<T : P1>(t: T) {
 }
 
 // Optional subscript references in generics.
-func optionalSubscriptGeneric<T : P1>(t: T) {
+func optionalSubscriptGeneric<T : P1>(_ t: T) {
   // Infers a value of optional type.
   var subscriptRef = t[5]
 
@@ -145,7 +145,7 @@ func optionalSubscriptGeneric<T : P1>(t: T) {
 }
 
 // Optional method references in existentials.
-func optionalMethodExistential(t: P1) {
+func optionalMethodExistential(_ t: P1) {
   // Infers a value of optional type.
   var methodRef = t.method
 
@@ -157,7 +157,7 @@ func optionalMethodExistential(t: P1) {
 }
 
 // Optional property references in existentials.
-func optionalPropertyExistential(t: P1) {
+func optionalPropertyExistential(_ t: P1) {
   // Infers a value of optional type.
   var propertyRef = t.prop
 
@@ -170,7 +170,7 @@ func optionalPropertyExistential(t: P1) {
 }
 
 // Optional subscript references in existentials.
-func optionalSubscriptExistential(t: P1) {
+func optionalSubscriptExistential(_ t: P1) {
   // Infers a value of optional type.
   var subscriptRef = t[5]
 
@@ -200,7 +200,7 @@ optional class optErrorClass { // expected-error{{'optional' modifier cannot be 
 }
   
 protocol optErrorProtocol {
-  optional func foo(x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
+  optional func foo(_ x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
   optional associatedtype Assoc  // expected-error{{'optional' modifier cannot be applied to this declaration}} {{3-12=}}
 }
 

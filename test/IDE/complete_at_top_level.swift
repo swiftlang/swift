@@ -131,16 +131,16 @@
 struct FooStruct {
   var instanceVar = 0
 
-  func instanceFunc(a: Int) {}
+  func instanceFunc(_ a: Int) {}
   // Add more stuff as needed.
 }
 
 var fooObject : FooStruct
 
 func fooFunc1() {}
-func fooFunc2(a: Int, _ b: Double) {}
+func fooFunc2(_ a: Int, _ b: Double) {}
 
-func erroneous1(x: Undeclared) {}
+func erroneous1(_ x: Undeclared) {}
 
 //===--- Test code completions of expressions that can be typechecked.
 

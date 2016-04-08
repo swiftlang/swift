@@ -57,7 +57,7 @@ OptionalTests.test("nil comparison") {
   expectEqual("forced extraction use: 2.", "forced extraction use: \(x!.successor()).")
 }
 
-func testRelation(p: (Int?, Int?) -> Bool) -> [Bool] {
+func testRelation(_ p: (Int?, Int?) -> Bool) -> [Bool] {
   typealias optPair = (Int?, Int?)
   
   let relationships: [optPair] = [
@@ -177,31 +177,31 @@ OptionalTests.test("flatMap") {
 
 @inline(never)
 @_semantics("optimize.sil.never")
-func anyToAny<T, U>(a: T, _ : U.Type) -> U {
+func anyToAny<T, U>(_ a: T, _ : U.Type) -> U {
   return a as! U
 }
 
 @inline(never)
 @_semantics("optimize.sil.never")
-func anyToAnyIs<T, U>(a: T, _ : U.Type) -> Bool {
+func anyToAnyIs<T, U>(_ a: T, _ : U.Type) -> Bool {
   return a is U
 }
 
 @inline(never)
 @_semantics("optimize.sil.never")
-func anyToAnyIsOptional<T, U>(a: T?, _ : U.Type) -> Bool {
+func anyToAnyIsOptional<T, U>(_ a: T?, _ : U.Type) -> Bool {
   return a is U?
 }
 
 @inline(never)
 @_semantics("optimize.sil.never")
-func anyToAnyOrNil<T, U>(a: T, _ : U.Type) -> U? {
+func anyToAnyOrNil<T, U>(_ a: T, _ : U.Type) -> U? {
   return a as? U
 }
 
 @inline(never)
 @_semantics("optimize.sil.never")
-func canGenericCast<T, U>(a: T, _ ty : U.Type) -> Bool {
+func canGenericCast<T, U>(_ a: T, _ ty : U.Type) -> Bool {
   return anyToAnyOrNil(a, ty) != nil
 }
 
@@ -311,7 +311,7 @@ class TestStream : Streamable {
   }
 }
 
-func debugPrintStr<T>(a: T) -> String {
+func debugPrintStr<T>(_ a: T) -> String {
   var s = ""
   debugPrint(a, terminator: "", to: &s)
   return s

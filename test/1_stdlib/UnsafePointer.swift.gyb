@@ -128,7 +128,7 @@ class Missile {
   deinit { Missile.missilesLaunched += 1 }
 }
 
-func checkPointerCorrectness(check: Check,
+func checkPointerCorrectness(_ check: Check,
   _ f: (UnsafeMutablePointer<Missile>) ->
     (UnsafeMutablePointer<Missile>, count: Int) -> Void,
   _ withMissiles: Bool = false) {

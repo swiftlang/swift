@@ -15,13 +15,13 @@ func gen<R>() -> R {
 }
 
 extension C {
-  class func factory(z: Int) -> Self {
+  class func factory(_ z: Int) -> Self {
     return gen()
   }
 }
 // The integer argument is truly dead, but the C.Type metadata argument may not be removed.
 // function signature specialization <Arg[0] = Dead> of static functionsigopts_self.C.factory (functionsigopts_self.C.Type)(Swift.Int) -> Self
-// CHECK-LABEL: sil hidden @_TTSf4d_n___TZFC20functionsigopts_self1C7factory{{.*}} : $@convention(thin) (@thick C.Type) -> @owned C
+// CHECK-LABEL: sil hidden @_TTSf4d_n___TZFC20functionsigopts_self1C7factory{{.*}} : $@convention(method) (@thick C.Type) -> @owned C
 // CHECK: bb0(%0 : $@thick C.Type):
 // CHECK: function_ref functionsigopts_self.gen <A> () -> A
 // CHECK: apply %{{[0-9]+}}<Self>

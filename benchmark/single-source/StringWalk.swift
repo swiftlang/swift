@@ -22,14 +22,14 @@ import TestsUtils
 
 var count: Int = 0
 
-@inline(never) func countChars(s: String) {
+@inline(never) func countChars(_ s: String) {
   for _ in s.unicodeScalars {
     count += 1
   }
 }
 
 @inline(never)
-public func run_StringWalk(N: Int) {
+public func run_StringWalk(_ N: Int) {
   let s = "siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebzig"
 
   for _ in 1...50000*N {

@@ -10,11 +10,11 @@
 // But: we want debug info for it.
 // CHECK-IR: !DISubprogram(name: "to_be_inlined"
 
-private func to_be_inlined(x: Int) -> Int {
+private func to_be_inlined(_ x: Int) -> Int {
 	return x + 1
 }
 
-public func caller(x: Int) -> Int {
+public func caller(_ x: Int) -> Int {
 	return to_be_inlined(x)
 }
 

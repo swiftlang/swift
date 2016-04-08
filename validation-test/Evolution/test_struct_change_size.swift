@@ -7,7 +7,7 @@ import struct_change_size
 
 var ClassChangeSizeTest = TestSuite("ClassChangeSize")
 
-func increment(c: inout ChangeSize) {
+func increment(_ c: inout ChangeSize) {
   c.version += 1
 }
 

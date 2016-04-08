@@ -884,6 +884,11 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
     auto super = archetype->getSuperclass();
     if (super.isNull())
       return false;
+
+    // Only ever permit this if the source type is a reference type.
+    if (!objectType.isAnyClassReferenceType())
+      return false;
+
     // A base class constraint that isn't NSError rules out the archetype being
     // bound to NSError.
     if (auto nserror = M.Types.getNSErrorType())
@@ -893,7 +898,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
   }
   
   if (targetType == M.Types.getNSErrorType()) {
-    // If we statically know the target is an NSError subclass, then the cast
+    // If we statically know the source is an NSError subclass, then the cast
     // can go through the scalar path (and it's trivially true so can be
     // killed).
     return targetType->isExactSuperclassOf(objectType, nullptr);
@@ -904,7 +909,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
   // - metatype to object
   // - object to object
   if ((objectType.isAnyClassReferenceType() || isa<AnyMetatypeType>(objectType))
-      && targetType->isAnyClassReferenceType())
+      && targetType.isAnyClassReferenceType())
     return true;
 
   if (isa<AnyMetatypeType>(objectType) && isa<AnyMetatypeType>(targetType))

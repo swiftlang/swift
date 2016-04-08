@@ -11,7 +11,7 @@ class ABC : Pingable {
   func ping() {}
 }
 
-func generic_call<T : Pingable>(x: T) {
+func generic_call<T : Pingable>(_ x: T) {
   x.ping()
 }
 
@@ -30,14 +30,14 @@ func interesting_code_here() {
 
 // Devirtualize generic archetype_methods with subst list.
 protocol TPingable {
-  func ping<T>(x : T)
+  func ping<T>(_ x : T)
 }
 
 class Foo : TPingable {
-  func ping<T>(x : T) {}
+  func ping<T>(_ x : T) {}
 }
 
-func aMethod<T : TPingable>(x : T) {
+func aMethod<T : TPingable>(_ x : T) {
   x.ping(2)
 }
 

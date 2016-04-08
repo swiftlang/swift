@@ -1458,7 +1458,7 @@ function(add_swift_library name)
         elseif("${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_TVOS})
-        elseif("${SDK}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
+        elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WATCHOS})
         endif()

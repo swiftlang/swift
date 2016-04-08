@@ -52,7 +52,7 @@ func test_switch(u: MaybePair) {
   do_switch(u: u)
 }
 
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7WrapperCfT3ValVs5Int32_S0_ : $@convention(thin) (Int32, @thin Wrapper.Type) -> Wrapper {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7WrapperCfT3ValVs5Int32_S0_ : $@convention(method) (Int32, @thin Wrapper.Type) -> Wrapper {
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper8getValue{{.*}} : $@convention(method) (Wrapper) -> Int32 {
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapperg10valueAgainVs5Int32 : $@convention(method) (Wrapper) -> Int32 {
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper13getValueAgain{{.*}} : $@convention(method) (Wrapper) -> Int32 {

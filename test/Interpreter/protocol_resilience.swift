@@ -21,7 +21,7 @@ import resilient_protocol
 
 var ResilientProtocolTestSuite = TestSuite("ResilientProtocol")
 
-func increment(x: inout Int, by: Int) {
+func increment(_ x: inout Int, by: Int) {
   x += by
 }
 

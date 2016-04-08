@@ -1,6 +1,6 @@
 class A<T> {
   typealias Element = T
-  func convertFromArrayLiteral(elements: Element...) -> A {
+  func convertFromArrayLiteral(_ elements: Element...) -> A {
     return A()
   }
 }

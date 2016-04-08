@@ -957,6 +957,7 @@ bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
 
   unsigned e = rawWitnessIDs.size();
   assert(e % 2 == 0 && "malformed default witness table");
+  (void) e;
 
   for (unsigned i = 0, e = rawWitnessIDs.size(); i < e; i += 2) {
     ValueDecl *requirement = cast<ValueDecl>(getDecl(rawWitnessIDs[i]));

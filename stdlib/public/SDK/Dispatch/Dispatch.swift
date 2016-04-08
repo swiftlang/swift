@@ -65,7 +65,7 @@ public var DISPATCH_QUEUE_PRIORITY_BACKGROUND: dispatch_queue_priority_t {
 }
 
 @warn_unused_result
-public func dispatch_get_global_queue(identifier: qos_class_t,
+public func dispatch_get_global_queue(_ identifier: qos_class_t,
                                       _ flags: UInt) -> dispatch_queue_t {
   return dispatch_get_global_queue(Int(identifier.rawValue), flags)
 }

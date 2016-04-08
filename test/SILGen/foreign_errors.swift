@@ -105,22 +105,22 @@ extension NSObject {
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFE14foreign_errorsCSo8NSObject7takeInt{{.*}} : $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
 // CHECK: bb0([[I:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[SELF:%[0-9]+]] : $NSObject)
-  @objc func takeInt(i: Int) throws { }
+  @objc func takeInt(_ i: Int) throws { }
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFE14foreign_errorsCSo8NSObject10takeDouble{{.*}} : $@convention(objc_method) (Double, Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @convention(block) (Int) -> Int, NSObject) -> Bool
 // CHECK: bb0([[D:%[0-9]+]] : $Double, [[INT:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[CLOSURE:%[0-9]+]] : $@convention(block) (Int) -> Int, [[SELF:%[0-9]+]] : $NSObject):
-  @objc func takeDouble(d: Double, int: Int, closure: (Int) -> Int) throws {
+  @objc func takeDouble(_ d: Double, int: Int, closure: (Int) -> Int) throws {
     throw NSError(domain: "", code: 1, userInfo: [:])
   }
 }
 
 let fn = ErrorProne.fail
 // CHECK-LABEL: sil shared [thunk] @_TTOZFCSo10ErrorProne4fail{{.*}} : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_owned () -> @error ErrorProtocol
-// CHECK:      [[T0:%.*]] = function_ref @_TTOZFCSo10ErrorProne4fail{{.*}} : $@convention(thin) (@thick ErrorProne.Type) -> @error ErrorProtocol
+// CHECK:      [[T0:%.*]] = function_ref @_TTOZFCSo10ErrorProne4fail{{.*}} : $@convention(method) (@thick ErrorProne.Type) -> @error ErrorProtocol
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[T0]](%0)
 // CHECK-NEXT: return [[T1]]
 
-// CHECK-LABEL: sil shared [thunk] @_TTOZFCSo10ErrorProne4fail{{.*}} : $@convention(thin) (@thick ErrorProne.Type) -> @error ErrorProtocol {
+// CHECK-LABEL: sil shared [thunk] @_TTOZFCSo10ErrorProne4fail{{.*}} : $@convention(method) (@thick ErrorProne.Type) -> @error ErrorProtocol {
 // CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
 // CHECK:      [[METHOD:%.*]] = class_method [volatile] [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : ErrorProne.Type -> () throws -> () , $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> Bool
 // CHECK:      [[TEMP:%.*]] = alloc_stack $Optional<NSError>
@@ -164,7 +164,7 @@ class VeryErrorProne : ErrorProne {
 
 // rdar://21051021
 // CHECK: sil hidden @_TF14foreign_errors12testProtocolFzPSo18ErrorProneProtocol_T_
-func testProtocol(p: ErrorProneProtocol) throws {
+func testProtocol(_ p: ErrorProneProtocol) throws {
   // CHECK:   [[T0:%.*]] = open_existential_ref %0 : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
   // CHECK:   [[T1:%.*]] = witness_method [volatile] $[[OPENED]], #ErrorProneProtocol.obliterate!1.foreign, [[T0]] : $[[OPENED]] :
   // CHECK:   apply [[T1]]<[[OPENED]]>({{%.*}}, [[T0]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ErrorProneProtocol> (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, τ_0_0) -> Bool
@@ -178,7 +178,7 @@ func testProtocol(p: ErrorProneProtocol) throws {
 
 // rdar://21144509 - Ensure that overrides of replace-with-() imports are possible.
 class ExtremelyErrorProne : ErrorProne {
-  override func conflict3(obj: AnyObject, error: ()) throws {}
+  override func conflict3(_ obj: AnyObject, error: ()) throws {}
 }
 // CHECK: sil hidden @_TFC14foreign_errors19ExtremelyErrorProne9conflict3{{.*}}
 // CHECK: sil hidden [thunk] @_TToFC14foreign_errors19ExtremelyErrorProne9conflict3{{.*}} : $@convention(objc_method) (AnyObject, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, ExtremelyErrorProne) -> Bool

@@ -1,7 +1,7 @@
 
 class C1 {
   init(passInt: Int, andThis: Float) {}
-  func meth(x: Int, passFloat: Float) {}
+  func meth(_ x: Int, passFloat: Float) {}
 }
 var c1 = C1(passInt: 0, andThis: 0)
 c1.meth(0, passFloat: 0)
@@ -15,7 +15,7 @@ c1.meth(0, passFloat: 0)
 
 // RUN: %sourcekitd-test -req=cursor -pos=7:6 %s -- %s | FileCheck -check-prefix=CHECK-METH %s
 // RUN: %sourcekitd-test -req=cursor -pos=7:14 %s -- %s | FileCheck -check-prefix=CHECK-METH %s
-// CHECK-METH: source.lang.swift.ref.function.method.instance (4:8-4:38)
+// CHECK-METH: source.lang.swift.ref.function.method.instance (4:8-4:40)
 
 // Make sure we don't highlight all "meth" occurrences when pointing at "withFloat:".
 // RUN: %sourcekitd-test -req=related-idents -pos=7:15 %s -- %s | FileCheck -check-prefix=CHECK-IDS %s

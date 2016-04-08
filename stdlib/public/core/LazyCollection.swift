@@ -95,7 +95,7 @@ extension LazyCollection : Sequence {
   }
 
   public func _customContainsEquatableElement(
-    element: Base.Iterator.Element
+    _ element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
@@ -155,7 +155,7 @@ extension LazyCollection : Collection {
   ///
   /// - Complexity: O(N).
   public func _customIndexOfEquatableElement(
-    element: Base.Iterator.Element
+    _ element: Base.Iterator.Element
   ) -> Index?? {
     return _base._customIndexOfEquatableElement(element)
   }

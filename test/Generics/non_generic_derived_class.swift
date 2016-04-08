@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 class Base<T> {
-  class func f(arg: T) -> Int {
+  class func f(_ arg: T) -> Int {
     return 0
   }
 }

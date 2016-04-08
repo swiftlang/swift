@@ -64,7 +64,7 @@ var condition = UnComputable.canCompute()
 var revP = p.swap()
 
 
-func testMasterConformanceMap(x: Int32) -> Bool {
+func testMasterConformanceMap(_ x: Int32) -> Bool {
   return x != -1
 }
 
@@ -82,7 +82,7 @@ struct TestLetProperties {
     _ = b.pattyCount
   }
 
-  func flip(b: Burger) {
+  func flip(_ b: Burger) {
     _ = b.pattyCount
   }
 }

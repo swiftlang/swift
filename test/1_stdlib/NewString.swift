@@ -8,13 +8,13 @@ import Swift
 
 // ==== Tests =====
 
-func hex(x: UInt64) -> String { return String(x, radix:16) }
+func hex(_ x: UInt64) -> String { return String(x, radix:16) }
 
-func hexAddrVal<T>(x: T) -> String {
+func hexAddrVal<T>(_ x: T) -> String {
   return "@0x" + hex(UInt64(unsafeBitCast(x, to: UInt.self)))
 }
 
-func hexAddr(x: AnyObject?) -> String {
+func hexAddr(_ x: AnyObject?) -> String {
   if let owner = x {
     if let y = owner as? _StringBuffer._Storage.Storage {
       return ".native\(hexAddrVal(y))"
@@ -29,11 +29,11 @@ func hexAddr(x: AnyObject?) -> String {
   return "null"
 }
 
-func repr(x: NSString) -> String {
+func repr(_ x: NSString) -> String {
   return "\(NSStringFromClass(object_getClass(x)))\(hexAddrVal(x)) = \"\(x)\""
 }
 
-func repr(x: _StringCore) -> String {
+func repr(_ x: _StringCore) -> String {
   if x.hasContiguousStorage {
     if let b = x.nativeBuffer {
     var offset = x.elementWidth == 2
@@ -51,7 +51,7 @@ func repr(x: _StringCore) -> String {
   return "?????"
 }
 
-func repr(x: String) -> String {
+func repr(_ x: String) -> String {
   return "String(\(repr(x._core))) = \"\(x)\""
 }
 

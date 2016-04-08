@@ -6,7 +6,7 @@ import blocks
 import Foundation
 
 var someNSString : NSString
-func useString(s: String) {}
+func useString(_ s: String) {}
 
 dispatch_async(dispatch_get_current_queue()) { }
 someNSString.enumerateLines {(s:String?) in }
@@ -26,7 +26,7 @@ func testNoEscape(@noescape f: @convention(block) () -> Void, nsStr: NSString,
   _ = nsStr.enumerateLines as Int // expected-error{{cannot convert value of type '(@noescape (String!) -> Void) -> Void' to type 'Int' in coercion}}
 }
 
-func checkTypeImpl<T>(a: inout T, _: T.Type) {}
+func checkTypeImpl<T>(_ a: inout T, _: T.Type) {}
 do {
   var block = blockWithoutNullability()
   checkTypeImpl(&block, ImplicitlyUnwrappedOptional<dispatch_block_t>.self)

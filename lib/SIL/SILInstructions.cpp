@@ -453,8 +453,11 @@ static SILType getPinResultType(SILType operandType) {
     OptionalType::get(operandType.getSwiftRValueType())->getCanonicalType());
 }
 
-StrongPinInst::StrongPinInst(SILDebugLocation Loc, SILValue operand)
-    : UnaryInstructionBase(Loc, operand, getPinResultType(operand->getType())) {}
+StrongPinInst::StrongPinInst(SILDebugLocation Loc, SILValue operand,
+                             Atomicity atomicity)
+    : UnaryInstructionBase(Loc, operand, getPinResultType(operand->getType())) {
+  setAtomicity(atomicity);
+}
 
 CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
                            SILValue DestLValue, IsTake_t isTakeOfSrc,

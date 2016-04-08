@@ -31,7 +31,7 @@ var words = [
   "Bobby", "Dylan", "Johnny", "Phillip", "Craig"]
 
 @inline(never)
-public func run_AngryPhonebook(N: Int) {
+public func run_AngryPhonebook(_ N: Int) {
   // Permute the names.
   for _ in 1...N {
     for firstname in words {

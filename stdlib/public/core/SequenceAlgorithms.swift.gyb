@@ -70,7 +70,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   @warn_unused_result
   public func min(
 %   if preds:
-    @noescape isOrderedBefore isOrderedBefore:
+    @noescape isOrderedBefore:
       (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
@@ -93,7 +93,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   @warn_unused_result
   public func max(
 %   if preds:
-    @noescape isOrderedBefore isOrderedBefore:
+    @noescape isOrderedBefore:
       (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
@@ -197,7 +197,7 @@ else:
   public func elementsEqual<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
-    other: OtherSequence${"," if preds else ""}
+    _ other: OtherSequence${"," if preds else ""}
 %   if preds:
     @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
@@ -265,7 +265,7 @@ else:
   public func lexicographicallyPrecedes<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
-    other: OtherSequence${"," if preds else ""}
+    _ other: OtherSequence${"," if preds else ""}
 %   if preds:
     @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
@@ -300,7 +300,7 @@ else:
 extension Sequence where Iterator.Element : Equatable {
   /// Returns `true` iff `element` is in `self`.
   @warn_unused_result
-  public func contains(element: ${GElement}) -> Bool {
+  public func contains(_ element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
     }
@@ -318,7 +318,7 @@ extension Sequence {
   /// Returns `true` iff an element in `self` satisfies `predicate`.
   @warn_unused_result
   public func contains(
-    @noescape predicate: (${GElement}) throws -> Bool
+    @noescape _ predicate: (${GElement}) throws -> Bool
   ) rethrows -> Bool {
     for e in self {
       if try predicate(e) {
@@ -341,7 +341,7 @@ extension Sequence {
   /// self[1]),...self[count-2]), self[count-1])`.
   @warn_unused_result
   public func reduce<T>(
-    initial: T, @noescape combine: (T, ${GElement}) throws -> T
+    _ initial: T, @noescape combine: (T, ${GElement}) throws -> T
   ) rethrows -> T {
     var result = initial
     for element in self {
@@ -392,7 +392,7 @@ extension Sequence {
   ///   and *N* is the length of the result.
   @warn_unused_result
   public func flatMap<S : Sequence>(
-    @noescape transform: (${GElement}) throws -> S
+    @noescape _ transform: (${GElement}) throws -> S
   ) rethrows -> [S.${GElement}] {
     var result: [S.${GElement}] = []
     for element in self {
@@ -410,7 +410,7 @@ extension Sequence {
   ///   and *N* is the length of the result.
   @warn_unused_result
   public func flatMap<T>(
-    @noescape transform: (${GElement}) throws -> T?
+    @noescape _ transform: (${GElement}) throws -> T?
   ) rethrows -> [T] {
     var result: [T] = []
     for element in self {
@@ -430,14 +430,14 @@ extension Sequence {
 
   @available(*, unavailable, renamed: "min")
   public func minElement(
-    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
+    @noescape _ isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "max")
   public func maxElement(
-    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
+    @noescape _ isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
     fatalError("unavailable function can't be called")
   }
@@ -461,7 +461,7 @@ extension Sequence {
   public func lexicographicalCompare<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
-    other: OtherSequence,
+    _ other: OtherSequence,
     @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
   ) rethrows -> Bool {
     fatalError("unavailable function can't be called")
@@ -492,7 +492,7 @@ extension Sequence where Iterator.Element : Comparable {
   public func lexicographicalCompare<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
-    other: OtherSequence
+    _ other: OtherSequence
   ) -> Bool {
     fatalError("unavailable function can't be called")
   }

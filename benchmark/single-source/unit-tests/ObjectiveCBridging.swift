@@ -14,12 +14,12 @@ import TestsUtils
 import Foundation
 
 @inline(never)
-public func forcedCast<NS, T>(ns: NS) -> T {
+public func forcedCast<NS, T>(_ ns: NS) -> T {
   return ns as! T
 }
 
 @inline(never)
-public func conditionalCast<NS, T>(ns: NS) -> T? {
+public func conditionalCast<NS, T>(_ ns: NS) -> T? {
   return ns as? T
 }
 
@@ -46,7 +46,7 @@ func testObjectiveCBridgeFromNSString() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSString(N: Int) {
+public func run_ObjectiveCBridgeFromNSString(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSString()
   }
@@ -65,7 +65,7 @@ func testObjectiveCBridgeFromNSStringForced() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSStringForced(N: Int) {
+public func run_ObjectiveCBridgeFromNSStringForced(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSStringForced()
   }
@@ -84,7 +84,7 @@ func testObjectiveCBridgeToNSString() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeToNSString(N: Int) {
+public func run_ObjectiveCBridgeToNSString(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeToNSString()
   }
@@ -123,7 +123,7 @@ func testObjectiveCBridgeFromNSArrayAnyObject() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSArrayAnyObject(N: Int) {
+public func run_ObjectiveCBridgeFromNSArrayAnyObject(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSArrayAnyObject()
   }
@@ -142,7 +142,7 @@ func testObjectiveCBridgeFromNSArrayAnyObjectForced() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSArrayAnyObjectForced(N: Int) {
+public func run_ObjectiveCBridgeFromNSArrayAnyObjectForced(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSArrayAnyObjectForced()
   }
@@ -162,7 +162,7 @@ func testObjectiveCBridgeToNSArray() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeToNSArray(N: Int) {
+public func run_ObjectiveCBridgeToNSArray(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeToNSArray()
   }
@@ -182,7 +182,7 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToString() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSArrayAnyObjectToString(N: Int) {
+public func run_ObjectiveCBridgeFromNSArrayAnyObjectToString(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSArrayAnyObjectToString()
   }
@@ -201,7 +201,7 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToStringForced() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced(N: Int) {
+public func run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSArrayAnyObjectToStringForced()
   }
@@ -250,7 +250,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObject() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSDictionaryAnyObject(N: Int) {
+public func run_ObjectiveCBridgeFromNSDictionaryAnyObject(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSDictionaryAnyObject()
   }
@@ -271,7 +271,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectForced() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced(N: Int) {
+public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSDictionaryAnyObjectForced()
   }
@@ -292,7 +292,7 @@ func testObjectiveCBridgeToNSDictionary() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeToNSDictionary(N: Int) {
+public func run_ObjectiveCBridgeToNSDictionary(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeToNSDictionary()
   }
@@ -314,7 +314,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToString() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString(N: Int) {
+public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSDictionaryAnyObjectToString()
   }
@@ -336,7 +336,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced(N: Int) {
+public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced()
   }
@@ -386,7 +386,7 @@ func testObjectiveCBridgeFromNSSetAnyObject() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSSetAnyObject(N: Int) {
+public func run_ObjectiveCBridgeFromNSSetAnyObject(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSSetAnyObject()
   }
@@ -407,7 +407,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectForced() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSSetAnyObjectForced(N: Int) {
+public func run_ObjectiveCBridgeFromNSSetAnyObjectForced(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSSetAnyObjectForced()
   }
@@ -428,7 +428,7 @@ func testObjectiveCBridgeToNSSet() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeToNSSet(N: Int) {
+public func run_ObjectiveCBridgeToNSSet(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeToNSSet()
   }
@@ -450,7 +450,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectToString() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSSetAnyObjectToString(N: Int) {
+public func run_ObjectiveCBridgeFromNSSetAnyObjectToString(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSSetAnyObjectToString()
   }
@@ -472,7 +472,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced(N: Int) {
+public func run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced(_ N: Int) {
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSSetAnyObjectToStringForced()
   }
