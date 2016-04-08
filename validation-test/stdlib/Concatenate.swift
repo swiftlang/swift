@@ -39,9 +39,11 @@ for (expected, source) in samples {
   ConcatenateTests.test("reverse-\(source)")
     .xfail(.custom( { true }, reason: "[swift-3-indexing-model] ReversedCollection.advance is not implemented"))
     .code {
+    // FIXME: swift-3-indexing-model expectedReversed is a workaround for <rdar://problem/25632022>
+    let expectedReversed = expected.lazy.reversed()
     // FIXME: separate 'expected' and 'reversed' variables are a workaround
     // for: <rdar://problem/20789500>
-    let expected = ContiguousArray(expected.lazy.reversed())
+    let expected = ContiguousArray(expectedReversed)
     let reversed = source.flatten().reversed()
     checkBidirectionalCollection(expected, reversed)
   }
