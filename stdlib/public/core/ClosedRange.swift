@@ -186,8 +186,7 @@ public struct ClosedRangeIterator<
   internal let _upperBound: Bound
 }
 
-/// A closed range that forms a collection of consecutive strideable comparable
-/// values.
+/// A closed range that forms a collection of consecutive `Strideable` values.
 ///
 /// A `CountableClosedRange` contains both its `lowerBound` and its
 /// `upperBound`. A `CountableClosedRange` with one element has
@@ -241,7 +240,6 @@ public struct CountableClosedRange<
   ///   should be used as an optimization only, when one is absolutely
   ///   certain that `lower <= upper`.  In general, the `...`
   ///   operator is to be preferred for forming closed ranges.
-  ///
   /// - Precondition: `lower <= upper`
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
@@ -256,7 +254,7 @@ public struct CountableClosedRange<
   /// The range's upper bound.
   ///
   /// `upperBound` is always reachable from `lowerBound` by zero or
-  /// more applications of `successor()`.
+  /// more applications of `successor(of:)`.
   public let upperBound: Bound
   
   @warn_unused_result
@@ -266,7 +264,8 @@ public struct CountableClosedRange<
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "CountableClosedRange(\(String(reflecting: lowerBound))...\(String(reflecting: upperBound)))"
+    return "CountableClosedRange(\(String(reflecting: lowerBound))"
+      + "...\(String(reflecting: upperBound)))"
   }
 
   public // ambiguity resolution between RangeProtocol and Collection defaults
@@ -289,9 +288,16 @@ extension CountableClosedRange : CustomReflectable {
   }
 }
 
-/// A closed range that contains both its lower and upper bound.
-/// 
-/// `ClosedRange` cannot represent an empty range.
+/// A span over a range of `Comparable` values, from a lower bound up to and
+/// including an upper bound. Cannot represent an empty range.
+///
+/// Use a `ClosedRange` to quickly check if a `Comparable` value is contained
+/// in a particular range of values. For example:
+///
+///     let lowercase: ClosedRange = "a"..."z"
+///     lowercase.contains("c")    // true
+///     lowercase.contains("5")    // false
+///     lowercase.contains("z")    // true
 public struct ClosedRange<
   Bound : Comparable
 > : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
@@ -300,6 +306,10 @@ public struct ClosedRange<
   /// Creates a range with `lowerBound == lower` and `upperBound ==
   /// upper`.
   ///
+  /// - Note: as this initializer does not check its precondition, it
+  ///   should be used as an optimization only, when one is absolutely
+  ///   certain that `lower <= upper`.  In general, the `...`
+  ///   operator is to be preferred for forming closed ranges.
   /// - Precondition: `lower <= upper`
   @inline(__always)
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
@@ -313,7 +323,8 @@ public struct ClosedRange<
   /// The range's upper bound.
   public let upperBound: Bound
 
-  /// Returns `true` iff `lowerBound <= element && element <= upperBound`.
+  /// Returns `true` iff `element` is between `lowerBound` and `upperBound` or
+  /// equal to either bound.
   @warn_unused_result
   public func contains(element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
@@ -327,7 +338,7 @@ public struct ClosedRange<
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"
-    + "...\(String(reflecting: upperBound)))"
+      + "...\(String(reflecting: upperBound)))"
   }
 }
 

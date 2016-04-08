@@ -16,15 +16,14 @@ public enum _DisabledRangeIndex_ {}
 
 /// A type that represents a contiguous range of any comparable value.
 ///
-/// A range contains at least every value `x` where
-/// `lowerBound < x < upperBound`. Individual types that conform to
-/// `RangeProtocol` must specify their containment rules for the bounds of the
-/// range.
+/// A range contains at least every value `x` where `lowerBound < x` and
+/// `x < upperBound`. Individual types that conform to `RangeProtocol` must
+/// specify their containment rules for the bounds of the range.
 ///
 /// The standard library defines two kinds of ranges: closed ranges,
 /// represented by `ClosedRangeProtocol`, and half-open ranges, represented by
 /// `HalfOpenRangeProtocol`. A closed range contains both its lower and upper
-/// bound, and therefore cannot be empty. A half-open range, on the other
+/// bounds, and therefore cannot be empty. A half-open range, on the other
 /// hand, contains its lower bound when nonempty but never its upper bound.
 ///
 ///     let closed: ClosedRange = 5...10
@@ -139,7 +138,7 @@ extension RangeProtocol {
   }
 }
 
-/// A type that represents a contiguous range of any comparable value,
+/// A type that represents a contiguous range of any `Comparable` value,
 /// with nonempty ranges containing their lower bounds but not their
 /// upper bounds.
 /// 
@@ -223,8 +222,8 @@ extension HalfOpenRangeProtocol
   }
 }
 
-/// A half-open range that forms a collection of consecutive strideable
-/// comparable values.
+/// A half-open range that forms a collection of consecutive `Strideable`
+/// values.
 ///
 /// A `CountableRange` instance contains its `lowerBound` but not its upper
 /// bound. Like other collections, a `CountableRange` containing one element
@@ -320,7 +319,9 @@ public struct CountableRange<
   ///
   /// `upperBound` is not a valid argument to `subscript`, and is always
   /// reachable from `lowerBound` by zero or more applications of
-  /// `successor()`.
+  /// `successor(of:)`.
+  /// 
+  /// Identical to `lowerBound` in an empty range.
   public let upperBound: Bound
   
   // FIXME(compiler limitation): this typealias should be inferred.
@@ -413,17 +414,27 @@ extension CountableRange : CustomReflectable {
   }
 }
 
-/// A half-open range that contains its lower bound but not its upper bound.
-/// 
-/// `Range` can represent an empty range.
+/// A span over a range of `Comparable` values, from a lower bound up to, but
+/// not including, an upper bound. Can represent an empty range.
+///
+/// Use a `Range` to quickly check if a `Comparable` value is contained in a
+/// particular range of values. For example:
+///
+///     let underFive: Range = 0.0..<5.0
+///     underFive.contains(3.14)    // true
+///     underFive.contains(6.28)    // false
+///     underFive.contains(5.0)     // false
 public struct Range<
   Bound : Comparable
 > : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
     HalfOpenRangeProtocol {
 
-  /// Creates a range with `lowerBound == lower` and `upperBound ==
-  /// upper`.
-  /// 
+  /// Creates a range with `lowerBound == lower` and `upperBound == upper`.
+  ///
+  /// - Note: As this initializer does not check its precondition, it should be
+  ///   used as an optimization only, when one is absolutely certain that
+  ///   `lower <= upper`. Using the `..<` operator to form `Range` instances
+  ///   is preferred.
   /// - Precondition: `lower <= upper`
   @inline(__always)
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
@@ -442,7 +453,9 @@ public struct Range<
   /// does not contain its `upperBound`.
   public let upperBound: Bound
 
-  /// Returns `true` iff `lowerBound <= element && element < upperBound`.
+  /// Returns `true` iff `element` is between `lowerBound` and `upperBound` or
+  /// equal to `lowerBound`. A `Range` instance does not contain its
+  /// `upperBound`.
   @warn_unused_result
   public func contains(element: Bound) -> Bool {
     return element >= self.lowerBound && element < self.upperBound
