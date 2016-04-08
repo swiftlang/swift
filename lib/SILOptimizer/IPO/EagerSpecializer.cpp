@@ -442,7 +442,8 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
   
   // Create a specialized function.
   GenericFuncSpecializer
-        FuncSpecializer(GenericFunc, SA.getSubstitutions(), ReInfo);
+        FuncSpecializer(GenericFunc, SA.getSubstitutions(),
+                        GenericFunc->isFragile(), ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)
