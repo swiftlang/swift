@@ -370,7 +370,7 @@ void FunctionSignatureInfo::analyze() {
 std::string FunctionSignatureInfo::getOptimizedName() const {
   Mangle::Mangler M;
   auto P = SpecializationPass::FunctionSignatureOpts;
-  FunctionSignatureSpecializationMangler FSSM(P, M, F);
+  FunctionSignatureSpecializationMangler FSSM(P, M, F->isFragile(), F);
 
   // Handle arguments' changes.
   for (unsigned i : indices(ArgDescList)) {
