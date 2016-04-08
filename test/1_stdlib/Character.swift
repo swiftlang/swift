@@ -1,8 +1,6 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
-// XFAIL: interpret
-
 import StdlibUnittest
 import Swift
 import SwiftPrivate

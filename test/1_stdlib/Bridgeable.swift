@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 // FIXME: Should go into the standard library.
