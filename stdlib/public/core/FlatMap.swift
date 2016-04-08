@@ -21,7 +21,7 @@ extension LazySequenceProtocol {
   public func flatMap<SegmentOfResult : Sequence>(
     _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazySequence<
-    FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
+    FlattenedSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
     return self.map(transform).flattened()
   }
 }

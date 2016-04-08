@@ -817,7 +817,7 @@ do {
     let expected = sample.expected
     let data = sample.data
 
-    tests.test("FlattenSequence/\(data)") {
+    tests.test("FlattenedSequence/\(data)") {
       var base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) })
       checkSequence(expected, base.flattened(), resiliencyChecks: .none)
@@ -835,7 +835,7 @@ do {
         "unexpected laziness in \(flattened.dynamicType)")
     }
 
-    tests.test("FlattenSequence/Lazy/\(data)") {
+    tests.test("FlattenedSequence/Lazy/\(data)") {
       // Checking that flatten doesn't remove laziness
       let base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) }
