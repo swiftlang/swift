@@ -1033,11 +1033,16 @@ public:
   /// we're exploring. 
   SolverState *solverState = nullptr;
 
+  struct ArgumentLabelState {
+    ArrayRef<Identifier> Labels;
+    bool HasTrailingClosure;
+  };
+
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument labels provided in the call to
   /// that locator.
-  llvm::DenseMap<ConstraintLocator *, ArrayRef<Identifier>> ArgumentLabels;
+  llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
 
   /// FIXME: This is a workaround for the way we perform protocol
   /// conformance checking for generic requirements, where we re-use
@@ -2198,6 +2203,14 @@ bool matchCallArguments(ArrayRef<CallArgParam> argTuple,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
+
+/// Attempt to prove that arguments with the given labels at the
+/// given parameter depth cannot be used with the given value.
+/// If this cannot be proven, conservatively returns true.
+bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
+                                               unsigned parameterDepth,
+                                               ArrayRef<Identifier> labels,
+                                               bool hasTrailingClosure);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.
