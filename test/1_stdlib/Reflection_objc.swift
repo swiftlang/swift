@@ -111,7 +111,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look uint
-switch PlaygroundQuickLook(reflecting: NSNumber(unsignedLongLong: UInt64.max)) {
+switch PlaygroundQuickLook(reflecting: NSNumber(value: UInt64.max)) {
 case .uInt(UInt64.max):
   print("got the expected quick look uint")
 case _:
@@ -235,7 +235,7 @@ class HasDebugQLO : CanaryBase {
 
 class HasNumberQLO : CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
-    let number = NSNumber(integer: 97210)
+    let number = NSNumber(value: 97210)
     return number
   }
 }

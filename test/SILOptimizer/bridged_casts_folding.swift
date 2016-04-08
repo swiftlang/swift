@@ -49,7 +49,7 @@ public func testCondCastNStoSwiftString() -> String? {
 
 // Check optimizations of casts from NSNumber to Int
 
-var nsIntNumber = NSNumber(integer: 1)
+var nsIntNumber = NSNumber(value: 1)
 
 // CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding32testForcedCastNSNumberToSwiftIntFT_Si
 // CHECK-NOT: unconditional_checked
@@ -73,7 +73,7 @@ public func testCondCastNSNumberToSwiftInt() -> Int? {
 
 // Check optimizations of casts from NSNumber to Double
 
-var nsDoubleNumber = NSNumber(double: 1.234)
+var nsDoubleNumber = NSNumber(value: 1.234)
 
 // CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding35testForcedCastNSNumberToSwiftDoubleFT_Sd
 // CHECK-NOT: unconditional_checked

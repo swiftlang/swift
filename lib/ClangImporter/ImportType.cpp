@@ -2097,9 +2097,10 @@ Type ClangImporter::Implementation::importMethodType(
 
     bool allowNSUIntegerAsIntInResult = isFromSystemModule;
     if (allowNSUIntegerAsIntInResult) {
-      Identifier name = methodName.getBaseName();
+      clang::Selector sel = clangDecl->getSelector();
+      StringRef name = sel.getNameForSlot(0);
       if (!name.empty()) {
-        allowNSUIntegerAsIntInResult = !nameContainsUnsigned(name.str());
+        allowNSUIntegerAsIntInResult = !nameContainsUnsigned(name);
       }
     }
 
@@ -2179,13 +2180,14 @@ Type ClangImporter::Implementation::importMethodType(
 
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
     if (allowNSUIntegerAsIntInParam) {
-      Identifier name;
-      if (nameIndex < argNames.size())
-        name = argNames[nameIndex];
+      StringRef name;
+      clang::Selector sel = clangDecl->getSelector();
+      if (nameIndex < sel.getNumArgs())
+        name = sel.getNameForSlot(nameIndex);
       if (name.empty() && nameIndex == 0)
-        name = methodName.getBaseName();
+        name = sel.getNameForSlot(0);
       if (!name.empty())
-        allowNSUIntegerAsIntInParam = !nameContainsUnsigned(name.str());
+        allowNSUIntegerAsIntInParam = !nameContainsUnsigned(name);
     }
 
     Type swiftParamTy;

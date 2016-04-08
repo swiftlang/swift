@@ -94,7 +94,7 @@
 // CHECK-FOUNDATION: open(_: URL!, completionHandler: ((Bool) -> Void)!)
 
 // Note: property name stripping property type.
-// CHECK-FOUNDATION: var uppercase: String
+// CHECK-FOUNDATION: var uppercased: String
 
 // Note: don't map base name down to a keyword.
 // CHECK-FOUNDATION: func doSelector(_: Selector)
