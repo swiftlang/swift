@@ -34,6 +34,17 @@ bool swift::canBeArgumentLabel(StringRef identifier) {
   return true;
 }
 
+StringRef swift::formattedArgumentLabel(StringRef identifier) {
+    bool newNameIsReserved = !canBeArgumentLabel(identifier);
+    llvm::SmallString<16> newStr;
+    if (newNameIsReserved)
+        newStr += "`";
+    newStr += identifier;
+    if (newNameIsReserved)
+        newStr += "`";
+    return newStr;
+}
+
 PrepositionKind swift::getPrepositionKind(StringRef word) {
 #define DIRECTIONAL_PREPOSITION(Word)           \
   if (word.equals_lower(#Word))                 \

@@ -3551,10 +3551,8 @@ static bool diagnoseArgumentLabelError(Expr *expr,
     llvm::SmallString<16> str;
     str += newNames[0].str();
     str += ":";
-    
     // Don't add the trailing space in the note.
     auto diagStr = str;
-    
     str += " ";
     
     // Emit the error.
@@ -3574,10 +3572,10 @@ static bool diagnoseArgumentLabelError(Expr *expr,
       // Emit a note to fix the decl,
       // so call sites are unaffected.
       emitFirstParamImplicitDeclFixIt();
-    } else {
-      diag.fixItInsert(expr->getStartLoc(), str);
+      return true;
     }
-    
+
+    diag.fixItInsert(expr->getStartLoc(), str);
     return true;
   }
   
@@ -3654,36 +3652,24 @@ static bool diagnoseArgumentLabelError(Expr *expr,
                                    plural, extraStr, isSubscript));
   }
   
-  auto cleanedArgumentLabel = [&](Identifier newName) {
-    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
-    llvm::SmallString<16> newStr;
-    if (newNameIsReserved)
-      newStr += "`";
-    newStr += newName.str();
-    if (newNameIsReserved)
-      newStr += "`";
-    return newStr;
-  };
-  
   // Emit Fix-Its to correct the names.
   auto &diag = *diagOpt;
   
   // If we're attempting to fix only the first parameter,
   // offer up the same fix as a scalar tuple promotion.
-  if (numMissing == 1 && declIsInModule) {
-    diag.flush();
+  if (numMissing == 1 && declIsInModule &&
+      tuple->getElementName(0) != newNames[0]) {
     auto element = tuple->getElement(0);
-    if (tuple->getElementName(0).empty()) {
-      SmallString<16> newStr = cleanedArgumentLabel(newNames[0]);
-      newStr += ':';
-      auto diag = CS.TC.diagnose(element->getStartLoc(),
-                                 diag::add_missing_argument_label,
-                                 newStr);
-      newStr += ' ';
-      diag.fixItInsert(element->getStartLoc(), newStr);
-      emitFirstParamImplicitDeclFixIt();
-      return true;
-    }
+    diag.flush();
+    SmallString<16> newStr = formattedArgumentLabel(newNames[0].str());
+    newStr += ':';
+    auto diag = CS.TC.diagnose(element->getStartLoc(),
+                               diag::add_missing_argument_label,
+                               newStr);
+    newStr += ' ';
+    diag.fixItInsert(element->getStartLoc(), newStr);
+    emitFirstParamImplicitDeclFixIt();
+    return true;
   }
   
   for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
@@ -3702,14 +3688,12 @@ static bool diagnoseArgumentLabelError(Expr *expr,
       continue;
     }
     
-    auto newStr = cleanedArgumentLabel(newName);
+    SmallString<16> newStr = formattedArgumentLabel(newName.str());
     
     if (oldName.empty()) {
       // Insert the name.
       newStr += ": ";
-      
       diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
-      
       continue;
     }
     
