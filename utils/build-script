@@ -1119,11 +1119,7 @@ the number of parallel build jobs to use""",
         os.environ.pop(v, None)
 
     if args.show_sdks:
-        swift_build_support.debug.print_xcodebuild_versions([
-            'iphonesimulator',
-            'appletvsimulator',
-            'watchsimulator',
-        ])
+        swift_build_support.debug.print_xcodebuild_versions()
 
     check_call(build_script_impl_args)
 
