@@ -3876,7 +3876,7 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   /// Returns the next consecutive value after `self`.
   ///
   /// - Precondition: The next value is representable.
-  public func successor() -> ${Self}Index<${TypeParameters}> {
+  internal func successor() -> ${Self}Index<${TypeParameters}> {
     if _fastPath(_guaranteedNative) {
       return ._native(_nativeIndex.successor())
     }

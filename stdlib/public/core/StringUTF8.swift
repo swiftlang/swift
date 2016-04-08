@@ -125,7 +125,7 @@ extension String {
       ///
       /// - Precondition: The next value is representable.
       @warn_unused_result
-      public func successor() -> Index {
+      internal func successor() -> Index {
         // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.successor(of: Index)
         // FIXME: swift-3-indexing-model: remove the successor() function.
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)

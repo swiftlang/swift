@@ -68,7 +68,7 @@ extension String {
       /// - Precondition: The next value is representable.
       @warn_unused_result
       @inline(__always)
-      public func successor() -> Index {
+      internal func successor() -> Index {
         // FIXME: swift-3-indexing-model: remove `successor()`.
         var scratch = _ScratchIterator(_core, _position)
         var decoder = UTF16()
@@ -80,7 +80,7 @@ extension String {
       ///
       /// - Precondition: The previous value is representable.
       @warn_unused_result
-      public func predecessor() -> Index {
+      internal func predecessor() -> Index {
         // FIXME: swift-3-indexing-model: remove `predecessor()`.
         var i = _position-1
         let codeUnit = _core[i]
