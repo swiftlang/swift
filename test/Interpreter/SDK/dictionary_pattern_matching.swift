@@ -17,7 +17,7 @@ func stateFromPlistLame(_ plist: Dictionary<String, AnyObject>) -> State? {
       if let abbrev = plist["abbrev"] as? NSString {
         if abbrev.length == 2 {
           return State(name: name as String,
-                       population: population.integerValue,
+                       population: population.intValue,
                        abbrev: abbrev as String)
         }
       }
