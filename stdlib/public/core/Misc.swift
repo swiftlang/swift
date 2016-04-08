@@ -70,6 +70,9 @@ func _withUninitializedString<R>(
   return (bodyResult, stringResult)
 }
 
+// FIXME(ABI): this API should allow controlling different kinds of
+// qualification separately: qualification with module names and qualification
+// with type names that we are nested in.
 @_silgen_name("swift_getTypeName")
 public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
