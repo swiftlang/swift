@@ -1115,7 +1115,9 @@ the number of parallel build jobs to use""",
             'MAKEFLAGS',
             'SDKROOT',
             'MACOSX_DEPLOYMENT_TARGET',
-            'IPHONEOS_DEPLOYMENT_TARGET']:
+            'IPHONEOS_DEPLOYMENT_TARGET',
+            'TVOS_DEPLOYMENT_TARGET',
+            'WATCHOS_DEPLOYMENT_TARGET']:
         os.environ.pop(v, None)
 
     if args.show_sdks:
