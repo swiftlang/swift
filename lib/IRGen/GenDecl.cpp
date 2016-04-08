@@ -1208,33 +1208,11 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   llvm_unreachable("bad link entity kind");
 }
 
-bool LinkEntity::isFragile(IRGenModule &IGM) const {
-  switch (getKind()) {
-    case Kind::SILFunction:
-      return getSILFunction()->isFragile();
-      
-    case Kind::SILGlobalVariable:
-      return getSILGlobalVariable()->isFragile();
-      
-    case Kind::DirectProtocolWitnessTable: {
-      if (auto wt = IGM.SILMod->lookUpWitnessTable(getProtocolConformance())) {
-        return wt->isFragile();
-      } else {
-        return false;
-      }
-    }
-      
-    default:
-      break;
-  }
-  return false;
-}
-
 
 static std::pair<llvm::GlobalValue::LinkageTypes,
                  llvm::GlobalValue::VisibilityTypes>
 getIRLinkage(IRGenModule &IGM,
-             SILLinkage linkage, bool isFragile, ForDefinition_t isDefinition,
+             SILLinkage linkage, ForDefinition_t isDefinition,
              bool isWeakImported) {
   
 #define RESULT(LINKAGE, VISIBILITY)        \
@@ -1256,32 +1234,17 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     break;
   }
 
-  if (isFragile) {
-    // Fragile functions/globals must be visible from outside, regardless of
-    // their accessibility. If a caller is also fragile and inlined into another
-    // module it must be able to access this (not-inlined) function/global.
-    switch (linkage) {
-    case SILLinkage::Hidden:
-    case SILLinkage::Private:
-      linkage = SILLinkage::Public;
-      break;
-
-    case SILLinkage::Public:
-    case SILLinkage::Shared:
-    case SILLinkage::HiddenExternal:
-    case SILLinkage::PrivateExternal:
-    case SILLinkage::PublicExternal:
-    case SILLinkage::SharedExternal:
-      break;
-    }
-  }
-  
   switch (linkage) {
   case SILLinkage::Public:
     return {llvm::GlobalValue::ExternalLinkage, PublicDefinitionVisibility};
+
   case SILLinkage::Shared:
-  case SILLinkage::SharedExternal: return RESULT(LinkOnceODR, Hidden);
-  case SILLinkage::Hidden: return RESULT(External, Hidden);
+  case SILLinkage::SharedExternal:
+    return RESULT(LinkOnceODR, Hidden);
+
+  case SILLinkage::Hidden:
+    return RESULT(External, Hidden);
+
   case SILLinkage::Private:
     if (IGM.dispatcher.hasMultipleIGMs()) {
       // In case of multiple llvm modules (in multi-threaded compilation) all
@@ -1289,6 +1252,7 @@ llvm::GlobalValue::VISIBILITY##Visibility }
       return RESULT(External, Hidden);
     }
     return RESULT(Internal, Default);
+
   case SILLinkage::PublicExternal:
     if (isDefinition) {
       return RESULT(AvailableExternally, Default);
@@ -1297,15 +1261,12 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     if (isWeakImported)
       return RESULT(ExternalWeak, Default);
     return RESULT(External, Default);
+
   case SILLinkage::HiddenExternal:
-  case SILLinkage::PrivateExternal: {
-    auto visibility = isFragile ? llvm::GlobalValue::DefaultVisibility
-                                : llvm::GlobalValue::HiddenVisibility;
-    if (isDefinition) {
-      return {llvm::GlobalValue::AvailableExternallyLinkage, visibility};
-    }
-    return {llvm::GlobalValue::ExternalLinkage, visibility};
-  }
+  case SILLinkage::PrivateExternal:
+    if (isDefinition) 
+      return RESULT(AvailableExternally, Hidden);
+    return RESULT(External, Hidden);
   }
   llvm_unreachable("bad SIL linkage");
 }
@@ -1320,7 +1281,6 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   auto linkage = getIRLinkage(
                    IGM,
                    entity.getLinkage(IGM, ForDefinition),
-                   entity.isFragile(IGM),
                    ForDefinition,
                    entity.isWeakImported(IGM.SILMod->getSwiftModule()));
   global->setLinkage(linkage.first);
@@ -1346,7 +1306,6 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
 
   std::tie(result.Linkage, result.Visibility) =
     getIRLinkage(IGM, entity.getLinkage(IGM, isDefinition),
-                 entity.isFragile(IGM),
                  isDefinition,
                  entity.isWeakImported(IGM.SILMod->getSwiftModule()));
 

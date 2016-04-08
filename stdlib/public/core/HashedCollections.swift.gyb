@@ -3659,6 +3659,7 @@ internal func < <${TypeParametersDecl}> (
 }
 
 #if _runtime(_ObjC)
+@_versioned
 internal struct _Cocoa${Self}Index : ForwardIndex, Comparable {
   // Assumption: we rely on NSDictionary.getObjects when being
   // repeatedly called on the same NSDictionary, returning items in the same

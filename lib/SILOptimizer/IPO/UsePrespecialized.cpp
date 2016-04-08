@@ -104,7 +104,8 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     std::string ClonedName;
     {
       Mangle::Mangler Mangler;
-      GenericSpecializationMangler GenericMangler(Mangler, ReferencedF, Subs);
+      GenericSpecializationMangler GenericMangler(Mangler, ReferencedF, Subs,
+                                                  ReferencedF->isFragile());
       GenericMangler.mangle();
       ClonedName = Mangler.finalize();
     }
