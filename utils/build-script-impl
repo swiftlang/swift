@@ -1532,6 +1532,12 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
         )
     fi
+    if [[ "${DARWIN_TOOLCHAIN_VERSION}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DDARWIN_TOOLCHAIN_VERSION="${DARWIN_TOOLCHAIN_VERSION}"
+        )
+    fi
 
     if [[ "${ENABLE_ASAN}" ]] ; then
         swift_cmake_options=(
