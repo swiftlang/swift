@@ -22,7 +22,7 @@ extension CGColorSpace {
 extension CGColor {
   class func create(colorSpace colorSpace: CGColorSpace, components: [CGFloat])
       -> CGColor {
-    return CGColor(fromColorSpace: colorSpace, components: components)!
+    return CGColor(withColorSpace: colorSpace, components: components)!
   }
 
   var r: CGFloat { return components[0] }
