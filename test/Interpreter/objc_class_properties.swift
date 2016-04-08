@@ -5,7 +5,6 @@
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Foundation
