@@ -128,4 +128,4 @@ def host_clang(xcrun_toolchain):
             return host_toolchain(xcrun_toolchain,
                                   suffixes=['38', '37', '36', '35'])
     return host_toolchain(xcrun_toolchain,
-                          suffixes=['-3.8', '-3.7', '-3.6', '-3.5'])
+                          suffixes=['', '-3.8', '-3.7', '-3.6', '-3.5'])
