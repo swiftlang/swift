@@ -104,14 +104,16 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
     Global
   };
 
-  class CGNode;
-  class CGNodeMap;
 public:
+  class CGNode;
   class ConnectionGraph;
 private:
+  class CGNodeMap;
 
   /// The int-part is an EdgeType and specifies which kind of predecessor it is.
   typedef llvm::PointerIntPair<CGNode *, 1> Predecessor;
+
+public:
 
   /// A node in the connection graph.
   /// A node basically represents a "pointer" or the "memory content" where a
@@ -302,7 +304,9 @@ private:
     CGNode *getContentNodeOrNull() const {
       return pointsTo;
     }
-};
+  };
+
+private:
 
   /// Mapping from nodes in a callee-graph to nodes in a caller-graph.
   class CGNodeMap {
