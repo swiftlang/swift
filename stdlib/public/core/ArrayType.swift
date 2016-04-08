@@ -65,6 +65,7 @@ protocol _ArrayProtocol
   /// - Complexity: Worst case O(N).
   ///
   /// - Precondition: `count > index`.
+  @discardableResult
   mutating func remove(at index: Int) -> Iterator.Element
 
   //===--- implementation detail  -----------------------------------------===//

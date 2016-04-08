@@ -723,6 +723,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// Remove and return the last element in O(1).
   ///
   /// - Precondition: `!isEmpty`.
+  @discardableResult
   public mutating func removeLast() -> Element {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let i = count
@@ -748,6 +749,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @discardableResult
   public mutating func remove(at index: Int) -> Element {
     let result = self[index]
     self.replaceSubrange(index..<(index + 1), with: EmptyCollection())
@@ -1412,6 +1414,7 @@ extension Array {
   ///
   /// - Complexity: O(`self.count`) if the array is bridged,
   ///   otherwise O(1).
+  @warn_unused_result
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     return removeLast()
@@ -1423,6 +1426,7 @@ extension ContiguousArray {
   /// return `nil`.
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     return removeLast()
