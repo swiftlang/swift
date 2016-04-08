@@ -276,13 +276,13 @@ __muloti4(ti_int a, ti_int b, int* overflow)
     if (a == MIN)
     {
         if (b != 0 && b != 1)
-	    *overflow = 1;
-	return result;
+            *overflow = 1;
+        return result;
     }
     if (b == MIN)
     {
         if (a != 0 && a != 1)
-	    *overflow = 1;
+            *overflow = 1;
         return result;
     }
     ti_int sa = a >> (N - 1);

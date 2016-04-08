@@ -541,7 +541,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       _buffer = ${Self}._allocateBufferUninitialized(minimumCapacity: count)
       _buffer.count = count
     }
-    // Can’t store count here because the buffer might be pointing to the
+    // Can't store count here because the buffer might be pointing to the
     // shared empty array.
   }
 

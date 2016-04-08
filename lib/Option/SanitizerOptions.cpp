@@ -77,7 +77,7 @@ SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
       Triple.getTriple());
   }
   // Thread Sanitizer only works on OS X and the simulators. It's only supported
-  // on 64 bit arcitectures.
+  // on 64 bit architectures.
   if (kind == SanitizerKind::Thread &&
       (!(Triple.isMacOSX() || tripleIsAnySimulator(Triple)) ||
        !Triple.isArch64Bit())) {
