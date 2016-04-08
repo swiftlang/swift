@@ -24,6 +24,7 @@
 // size with the ternary operator.  This is also the cause of the
 // extra element requirement for 8 bit elements.  See the
 // implementation of subscript(Int) -> UTF16.CodeUnit below for details.
+@_fixed_layout
 public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
@@ -104,7 +105,7 @@ public struct _StringCore {
   }
 
   static func _copyElements(
-    srcStart: OpaquePointer, srcElementWidth: Int,
+    _ srcStart: OpaquePointer, srcElementWidth: Int,
     dstStart: OpaquePointer, dstElementWidth: Int,
     count: Int
   ) {
@@ -294,8 +295,9 @@ public struct _StringCore {
   }
 
   /// Get the Nth UTF-16 Code Unit stored.
+  @_versioned
   @warn_unused_result
-  func _nthContiguous(position: Int) -> UTF16.CodeUnit {
+  func _nthContiguous(_ position: Int) -> UTF16.CodeUnit {
     let p =
         UnsafeMutablePointer<UInt8>(_pointer(toElementAt: position)._rawValue)
     // Always dereference two bytes, but when elements are 8 bits we
@@ -331,7 +333,7 @@ public struct _StringCore {
   /// Write the string, in the given encoding, to output.
   func encode<
     Encoding: UnicodeCodec
-  >(encoding: Encoding.Type, @noescape output: (Encoding.CodeUnit) -> Void)
+  >(_ encoding: Encoding.Type, @noescape output: (Encoding.CodeUnit) -> Void)
   {
     if _fastPath(_baseAddress != nil) {
       if _fastPath(elementWidth == 1) {
@@ -382,7 +384,7 @@ public struct _StringCore {
   ///   the existing buffer's storage.
   @warn_unused_result
   mutating func _claimCapacity(
-    newSize: Int, minElementWidth: Int) -> (Int, OpaquePointer) {
+    _ newSize: Int, minElementWidth: Int) -> (Int, OpaquePointer) {
     if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
       var buffer = nativeBuffer!
 
@@ -416,7 +418,7 @@ public struct _StringCore {
   /// you must immediately copy valid data into that storage.
   @warn_unused_result
   mutating func _growBuffer(
-    newSize: Int, minElementWidth: Int
+    _ newSize: Int, minElementWidth: Int
   ) -> OpaquePointer {
     let (newCapacity, existingStorage)
       = _claimCapacity(newSize, minElementWidth: minElementWidth)
@@ -440,7 +442,7 @@ public struct _StringCore {
   /// width.  Effectively appends garbage to the String until it has
   /// newSize UTF-16 code units.
   mutating func _copyInPlace(
-    newSize newSize: Int, newCapacity: Int, minElementWidth: Int
+    newSize: Int, newCapacity: Int, minElementWidth: Int
   ) {
     _sanityCheck(newCapacity >= newSize)
     let oldCount = count
@@ -480,7 +482,7 @@ public struct _StringCore {
   ///
   /// - Complexity: O(1) when amortized over repeated appends of equal
   ///   character values.
-  mutating func append(c: UnicodeScalar) {
+  mutating func append(_ c: UnicodeScalar) {
     let width = UTF16.width(c)
     append(
       width == 2 ? UTF16.leadSurrogate(c) : UTF16.CodeUnit(c.value),
@@ -491,11 +493,11 @@ public struct _StringCore {
   /// Append `u` to `self`.
   ///
   /// - Complexity: Amortized O(1).
-  public mutating func append(u: UTF16.CodeUnit) {
+  public mutating func append(_ u: UTF16.CodeUnit) {
     append(u, nil)
   }
 
-  mutating func append(u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit?) {
+  mutating func append(_ u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit?) {
     _invariantCheck()
     let minBytesPerCodeUnit = u0 <= 0x7f ? 1 : 2
     let utf16Width = u1 == nil ? 1 : 2
@@ -523,7 +525,7 @@ public struct _StringCore {
   }
 
   @inline(never)
-  mutating func append(rhs: _StringCore) {
+  mutating func append(_ rhs: _StringCore) {
     _invariantCheck()
     let minElementWidth
     = elementWidth >= rhs.elementWidth
@@ -590,7 +592,7 @@ extension _StringCore : RangeReplaceableCollection {
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UTF16.CodeUnit
   >(
-    bounds: Range<Int>, with newElements: C
+    _ bounds: Range<Int>, with newElements: C
   ) {
     _precondition(
       bounds.startIndex >= 0,
@@ -665,7 +667,7 @@ extension _StringCore : RangeReplaceableCollection {
     }
   }
 
-  public mutating func reserveCapacity(n: Int) {
+  public mutating func reserveCapacity(_ n: Int) {
     if _fastPath(!hasCocoaBuffer) {
       if _fastPath(isUniquelyReferencedNonObjC(&_owner)) {
 

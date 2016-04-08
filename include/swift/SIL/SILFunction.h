@@ -293,12 +293,17 @@ public:
 
   /// Returns true if the function has parameters that are consumed by the
   // callee.
-  bool hasOwnedParameters() {
+  bool hasOwnedParameters() const {
     for (auto &ParamInfo : getLoweredFunctionType()->getParameters()) {
       if (ParamInfo.isConsumed())
         return true;
     }
     return false;
+  }
+
+  // Returns true if the function has indirect out parameters.
+  bool hasIndirectResults() const {
+    return getLoweredFunctionType()->getNumIndirectResults() > 0;
   }
 
   /// Returns true if this function either has a self metadata argument or
@@ -324,6 +329,12 @@ public:
 
   /// Set the function's linkage attribute.
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
+
+  /// Returns true if this function can be inlined into a fragile function
+  /// body.
+  bool hasValidLinkageForFragileInline() const {
+    return isFragile() || isThunk() == IsReabstractionThunk;
+  }
 
   /// Returns true if this function can be referenced from a fragile function
   /// body.
@@ -657,7 +668,7 @@ public:
 
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
-  void verify() const;
+  void verify(bool SingleFunction=true) const;
 
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;

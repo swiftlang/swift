@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public func run_StringWithCString(N: Int) {
+public func run_StringWithCString(_ N: Int) {
   let str = String(repeating: "x" as UnicodeScalar, count: 100 * (1 << 16))
   for _ in 0 ..< N {
     str.withCString { _ in }

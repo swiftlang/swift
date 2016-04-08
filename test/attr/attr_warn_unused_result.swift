@@ -29,11 +29,11 @@ class C1 {
   static func f2() { }
 }
 
-func testMethodsNegative(c1: C1) {
+func testMethodsNegative(_ c1: C1) {
   c1.f1 // expected-error{{expression resolves to an unused function}}
 }
 
-func testMethodsPositive(c1: C1) {
+func testMethodsPositive(_ c1: C1) {
   c1.f1() // expected-warning{{result of call to 'f1()' is unused}}
   C1.f2() // expected-warning{{result of call to 'f2()' is unused: huzzah}}
 }
@@ -58,12 +58,12 @@ struct Mutating1 {
   mutating func fooInPlace() { }
 
   @warn_unused_result(message: "zug zug", mutable_variant: "barInPlace")
-  func bar(x: Int, y: Int) -> Mutating1 { return self }
+  func bar(_ x: Int, y: Int) -> Mutating1 { return self }
 
-  mutating func barInPlace(x: Int, y: Int) { }
+  mutating func barInPlace(_ x: Int, y: Int) { }
 }
 
-func testMutating1(m1: Mutating1, m2: Mutating1) {
+func testMutating1(_ m1: Mutating1, m2: Mutating1) {
   var m2 = m2
   m1.foo() // expected-warning{{result of call to 'foo()' is unused}}
   m2.foo() // expected-warning{{result of call to non-mutating function 'foo()' is unused; use 'fooInPlace()' to mutate in-place}}{{6-9=fooInPlace}}

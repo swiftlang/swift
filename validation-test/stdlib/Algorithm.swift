@@ -6,12 +6,6 @@ import StdlibUnittest
 import StdlibCollectionUnittest
 import SwiftPrivate
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var Algorithm = TestSuite("Algorithm")
 
@@ -167,10 +161,10 @@ Algorithm.test("invalidOrderings") {
 }
 
 // The routine is based on http://www.cs.dartmouth.edu/~doug/mdmspe.pdf
-func makeQSortKiller(len: Int) -> [Int] {
+func makeQSortKiller(_ len: Int) -> [Int] {
   var candidate: Int = 0
   var keys = [Int:Int]()
-  func Compare(x: Int, y : Int) -> Bool {
+  func Compare(_ x: Int, y : Int) -> Bool {
     if keys[x] == nil && keys[y] == nil {
       if (x == candidate) {
         keys[x] = keys.count

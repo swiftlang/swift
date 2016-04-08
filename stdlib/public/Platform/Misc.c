@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <semaphore.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 extern int
 _swift_Platform_open(const char *path, int oflag, mode_t mode) {
@@ -62,7 +62,7 @@ extern long double
 _swift_Darwin_lgammal_r(long double x, int *psigngam) {
   return lgammal_r(x, psigngam);
 }
-#endif
+#endif // defined(__APPLE__)
 
 #if defined(__FreeBSD__)
 extern char **
@@ -70,4 +70,4 @@ _swift_FreeBSD_getEnv() {
   extern char **environ;
   return environ;
 }
-#endif
+#endif // defined(__FreeBSD__)

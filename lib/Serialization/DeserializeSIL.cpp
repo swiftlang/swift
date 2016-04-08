@@ -487,7 +487,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     // serializing a copy of the function. This comes up with generic
     // reabstraction thunks which have shared linkage.
     DeclContext *outerParamContext = SILMod.getSwiftModule();
-    while(true) {
+    while (true) {
       // Params' OuterParameters will point to contextParams.
       auto *Params = MF->maybeReadGenericParams(outerParamContext,
                                                 SILCursor, contextParams);
@@ -1197,12 +1197,23 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.create##ID(Loc, getLocalValue(ValID,  \
                     getSILType(MF->getType(TyID),                        \
                                (SILValueCategory)TyCategory)));          \
+   break;
+
+#define REFCOUNTING_INSTRUCTION(ID) \
+  case ValueKind::ID##Inst:                   \
+    assert(RecordKind == SIL_ONE_OPERAND &&            \
+           "Layout should be OneOperand.");            \
+    ResultVal = Builder.create##ID(Loc, getLocalValue(ValID,  \
+                    getSILType(MF->getType(TyID),                        \
+                               (SILValueCategory)TyCategory)),  \
+                                   (Atomicity)Attr);          \
     break;
+
   UNARY_INSTRUCTION(CondFail)
-  UNARY_INSTRUCTION(RetainValue)
-  UNARY_INSTRUCTION(ReleaseValue)
-  UNARY_INSTRUCTION(AutoreleaseValue)
-  UNARY_INSTRUCTION(SetDeallocating)
+  REFCOUNTING_INSTRUCTION(RetainValue)
+  REFCOUNTING_INSTRUCTION(ReleaseValue)
+  REFCOUNTING_INSTRUCTION(AutoreleaseValue)
+  REFCOUNTING_INSTRUCTION(SetDeallocating)
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
@@ -1211,18 +1222,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(Throw)
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(CopyBlock)
-  UNARY_INSTRUCTION(StrongPin)
-  UNARY_INSTRUCTION(StrongUnpin)
-  UNARY_INSTRUCTION(StrongRetain)
-  UNARY_INSTRUCTION(StrongRelease)
-  UNARY_INSTRUCTION(StrongRetainUnowned)
-  UNARY_INSTRUCTION(UnownedRetain)
-  UNARY_INSTRUCTION(UnownedRelease)
+  REFCOUNTING_INSTRUCTION(StrongPin)
+  REFCOUNTING_INSTRUCTION(StrongUnpin)
+  REFCOUNTING_INSTRUCTION(StrongRetain)
+  REFCOUNTING_INSTRUCTION(StrongRelease)
+  REFCOUNTING_INSTRUCTION(StrongRetainUnowned)
+  REFCOUNTING_INSTRUCTION(UnownedRetain)
+  REFCOUNTING_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(IsUniqueOrPinned)
   UNARY_INSTRUCTION(DebugValue)
   UNARY_INSTRUCTION(DebugValueAddr)
 #undef UNARY_INSTRUCTION
+#undef REFCOUNTING_INSTRUCTION
 
   case ValueKind::LoadUnownedInst: {
     auto Ty = MF->getType(TyID);

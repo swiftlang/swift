@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o %t.ll
 // RUN: FileCheck %s < %t.ll
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 var puzzleOutput: [String] = []
 // CHECK-NOT: !DILocalVariable(name: "$letter$generator"

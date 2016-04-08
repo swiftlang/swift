@@ -170,7 +170,7 @@ extension Sequence where Iterator.Element : Sequence {
     Separator : Sequence
     where
     Separator.Iterator.Element == Iterator.Element.Iterator.Element
-  >(separator separator: Separator) -> JoinedSequence<Self> {
+  >(separator: Separator) -> JoinedSequence<Self> {
     return JoinedSequence(base: self, separator: separator)
   }
 }
@@ -181,7 +181,7 @@ public struct JoinGenerator<
 > {}
 
 extension JoinedSequence {
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> JoinedIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }
@@ -193,7 +193,7 @@ extension Sequence where Iterator.Element : Sequence {
     Separator : Sequence
     where
     Separator.Iterator.Element == Iterator.Element.Iterator.Element
-  >(separator: Separator) -> JoinedSequence<Self> {
+  >(_ separator: Separator) -> JoinedSequence<Self> {
     fatalError("unavailable function can't be called")
   }
 }

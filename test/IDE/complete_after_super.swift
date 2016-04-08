@@ -127,7 +127,7 @@ class SuperBaseA {
   // Don't declare constructors.
 
   func baseFunc0() {}
-  func baseFunc1(a: Int) {}
+  func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -293,7 +293,7 @@ class SuperBaseB {
   init(int: Int) {}
 
   func baseFunc0() {}
-  func baseFunc1(a: Int) {}
+  func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -412,7 +412,7 @@ class SemanticContextBase1 {
   init() {}
   init(a: Int) {}
   func instanceFunc1() {}
-  func instanceFunc1(a: Int) {}
+  func instanceFunc1(_ a: Int) {}
 }
 
 class SemanticContextDerived1 : SemanticContextBase1 {
@@ -445,7 +445,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: End completions
   }
-  func instanceFunc1(a: Int) {
+  func instanceFunc1(_ a: Int) {
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1()[#Void#]{{; name=.+$}}

@@ -90,16 +90,10 @@ static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
   PM.add(createAddressSanitizerModulePass());
 }
 
-// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp.
-// These should be moved to a single definition shared by clang and swift.
-enum ImageInfoFlags {
-  eImageInfo_FixAndContinue      = (1 << 0),
-  eImageInfo_GarbageCollected    = (1 << 1),
-  eImageInfo_GCOnly              = (1 << 2),
-  eImageInfo_OptimizedByDyld     = (1 << 3),
-  eImageInfo_CorrectedSynthesize = (1 << 4),
-  eImageInfo_ImageIsSimulated    = (1 << 5)
-};
+static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+  PM.add(createThreadSanitizerPass());
+}
 
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
 swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
@@ -163,6 +157,13 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                            addAddressSanitizerPasses);
   }
   
+  if (Opts.Sanitize == SanitizerKind::Thread) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addThreadSanitizerPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addThreadSanitizerPass);
+  }
+
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(createTargetTransformInfoWrapperPass(
@@ -584,6 +585,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       IGM.emitFieldTypeMetadataRecords();
       IGM.emitAssociatedTypeMetadataRecords();
     }
+
+    IGM.emitSwiftReflectionVersion();
 
     // Okay, emit any definitions that we suddenly need.
     dispatcher.emitLazyDefinitions();

@@ -19,10 +19,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
@@ -434,6 +434,24 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   VD->print(Printer, PO);
 }
 
+void SwiftLangSupport::
+printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
+                                          swift::NominalTypeDecl *Target,
+                                          llvm::raw_ostream &OS) {
+  static llvm::SmallDenseMap<swift::ValueDecl*,
+    std::unique_ptr<swift::SynthesizedExtensionAnalyzer>> TargetToAnalyzerMap;
+  FullyAnnotatedDeclarationPrinter Printer(OS);
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  if (TargetToAnalyzerMap.count(Target) == 0) {
+    std::unique_ptr<SynthesizedExtensionAnalyzer> Analyzer(
+      new SynthesizedExtensionAnalyzer(Target, PO));
+    TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
+  }
+  auto *Analyzer = TargetToAnalyzerMap.find(Target)->getSecond().get();
+  PO.initArchetypeTransformerForSynthesizedExtensions(Target, Analyzer);
+  VD->print(Printer, PO);
+}
+
 template <typename FnTy>
 void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
@@ -607,7 +625,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   auto BaseType = findBaseTypeForReplacingArchetype(VD, Ty);
   bool InSynthesizedExtension = false;
   if (BaseType) {
-    if(auto Target = BaseType->getAnyNominal()) {
+    if (auto Target = BaseType->getAnyNominal()) {
       SynthesizedExtensionAnalyzer Analyzer(Target,
                                             PrintOptions::printInterface());
       InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
@@ -1174,7 +1192,7 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-class RelatedIdScanner : public ide::SourceEntityWalker {
+class RelatedIdScanner : public SourceEntityWalker {
   ValueDecl *Dcl;
   llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges;
   SourceManager &SourceMgr;

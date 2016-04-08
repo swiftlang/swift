@@ -6,12 +6,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var CollectionTests = TestSuite("CollectionTests")
 
@@ -87,7 +81,7 @@ func isPalindrome0<
   where
   S.Index : BidirectionalIndex,
   S.Iterator.Element : Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
   typealias Index = S.Index
 
   let a = seq.indices
@@ -112,7 +106,7 @@ func isPalindrome1<
   where
   S.Index : BidirectionalIndex,
   S.Iterator.Element : Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
 
   var a = PermutationGenerator(elements: seq, indices: seq.indices)
   var b = seq.lazy.reversed().makeIterator()
@@ -130,7 +124,7 @@ func isPalindrome1_5<
   S.Index: BidirectionalIndex,
   S.Iterator.Element == S.Iterator.Element,
   S.Iterator.Element: Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
 
   var b = seq.lazy.reversed().makeIterator()
   for nextChar in seq {
@@ -158,7 +152,7 @@ func isPalindrome2<
   where
   S.Index : BidirectionalIndex,
   S.Iterator.Element: Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
 
   var b = seq.startIndex, e = seq.endIndex
 
@@ -192,7 +186,7 @@ func isPalindrome4<
   where
   S.Index : BidirectionalIndex,
   S.Iterator.Element : Equatable
->(seq: S) -> Bool {
+>(_ seq: S) -> Bool {
   typealias Index = S.Index
 
   var a = PermutationGenerator(elements: seq, indices: seq.indices)

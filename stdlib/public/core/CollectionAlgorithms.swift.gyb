@@ -129,8 +129,7 @@ ${partitionDocComment}
 ${orderingRequirementForPredicate}
   @warn_unused_result
   public mutating func partition(
-    @noescape isOrderedBefore isOrderedBefore:
-      (${IElement}, ${IElement}) -> Bool
+    @noescape isOrderedBefore: (${IElement}, ${IElement}) -> Bool
   ) -> Index {
 
 %   else:
@@ -206,7 +205,7 @@ sortIsUnstableForComparable = """\
 
 }%
 
-% for Self in [ 'Sequence', 'MutableCollection' ]:
+% for Self in ['Sequence', 'MutableCollection']:
 
 extension ${Self} where Self.Iterator.Element : Comparable {
 ${sortedDocCommentForComparable}
@@ -230,7 +229,7 @@ ${sortIsUnstableForPredicate}
 ${orderingRequirementForPredicate}
   @warn_unused_result(${'mutable_variant: "sort"' if Self == 'MutableCollection' else ''})
   public func sorted(
-    @noescape isOrderedBefore isOrderedBefore:
+    @noescape isOrderedBefore:
       (${IElement}, ${IElement}) -> Bool
   ) -> [Iterator.Element] {
     var result = ContiguousArray(self)
@@ -273,7 +272,7 @@ ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
   public mutating func sort(
-    @noescape isOrderedBefore isOrderedBefore:
+    @noescape isOrderedBefore:
       (${IElement}, ${IElement}) -> Bool
   ) {
     typealias EscapingBinaryPredicate =
@@ -303,7 +302,7 @@ extension MutableCollection
 
   @available(*, unavailable, message: "slice the collection using the range, and call partition(isOrderedBefore:)")
   public mutating func partition(
-    range: Range<Index>,
+    _ range: Range<Index>,
     isOrderedBefore: (${IElement}, ${IElement}) -> Bool
   ) -> Index {
     fatalError("unavailable function can't be called")
@@ -314,7 +313,7 @@ extension MutableCollection
   where Index : RandomAccessIndex, ${IElement} : Comparable {
 
   @available(*, unavailable, message: "slice the collection using the range, and call partition()")
-  public mutating func partition(range: Range<Index>) -> Index {
+  public mutating func partition(_ range: Range<Index>) -> Index {
     fatalError("unavailable function can't be called")
   }
 }
@@ -333,7 +332,7 @@ extension MutableCollection
 extension MutableCollection where Self.Index : RandomAccessIndex {
   @available(*, unavailable, renamed: "sort(isOrderedBefore:)")
   public mutating func sortInPlace(
-    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+    @noescape _ isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) {
     fatalError("unavailable function can't be called")
   }
@@ -342,7 +341,7 @@ extension MutableCollection where Self.Index : RandomAccessIndex {
 extension Collection where ${IElement} : Equatable {
   @available(*, unavailable, renamed: "index(of:)")
   @warn_unused_result
-  public func indexOf(element: ${IElement}) -> Index? {
+  public func indexOf(_ element: ${IElement}) -> Index? {
     fatalError("unavailable function can't be called")
   }
 }
@@ -351,7 +350,7 @@ extension Collection {
   @available(*, unavailable, renamed: "index(where:)")
   @warn_unused_result
   public func indexOf(
-    @noescape predicate: (${IElement}) throws -> Bool
+    @noescape _ predicate: (${IElement}) throws -> Bool
   ) rethrows -> Index? {
     fatalError("unavailable function can't be called")
   }

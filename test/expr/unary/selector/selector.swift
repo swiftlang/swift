@@ -9,24 +9,24 @@ import ObjectiveC
 class C1 {
   @objc init(a: A, b: B) { }
 
-  @objc func method1(a: A, b: B) { }
-  @objc(someMethodWithA:B:) func method2(a: A, b: B) { }
+  @objc func method1(_ a: A, b: B) { }
+  @objc(someMethodWithA:B:) func method2(_ a: A, b: B) { }
 
+  @objc class func method3(_ a: A, b: B) { } // expected-note{{found this candidate}}
   @objc class func method3(a: A, b: B) { } // expected-note{{found this candidate}}
-  @objc class func method3(a a: A, b: B) { } // expected-note{{found this candidate}}
 
   @objc var a: A = A() // expected-note{{'a' declared here}}
 
   @objc func getC1() -> AnyObject { return self }
 
-  @objc func testUnqualifiedSelector(a: A, b: B) {
+  @objc func testUnqualifiedSelector(_ a: A, b: B) {
     _ = #selector(testUnqualifiedSelector(_:b:))
     let testUnqualifiedSelector = 1
     _ = #selector(testUnqualifiedSelector(_:b:))
     _ = testUnqualifiedSelector // suppress unused warning
   }
 
-  @objc func testParam(testParam: A) { // expected-note{{'testParam' declared here}}
+  @objc func testParam(_ testParam: A) { // expected-note{{'testParam' declared here}}
     _ = #selector(testParam) // expected-error{{argument of '#selector' cannot refer to a parameter}}
   }
 
@@ -37,15 +37,15 @@ class C1 {
 }
 
 @objc protocol P1 {
-  func method4(a: A, b: B)
-  static func method5(a: B, b: B)
+  func method4(_ a: A, b: B)
+  static func method5(_ a: B, b: B)
 }
 
 extension C1 {
   final func method6() { } // expected-note{{add '@objc' to expose this method to Objective-C}}{{3-3=@objc }}
 }
 
-func testSelector(c1: C1, p1: P1, obj: AnyObject) {
+func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
   // Instance methods on an instance
   let sel1 = #selector(c1.method1)
   _ = #selector(c1.method1(_:b:))
@@ -88,25 +88,29 @@ func testAmbiguity() {
   _ = #selector(C1.method3) // expected-error{{ambiguous use of 'method3(_:b:)'}}
 }
 
-func testProperties(c1: C1) {
+func testUnusedSelector() {
+    #selector(C1.getC1) // expected-warning{{result of '#selector' is unused}}
+}
+
+func testProperties(_ c1: C1) {
   _ = #selector(c1.a) // expected-error{{argument of '#selector' cannot refer to a property}}
   _ = #selector(C1.a) // FIXME poor diagnostic: expected-error{{instance member 'a' cannot be used on type 'C1'}}
 }
 
-func testNonObjC(c1: C1) {
+func testNonObjC(_ c1: C1) {
   _ = #selector(c1.method6) // expected-error{{argument of '#selector' refers to a method that is not exposed to Objective-C}}
 }
 
 func testParseErrors1() {
-  #selector foo // expected-error{{expected '(' following '#selector'}}
+  _ = #selector foo // expected-error{{expected '(' following '#selector'}}
 }
 
 func testParseErrors2() {
-  #selector( // expected-error{{expected expression naming a method within '#selector(...)'}}
+  _ = #selector( // expected-error{{expected expression naming a method within '#selector(...)'}}
 }
 
-func testParseErrors3(c1: C1) {
-  #selector( // expected-note{{to match this opening '('}}
+func testParseErrors3(_ c1: C1) {
+  _ = #selector( // expected-note{{to match this opening '('}}
       c1.method1(_:b:) // expected-error{{expected ')' to complete '#selector' expression}}
 }
 

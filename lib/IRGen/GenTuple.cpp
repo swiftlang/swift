@@ -356,7 +356,7 @@ const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
   } else {                                                           \
     return tupleTI.as<NonFixedTupleTypeInfo>().op(IGF, __VA_ARGS__); \
   }                                                                  \
-} while(0)
+} while (0)
 
 void irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
                                              SILType tupleType,

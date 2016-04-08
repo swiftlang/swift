@@ -5,12 +5,6 @@ import Swift
 import SwiftPrivate
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var HashingTestSuite = TestSuite("Hashing")
 
@@ -78,7 +72,7 @@ HashingTestSuite.test("_mixInt/GoldenValues") {
 
 HashingTestSuite.test("_squeezeHashValue/Int") {
   // Check that the function can return values that cover the whole range.
-  func checkRange(r: Range<Int>) {
+  func checkRange(_ r: Range<Int>) {
     var results = [Int : Void]()
     for _ in 0..<(14 * (r.endIndex - r.startIndex)) {
       let v = _squeezeHashValue(randInt(), r)
@@ -109,7 +103,7 @@ HashingTestSuite.test("_squeezeHashValue/Int") {
 
 HashingTestSuite.test("_squeezeHashValue/UInt") {
   // Check that the function can return values that cover the whole range.
-  func checkRange(r: Range<UInt>) {
+  func checkRange(_ r: Range<UInt>) {
     var results = [UInt : Void]()
     let cardinality = r.endIndex - r.startIndex
     for _ in 0..<(14 * cardinality) {

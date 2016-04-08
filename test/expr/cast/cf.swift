@@ -5,7 +5,7 @@
 import CoreFoundation
 import Foundation
 
-func testCFToObjC(cfStr: CFString, cfMutableStr: CFMutableString) {
+func testCFToObjC(_ cfStr: CFString, cfMutableStr: CFMutableString) {
   var nsStr: NSString = cfStr
   nsStr = cfMutableStr
   _ = nsStr
@@ -17,7 +17,7 @@ func testCFToObjC(cfStr: CFString, cfMutableStr: CFMutableString) {
   nsStr = nsMutableStr
 }
 
-func testObjCToCF(nsStr: NSString, nsMutableStr: NSMutableString) {
+func testObjCToCF(_ nsStr: NSString, nsMutableStr: NSMutableString) {
   var cfStr: CFString = nsStr
   cfStr = nsMutableStr
 
@@ -28,18 +28,18 @@ func testObjCToCF(nsStr: NSString, nsMutableStr: NSMutableString) {
   cfStr = cfMutableStr
 }
 
-func testCFToNative(cfStr: CFString, cfMutableStr: CFMutableString) {
+func testCFToNative(_ cfStr: CFString, cfMutableStr: CFMutableString) {
   var str = cfStr as String
   str = cfMutableStr as String
   _ = str
 }
 
-func testNativeToCF(str: String) {
+func testNativeToCF(_ str: String) {
   var cfStr = str as CFString
   var cfMutableStr = str as CFMutableString // expected-error{{'String' is not convertible to 'CFMutableString'}} {{26-28=as!}}
 }
 
-func testCFToAnyObject(cfStr: CFString, cfMutableStr: CFMutableString,
+func testCFToAnyObject(_ cfStr: CFString, cfMutableStr: CFMutableString,
                        cfTree: CFTree) {
   var anyObject: AnyObject = cfStr
   anyObject = cfMutableStr
@@ -47,7 +47,7 @@ func testCFToAnyObject(cfStr: CFString, cfMutableStr: CFMutableString,
   _ = anyObject
 }
 
-func testAnyObjectToCF(anyObject: AnyObject) {
+func testAnyObjectToCF(_ anyObject: AnyObject) {
   var cfStr: CFString = anyObject as! CFString
   var _: CFMutableString = anyObject as! CFMutableString
   var _: CFTree = anyObject as! CFTree
@@ -57,7 +57,7 @@ func testAnyObjectToCF(anyObject: AnyObject) {
   _ = cfStr
 }
 
-func testUncheckableCasts(anyObject: AnyObject, nsObject: NSObject,
+func testUncheckableCasts(_ anyObject: AnyObject, nsObject: NSObject,
                           anyObjectType: AnyObject.Type, 
                           nsObjectType: NSObject.Type) {
   if let _ = anyObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed}}
@@ -73,9 +73,9 @@ func testUncheckableCasts(anyObject: AnyObject, nsObject: NSObject,
   if let _ = nsObjectType as? CFTree.Type { } // expected-error{{will always succeed}}
 }
 
-func testCFConvWithIUO(x: CFString!, y: NSString!) {
-  func acceptCFString(a: CFString!) { }
-  func acceptNSString(b: NSString!) { }
+func testCFConvWithIUO(_ x: CFString!, y: NSString!) {
+  func acceptCFString(_ a: CFString!) { }
+  func acceptNSString(_ b: NSString!) { }
 
   acceptNSString(x)
   acceptCFString(y)

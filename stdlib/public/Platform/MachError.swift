@@ -95,7 +95,6 @@
   /// kernel (it forces the kernel to restart the fault). It will not
   /// be seen by users.
   case KERN_MEMORY_DATA_MOVED         = 24
-                
 
   /// A strategic copy was attempted of an object upon which a quicker
   /// copy is now possible.  The caller should retry the copy using
@@ -142,27 +141,27 @@
   /// thread_depress_abort was called on a thread which was not
   /// currently depressed.
   case KERN_NOT_DEPRESSED             = 36
-                
-  /// Object has been terminated and is no longer available
+
+  /// Object has been terminated and is no longer available.
   case KERN_TERMINATED                = 37
 
   /// Lock set has been destroyed and is no longer available.
   case KERN_LOCK_SET_DESTROYED        = 38
 
-  /// The thread holding the lock terminated before releasing the lock
+  /// The thread holding the lock terminated before releasing the lock.
   case KERN_LOCK_UNSTABLE             = 39
 
-  /// The lock is already owned by another thread
+  /// The lock is already owned by another thread.
   case KERN_LOCK_OWNED                = 40
 
-  /// The lock is already owned by the calling thread
+  /// The lock is already owned by the calling thread.
   case KERN_LOCK_OWNED_SELF           = 41
 
   /// Semaphore has been destroyed and is no longer available.
   case KERN_SEMAPHORE_DESTROYED       = 42
 
   /// Return from RPC indicating the target server was terminated
-  /// before it successfully replied
+  /// before it successfully replied.
   case KERN_RPC_SERVER_TERMINATED     = 43
 
   /// Terminate an orphaned activation.
@@ -171,7 +170,7 @@
   /// Allow an orphaned activation to continue executing.
   case KERN_RPC_CONTINUE_ORPHAN       = 45
 
-  /// Empty thread activation (No thread linked to it)
+  /// Empty thread activation (No thread linked to it).
   case KERN_NOT_SUPPORTED             = 46
 
   /// Remote node down or inaccessible.
@@ -180,7 +179,7 @@
   /// A signalled thread was not actually waiting.
   case KERN_NOT_WAITING               = 48
 
-  /// Some thread-oriented operation (semaphore_wait) timed out
+  /// Some thread-oriented operation (semaphore_wait) timed out.
   case KERN_OPERATION_TIMED_OUT       = 49
 
   /// During a page fault, indicates that the page was rejected as a
@@ -190,4 +189,4 @@
   /// The requested property cannot be changed at this time.
   case KERN_POLICY_STATIC             = 51
 }
-#endif
+#endif // os(OSX) || os(iOS) || os(tvOS) || os(watchOS)

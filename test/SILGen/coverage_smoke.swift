@@ -5,9 +5,11 @@
 // RUN: %llvm-profdata show %t/default.profdata -function=main | FileCheck %s --check-prefix=CHECK-PROF
 // RUN: %llvm-cov show %t/main -instr-profile=%t/default.profdata | FileCheck %s --check-prefix=CHECK-COV
 // RUN: rm -rf %t
+
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx
 // REQUIRES: rdar://problem/25493310
+// XFAIL: asan
 
 func main() {
 // CHECK-PROF: Counters: 2

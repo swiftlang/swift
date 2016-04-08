@@ -27,7 +27,7 @@ import Foundation
 // useful in tests, and stdlib does not have such facilities yet.
 //
 
-func findSubstring(string: String, _ substring: String) -> String.Index? {
+func findSubstring(_ string: String, _ substring: String) -> String.Index? {
   if substring.isEmpty {
     return string.startIndex
   }
@@ -70,7 +70,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
 }
 
 public func createTemporaryFile(
-  fileNamePrefix: String, _ fileNameSuffix: String, _ contents: String
+  _ fileNamePrefix: String, _ fileNameSuffix: String, _ contents: String
 ) -> String {
 #if _runtime(_ObjC)
   let tempDir: NSString = NSTemporaryDirectory()
@@ -135,7 +135,7 @@ extension TypeIdentifier
 }
 
 func _forAllPermutationsImpl(
-  index: Int, _ size: Int,
+  _ index: Int, _ size: Int,
   _ perm: inout [Int], _ visited: inout [Bool],
   _ body: ([Int]) -> Void
 ) {
@@ -156,7 +156,7 @@ func _forAllPermutationsImpl(
 }
 
 /// Generate all permutations.
-public func forAllPermutations(size: Int, body: ([Int]) -> Void) {
+public func forAllPermutations(_ size: Int, body: ([Int]) -> Void) {
   if size == 0 {
     return
   }
@@ -168,7 +168,7 @@ public func forAllPermutations(size: Int, body: ([Int]) -> Void) {
 
 /// Generate all permutations.
 public func forAllPermutations<S : Sequence>(
-  sequence: S, body: ([S.Iterator.Element]) -> Void
+  _ sequence: S, body: ([S.Iterator.Element]) -> Void
 ) {
   let data = Array(sequence)
   forAllPermutations(data.count) {

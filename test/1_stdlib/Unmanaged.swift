@@ -5,13 +5,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 // Check that the generic parameter is called 'Instance'.
 protocol TestProtocol1 {}
@@ -63,6 +56,17 @@ UnmanagedTests.test("_withUnsafeGuaranteedRef") {
     }
   }
 }
+
+UnmanagedTests.test("_withUnsafeGuaranteedRef/return") {
+  var ref = Foobar()
+  var unmanaged = Unmanaged.passUnretained(ref)
+  withExtendedLifetime(ref) {
+    expectEqual(1, unmanaged._withUnsafeGuaranteedRef {
+      return $0.foo()
+    })
+  }
+}
+
 
 runAllTests()
 

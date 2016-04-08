@@ -101,6 +101,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   Lowering::TypeConverter &TC;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
+  bool SingleFunction = true;
 
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
@@ -410,9 +411,9 @@ public:
     }
   }
 
-  SILVerifier(const SILFunction &F)
+  SILVerifier(const SILFunction &F, bool SingleFunction=true)
     : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types),
-      Dominance(nullptr) {
+      Dominance(nullptr), SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
       
@@ -902,22 +903,6 @@ public:
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
   }
   
-  /// Returns true if \p FRI is only used as a callee and will always be
-  /// inlined at those call sites.
-  static bool isAlwaysInlined(FunctionRefInst *FRI) {
-    if (FRI->getReferencedFunction()->getInlineStrategy() != AlwaysInline &&
-        !FRI->getReferencedFunction()->isTransparent()) {
-      return false;
-    }
-
-    for (auto use : FRI->getUses()) {
-      auto site = FullApplySite::isa(use->getUser());
-      if (!site || site.getCallee() != FRI)
-        return false;
-    }
-    return true;
-  }
-
   void checkFunctionRefInst(FunctionRefInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
@@ -925,8 +910,8 @@ public:
             "function_ref should have a context-free function result");
     if (F.isFragile()) {
       SILFunction *RefF = FRI->getReferencedFunction();
-      require(isAlwaysInlined(FRI)
-                || RefF->hasValidLinkageForFragileRef(),
+      require((SingleFunction && RefF->isExternalDeclaration()) ||
+              RefF->hasValidLinkageForFragileRef(),
               "function_ref inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -2641,7 +2626,7 @@ public:
               "switch_enum default destination must take no arguments");
   }
 
-  void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
+  void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
     require(SOI->getOperand()->getType().isAddress(),
             "switch_enum_addr operand must be an address");
 
@@ -3128,12 +3113,12 @@ public:
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify() const {
+void SILFunction::verify(bool SingleFunction) const {
 #ifndef NDEBUG
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier(*this).verify();
+  SILVerifier(*this, SingleFunction).verify();
 #endif
 }
 
@@ -3274,7 +3259,7 @@ void SILModule::verify() const {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify();
+    f.verify(/*SingleFunction=*/ false);
   }
 
   // Check all globals.

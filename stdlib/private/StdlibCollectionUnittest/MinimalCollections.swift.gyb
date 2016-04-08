@@ -194,7 +194,7 @@ internal enum _CollectionOperation : Equatable {
   case removeAll(keepCapacity: Bool)
 
   internal func _applyTo(
-    elementsLastMutatedStateIds: [Int], nextStateId: Int) -> [Int] {
+    _ elementsLastMutatedStateIds: [Int], nextStateId: Int) -> [Int] {
     var result = elementsLastMutatedStateIds
     switch self {
     case reserveCapacity:
@@ -401,7 +401,7 @@ internal struct _CollectionStateTransition {
 /// Asserts that the two indices are allowed to participate in a binary
 /// operation.
 internal func _expectCompatibleIndices<Index : _MinimalIndex>(
-  first: Index,
+  _ first: Index,
   _ second: Index,
   ${TRACE}
 ) {
@@ -416,7 +416,7 @@ internal func _expectCompatibleIndices<Index : _MinimalIndex>(
   // The indices are derived from different states.  Check that they point
   // to elements that persisted from the same state.
 
-  func getLastMutatedStateId(i: Index) -> Int? {
+  func getLastMutatedStateId(_ i: Index) -> Int? {
     guard let state = i._collectionState else { return nil }
     let offset = i._offset
     if offset == state._elementsLastMutatedStateIds.endIndex {
@@ -451,7 +451,7 @@ public protocol _MinimalIndex {
   var _collectionState: _CollectionState? { get }
 }
 
-% for Distance in [ '', 'Int32' ]:
+% for Distance in ['', 'Int32']:
 %   Index = 'MinimalForward%sIndex' % Distance
 
 public struct ${Index} : ForwardIndex {
@@ -491,7 +491,7 @@ public struct ${Index} : ForwardIndex {
   }
 
   public static func _failEarlyRangeCheck(
-    index: ${Index}, bounds: Range<${Index}>
+    _ index: ${Index}, bounds: Range<${Index}>
   ) {
     expectLE(bounds.startIndex.position, index.position)
     expectGT(bounds.endIndex.position, index.position)
@@ -504,7 +504,7 @@ public struct ${Index} : ForwardIndex {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart rangeStart: ${Index}, rangeEnd: ${Index},
+    rangeStart: ${Index}, rangeEnd: ${Index},
     boundsStart: ${Index}, boundsEnd: ${Index}
   ) {
     let range = rangeStart..<rangeEnd
@@ -589,7 +589,7 @@ public struct MinimalBidirectionalIndex : BidirectionalIndex {
   }
 
   public static func _failEarlyRangeCheck(
-    index: MinimalBidirectionalIndex,
+    _ index: MinimalBidirectionalIndex,
     bounds: Range<MinimalBidirectionalIndex>
   ) {
     expectLE(bounds.startIndex.position, index.position)
@@ -603,7 +603,7 @@ public struct MinimalBidirectionalIndex : BidirectionalIndex {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart rangeStart: MinimalBidirectionalIndex,
+    rangeStart: MinimalBidirectionalIndex,
     rangeEnd: MinimalBidirectionalIndex,
     boundsStart: MinimalBidirectionalIndex,
     boundsEnd: MinimalBidirectionalIndex
@@ -791,7 +791,7 @@ public struct MinimalRandomAccessIndex : RandomAccessIndex {
   }
 
   public static func _failEarlyRangeCheck(
-    index: MinimalRandomAccessIndex,
+    _ index: MinimalRandomAccessIndex,
     bounds: Range<MinimalRandomAccessIndex>
   ) {
     expectLE(bounds.startIndex.position, index.position)
@@ -805,7 +805,7 @@ public struct MinimalRandomAccessIndex : RandomAccessIndex {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart rangeStart: MinimalRandomAccessIndex,
+    rangeStart: MinimalRandomAccessIndex,
     rangeEnd: MinimalRandomAccessIndex,
     boundsStart: MinimalRandomAccessIndex,
     boundsEnd: MinimalRandomAccessIndex
@@ -853,8 +853,8 @@ extension MinimalRandomAccessIndex : _MinimalIndex {
 // Minimal***[Mutable]?Collection
 //===----------------------------------------------------------------------===//
 
-% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%   for mutable in [ False, True ]:
+% for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+%   for mutable in [False, True]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %     Protocol = 'Strict%s%sCollection' % (traversal, 'Mutable' if mutable else '')
 %     Self = 'Minimal%s%sCollection' % (traversal, 'Mutable' if mutable else '')
@@ -985,7 +985,7 @@ public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
 // Minimal***RangeReplaceableCollection
 //===----------------------------------------------------------------------===//
 
-% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+% for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 %   Protocol = 'Strict%sRangeReplaceableCollection' % traversal
 %   Self = 'Minimal%sRangeReplaceableCollection' % traversal
 %   Index = 'Minimal%sIndex' % traversal
@@ -999,11 +999,12 @@ public protocol ${Protocol} : RangeReplaceableCollection {
 extension ${Protocol} {
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Element
-  >(subRange: Range<${Self}<Element>.Index>,
+  >(_ subRange: Range<${Self}<Element>.Index>,
     with newElements: C) {
     base.replaceSubrange(subRange, with: newElements)
   }
 
+  @discardableResult
   public mutating func removeLast() -> Element {
     return base.removeLast()
   }
@@ -1111,13 +1112,13 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     }
   }
 
-  public mutating func reserveCapacity(n: Int) {
+  public mutating func reserveCapacity(_ n: Int) {
     _willMutate(.reserveCapacity(capacity: n))
     elements.reserveCapacity(n)
     reservedCapacity = Swift.max(reservedCapacity, n)
   }
 
-  public mutating func append(x: T) {
+  public mutating func append(_ x: T) {
     _willMutate(.append)
     elements.append(x)
   }
@@ -1134,7 +1135,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == T
   >(
-    subRange: Range<${Index}>, with newElements: C
+    _ subRange: Range<${Index}>, with newElements: C
   ) {
     let oldCount = count
     elements.replaceSubrange(
@@ -1146,7 +1147,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
       replacementCount: subRange.count + newCount - oldCount))
   }
 
-  public mutating func insert(newElement: T, at i: ${Index}) {
+  public mutating func insert(_ newElement: T, at i: ${Index}) {
     _willMutate(.insert(atIndex: i._offset))
     elements.insert(newElement, at: i.position)
   }
@@ -1165,17 +1166,19 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     }
   }
 
+  @discardableResult
   public mutating func remove(at i: ${Index}) -> T {
     _willMutate(.removeAtIndex(index: i._offset))
     return elements.remove(at: i.position)
   }
 
+  @discardableResult
   public mutating func removeLast() -> T {
     _willMutate(.removeLast)
     return elements.removeLast()
   }
 
-  public mutating func removeSubrange(subRange: Range<${Index}>) {
+  public mutating func removeSubrange(_ subRange: Range<${Index}>) {
     if !subRange.isEmpty {
       _willMutate(.removeRange(
         subRange: subRange.startIndex._offset..<subRange.endIndex._offset))
@@ -1191,7 +1194,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     elements.removeAll(keepingCapacity: false)
   }
 
-  internal mutating func _willMutate(operation: _CollectionOperation) {
+  internal mutating func _willMutate(_ operation: _CollectionOperation) {
     _collectionState = _CollectionStateTransition(
       previousState: _collectionState,
       operation: operation)._nextState
@@ -1216,7 +1219,7 @@ public struct DefaultedSequence<Element> : StrictSequence {
   }
 }
 
-% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+% for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
 /// A Collection that uses as many default implementations as
 /// `Collection` can provide.
@@ -1354,7 +1357,7 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
   public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Element
   >(
-    subRange: Range<Index>,
+    _ subRange: Range<Index>,
     with newElements: C
   ) {
     let startOffset = startIndex.position

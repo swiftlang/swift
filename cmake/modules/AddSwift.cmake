@@ -1347,7 +1347,7 @@ endfunction()
 #   Sources to add into this library.
 function(add_swift_library name)
   set(SWIFTLIB_options
-      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY
+      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY IS_HOST
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
@@ -1426,6 +1426,9 @@ function(add_swift_library name)
     # SDKs building the variants of this library.
     list_intersect(
         "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_SDKS}" SWIFTLIB_TARGET_SDKS)
+    if(SWIFTLIB_IS_HOST)
+      list_union("${SWIFTLIB_TARGET_SDKS}" "${SWIFT_HOST_VARIANT_SDK}" SWIFTLIB_TARGET_SDKS)
+    endif()
     foreach(sdk ${SWIFTLIB_TARGET_SDKS})
       set(THIN_INPUT_TARGETS)
 
@@ -1455,7 +1458,7 @@ function(add_swift_library name)
         elseif("${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_TVOS})
-        elseif("${SDK}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
+        elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WATCHOS})
         endif()
@@ -1632,13 +1635,15 @@ function(add_swift_library name)
       if(SWIFTLIB_IS_STDLIB)
         foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
           set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-          add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
-              ${lipo_target}
-              ${lipo_target_static})
-          if(NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest")
-            add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
+          if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
+            add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
                 ${lipo_target}
                 ${lipo_target_static})
+            if(NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest")
+              add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
+                  ${lipo_target}
+                  ${lipo_target_static})
+            endif()
           endif()
         endforeach()
       endif()

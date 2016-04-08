@@ -22,7 +22,7 @@ public typealias _CocoaString = AnyObject
 
 public // @testable
 func _stdlib_binary_CFStringCreateCopy(
-  source: _CocoaString
+  _ source: _CocoaString
 ) -> _CocoaString {
   let result = _swift_stdlib_CFStringCreateCopy(nil, source)
   Builtin.release(result)
@@ -31,14 +31,14 @@ func _stdlib_binary_CFStringCreateCopy(
 
 public // @testable
 func _stdlib_binary_CFStringGetLength(
-  source: _CocoaString
+  _ source: _CocoaString
 ) -> Int {
   return _swift_stdlib_CFStringGetLength(source)
 }
 
 public // @testable
 func _stdlib_binary_CFStringGetCharactersPtr(
-  source: _CocoaString
+  _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit> {
   return UnsafeMutablePointer(_swift_stdlib_CFStringGetCharactersPtr(source))
 }
@@ -47,7 +47,7 @@ func _stdlib_binary_CFStringGetCharactersPtr(
 /// characters (does not apply ASCII optimizations).
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 func _cocoaStringToSwiftString_NonASCII(
-  source: _CocoaString
+  _ source: _CocoaString
 ) -> String {
   let cfImmutableValue = _stdlib_binary_CFStringCreateCopy(source)
   let length = _stdlib_binary_CFStringGetLength(cfImmutableValue)
@@ -68,7 +68,7 @@ func _cocoaStringToSwiftString_NonASCII(
 /// `_CocoaString`, having the given minimum capacity.
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringToContiguous(
-  source source: _CocoaString, range: Range<Int>, minimumCapacity: Int
+  source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
     "Known contiguously-stored strings should already be converted to Swift")
@@ -90,7 +90,7 @@ internal func _cocoaStringToContiguous(
 /// storage of sufficient capacity.
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringReadAll(
-  source: _CocoaString, _ destination: UnsafeMutablePointer<UTF16.CodeUnit>
+  _ source: _CocoaString, _ destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) {
   _swift_stdlib_CFStringGetCharacters(
     source, _swift_shims_CFRange(
@@ -99,7 +99,7 @@ internal func _cocoaStringReadAll(
 
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringSlice(
-  target: _StringCore, _ bounds: Range<Int>
+  _ target: _StringCore, _ bounds: Range<Int>
 ) -> _StringCore {
   _sanityCheck(target.hasCocoaBuffer)
   
@@ -116,9 +116,10 @@ internal func _cocoaStringSlice(
   return String(_cocoaString: cfResult)._core
 }
 
+@_versioned
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringSubscript(
-  target: _StringCore, _ position: Int
+  _ target: _StringCore, _ position: Int
 ) -> UTF16.CodeUnit {
   let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
 
@@ -195,7 +196,7 @@ public protocol _NSStringCore :
 
   func length() -> Int
 
-  func characterAtIndex(index: Int) -> UInt16
+  func characterAtIndex(_ index: Int) -> UInt16
 
   // We also override the following methods for efficiency.
 }
@@ -218,12 +219,12 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     return _core.count
   }
 
-  func characterAtIndex(index: Int) -> UInt16 {
+  func characterAtIndex(_ index: Int) -> UInt16 {
     return _core[index]
   }
 
   func getCharacters(
-    buffer: UnsafeMutablePointer<UInt16>,
+    _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
 
     _precondition(aRange.location + aRange.length <= Int(_core.count))
@@ -251,15 +252,15 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   //
   // Implement sub-slicing without adding layers of wrapping
   //
-  func substringFromIndex(start: Int) -> _NSContiguousString {
+  func substringFromIndex(_ start: Int) -> _NSContiguousString {
     return _NSContiguousString(_core[Int(start)..<Int(_core.count)])
   }
 
-  func substringToIndex(end: Int) -> _NSContiguousString {
+  func substringToIndex(_ end: Int) -> _NSContiguousString {
     return _NSContiguousString(_core[0..<Int(end)])
   }
 
-  func substringWithRange(aRange: _SwiftNSRange) -> _NSContiguousString {
+  func substringWithRange(_ aRange: _SwiftNSRange) -> _NSContiguousString {
     return _NSContiguousString(
       _core[Int(aRange.location)..<Int(aRange.location + aRange.length)])
   }
@@ -275,7 +276,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   /// will result in undefined behavior.
   @_semantics("self_no_escaping_closure")
   func _unsafeWithNotEscapedSelfPointer<Result>(
-    @noescape body: (OpaquePointer) throws -> Result
+    @noescape _ body: (OpaquePointer) throws -> Result
   ) rethrows -> Result {
     let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
     defer {
@@ -290,8 +291,8 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   /// behavior.
   @_semantics("pair_no_escaping_closure")
   func _unsafeWithNotEscapedSelfPointerPair<Result>(
-    rhs: _NSContiguousString,
-    @noescape body: (OpaquePointer, OpaquePointer) throws -> Result
+    _ rhs: _NSContiguousString,
+    @noescape _ body: (OpaquePointer, OpaquePointer) throws -> Result
   ) rethrows -> Result {
     let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
     let rhsAsPointer = unsafeBitCast(rhs, to: OpaquePointer.self)

@@ -19,12 +19,6 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var LazyTestSuite = TestSuite("Lazy")
 
@@ -177,7 +171,7 @@ LazyTestSuite.test("LazySequence<Sequence>/underestimatedCount") {
   expectEqual(42, lazySeq.underestimatedCount)
 }
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
 LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimatedCount") {
   let s = Minimal${traversal}Collection(
@@ -245,7 +239,7 @@ LazyTestSuite.test("LazySequence.array") {
     [], Array(base).map { $0.value }, "sequence should be consumed")
 }
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
 LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimatedCount") {
   let s = Minimal${traversal}Collection(
@@ -398,7 +392,7 @@ func expectSequencePassthrough<
   where
   S : LazySequenceProtocol, Base : LoggingType,
   Base.Iterator.Element == S.Iterator.Element
->(s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
+>(_ s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
   let baseType = base.dynamicType
 
   SequenceLog.makeIterator.expectIncrement(baseType) { _ = s.makeIterator() }
@@ -684,7 +678,7 @@ func checkFilterIteratorBase<
   where
   S.Iterator == LazyFilterIterator<I>,
   I.Element == OpaqueValue<Int>
->(s1: S, _ s2: S) {
+>(_ s1: S, _ s2: S) {
   var iter1 = s1.makeIterator()
   expectEqual(0, iter1.next()!.value)
   expectEqual(2, iter1.next()!.value)

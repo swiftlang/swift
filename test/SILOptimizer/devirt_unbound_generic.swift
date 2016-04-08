@@ -14,14 +14,14 @@ protocol P {
 class C<T:P> {
    typealias Node = T.Node
 
-   func foo(n:Node) {
+   func foo(_ n:Node) {
    }
 
-   func boo<S>(n:Node, s:S) {
+   func boo<S>(_ n:Node, s:S) {
    }
 }
 
-func test1<T>(t:C<T>, a: T.Node) {
+func test1<T>(_ t:C<T>, a: T.Node) {
    t.boo(a, s:1)
 }
 
@@ -50,11 +50,11 @@ class Derived<T> : Base<T> {
 // CHECK-NOT: class_method
 // CHECK: return
 @inline(never)
-func test2<T>(d: Derived<T>) {
+func test2<T>(_ d: Derived<T>) {
    d.foo()
 }
 
-public func doTest2<T>(t:T) {
+public func doTest2<T>(_ t:T) {
   test2(Derived<T>())
 }
 
@@ -66,10 +66,10 @@ public func doTest2<T>(t:T) {
 // CHECK-NOT: class_method
 // CHECK: return
 @inline(never)
-func test3<T>(d: Derived<T>) {
+func test3<T>(_ d: Derived<T>) {
    d.dynamicType.boo()
 }
 
-public func doTest3<T>(t:T) {
+public func doTest3<T>(_ t:T) {
   test3(Derived<T>())
 }

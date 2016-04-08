@@ -47,3 +47,8 @@ public extension S1 {
     public let b = 1
   }
 }
+
+@objc
+public protocol P2 {
+  optional func foo1()
+}

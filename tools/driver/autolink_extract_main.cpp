@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <set>
 #include <string>
+#include <vector>
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Frontend/Frontend.h"
@@ -113,7 +113,7 @@ public:
 static bool extractLinkerFlags(const llvm::object::Binary *Bin,
                                CompilerInstance &Instance,
                                StringRef BinaryFileName,
-                               std::set<std::string> &LinkerFlags) {
+                               std::vector<std::string> &LinkerFlags) {
   if (auto *ObjectFile = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Bin)) {
     // Search for the section we hold autolink entries in
     for (auto &Section : ObjectFile->sections()) {
@@ -126,11 +126,10 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
         // entries are null-terminated, so extract them and push them into
         // the set.
         llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
-        SectionData.split(SplitFlags, llvm::StringRef("\0", 1),
-          -1, /*KeepEmpty=*/false);
-        for (const auto &Flag : SplitFlags) {
-          LinkerFlags.insert(Flag);
-        }
+        SectionData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
+                          /*KeepEmpty=*/false);
+        for (const auto &Flag : SplitFlags)
+          LinkerFlags.push_back(Flag);
       }
     }
     return false;
@@ -176,8 +175,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
     return 1;
   }
 
-  // Store each linker flag only once
-  std::set<std::string> LinkerFlags;
+  std::vector<std::string> LinkerFlags;
 
   // Extract the linker flags from the objects.
   for (const auto &BinaryFileName : Invocation.getInputFilenames()) {

@@ -6,7 +6,7 @@
 
 // @_transparent to force serialization.
 @_transparent
-public func testPartialApply(obj: Test) {
+public func testPartialApply(_ obj: Test) {
   // CHECK-LABEL: @_TF4Test16testPartialApplyFPSo4Test_T_ : $@convention(thin) (@owned Test) -> () {
   if let curried1 = obj.normalObject {
     // CHECK: dynamic_method_br [[CURRIED1_OBJ:%.+]] : $@opened([[CURRIED1_EXISTENTIAL:.+]]) Test, #Test.normalObject!1.foreign, [[CURRIED1_TRUE:[^,]+]], [[CURRIED1_FALSE:[^,]+]]

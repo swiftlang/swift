@@ -22,12 +22,12 @@ enum MyState : String {
 }
 
 @inline(never)
-func check_state(state : MyState) -> Int {
+func check_state(_ state : MyState) -> Int {
   return state == .Opened ? 1 : 0
 }
 
 @inline(never)
-public func run_OpenClose(N: Int) {
+public func run_OpenClose(_ N: Int) {
   var c = 0
   for _ in 1...N*10000 {
       c += check_state(MyState.Closed)

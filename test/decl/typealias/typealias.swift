@@ -132,18 +132,18 @@ protocol CB {
   associatedtype C : Col
   typealias E = C.Elem
   
-  func setIt(element: E)
+  func setIt(_ element: E)
 }
 
-func go1<T : CB, U : Col where U.Elem == T.E>(col: U, builder: T) { // OK
+func go1<T : CB, U : Col where U.Elem == T.E>(_ col: U, builder: T) { // OK
   builder.setIt(col.elem)
 }
-func go2<T : CB, U : Col where U.Elem == T.C.Elem>(col: U, builder: T) { // OK
+func go2<T : CB, U : Col where U.Elem == T.C.Elem>(_ col: U, builder: T) { // OK
   builder.setIt(col.elem)
 }
 
 // Test for same type requirement with typealias == concrete
-func go3<T : CB where T.E == Int>(builder: T) {
+func go3<T : CB where T.E == Int>(_ builder: T) {
   builder.setIt(1)
 }
 
@@ -159,7 +159,7 @@ protocol MySeq {
   typealias Elem = Self.I.Elem
   
   func makeIterator() -> I
-  func getIndex(i: Int) -> Elem
+  func getIndex(_ i: Int) -> Elem
   func first() -> Elem
 }
 
@@ -169,7 +169,7 @@ extension MySeq where Self : MyIterator {
   }
 }
 
-func plusOne<S: MySeq where S.Elem == Int>(s: S, i: Int) -> Int {
+func plusOne<S: MySeq where S.Elem == Int>(_ s: S, i: Int) -> Int {
   return s.getIndex(i) + 1
 }
 
@@ -180,7 +180,7 @@ struct OneIntSeq: MySeq, MyIterator {
     return e
   }
   
-  func getIndex(i: Int) -> Float {
+  func getIndex(_ i: Int) -> Float {
     return e
   }
 }
@@ -202,7 +202,7 @@ protocol P2 {
     associatedtype B
 }
 
-func go3<T : P1, U : P2 where T.F == U.B>(x: T) -> U { // expected-error {{typealias 'F' is too complex to be used as a generic constraint; use an associatedtype instead}} expected-error {{'F' is not a member type of 'T'}}
+func go3<T : P1, U : P2 where T.F == U.B>(_ x: T) -> U { // expected-error {{typealias 'F' is too complex to be used as a generic constraint; use an associatedtype instead}} expected-error {{'F' is not a member type of 'T'}}
 }
 
 // Specific diagnosis for things that look like Swift 2.x typealiases

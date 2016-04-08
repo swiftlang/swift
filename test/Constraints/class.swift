@@ -15,9 +15,9 @@ var d : D
 var ef : E<Float> 
 var fi : F<Int>
 
-func f0(b : B) {}
+func f0(_ b : B) {}
 
-func ternary<T>(cond: Bool,
+func ternary<T>(_ cond: Bool,
                 @autoclosure _ ifTrue: () -> T,
                 @autoclosure _ ifFalse: () -> T) -> T {}
 

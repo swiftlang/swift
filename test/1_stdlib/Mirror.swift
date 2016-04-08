@@ -21,13 +21,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var mirrors = TestSuite("Mirrors")
 
@@ -56,7 +49,7 @@ mirrors.test("RandomAccessStructure") {
 
 let letters = "abcdefghijklmnopqrstuvwxyz "
 
-func find(substring: String, within domain: String) -> String.Index? {
+func find(_ substring: String, within domain: String) -> String.Index? {
   let domainCount = domain.characters.count
   let substringCount = substring.characters.count
 
@@ -171,7 +164,7 @@ mirrors.test("Legacy") {
   let mb = Mirror(reflecting: B())
   
   func expectBMirror(
-    mb: Mirror,   stackTrace: SourceLocStack = SourceLocStack(),
+    _ mb: Mirror, stackTrace: SourceLocStack = SourceLocStack(),
     file: String = #file, line: UInt = #line
   ) {
     expectTrue(mb.subjectType == B.self,

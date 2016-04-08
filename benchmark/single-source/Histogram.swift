@@ -16,7 +16,7 @@ import TestsUtils
 
 typealias rrggbb_t = UInt32
 
-func output_sorted_sparse_rgb_histogram<S: Sequence where S.Iterator.Element == rrggbb_t>(samples: S, _ N: Int) {
+func output_sorted_sparse_rgb_histogram<S: Sequence where S.Iterator.Element == rrggbb_t>(_ samples: S, _ N: Int) {
   var histogram = Dictionary<rrggbb_t, Int>()
   for  _ in 1...50*N {
     for sample in samples {   // This part is really awful, I agree
@@ -109,6 +109,6 @@ let samples: [rrggbb_t] = [
 ]
 
 @inline(never)
-public func run_Histogram(N: Int) {
+public func run_Histogram(_ N: Int) {
   output_sorted_sparse_rgb_histogram(samples, N);
 }

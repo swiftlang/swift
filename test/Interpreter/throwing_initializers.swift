@@ -3,13 +3,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var ThrowingInitTestSuite = TestSuite("ThrowingInit")
 
@@ -17,7 +10,7 @@ enum E : ErrorProtocol {
   case X
 }
 
-func unwrap(b: Bool) throws -> Int {
+func unwrap(_ b: Bool) throws -> Int {
   if b {
     throw E.X
   }
@@ -265,7 +258,7 @@ struct Chimera {
   }
 }
 
-func mustThrow<T>(f: () throws -> T) {
+func mustThrow<T>(_ f: () throws -> T) {
   do {
     try f()
     preconditionFailure("Didn't throw")

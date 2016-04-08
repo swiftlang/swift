@@ -112,86 +112,7 @@ struct String {
   {}
 #endif
 };
-  
-struct Array {
-  // Keep the details of Array's implementation opaque to the runtime.
-  const void *x;
-};
-  
-struct PlaygroundQuickLook {
-  struct RawData {
-    Array Data;
-    String Type;
-  };
-  struct Rectangle {
-    double x, y, w, h;
-  };
-  struct Point {
-    double x, y;
-  };
-  struct Interval {
-    int64_t loc,len;
-  };
-  
-  union {
-    String TextOrURL;
-    int64_t Int;
-    uint64_t UInt;
-    float Float;
-    double Double;
-    Any Any;
-    RawData Raw;
-    Rectangle Rect;
-    Point PointOrSize;
-    bool Logical;
-    Interval Range;
-  };
-  enum class Tag : uint8_t {
-    Text,
-    Int,
-    UInt,
-    Float,
-    Double,
-    Image,
-    Sound,
-    Color,
-    BezierPath,
-    AttributedString,
-    Rectangle,
-    Point,
-    Size,
-    Logical,
-    Range,
-    View,
-    Sprite,
-    URL,
-    Raw,
-  } Kind;
-};
-  
-struct OptionalPlaygroundQuickLook {
-  union {
-    struct {
-      union {
-        String TextOrURL;
-        int64_t Int;
-        uint64_t UInt;
-        float Float;
-        double Double;
-        Any Any;
-        PlaygroundQuickLook::RawData Raw;
-        PlaygroundQuickLook::Rectangle Rect;
-        PlaygroundQuickLook::Point PointOrSize;
-        bool Logical;
-        PlaygroundQuickLook::Interval Range;
-      };
-      PlaygroundQuickLook::Tag Kind;
-      bool isNone;
-    } optional;
-    PlaygroundQuickLook payload;
-  };
-};
-  
+
 /// A Mirror witness table for use by MagicMirror.
 struct MirrorWitnessTable;
   
@@ -495,6 +416,7 @@ intptr_t swift_TupleMirror_count(HeapObject *owner,
                                  const OpaqueValue *value,
                                  const Metadata *type) {
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
+  swift_release(owner);
   return Tuple->NumElements;
 }
 
@@ -524,9 +446,6 @@ void swift_TupleMirror_subscript(String *outString,
   auto bytes = reinterpret_cast<const char*>(value);
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
 
-  // This retain matches the -1 in reflect.
-  swift_retain(owner);
-
   // 'owner' is consumed by this call.
   new (outMirror) Mirror(reflect(owner, eltData, elt.Type));
 }
@@ -551,6 +470,7 @@ intptr_t swift_StructMirror_count(HeapObject *owner,
                                   const OpaqueValue *value,
                                   const Metadata *type) {
   auto Struct = static_cast<const StructMetadata *>(type);
+  swift_release(owner);
   return Struct->Description->Struct.NumFields;
 }
 
@@ -575,9 +495,6 @@ void swift_StructMirror_subscript(String *outString,
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
 
   new (outString) String(getFieldName(Struct->Description->Struct.FieldNames, i));
-
-  // This matches the -1 in reflect.
-  swift_retain(owner);
 
   // 'owner' is consumed by this call.
   assert(!fieldType.isIndirect() && "indirect struct fields not implemented");
@@ -635,14 +552,19 @@ extern "C"
 const char *swift_EnumMirror_caseName(HeapObject *owner,
                                       const OpaqueValue *value,
                                       const Metadata *type) {
-  if (!isEnumReflectable(type))
+  if (!isEnumReflectable(type)) {
+    swift_release(owner);
     return nullptr;
+  }
 
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = Enum->Description->Enum;
 
   unsigned tag;
   getEnumMirrorInfo(value, type, &tag, nullptr, nullptr);
+
+  swift_release(owner);
+
   return getFieldName(Description.CaseNames, tag);
 }
 
@@ -667,6 +589,7 @@ const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
 
   MagicMirror *theMirror = reinterpret_cast<MagicMirror *>(&mirror);
   MagicMirrorData data = theMirror->Data;
+  swift_retain(data.Owner);
   const char *result = swift_EnumMirror_caseName(data.Owner, data.Value, data.Type);
   type->vw_destroy(value);
   return result;
@@ -677,11 +600,14 @@ extern "C"
 intptr_t swift_EnumMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
-  if (!isEnumReflectable(type))
+  if (!isEnumReflectable(type)) {
+    swift_release(owner);
     return 0;
+  }
 
   const Metadata *payloadType;
   getEnumMirrorInfo(value, type, nullptr, &payloadType, nullptr);
+  swift_release(owner);
   return (payloadType != nullptr) ? 1 : 0;
 }
 
@@ -702,22 +628,27 @@ void swift_EnumMirror_subscript(String *outString,
 
   getEnumMirrorInfo(value, type, &tag, &payloadType, &indirect);
 
-  // Copy the payload since the projection is destructive.
-  BoxPair pair = swift_allocBox(type);
+  // Copy the enum payload into a box
+  const Metadata *boxType = (indirect ? &_TMBo.base : payloadType);
+  BoxPair pair = swift_allocBox(boxType);
+
+  type->vw_destructiveProjectEnumData(const_cast<OpaqueValue *>(value));
+  boxType->vw_initializeWithCopy(pair.second, const_cast<OpaqueValue *>(value));
+  type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value),
+                                    (int) (tag - Description.getNumPayloadCases()));
+
+  swift_release(owner);
 
   owner = pair.first;
-  type->vw_initializeWithTake(pair.second, const_cast<OpaqueValue *>(value));
-  type->vw_destructiveProjectEnumData(pair.second);
   value = pair.second;
 
   // If the payload is indirect, we need to jump through the box to get it.
   if (indirect) {
     owner = *reinterpret_cast<HeapObject * const *>(value);
     value = swift_projectBox(const_cast<HeapObject *>(owner));
+    swift_retain(owner);
+    swift_release(pair.first);
   }
-
-  // This matches the -1 in reflect.
-  swift_retain(owner);
 
   new (outString) String(getFieldName(Description.CaseNames, tag));
   new (outMirror) Mirror(reflect(owner, value, payloadType));
@@ -970,100 +901,30 @@ void swift_ObjCMirror_subscript(String *outString,
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" OptionalPlaygroundQuickLook
+extern "C" id
 swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
                                   const Metadata *type) {
-  OptionalPlaygroundQuickLook result;
-  memset(&result, 0, sizeof(result));
-  
   id object = [*reinterpret_cast<const id *>(value) retain];
   swift_release(owner);
   if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
     id quickLookObject = [object debugQuickLookObject];
     [quickLookObject retain];
     [object release];
-    object = quickLookObject;
+    return quickLookObject;
   }
-  
-  // NSNumbers quick-look as integers or doubles, depending on type.
-  if ([object isKindOfClass:[NSNumber class]]) {
-    NSNumber *n = object;
-    
-    switch ([n objCType][0]) {
-    case 'd': // double
-      result.payload.Double = [n doubleValue];
-      result.payload.Kind = PlaygroundQuickLook::Tag::Double;
-      break;
-    case 'f': // float
-      result.payload.Float = [n floatValue];
-      result.payload.Kind = PlaygroundQuickLook::Tag::Float;
-      break;
-        
-    case 'Q': // unsigned long long
-      result.payload.UInt = [n unsignedLongLongValue];
-      result.payload.Kind = PlaygroundQuickLook::Tag::UInt;
-      break;
 
-    // FIXME: decimals?
-    default:
-      result.payload.Int = [n longLongValue];
-      result.payload.Kind = PlaygroundQuickLook::Tag::Int;
-      break;
-    }
-    
-    [object release];
-    result.optional.isNone = false;
-    return result;
-  }
-  
-  // Various other framework types are used for rich representations.
-  
-  /// Store an ObjC reference into an Any.
-  auto initializeAnyWithTakeOfObject = [](Any &any, id obj) {
-    any.Type = swift_getObjCClassMetadata(_swift_getClass((const void*) obj));
-    *reinterpret_cast<id *>(&any.Buffer) = obj;
-  };
-  
-  if ([object isKindOfClass:NSClassFromString(@"NSAttributedString")]) {
-    initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = PlaygroundQuickLook::Tag::AttributedString;
-    result.optional.isNone = false;
-    return result;
-  } else if ([object isKindOfClass:NSClassFromString(@"NSImage")]
-      || [object isKindOfClass:NSClassFromString(@"UIImage")]
-      || [object isKindOfClass:NSClassFromString(@"NSImageView")]
-      || [object isKindOfClass:NSClassFromString(@"UIImageView")]
-      || [object isKindOfClass:NSClassFromString(@"CIImage")]
-      || [object isKindOfClass:NSClassFromString(@"NSBitmapImageRep")]) {
-    initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = PlaygroundQuickLook::Tag::Image;
-    result.optional.isNone = false;
-    return result;
-  } else if ([object isKindOfClass:NSClassFromString(@"NSColor")]
-             || [object isKindOfClass:NSClassFromString(@"UIColor")]) {
-    initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = PlaygroundQuickLook::Tag::Color;
-    result.optional.isNone = false;
-    return result;
-  } else if ([object isKindOfClass:NSClassFromString(@"NSBezierPath")]
-             || [object isKindOfClass:NSClassFromString(@"UIBezierPath")]) {
-    initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = PlaygroundQuickLook::Tag::BezierPath;
-    result.optional.isNone = false;
-    return result;
-  } else if ([object isKindOfClass:[NSString class]]) {
-    result.payload.TextOrURL = String((NSString*)object);
-    [object release];
-    result.payload.Kind = PlaygroundQuickLook::Tag::Text;
-    result.optional.isNone = false;
-    return result;
-  }
-  
-  // Return none if we didn't get a suitable object.
+  return object;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" bool swift_isKind(id object, NSString *className) {
+  bool result = [object isKindOfClass:NSClassFromString(className)];
   [object release];
-  result.optional.isNone = true;
+  [className release];
+
   return result;
 }
+
 #endif
   
 // -- MagicMirror implementation.

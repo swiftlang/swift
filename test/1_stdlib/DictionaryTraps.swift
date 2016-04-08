@@ -15,7 +15,7 @@ import Foundation
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
     var result: Self? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -23,13 +23,6 @@ public extension _ObjectiveCBridgeable {
   }
 }
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {
@@ -159,7 +152,7 @@ class TestObjCKeyTy : NSObject {
     self.value = value
   }
 
-  override func isEqual(object: AnyObject!) -> Bool {
+  override func isEqual(_ object: AnyObject!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
@@ -189,14 +182,14 @@ struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: TestObjCKeyTy,
+    _ x: TestObjCKeyTy,
     result: inout TestBridgedKeyTy?
   ) {
     result = TestBridgedKeyTy(x.value)
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    x: TestObjCKeyTy,
+    _ x: TestObjCKeyTy,
     result: inout TestBridgedKeyTy?
   ) -> Bool {
     result = TestBridgedKeyTy(x.value)

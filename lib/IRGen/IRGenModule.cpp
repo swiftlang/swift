@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
@@ -375,11 +376,13 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
 
   // Only use the new calling conventions on platforms that support it.
   auto Arch = Triple.getArch();
-  if (Arch == llvm::Triple::ArchType::x86_64 ||
-      Arch == llvm::Triple::ArchType::aarch64)
+  if (SWIFT_RT_USE_RegisterPreservingCC &&
+      Arch == llvm::Triple::ArchType::aarch64) {
     RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
-  else
+  }
+  else {
     RegisterPreservingCC = DefaultCC;
+  }
 
   ABITypes = new CodeGenABITypes(clangASTContext, Module);
 
@@ -924,6 +927,26 @@ void IRGenModule::emitAutolinkInfo() {
                                    llvm::Constant::getNullValue(Int1Ty),
                                    buf.str());
   }
+}
+
+void IRGenModuleDispatcher::emitSwiftReflectionVersion() {
+  for (auto &m : *this) {
+    m.second->emitSwiftReflectionVersion();
+  }
+}
+
+llvm::Constant*
+IRGenModule::emitSwiftReflectionVersion() {
+  auto Init = llvm::ConstantInt::get(Int32Ty, REFLECTION_VERSION);
+
+  auto Version = new llvm::GlobalVariable(Module, Int32Ty,
+                                               /*constant*/ true,
+                                          llvm::GlobalValue::LinkOnceODRLinkage,
+                                               Init,
+                                               "__swift_reflection_version");
+  addUsedGlobal(Version);
+
+  return Version;
 }
 
 void IRGenModule::cleanupClangCodeGenMetadata() {

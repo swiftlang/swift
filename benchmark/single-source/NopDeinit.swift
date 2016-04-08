@@ -24,7 +24,7 @@ class X<T : Comparable> {
   }
 }
 
-public func run_NopDeinit(N: Int) {
+public func run_NopDeinit(_ N: Int) {
   for _ in 1...N {
     var arr :[X<Int>] = []
     let size = 500

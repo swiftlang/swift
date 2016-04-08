@@ -7,19 +7,12 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 enum Excuse : ErrorProtocol { case CatAteHomework(LifetimeTracked) }
 
 var ErrorHandlingTests = TestSuite("ErrorHandling")
 
-func furball(b: Bool) throws -> LifetimeTracked {
+func furball(_ b: Bool) throws -> LifetimeTracked {
   if b {
     throw Excuse.CatAteHomework(LifetimeTracked(0))
   } else {

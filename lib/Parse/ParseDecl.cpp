@@ -5214,7 +5214,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   // '{'
   // Parse getter and setter.
   ParsedAccessors accessors;
-  if (Tok.isNot(tok::l_brace))  {
+  if (Tok.isNot(tok::l_brace)) {
     // Subscript declarations must always have at least a getter, so they need
     // to be followed by a {.
     if (Flags.contains(PD_InProtocol))

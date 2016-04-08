@@ -557,9 +557,9 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
     // can simply ask SSAUpdater for the reaching store.
     SILValue RelVal = SSAUp.GetValueAtEndOfBlock(RelPoint->getParent());
     if (StVal->getType().isReferenceCounted(RelPoint->getModule()))
-      B.createStrongRelease(RelPoint->getLoc(), RelVal)->getOperandRef();
+      B.createStrongRelease(RelPoint->getLoc(), RelVal, Atomicity::Atomic);
     else
-      B.createReleaseValue(RelPoint->getLoc(), RelVal)->getOperandRef();
+      B.createReleaseValue(RelPoint->getLoc(), RelVal, Atomicity::Atomic);
   }
 }
 

@@ -19,12 +19,12 @@
 // CHECK: 42
 // CHECK: 237
 
-public func testit(x: Int) -> Int {
+public func testit(_ x: Int) -> Int {
 	return incrementit(x)
 }
 
 public class Base {
-	func memberfunc(x: Int) -> Int {
+	func memberfunc(_ x: Int) -> Int {
 		return x + 1
 	}
 }
@@ -32,16 +32,16 @@ public class Base {
 public var g2 = 123
 
 @inline(never)
-func callmember(b: Base) -> Int {
+func callmember(_ b: Base) -> Int {
 	return b.memberfunc(g2)
 }
 
 @inline(never)
-private func privateInc(x: Int) -> Int {
+private func privateInc(_ x: Int) -> Int {
 	return x + 3
 }
 
-func callPrivInc(x: Int) -> Int {
+func callPrivInc(_ x: Int) -> Int {
 	return privateInc(x)
 }
 
@@ -50,7 +50,7 @@ protocol MyProto {
 }
 
 @inline(never)
-func callproto(p: MyProto) {
+func callproto(_ p: MyProto) {
 	print(p.protofunc())
 }
 

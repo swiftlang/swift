@@ -16,13 +16,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 // Check that the generic parameter is called 'Bound'.
 protocol TestProtocol1 {}
@@ -97,7 +90,7 @@ IntervalTestSuite.test("Overlaps") {
   
   func expectOverlaps<
     I0: Interval, I1: Interval where I0.Bound == I1.Bound
-  >(expectation: Bool, _ lhs: I0, _ rhs: I1) {
+  >(_ expectation: Bool, _ lhs: I0, _ rhs: I1) {
     if expectation {
       expectTrue(lhs.overlaps(rhs))
       expectTrue(rhs.overlaps(lhs))

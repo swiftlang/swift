@@ -6,13 +6,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import WatchKit
 
@@ -26,7 +19,7 @@ WatchKitTests.test("WKInterfaceController/reloadRootControllers(_:)") {
 
 // This is a very weak test, but we can't do better without spawning a GUI app.
 WatchKitTests.test("WKInterfaceController/presentController(_:)") {
-  var curried = WKInterfaceController.presentController
+  let curried = WKInterfaceController.presentController(_:)
   typealias ExpectedType =
     (WKInterfaceController) -> ([(name: String, context: AnyObject)]) -> Void
   let checkType: ExpectedType = curried
@@ -34,6 +27,8 @@ WatchKitTests.test("WKInterfaceController/presentController(_:)") {
 
   // FIXME: can't write the following line: rdar://20985062
   // expectType(ExpectedType.self, &curried)
+
+  let curried2 = WKInterfaceController.presentController as ExpectedType
 }
 
 } // #available(iOS 8.2, *)

@@ -87,21 +87,21 @@ public extension UIDeviceOrientation {
 
 @warn_unused_result
 public func UIDeviceOrientationIsLandscape(
-  orientation: UIDeviceOrientation
+  _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isLandscape
 }
 
 @warn_unused_result
 public func UIDeviceOrientationIsPortrait(
-  orientation: UIDeviceOrientation
+  _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isPortrait
 }
 
 @warn_unused_result
 public func UIDeviceOrientationIsValidInterfaceOrientation(
-  orientation: UIDeviceOrientation) -> Bool
+  _ orientation: UIDeviceOrientation) -> Bool
 {
   return orientation.isValidInterfaceOrientation
 }
@@ -124,13 +124,13 @@ public extension UIInterfaceOrientation {
 
 @warn_unused_result
 public func UIInterfaceOrientationIsPortrait(
-  orientation: UIInterfaceOrientation) -> Bool {
+  _ orientation: UIInterfaceOrientation) -> Bool {
   return orientation.isPortrait
 }
 
 @warn_unused_result
 public func UIInterfaceOrientationIsLandscape(
-  orientation: UIInterfaceOrientation
+  _ orientation: UIInterfaceOrientation
 ) -> Bool {
   return orientation.isLandscape
 }
@@ -204,7 +204,7 @@ extension UIView : CustomPlaygroundQuickLookable {
       // be present.)
       let ctx: CGContext! = UIGraphicsGetCurrentContext()
       UIColor(white:1.0, alpha:0.0).set()
-      CGContextFillRect(ctx, bounds)
+      ctx.fillRect(bounds)
       layer.render(in: ctx)
 
       let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()

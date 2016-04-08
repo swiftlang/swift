@@ -940,6 +940,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       assert(SizeInBits && "zero-sized piece");
       assert(SizeInBits < VarSizeInBits && "piece covers entire var");
       assert(OffsetInBits+SizeInBits <= VarSizeInBits && "pars > totum");
+      (void) VarSizeInBits;
 
       // Add the piece DWARF expression.
       Operands.push_back(llvm::dwarf::DW_OP_bit_piece);
@@ -1360,7 +1361,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::Class: {
     // Classes are represented as DW_TAG_structure_type. This way the
-    // DW_AT_APPLE_runtime_class( DW_LANG_Swift ) attribute can be
+    // DW_AT_APPLE_runtime_class(DW_LANG_Swift) attribute can be
     // used to differentiate them from C++ and ObjC classes.
     auto *ClassTy = BaseTy->castTo<ClassType>();
     auto *Decl = ClassTy->getDecl();

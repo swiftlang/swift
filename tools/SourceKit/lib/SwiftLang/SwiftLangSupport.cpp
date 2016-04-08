@@ -155,7 +155,7 @@ namespace {
 
 class UIdentVisitor : public ASTVisitor<UIdentVisitor,
                                         UIdent, UIdent, UIdent, UIdent > {
-  bool IsRef;
+  const bool IsRef;
 
 public:
   explicit UIdentVisitor(bool IsRef) : IsRef(IsRef) { }
@@ -275,6 +275,21 @@ SwiftLangSupport::~SwiftLangSupport() {
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
   return UIdentVisitor(IsRef).visit(const_cast<Decl*>(D));
+}
+
+UIdent SwiftLangSupport::getUIDForExtensionOfDecl(const Decl *D) {
+  switch (D->getKind()) {
+    case swift::DeclKind::Struct:
+      return KindDeclExtensionStruct;
+    case swift::DeclKind::Enum:
+      return KindDeclExtensionEnum;
+    case swift::DeclKind::Class:
+      return KindDeclExtensionClass;
+    case swift::DeclKind::Protocol:
+      return KindDeclExtensionProtocol;
+    default:
+      llvm_unreachable("cannot have extension.");
+  }
 }
 
 UIdent SwiftLangSupport::getUIDForLocalVar(bool IsRef) {

@@ -24,14 +24,14 @@ case Error(ErrorProtocol)
     self = Error(error)
   }
   
-  func map<U>(@noescape transform: (Value) -> U) -> Result<U> {
+  func map<U>(@noescape _ transform: (Value) -> U) -> Result<U> {
     switch self {
     case Success(let x): return .Success(transform(x))
     case Error(let e): return .Error(e)
     }
   }
 
-  func flatMap<U>(@noescape transform: (Value) -> Result<U>) -> Result<U> {
+  func flatMap<U>(@noescape _ transform: (Value) -> Result<U>) -> Result<U> {
     switch self {
     case Success(let x): return transform(x)
     case Error(let e): return .Error(e)
@@ -128,7 +128,7 @@ catch {
   print(error)
 }
 
-func mayFail(fail: Bool) throws -> Int {
+func mayFail(_ fail: Bool) throws -> Int {
   if fail { throw Icky.Poor }
   return 0
 }

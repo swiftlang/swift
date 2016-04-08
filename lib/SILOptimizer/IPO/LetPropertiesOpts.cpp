@@ -387,7 +387,7 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
                       << "' has no unknown uses\n");
 
   // Only properties of simple types can be optimized.
-  if(!isSimpleType(Module->Types.getLoweredType(Property->getType()), *Module)) {
+  if (!isSimpleType(Module->Types.getLoweredType(Property->getType()), *Module)) {
      DEBUG(llvm::dbgs() << "Property '" << *Property
                        << "' is not of trivial type\n");
     SkipProcessing.insert(Property);
@@ -415,6 +415,7 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
             (isa<StructElementAddrInst>(Dest) &&
              cast<StructElementAddrInst>(Dest)->getField() == Property)) &&
            "Store instruction should store into a proper let property");
+    (void) Dest;
     ValueOfProperty = SI->getSrc();
   }
 
@@ -491,6 +492,7 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
       DEBUG(llvm::dbgs() << "The value of a let property '" << *Prop
                          << "' is not statically known\n");
     }
+    (void) PropValue;
   }
 }
 

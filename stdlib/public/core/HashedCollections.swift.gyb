@@ -213,22 +213,30 @@ internal protocol _HashStorage {
   func index(forKey key: Key) -> Index?
 
   @warn_unused_result
-  func assertingGet(i: Index) -> SequenceElement
+  func assertingGet(_ i: Index) -> SequenceElement
 
   @warn_unused_result
-  func assertingGet(key: Key) -> Value
+  func assertingGet(_ key: Key) -> Value
 
   @warn_unused_result
-  func maybeGet(key: Key) -> Value?
+  func maybeGet(_ key: Key) -> Value?
 
-  mutating func updateValue(value: Value, forKey key: Key) -> Value?
+  @discardableResult
+  mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
+
+  @discardableResult
   mutating func remove(at index: Index) -> SequenceElement
+
+  @discardableResult
   mutating func removeValue(forKey key: Key) -> Value?
+
+  @discardableResult
   mutating func removeAll(keepingCapacity keepCapacity: Bool)
+
   var count: Int { get }
 
   @warn_unused_result
-  static func fromArray(elements: [SequenceElementWithoutLabels]) -> Self
+  static func fromArray(_ elements: [SequenceElementWithoutLabels]) -> Self
 }
 
 /// The inverse of the default hash table load factor.  Factored out so that it
@@ -245,7 +253,7 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 /// This function is part of the runtime because `Bool` type is bridged to
 /// `ObjCBool`, which is in Foundation overlay.
 @_silgen_name("swift_stdlib_NSObject_isEqual")
-internal func _stdlib_NSObject_isEqual(lhs: AnyObject, _ rhs: AnyObject) -> Bool
+internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bool
 #endif
 
 //===--- Hacks and workarounds --------------------------------------------===//
@@ -280,6 +288,7 @@ internal struct _UnmanagedAnyObjectArray {
 ///
 /// The order of elements in a set is stable between mutations but
 /// otherwise unpredictable.
+@_fixed_layout
 public struct Set<Element : Hashable> :
   SetAlgebra, Hashable, Collection, ArrayLiteralConvertible {
 
@@ -357,7 +366,7 @@ public struct Set<Element : Hashable> :
 
   /// Returns `true` if the set contains a member.
   @warn_unused_result
-  public func contains(member: Element) -> Bool {
+  public func contains(_ member: Element) -> Bool {
     return _variantStorage.maybeGet(member) != nil
   }
 
@@ -370,16 +379,18 @@ public struct Set<Element : Hashable> :
 
   // APINAMING: say what happens when the element is already there.
   /// Insert a new member into the set.
-  public mutating func insert(newMember: Element) {
+  public mutating func insert(_ newMember: Element) {
     _variantStorage.updateValue(newMember, forKey: newMember)
   }
 
   /// Remove the member from the set and return it if it was present.
-  public mutating func remove(member: Element) -> Element? {
+  @discardableResult
+  public mutating func remove(_ member: Element) -> Element? {
     return _variantStorage.removeValue(forKey: member)
   }
 
   /// Remove the element at the given `position`.
+  @discardableResult
   public mutating func remove(at position: Index) -> Element {
     return _variantStorage.remove(at: position)
   }
@@ -393,6 +404,7 @@ public struct Set<Element : Hashable> :
   /// Removes and returns the first element.
   ///
   /// - Precondition: `!isEmpty`.
+  @discardableResult
   public mutating func removeFirst() -> Element {
     _precondition(!isEmpty, "can't removeFirst from an empty Set")
     return remove(at: startIndex)
@@ -472,7 +484,7 @@ public struct Set<Element : Hashable> :
   @warn_unused_result
   public func isSubsetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(possibleSuperset: S) -> Bool {
+  >(_ possibleSuperset: S) -> Bool {
     // FIXME(performance): isEmpty fast path, here and elsewhere.
     let other = Set(possibleSuperset)
     return isSubsetOf(other)
@@ -483,7 +495,7 @@ public struct Set<Element : Hashable> :
   @warn_unused_result
   public func isStrictSubsetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(possibleStrictSuperset: S) -> Bool {
+  >(_ possibleStrictSuperset: S) -> Bool {
     // FIXME: code duplication.
     let other = Set(possibleStrictSuperset)
     return isStrictSubsetOf(other)
@@ -493,7 +505,7 @@ public struct Set<Element : Hashable> :
   @warn_unused_result
   public func isSupersetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(possibleSubset: S) -> Bool {
+  >(_ possibleSubset: S) -> Bool {
     // FIXME(performance): Don't build a set; just ask if every element is in
     // `self`.
     let other = Set(possibleSubset)
@@ -505,7 +517,7 @@ public struct Set<Element : Hashable> :
   @warn_unused_result
   public func isStrictSupersetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(possibleStrictSubset: S) -> Bool {
+  >(_ possibleStrictSubset: S) -> Bool {
     let other = Set(possibleStrictSubset)
     return other.isStrictSubsetOf(self)
   }
@@ -514,7 +526,7 @@ public struct Set<Element : Hashable> :
   @warn_unused_result
   public func isDisjointWith<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) -> Bool {
+  >(_ other: S) -> Bool {
     // FIXME(performance): Don't need to build a set.
     let otherSet = Set(other)
     return isDisjointWith(otherSet)
@@ -526,7 +538,7 @@ public struct Set<Element : Hashable> :
   @warn_unused_result
   public func union<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) -> Set<Element> {
+  >(_ other: S) -> Set<Element> {
     var newSet = self
     newSet.unionInPlace(other)
     return newSet
@@ -535,7 +547,7 @@ public struct Set<Element : Hashable> :
   /// Inserts the elements of `other` into `self`.
   public mutating func unionInPlace<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) {
+  >(_ other: S) {
     for item in other {
       insert(item)
     }
@@ -545,13 +557,13 @@ public struct Set<Element : Hashable> :
   @warn_unused_result
   public func subtract<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) -> Set<Element> {
+  >(_ other: S) -> Set<Element> {
     return _subtract(other)
   }
 
   internal func _subtract<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) -> Set<Element> {
+  >(_ other: S) -> Set<Element> {
     var newSet = self
     newSet.subtractInPlace(other)
     return newSet
@@ -560,13 +572,13 @@ public struct Set<Element : Hashable> :
   /// Removes the elements of `other` from `self`.
   public mutating func subtractInPlace<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) {
+  >(_ other: S) {
     _subtractInPlace(other)
   }
 
   internal mutating func _subtractInPlace<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) {
+  >(_ other: S) {
     for item in other {
       remove(item)
     }
@@ -576,7 +588,7 @@ public struct Set<Element : Hashable> :
   @warn_unused_result
   public func intersect<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) -> Set<Element> {
+  >(_ other: S) -> Set<Element> {
     let otherSet = Set(other)
     return intersect(otherSet)
   }
@@ -584,7 +596,7 @@ public struct Set<Element : Hashable> :
   /// Removes any members not contained in `other`.
   public mutating func intersectInPlace<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) {
+  >(_ other: S) {
     // Because `intersect` needs to both modify and iterate over
     // the left-hand side, the index may become invalidated during
     // traversal so an intermediate set must be created.
@@ -605,7 +617,7 @@ public struct Set<Element : Hashable> :
   @warn_unused_result
   public func exclusiveOr<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) -> Set<Element> {
+  >(_ other: S) -> Set<Element> {
     var newSet = self
     newSet.exclusiveOrInPlace(other)
     return newSet
@@ -615,7 +627,7 @@ public struct Set<Element : Hashable> :
   /// but not both.
   public mutating func exclusiveOrInPlace<
     S : Sequence where S.Iterator.Element == Element
-  >(other: S) {
+  >(_ other: S) {
     let otherSet = Set(other)
     exclusiveOrInPlace(otherSet)
   }
@@ -634,12 +646,14 @@ public struct Set<Element : Hashable> :
   //
 
   @warn_unused_result
-  public func _customContainsEquatableElement(member: Element) -> Bool? {
+  public func _customContainsEquatableElement(_ member: Element) -> Bool? {
     return contains(member)
   }
 
   @warn_unused_result
-  public func _customIndexOfEquatableElement(member: Element) -> Index?? {
+  public func _customIndexOfEquatableElement(
+     _ member: Element
+    ) -> Index?? {
     return Optional(index(of: member))
   }
 
@@ -663,7 +677,7 @@ public struct Set<Element : Hashable> :
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
 @warn_unused_result
-internal func _compareSets<Element>(lhs: Set<Element>, _ rhs: Set<Element>)
+internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
   -> (isSubset: Bool, isEqual: Bool) {
   // FIXME(performance): performance could be better if we start by comparing
   // counts.
@@ -747,7 +761,7 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
 
 extension Set : CustomStringConvertible, CustomDebugStringConvertible {
   @warn_unused_result
-  private func makeDescription(isDebug isDebug: Bool) -> String {
+  private func makeDescription(isDebug: Bool) -> String {
     var result = isDebug ? "Set([" : "["
     var first = true
     for member in self {
@@ -775,11 +789,11 @@ extension Set : CustomStringConvertible, CustomDebugStringConvertible {
 
 #if _runtime(_ObjC)
 @_silgen_name("swift_stdlib_CFSetGetValues")
-func _stdlib_CFSetGetValues(nss: _NSSet, _: UnsafeMutablePointer<AnyObject>)
+func _stdlib_CFSetGetValues(_ nss: _NSSet, _: UnsafeMutablePointer<AnyObject>)
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
-internal func _stdlib_NSSet_allObjects(nss: _NSSet) ->
+internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) ->
   _HeapBuffer<Int, AnyObject> {
   let count = nss.count
   let buffer = _HeapBuffer<Int, AnyObject>(
@@ -797,7 +811,7 @@ internal func _stdlib_NSSet_allObjects(nss: _NSSet) ->
 /// - Precondition: `BaseValue` is a base class or base `@objc`
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
 @warn_unused_result
-public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>)
+public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
   -> Set<BaseValue> {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
@@ -817,7 +831,7 @@ public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>)
 ///   and requires non-trivial bridging.
 @warn_unused_result
 public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
-  source: Set<SwiftValue>
+  _ source: Set<SwiftValue>
 ) -> Set<ObjCValue> {
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
@@ -849,7 +863,7 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 ///   are reference types.
 @warn_unused_result
-public func _setDownCast<BaseValue, DerivedValue>(source: Set<BaseValue>)
+public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   -> Set<DerivedValue> {
 
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
@@ -877,7 +891,7 @@ public func _setDownCast<BaseValue, DerivedValue>(source: Set<BaseValue>)
 ///   are reference types.
 @warn_unused_result
 public func _setDownCastConditional<BaseValue, DerivedValue>(
-  source: Set<BaseValue>
+  _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
@@ -899,7 +913,7 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
 ///   type, and the corresponding `ObjCValue` is a reference type.
 @warn_unused_result
 public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
-  source: Set<ObjCValue>
+  _ source: Set<ObjCValue>
 ) -> Set<SwiftValue> {
   let result: Set<SwiftValue>? = _setBridgeFromObjectiveCConditional(source)
   _precondition(result != nil, "This set cannot be bridged from Objective-C")
@@ -917,7 +931,7 @@ public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
 public func _setBridgeFromObjectiveCConditional<
   ObjCValue, SwiftValue
 >(
-  source: Set<ObjCValue>
+  _ source: Set<ObjCValue>
 ) -> Set<SwiftValue>? {
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
@@ -956,6 +970,7 @@ public func _setBridgeFromObjectiveCConditional<
 ///
 /// The order of elements in a dictionary is stable between mutations
 /// but otherwise unpredictable.
+@_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
   Collection, DictionaryLiteralConvertible {
 
@@ -1080,8 +1095,9 @@ public struct Dictionary<Key : Hashable, Value> :
   ///
   /// Returns the value that was replaced, or `nil` if a new key-value pair
   /// was added.
+  @discardableResult
   public mutating func updateValue(
-    value: Value, forKey key: Key
+    _ value: Value, forKey key: Key
   ) -> Value? {
     return _variantStorage.updateValue(value, forKey: key)
   }
@@ -1091,6 +1107,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @discardableResult
   public mutating func remove(at index: Index) -> Element {
     return _variantStorage.remove(at: index)
   }
@@ -1098,6 +1115,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Remove a given key and the associated value from the dictionary.
   /// Returns the value that was removed, or `nil` if the key was not present
   /// in the dictionary.
+  @discardableResult
   public mutating func removeValue(forKey key: Key) -> Value? {
     return _variantStorage.removeValue(forKey: key)
   }
@@ -1315,7 +1333,7 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
 @warn_unused_result
-internal func _stdlib_NSDictionary_allKeys(nsd: _NSDictionary)
+internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
     -> _HeapBuffer<Int, AnyObject> {
   let count = nsd.count
   let buffer = _HeapBuffer<Int, AnyObject>(
@@ -1336,7 +1354,7 @@ internal func _stdlib_NSDictionary_allKeys(nsd: _NSDictionary)
 ///   respectively.
 @warn_unused_result
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
-    source: Dictionary<DerivedKey, DerivedValue>
+    _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
   // FIXME: This crappy implementation is O(n) because it copies the
   // data; a proper implementation would be O(1).
@@ -1366,7 +1384,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 public func _dictionaryBridgeToObjectiveC<
   SwiftKey, SwiftValue, ObjCKey, ObjCValue
 >(
-  source: Dictionary<SwiftKey, SwiftValue>
+  _ source: Dictionary<SwiftKey, SwiftValue>
 ) -> Dictionary<ObjCKey, ObjCValue> {
 
   // Note: We force this function to stay in the swift dylib because
@@ -1424,7 +1442,7 @@ public func _dictionaryBridgeToObjectiveC<
 ///   a subtype of `BaseValue`, and all of these types are reference types.
 @warn_unused_result
 public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
-  source: Dictionary<BaseKey, BaseValue>
+  _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue> {
   _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
@@ -1466,7 +1484,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
 public func _dictionaryDownCastConditional<
   BaseKey, BaseValue, DerivedKey, DerivedValue
 >(
-  source: Dictionary<BaseKey, BaseValue>
+  _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue>? {
   _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
@@ -1497,7 +1515,7 @@ public func _dictionaryDownCastConditional<
 public func _dictionaryBridgeFromObjectiveC<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
-  source: Dictionary<ObjCKey, ObjCValue>
+  _ source: Dictionary<ObjCKey, ObjCValue>
 ) -> Dictionary<SwiftKey, SwiftValue> {
   let result: Dictionary<SwiftKey, SwiftValue>? =
     _dictionaryBridgeFromObjectiveCConditional(source)
@@ -1516,7 +1534,7 @@ public func _dictionaryBridgeFromObjectiveC<
 public func _dictionaryBridgeFromObjectiveCConditional<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
-  source: Dictionary<ObjCKey, ObjCValue>
+  _ source: Dictionary<ObjCKey, ObjCValue>
 ) -> Dictionary<SwiftKey, SwiftValue>? {
   _sanityCheck(
     _isClassOrObjCExistential(ObjCKey.self) ||
@@ -1617,17 +1635,17 @@ internal struct _BitMap {
 
   // Note: We use UInt here to get unsigned math (shifts).
   @warn_unused_result
-  internal static func wordIndex(i: UInt) -> UInt {
+  internal static func wordIndex(_ i: UInt) -> UInt {
     return i / UInt._sizeInBits
   }
 
   @warn_unused_result
-  internal static func bitIndex(i: UInt) -> UInt {
+  internal static func bitIndex(_ i: UInt) -> UInt {
     return i % UInt._sizeInBits
   }
 
   @warn_unused_result
-  internal static func wordsFor(bitCount: Int) -> Int {
+  internal static func wordsFor(_ bitCount: Int) -> Int {
     return bitCount + Int._sizeInBytes - 1 / Int._sizeInBytes
   }
 
@@ -1708,7 +1726,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// Returns the bytes necessary to store a bit map of 'capacity' bytes and
   /// padding to align the start to word alignment.
   @warn_unused_result
-  internal static func bytesForBitMap(capacity capacity: Int) -> Int {
+  internal static func bytesForBitMap(capacity: Int) -> Int {
     let numWords = _BitMap.wordsFor(capacity)
     return numWords * sizeof(UInt) + alignof(UInt)
   }
@@ -1717,7 +1735,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// the start to the alignment of the 'Key' type assuming a word aligned base
   /// address.
   @warn_unused_result
-  internal static func bytesForKeys(capacity capacity: Int) -> Int {
+  internal static func bytesForKeys(capacity: Int) -> Int {
     let padding = max(0, alignof(Key.self) - alignof(UInt))
     return strideof(Key.self) * capacity + padding
   }
@@ -1729,7 +1747,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
 %if Self == 'Dictionary':
   @warn_unused_result
-  internal static func bytesForValues(capacity capacity: Int) -> Int {
+  internal static func bytesForValues(capacity: Int) -> Int {
     let maxPrevAlignment = max(alignof(Key.self), alignof(UInt))
     let padding = max(0, alignof(Value.self) - maxPrevAlignment)
     return strideof(Value.self) * capacity + padding
@@ -1761,6 +1779,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     }
   }
 
+  @_versioned
   internal var _count: Int {
     set {
       _body.count = newValue
@@ -1820,7 +1839,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   /// Create a storage instance with room for 'capacity' entries and all entries
   /// marked invalid.
-  internal class func create(capacity capacity: Int) -> StorageImpl {
+  internal class func create(capacity: Int) -> StorageImpl {
     let requiredCapacity =
       bytesForBitMap(capacity: capacity) + bytesForKeys(capacity: capacity)
 %if Self == 'Dictionary':
@@ -1869,6 +1888,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   }
 }
 
+@_fixed_layout
 public // @testable
 struct _Native${Self}Storage<${TypeParametersDecl}> :
   _HashStorage, CustomStringConvertible {
@@ -1930,6 +1950,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     }
   }
 
+  @_versioned
   @_transparent
   internal var count: Int {
     @warn_unused_result
@@ -1954,6 +1975,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     }
   }
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
   internal func key(at i: Int) -> Key {
@@ -1965,6 +1987,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return res
   }
 
+  @_versioned
   @warn_unused_result
   internal func isInitializedEntry(at i: Int) -> Bool {
     _precondition(i >= 0 && i < capacity)
@@ -1984,7 +2007,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
 %if Self == 'Set':
   @_transparent
-  internal func initializeKey(k: Key, at i: Int) {
+  internal func initializeKey(_ k: Key, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
 
     (keys + i).initialize(with: k)
@@ -1993,16 +2016,14 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_transparent
-  internal func moveInitializeEntry(
-    from from: Storage, at: Int, toEntryAt: Int
-  ) {
+  internal func moveInitializeEntry(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
     (keys + toEntryAt).initialize(with: (from.keys + at).move())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
 
-  internal func setKey(key: Key, at i: Int) {
+  internal func setKey(_ key: Key, at i: Int) {
     _precondition(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
 
@@ -2012,7 +2033,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
 %elif Self == 'Dictionary':
   @_transparent
-  internal func initializeKey(k: Key, value v: Value, at i: Int) {
+  internal func initializeKey(_ k: Key, value v: Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
 
     (keys + i).initialize(with: k)
@@ -2022,9 +2043,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_transparent
-  internal func moveInitializeEntry(
-    from from: Storage, at: Int, toEntryAt: Int
-  ) {
+  internal func moveInitializeEntry(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
     (keys + toEntryAt).initialize(with: (from.keys + at).move())
     (values + toEntryAt).initialize(with: (from.values + at).move())
@@ -2032,6 +2051,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     initializedEntries[toEntryAt] = true
   }
 
+  @_versioned
   @_transparent
   @warn_unused_result
   internal func value(at i: Int) -> Value {
@@ -2043,7 +2063,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_transparent
-  internal func setKey(key: Key, value: Value, at i: Int) {
+  internal func setKey(_ key: Key, value: Value, at i: Int) {
     _sanityCheck(isInitializedEntry(at: i))
     (keys + i).pointee = key
     (values + i).pointee = value
@@ -2061,19 +2081,21 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return capacity &- 1
   }
 
+  @_versioned
   @warn_unused_result
-  internal func _bucket(k: Key) -> Int {
+  internal func _bucket(_ k: Key) -> Int {
     return _squeezeHashValue(k.hashValue, 0..<capacity)
   }
 
+  @_versioned
   @warn_unused_result
-  internal func _next(bucket: Int) -> Int {
+  internal func _next(_ bucket: Int) -> Int {
     // Bucket is within 0 and capacity. Therefore adding 1 does not overflow.
     return (bucket &+ 1) & _bucketMask
   }
 
   @warn_unused_result
-  internal func _prev(bucket: Int) -> Int {
+  internal func _prev(_ bucket: Int) -> Int {
     // Bucket is not negative. Therefore subtracting 1 does not overflow.
     return (bucket &- 1) & _bucketMask
   }
@@ -2082,9 +2104,10 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   ///
   /// If the key is not present, returns the position where it could be
   /// inserted.
+  @_versioned
   @warn_unused_result
   @inline(__always)
-  internal func _find(key: Key, startBucket: Int)
+  internal func _find(_ key: Key, startBucket: Int)
     -> (pos: Index, found: Bool) {
 
     var bucket = startBucket
@@ -2106,7 +2129,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   @warn_unused_result
   internal static func minimumCapacity(
-    minimumCount minimumCount: Int,
+    minimumCount: Int,
     maxLoadFactorInverse: Double
   ) -> Int {
     // `minimumCount + 1` below ensures that we don't fill in the last hole
@@ -2161,14 +2184,17 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   internal typealias Index = _Native${Self}Index<${TypeParameters}>
 
+  @_versioned
   internal var startIndex: Index {
     return Index(nativeStorage: self, offset: -1).successor()
   }
 
+  @_versioned
   internal var endIndex: Index {
     return Index(nativeStorage: self, offset: capacity)
   }
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
@@ -2181,7 +2207,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @warn_unused_result
-  internal func assertingGet(i: Index) -> SequenceElement {
+  internal func assertingGet(_ i: Index) -> SequenceElement {
     _precondition(
       isInitializedEntry(at: i.offset),
       "attempting to access ${Self} elements using an invalid Index")
@@ -2195,7 +2221,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @warn_unused_result
-  internal func assertingGet(key: Key) -> Value {
+  internal func assertingGet(_ key: Key) -> Value {
     let (i, found) = _find(key, startBucket: _bucket(key))
     _precondition(found, "key not found")
 %if Self == 'Set':
@@ -2205,9 +2231,10 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 %end
   }
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
-  internal func maybeGet(key: Key) -> Value? {
+  internal func maybeGet(_ key: Key) -> Value? {
     if count == 0 {
       // Fast path that avoids computing the hash of the key.
       return nil
@@ -2224,16 +2251,19 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return nil
   }
 
-  internal mutating func updateValue(value: Value, forKey key: Key) -> Value? {
+  @discardableResult
+  internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
 
+  @discardableResult
   internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
 
+  @discardableResult
   internal mutating func removeValue(forKey key: Key) -> Value? {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
@@ -2245,7 +2275,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @warn_unused_result
-  internal static func fromArray(elements: [SequenceElementWithoutLabels])
+  internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
     -> _Native${Self}Storage<${TypeParameters}> {
 
     let requiredCapacity =
@@ -2323,6 +2353,7 @@ internal struct _BridgedNative${Self}Storage {
     }
   }
 
+  @_versioned
   internal func isInitializedEntry(at i: Int) -> Bool {
     return initializedEntries[i]
   }
@@ -2336,7 +2367,7 @@ internal struct _BridgedNative${Self}Storage {
     return res
   }
 
-  internal func setKey(key: AnyObject, at i: Int) {
+  internal func setKey(_ key: AnyObject, at i: Int) {
     _precondition(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
 
@@ -2346,7 +2377,7 @@ internal struct _BridgedNative${Self}Storage {
 
 %if Self == 'Set':
   @_transparent
-  internal func initializeKey(k: AnyObject, at i: Int) {
+  internal func initializeKey(_ k: AnyObject, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
 
     (keys + i).initialize(with: k)
@@ -2355,7 +2386,7 @@ internal struct _BridgedNative${Self}Storage {
   }
 %elif Self == 'Dictionary':
   @_transparent
-  internal func initializeKey(k: AnyObject, value v: AnyObject, at i: Int
+  internal func initializeKey(_ k: AnyObject, value v: AnyObject, at i: Int
   ) {
     _sanityCheck(!isInitializedEntry(at: i))
 
@@ -2376,7 +2407,7 @@ internal struct _BridgedNative${Self}Storage {
 %end
 
   @warn_unused_result
-  internal func assertingGet(i: Int) -> SequenceElement {
+  internal func assertingGet(_ i: Int) -> SequenceElement {
     _precondition(
       isInitializedEntry(at: i),
       "attempting to access ${Self} elements using an invalid Index")
@@ -2431,7 +2462,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
 
   @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumeratingWith(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
   ) -> Int {
@@ -2521,7 +2552,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc
   @warn_unused_result
-  internal func member(object: AnyObject) -> AnyObject? {
+  internal func member(_ object: AnyObject) -> AnyObject? {
     return bridgingObjectForKey(object)
   }
 
@@ -2558,7 +2589,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc(objectForKey:)
   @warn_unused_result
-  internal func objectFor(aKey: AnyObject) -> AnyObject? {
+  internal func objectFor(_ aKey: AnyObject) -> AnyObject? {
     return bridgingObjectForKey(aKey)
   }
 
@@ -2578,7 +2609,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc
   internal func getObjects(
-    objects: UnsafeMutablePointer<AnyObject>,
+    _ objects: UnsafeMutablePointer<AnyObject>,
     andKeys keys: UnsafeMutablePointer<AnyObject>
   ) {
     bridgedAllKeysAndValues(objects, keys)
@@ -2604,7 +2635,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   /// Attach a storage for bridged ${Self} elements.
-  internal func _initializeHeapBufferBridged(newBuffer: AnyObject) {
+  internal func _initializeHeapBufferBridged(_ newBuffer: AnyObject) {
     _stdlib_atomicInitializeARCRef(
       object: _heapBufferBridgedPtr, desired: newBuffer)
   }
@@ -2624,7 +2655,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   @warn_unused_result
-  internal func _createBridgedNativeStorage(capacity: Int) ->
+  internal func _createBridgedNativeStorage(_ capacity: Int) ->
     BridgedNativeStorage {
     let buffer = BridgedNativeStorage.StorageImpl.create(capacity: capacity)
     return BridgedNativeStorage(buffer: buffer)
@@ -2661,7 +2692,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   // storage directly, use these functions.
   //
   @warn_unused_result
-  internal func _getBridgedKey(i: _Native${Self}Index<${TypeParameters}>) ->
+  internal func _getBridgedKey(_ i: _Native${Self}Index<${TypeParameters}>) ->
     AnyObject {
     if _fastPath(_isClassOrObjCExistential(Key.self)) {
 %if Self == 'Set':
@@ -2681,7 +2712,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 %if Self == 'Set':
 
   @warn_unused_result
-  internal func _getBridgedValue(i: _Native${Self}Index<${TypeParameters}>) ->
+  internal func _getBridgedValue(_ i: _Native${Self}Index<${TypeParameters}>) ->
     AnyObject {
     if _fastPath(_isClassOrObjCExistential(Value.self)) {
       return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i))
@@ -2693,7 +2724,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 %elif Self == 'Dictionary':
 
   @warn_unused_result
-  internal func _getBridgedValue(i: _Native${Self}Index<${TypeParameters}>)
+  internal func _getBridgedValue(_ i: _Native${Self}Index<${TypeParameters}>)
     -> AnyObject {
     if _fastPath(_isClassOrObjCExistential(Value.self)) {
       return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i).1)
@@ -2703,7 +2734,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   internal func bridgedAllKeysAndValues(
-    objects: UnsafeMutablePointer<AnyObject>,
+    _ objects: UnsafeMutablePointer<AnyObject>,
     _ keys: UnsafeMutablePointer<AnyObject>
   ) {
     bridgeEverything()
@@ -2763,7 +2794,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   @warn_unused_result
-  internal func bridgingObjectForKey(aKey: AnyObject)
+  internal func bridgingObjectForKey(_ aKey: AnyObject)
     -> AnyObject? {
     let nativeKey = _forceBridgeFromObjectiveC(aKey, Key.self)
     let (i, found) = nativeStorage._find(
@@ -2781,7 +2812,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumeratingWith(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
   ) -> Int {
@@ -2833,6 +2864,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
     return Index(cocoa${Self}, endIndex: ())
   }
 
+  @_versioned
   @warn_unused_result
   internal func index(forKey key: Key) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
@@ -2861,7 +2893,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
   }
 
   @warn_unused_result
-  internal func assertingGet(i: Index) -> SequenceElement {
+  internal func assertingGet(_ i: Index) -> SequenceElement {
 %if Self == 'Set':
     let value: Value? = i.allKeys[i.currentKeyIndex]
     _sanityCheck(value != nil, "item not found in underlying NS${Self}")
@@ -2875,7 +2907,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
   }
 
   @warn_unused_result
-  internal func assertingGet(key: Key) -> Value {
+  internal func assertingGet(_ key: Key) -> Value {
 %if Self == 'Set':
     let value: Value? = cocoa${Self}.member(key)
     _precondition(value != nil, "member not found in underlying NS${Self}")
@@ -2889,8 +2921,8 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 
   @warn_unused_result
   @inline(__always)
-  internal func maybeGet(key: Key) -> Value? {
-
+  internal func maybeGet(_ key: Key) -> Value? {
+      
 %if Self == 'Set':
   return cocoaSet.member(key)
 %elif Self == 'Dictionary':
@@ -2899,14 +2931,17 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 
   }
 
-  internal mutating func updateValue(value: Value, forKey key: Key) -> Value? {
+  @discardableResult
+  internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
+  @discardableResult
   internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
+  @discardableResult
   internal mutating func removeValue(forKey key: Key) -> Value? {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
@@ -2920,7 +2955,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
   }
 
   @warn_unused_result
-  internal static func fromArray(elements: [SequenceElementWithoutLabels])
+  internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
     -> _Cocoa${Self}Storage {
 
     _sanityCheckFailure("this function should never be called")
@@ -2949,6 +2984,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   case native(NativeStorageOwner)
   case cocoa(CocoaStorage)
 
+  @_versioned
   @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
@@ -2970,6 +3006,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
+  @_versioned
   internal var asNative: NativeStorage {
     switch self {
     case .native(let owner):
@@ -2992,7 +3029,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   /// Ensure this we hold a unique reference to a native storage
   /// having at least `minimumCapacity` elements.
-  internal mutating func ensureUniqueNativeStorage(minimumCapacity: Int)
+  internal mutating func ensureUniqueNativeStorage(_ minimumCapacity: Int)
     -> (reallocated: Bool, capacityChanged: Bool) {
     switch self {
     case .native:
@@ -3076,7 +3113,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 #if _runtime(_ObjC)
   @inline(never)
   internal mutating func migrateDataToNativeStorage(
-    cocoaStorage: _Cocoa${Self}Storage
+    _ cocoaStorage: _Cocoa${Self}Storage
   ) {
     let minCapacity = NativeStorage.minimumCapacity(
       minimumCount: cocoaStorage.count,
@@ -3126,6 +3163,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
@@ -3156,7 +3194,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   @warn_unused_result
-  internal func assertingGet(i: Index) -> SequenceElement {
+  internal func assertingGet(_ i: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
       return asNative.assertingGet(i._nativeIndex)
     }
@@ -3184,7 +3222,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   @warn_unused_result
-  internal func assertingGet(key: Key) -> Value {
+  internal func assertingGet(_ key: Key) -> Value {
     if _fastPath(guaranteedNative) {
       return asNative.assertingGet(key)
     }
@@ -3205,9 +3243,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
 #if _runtime(_ObjC)
+  @_versioned
   @inline(never)
   internal static func maybeGetFromCocoaStorage(
-    cocoaStorage : CocoaStorage, forKey key: Key
+    _ cocoaStorage : CocoaStorage, forKey key: Key
   ) -> Value? {
     let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
     if let anyObjectValue = cocoaStorage.maybeGet(anyObjectKey) {
@@ -3217,9 +3256,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 #endif
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
-  internal func maybeGet(key: Key) -> Value? {
+  internal func maybeGet(_ key: Key) -> Value? {
     if _fastPath(guaranteedNative) {
       return asNative.maybeGet(key)
     }
@@ -3237,7 +3277,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   internal mutating func nativeUpdateValue(
-    value: Value, forKey key: Key
+    _ value: Value, forKey key: Key
   ) -> Value? {
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
     
@@ -3273,8 +3313,9 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     return oldValue
   }
 
+  @discardableResult
   internal mutating func updateValue(
-    value: Value, forKey key: Key
+    _ value: Value, forKey key: Key
   ) -> Value? {
 
     if _fastPath(guaranteedNative) {
@@ -3298,7 +3339,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   /// - parameter offset: The offset of the element that will be deleted.
   /// Precondition: there should be an initialized entry at offset.
   internal mutating func nativeDeleteImpl(
-    nativeStorage: NativeStorage, idealBucket: Int, offset: Int
+    _ nativeStorage: NativeStorage, idealBucket: Int, offset: Int
   ) {
     _sanityCheck(
         nativeStorage.isInitializedEntry(at: offset), "expected initialized entry")
@@ -3413,6 +3454,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     return result
   }
 
+  @discardableResult
   internal mutating func remove(at index: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
       return nativeRemove(at: index._nativeIndex)
@@ -3447,6 +3489,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
+  @discardableResult
   internal mutating func removeValue(forKey key: Key) -> Value? {
     if _fastPath(guaranteedNative) {
       return nativeRemoveObject(forKey: key)
@@ -3539,6 +3582,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   /// Returns an iterator over the `(Key, Value)` pairs.
   ///
   /// - Complexity: O(1).
+  @_versioned
   @inline(__always)
   internal func makeIterator() -> ${Self}Iterator<${TypeParameters}> {
     switch self {
@@ -3555,7 +3599,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   @warn_unused_result
-  internal static func fromArray(elements: [SequenceElement])
+  internal static func fromArray(_ elements: [SequenceElement])
     -> _Variant${Self}Storage<${TypeParameters}> {
 
     _sanityCheckFailure("this function should never be called")
@@ -3568,9 +3612,11 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
   internal typealias NativeStorage = _Native${Self}Storage<${TypeParameters}>
   internal typealias NativeIndex = _Native${Self}Index<${TypeParameters}>
 
+  @_versioned
   internal var nativeStorage: NativeStorage
   internal var offset: Int
 
+  @_versioned
   internal init(nativeStorage: NativeStorage, offset: Int) {
     self.nativeStorage = nativeStorage
     self.offset = offset
@@ -3613,6 +3659,7 @@ internal func < <${TypeParametersDecl}> (
 }
 
 #if _runtime(_ObjC)
+@_versioned
 internal struct _Cocoa${Self}Index : ForwardIndex, Comparable {
   // Assumption: we rely on NSDictionary.getObjects when being
   // repeatedly called on the same NSDictionary, returning items in the same
@@ -3741,15 +3788,18 @@ public struct ${Self}Index<${TypeParametersDecl}> :
 
   internal var _value: ${Self}IndexRepresentation<${TypeParameters}>
 
-  internal static func _native(index: _NativeIndex) -> ${Self}Index {
+  @_versioned
+  internal static func _native(_ index: _NativeIndex) -> ${Self}Index {
     return ${Self}Index(_value: ._native(index))
   }
 #if _runtime(_ObjC)
-  internal static func _cocoa(index: _CocoaIndex) -> ${Self}Index {
+  @_versioned
+  internal static func _cocoa(_ index: _CocoaIndex) -> ${Self}Index {
     return ${Self}Index(_value: ._cocoa(index))
   }
 #endif
 
+  @_versioned
   @_transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
@@ -3845,6 +3895,7 @@ public func < <${TypeParametersDecl}> (
 }
 
 #if _runtime(_ObjC)
+@_versioned
 final internal class _Cocoa${Self}Iterator : IteratorProtocol {
   internal typealias Element = ${AnySequenceType}
 
@@ -3880,10 +3931,12 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
   internal var itemIndex: Int = 0
   internal var itemCount: Int = 0
 
+  @_versioned
   internal init(_ cocoa${Self}: _NS${Self}) {
     self.cocoa${Self} = cocoa${Self}
   }
 
+  @_versioned
   internal func next() -> Element? {
     if itemIndex < 0 {
       return nil
@@ -3956,22 +4009,26 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
     _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
 
+  @_versioned
   internal var _state: ${Self}IteratorRepresentation<${TypeParameters}>
 
+  @_versioned
   internal static func _native(
-    start start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner
+    start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner
   ) -> ${Self}Iterator {
     return ${Self}Iterator(
       _state: ._native(start: start, end: end, owner: owner))
   }
 #if _runtime(_ObjC)
+  @_versioned
   internal static func _cocoa(
-    iterator: _Cocoa${Self}Iterator
+    _ iterator: _Cocoa${Self}Iterator
   ) -> ${Self}Iterator{
     return ${Self}Iterator(_state: ._cocoa(iterator))
   }
 #endif
 
+  @_versioned
   @_transparent
   internal var _guaranteedNative: Bool {
 %if Self == 'Set':
@@ -3981,6 +4038,7 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
 %end
   }
 
+  @_versioned
   internal mutating func _nativeNext() -> ${Sequence}? {
     switch _state {
     case ._native(let startIndex, let endIndex, let owner):
@@ -4108,6 +4166,7 @@ extension ${Self} {
   /// elements, otherwise return `nil`.
   ///
   /// - Complexity: Amortized O(1)
+  @warn_unused_result
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
     return remove(at: startIndex)
@@ -4138,7 +4197,7 @@ extension ${Self} {
 
   @warn_unused_result
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
-    s: AnyObject
+    _ s: AnyObject
   ) -> ${Self}<${TypeParameters}>? {
     if let nativeOwner =
         s as AnyObject as? _Native${Self}StorageOwner<${TypeParameters}> {
@@ -4159,26 +4218,26 @@ extension Set {
   /// Removes all elements of `other` from `self`.
   ///
   /// - Equivalent to replacing `self` with `self.subtract(other)`.
-  public mutating func subtractInPlace(other: Set<Element>) {
+  public mutating func subtractInPlace(_ other: Set<Element>) {
     _subtractInPlace(other)
   }
 
   /// Returns true iff every element of `self` is contained in `other`.
   @warn_unused_result
-  public func isSubsetOf(other: Set<Element>) -> Bool {
+  public func isSubsetOf(_ other: Set<Element>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
 
   /// Returns true iff every element of `other` is contained in `self`.
   @warn_unused_result
-  public func isSupersetOf(other: Set<Element>) -> Bool {
+  public func isSupersetOf(_ other: Set<Element>) -> Bool {
     return other.isSubsetOf(self)
   }
 
   /// Returns true iff `self.intersect(other).isEmpty`.
   @warn_unused_result
-  public func isDisjointWith(other: Set<Element>) -> Bool {
+  public func isDisjointWith(_ other: Set<Element>) -> Bool {
     for member in self {
       if other.contains(member) {
         return false
@@ -4189,27 +4248,27 @@ extension Set {
 
   /// Returns the set of elements contained in `self` but not in `other`.
   @warn_unused_result
-  public func subtract(other: Set<Element>) -> Set<Element> {
+  public func subtract(_ other: Set<Element>) -> Set<Element> {
     return _subtract(other)
   }
 
   /// Returns true iff every element of `other` is contained in `self`
   /// and `self` contains an element that is not contained in `other`.
   @warn_unused_result
-  public func isStrictSupersetOf(other: Set<Element>) -> Bool {
+  public func isStrictSupersetOf(_ other: Set<Element>) -> Bool {
     return self.isSupersetOf(other) && self != other
   }
 
   /// Return true iff every element of `self` is contained in `other`
   /// and `other` contains an element that is not contained in `self`.
   @warn_unused_result
-  public func isStrictSubsetOf(other: Set<Element>) -> Bool {
+  public func isStrictSubsetOf(_ other: Set<Element>) -> Bool {
     return other.isStrictSupersetOf(self)
   }
 
   /// Return the members of `self` contained in `other`.
   @warn_unused_result
-  public func intersect(other: Set<Element>) -> Set<Element> {
+  public func intersect(_ other: Set<Element>) -> Set<Element> {
     var newSet = Set<Element>()
     for member in self {
       if other.contains(member) {
@@ -4221,7 +4280,7 @@ extension Set {
 
   /// Replace `self` with the elements contained in `self` or `other`,
   /// but not both.
-  public mutating func exclusiveOrInPlace(other: Set<Element>) {
+  public mutating func exclusiveOrInPlace(_ other: Set<Element>) {
     for member in other {
       if contains(member) {
         remove(member)
@@ -4234,38 +4293,38 @@ extension Set {
 
 extension Set {
   @available(*, unavailable, renamed: "remove(at:)")
-  public mutating func removeAtIndex(index: Index) -> Element {
+  public mutating func removeAtIndex(_ index: Index) -> Element {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> SetIterator<Element> {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "index(of:)")
-  public func indexOf(member: Element) -> Index? {
+  public func indexOf(_ member: Element) -> Index? {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension Dictionary {
   @available(*, unavailable, renamed: "remove(at:)")
-  public mutating func removeAtIndex(index: Index) -> Element {
+  public mutating func removeAtIndex(_ index: Index) -> Element {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "index(forKey:)")
-  public func indexForKey(key: Key) -> Index? {
+  public func indexForKey(_ key: Key) -> Index? {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "removeValue(forKey:)")
-  public mutating func removeValueForKey(key: Key) -> Value? {
+  public mutating func removeValueForKey(_ key: Key) -> Value? {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> DictionaryIterator<Key, Value> {
     fatalError("unavailable function can't be called")
   }

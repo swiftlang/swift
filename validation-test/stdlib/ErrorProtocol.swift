@@ -7,13 +7,6 @@ import SwiftPrivate
 import StdlibUnittest
 import Foundation
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 enum SomeError : ErrorProtocol {
   case GoneToFail
@@ -34,7 +27,7 @@ struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialData {
 
   func makeThreadLocalData() {}
 
-  func thread1(raceData: RaceData, _: inout Void) -> Observation3Int {
+  func thread1(_ raceData: RaceData, _: inout Void) -> Observation3Int {
     let ns = raceData.error as NSError
     // Use valueForKey to bypass bridging, so we can verify that the identity
     // of the unbridged NSString object is stable.
@@ -45,7 +38,7 @@ struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialData {
   }
 
   func evaluateObservations(
-    observations: [Observation3Int],
+    _ observations: [Observation3Int],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     sink(evaluateObservationsAllEqual(observations))

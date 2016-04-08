@@ -1866,6 +1866,8 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
     return ctx.getObjCObjectPointerType(ctx.getObjCInterfaceType(objcClass));
 
   if (auto objcCategory = dyn_cast<clang::ObjCCategoryDecl>(dc)) {
+    if (objcCategory->isInvalidDecl()) return clang::QualType();
+    
     return ctx.getObjCObjectPointerType(
              ctx.getObjCInterfaceType(
                objcCategory->getClassInterface()));
@@ -2067,7 +2069,8 @@ Type ClangImporter::Implementation::importMethodType(
     }
   }
 
-  DeclContext *origDC = importDeclContextOf(clangDecl);
+  DeclContext *origDC = importDeclContextOf(clangDecl,
+                                            clangDecl->getDeclContext());
   assert(origDC);
   auto mapTypeIntoContext = [&](Type type) -> Type {
     if (dc != origDC) {

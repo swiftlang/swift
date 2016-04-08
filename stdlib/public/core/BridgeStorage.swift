@@ -20,6 +20,7 @@
 //===----------------------------------------------------------------------===//
 import SwiftShims
 
+@_fixed_layout
 public // @testable
 struct _BridgeStorage<
   NativeClass: AnyObject, ObjCClass: AnyObject
@@ -91,7 +92,7 @@ struct _BridgeStorage<
   @inline(__always)
   @warn_unused_result
   public // @testable
-  func isNativeWithClearedSpareBits(bits: Int) -> Bool {
+  func isNativeWithClearedSpareBits(_ bits: Int) -> Bool {
     return (_bitPattern(rawValue) &
             (_objCTaggedPointerBits | _objectPointerIsObjCBit |
              (UInt(bits)) << _objectPointerLowSpareBitShift)) == 0

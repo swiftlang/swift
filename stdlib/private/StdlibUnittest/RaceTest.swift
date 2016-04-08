@@ -47,7 +47,7 @@ import Glibc
 #if _runtime(_ObjC)
 import ObjectiveC
 #else
-func autoreleasepool(@noescape code: () -> Void) {
+func autoreleasepool(@noescape _ code: () -> Void) {
   // Native runtime does not have autorelease pools.  Execute the code
   // directly.
   code()
@@ -88,12 +88,12 @@ public protocol RaceTestWithPerTrialData {
 
   /// Performs the operation under test and makes an observation.
   func thread1(
-    raceData: RaceData, _ threadLocalData: inout ThreadLocalData) -> Observation
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData) -> Observation
 
   /// Evaluates the observations made by all threads for a particular instance
   /// of `RaceData`.
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void)
 }
 
@@ -320,7 +320,7 @@ public func == (lhs: Observation9Int, rhs: Observation9Int) -> Bool {
 
 /// A helper that is useful to implement
 /// `RaceTestWithPerTrialData.evaluateObservations()` in race tests.
-public func evaluateObservationsAllEqual<T : Equatable>(observations: [T])
+public func evaluateObservationsAllEqual<T : Equatable>(_ observations: [T])
   -> RaceTestObservationEvaluation {
   let first = observations.first!
   for x in observations {
@@ -339,7 +339,7 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
 
   init() {}
 
-  mutating func addEvaluation(evaluation: RaceTestObservationEvaluation) {
+  mutating func addEvaluation(_ evaluation: RaceTestObservationEvaluation) {
     switch evaluation {
     case .pass:
       passCount += 1
@@ -412,7 +412,7 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
 }
 
 func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
-  sharedState: _RaceTestSharedState<RT>
+  _ sharedState: _RaceTestSharedState<RT>
 ) {
   let racingThreadCount = sharedState.racingThreadCount
   let raceDataCount = racingThreadCount * racingThreadCount
@@ -472,7 +472,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
 }
 
 func _workerThreadOneTrial<RT : RaceTestWithPerTrialData>(
-  tid: Int, _ sharedState: _RaceTestSharedState<RT>
+  _ tid: Int, _ sharedState: _RaceTestSharedState<RT>
 ) {
   sharedState.trialBarrier.wait()
   let racingThreadCount = sharedState.racingThreadCount
@@ -546,12 +546,12 @@ public func runRaceTest<RT : RaceTestWithPerTrialData>(
   print(aggregatedEvaluations)
 }
 
-internal func _divideRoundUp(lhs: Int, _ rhs: Int) -> Int {
+internal func _divideRoundUp(_ lhs: Int, _ rhs: Int) -> Int {
   return (lhs + rhs) / rhs
 }
 
 public func runRaceTest<RT : RaceTestWithPerTrialData>(
-  test: RT.Type,
+  _ test: RT.Type,
   operations: Int,
   threads: Int? = nil
 ) {

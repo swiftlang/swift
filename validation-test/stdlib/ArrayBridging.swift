@@ -14,13 +14,6 @@ import StdlibUnittest
 import Foundation
 import SlurpFastEnumeration
 
-// Also import modules which are used by StdlibUnittest internally. This is
-// needed to link all required libraries in case we serialize StdlibUnittest.
-import SwiftPrivate
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
   class RaceData {
@@ -43,7 +36,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
   }
 
   func thread1(
-    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsa = raceData.nsa
     let v: AnyObject = nsa.object(at: 0)
@@ -51,7 +44,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     sink(evaluateObservationsAllEqual(observations))
@@ -80,7 +73,7 @@ struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
   }
 
   func thread1(
-    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsa = raceData.nsa
     let objcValues = NSMutableArray()
@@ -93,7 +86,7 @@ struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     sink(evaluateObservationsAllEqual(observations))

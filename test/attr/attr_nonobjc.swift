@@ -8,17 +8,17 @@ import Foundation
     caloriesBurned = 5
   }
 
-  func defeatEnemy(b: Bool) -> Bool { // expected-note {{'defeatEnemy' previously declared here}}
+  func defeatEnemy(_ b: Bool) -> Bool { // expected-note {{'defeatEnemy' previously declared here}}
     return !b
   }
 
   // Make sure we can overload a method with @nonobjc methods
-  @nonobjc func defeatEnemy(i: Int) -> Bool {
+  @nonobjc func defeatEnemy(_ i: Int) -> Bool {
     return (i > 0)
   }
 
   // This is not allowed, though
-  func defeatEnemy(s: String) -> Bool { // expected-error {{method 'defeatEnemy' with Objective-C selector 'defeatEnemy:' conflicts with previous declaration with the same Objective-C selector}}
+  func defeatEnemy(_ s: String) -> Bool { // expected-error {{method 'defeatEnemy' with Objective-C selector 'defeatEnemy:' conflicts with previous declaration with the same Objective-C selector}}
     return s != ""
   }
 
@@ -30,7 +30,7 @@ import Foundation
 }
 
 class BlueLightSaber : LightSaber {
-  @nonobjc override func defeatEnemy(b: Bool) -> Bool { }
+  @nonobjc override func defeatEnemy(_ b: Bool) -> Bool { }
 }
 
 @objc class InchoateToad {

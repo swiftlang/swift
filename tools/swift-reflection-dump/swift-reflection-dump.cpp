@@ -180,7 +180,7 @@ static int doDumpReflectionSections(std::string BinaryFilename,
     reinterpret_cast<const void *>(TypeRefSectionContents.end())
   };
 
-  InProcessMemoryReader Reader;
+  auto Reader = std::make_shared<InProcessMemoryReader>();
   ReflectionContext<External<RuntimeTarget<8>>> RC(Reader);
   RC.addReflectionInfo({
     BinaryFilename,

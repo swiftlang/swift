@@ -71,12 +71,12 @@ public protocol UnicodeCodec {
   ///   results.
   mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(next: inout I) -> UnicodeDecodingResult
+  >(_ next: inout I) -> UnicodeDecodingResult
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `processCodeUnit` on each `CodeUnit`.
   static func encode(
-    input: UnicodeScalar,
+    _ input: UnicodeScalar,
     @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   )
 }
@@ -123,7 +123,7 @@ public struct UTF8 : UnicodeCodec {
   ///   results.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(next: inout I) -> UnicodeDecodingResult {
+  >(_ next: inout I) -> UnicodeDecodingResult {
 
     refillBuffer: if !_didExhaustIterator {
       // Bufferless ASCII fastpath.
@@ -139,7 +139,7 @@ public struct UTF8 : UnicodeCodec {
           _didExhaustIterator = true
           return .emptyInput
         }
-      } else if(_decodeBuffer & 0x80 == 0) {
+      } else if (_decodeBuffer & 0x80 == 0) {
         // ASCII in buffer.  We don't refill the buffer so we can return
         // to bufferless mode once we've exhausted it.
         break refillBuffer
@@ -201,7 +201,7 @@ public struct UTF8 : UnicodeCodec {
   ///   continuation byte form (`0b10xxxxxx`).
   @warn_unused_result
   public // @testable
-  static func _decodeOne(buffer: UInt32) -> (result: UInt32?, length: UInt8) {
+  static func _decodeOne(_ buffer: UInt32) -> (result: UInt32?, length: UInt8) {
     // Note the buffer is read least significant byte first: [ #3 #2 #1 #0 ].
 
     if buffer & 0x80 == 0 { // 1-byte sequence (ASCII), buffer: [ … … … CU0 ].
@@ -284,7 +284,7 @@ public struct UTF8 : UnicodeCodec {
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `processCodeUnit` on each `CodeUnit`.
   public static func encode(
-    input: UnicodeScalar,
+    _ input: UnicodeScalar,
     @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     var c = UInt32(input)
@@ -319,7 +319,7 @@ public struct UTF8 : UnicodeCodec {
   /// Returns `true` if `byte` is a continuation byte of the form
   /// `0b10xxxxxx`.
   @warn_unused_result
-  public static func isContinuation(byte: CodeUnit) -> Bool {
+  public static func isContinuation(_ byte: CodeUnit) -> Bool {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
 }
@@ -360,7 +360,7 @@ public struct UTF16 : UnicodeCodec {
   ///   results.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(input: inout I) -> UnicodeDecodingResult {
+  >(_ input: inout I) -> UnicodeDecodingResult {
     if _lookaheadFlags & 0b01 != 0 {
       return .emptyInput
     }
@@ -436,9 +436,10 @@ public struct UTF16 : UnicodeCodec {
   /// Try to decode one Unicode scalar, and return the actual number of code
   /// units it spanned in the input.  This function may consume more code
   /// units than required for this scalar.
+  @_versioned
   internal mutating func _decodeOne<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(input: inout I) -> (UnicodeDecodingResult, Int) {
+  >(_ input: inout I) -> (UnicodeDecodingResult, Int) {
     let result = decode(&input)
     switch result {
     case .scalarValue(let us):
@@ -455,7 +456,7 @@ public struct UTF16 : UnicodeCodec {
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `processCodeUnit` on each `CodeUnit`.
   public static func encode(
-    input: UnicodeScalar,
+    _ input: UnicodeScalar,
     @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     let scalarValue: UInt32 = UInt32(input)
@@ -497,13 +498,13 @@ public struct UTF32 : UnicodeCodec {
   ///   results.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(input: inout I) -> UnicodeDecodingResult {
+  >(_ input: inout I) -> UnicodeDecodingResult {
     return UTF32._decode(&input)
   }
 
   internal static func _decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(input: inout I) -> UnicodeDecodingResult {
+  >(_ input: inout I) -> UnicodeDecodingResult {
     guard let x = input.next() else { return .emptyInput }
     if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
       return .scalarValue(UnicodeScalar(x))
@@ -515,7 +516,7 @@ public struct UTF32 : UnicodeCodec {
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `processCodeUnit` on each `CodeUnit`.
   public static func encode(
-    input: UnicodeScalar,
+    _ input: UnicodeScalar,
     @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     processCodeUnit(UInt32(input))
@@ -534,7 +535,7 @@ public func transcode<
   OutputEncoding : UnicodeCodec
   where InputEncoding.CodeUnit == Input.Element
 >(
-  input: Input,
+  _ input: Input,
   from inputEncoding: InputEncoding.Type,
   to outputEncoding: OutputEncoding.Type,
   stoppingOnError stopOnError: Bool,
@@ -575,7 +576,7 @@ internal func _transcodeSomeUTF16AsUTF8<
   Input : Collection
   where
   Input.Iterator.Element == UInt16>(
-  input: Input, _ startIndex: Input.Index
+  _ input: Input, _ startIndex: Input.Index
 ) -> (Input.Index, _StringCore._UTF8Chunk) {
   typealias _UTF8Chunk = _StringCore._UTF8Chunk
 
@@ -669,17 +670,17 @@ protocol _StringElement {
   static func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
 
   @warn_unused_result
-  static func _fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
+  static func _fromUTF16CodeUnit(_ utf16: UTF16.CodeUnit) -> Self
 }
 
 extension UTF16.CodeUnit : _StringElement {
   public // @testable
-  static func _toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
+  static func _toUTF16CodeUnit(_ x: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return x
   }
   public // @testable
   static func _fromUTF16CodeUnit(
-    utf16: UTF16.CodeUnit
+    _ utf16: UTF16.CodeUnit
   ) -> UTF16.CodeUnit {
     return utf16
   }
@@ -687,13 +688,13 @@ extension UTF16.CodeUnit : _StringElement {
 
 extension UTF8.CodeUnit : _StringElement {
   public // @testable
-  static func _toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
+  static func _toUTF16CodeUnit(_ x: UTF8.CodeUnit) -> UTF16.CodeUnit {
     _sanityCheck(x <= 0x7f, "should only be doing this with ASCII")
     return UTF16.CodeUnit(x)
   }
   public // @testable
   static func _fromUTF16CodeUnit(
-    utf16: UTF16.CodeUnit
+    _ utf16: UTF16.CodeUnit
   ) -> UTF8.CodeUnit {
     _sanityCheck(utf16 <= 0x7f, "should only be doing this with ASCII")
     return UTF8.CodeUnit(utf16)
@@ -703,7 +704,7 @@ extension UTF8.CodeUnit : _StringElement {
 extension UTF16 {
   /// Returns the number of code units required to encode `x`.
   @warn_unused_result
-  public static func width(x: UnicodeScalar) -> Int {
+  public static func width(_ x: UnicodeScalar) -> Int {
     return x.value <= 0xFFFF ? 1 : 2
   }
 
@@ -712,7 +713,7 @@ extension UTF16 {
   ///
   /// - Precondition: `width(x) == 2`.
   @warn_unused_result
-  public static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
+  public static func leadSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit((x.value - 0x1_0000) >> (10 as UInt32)) + 0xD800
   }
@@ -722,7 +723,7 @@ extension UTF16 {
   ///
   /// - Precondition: `width(x) == 2`.
   @warn_unused_result
-  public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
+  public static func trailSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit(
       (x.value - 0x1_0000) & (((1 as UInt32) << 10) - 1)
@@ -730,18 +731,18 @@ extension UTF16 {
   }
 
   @warn_unused_result
-  public static func isLeadSurrogate(x: CodeUnit) -> Bool {
+  public static func isLeadSurrogate(_ x: CodeUnit) -> Bool {
     return 0xD800...0xDBFF ~= x
   }
 
   @warn_unused_result
-  public static func isTrailSurrogate(x: CodeUnit) -> Bool {
+  public static func isTrailSurrogate(_ x: CodeUnit) -> Bool {
     return 0xDC00...0xDFFF ~= x
   }
 
   public // @testable
   static func _copy<T : _StringElement, U : _StringElement>(
-    source source: UnsafeMutablePointer<T>,
+    source: UnsafeMutablePointer<T>,
     destination: UnsafeMutablePointer<U>,
     count: Int
   ) {
@@ -826,7 +827,7 @@ public func transcode<
   OutputEncoding : UnicodeCodec
   where InputEncoding.CodeUnit == Input.Element
 >(
-  inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
+  _ inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
   stoppingOnError stopOnError: Bool
 ) -> Bool {

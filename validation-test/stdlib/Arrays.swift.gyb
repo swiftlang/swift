@@ -9,13 +9,6 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 //===--- struct MrMcRange -------------------------------------------------===//
 // A wrapper around Range<Tracked> that allows us to detect when it is
@@ -71,7 +64,7 @@ CopyToNativeArrayBufferTests.test("Collection._copyToNativeArrayBuffer()") {
 }
 
 %{
-all_array_types = [ 'ContiguousArray', 'ArraySlice', 'Array' ]
+all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
 }%
 
 extension Array {
@@ -147,7 +140,7 @@ extension ${array_type} where Element : TestProtocol1 {
 }
 
 /// Returns an ${array_type} that does not share its buffer with other arrays.
-func getFresh${array_type}<S : Sequence>(sequence: S)
+func getFresh${array_type}<S : Sequence>(_ sequence: S)
   -> ${array_type}<S.Iterator.Element> {
   var result: ${array_type}<S.Iterator.Element> = []
   result.reserveCapacity(sequence.underestimatedCount)

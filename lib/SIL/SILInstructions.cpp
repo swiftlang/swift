@@ -453,8 +453,11 @@ static SILType getPinResultType(SILType operandType) {
     OptionalType::get(operandType.getSwiftRValueType())->getCanonicalType());
 }
 
-StrongPinInst::StrongPinInst(SILDebugLocation Loc, SILValue operand)
-    : UnaryInstructionBase(Loc, operand, getPinResultType(operand->getType())) {}
+StrongPinInst::StrongPinInst(SILDebugLocation Loc, SILValue operand,
+                             Atomicity atomicity)
+    : UnaryInstructionBase(Loc, operand, getPinResultType(operand->getType())) {
+  setAtomicity(atomicity);
+}
 
 CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
                            SILValue DestLValue, IsTake_t isTakeOfSrc,
@@ -684,6 +687,25 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   llvm_unreachable("not a terminator?!");
 }
 
+bool TermInst::isFunctionExiting() const {
+  switch (getTermKind()) {
+    case TermKind::BranchInst:
+    case TermKind::CondBranchInst:
+    case TermKind::SwitchValueInst:
+    case TermKind::SwitchEnumInst:
+    case TermKind::SwitchEnumAddrInst:
+    case TermKind::DynamicMethodBranchInst:
+    case TermKind::CheckedCastBranchInst:
+    case TermKind::CheckedCastAddrBranchInst:
+    case TermKind::UnreachableInst:
+    case TermKind::TryApplyInst:
+      return false;
+    case TermKind::ReturnInst:
+    case TermKind::ThrowInst:
+      return true;
+  }
+}
+
 BranchInst::BranchInst(SILDebugLocation Loc, SILBasicBlock *DestBB,
                        ArrayRef<SILValue> Args)
     : TermInst(ValueKind::BranchInst, Loc), DestBB(this, DestBB),
@@ -883,7 +905,7 @@ SwitchValueInst *SwitchValueInst::create(
   SmallVector<SILBasicBlock *, 8> BBs;
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
-  for(auto pair: CaseBBs) {
+  for (auto pair: CaseBBs) {
     Cases.push_back(pair.first);
     BBs.push_back(pair.second);
   }

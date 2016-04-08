@@ -202,7 +202,7 @@ passes you a string *you own it*.  Nobody can change a string value
 .. parsed-literal::
   |swift| class Cave {
             // Utter something in the cave
-            func say(msg: String) -> String {
+            func say(_ msg: String) -> String {
               :look1:`msg.addEcho()`\ :aside:`Modifying a parameter is safe because the callee sees a copy of the argument`
               self.lastSound = msg
               :look1:`return self.lastSound`\ :aside:`Returning a stored value is safe because the caller sees a copy of the value`
@@ -781,7 +781,7 @@ Indexing
   .. Admonition:: Example
 
     .. parsed-literal::
-        s[beginning...ending] // [s substringWithRange: NSMakeRange( beginning, ending )]
+        s[beginning...ending] // [s substringWithRange: NSMakeRange(beginning, ending)]
         s[beginning...]       // [s substringFromIndex: beginning]
         s[...ending]          // [s substringToIndex: ending]
 
@@ -907,8 +907,8 @@ Searching
 
 :Swift: 
   .. parsed-literal::
-     func **startsWith**\ (prefix: String)
-     func **endsWith**\ (suffix: String)
+     func **startsWith**\ (_ prefix: String)
+     func **endsWith**\ (_ suffix: String)
 
 ----
 
@@ -918,7 +918,7 @@ Searching
 
 :Swift:
   .. parsed-literal::
-       func **find**\ (sought: String) -> Range<String.IndexType>
+       func **find**\ (_ sought: String) -> Range<String.IndexType>
 
   .. Note:: Most other languages provide something like
             ``s1.indexOf(s2)``, which returns only the starting index of
@@ -940,7 +940,7 @@ Searching
 
 :Swift:
   .. parsed-literal::
-       func **find**\ (match: (Character) -> Bool) -> Range<String.IndexType>
+       func **find**\ (_ match: (Character) -> Bool) -> Range<String.IndexType>
 
   .. Admonition:: Usage Example
 
@@ -982,7 +982,7 @@ Building
   .. parsed-literal::
         func **+** (lhs: String, rhs: String) -> String
         func [infix,assignment] **+=** (lhs: [inout] String, rhs: String)
-        func **append**\ (suffix: String)
+        func **append**\ (_ suffix: String)
 
 
 Dynamic Formatting
@@ -1021,8 +1021,8 @@ Splitting
 
 :Swift:
   .. parsed-literal::
-     func split(maxSplit: Int = Int.max()) -> [String]
-     func split(separator: Character, maxSplit: Int = Int.max()) -> [String]
+     func split(_ maxSplit: Int = Int.max()) -> [String]
+     func split(_ separator: Character, maxSplit: Int = Int.max()) -> [String]
 
   The semantics of these functions were taken from Python, which seems
   to be a fairly good representative of what modern languages are
@@ -1037,7 +1037,7 @@ Splitting
 
     func **split**\ <Seq: Sliceable, IsSeparator: Predicate 
         where IsSeparator.Arguments == Seq.Element
-    >(seq: Seq, isSeparator: IsSeparator, maxSplit: Int = Int.max(),
+    >(_ seq: Seq, isSeparator: IsSeparator, maxSplit: Int = Int.max(),
       allowEmptySlices: Bool = false  ) -> [Seq]
 
 Splitting
@@ -1049,7 +1049,7 @@ Splitting
 
 :Swift:
   .. parsed-literal::
-     func **commonPrefix**\ (other: String) -> String
+     func **commonPrefix**\ (_ other: String) -> String
 
 Upper/Lowercase
 ~~~~~~~~~~~~~~~

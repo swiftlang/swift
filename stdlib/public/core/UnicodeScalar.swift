@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A [Unicode scalar value](http://www.unicode.org/glossary/#unicode_scalar_value).
+@_fixed_layout
 public struct UnicodeScalar :
   _BuiltinUnicodeScalarLiteralConvertible,
   UnicodeScalarLiteralConvertible {
@@ -79,7 +80,7 @@ public struct UnicodeScalar :
   ///   representation.
   @warn_unused_result
   public func escaped(asASCII forceASCII: Bool) -> String {
-    func lowNibbleAsHex(v: UInt32) -> String {
+    func lowNibbleAsHex(_ v: UInt32) -> String {
       let nibble = v & 15
       if nibble < 10 {
         return String(UnicodeScalar(nibble+48))    // 48 = '0'
@@ -266,7 +267,7 @@ extension UnicodeScalar.UTF16View : Collection {
 /// Returns c as a UTF8.CodeUnit.  Meant to be used as _ascii8("x").
 @warn_unused_result
 public // SPI(SwiftExperimental)
-func _ascii8(c: UnicodeScalar) -> UTF8.CodeUnit {
+func _ascii8(_ c: UnicodeScalar) -> UTF8.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF8.CodeUnit(c.value)
 }
@@ -274,7 +275,7 @@ func _ascii8(c: UnicodeScalar) -> UTF8.CodeUnit {
 /// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
 @warn_unused_result
 public // SPI(SwiftExperimental)
-func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {
+func _ascii16(_ c: UnicodeScalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
 }

@@ -19,8 +19,8 @@
 #include "llvm/ADT/PointerUnion.h"
 
 namespace clang {
-	class RecordDecl;
-	class TypedefNameDecl;
+  class RecordDecl;
+  class TypedefNameDecl;
 }
 
 namespace swift {

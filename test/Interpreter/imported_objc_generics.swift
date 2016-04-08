@@ -13,8 +13,6 @@ import Foundation
 import StdlibUnittest
 import ObjCClasses
 
-let wut = Container<NSString>.self
-
 var ImportedObjCGenerics = TestSuite("ImportedObjCGenerics")
 
 ImportedObjCGenerics.test("Creation") {
@@ -55,13 +53,13 @@ ImportedObjCGenerics.test("Subclasses") {
 }
 
 ImportedObjCGenerics.test("SwiftGenerics") {
-  func openContainer<T: AnyObject>(x: Container<T>) -> T {
+  func openContainer<T: AnyObject>(_ x: Container<T>) -> T {
     return x.object
   }
-  func openStringContainer<T: Container<NSString>>(x: T) -> NSString {
+  func openStringContainer<T: Container<NSString>>(_ x: T) -> NSString {
     return x.object
   }
-  func openArbitraryContainer<S: AnyObject, T: Container<S>>(x: T) -> S {
+  func openArbitraryContainer<S: AnyObject, T: Container<S>>(_ x: T) -> S {
     return x.object
   }
 
@@ -90,7 +88,7 @@ ImportedObjCGenerics.test("SwiftGenerics") {
 }
 
 ImportedObjCGenerics.test("SwiftGenerics/Creation") {
-  func makeContainer<T: AnyObject>(x: T) -> Container<T> {
+  func makeContainer<T: AnyObject>(_ x: T) -> Container<T> {
     return Container(object: x)
   }
 
@@ -99,7 +97,7 @@ ImportedObjCGenerics.test("SwiftGenerics/Creation") {
 }
 
 ImportedObjCGenerics.test("ProtocolConstraints") {
-  func copyContainerContents<T: NSCopying>(x: CopyingContainer<T>) -> T {
+  func copyContainerContents<T: NSCopying>(_ x: CopyingContainer<T>) -> T {
     return x.object.copy(with: nil) as! T
   }
 
@@ -108,7 +106,7 @@ ImportedObjCGenerics.test("ProtocolConstraints") {
 }
 
 ImportedObjCGenerics.test("ClassConstraints") {
-  func makeContainedAnimalMakeNoise<T>(x: AnimalContainer<T>) -> NSString {
+  func makeContainedAnimalMakeNoise<T>(_ x: AnimalContainer<T>) -> NSString {
     return x.object.noise
   }
   let petCarrier = AnimalContainer(object: Dog())
@@ -146,6 +144,49 @@ ImportedObjCGenerics.test("InheritanceFromNongeneric") {
   expectTrue(Container<NSString>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.self == Container<NSString>.self)
+}
+
+public class InheritInSwift: Container<NSString> {
+  public override init(object: NSString) {
+    super.init(object: object.lowercase)
+  }
+  public override var object: NSString {
+    get {
+      return super.object.uppercase
+    }
+    set {
+      super.object = newValue.lowercase
+    }
+  }
+
+  public var superObject: NSString {
+    get {
+      return super.object
+    }
+  }
+}
+
+ImportedObjCGenerics.test("InheritInSwift") {
+  let s = InheritInSwift(object: "HEllo")
+  let sup: Container = s
+
+  expectEqual(s.superObject, "hello")
+  expectEqual(s.object, "HELLO")
+  expectEqual(sup.object, "HELLO")
+
+  s.object = "GOodbye"
+  expectEqual(s.superObject, "goodbye")
+  expectEqual(s.object, "GOODBYE")
+  expectEqual(sup.object, "GOODBYE")
+
+  s.processObject { o in
+    expectEqual(o, "GOODBYE")
+  }
+
+  s.updateObject { "Aloha" }
+  expectEqual(s.superObject, "aloha")
+  expectEqual(s.object, "ALOHA")
+  expectEqual(sup.object, "ALOHA")
 }
 
 runAllTests()

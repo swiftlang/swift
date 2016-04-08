@@ -1901,25 +1901,45 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILDebugLocation(InstLoc, B)) return true; \
     ResultVal = B.create##ID(InstLoc, Val);   \
     break;
-  UNARY_INSTRUCTION(FixLifetime)
-  UNARY_INSTRUCTION(CopyBlock)
-  UNARY_INSTRUCTION(StrongPin)
-  UNARY_INSTRUCTION(StrongRetain)
-  UNARY_INSTRUCTION(StrongRelease)
-  UNARY_INSTRUCTION(StrongUnpin)
-  UNARY_INSTRUCTION(StrongRetainUnowned)
-  UNARY_INSTRUCTION(UnownedRetain)
-  UNARY_INSTRUCTION(UnownedRelease)
-  UNARY_INSTRUCTION(IsUnique)
-  UNARY_INSTRUCTION(IsUniqueOrPinned)
-  UNARY_INSTRUCTION(DestroyAddr)
-  UNARY_INSTRUCTION(AutoreleaseValue)
-  UNARY_INSTRUCTION(SetDeallocating)
-  UNARY_INSTRUCTION(ReleaseValue)
-  UNARY_INSTRUCTION(RetainValue)
-  UNARY_INSTRUCTION(Load)
-  UNARY_INSTRUCTION(CondFail)
+
+#define REFCOUNTING_INSTRUCTION(ID)                                            \
+  case ValueKind::ID##Inst: {                                                  \
+    Atomicity atomicity = Atomicity::Atomic;                                   \
+    StringRef Optional;                                                        \
+    if (parseSILOptional(Optional, *this)) {                                   \
+      if (Optional == "nonatomic") {                                           \
+        atomicity = Atomicity::NonAtomic;                                      \
+      } else {                                                                 \
+        return true;                                                           \
+      }                                                                        \
+    }                                                                          \
+    if (parseTypedValueRef(Val, B))                                            \
+      return true;                                                             \
+    if (parseSILDebugLocation(InstLoc, B))                                     \
+      return true;                                                             \
+    ResultVal = B.create##ID(InstLoc, Val, atomicity);                         \
+  } break;
+
+    UNARY_INSTRUCTION(FixLifetime)
+    UNARY_INSTRUCTION(CopyBlock)
+    UNARY_INSTRUCTION(IsUnique)
+    UNARY_INSTRUCTION(IsUniqueOrPinned)
+    UNARY_INSTRUCTION(DestroyAddr)
+    UNARY_INSTRUCTION(Load)
+    UNARY_INSTRUCTION(CondFail)
+    REFCOUNTING_INSTRUCTION(StrongPin)
+    REFCOUNTING_INSTRUCTION(StrongRetain)
+    REFCOUNTING_INSTRUCTION(StrongRelease)
+    REFCOUNTING_INSTRUCTION(StrongUnpin)
+    REFCOUNTING_INSTRUCTION(StrongRetainUnowned)
+    REFCOUNTING_INSTRUCTION(UnownedRetain)
+    REFCOUNTING_INSTRUCTION(UnownedRelease)
+    REFCOUNTING_INSTRUCTION(AutoreleaseValue)
+    REFCOUNTING_INSTRUCTION(SetDeallocating)
+    REFCOUNTING_INSTRUCTION(ReleaseValue)
+    REFCOUNTING_INSTRUCTION(RetainValue)
 #undef UNARY_INSTRUCTION
+#undef REFCOUNTING_INSTRUCTION
 
  case ValueKind::DebugValueInst:
  case ValueKind::DebugValueAddrInst: {
@@ -3224,7 +3244,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         if (intTy) {
           // If it is a switch on an integer type, check that all case values
           // are integer literals or undef.
-          if (!isa<SILUndef>(CaseVal))  {
+          if (!isa<SILUndef>(CaseVal)) {
             auto *IL = dyn_cast<IntegerLiteralInst>(CaseVal);
             if (!IL) {
               P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);

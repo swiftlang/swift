@@ -12,12 +12,6 @@ import StdlibUnittest
 import StdlibCollectionUnittest
 import SwiftPrivate
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var CollectionTypeTests = TestSuite("Collection")
 
@@ -57,7 +51,7 @@ struct CollectionWithDefaultUnderestimatedCount : Collection {
 
 var MinimalForwardCollectionWithCustomFilter_timesFilterWasCalled: Int = 0
 
-% for Implementation in [ 'Default', 'Custom' ]:
+% for Implementation in ['Default', 'Custom']:
 
 struct MinimalForwardCollectionWith${Implementation}Filter<Element>
   : Collection {
@@ -98,7 +92,7 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
   }
 
   func filter(
-    @noescape transform: (Element) throws -> Bool
+    @noescape _ transform: (Element) throws -> Bool
   ) rethrows -> [Element] {
     MinimalForwardCollectionWithCustomFilter.timesFilterWasCalled += 1
     return try _data.filter(transform)
@@ -111,7 +105,7 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
 % end
 
 func callStaticCollectionFilter(
-  sequence: MinimalForwardCollectionWithDefaultFilter<OpaqueValue<Int>>,
+  _ sequence: MinimalForwardCollectionWithDefaultFilter<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
@@ -120,7 +114,7 @@ func callStaticCollectionFilter(
 }
 
 func callStaticCollectionFilter(
-  sequence: MinimalForwardCollectionWithCustomFilter<OpaqueValue<Int>>,
+  _ sequence: MinimalForwardCollectionWithCustomFilter<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
@@ -129,7 +123,7 @@ func callStaticCollectionFilter(
 }
 
 func callGenericCollectionFilter<S : Collection>(
-  sequence: S,
+  _ sequence: S,
   @noescape includeElement: (S.Iterator.Element) -> Bool
 ) -> [S.Iterator.Element] {
   var result = sequence.filter(includeElement)
@@ -137,9 +131,9 @@ func callGenericCollectionFilter<S : Collection>(
   return result
 }
 
-% for Implementation in [ 'Default', 'Custom' ]:
+% for Implementation in ['Default', 'Custom']:
 
-%   for dispatch in [ 'Static', 'Generic' ]:
+%   for dispatch in ['Static', 'Generic']:
 
 CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${dispatch}") {
   for test in filterTests {
@@ -189,7 +183,7 @@ CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${di
 //===----------------------------------------------------------------------===//
 var MinimalForwardCollectionWithCustomMap_timesMapWasCalled: Int = 0
 
-% for Implementation in [ 'Default', 'Custom' ]:
+% for Implementation in ['Default', 'Custom']:
 
 struct MinimalForwardCollectionWith${Implementation}Map<Element>
   : Collection {
@@ -230,7 +224,7 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
   }
 
   func map<T>(
-    @noescape transform: (Element) throws -> T
+    @noescape _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     MinimalForwardCollectionWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
@@ -243,7 +237,7 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
 % end
 
 func callStaticCollectionMap<T>(
-  collection: MinimalForwardCollectionWithDefaultMap<OpaqueValue<Int>>,
+  _ collection: MinimalForwardCollectionWithDefaultMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
@@ -252,7 +246,7 @@ func callStaticCollectionMap<T>(
 }
 
 func callStaticCollectionMap<T>(
-  collection: MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>,
+  _ collection: MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
@@ -261,7 +255,7 @@ func callStaticCollectionMap<T>(
 }
 
 func callGenericCollectionMap<C : Collection, T>(
-  collection: C,
+  _ collection: C,
   @noescape transform: (C.Iterator.Element) -> T
 ) -> [T] {
   var result = collection.map(transform)
@@ -269,9 +263,9 @@ func callGenericCollectionMap<C : Collection, T>(
   return result
 }
 
-% for Implementation in [ 'Default', 'Custom' ]:
+% for Implementation in ['Default', 'Custom']:
 
-%   for dispatch in [ 'Static', 'Generic' ]:
+%   for dispatch in ['Static', 'Generic']:
 
 CollectionTypeTests.test(
   "map/Collection/${Implementation}Implementation/${dispatch}"
@@ -414,7 +408,7 @@ struct MinimalForwardCollectionWithDefaultIterator : Collection {
   var _count: Int
 }
 
-func callGenericIterator<S : Sequence>(sequence: S) -> S.Iterator {
+func callGenericIterator<S : Sequence>(_ sequence: S) -> S.Iterator {
   return sequence.makeIterator()
 }
 
@@ -575,18 +569,18 @@ CollectionTypeTests.test("index(of:)/WhereElementIsEquatable/dispatch") {
 // completely different line type-checks
 func callGenericFind_<
   C : Collection where C.Iterator.Element : Equatable
->(collection: C, _ element: C.Iterator.Element) -> C.Index? {
+>(_ collection: C, _ element: C.Iterator.Element) -> C.Index? {
   return collection.index(of: element)
 }
 
 func callStaticFind_(
-  set: Set<MinimalHashableValue>,
+  _ set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Set<MinimalHashableValue>.Index? {
   return set.index(of: element)
 }
 
-% for dispatch in [ 'Static', 'Generic' ]:
+% for dispatch in ['Static', 'Generic']:
 
 // FIXME: implement the same optimization for Dictionary.
 // FIXME: move to the file where other Set tests live.
@@ -635,7 +629,7 @@ extension Collection where
   SubSequence.Iterator.Element == Iterator.Element,
   SubSequence.Index == Index {
 
-  func _test_indicesOf(element: Iterator.Element) -> [Index] {
+  func _test_indicesOf(_ element: Iterator.Element) -> [Index] {
     var result: [Index] = []
     var tail = self[indices]
     while let foundIndex = tail.index(of: element) {
@@ -722,10 +716,10 @@ CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") 
 //===----------------------------------------------------------------------===//
 // Standard collection tests
 //===----------------------------------------------------------------------===//
-% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%   for base_kind in [ 'Defaulted', 'Minimal' ]:
+% for traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+%   for base_kind in ['Defaulted', 'Minimal']:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%     for mutable in [ False, True ]:
+%     for mutable in [False, True]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %       Base = "%s%s%sCollection" % (base_kind, traversal, 'Mutable' if mutable else '')
 

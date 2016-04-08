@@ -68,7 +68,7 @@ collectNameTypeMap(Type Ty, const DeclContext *DC) {
     assert(ParamDecls.size() == Args.size());
 
     // Map type parameter names with their instantiating arguments.
-    for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
+    for (unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
       (*IdMap)[ParamDecls[I]->getName().str()] = Args[I];
     }
   } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
@@ -154,7 +154,7 @@ class ArchetypeSelfTransformer : public PrinterArchetypeTransformer {
     auto ATT = cast<ArchetypeType>(Ty.getPointer());
     ArchetypeType *Self = ATT;
     std::vector<Identifier> Names;
-    for(; Self->getParent(); Self = Self->getParent()) {
+    for (; Self->getParent(); Self = Self->getParent()) {
       Names.insert(Names.begin(), Self->getName());
     }
     if (!Self->getSelfProtocol() || Names.empty())
@@ -371,7 +371,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     Text = Text.trim();
     auto ParamStart = Text.find_first_of('<');
     auto ParamEnd = Text.find_last_of('>');
-    if(StringRef::npos == ParamStart) {
+    if (StringRef::npos == ParamStart) {
       return checkElementType(Text);
     }
     Type GenericType = checkElementType(StringRef(Text.data(), ParamStart));
@@ -442,7 +442,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       return {Result, MergeInfo};
     }
     assert(Ext->getGenericParams() && "No generic params.");
-    for (auto Req : Ext->getGenericParams()->getRequirements()){
+    for (auto Req : Ext->getGenericParams()->getRequirements()) {
       auto TupleOp = Req.getAsAnalyzedWrittenString();
       if (!TupleOp)
         continue;
@@ -461,7 +461,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         auto Written = Req.getAsWrittenString();
         switch (Kind) {
           case RequirementReprKind::TypeConstraint:
-            if(!canPossiblyConvertTo(First, Second, *DC))
+            if (!canPossiblyConvertTo(First, Second, *DC))
               return {Result, MergeInfo};
             else if (isConvertibleTo(First, Second, *DC))
               Result.KnownSatisfiedRequirements.push_back(Written);
@@ -536,7 +536,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
     ExtensionMergeInfoMap MergeInfoMap;
     std::vector<NominalTypeDecl*> Unhandled;
-    auto addTypeLocNominal = [&](TypeLoc TL){
+    auto addTypeLocNominal = [&](TypeLoc TL) {
       if (TL.getType()) {
         if (auto D = TL.getType()->getAnyNominal()) {
           Unhandled.push_back(D);
@@ -546,7 +546,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     for (auto TL : Target->getInherited()) {
       addTypeLocNominal(TL);
     }
-    while(!Unhandled.empty()) {
+    while (!Unhandled.empty()) {
       NominalTypeDecl* Back = Unhandled.back();
       Unhandled.pop_back();
       for (ExtensionDecl *E : Back->getExtensions()) {
@@ -600,8 +600,8 @@ SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 
 bool SynthesizedExtensionAnalyzer::
 isInSynthesizedExtension(const ValueDecl *VD) {
-  if(auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
-                                                getInnermostTypeContext())) {
+  if (auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
+                                                 getInnermostTypeContext())) {
     return Impl.InfoMap->count(Ext) != 0 &&
            Impl.InfoMap->find(Ext)->second.IsSynthesized;
   }
@@ -771,7 +771,7 @@ ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
   assert(VD->getRawComment().isEmpty());
   std::queue<ValueDecl*> AllConformances;
   AllConformances.push(VD);
-  while(!AllConformances.empty()) {
+  while (!AllConformances.empty()) {
     auto *VD = AllConformances.front();
     AllConformances.pop();
     if (VD->getRawComment().isEmpty()) {
@@ -1205,7 +1205,7 @@ private:
                          bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL, bool isCurried,
-                          std::function<bool(unsigned)> isAPINameByDefault);
+                          std::function<bool()> isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -2626,13 +2626,13 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
 }
 
 void PrintAST::printParameterList(ParameterList *PL, bool isCurried,
-                            std::function<bool(unsigned)> isAPINameByDefault) {
+                            std::function<bool()> isAPINameByDefault) {
   Printer << "(";
   for (unsigned i = 0, e = PL->size(); i != e; ++i) {
     if (i > 0)
       Printer << ", ";
 
-    printOneParameter(PL->get(i), isCurried, isAPINameByDefault(i));
+    printOneParameter(PL->get(i), isCurried, isAPINameByDefault());
   }
   Printer << ")";
 }
@@ -2647,8 +2647,8 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   for (unsigned CurrPattern = 0, NumPatterns = BodyParams.size();
        CurrPattern != NumPatterns; ++CurrPattern) {
     printParameterList(BodyParams[CurrPattern], /*Curried=*/CurrPattern > 0,
-                       [&](unsigned argNo)->bool {
-      return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault(argNo);
+                       [&]()->bool {
+      return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
     });
   }
 
@@ -2873,7 +2873,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer << "subscript";
   }, [&] { // Parameters
     printParameterList(decl->getIndices(), /*Curried=*/false,
-                       /*isAPINameByDefault*/[](unsigned)->bool{return false;});
+                       /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";
 
@@ -3689,7 +3689,7 @@ public:
   }
 
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
-    if(Options.SkipAttributes)
+    if (Options.SkipAttributes)
       return;
     auto IsAttrExcluded = [&](DeclAttrKind Kind) {
       return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
@@ -3732,7 +3732,7 @@ public:
   }
 
   void printFunctionExtInfo(SILFunctionType::ExtInfo info) {
-    if(Options.SkipAttributes)
+    if (Options.SkipAttributes)
       return;
 
     if (Options.PrintFunctionRepresentationAttrs) {

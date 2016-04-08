@@ -31,8 +31,12 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
-  add_subdirectory(Platform)
   add_subdirectory(Reflection)
+  add_subdirectory(SwiftRemoteMirror)
+endif()
+
+if(SWIFT_BUILD_SDK_OVERLAY)
+  add_subdirectory(Platform)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")

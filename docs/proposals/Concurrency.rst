@@ -222,7 +222,7 @@ be called by worker-threads.
 
 .. code-block:: swift
 
-    func logger(x : Int) {
+    func logger(_ x : Int) {
 
       // I know what I'm doing!
       issafe {
@@ -326,7 +326,7 @@ This is an example of a tiny concurrent program that uses Tasks and Streams.
     let input  = Stream<String>()
     let output = Stream<String>()
 
-    func echoServer(inp : Stream<String>,
+    func echoServer(_ inp : Stream<String>,
                     out : Stream<String>) {
       while true { out.push(inp.pop()) }
     }
@@ -436,7 +436,7 @@ Here is another example of async calls using trailing closures and enums.
                                   }}
 
      //CHECK: Shape: Oval
-     print("Shape: \( res.await() )")
+     print("Shape: \(res.await())")
 
 Notice that the swift compiler infers that ``Shape`` and `String` can be sent
 between the threads.
@@ -475,7 +475,7 @@ free to make unsafe calls capture locals and access globals.
 
 .. code-block:: swift
 
-  @IBAction func onClick(sender: AnyObject) {
+  @IBAction func onClick(_ sender: AnyObject) {
 
     progress.startAnimating()
     Label!.text = ""
@@ -541,7 +541,7 @@ are not synchronized on the same lock.
     var cache : [Int : Bool] = [:]
 
     @_semantics("swift.concurrent.safe")
-    func isPrime(num : Int) -> Bool {
+    func isPrime(_ num : Int) -> Bool {
       return self.critical {
         if let r = self.cache[num] { return r }
         let b = calcIsPrime(num)
@@ -551,7 +551,7 @@ are not synchronized on the same lock.
     }
   }
 
-  func countPrimes(P : PrimesCache) -> Int {
+  func countPrimes(_ P : PrimesCache) -> Int {
     var sum = 0
     for i in 2..<10_000 { if P.isPrime(i) { sum += 1} }
     return sum
@@ -575,7 +575,7 @@ code runs significantly faster.
 
 .. code-block:: swift
 
-  func ParallelMatMul(A : Matrix,_ B : Matrix) -> Matrix {
+  func ParallelMatMul(_ A : Matrix,_ B : Matrix) -> Matrix {
     assert(A.size == B.size, "size mismatch!")
 
     // Handle small matrices using the serial algorithm.
@@ -655,7 +655,7 @@ Finally, a collector actor saves all of the messages into an array.
 
     var numbers = ContiguousArray<Int>()
 
-    override func accept(x : Int) { numbers.append(x) }
+    override func accept(_ x : Int) { numbers.append(x) }
   }
 
   // Filter numbers that are divisible by an argument.
@@ -667,7 +667,7 @@ Finally, a collector actor saves all of the messages into an array.
       div = d ; next = n
     }
 
-    override func accept(x : Int) {
+    override func accept(_ x : Int) {
       if x != div && x % div == 0 { return }
       next.send(x)
     }

@@ -1417,7 +1417,7 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
     // For a major decl, we print an empty line before it.
     if (MajorDeclKinds.find(decl->getKind()) != MajorDeclKinds.end())
       Printer << "\n";
-    if(decl->print(Printer, PO))
+    if (decl->print(Printer, PO))
       Printer << "\n";
   }
 }

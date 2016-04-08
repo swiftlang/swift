@@ -1,17 +1,17 @@
 import Swift
 import StdlibUnittest
 
-func acceptsAnySet<T : Hashable>(s: Set<T>) {}
+func acceptsAnySet<T : Hashable>(_ s: Set<T>) {}
 
 func acceptsAnyDictionary<KeyTy : Hashable, ValueTy>(
-  d: Dictionary<KeyTy, ValueTy>) {
+  _ d: Dictionary<KeyTy, ValueTy>) {
 }
 
 // Compare two arrays as sets.
 func equalsUnordered<T : Comparable>(
-  lhs: Array<(T, T)>, _ rhs: Array<(T, T)>
+  _ lhs: Array<(T, T)>, _ rhs: Array<(T, T)>
 ) -> Bool {
-  func comparePair(lhs: (T, T), _ rhs: (T, T)) -> Bool {
+  func comparePair(_ lhs: (T, T), _ rhs: (T, T)) -> Bool {
     return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
   }
   return lhs.sorted(isOrderedBefore: comparePair)
@@ -21,7 +21,7 @@ func equalsUnordered<T : Comparable>(
   }
 }
 
-func equalsUnordered<T : Comparable>(lhs: [T], _ rhs: [T]) -> Bool {
+func equalsUnordered<T : Comparable>(_ lhs: [T], _ rhs: [T]) -> Bool {
   return lhs.sorted().elementsEqual(rhs.sorted())
 }
 
@@ -193,10 +193,10 @@ func < (
 }
 
 func _equalsWithoutElementIdentity(
-  lhs: [ExpectedArrayElement], _ rhs: [ExpectedArrayElement]
+  _ lhs: [ExpectedArrayElement], _ rhs: [ExpectedArrayElement]
 ) -> Bool {
   func stripIdentity(
-    list: [ExpectedArrayElement]
+    _ list: [ExpectedArrayElement]
   ) -> [ExpectedArrayElement] {
     return list.map { ExpectedArrayElement(value: $0.value) }
   }
@@ -205,7 +205,7 @@ func _equalsWithoutElementIdentity(
 }
 
 func _makeExpectedArrayContents(
-  expected: [Int]
+  _ expected: [Int]
 ) -> [ExpectedArrayElement] {
   var result = [ExpectedArrayElement]()
   for value in expected {
@@ -247,7 +247,7 @@ func < (
 }
 
 func _makeExpectedSetContents(
-  expected: [Int]
+  _ expected: [Int]
 ) -> [ExpectedSetElement] {
   var result = [ExpectedSetElement]()
   for value in expected {
@@ -257,10 +257,10 @@ func _makeExpectedSetContents(
 }
 
 func _equalsUnorderedWithoutElementIdentity(
-  lhs: [ExpectedSetElement], _ rhs: [ExpectedSetElement]
+  _ lhs: [ExpectedSetElement], _ rhs: [ExpectedSetElement]
 ) -> Bool {
   func stripIdentity(
-    list: [ExpectedSetElement]
+    _ list: [ExpectedSetElement]
   ) -> [ExpectedSetElement] {
     return list.map { ExpectedSetElement(value: $0.value) }
   }
@@ -313,10 +313,10 @@ func < (
 }
 
 func _equalsUnorderedWithoutElementIdentity(
-  lhs: [ExpectedDictionaryElement], _ rhs: [ExpectedDictionaryElement]
+  _ lhs: [ExpectedDictionaryElement], _ rhs: [ExpectedDictionaryElement]
 ) -> Bool {
   func stripIdentity(
-    list: [ExpectedDictionaryElement]
+    _ list: [ExpectedDictionaryElement]
   ) -> [ExpectedDictionaryElement] {
     return list.map { ExpectedDictionaryElement(key: $0.key, value: $0.value) }
   }
@@ -325,7 +325,7 @@ func _equalsUnorderedWithoutElementIdentity(
 }
 
 func _makeExpectedDictionaryContents(
-  expected: [(Int, Int)]
+  _ expected: [(Int, Int)]
 ) -> [ExpectedDictionaryElement] {
   var result = [ExpectedDictionaryElement]()
   for (key, value) in expected {

@@ -21,6 +21,7 @@
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/DemangleWrappers.h"
@@ -35,7 +36,6 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -1058,7 +1058,7 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
 
 namespace {
 
-class AnnotationPrinter : public ide::SourceEntityWalker {
+class AnnotationPrinter : public SourceEntityWalker {
   SourceManager &SM;
   unsigned BufferID;
   llvm::raw_ostream &OS;
@@ -1663,7 +1663,7 @@ struct GroupNamesPrinter {
   }
 
   void addDecl(const Decl *D) {
-    if(auto VD = dyn_cast<ValueDecl>(D)) {
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
       if (!VD->isImplicit() && !VD->isPrivateStdlibDecl()) {
         StringRef Name = VD->getGroupName().hasValue() ?
           VD->getGroupName().getValue() : "";
@@ -1972,7 +1972,7 @@ public:
 
     llvm::markup::MarkupContext MC;
     auto DC = getDocComment(MC, D);
-    if(DC.hasValue())
+    if (DC.hasValue())
       llvm::markup::dump(DC.getValue()->getDocument(), OS);
 
     return true;
@@ -2363,7 +2363,7 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
 
 namespace {
 
-class USRPrinter : public ide::SourceEntityWalker {
+class USRPrinter : public SourceEntityWalker {
   SourceManager &SM;
   unsigned BufferID;
   llvm::raw_ostream &OS;

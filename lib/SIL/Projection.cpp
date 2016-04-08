@@ -879,7 +879,7 @@ std::string
 ProjectionTreeNode::getNameEncoding(const ProjectionTree &PT) const {
   std::string Encoding;
   const ProjectionTreeNode *Node = this;
-  while(Node) {
+  while (Node) {
     if (Node->isRoot())
       break;
     Encoding += std::to_string(Node->Proj->getIndex());
@@ -1242,7 +1242,7 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
 
 SILValue
 ProjectionTree::computeExplodedArgumentValue(
-                            SILBuilder &Builder,  SILLocation Loc,
+                            SILBuilder &Builder, SILLocation Loc,
                             llvm::SmallVector<SILValue, 8> &LeafValues) {
   // Construct the leaf index to leaf value map.
   llvm::DenseMap<unsigned, SILValue> LeafIndexToValue;

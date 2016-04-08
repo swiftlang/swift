@@ -95,7 +95,7 @@ static void IAMStruct1DoSomething(struct IAMMutableStruct1 iamStruct1);
 
 typedef struct TDStruct TDStruct;
 struct TDStruct {
-	double x;
+  double x;
 };
 // FIXME: the below doesn't appear in the output
 const TDStruct TDStructCreateWithFloat(float Float);

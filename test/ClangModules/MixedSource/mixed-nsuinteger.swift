@@ -38,7 +38,7 @@ var r: Int = a[0].countByEnumerating(with: p, objects: pp, count: i)
 var rr: UInt = userTypedObj.countByEnumerating(with: p, objects: pp, count: ui)
 
 // Check exercising protocol conformance.
-func gen<T:NSFastEnumeration>(t:T) {
+func gen<T:NSFastEnumeration>(_ t:T) {
   let i: Int = 56
   let p: UnsafeMutablePointer<NSFastEnumerationState> = nil
   let pp: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil

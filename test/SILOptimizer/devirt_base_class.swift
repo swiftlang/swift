@@ -16,7 +16,7 @@ private class C : A {
 }
 
 @inline(never)
-private func foo(a: A) -> Int {
+private func foo(_ a: A) -> Int {
 
 
 // Check that a.f() call can be devirtualized, even

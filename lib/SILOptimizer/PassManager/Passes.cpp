@@ -259,6 +259,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
 
+  if (Module.getOptions().DisableSILPerfOptimizations)
+    return;
+
   if (Module.getOptions().DebugSerialization) {
     SILPassManager PM(&Module);
     PM.addSILLinker();
@@ -329,6 +332,11 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Speculate virtual call targets.
   PM.addSpeculativeDevirtualization();
+
+  // There should be at least one SILCombine+SimplifyCFG between the
+  // ClosureSpecializer, etc. and the last inliner. Cleaning up after these
+  // passes can expose more inlining opportunities.
+  AddSimplifyCFGSILCombine(PM);
 
   // We do this late since it is a pass like the inline caches that we only want
   // to run once very late. Make sure to run at least one round of the ARC
@@ -521,6 +529,9 @@ PMDescriptor::PMDescriptor(llvm::yaml::SequenceNode *Desc) {
 void swift::runSILOptimizationPassesWithFileSpecification(SILModule &Module,
                                                           StringRef FileName) {
 #ifndef NDEBUG
+  if (Module.getOptions().DisableSILPerfOptimizations)
+    return;
+
   llvm::SmallVector<PMDescriptor, 4> Descriptors;
   PMDescriptor::descriptorsForFile(FileName, Descriptors);
 

@@ -5,18 +5,10 @@
 import StdlibUnittest
 import class_change_size
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var ClassChangeSizeTest = TestSuite("ClassChangeSize")
 
-func increment(c: inout ChangeSize) {
+func increment(_ c: inout ChangeSize) {
   c.version += 1
 }
 

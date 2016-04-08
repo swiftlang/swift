@@ -7,12 +7,6 @@
 import StdlibUnittest
 import PrintTestTypes
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 let PrintTests = TestSuite("PrintStruct")
 
@@ -54,7 +48,7 @@ PrintTests.test("custom string convertible structs") {
 }
 
 func test_ThickMetatypePrintingImpl<T>(
-  thickMetatype: T.Type,
+  _ thickMetatype: T.Type,
   _ expectedPrint: String,
   _ expectedDebug: String
   ) {

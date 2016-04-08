@@ -197,7 +197,7 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
     ABSOLUTE)
 
-  if( NOT EXISTS "${${product}_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h" )
+  if(NOT EXISTS "${${product}_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
     message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
   else()
     get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
@@ -320,7 +320,7 @@ macro(swift_common_unified_build_config product)
       "${CMARK_BUILD_INCLUDE_DIR}")
 
   check_cxx_compiler_flag("-Werror -Wnested-anon-types" CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
-  if( CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG )
+  if(CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types")
   endif()
 endmacro()

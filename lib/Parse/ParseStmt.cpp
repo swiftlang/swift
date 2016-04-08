@@ -1734,7 +1734,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
                  "string literal");
         return ConditionalCompilationExprState::error();
       }
-    } else if(fnName.equals("swift")) {
+    } else if (fnName.equals("swift")) {
       auto PUE = dyn_cast<PrefixUnaryExpr>(PE->getSubExpr());
       if (!PUE) {
         diagnose(PE->getSubExpr()->getLoc(),

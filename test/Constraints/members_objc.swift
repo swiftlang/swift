@@ -4,16 +4,16 @@ import Swift
 
 @objc
 protocol P2 {
-  func bar(x: Int)
-  static func pub(x: Int)
+  func bar(_ x: Int)
+  static func pub(_ x: Int)
 }
 
-func existential(p2 : P2) {
+func existential(_ p2 : P2) {
   _ = p2.bar
   _ = P2.bar
 }
 
-func archetype<T: P2>(p2 : T) {
+func archetype<T: P2>(_ p2 : T) {
   _ = p2.bar
   _ = T.bar
   _ = T.pub

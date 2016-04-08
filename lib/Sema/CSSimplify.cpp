@@ -129,7 +129,39 @@ std::string constraints::getParamListAsString(ArrayRef<CallArgParam> params){
   return result;
 }
 
+bool constraints::
+areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
+                                          unsigned parameterDepth,
+                                          ArrayRef<Identifier> labels,
+                                          bool hasTrailingClosure) {
+  // Bail out conservatively if this isn't a function declaration.
+  auto fn = dyn_cast<AbstractFunctionDecl>(decl);
+  if (!fn) return true;
+  assert(parameterDepth < fn->getNumParameterLists());
 
+  ParameterList &params = *fn->getParameterList(parameterDepth);
+
+  SmallVector<CallArgParam, 8> argInfos;
+  for (auto argLabel : labels) {
+    argInfos.push_back(CallArgParam());
+    argInfos.back().Label = argLabel;
+  }
+
+  SmallVector<CallArgParam, 8> paramInfos;
+  for (auto param : params) {
+    paramInfos.push_back(CallArgParam());
+    paramInfos.back().Label = param->getArgumentName();
+    paramInfos.back().HasDefaultArgument = param->isDefaultArgument();
+    paramInfos.back().Variadic = param->isVariadic();
+  }
+
+  MatchCallArgumentListener listener;
+  SmallVector<ParamBinding, 8> unusedParamBindings;
+
+  return !matchCallArguments(argInfos, paramInfos, hasTrailingClosure,
+                             /*allow fixes*/ false,
+                             listener, unusedParamBindings);
+}
 
 bool constraints::
 matchCallArguments(ArrayRef<CallArgParam> args,
@@ -458,7 +490,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
   if (potentiallyOutOfOrder) {
     // Build a mapping from arguments to parameters.
     SmallVector<unsigned, 4> argumentBindings(numArgs);
-    for(paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+    for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
       for (auto argIdx : parameterBindings[paramIdx])
         argumentBindings[argIdx] = paramIdx;
     }
@@ -516,7 +548,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
     // If the param type is an empty existential composition, the function can
     // only have one argument. Check if exactly one argument was passed to this
     // function, otherwise we obviously have a mismatch
-    if (auto tupleArgType = argType->getAs<TupleType>()) {
+    if (auto tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
       if (tupleArgType->getNumElements() != 1) {
         return ConstraintSystem::SolutionKind::Error;
       }
@@ -2521,7 +2553,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
 
 /// Retrieve the argument labels that are provided for a member
 /// reference at the given locator.
-static Optional<ArrayRef<Identifier>> 
+static Optional<ConstraintSystem::ArgumentLabelState>
 getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 2> parts;
   Expr *anchor = locator.getLocatorParts(parts);
@@ -2585,12 +2617,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // Dig out the instance type and figure out what members of the instance type
   // we are going to see.
   bool isMetatype = false;
+  bool isModule = false;
   bool hasInstanceMembers = false;
   bool hasInstanceMethods = false;
   bool hasStaticMembers = false;
   Type instanceTy = baseObjTy;
   if (baseObjTy->is<ModuleType>()) {
     hasStaticMembers = true;
+    isModule = true;
   } else if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     instanceTy = baseObjMeta->getInstanceType();
     isMetatype = true;
@@ -2664,7 +2698,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
   // If we have a simple name, determine whether there are argument
   // labels we can use to restrict the set of lookup results.
-  Optional<ArrayRef<Identifier>> argumentLabels;
+  Optional<ArgumentLabelState> argumentLabels;
   if (memberName.isSimpleName()) {
     argumentLabels = getArgumentLabels(*this,
                                        ConstraintLocatorBuilder(memberLocator));
@@ -2675,7 +2709,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // high.
     if (baseObjTy->isAnyObject() && argumentLabels) {
       memberName = DeclName(TC.Context, memberName.getBaseName(),
-                            *argumentLabels);
+                            argumentLabels->Labels);
       argumentLabels.reset();
     }
   }
@@ -2686,27 +2720,31 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (!argumentLabels)
       return true;
 
-    auto name = decl->getFullName();
-    if (name.isSimpleName())
-      return true;
-
-    for (auto argLabel : *argumentLabels) {
-      if (argLabel.empty())
-        continue;
-
-      if (std::find(name.getArgumentNames().begin(),
-                    name.getArgumentNames().end(),
-                    argLabel) == name.getArgumentNames().end()) {
-        return false;
-      }
+    // This is a member lookup, which generally means that the call arguments
+    // (if we have any) will apply to the second level of parameters, with
+    // the member lookup binding the first level.  But there are cases where
+    // we can get an unapplied declaration reference back.
+    unsigned parameterDepth;
+    if (isModule) {
+      parameterDepth = 0;
+    } else if (isMetatype && decl->isInstanceMember()) {
+      parameterDepth = 0;
+    } else {
+      parameterDepth = 1;
     }
 
-    return true;
+    return areConservativelyCompatibleArgumentLabels(decl, parameterDepth,
+                                          argumentLabels->Labels,
+                                          argumentLabels->HasTrailingClosure);
   };
 
   
   // Handle initializers, they have their own approach to name lookup.
   if (memberName.isSimpleName(TC.Context.Id_init)) {
+    // The constructors are only found on the metatype.
+    if (!isMetatype)
+      return result;
+    
     NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
@@ -2719,10 +2757,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     LookupResult ctors = TC.lookupConstructors(DC, baseObjTy, lookupOptions);
     if (!ctors)
       return result;    // No result.
-    
-    // The constructors are only found on the metatype.
-    if (!isMetatype)
-      return result;
     
     TypeBase *favoredType = nullptr;
     if (auto anchor = memberLocator->getAnchor()) {

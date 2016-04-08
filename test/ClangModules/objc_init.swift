@@ -57,7 +57,7 @@ class MyDocument3 : NSAwesomeDocument {
   }
 }
 
-func createMyDocument3(url: NSURL) {
+func createMyDocument3(_ url: NSURL) {
   var md = MyDocument3()
   md = try! MyDocument3(contentsOf: url, ofType:"")
   _ = md
@@ -77,7 +77,7 @@ func createMyInterestingDesignated() {
   _ = MyInterestingDesignated(url: "http://llvm.org")
 }
 
-func testNoReturn(a : NSAwesomeDocument) -> Int {
+func testNoReturn(_ a : NSAwesomeDocument) -> Int {
   a.noReturnMethod(42)
   return 17    // TODO: In principle, we should produce an unreachable code diagnostic here.
 }
@@ -98,13 +98,13 @@ class MyTableViewController : NSTableViewController {
 }
 
 class MyOtherTableViewController : NSTableViewController {
-  override init(int i: Int)  {
+  override init(int i: Int) {
     super.init(int: i)
   }
 } // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSTableViewController'}}
 
 class MyThirdTableViewController : NSTableViewController {
-  override init(int i: Int)  {
+  override init(int i: Int) {
     super.init(int: i)
   }
 
@@ -113,7 +113,7 @@ class MyThirdTableViewController : NSTableViewController {
   }
 }
 
-func checkInitWithCoder(coder: NSCoder) {
+func checkInitWithCoder(_ coder: NSCoder) {
   NSViewController(coder: coder) // expected-warning{{unused}}
   NSTableViewController(coder: coder) // expected-warning{{unused}}
   MyViewController(coder: coder) // expected-warning{{unused}}
@@ -142,7 +142,7 @@ class MyString : NSString {
 
 // <rdar://problem/17281900>
 class View: NSView {
-  override func addSubview(aView: NSView) {
+  override func addSubview(_ aView: NSView) {
     _ = MyViewController.init()
   }
 }

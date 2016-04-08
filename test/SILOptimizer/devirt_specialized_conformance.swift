@@ -17,21 +17,21 @@ struct Int32 {}
 func unknown1() -> ()
 
 protocol P {
-  func doSomething(x : Int32)
+  func doSomething(_ x : Int32)
 }
 
 struct X {}
 
 class B<T> : P {
-  func doSomething(x : Int32) {
+  func doSomething(_ x : Int32) {
      unknown1()
    }
  }
 
-func doSomething(p : P, _ x : Int32) {
+func doSomething(_ p : P, _ x : Int32) {
   p.doSomething(x)
 }
-func doSomething2<T : P>(t : T, _ x : Int32) {
+func doSomething2<T : P>(_ t : T, _ x : Int32) {
   t.doSomething(x)
 }
 

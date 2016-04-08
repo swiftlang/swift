@@ -9,12 +9,6 @@ import Darwin
 import Glibc
 #endif
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var StringTestSuite = TestSuite("String")
 
@@ -45,7 +39,7 @@ func barrier() {
   expectTrue(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD)
 }
 
-func sliceConcurrentAppendThread(tid: ThreadID) {
+func sliceConcurrentAppendThread(_ tid: ThreadID) {
   for i in 0..<100 {
     barrier()
     if tid == .Primary {

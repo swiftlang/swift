@@ -89,7 +89,7 @@ in the following code snippet, ``a.aProperty``, ``a.doSomething()`` and
     override func doSomething() { ... }
   }
 
-  func usingAnA(a: A) {
+  func usingAnA(_ a: A) {
     a.doSomething()
     a.aProperty = ...
   }
@@ -124,12 +124,12 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
     var array2: [Int]      // 'array2' *can* be overridden by a computed property.
   }
 
-  func usingC(c: C) {
+  func usingC(_ c: C) {
      c.array1[i] = ... // Can directly access C.array without going through dynamic dispatch.
      c.doSomething() = ... // Can directly call C.doSomething without going through virtual dispatch.
   }
 
-  func usingD(d: D) {
+  func usingD(_ d: D) {
      d.array1[i] = ... // Can directly access D.array1 without going through dynamic dispatch.
      d.array2[i] = ... // Will access D.array2 through dynamic dispatch.
   }
@@ -156,13 +156,13 @@ do not have any overriding declarations in the same file:
     private var myPrivateVar : Int
   }
 
-  func usingE(e: E) {
+  func usingE(_ e: E) {
     e.doSomething() // There is no sub class in the file that declares this class.
                     // The compiler can remove virtual calls to doSomething()
                     // and directly call A's doSomething method.
   }
 
-  func usingF(f: F) -> Int {
+  func usingF(_ f: F) -> Int {
     return f.myPrivateVar
   }
 
@@ -239,7 +239,7 @@ end of the callee. This means that if one writes a function like the following:
 
 ::
 
-  func append_one(a: [Int]) -> [Int] {
+  func append_one(_ a: [Int]) -> [Int] {
     a.append(1)
     return a
   }
@@ -313,11 +313,11 @@ generics. Some more examples of generics:
 ::
 
   class MyStack<T> {
-    func push(element: T) { ... }
+    func push(_ element: T) { ... }
     func pop() -> T { ... }
   }
 
-  func myAlgorithm(a: [T], length: Int) { ... }
+  func myAlgorithm(_ a: [T], length: Int) { ... }
 
   // The compiler can specialize code of MyStack[Int]
   var stackOfInts: MyStack[Int]
@@ -515,19 +515,45 @@ count operations are expensive and unavoidable when using Swift classes.
 Advice: Use unmanaged references to avoid reference counting overhead
 ---------------------------------------------------------------------
 
-In performance-critical code you can use choose to use unmanaged
-references. The ``Unmanaged<T>`` structure allows developers to disable
-automatic reference counting for a specific reference.
+Note, ``Unmanaged<T>._withUnsafeGuaranteedRef`` is not public api and will go
+away in the future. Therefore, don't use it in code that you can not change in
+the future.
+
+In performance-critical code you can choose to use unmanaged references. The
+``Unmanaged<T>`` structure allows developers to disable automatic reference
+counting for a specific reference.
+
+When you do this you need to make sure that there exists another reference to
+instance held by the ``Unmanaged`` struct instance for the duration of the use
+of ``Unmanaged`` (see `Unmanaged.swift`_ for more details) that keeps the instance
+alive.
 
 ::
 
-    var Ref : Unmanaged<Node> = Unmanaged.passUnretained(Head)
+    // The call to ``withExtendedLifetime(Head)`` makes sure that the lifetime of
+    // Head is guaranteed to extend over the region of code that uses Unmanaged
+    // references. Because there exists a reference to Head for the duration
+    // of the scope and we don't modify the list of ``Node``s there also exist a
+    // reference through the chain of ``Head.next``, ``Head.next.next``, ...
+    // instances.
 
-    while let Next = Ref.takeUnretainedValue().next {
-      ...
-      Ref = Unmanaged.passUnretained(Next)
+    withExtendedLifetime(Head) {
+
+      // Create an Unmanaged reference.
+      var Ref : Unmanaged<Node> = Unmanaged.passUnretained(Head)
+
+      // Use the unmanaged reference in a call/variable access. The use of
+      // _withUnsafeGuaranteedRef allows the compiler to remove the ultimate
+      // retain/release across the call/access.
+
+      while let Next = Ref._withUnsafeGuaranteedRef { $0.next } {
+        ...
+        Ref = Unmanaged.passUnretained(Next)
+      }
     }
 
+
+.. _Unmanaged.swift: https://github.com/apple/swift/blob/master/stdlib/public/core/Unmanaged.swift
 
 Protocols
 =========

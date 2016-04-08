@@ -16,6 +16,7 @@ import SwiftShims
 // without gobs of boilerplate.
 
 /// An initialized raw pointer to use as a NULL value.
+@_versioned
 @_transparent
 internal var _nilRawPointer: Builtin.RawPointer {
   let zero: Int8 = 0
@@ -76,7 +77,7 @@ public func strideofValue<T>(_:T) -> Int {
 
 @_versioned
 @warn_unused_result
-internal func _roundUp(offset: Int, toAlignment alignment: Int) -> Int {
+internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
   _sanityCheck(offset >= 0)
   _sanityCheck(alignment > 0)
   _sanityCheck(_isPowerOf2(alignment))
@@ -104,7 +105,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///
 @_transparent
 @warn_unused_result
-public func unsafeBitCast<T, U>(x: T, to: U.Type) -> U {
+public func unsafeBitCast<T, U>(_ x: T, to: U.Type) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
     "can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
@@ -113,7 +114,7 @@ public func unsafeBitCast<T, U>(x: T, to: U.Type) -> U {
 /// `unsafeBitCast` something to `AnyObject`.
 @_transparent
 @warn_unused_result
-public func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
+public func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
   return unsafeBitCast(x, to: AnyObject.self)
 }
 
@@ -160,7 +161,7 @@ public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
 /// known at compile-time to be true.  If condition is false, or true
 /// but not a compile-time constant, this call has no effect.
 @_transparent
-internal func _unreachable(condition: Bool = true) {
+internal func _unreachable(_ condition: Bool = true) {
   if condition {
     // FIXME: use a parameterized version of Builtin.unreachable when
     // <rdar://problem/16806232> is closed.
@@ -170,7 +171,7 @@ internal func _unreachable(condition: Bool = true) {
 
 /// Tell the optimizer that this code is unreachable if this builtin is
 /// reachable after constant folding build configuration builtins.
-@_transparent @noreturn internal
+@_versioned @_transparent @noreturn internal
 func _conditionallyUnreachable() {
   Builtin.conditionallyUnreachable()
 }
@@ -178,14 +179,14 @@ func _conditionallyUnreachable() {
 @_versioned
 @warn_unused_result
 @_silgen_name("swift_isClassOrObjCExistentialType")
-func _swift_isClassOrObjCExistentialType<T>(x: T.Type) -> Bool
+func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 
 /// Returns `true` iff `T` is a class type or an `@objc` existential such as
 /// `AnyObject`.
 @_versioned
 @inline(__always)
 @warn_unused_result
-internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
+internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
   let tmp = _canBeClass(x)
 
   // Is not a class.
@@ -210,7 +211,7 @@ public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
 }
 
 @available(*, unavailable, renamed: "unsafeAddress(of:)")
-public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
+public func unsafeAddressOf(_ object: AnyObject) -> UnsafePointer<Void> {
   fatalError("unavailable function can't be called")
 }
 
@@ -222,7 +223,7 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
 /// optional references.
 @_transparent
 @warn_unused_result
-public func _unsafeReferenceCast<T, U>(x: T, to: U.Type) -> U {
+public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
   return Builtin.castReference(x)
 }
 
@@ -238,14 +239,14 @@ public func _unsafeReferenceCast<T, U>(x: T, to: U.Type) -> U {
 ///   checking is still performed in debug builds.
 @_transparent
 @warn_unused_result
-public func unsafeDowncast<T : AnyObject>(x: AnyObject, to: T.Type) -> T {
+public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to: T.Type) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 
 @inline(__always)
 @warn_unused_result
-public func _getUnsafePointerToStoredProperties(x: AnyObject)
+public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
   -> UnsafeMutablePointer<UInt8> {
   let storedPropertyOffset = _roundUp(
     sizeof(_HeapObject.self),
@@ -262,10 +263,11 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
 // semantics of these function calls. This won't be necessary with
 // mandatory generic inlining.
 
+@_versioned
 @_transparent
 @_semantics("branchhint")
 @warn_unused_result
-internal func _branchHint<C : Boolean>(actual: C, expected: Bool)
+internal func _branchHint<C : Boolean>(_ actual: C, expected: Bool)
   -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.boolValue._value, expected._value))
 }
@@ -274,7 +276,7 @@ internal func _branchHint<C : Boolean>(actual: C, expected: Bool)
 @_transparent
 @_semantics("fastpath")
 @warn_unused_result
-public func _fastPath<C: Boolean>(x: C) -> Bool {
+public func _fastPath<C: Boolean>(_ x: C) -> Bool {
   return _branchHint(x.boolValue, expected: true)
 }
 
@@ -282,8 +284,15 @@ public func _fastPath<C: Boolean>(x: C) -> Bool {
 @_transparent
 @_semantics("slowpath")
 @warn_unused_result
-public func _slowPath<C : Boolean>(x: C) -> Bool {
+public func _slowPath<C : Boolean>(_ x: C) -> Bool {
   return _branchHint(x.boolValue, expected: false)
+}
+
+/// Optimizer hint that the code where this function is called is on the fast
+/// path.
+@_transparent
+public func _onFastPath() {
+  Builtin.onFastPath()
 }
 
 //===--- Runtime shim wrappers --------------------------------------------===//
@@ -293,7 +302,7 @@ public func _slowPath<C : Boolean>(x: C) -> Bool {
 @_versioned
 @inline(__always)
 @warn_unused_result
-internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
+internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
   return swift_objc_class_usesNativeSwiftReferenceCounting(
     unsafeAddress(of: theClass)
@@ -305,18 +314,18 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 
 @warn_unused_result
 @_silgen_name("swift_class_getInstanceExtents")
-func swift_class_getInstanceExtents(theClass: AnyClass)
+func swift_class_getInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @warn_unused_result
 @_silgen_name("swift_objc_class_unknownGetInstanceExtents")
-func swift_objc_class_unknownGetInstanceExtents(theClass: AnyClass)
+func swift_objc_class_unknownGetInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 /// - Returns: 
 @inline(__always)
 @warn_unused_result
-internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
+internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
   return Int(swift_objc_class_unknownGetInstanceExtents(theClass).positive)
 #else
@@ -331,12 +340,15 @@ internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 internal var _objectPointerSpareBits: UInt {
     @inline(__always) get { return 0x0000_0003 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
     @inline(__always) get { return 0x0000_0002 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
     @inline(__always) get { return 0 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
   @inline(__always) get { return 0 }
 }
@@ -345,12 +357,15 @@ internal var _objCTaggedPointerBits: UInt {
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x7F00_0000_0000_0006 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x4000_0000_0000_0000 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
   @inline(__always) get { return 1 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
   @inline(__always) get { return 0x8000_0000_0000_0001 }
 }
@@ -359,25 +374,32 @@ internal var _objCTaggedPointerBits: UInt {
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x7F00_0000_0000_0007 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x4000_0000_0000_0000 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
     @inline(__always) get { return 0 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
     @inline(__always) get { return 0x8000_0000_0000_0000 }
 }
 #elseif arch(powerpc64) || arch(powerpc64le)
+@_versioned
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x0000_0000_0000_0007 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x0000_0000_0000_0002 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
     @inline(__always) get { return 0 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
     @inline(__always) get { return 0 }
 }
@@ -387,20 +409,22 @@ internal var _objCTaggedPointerBits: UInt {
 @_versioned
 @inline(__always)
 @warn_unused_result
-internal func _bitPattern(x: Builtin.BridgeObject) -> UInt {
+internal func _bitPattern(_ x: Builtin.BridgeObject) -> UInt {
   return UInt(Builtin.castBitPatternFromBridgeObject(x))
 }
 
 /// Extract the raw spare bits of `x`.
+@_versioned
 @inline(__always)
 @warn_unused_result
-internal func _nonPointerBits(x: Builtin.BridgeObject) -> UInt {
+internal func _nonPointerBits(_ x: Builtin.BridgeObject) -> UInt {
   return _bitPattern(x) & _objectPointerSpareBits
 }
 
+@_versioned
 @inline(__always)
 @warn_unused_result
-internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
+internal func _isObjCTaggedPointer(_ x: AnyObject) -> Bool {
   return (Builtin.reinterpretCast(x) & _objCTaggedPointerBits) != 0
 }
 
@@ -412,10 +436,11 @@ internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
 ///
 /// - Precondition: `bits & _objectPointerIsObjCBit == 0`,
 ///   `bits & _objectPointerSpareBits == bits`.
+@_versioned
 @inline(__always)
 @warn_unused_result
 internal func _makeNativeBridgeObject(
-  nativeObject: AnyObject, _ bits: UInt
+  _ nativeObject: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
   _sanityCheck(
     (bits & _objectPointerIsObjCBit) == 0,
@@ -429,7 +454,7 @@ internal func _makeNativeBridgeObject(
 @warn_unused_result
 public // @testable
 func _makeObjCBridgeObject(
-  objCObject: AnyObject
+  _ objCObject: AnyObject
 ) -> Builtin.BridgeObject {
   return _makeBridgeObject(
     objCObject,
@@ -445,10 +470,11 @@ func _makeObjCBridgeObject(
 ///   2. if `object` is a tagged pointer, `bits == 0`.  Otherwise,
 ///      `object` is either a native object, or `bits ==
 ///      _objectPointerIsObjCBit`.
+@_versioned
 @inline(__always)
 @warn_unused_result
 internal func _makeBridgeObject(
-  object: AnyObject, _ bits: UInt
+  _ object: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
   _sanityCheck(!_isObjCTaggedPointer(object) || bits == 0,
     "Tagged pointers cannot be combined with bits")
@@ -474,7 +500,7 @@ internal func _makeBridgeObject(
 @inline(__always)
 @warn_unused_result
 public // @testable
-func _getSuperclass(t: AnyClass) -> AnyClass? {
+func _getSuperclass(_ t: AnyClass) -> AnyClass? {
   return unsafeBitCast(
     swift_class_getSuperclass(unsafeBitCast(t, to: OpaquePointer.self)),
     to: AnyClass.self)
@@ -485,7 +511,7 @@ func _getSuperclass(t: AnyClass) -> AnyClass? {
 @inline(__always)
 @warn_unused_result
 public // @testable
-func _getSuperclass(t: Any.Type) -> AnyClass? {
+func _getSuperclass(_ t: Any.Type) -> AnyClass? {
   return (t as? AnyClass).flatMap { _getSuperclass($0) }
 }
 
@@ -509,16 +535,18 @@ func _getSuperclass(t: Any.Type) -> AnyClass? {
 // and type checking will fail.
 
 /// Returns `true` if `object` is uniquely referenced.
+@_versioned
 @_transparent
 @warn_unused_result
-internal func _isUnique<T>(object: inout T) -> Bool {
+internal func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
 
 /// Returns `true` if `object` is uniquely referenced or pinned.
+@_versioned
 @_transparent
 @warn_unused_result
-internal func _isUniqueOrPinned<T>(object: inout T) -> Bool {
+internal func _isUniqueOrPinned<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUniqueOrPinned(&object))
 }
 
@@ -527,7 +555,7 @@ internal func _isUniqueOrPinned<T>(object: inout T) -> Bool {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isUnique_native<T>(object: inout T) -> Bool {
+func _isUnique_native<T>(_ object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any case it's non pointer bits must be zero, so
   // force cast it to BridgeObject and check the spare bits.
@@ -544,7 +572,7 @@ func _isUnique_native<T>(object: inout T) -> Bool {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isUniqueOrPinned_native<T>(object: inout T) -> Bool {
+func _isUniqueOrPinned_native<T>(_ object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any case it's non pointer bits must be zero.
   _sanityCheck(
@@ -560,7 +588,7 @@ func _isUniqueOrPinned_native<T>(object: inout T) -> Bool {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isPOD<T>(type: T.Type) -> Bool {
+func _isPOD<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
 }
 
@@ -568,11 +596,11 @@ func _isPOD<T>(type: T.Type) -> Bool {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isOptional<T>(type: T.Type) -> Bool {
+func _isOptional<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.isOptional(type))
 }
 
 @available(*, unavailable, message: "Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
-public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
+public func unsafeUnwrap<T>(_ nonEmpty: T?) -> T {
   fatalError("unavailable function can't be called")
 }

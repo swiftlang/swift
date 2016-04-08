@@ -14,9 +14,11 @@
 ///
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
+@_fixed_layout
 public struct Unmanaged<Instance : AnyObject> {
   internal unowned(unsafe) var _value: Instance
 
+  @_versioned
   @_transparent
   internal init(_private: Instance) { _value = _private }
 
@@ -28,7 +30,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @_transparent
   @warn_unused_result
-  public static func fromOpaque(value: OpaquePointer) -> Unmanaged {
+  public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
     // Null pointer check is a debug check, because it guards only against one
     // specific bad pointer value.
     _debugPrecondition(
@@ -46,7 +48,7 @@ public struct Unmanaged<Instance : AnyObject> {
   /// API expects you to pass the object at +1.
   @_transparent
   @warn_unused_result
-  public static func passRetained(value: Instance) -> Unmanaged {
+  public static func passRetained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value).retain()
   }
 
@@ -61,7 +63,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///                            .passUnretained(object))
   @_transparent
   @warn_unused_result
-  public static func passUnretained(value: Instance) -> Unmanaged {
+  public static func passUnretained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value)
   }
 
@@ -173,19 +175,20 @@ public struct Unmanaged<Instance : AnyObject> {
   ///        }
   ///    }
   ///
-  ///    func doSomething(u : Unmanaged<Owned>) {
+  ///    func doSomething(_ u : Unmanaged<Owned>) {
   ///      u._withUnsafeGuaranteedRef {
   ///        $0.doSomething()
   ///      }
   ///    }
   ///  }
   public func _withUnsafeGuaranteedRef<Result>(
-    @noescape closure: (Instance) throws -> Result
-  ) rethrows {
+    @noescape _ closure: (Instance) throws -> Result
+  ) rethrows -> Result {
     let instance = _value
     let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(instance)
-    try closure(guaranteedInstance)
+    let result = try closure(guaranteedInstance)
     Builtin.unsafeGuaranteedEnd(token)
+    return result
   }
 
   /// Perform an unbalanced retain of the object.

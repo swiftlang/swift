@@ -73,9 +73,9 @@ bb2:
 
 // CHECK-LABEL: sil @hoist_ignoring_paired_retain_release_and_hoist
 // CHECK: bb0(
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: apply [[MM]]
 // CHECK: br bb1
 // CHECK: bb1:
@@ -159,9 +159,9 @@ bb2:
 
 // CHECK-LABEL: sil @hoist_not_blocked_by_unpaired_release
 // CHECK: bb0(
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: apply [[MM]]
 // CHECK: br bb1
 // CHECK: bb1:
@@ -187,9 +187,9 @@ bb2:
 
 // CHECK-LABEL: sil @cow_should_ignore_mark_dependence_addrproj_use : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 // CHECK: bb0(
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: apply [[MM]]
 // CHECK: br bb1
 // CHECK: bb1:
@@ -220,9 +220,9 @@ bb2:
 
 // CHECK-LABEL: sil @cow_should_ignore_mark_dependence_value : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 // CHECK: bb0(
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: apply [[MM]]
 // CHECK: br bb1
 // CHECK: bb1:
@@ -250,9 +250,9 @@ bb2:
 
 // CHECK-LABEL: sil @cow_should_ignore_enum : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 // CHECK: bb0(
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 // CHECK: apply [[MM]]
 // CHECK: br bb1
 // CHECK: bb1:

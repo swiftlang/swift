@@ -46,8 +46,8 @@ class struct(object):
     return 'struct(%r)' % self.__dict__
 
 binaryArithmetic = [
-    struct(operator='+', name='adding',      mutatingName='add',           firstArg='',           llvmName='add', kind='+'),
-    struct(operator='-', name='subtracting', mutatingName='subtract',      firstArg='',           llvmName='sub', kind='-'),
+    struct(operator='+', name='adding',      mutatingName='add',           firstArg='_',           llvmName='add', kind='+'),
+    struct(operator='-', name='subtracting', mutatingName='subtract',      firstArg='_',           llvmName='sub', kind='-'),
     struct(operator='*', name='multiplied',  mutatingName='multiply',      firstArg='by',         llvmName='mul', kind='*'),
     struct(operator='/', name='divided',     mutatingName='divide',        firstArg='by',         llvmName='div', kind='/'),
     struct(operator='%', name='remainder',   mutatingName='formRemainder', firstArg='dividingBy', llvmName='rem', kind='/'),
@@ -104,7 +104,7 @@ infix operator &>>= { associativity right precedence 90 assignment }
 
 @_transparent
 public func _assertCond(
-  @autoclosure condition: () -> Bool,
+  @autoclosure _ condition: () -> Bool,
   @autoclosure _ message: () -> String,
   file: StaticString = #file, line: UInt = #line) {
   let ok = condition()
@@ -119,7 +119,7 @@ public func _assertCond(
 /// Prints the message if the body is uncommented; used for
 /// diagnostics.
 @_transparent
-public func _log(@autoclosure message: ()->String) {
+public func _log(@autoclosure _ message: ()->String) {
   print(message())
 }
 
@@ -153,7 +153,7 @@ public protocol Arithmetic {
 
 extension Arithmetic {
 % for x in binaryArithmetic:
-%   callLabel = x.firstArg + ': ' if x.firstArg else ''
+%   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
   public func ${x.name}(${x.firstArg} rhs: Self) -> Self {
     var lhs = self
     lhs.${x.mutatingName}(${callLabel}rhs)
@@ -178,7 +178,7 @@ extension SignedArithmetic {
 }
 
 % for x in binaryArithmetic:
-%   callLabel = x.firstArg + ': ' if x.firstArg else ''
+%   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 @_transparent
 @warn_unused_result
 public func ${x.operator} <T: Arithmetic>(lhs: T, rhs: T) -> T {
@@ -263,7 +263,7 @@ public protocol Integer : ${IntegerBase} {
 
   /// Return n-th word in the underlying representation of `self`.
   @warn_unused_result
-  func nthWord(n: Word) -> UWord
+  func nthWord(_ n: Word) -> UWord
 
   /// A number of bits in current representation of `self`
   /// Will be constant for fixed-width integer types.
@@ -437,11 +437,11 @@ ${comment}
 
 % for x in binaryBitwise + maskingShifts:
   @warn_unused_result
-  func ${x.name}(rhs: Self) -> Self
+  func ${x.name}(_ rhs: Self) -> Self
 % end
 
   @warn_unused_result
-  func doubleWidthMultiply(other: Self) -> (high: Self, low: AbsoluteValue)
+  func doubleWidthMultiply(_ other: Self) -> (high: Self, low: AbsoluteValue)
 
   init(_truncatingBits bits: UWord)
 }
@@ -552,7 +552,7 @@ extension FixedWidthInteger {
   }
 
 % for x in binaryArithmetic:
-%   callLabel = x.firstArg + ': ' if x.firstArg else ''
+%   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
   @_transparent
   public mutating func ${x.mutatingName}(${x.firstArg} rhs: Self) {
     let (result, overflow) = self.${x.name}WithOverflow(${callLabel}rhs)
@@ -617,7 +617,7 @@ extension FixedWidthInteger {
 }
 
 % for x in binaryArithmetic:
-%   callLabel = x.firstArg + ': ' if x.firstArg else ''
+%   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 %   if x.kind != '/':
 @warn_unused_result
 public func &${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
@@ -764,7 +764,7 @@ public struct ${Self}
   }
 
 %       for x in binaryArithmetic:
-%         callLabel = x.firstArg + ': ' if x.firstArg else ''
+%         callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
   /// Return a pair consisting of `self` ${x.operator} `rhs`,
   /// truncated to fit if necessary, and a flag indicating whether an
   /// arithmetic overflow occurred.
@@ -809,7 +809,7 @@ public struct ${Self}
 % for x in binaryBitwise:
   @warn_unused_result
   @_transparent
-  public func ${x.name}(rhs: ${Self}) -> ${Self} {
+  public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     return ${Self}(
       Builtin.${x.name}_Int${bits}(self._storage, rhs._storage))
   }
@@ -818,7 +818,7 @@ public struct ${Self}
 % for x in maskingShifts:
   @warn_unused_result
   @_transparent
-  public func ${x.name}(rhs: ${Self}) -> ${Self} {
+  public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     let rhs_ = rhs & ${Self}._highBitIndex
     return ${Self}(
       Builtin.${x.llvmName(signed)}_Int${bits}(self._storage, rhs_._storage))
@@ -851,7 +851,7 @@ public struct ${Self}
   }
 
   @_transparent
-  public func nthWord(n: Word) -> UWord {
+  public func nthWord(_ n: Word) -> UWord {
     _precondition(n >= 0, "Negative word index")
     if _fastPath(n < countRepresentedWords) {
       let shift = UWord(n._storage) &* ${word_bits}
@@ -890,7 +890,7 @@ public struct ${Self}
 
 %     dbits = bits*2
   @warn_unused_result
-  public func doubleWidthMultiply(other: ${Self})
+  public func doubleWidthMultiply(_ other: ${Self})
     -> (high: ${Self}, low: ${Self}.AbsoluteValue) {
 %       if bits > 64:
     fatalError("${bits}-bit integer multiplication is not supported")
@@ -973,7 +973,7 @@ public struct DoubleWidth<
   }
 
   @warn_unused_result
-  public func nthWord(n: Word) -> UWord {
+  public func nthWord(_ n: Word) -> UWord {
     if T.bitWidth < ${word_bits} || T.bitWidth % ${word_bits} != 0 {
       fatalError("nthWord is not supported on this type")
     }
@@ -1010,7 +1010,7 @@ public struct DoubleWidth<
 
 % for x in binaryArithmetic[:2]:
 %   highAffectedByLowOverflow = 'T.max' if x.operator == '+' else 'T.min'
-  public func ${x.name}WithOverflow(rhs: DoubleWidth<T>)
+  public func ${x.name}WithOverflow(_ rhs: DoubleWidth<T>)
     -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
     let (low, lowOverflow) =
       _storage.low.${x.name}WithOverflow(rhs._storage.low)
@@ -1034,7 +1034,7 @@ public struct DoubleWidth<
   ) -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
     let isNegative = (self < DoubleWidth<T>()) != (rhs < DoubleWidth<T>())
 
-    func mul(x: Low, _ y: Low, _ carry: Low) -> (partial: Low, carry: Low) {
+    func mul(_ x: Low, _ y: Low, _ carry: Low) -> (partial: Low, carry: Low) {
       let pair = x.doubleWidthMultiply(y)
       let t = DoubleWidth<Low>(pair) + DoubleWidth<Low>((0, carry))
       return (partial: t._storage.low, carry: t._storage.high)
@@ -1043,7 +1043,7 @@ public struct DoubleWidth<
     var high: Low = 0
     var low: Low = 0
 
-    func mkResult(isOverflow: Bool)
+    func mkResult(_ isOverflow: Bool)
       -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
 
       // TODO: High() cast fails
@@ -1099,14 +1099,14 @@ public struct DoubleWidth<
 % end
 
   @warn_unused_result
-  public func doubleWidthMultiply(other: DoubleWidth<T>)
+  public func doubleWidthMultiply(_ other: DoubleWidth<T>)
     -> (high: DoubleWidth<T>, low: DoubleWidth<T>.AbsoluteValue) {
       fatalError()
   }
 
 % for x in binaryBitwise + maskingShifts:
   @warn_unused_result
-  public func ${x.name}(rhs: DoubleWidth<T>) -> DoubleWidth<T> {
+  public func ${x.name}(_ rhs: DoubleWidth<T>) -> DoubleWidth<T> {
     fatalError()
   }
 % end
@@ -1142,7 +1142,7 @@ public struct ${Self}
   internal var _storage = DoubleWidth<${Half}>()
 
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    var storage = Builtin.truncOrBitCast_${IntLiteral}_Int128(x)
+    let storage = Builtin.truncOrBitCast_${IntLiteral}_Int128(x)
     Builtin.condfail(
       Builtin.cmp_ne_${IntLiteral}(
         Builtin.${z}extOrBitCast_Int128_${IntLiteral}(
@@ -1166,7 +1166,7 @@ public struct ${Self}
   }
 
 %   for x in binaryArithmetic:
-%     callLabel = x.firstArg + ': ' if x.firstArg else ''
+%     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
   /// Return a pair consisting of `self` ${x.operator} `rhs`,
   /// truncated to fit if necessary, and a flag indicating whether an
   /// arithmetic overflow occurred.
@@ -1181,7 +1181,7 @@ public struct ${Self}
 % for x in binaryBitwise:
   @warn_unused_result
   @_transparent
-  public func ${x.name}(rhs: ${Self}) -> ${Self} {
+  public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     fatalError()
   }
 % end
@@ -1189,7 +1189,7 @@ public struct ${Self}
 % for x in maskingShifts:
   @warn_unused_result
   @_transparent
-  public func ${x.name}(rhs: ${Self}) -> ${Self} {
+  public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     fatalError()
   }
 % end
@@ -1207,7 +1207,7 @@ public struct ${Self}
     fatalError()
   }
 
-  public func nthWord(n: Word) -> UWord {
+  public func nthWord(_ n: Word) -> UWord {
     _precondition(n >= 0, "Negative word index")
     return _storage.nthWord(n)
   }
@@ -1224,7 +1224,7 @@ public struct ${Self}
 % end
 
   @warn_unused_result
-  public func doubleWidthMultiply(other: ${Self})
+  public func doubleWidthMultiply(_ other: ${Self})
     -> (high: ${Self}, low: ${Self}.AbsoluteValue) {
     let (high: high, low: low) = _storage.doubleWidthMultiply(other._storage)
     return (high: ${Self}(high), low: ${Self}.AbsoluteValue(low))
@@ -1241,7 +1241,7 @@ public struct ${Self}
 
 extension FixedWidthInteger {
   // @_transparent
-  public mutating func replaceUWord(n: Word, with newBits: UWord) -> Bool {
+  public mutating func replaceUWord(_ n: Word, with newBits: UWord) -> Bool {
     let flippedBits = nthWord(n) ^ newBits
     self ^= Self(_truncatingBits: flippedBits) << (${word_bits} * n)
     if nthWord(n) != newBits {
@@ -1251,7 +1251,7 @@ extension FixedWidthInteger {
   }
 
   /// a hex representation of every bit in the number
-  func hexBits(bitWidth: Word) -> String {
+  func hexBits(_ bitWidth: Word) -> String {
     let hexDigits: [UnicodeScalar] = [
       "0", "1", "2", "3", "4", "5", "6", "7",
       "8", "9", "A", "B", "C", "D", "E", "F"]
@@ -1284,16 +1284,9 @@ typealias UDWord = UInt${word_bits*2}
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 func expectEqual<T : FixedWidthInteger>(
-  expected: T, _ actual: T,
+  _ expected: T, _ actual: T,
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),
@@ -1313,7 +1306,7 @@ func expectEqual<T : FixedWidthInteger>(
 }
 
 func expectEqual<T : FixedWidthInteger>(
-  expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
+  _ expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),
@@ -1366,7 +1359,7 @@ tests.test("Equality") {
   expectNotEqual(-49 as Int8, 49)
 }
 
-func indexOrder<T: RandomAccessIndex>(x: T, y: T)
+func indexOrder<T: RandomAccessIndex>(_ x: T, y: T)
   -> ExpectedComparisonResult {
   return x < y ? .lt : x > y ? .gt : .eq
 }

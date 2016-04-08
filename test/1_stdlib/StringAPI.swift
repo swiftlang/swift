@@ -10,15 +10,10 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
 #if _runtime(_ObjC)
-import ObjectiveC
 import Foundation
-import StdlibUnittestFoundationExtras
 #endif
+
 
 var StringTests = TestSuite("StringTests")
 
@@ -143,7 +138,7 @@ let comparisonTests = [
 ]
 
 func checkStringComparison(
-  expected: ExpectedComparisonResult,
+  _ expected: ExpectedComparisonResult,
   _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
   // String / String
@@ -191,7 +186,7 @@ for test in comparisonTests {
 }
 
 func checkCharacterComparison(
-  expected: ExpectedComparisonResult,
+  _ expected: ExpectedComparisonResult,
   _ lhs: Character, _ rhs: Character, _ stackTrace: SourceLocStack
 ) {
   // Character / Character
@@ -225,7 +220,7 @@ for test in comparisonTests {
 }
 
 func checkHasPrefixHasSuffix(
-  lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
+  _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
 #if _runtime(_ObjC)
   if lhs == "" {
@@ -370,7 +365,7 @@ func getIllFormedUTF8String2(
   return (UnsafeMutablePointer(up), { up.deallocateCapacity(100) })
 }
 
-func asCCharArray(a: [UInt8]) -> [CChar] {
+func asCCharArray(_ a: [UInt8]) -> [CChar] {
   return a.map { CChar(bitPattern: $0) }
 }
 

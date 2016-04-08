@@ -13,19 +13,12 @@ import Darwin
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import StdlibUnittestFoundationExtras
 import Foundation
 
 %{
-all_array_types = [ 'ContiguousArray', 'ArraySlice', 'Array' ]
+all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
 }%
 
 extension Array {
@@ -53,15 +46,15 @@ var ArrayTestSuite = TestSuite("Array")
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func withInoutInt(x: inout Int, body: (x: inout Int) -> Void) {
+func withInoutInt(_ x: inout Int, body: (x: inout Int) -> Void) {
   body(x: &x)
 }
 
-func withInoutT<T>(x: inout T, body: (x: inout T) -> Void) {
+func withInoutT<T>(_ x: inout T, body: (x: inout T) -> Void) {
   body(x: &x)
 }
 
-% for element_type in [ 'TestValueTy', 'TestBridgedValueTy' ]:
+% for element_type in ['TestValueTy', 'TestBridgedValueTy']:
 %   for array_type in all_array_types:
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
@@ -73,7 +66,7 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
   let identityOuter = a.identity
   var identityInner = a[0].identity
 
-  func checkIdentity(stackTrace: SourceLocStack) {
+  func checkIdentity(_ stackTrace: SourceLocStack) {
 %     if element_type == 'TestValueTy':
     // Does not reallocate storage because we changed a property based on a
     // reference; array storage was not changed.  Writeback of the inner array
@@ -143,7 +136,7 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   let identityOuter = a.identity
   var identityInner = a[0].identity
 
-  func checkIdentity(stackTrace: SourceLocStack) {
+  func checkIdentity(_ stackTrace: SourceLocStack) {
 %     if element_type == 'TestValueTy':
     // Does not reallocate storage because we changed a property based on a
     // reference; array storage was not changed.
@@ -242,26 +235,26 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func isNativeArray<Element>(a: Array<Element>) -> Bool {
+func isNativeArray<Element>(_ a: Array<Element>) -> Bool {
   return a._hoistableIsNativeTypeChecked()
 }
 
-func isCocoaArray<Element>(a: Array<Element>) -> Bool {
+func isCocoaArray<Element>(_ a: Array<Element>) -> Bool {
   return !isNativeArray(a)
 }
 
-func getAsImmutableNSArray(a: Array<Int>) -> NSArray {
+func getAsImmutableNSArray(_ a: Array<Int>) -> NSArray {
   var elements = a.map { TestObjCValueTy($0) as AnyObject? }
   return NSArray(objects: &elements, count: elements.count)
 }
 
-func getAsNSArray(a: Array<Int>) -> NSArray {
+func getAsNSArray(_ a: Array<Int>) -> NSArray {
   // Return an `NSMutableArray` to make sure that it has a unique
   // pointer identity.
   return getAsNSMutableArray(a)
 }
 
-func getAsNSMutableArray(a: Array<Int>) -> NSMutableArray {
+func getAsNSMutableArray(_ a: Array<Int>) -> NSMutableArray {
   let result = NSMutableArray()
   for element in a {
     result.add(TestObjCValueTy(element))

@@ -62,6 +62,10 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
+option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
+       "Use the host compiler and not the internal clang to build the swift runtime"
+       FALSE)
+
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
     "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
@@ -679,7 +683,11 @@ endif()
 #
 # Set up global CMake variables for API notes.
 #
-
+# API notes version 1.0.0
+#
+# Change the above comment to 'touch' this file and keep incremental builds
+# working when adding a new apinotes file.
+#
 set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
 if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
   message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
@@ -696,13 +704,13 @@ if(SWIFT_BUILD_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
+  add_subdirectory(tools/swift-reflection-dump)
 endif()
 add_subdirectory(utils)
 add_subdirectory(stdlib)
 
-if(SWIFT_BUILD_TOOLS)
+if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
   add_subdirectory(tools/swift-reflection-test)
-  add_subdirectory(tools/swift-reflection-dump)
 endif()
 
 if(SWIFT_BUILD_PERF_TESTSUITE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")

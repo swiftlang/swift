@@ -11,13 +11,6 @@
 import simd
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 % scalar_types = ['Float', 'Double', 'Int32', 'UInt32']
 % float_types = ['Float', 'Double']
@@ -28,7 +21,7 @@ import ObjectiveC
 %   for cols in [2,3,4]:
 //    Workaround <rdar://problem/18900352>
 %     vectype = ctype[type] + str(cols)
-func same(x: ${vectype}, _ y: ${vectype}) -> Bool {
+func same(_ x: ${vectype}, _ y: ${vectype}) -> Bool {
   for i in 0..<${cols} {
 //    Workaround <rdar://problem/18900352>
 %   if type in float_types:
@@ -44,7 +37,7 @@ func same(x: ${vectype}, _ y: ${vectype}) -> Bool {
 %       for rows in [2,3,4]:
 //        Workaround <rdar://problem/18900352>
 %         mattype = ctype[type] + str(cols) + 'x' + str(rows)
-func same(x: ${mattype}, _ y: ${mattype}) -> Bool {
+func same(_ x: ${mattype}, _ y: ${mattype}) -> Bool {
   for i in 0..<${cols} {
     if !same(x[i], y[i]) { return false }
   }
@@ -58,7 +51,7 @@ func same(x: ${mattype}, _ y: ${mattype}) -> Bool {
 
 
 /*
-func same<M: SIMDMatrixType>(x:M, _ y:M) -> Bool {
+func same<M: SIMDMatrixType>(_ x:M, _ y:M) -> Bool {
   for i in 0 ..< x.columns {
     if (!same(x[i], y[i])) { return false }
   }
@@ -70,10 +63,10 @@ var simdTestSuite = TestSuite("simd")
 
 simdTestSuite.test("sizes") {
 //  C interop requires that vector be the right size.
-  expectEqual(8,  sizeof(float2.self))
+  expectEqual(8, sizeof(float2.self))
   expectEqual(16, sizeof(float3.self))
   expectEqual(16, sizeof(float4.self))
-  expectEqual(8,  sizeof(int2.self))
+  expectEqual(8, sizeof(int2.self))
   expectEqual(16, sizeof(int3.self))
   expectEqual(16, sizeof(int4.self))
   expectEqual(16, sizeof(double2.self))

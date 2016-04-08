@@ -19,7 +19,7 @@ import Foundation
 import TestsUtils
 
 @inline(never)
-public func run_NSDictionaryCastToSwift(N: Int) {
+public func run_NSDictionaryCastToSwift(_ N: Int) {
     let NSDict = NSDictionary()
     var swiftDict = [String: NSObject]()
     for _ in 1...10000*N {

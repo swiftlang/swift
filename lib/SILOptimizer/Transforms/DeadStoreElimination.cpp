@@ -476,7 +476,7 @@ public:
 
 } // end anonymous namespace
 
-void BlockState::init(DSEContext &Ctx, bool Optimistic)  {
+void BlockState::init(DSEContext &Ctx, bool Optimistic) {
   std::vector<LSLocation> &LV = Ctx.getLocationVault();
   LocationNum = LV.size();
   // For function that requires just 1 iteration of the data flow to converge

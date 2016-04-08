@@ -232,7 +232,7 @@ extension LazySequenceProtocol {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Iterator.Element) -> Bool
+    _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
       _base: self.elements, whereElementsSatisfy: predicate)
@@ -248,7 +248,7 @@ extension LazyCollectionProtocol {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Iterator.Element) -> Bool
+    _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(
       _base: self.elements, whereElementsSatisfy: predicate)
@@ -277,7 +277,7 @@ extension LazyFilterSequence {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }
@@ -292,7 +292,7 @@ extension LazyFilterCollection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "iterator")
+  @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }

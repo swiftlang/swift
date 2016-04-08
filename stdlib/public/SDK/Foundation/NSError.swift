@@ -44,7 +44,7 @@ public protocol _ObjectiveCBridgeableErrorProtocol : ErrorProtocol {
 @_silgen_name("swift_stdlib_bridgeNSErrorToErrorProtocol")
 public func _stdlib_bridgeNSErrorToErrorProtocol<
   T : _ObjectiveCBridgeableErrorProtocol
->(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
+>(_ error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
   if let bridged = T(_bridgedNSError: error) {
     out.initialize(with: bridged)
     return true

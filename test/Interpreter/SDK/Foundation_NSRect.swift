@@ -6,7 +6,7 @@
 
 import Foundation
 
-func printRect(r: NSRect) {
+func printRect(_ r: NSRect) {
   // FIXME: Constraint checker takes too long to typecheck this as an
   // interpolation expression
   print("NSRect(", terminator: "")

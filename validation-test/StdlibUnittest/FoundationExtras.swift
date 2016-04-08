@@ -5,13 +5,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Foundation
 import StdlibUnittestFoundationExtras
@@ -79,7 +72,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(String)") {
 }
 
 @_silgen_name("objc_autorelease")
-func objc_autorelease(ref: AnyObject)
+func objc_autorelease(_ ref: AnyObject)
 
 FoundationExtrasTests.test("objc_autorelease()") {
   autoreleasepool {

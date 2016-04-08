@@ -63,7 +63,7 @@ public:
 
   bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                  ReferenceCounting *refcounting) const override {
-    if(refcounting)
+    if (refcounting)
       *refcounting = asDerived().getReferenceCounting();
     return true;
   }
@@ -88,28 +88,32 @@ public:
 
   // Emit the copy/destroy operations required by SingleScalarTypeInfo
   // using strong reference counting.
-  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitStrongRelease(value, asDerived().getReferenceCounting());
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+                         Atomicity atomicity) const {
+    IGF.emitStrongRelease(value, asDerived().getReferenceCounting(), atomicity);
   }
 
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
     return IGF.emitFixLifetime(value);
   }
 
-  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitStrongRetain(value, asDerived().getReferenceCounting());
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const {
+    IGF.emitStrongRetain(value, asDerived().getReferenceCounting(), atomicity);
   }
 
   // Implement the primary retain/release operations of ReferenceTypeInfo
   // using basic reference counting.
-  void strongRetain(IRGenFunction &IGF, Explosion &e) const override {
+  void strongRetain(IRGenFunction &IGF, Explosion &e,
+                    Atomicity atomicity) const override {
     llvm::Value *value = e.claimNext();
-    asDerived().emitScalarRetain(IGF, value);
+    asDerived().emitScalarRetain(IGF, value, atomicity);
   }
 
-  void strongRelease(IRGenFunction &IGF, Explosion &e) const override {
+  void strongRelease(IRGenFunction &IGF, Explosion &e,
+                     Atomicity atomicity) const override {
     llvm::Value *value = e.claimNext();
-    asDerived().emitScalarRelease(IGF, value);
+    asDerived().emitScalarRelease(IGF, value, atomicity);
   }
 
   void strongRetainUnowned(IRGenFunction &IGF, Explosion &e) const override {
@@ -215,5 +219,3 @@ public:
 }
 
 #endif
-
-

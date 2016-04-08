@@ -78,7 +78,7 @@ namespace swift {
   /// compilation.
   bool shouldVerify(const Decl *D, const ASTContext &Context);
 
-  /// \brief Check that the source file is well formed, aborting and spewing
+  /// \brief Check that the source file is well-formed, aborting and spewing
   /// errors if not.
   ///
   /// "Well-formed" here means following the invariants of the AST, not that the
@@ -232,28 +232,24 @@ namespace swift {
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
-  std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                    ModuleDecl *M,
-                                                    SILModule *SILMod,
-                                                    StringRef ModuleName,
-                                                llvm::LLVMContext &LLVMContext);
+  std::unique_ptr<llvm::Module>
+  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M, SILModule *SILMod,
+                      StringRef ModuleName, llvm::LLVMContext &LLVMContext);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
-  std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                    SourceFile &SF,
-                                                    SILModule *SILMod,
-                                                    StringRef ModuleName,
-                                                 llvm::LLVMContext &LLVMContext,
-                                                    unsigned StartElem = 0);
+  std::unique_ptr<llvm::Module>
+  performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
+                      StringRef ModuleName, llvm::LLVMContext &LLVMContext,
+                      unsigned StartElem = 0);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be
-  /// printed. Only optimized.
+  /// printed, only to be optimized.
   void performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine);
 
-  /// Wrap a serialized module inside a swift ast section in an object file.
+  /// Wrap a serialized module inside a swift AST section in an object file.
   void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                    StringRef OutputPath);
 
@@ -284,4 +280,4 @@ namespace swift {
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_SUBSYSTEMS_H

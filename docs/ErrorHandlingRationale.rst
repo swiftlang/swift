@@ -1370,7 +1370,7 @@ declaration or type::
   }
 
   // 'throws' appears in a consistent position in function types.
-  func fred(callback: (UInt8) throws -> ()) throws {
+  func fred(_ callback: (UInt8) throws -> ()) throws {
      while true {
        let code = try stream.readByte()
        if code == OPER_CLOSE { return }
@@ -1381,7 +1381,7 @@ declaration or type::
   // It only applies to the innermost function for curried functions;
   // this function has type:
   //   (Int) -> (Int) throws -> Int
-  func jerry(i: Int)(j: Int) throws -> Int {
+  func jerry(_ i: Int)(j: Int) throws -> Int {
     // It's not an error to use 'throws' on a function that can't throw.
     return i + j
   }
@@ -1458,7 +1458,7 @@ done in a fairly simple way: a function can declare that it throws if
 any of a set of named arguments do.  As an example (using strawman
 syntax)::
 
-  func map<T,U>(array: [T], fn: T throws -> U) throwsIf(fn) -> [U] {
+  func map<T,U>(_ array: [T], fn: T throws -> U) throwsIf(fn) -> [U] {
     ...
   }
 
@@ -1908,7 +1908,7 @@ this one from ``NSAttributedString``::
 
 would be imported as::
 
-  func dataFromRange(range: NSRange,
+  func dataFromRange(_ range: NSRange,
                      documentAttributes dict: NSDictionary) throws -> NSData
 
 However, applying this rule haphazardly causes problems for

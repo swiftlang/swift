@@ -2,7 +2,7 @@
 
 // REQUIRES: CPU=x86_64
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 // CHECK-LABEL: define hidden void @_TF17vtable_multi_file36baseClassVtablesIncludeImplicitInitsFT_T_() {{.*}} {
 func baseClassVtablesIncludeImplicitInits() {

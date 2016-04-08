@@ -410,7 +410,7 @@ mapParsedParameters(Parser &parser,
   // parameters.
   SmallVector<ParamDecl*, 4> elements;
   SourceLoc ellipsisLoc;
-  bool isFirstParameter = true;
+
   for (auto &param : params) {
     // Whether the provided name is API by default depends on the parameter
     // context.
@@ -421,16 +421,11 @@ mapParsedParameters(Parser &parser,
     case Parser::ParameterContextKind::Operator:
       isKeywordArgumentByDefault = !isFirstParameterClause;
       break;
-
+    case Parser::ParameterContextKind::Curried:
     case Parser::ParameterContextKind::Initializer:
       isKeywordArgumentByDefault = true;
       break;
-
     case Parser::ParameterContextKind::Function:
-      isKeywordArgumentByDefault = !isFirstParameterClause || !isFirstParameter;
-      break;
-
-    case Parser::ParameterContextKind::Curried:
       isKeywordArgumentByDefault = true;
       break;
     }
@@ -446,17 +441,6 @@ mapParsedParameters(Parser &parser,
       // Both names were provided, so pass them in directly.
       result = createParam(param, argName, param.FirstNameLoc,
                            paramName, param.SecondNameLoc);
-
-      // If the first name is empty and this parameter would not have been
-      // an API name by default, complain.
-      if (param.FirstName.empty() && !isKeywordArgumentByDefault) {
-        parser.diagnose(param.FirstNameLoc,
-                        diag::parameter_extraneous_empty_name,
-                        param.SecondName)
-          .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
-
-        param.FirstNameLoc = SourceLoc();
-      }
 
       // If the first and second names are equivalent and non-empty, and we
       // would have an argument label by default, complain.
@@ -506,8 +490,6 @@ mapParsedParameters(Parser &parser,
 
     if (argNames)
       argNames->push_back(argName);
-
-    isFirstParameter = false;
   }
 
   return ParameterList::create(ctx, leftParenLoc, elements, rightParenLoc);

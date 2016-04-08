@@ -38,9 +38,9 @@ func f() -> Bool {
 }
 
 // Test that nested diagnostics are properly surfaced.
-func takesInt(i: Int) {}
+func takesInt(_ i: Int) {}
 func noParams() -> Int { return 0 }
-func takesAndReturnsInt(i: Int) -> Int { return 0 }
+func takesAndReturnsInt(_ i: Int) -> Int { return 0 }
 
 takesInt(noParams(1)) // expected-error{{argument passed to call that takes no arguments}}
 
@@ -117,7 +117,7 @@ func test17875634() {
 
   // Make sure the behavior matches the non-generic case.
   struct FakeNonGenericArray {
-    func append(p: (Int, Int)) {}
+    func append(_ p: (Int, Int)) {}
   }
   let a2 = FakeNonGenericArray()
   a2.append(row, col) // expected-error{{extra argument in call}}
@@ -134,7 +134,7 @@ func test20770032() {
 
 
 
-func tuple_splat1(a : Int, _ b : Int) {
+func tuple_splat1(_ a : Int, _ b : Int) {
   let x = (1,2)
   tuple_splat1(x)          // expected-warning {{passing 2 arguments to a callee as a single tuple value is deprecated}}
   tuple_splat1(1, 2)       // Ok.
@@ -142,7 +142,7 @@ func tuple_splat1(a : Int, _ b : Int) {
 }
 
 // This take a tuple as a value, so it isn't a tuple splat.
-func tuple_splat2(q : (a : Int, b : Int)) {
+func tuple_splat2(_ q : (a : Int, b : Int)) {
   let x = (1,2)
   tuple_splat2(x)          // Ok
   let y = (1, b: 2)

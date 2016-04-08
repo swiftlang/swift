@@ -480,7 +480,8 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         SmallVector<Identifier, 4> identifiers;
         
         if (auto archetype = type->getAs<ArchetypeType>()) {
-          auto containingProtocol = cast<ProtocolDecl>(alias->getParent());
+          auto containingProtocol = dyn_cast<ProtocolDecl>(alias->getParent());
+          if (!containingProtocol) continue;
           
           // Go up archetype parents until we find our containing protocol.
           while (archetype->getSelfProtocol() != containingProtocol) {
@@ -501,7 +502,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         if (identifiers.size()) {
           // Go down our PAs until we find the referenced PA.
           auto existingPA = this;
-          while(identifiers.size()) {
+          while (identifiers.size()) {
             auto identifier = identifiers.back();
             // If we end up looking for ourselves, don't recurse.
             if (existingPA == this && identifier == nestedName) {

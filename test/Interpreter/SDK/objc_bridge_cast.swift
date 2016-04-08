@@ -7,11 +7,11 @@
 
 import Foundation
 
-func genericForcedCast<T, U>(a: T) -> U {
+func genericForcedCast<T, U>(_ a: T) -> U {
   return a as! U
 }
 
-func genericConditionalCast<T, U>(a: T) -> U? {
+func genericConditionalCast<T, U>(_ a: T) -> U? {
   return a as? U
 }
 

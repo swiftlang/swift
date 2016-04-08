@@ -1,6 +1,10 @@
 include(CheckSymbolExists)
 
-set(SOURCEKIT_VERSION_STRING "${SWIFT_COMPILER_VERSION}")
+if (DARWIN_TOOLCHAIN_VERSION)
+  set(SOURCEKIT_VERSION_STRING "${DARWIN_TOOLCHAIN_VERSION}")
+else()
+  set(SOURCEKIT_VERSION_STRING "${SWIFT_COMPILER_VERSION}")
+endif()
 
 set(SOURCEKIT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SOURCEKIT_BINARY_DIR ${SWIFT_BINARY_DIR})
@@ -116,13 +120,13 @@ macro(add_sourcekit_library name)
       ${CMAKE_CURRENT_SOURCE_DIR}
     )
     if(NOT lib_path MATCHES "^[.][.]")
-      file( GLOB_RECURSE headers
+      file(GLOB_RECURSE headers
         ${SOURCEKIT_SOURCE_DIR}/include/SourceKit/${lib_path}/*.h
         ${SOURCEKIT_SOURCE_DIR}/include/SourceKit/${lib_path}/*.def
       )
       set_source_files_properties(${headers} PROPERTIES HEADER_FILE_ONLY ON)
 
-      file( GLOB_RECURSE tds
+      file(GLOB_RECURSE tds
         ${SOURCEKIT_SOURCE_DIR}/include/SourceKit/${lib_path}/*.td
       )
       source_group("TableGen descriptions" FILES ${tds})
@@ -138,16 +142,16 @@ macro(add_sourcekit_library name)
   else()
     set(libkind)
   endif()
-  add_library( ${name} ${libkind} ${srcs} )
+  add_library(${name} ${libkind} ${srcs})
   llvm_update_compile_flags(${name})
 
   set_output_directory(${name}
       BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
 
-  if( LLVM_COMMON_DEPENDS )
-    add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
-  endif( LLVM_COMMON_DEPENDS )
+  if(LLVM_COMMON_DEPENDS)
+    add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
+  endif(LLVM_COMMON_DEPENDS)
 
   set(prefixed_link_libraries)
   foreach(dep ${SOURCEKITLIB_DEPENDS})
@@ -167,7 +171,7 @@ macro(add_sourcekit_library name)
     target_link_libraries("${name}" INTERFACE ${SOURCEKITLIB_DEPENDS})
   endif()
 
-  swift_common_llvm_config( ${name} ${SOURCEKITLIB_COMPONENT_DEPENDS} )
+  swift_common_llvm_config(${name} ${SOURCEKITLIB_COMPONENT_DEPENDS})
 
   if(SOURCEKITLIB_SHARED AND EXPORTED_SYMBOL_FILE)
     add_sourcekit_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
@@ -225,7 +229,7 @@ macro(add_sourcekit_executable name)
 
   # Add appropriate dependencies
   if(LLVM_COMMON_DEPENDS)
-    add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
+    add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
   endif()
 
   target_link_libraries(${name} ${SOURCEKITEXE_DEPENDS})
@@ -282,7 +286,7 @@ macro(add_sourcekit_framework name)
   endif()
 
   llvm_process_sources(srcs ${srcs})
-  add_library( ${name} SHARED ${srcs} )
+  add_library(${name} SHARED ${srcs})
   llvm_update_compile_flags(${name})
 
   set(headers)
@@ -297,15 +301,15 @@ macro(add_sourcekit_framework name)
     set_source_files_properties(${headers} PROPERTIES HEADER_FILE_ONLY ON)
   endif(MSVC_IDE OR XCODE)
 
-  if( LLVM_COMMON_DEPENDS )
-    add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
-  endif( LLVM_COMMON_DEPENDS )
+  if(LLVM_COMMON_DEPENDS)
+    add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
+  endif(LLVM_COMMON_DEPENDS)
 
-  target_link_libraries( ${name} PRIVATE ${SOURCEKITFW_DEPENDS} )
-  swift_common_llvm_config( ${name} ${SOURCEKITFW_COMPONENT_DEPENDS} )
+  target_link_libraries(${name} PRIVATE ${SOURCEKITFW_DEPENDS})
+  swift_common_llvm_config(${name} ${SOURCEKITFW_COMPONENT_DEPENDS})
 
   if (EXPORTED_SYMBOL_FILE)
-    add_sourcekit_symbol_exports( ${name} ${EXPORTED_SYMBOL_FILE} ) 
+    add_sourcekit_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
   endif()
 
   if(SOURCEKITFW_MODULEMAP)
@@ -400,7 +404,7 @@ macro(add_sourcekit_xpc_service name framework_target)
       "${CMAKE_CURRENT_BINARY_DIR}/${name}.Info.plist" "${xpc_contents_dir}/Info.plist")
   list(APPEND srcs "${xpc_contents_dir}/Info.plist")
 
-  add_llvm_executable( ${name} ${srcs} )
+  add_llvm_executable(${name} ${srcs})
   set_target_properties(${name} PROPERTIES FOLDER "XPC Services")
   set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${xpc_bin_dir}")
 
@@ -409,15 +413,15 @@ macro(add_sourcekit_xpc_service name framework_target)
     LIBRARY_DIR "${xpc_bin_dir}")
 
   # Add appropriate dependencies
-  if( LLVM_COMMON_DEPENDS )
-    add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
-  endif( LLVM_COMMON_DEPENDS )
+  if(LLVM_COMMON_DEPENDS)
+    add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
+  endif(LLVM_COMMON_DEPENDS)
 
-  target_link_libraries( ${name} ${SOURCEKITXPC_DEPENDS} )
-  swift_common_llvm_config( ${name} ${SOURCEKITXPC_COMPONENT_DEPENDS} )
-  target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
+  target_link_libraries(${name} ${SOURCEKITXPC_DEPENDS})
+  swift_common_llvm_config(${name} ${SOURCEKITXPC_COMPONENT_DEPENDS})
+  target_link_libraries(${name} ${LLVM_COMMON_LIBS})
   
-  add_dependencies( ${framework_target} ${name} )
+  add_dependencies(${framework_target} ${name})
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
     add_custom_command(TARGET ${name} POST_BUILD

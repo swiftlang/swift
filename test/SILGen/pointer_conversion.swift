@@ -5,14 +5,14 @@
 
 import Foundation
 
-func takesMutablePointer(x: UnsafeMutablePointer<Int>) {}
-func takesConstPointer(x: UnsafePointer<Int>) {}
-func takesMutableVoidPointer(x: UnsafeMutablePointer<Void>) {}
-func takesConstVoidPointer(x: UnsafePointer<Void>) {}
+func takesMutablePointer(_ x: UnsafeMutablePointer<Int>) {}
+func takesConstPointer(_ x: UnsafePointer<Int>) {}
+func takesMutableVoidPointer(_ x: UnsafeMutablePointer<Void>) {}
+func takesConstVoidPointer(_ x: UnsafePointer<Void>) {}
 
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion16pointerToPointerFTGSpSi_GSPSi__T_
 // CHECK: bb0([[MP:%.*]] : $UnsafeMutablePointer<Int>, [[CP:%.*]] : $UnsafePointer<Int>):
-func pointerToPointer(mp: UnsafeMutablePointer<Int>,
+func pointerToPointer(_ mp: UnsafeMutablePointer<Int>,
                       _ cp: UnsafePointer<Int>) {
   // There should be no conversion here
   takesMutablePointer(mp)
@@ -60,7 +60,7 @@ func arrayToPointer() {
 }
 
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion15stringToPointerFSST_ 
-func stringToPointer(s: String) {
+func stringToPointer(_ s: String) {
   takesConstVoidPointer(s)
   // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGSPT__T_
   // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_TFs40_convertConstStringToUTF8PointerArgument
@@ -99,9 +99,9 @@ func inoutToPointer() {
 
 class C {}
 
-func takesPlusOnePointer(x: UnsafeMutablePointer<C>) {}
-func takesPlusZeroPointer(x: AutoreleasingUnsafeMutablePointer<C>) {}
-func takesPlusZeroOptionalPointer(x: AutoreleasingUnsafeMutablePointer<C?>) {}
+func takesPlusOnePointer(_ x: UnsafeMutablePointer<C>) {}
+func takesPlusZeroPointer(_ x: AutoreleasingUnsafeMutablePointer<C>) {}
+func takesPlusZeroOptionalPointer(_ x: AutoreleasingUnsafeMutablePointer<C?>) {}
 
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion19classInoutToPointerFT_T_
 func classInoutToPointer() {
@@ -137,7 +137,7 @@ func classInoutToPointer() {
 // Check that pointer types don't bridge anymore.
 @objc class ObjCMethodBridging : NSObject {
   // CHECK-LABEL: sil hidden [thunk] @_TToFC18pointer_conversion18ObjCMethodBridging11pointerArgs{{.*}} : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
-  @objc func pointerArgs(x: UnsafeMutablePointer<Int>,
+  @objc func pointerArgs(_ x: UnsafeMutablePointer<Int>,
                          y: UnsafePointer<Int>,
                          z: AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>) {}
 }

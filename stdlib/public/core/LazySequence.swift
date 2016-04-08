@@ -46,7 +46,7 @@
 ///       ///
 ///       /// - Complexity: O(N)
 ///       func scan<ResultElement>(
-///         initial: ResultElement,
+///         _ initial: ResultElement,
 ///         @noescape combine: (ResultElement, Iterator.Element) -> ResultElement
 ///       ) -> [ResultElement] {
 ///         var result = [initial]
@@ -100,7 +100,7 @@
 ///       ///
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
-///         initial: ResultElement,
+///         _ initial: ResultElement,
 ///         combine: (ResultElement, Iterator.Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(

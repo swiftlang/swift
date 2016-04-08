@@ -82,7 +82,7 @@ ClassProperties.test("direct") {
   expectEqual(1, Subclass.setCount)
 }
 
-func testExistential(e: ProtoWithClassProperty.Type) {
+func testExistential(_ e: ProtoWithClassProperty.Type) {
   e.reset()
   expectEqual(0, e.value)
   e.value = 4
@@ -102,7 +102,7 @@ ClassProperties.test("existentials") {
   expectEqual(1, Subclass.setCount)
 }
 
-func testGeneric<T: ProtoWithClassProperty>(e: T.Type) {
+func testGeneric<T: ProtoWithClassProperty>(_ e: T.Type) {
   e.reset()
   expectEqual(0, e.value)
   e.value = 4
@@ -122,7 +122,7 @@ ClassProperties.test("generics") {
   expectEqual(1, Subclass.setCount)
 }
 
-func testInheritance(e: ClassWithClassProperty.Type) {
+func testInheritance(_ e: ClassWithClassProperty.Type) {
   e.reset()
   expectEqual(0, e.value)
   e.value = 4
@@ -138,7 +138,7 @@ ClassProperties.test("inheritance") {
   expectEqual(1, Subclass.setCount)
 }
 
-func testInheritanceGeneric<T: ClassWithClassProperty>(e: T.Type) {
+func testInheritanceGeneric<T: ClassWithClassProperty>(_ e: T.Type) {
   e.reset()
   expectEqual(0, e.value)
   e.value = 4
@@ -176,7 +176,9 @@ class NamingConflictSubclass : PropertyNamingConflict {
   override class var prop: AnyObject? { return NamingConflictSubclass() }
 }
 
-ClassProperties.test("namingConflict") {
+ClassProperties.test("namingConflict")
+  .skip(.osxMinorRange(10, 0..<11, reason: "unexpected failures on 10.10"))
+  .code {
   let obj = PropertyNamingConflict()
   expectTrue(obj === obj.prop)
   expectEmpty(obj.dynamicType.prop)
@@ -199,13 +201,25 @@ extension NamingConflictSubclass : PropertyNamingConflictProto {
   }
 }
 
-ClassProperties.test("namingConflict/protocol") {
+ClassProperties.test("namingConflict/protocol")
+  .skip(.osxMinorRange(10, 0..<11, reason: "unexpected failures on 10.10"))
+  .code {
   let obj: PropertyNamingConflictProto = NamingConflictSubclass()
   expectTrue(obj === obj.protoProp)
   expectEmpty(obj.dynamicType.protoProp)
 
   let type: PropertyNamingConflictProto.Type = NamingConflictSubclass.self
   expectEmpty(type.protoProp)
+}
+
+ClassProperties.test("runtime") {
+  let theClass: AnyObject = SwiftClass.self
+  let prop = class_getProperty(object_getClass(theClass), "value")
+  expectTrue(prop != nil)
+
+  let nameAsCString = property_getName(prop)
+  expectTrue(nameAsCString != nil)
+  expectEqual("value", String(cString: nameAsCString))
 }
 
 runAllTests()

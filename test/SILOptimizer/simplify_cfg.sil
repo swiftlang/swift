@@ -572,7 +572,7 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: @dead_loop
-// CHECK-NOT: br
+// CHECK-NOT: br bb
 sil @dead_loop : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0           // users: %1, %4
@@ -2187,7 +2187,7 @@ bb5:
 
 bb1:
   %3 = select_enum %0 : $AnEnum, case #AnEnum.B!enumelt.1: %f, case #AnEnum.C!enumelt.1: %t : $Builtin.Int1
-  cond_br %3,  bb2, bb3
+  cond_br %3, bb2, bb3
 
 bb2:
   %6 = apply %2() : $@convention(thin) () -> ()

@@ -95,7 +95,7 @@ class CheckedCastBrJumpThreading {
                                CheckedCastBranchInst *DomCCBI);
   bool checkCloningConstraints();
 
-  void classifyPredecessor( SILBasicBlock *Pred, bool SuccessDominates,
+  void classifyPredecessor(SILBasicBlock *Pred, bool SuccessDominates,
                            bool FailureDominates);
 
   SILValue isArgValueEquivalentToCondition(SILValue Value,

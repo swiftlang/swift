@@ -5,7 +5,7 @@ import Swift
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self
 }
 
@@ -15,9 +15,9 @@ struct Butt: _ObjectiveCBridgeable {
   typealias _ObjectiveCType = NSCloud
   static func _isBridgedToObjectiveC() -> Bool
   func _bridgeToObjectiveC() -> NSCloud
-  static func _forceBridgeFromObjectiveC(source: NSCloud,
+  static func _forceBridgeFromObjectiveC(_ source: NSCloud,
                                          result: inout Butt?)
-  static func _conditionallyBridgeFromObjectiveC(source: NSCloud,
+  static func _conditionallyBridgeFromObjectiveC(_ source: NSCloud,
                                          result: inout Butt?) -> Bool
 }
 

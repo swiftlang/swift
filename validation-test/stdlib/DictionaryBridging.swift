@@ -13,14 +13,6 @@ import StdlibUnittest
 import Foundation
 import SlurpFastEnumeration
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialData {
   class RaceData {
@@ -46,7 +38,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialData {
   let key = TestObjCKeyTy(10)
 
   func thread1(
-    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsd = raceData.nsd
     let v: AnyObject? = nsd.object(forKey: key)
@@ -54,7 +46,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialData {
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     sink(evaluateObservationsAllEqual(observations))
@@ -84,7 +76,7 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
   }
 
   func thread1(
-    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsd = raceData.nsd
     let objcPairs = NSMutableArray()
@@ -97,7 +89,7 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     sink(evaluateObservationsAllEqual(observations))

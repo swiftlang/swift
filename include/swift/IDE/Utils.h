@@ -16,7 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
 #include <string>

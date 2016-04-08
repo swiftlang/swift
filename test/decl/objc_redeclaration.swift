@@ -37,10 +37,10 @@ extension Redecl1 {
 
 extension Redecl1 {
   @objc
-  func method2(x: Int) { } // expected-error{{method 'method2' with Objective-C selector 'method2:' conflicts with setter for 'method1_var_alias' with the same Objective-C selector}}
+  func method2(_ x: Int) { } // expected-error{{method 'method2' with Objective-C selector 'method2:' conflicts with setter for 'method1_var_alias' with the same Objective-C selector}}
 
   @objc(objectAtIndexedSubscript:)
-  func indexed(x: Int) { } // expected-error{{method 'indexed' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with subscript getter with the same Objective-C selector}}
+  func indexed(_ x: Int) { } // expected-error{{method 'indexed' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with subscript getter with the same Objective-C selector}}
 
   @objc(init)
   func initialize() { } // expected-error{{method 'initialize()' with Objective-C selector 'init' conflicts with initializer 'init()' with the same Objective-C selector}}
@@ -48,11 +48,11 @@ extension Redecl1 {
   @objc
   func dealloc() { } // expected-error{{method 'dealloc()' with Objective-C selector 'dealloc' conflicts with implicit deinitializer with the same Objective-C selector}}
 
-  @objc func setValue(x: Int) { } // expected-error{{method 'setValue' with Objective-C selector 'setValue:' conflicts with setter for 'value' with the same Objective-C selector}}
+  @objc func setValue(_ x: Int) { } // expected-error{{method 'setValue' with Objective-C selector 'setValue:' conflicts with setter for 'value' with the same Objective-C selector}}
 }
 
 extension Redecl1 {
-  @objc func setWibble(other: Int) { } // expected-error{{method 'setWibble' with Objective-C selector 'setWibble:' conflicts with setter for 'other' with the same Objective-C selector}}
+  @objc func setWibble(_ other: Int) { } // expected-error{{method 'setWibble' with Objective-C selector 'setWibble:' conflicts with setter for 'other' with the same Objective-C selector}}
   @objc func wibble() -> Int { return 0 } // expected-error{{method 'wibble()' with Objective-C selector 'wibble' conflicts with getter for 'other' with the same Objective-C selector}}
 }
 

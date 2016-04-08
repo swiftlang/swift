@@ -12,36 +12,29 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var RangeReplaceableTestSuite = TestSuite("RangeReplaceable")
 
 RangeReplaceableTestSuite.test("append/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   tester.append(OpaqueValue(2))
   expectCustomizable(tester, tester.log.append)
 }
 
 RangeReplaceableTestSuite.test("appendContentsOf/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   tester.append(contentsOf: [ 2, 3 ].map(OpaqueValue.init))
   expectCustomizable(tester, tester.log.appendContentsOf)
 }
 
 RangeReplaceableTestSuite.test("insert/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   tester.insert(OpaqueValue(2), at: tester.base.startIndex)
   expectCustomizable(tester, tester.log.insert)
 }
 
 RangeReplaceableTestSuite.test("insert(contentsOf:at:)/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   tester.insert(
     contentsOf: [ 2, 3 ].map(OpaqueValue.init),
     at: tester.base.endIndex)
@@ -49,19 +42,19 @@ RangeReplaceableTestSuite.test("insert(contentsOf:at:)/dispatch") {
 }
 
 RangeReplaceableTestSuite.test("remove(at:)/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   tester.remove(at: tester.base.startIndex)
   expectCustomizable(tester, tester.log.removeAt)
 }
 
 RangeReplaceableTestSuite.test("removeLast/whereIndexIsBidirectional/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester.removeLast()
   expectCustomizable(tester, tester.log._customRemoveLast)
 }
 
 RangeReplaceableTestSuite.test("removeLast(n: Int)/whereIndexIsBidirectional/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester.removeLast(1)
   expectCustomizable(tester, tester.log._customRemoveLastN)
 }
@@ -74,19 +67,19 @@ RangeReplaceableTestSuite.test("removeSubrange/dispatch") {
 }
 
 RangeReplaceableTestSuite.test("removeFirst/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   tester.removeFirst()
   expectCustomizable(tester, tester.log.removeFirst)
 }
 
 RangeReplaceableTestSuite.test("removeFirst(n)/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   tester.removeFirst(1)
   expectCustomizable(tester, tester.log.removeFirstN)
 }
 
 RangeReplaceableTestSuite.test("removeAll/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  var tester = RangeReplaceableCollectionLog.dispatchTester([OpaqueValue(1)])
   tester.removeAll(keepingCapacity: false)
   expectCustomizable(tester, tester.log.removeAll)
 }
@@ -97,16 +90,16 @@ RangeReplaceableTestSuite.test("reserveCapacity/dispatch") {
   expectCustomizable(tester, tester.log.reserveCapacity)
 }
 
-func identity(element: OpaqueValue<Int>) -> OpaqueValue<Int> {
+func identity(_ element: OpaqueValue<Int>) -> OpaqueValue<Int> {
   return element
 }
-func identityEq(element: MinimalEquatableValue) -> MinimalEquatableValue {
+func identityEq(_ element: MinimalEquatableValue) -> MinimalEquatableValue {
   return element
 }
 
 % from itertools import product
-% traversals = [ 'Forward', 'Bidirectional', 'RandomAccess' ]
-% base_kinds = [ 'Defaulted', 'Minimal' ]
+% traversals = ['Forward', 'Bidirectional', 'RandomAccess']
+% base_kinds = ['Defaulted', 'Minimal']
 % collections = [
 %   ('{}{}RangeReplaceableCollection'.format(base_kind, traversal), traversal)
 %     for base_kind, traversal in product(base_kinds, traversals)

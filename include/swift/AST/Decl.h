@@ -1138,9 +1138,9 @@ public:
 
   unsigned size() const { return NumParams; }
   iterator begin() { return getParams().begin(); }
-  iterator end()   { return getParams().end(); }
+  iterator end() { return getParams().end(); }
   const_iterator begin() const { return getParams().begin(); }
-  const_iterator end()   const { return getParams().end(); }
+  const_iterator end() const { return getParams().end(); }
 
   /// Get the total number of parameters, including those from parent generic
   /// parameter lists.
@@ -3278,6 +3278,10 @@ public:
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
+  /// Determine whether the class is only visible to the Objective-C runtime
+  /// and not to the linker.
+  bool isOnlyObjCRuntimeVisible() const;
+
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
   ///
@@ -4712,8 +4716,9 @@ public:
   /// the type of the corresponding parameter.
   std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned Index) const;
 
-  /// Determine whether the name of the ith argument is an API name by default.
-  bool argumentNameIsAPIByDefault(unsigned i) const;
+  /// Determine whether the name of an argument is an API name by default
+  /// depending on the function context.
+  bool argumentNameIsAPIByDefault() const;
 
   unsigned getNumParameterLists() const {
     return AbstractFunctionDeclBits.NumParameterLists;

@@ -18,7 +18,7 @@ func _getObjCCount(_: _MagicMirrorData) -> Int
 @_silgen_name("swift_ObjCMirror_subscript") 
 func _getObjCChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
-func _getObjCSummary(data: _MagicMirrorData) -> String {
+func _getObjCSummary(_ data: _MagicMirrorData) -> String {
   let theDescription = _swift_stdlib_objcDebugDescription(data._loadValue())
   return _cocoaStringToSwiftString_NonASCII(theDescription)
 }
@@ -42,7 +42,8 @@ struct _ObjCMirror : _Mirror {
     return _getObjCSummary(data)
   }
   public var quickLookObject: PlaygroundQuickLook? {
-    return _getClassPlaygroundQuickLook(data)
+    let object = _swift_ClassMirror_quickLookObject(data)
+    return _getClassPlaygroundQuickLook(object)
   }
   public var disposition: _MirrorDisposition { return .objCObject }
 }
@@ -68,7 +69,8 @@ struct _ObjCSuperMirror : _Mirror {
     return _getObjCSummary(data)
   }
   public var quickLookObject: PlaygroundQuickLook? {
-    return _getClassPlaygroundQuickLook(data)
+    let object = _swift_ClassMirror_quickLookObject(data)
+    return _getClassPlaygroundQuickLook(object)
   }
   public var disposition: _MirrorDisposition { return .objCObject }
 }

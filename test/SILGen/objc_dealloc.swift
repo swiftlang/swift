@@ -57,7 +57,7 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $SwiftGizmo
   // CHECK:        [[XCTOR:%[0-9]+]] = function_ref @_TFC12objc_dealloc1XC
   // CHECK-NEXT:   [[XMETA:%[0-9]+]] = metatype $@thick X.Type
-  // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XCTOR]]([[XMETA]]) : $@convention(thin) (@thick X.Type) -> @owned X
+  // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XCTOR]]([[XMETA]]) : $@convention(method) (@thick X.Type) -> @owned X
   // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[SELF]] : $SwiftGizmo, #SwiftGizmo.x
   // CHECK-NEXT:   assign [[XOBJ]] to [[X]] : $*X
   // CHECK-NEXT:   return [[SELF]] : $SwiftGizmo

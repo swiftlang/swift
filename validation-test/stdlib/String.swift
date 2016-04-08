@@ -5,13 +5,8 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
 #if _runtime(_ObjC)
-import ObjectiveC
-import Foundation
+import Foundation  // For NSRange
 #endif
 
 extension String {
@@ -33,7 +28,7 @@ StringTests.test("sizeof") {
 }
 
 func checkUnicodeScalarViewIteration(
-    expectedScalars: [UInt32], _ str: String
+    _ expectedScalars: [UInt32], _ str: String
 ) {
   do {
     let us = str.unicodeScalars
@@ -606,7 +601,7 @@ StringTests.test("COW/replaceSubrange/end") {
 
 func asciiString<
   S: Sequence where S.Iterator.Element == Character
->(content: S) -> String {
+>(_ content: S) -> String {
   var s = String()
   s.append(contentsOf: content)
   expectEqual(1, s._core.elementWidth)
@@ -717,7 +712,7 @@ StringTests.test("stringCoreReserve")
 #endif
 }
 
-func makeStringCore(base: String) -> _StringCore {
+func makeStringCore(_ base: String) -> _StringCore {
   var x = _StringCore()
   // make sure some - but not all - replacements will have to grow the buffer
   x.reserveCapacity(base._core.count * 3 / 2)
@@ -820,7 +815,7 @@ StringTests.test("toInt") {
   // Make a String from an Int, mangle the String's characters,
   // then print if the new String is or is not still an Int.
   func testConvertabilityOfStringWithModification(
-    initialValue: Int,
+    _ initialValue: Int,
     modification: (chars: inout [UTF8.CodeUnit]) -> Void
   ) {
     var chars = Array(String(initialValue).utf8)

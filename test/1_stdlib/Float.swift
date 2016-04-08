@@ -26,7 +26,7 @@ func noinlineMinusZero() -> TestFloat {
 // Normals
 //===---
 
-func checkNormal(normal: TestFloat) {
+func checkNormal(_ normal: TestFloat) {
   _precondition(normal.isNormal)
   _precondition(normal.isFinite)
   _precondition(!normal.isZero)
@@ -63,7 +63,7 @@ testNormal()
 // Zeroes
 //===---
 
-func checkZero(zero: TestFloat) {
+func checkZero(_ zero: TestFloat) {
   _precondition(!zero.isNormal)
   _precondition(zero.isFinite)
   _precondition(zero.isZero)
@@ -100,7 +100,7 @@ testZero()
 // Subnormals
 //===---
 
-func checkSubnormal(subnormal: TestFloat) {
+func checkSubnormal(_ subnormal: TestFloat) {
   _precondition(!subnormal.isNormal)
   _precondition(subnormal.isFinite)
   _precondition(!subnormal.isZero)
@@ -110,11 +110,11 @@ func checkSubnormal(subnormal: TestFloat) {
   _precondition(!subnormal.isSignaling)
 }
 
-func asUInt64(a: UInt64) -> UInt64 {
+func asUInt64(_ a: UInt64) -> UInt64 {
   return a
 }
 
-func asUInt64(a: UInt32) -> UInt64 {
+func asUInt64(_ a: UInt32) -> UInt64 {
   return UInt64(a)
 }
 
@@ -160,7 +160,7 @@ func testSubnormal() {
 // Infinities
 //===---
 
-func checkInf(inf: TestFloat) {
+func checkInf(_ inf: TestFloat) {
   _precondition(!inf.isNormal)
   _precondition(!inf.isFinite)
   _precondition(!inf.isZero)
@@ -206,7 +206,7 @@ testInf()
 // NaNs
 //===---
 
-func checkNaN(nan: TestFloat) {
+func checkNaN(_ nan: TestFloat) {
   _precondition(!nan.isSignMinus)
   _precondition(!nan.isNormal)
   _precondition(!nan.isFinite)
@@ -216,7 +216,7 @@ func checkNaN(nan: TestFloat) {
   _precondition(nan.isNaN)
 }
 
-func checkQNaN(qnan: TestFloat) {
+func checkQNaN(_ qnan: TestFloat) {
   checkNaN(qnan)
   _precondition(!qnan.isSignaling)
   _precondition(qnan.floatingPointClass == .quietNaN)

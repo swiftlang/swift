@@ -52,7 +52,7 @@ let c = MaybeIntPair.just(74, 75)
 let movie : Maybe<Color> = .none
 
 public enum Nothing { }
-public func foo(empty : Nothing) { }
+public func foo(_ empty : Nothing) { }
 // CHECK: !DICompositeType({{.*}}name: "Nothing", {{.*}}elements: ![[EMPTY]]
 
 // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS:[0-9]+]],
@@ -64,7 +64,7 @@ enum Rose<A> {
 	case IORose(() -> Rose<A>)
 }
 
-func foo<T>(x : Rose<T>) -> Rose<T> { return x }
+func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 
 // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
 // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5Tuplex_")
@@ -74,7 +74,7 @@ public enum Tuple<P> {
 	case C(P, () -> Tuple)
 }
 
-func bar<T>(x : Tuple<T>) -> Tuple<T> { return x }
+func bar<T>(_ x : Tuple<T>) -> Tuple<T> { return x }
 
 public enum List<T> {
        indirect case Tail(List, T)

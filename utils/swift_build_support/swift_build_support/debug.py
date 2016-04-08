@@ -28,15 +28,36 @@ def _output(args):
         return None
 
 
-def print_xcodebuild_versions(sdks, file=sys.stdout):
+def get_xcode_sdks():
+    """
+    A generator for canonical Xcode SDK identifiers (e.g. 'macosx10.11' or
+    'iphonesimulator9.2') available in the currently selected Xcode.
+
+    :return: A generator of SDK identifiers (strings).
+    """
+    try:
+        command = ['xcodebuild', '-showsdks']
+        out = subprocess.check_output(command, stderr=subprocess.PIPE)
+        lines = [line.rstrip() for line in out.splitlines()]
+        import pdb
+        sdk_flag = '-sdk'
+        for line in lines:
+            if sdk_flag in line:
+                prefix, identifier = line.split('-sdk')
+                yield identifier.lstrip().rstrip()
+    except subprocess.CalledProcessError:
+        pass
+
+
+def print_xcodebuild_versions(file=sys.stdout):
     """
     Print the host machine's `xcodebuild` version, as well as version
-    information for each of the given SDKs (for a full list of available
-    SDKs, invoke `xcodebuild -showsdks` on the command line).
+    information for all available SDKs.
     """
-    print(u'--- SDK versions ---', file=file)
     print(u'{}\n'.format(_output(['xcodebuild', '-version'])), file=file)
-    for sdk in sdks:
-        print(
-            u'{}\n'.format(_output(['xcodebuild', '-version', '-sdk', sdk])),
-            file=file)
+    print(u'--- SDK versions ---', file=file)
+    print(u'{}\n'.format(_output(['xcodebuild', '-version', '-sdk'])),
+          file=file)
+    # You can't test beyond this because each developer's machines may have
+    # a different set of SDKs installed.
+
