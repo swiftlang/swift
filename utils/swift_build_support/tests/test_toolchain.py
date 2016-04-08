@@ -31,7 +31,7 @@ class HostClangTestCase(unittest.TestCase):
 
 class HostToolchainTestCase(unittest.TestCase):
     def test_found_executables_match(self):
-        # Test that the raw incovation of _first_common_executables
+        # Test that the raw invocation of _first_common_executables
         # either returns None or matching paths.
         suffixes = ['', '-3.8', '-3.7', '-3.6']
         toolchain = host_toolchain(suffixes=suffixes)

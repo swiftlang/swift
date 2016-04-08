@@ -736,7 +736,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   if (auto sourceOptObjectType =
         sourceType.getAnyOptionalObjectType(*IGF.IGM.SILMod, optKind)) {
 
-    // Translate the value from an enum represention to a possibly-null
+    // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe
     // for the particular case of an optional class-reference or metatype
     // value.
