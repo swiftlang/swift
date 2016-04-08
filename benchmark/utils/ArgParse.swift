@@ -55,7 +55,7 @@ public func parseArgs(_ validOptions: [String]? = nil)
       continue
     }
     // Attempt to split it into two components separated by an equals sign.
-    let components = arg.componentsSeparated(by: "=")
+    let components = arg.components(separatedBy: "=")
     let optionName = components[0]
     if validOptions != nil && !validOptions!.contains(optionName) {
       print("Invalid option: \(arg)")

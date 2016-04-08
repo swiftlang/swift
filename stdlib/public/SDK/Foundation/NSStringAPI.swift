@@ -160,9 +160,9 @@ extension String {
   /// Returns a human-readable string giving the name of a given encoding.
   @warn_unused_result
   public static func localizedName(
-    ofStringEncoding encoding: NSStringEncoding
+    of encoding: NSStringEncoding
   ) -> String {
-    return NSString.localizedName(ofStringEncoding: encoding)
+    return NSString.localizedName(of: encoding)
   }
 
   // + (instancetype)localizedStringWithFormat:(NSString *)format, ...
@@ -251,8 +251,8 @@ extension String {
   /// `String` can be converted to a given encoding without loss of
   /// information.
   @warn_unused_result
-  public func canBeConverted(toEncoding encoding: NSStringEncoding) -> Bool {
-    return _ns.canBeConverted(toEncoding: encoding)
+  public func canBeConverted(to encoding: NSStringEncoding) -> Bool {
+    return _ns.canBeConverted(to: encoding)
   }
 
   // @property NSString* capitalizedString
@@ -277,8 +277,8 @@ extension String {
   /// Returns a capitalized representation of the `String`
   /// using the specified locale.
   @warn_unused_result
-  public func capitalizedString(with locale: NSLocale?) -> String {
-    return _ns.capitalizedString(with: locale) as String
+  public func capitalized(with locale: NSLocale?) -> String {
+    return _ns.capitalized(with: locale) as String
   }
 
   // - (NSComparisonResult)caseInsensitiveCompare:(NSString *)aString
@@ -399,11 +399,9 @@ extension String {
   /// Returns an array containing substrings from the `String`
   /// that have been divided by characters in a given set.
   @warn_unused_result
-  public func componentsSeparatedByCharacters(
-    in separator: NSCharacterSet
-  ) -> [String] {
+  public func components(separatedBy separator: NSCharacterSet) -> [String] {
     // FIXME: two steps due to <rdar://16971181>
-    let nsa = _ns.componentsSeparatedByCharacters(in: separator) as NSArray
+    let nsa = _ns.components(separatedBy: separator) as NSArray
     // Since this function is effectively a bridge thunk, use the
     // bridge thunk semantics for the NSArray conversion
     return nsa as! [String]
@@ -414,8 +412,8 @@ extension String {
 
   /// Returns an array containing substrings from the `String`
   /// that have been divided by a given separator.
-  public func componentsSeparated(by separator: String) -> [String] {
-    let nsa = _ns.componentsSeparated(by: separator) as NSArray
+  public func components(separatedBy separator: String) -> [String] {
+    let nsa = _ns.components(separatedBy: separator) as NSArray
     // Since this function is effectively a bridge thunk, use the
     // bridge thunk semantics for the NSArray conversion
     return nsa as! [String]
@@ -426,10 +424,10 @@ extension String {
   /// Returns a representation of the `String` as a C string
   /// using a given encoding.
   @warn_unused_result
-  public func cString(usingEncoding encoding: NSStringEncoding) -> [CChar]? {
+  public func cString(using encoding: NSStringEncoding) -> [CChar]? {
     return withExtendedLifetime(_ns) {
       (s: NSString) -> [CChar]? in
-      _persistCString(s.cString(usingEncoding: encoding))
+      _persistCString(s.cString(using: encoding))
     }
   }
 
@@ -443,11 +441,11 @@ extension String {
   /// the `String` encoded using a given encoding.
   @warn_unused_result
   public func data(
-    usingEncoding encoding: NSStringEncoding,
+    using encoding: NSStringEncoding,
     allowLossyConversion: Bool = false
   ) -> NSData? {
     return _ns.data(
-      usingEncoding: encoding,
+      using: encoding,
       allowLossyConversion: allowLossyConversion)
   }
 
@@ -995,8 +993,8 @@ extension String {
   /// Returns the number of bytes required to store the
   /// `String` in a given encoding.
   @warn_unused_result
-  public func lengthOfBytes(usingEncoding encoding: NSStringEncoding) -> Int {
-    return _ns.lengthOfBytes(usingEncoding: encoding)
+  public func lengthOfBytes(using encoding: NSStringEncoding) -> Int {
+    return _ns.lengthOfBytes(using: encoding)
   }
 
   // - (NSRange)lineRangeForRange:(NSRange)aRange
@@ -1086,8 +1084,8 @@ extension String {
   /// converted to lowercase, taking into account the specified
   /// locale.
   @warn_unused_result
-  public func lowercaseString(with locale: NSLocale?) -> String {
-    return _ns.lowercaseString(with: locale)
+  public func lowercased(with locale: NSLocale?) -> String {
+    return _ns.lowercased(with: locale)
   }
 
   // - (NSUInteger)maximumLengthOfBytesUsingEncoding:(NSStringEncoding)enc
@@ -1096,8 +1094,8 @@ extension String {
   /// `String` in a given encoding.
   @warn_unused_result
   public
-  func maximumLengthOfBytes(usingEncoding encoding: NSStringEncoding) -> Int {
-    return _ns.maximumLengthOfBytes(usingEncoding: encoding)
+  func maximumLengthOfBytes(using encoding: NSStringEncoding) -> Int {
+    return _ns.maximumLengthOfBytes(using: encoding)
   }
 
   // - (NSRange)paragraphRangeForRange:(NSRange)aRange
@@ -1338,9 +1336,9 @@ extension String {
   /// the `String` into a legal URL string.
   @available(*, deprecated, message: "Use addingPercentEncoding(withAllowedCharacters:) instead, which always uses the recommended UTF-8 encoding, and which encodes for a specific URL component or subcomponent since each URL component or subcomponent has different rules for what characters are valid.")
   public func addingPercentEscapes(
-    usingEncoding encoding: NSStringEncoding
+    using encoding: NSStringEncoding
   ) -> String? {
-    return _ns.addingPercentEscapes(usingEncoding: encoding)
+    return _ns.addingPercentEscapes(using: encoding)
   }
 
   // - (NSString *)stringByAppendingFormat:(NSString *)format, ...
@@ -1439,11 +1437,11 @@ extension String {
   @warn_unused_result
   public func padding(
     toLength newLength: Int,
-    with padString: String,
+    withPad padString: String,
     startingAt padIndex: Int
   ) -> String {
     return _ns.padding(
-      toLength: newLength, with: padString, startingAt: padIndex)
+      toLength: newLength, withPad: padString, startingAt: padIndex)
   }
 
   // @property NSString* stringByRemovingPercentEncoding;
@@ -1506,9 +1504,9 @@ extension String {
   /// by a given encoding.
   @available(*, deprecated, message: "Use removingPercentEncoding instead, which always uses the recommended UTF-8 encoding.")
   public func replacingPercentEscapes(
-    usingEncoding encoding: NSStringEncoding
+    using encoding: NSStringEncoding
   ) -> String? {
-    return _ns.replacingPercentEscapes(usingEncoding: encoding)
+    return _ns.replacingPercentEscapes(using: encoding)
   }
 
   // @property NSString* stringByResolvingSymlinksInPath;
@@ -1589,8 +1587,8 @@ extension String {
   /// converted to uppercase, taking into account the specified
   /// locale.
   @warn_unused_result
-  public func uppercaseString(with locale: NSLocale?) -> String {
-    return _ns.uppercaseString(with: locale)
+  public func uppercased(with locale: NSLocale?) -> String {
+    return _ns.uppercased(with: locale)
   }
 
   //===--- Omitted due to redundancy with "utf8" property -----------------===//
@@ -1684,7 +1682,7 @@ extension String {
 // Pre-Swift-3 method names
 extension String {
 
-  @available(*, unavailable, renamed: "localizedName(ofStringEncoding:)")
+  @available(*, unavailable, renamed: "localizedName(of:)")
   public static func localizedNameOfStringEncoding(
     _ encoding: NSStringEncoding
   ) -> String {
@@ -1696,7 +1694,7 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "canBeConverted(toEncoding:)")
+  @available(*, unavailable, renamed: "canBeConverted(to:)")
   public func canBeConvertedToEncoding(_ encoding: NSStringEncoding) -> Bool {
     fatalError("unavailable function can't be called")
   }
@@ -1722,7 +1720,7 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "componentsSeparatedByCharacters(in:)")
+  @available(*, unavailable, renamed: "components(separatedBy:)")
   public func componentsSeparatedByCharactersIn(
     _ separator: NSCharacterSet
   ) -> [String] {
@@ -1804,7 +1802,7 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "lengthOfBytes(usingEncoding:)")
+  @available(*, unavailable, renamed: "lengthOfBytes(using:)")
   public func lengthOfBytesUsingEncoding(_ encoding: NSStringEncoding) -> Int {
     fatalError("unavailable function can't be called")
   }
@@ -1825,12 +1823,12 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "lowercaseString(with:)")
+  @available(*, unavailable, renamed: "lowercased(with:)")
   public func lowercaseStringWith(_ locale: NSLocale?) -> String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "maximumLengthOfBytes(usingEncoding:)")
+  @available(*, unavailable, renamed: "maximumLengthOfBytes(using:)")
   public
   func maximumLengthOfBytesUsingEncoding(_ encoding: NSStringEncoding) -> Int {
     fatalError("unavailable function can't be called")
@@ -1885,7 +1883,7 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "addingPercentEscapes(usingEncoding:)")
+  @available(*, unavailable, renamed: "addingPercentEscapes(using:)")
   public func addingPercentEscapesUsingEncoding(
     _ encoding: NSStringEncoding
   ) -> String? {
@@ -1962,7 +1960,7 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "uppercaseString(with:)")
+  @available(*, unavailable, renamed: "uppercased(with:)")
   public func uppercaseStringWith(_ locale: NSLocale?) -> String {
     fatalError("unavailable function can't be called")
   }

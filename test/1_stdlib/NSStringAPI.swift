@@ -72,7 +72,7 @@ NSStringAPIs.test("Encodings") {
   let defaultCStringEncoding = String.defaultCStringEncoding()
   expectTrue(availableEncodings.contains(defaultCStringEncoding))
 
-  expectNotEqual("", String.localizedName(ofStringEncoding: NSUTF8StringEncoding))
+  expectNotEqual("", String.localizedName(of: NSUTF8StringEncoding))
 }
 
 NSStringAPIs.test("NSStringEncoding") {
@@ -212,8 +212,8 @@ NSStringAPIs.test("init(utf8String:)") {
 }
 
 NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
-  expectTrue("foo".canBeConverted(toEncoding: NSASCIIStringEncoding))
-  expectFalse("あいう".canBeConverted(toEncoding: NSASCIIStringEncoding))
+  expectTrue("foo".canBeConverted(to: NSASCIIStringEncoding))
+  expectFalse("あいう".canBeConverted(to: NSASCIIStringEncoding))
 }
 
 NSStringAPIs.test("capitalized") {
@@ -286,14 +286,14 @@ func expectLocalizedEquality(
 NSStringAPIs.test("capitalizedString(with:)") {
   expectLocalizedEquality(
     "Foo Foo Foo Foo",
-    { loc in "foo Foo fOO FOO".capitalizedString(with: loc) })
+    { loc in "foo Foo fOO FOO".capitalized(with: loc) })
   
-  expectLocalizedEquality("Жжж", { loc in "жжж".capitalizedString(with: loc) })
+  expectLocalizedEquality("Жжж", { loc in "жжж".capitalized(with: loc) })
 
   expectEqual(
     "Foo Foo Foo Foo",
-    "foo Foo fOO FOO".capitalizedString(with: nil))
-  expectEqual("Жжж", "жжж".capitalizedString(with: nil))
+    "foo Foo fOO FOO".capitalized(with: nil))
+  expectEqual("Жжж", "жжж".capitalized(with: nil))
 
   //
   // Special casing.
@@ -304,14 +304,14 @@ NSStringAPIs.test("capitalizedString(with:)") {
   // U+0049 LATIN CAPITAL LETTER I
   expectLocalizedEquality(
     "Iii Iii",
-    { loc in "iii III".capitalizedString(with: loc) }, "en")
+    { loc in "iii III".capitalized(with: loc) }, "en")
 
   // U+0069 LATIN SMALL LETTER I
   // to upper case in Turkish locale:
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
   expectLocalizedEquality(
     "İii Iıı",
-    { loc in "iii III".capitalizedString(with: loc) }, "tr")
+    { loc in "iii III".capitalized(with: loc) }, "tr")
 }
 
 NSStringAPIs.test("caseInsensitiveCompare(_:)") {
@@ -430,55 +430,55 @@ NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
   }
 }
 
-NSStringAPIs.test("componentsSeparatedByCharacters(in:)") {
-  expectEqual([ "" ], "".componentsSeparatedByCharacters(
-    in: NSCharacterSet.decimalDigit()))
+NSStringAPIs.test("components(separatedBy:) (NSCharacterSet)") {
+  expectEqual([ "" ], "".components(
+    separatedBy: NSCharacterSet.decimalDigits()))
 
   expectEqual(
     [ "абв", "", "あいう", "abc" ],
-    "абв12あいう3abc".componentsSeparatedByCharacters(
-        in: NSCharacterSet.decimalDigit()))
+    "абв12あいう3abc".components(
+        separatedBy: NSCharacterSet.decimalDigits()))
 
   expectEqual(
     [ "абв", "", "あいう", "abc" ],
     "абв\u{1F601}\u{1F602}あいう\u{1F603}abc"
-      .componentsSeparatedByCharacters(
-        in: NSCharacterSet(charactersIn: "\u{1F601}\u{1F602}\u{1F603}")))
+      .components(
+        separatedBy: NSCharacterSet(charactersIn: "\u{1F601}\u{1F602}\u{1F603}")))
 
   // Performs Unicode scalar comparison.
   expectEqual(
     [ "abcし\u{3099}def" ],
-    "abcし\u{3099}def".componentsSeparatedByCharacters(
-      in: NSCharacterSet(charactersIn: "\u{3058}")))
+    "abcし\u{3099}def".components(
+      separatedBy: NSCharacterSet(charactersIn: "\u{3058}")))
 }
 
-NSStringAPIs.test("componentsSeparated(by:)") {
-  expectEqual([ "" ], "".componentsSeparated(by: "//"))
+NSStringAPIs.test("components(separatedBy:) (String)") {
+  expectEqual([ "" ], "".components(separatedBy: "//"))
 
   expectEqual(
     [ "абв", "あいう", "abc" ],
-    "абв//あいう//abc".componentsSeparated(by: "//"))
+    "абв//あいう//abc".components(separatedBy: "//"))
 
   // Performs normalization.
   expectEqual(
     [ "abc", "def" ],
-    "abcし\u{3099}def".componentsSeparated(by: "\u{3058}"))
+    "abcし\u{3099}def".components(separatedBy: "\u{3058}"))
 }
 
 NSStringAPIs.test("cString(usingEncoding:)") {
-  expectEmpty("абв".cString(usingEncoding: NSASCIIStringEncoding))
+  expectEmpty("абв".cString(using: NSASCIIStringEncoding))
 
   let expectedBytes: [UInt8] = [ 0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2, 0 ]
   var expectedStr: [CChar] = expectedBytes.map { CChar(bitPattern: $0) }
   expectEqual(expectedStr,
-      "абв".cString(usingEncoding: NSUTF8StringEncoding)!)
+      "абв".cString(using: NSUTF8StringEncoding)!)
 }
 
 NSStringAPIs.test("data(usingEncoding:allowLossyConversion:)") {
-  expectEmpty("あいう".data(usingEncoding: NSASCIIStringEncoding, allowLossyConversion: false))
+  expectEmpty("あいう".data(using: NSASCIIStringEncoding, allowLossyConversion: false))
 
   do {
-    let data = "あいう".data(usingEncoding: NSUTF8StringEncoding)
+    let data = "あいう".data(using: NSUTF8StringEncoding)
     let bytes = Array(
       UnsafeBufferPointer(
         start: UnsafePointer<UInt8>(data!.bytes), count: data!.length))
@@ -865,8 +865,8 @@ NSStringAPIs.test("utf16Count") {
 }
 
 NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
-  expectEqual(1, "a".lengthOfBytes(usingEncoding: NSUTF8StringEncoding))
-  expectEqual(2, "あ".lengthOfBytes(usingEncoding: NSShiftJISStringEncoding))
+  expectEqual(1, "a".lengthOfBytes(using: NSUTF8StringEncoding))
+  expectEqual(2, "あ".lengthOfBytes(using: NSShiftJISStringEncoding))
 }
 
 NSStringAPIs.test("lineRangeFor(_:)") {
@@ -980,13 +980,13 @@ NSStringAPIs.test("localizedLowercase") {
   }
 }
 
-NSStringAPIs.test("lowercaseString(with:)") {
-  expectLocalizedEquality("abcd", { loc in "abCD".lowercaseString(with: loc) }, "en")
+NSStringAPIs.test("lowercased(with:)") {
+  expectLocalizedEquality("abcd", { loc in "abCD".lowercased(with: loc) }, "en")
 
-  expectLocalizedEquality("абвг", { loc in "абВГ".lowercaseString(with: loc) }, "en")
-  expectLocalizedEquality("абвг", { loc in "абВГ".lowercaseString(with: loc) }, "ru")
+  expectLocalizedEquality("абвг", { loc in "абВГ".lowercased(with: loc) }, "en")
+  expectLocalizedEquality("абвг", { loc in "абВГ".lowercased(with: loc) }, "ru")
 
-  expectLocalizedEquality("たちつてと", { loc in "たちつてと".lowercaseString(with: loc) }, "ru")
+  expectLocalizedEquality("たちつてと", { loc in "たちつてと".lowercased(with: loc) }, "ru")
 
   //
   // Special casing.
@@ -996,42 +996,42 @@ NSStringAPIs.test("lowercaseString(with:)") {
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectLocalizedEquality("\u{0069}\u{0307}", { loc in "\u{0130}".lowercaseString(with: loc) }, "en")
+  expectLocalizedEquality("\u{0069}\u{0307}", { loc in "\u{0130}".lowercased(with: loc) }, "en")
 
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
   // to lower case in Turkish locale:
   // U+0069 LATIN SMALL LETTER I
-  expectLocalizedEquality("\u{0069}", { loc in "\u{0130}".lowercaseString(with: loc) }, "tr")
+  expectLocalizedEquality("\u{0069}", { loc in "\u{0130}".lowercased(with: loc) }, "tr")
 
   // U+0049 LATIN CAPITAL LETTER I
   // U+0307 COMBINING DOT ABOVE
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectLocalizedEquality("\u{0069}\u{0307}", { loc in "\u{0049}\u{0307}".lowercaseString(with: loc) }, "en")
+  expectLocalizedEquality("\u{0069}\u{0307}", { loc in "\u{0049}\u{0307}".lowercased(with: loc) }, "en")
 
   // U+0049 LATIN CAPITAL LETTER I
   // U+0307 COMBINING DOT ABOVE
   // to lower case in Turkish locale:
   // U+0069 LATIN SMALL LETTER I
-  expectLocalizedEquality("\u{0069}", { loc in "\u{0049}\u{0307}".lowercaseString(with: loc) }, "tr")
+  expectLocalizedEquality("\u{0069}", { loc in "\u{0049}\u{0307}".lowercased(with: loc) }, "tr")
 }
 
 NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
   do {
     let s = "abc"
     expectLE(s.utf8.count,
-        s.maximumLengthOfBytes(usingEncoding: NSUTF8StringEncoding))
+        s.maximumLengthOfBytes(using: NSUTF8StringEncoding))
   }
   do {
     let s = "abc абв"
     expectLE(s.utf8.count,
-        s.maximumLengthOfBytes(usingEncoding: NSUTF8StringEncoding))
+        s.maximumLengthOfBytes(using: NSUTF8StringEncoding))
   }
   do {
     let s = "\u{1F60A}"
     expectLE(s.utf8.count,
-        s.maximumLengthOfBytes(usingEncoding: NSUTF8StringEncoding))
+        s.maximumLengthOfBytes(using: NSUTF8StringEncoding))
   }
 }
 
@@ -1350,13 +1350,13 @@ func getHomeDir() -> String {
 #endif
 }
 
-NSStringAPIs.test("addingPercentEscapes(usingEncoding:)") {
+NSStringAPIs.test("addingPercentEscapes(using:)") {
   expectEmpty(
     "abcd абвг".addingPercentEscapes(
-      usingEncoding: NSASCIIStringEncoding))
+      using: NSASCIIStringEncoding))
   expectOptionalEqual("abcd%20%D0%B0%D0%B1%D0%B2%D0%B3",
     "abcd абвг".addingPercentEscapes(
-      usingEncoding: NSUTF8StringEncoding))
+      using: NSUTF8StringEncoding))
 }
 
 NSStringAPIs.test("appendingFormat(_:_:...)") {
@@ -1420,19 +1420,19 @@ NSStringAPIs.test("folding(_:locale:)") {
     "example123", fwo("ｅｘａｍｐｌｅ１２３", .widthInsensitiveSearch), "en")
 }
 
-NSStringAPIs.test("padding(toLength:with:startingAtIndex:)") {
+NSStringAPIs.test("padding(toLength:withPad:startingAtIndex:)") {
   expectEqual(
     "abc абв \u{0001F60A}",
     "abc абв \u{0001F60A}".padding(
-      toLength: 10, with: "XYZ", startingAt: 0))
+      toLength: 10, withPad: "XYZ", startingAt: 0))
   expectEqual(
     "abc абв \u{0001F60A}XYZXY",
     "abc абв \u{0001F60A}".padding(
-      toLength: 15, with: "XYZ", startingAt: 0))
+      toLength: 15, withPad: "XYZ", startingAt: 0))
   expectEqual(
     "abc абв \u{0001F60A}YZXYZ",
     "abc абв \u{0001F60A}".padding(
-      toLength: 15, with: "XYZ", startingAt: 1))
+      toLength: 15, withPad: "XYZ", startingAt: 1))
 }
 
 NSStringAPIs.test("removingPercentEncoding/OSX 10.9")
@@ -1576,30 +1576,30 @@ NSStringAPIs.test("replacingOccurrences(of:with:options:range:)") {
       range: s.startIndex.advanced(by: 1)..<s.startIndex.advanced(by: 3)))
 }
 
-NSStringAPIs.test("replacingPercentEscapes(usingEncoding:)") {
+NSStringAPIs.test("replacingPercentEscapes(using:)") {
   expectOptionalEqual(
     "abcd абвг",
     "abcd абвг".replacingPercentEscapes(
-      usingEncoding: NSASCIIStringEncoding))
+      using: NSASCIIStringEncoding))
 
   expectOptionalEqual(
     "abcd абвг\u{0000}\u{0001}",
     "abcd абвг%00%01".replacingPercentEscapes(
-      usingEncoding: NSASCIIStringEncoding))
+      using: NSASCIIStringEncoding))
 
   expectOptionalEqual(
     "abcd абвг",
     "%61%62%63%64%20%D0%B0%D0%B1%D0%B2%D0%B3"
-      .replacingPercentEscapes(usingEncoding: NSUTF8StringEncoding))
+      .replacingPercentEscapes(using: NSUTF8StringEncoding))
 
   expectEmpty("%ED%B0".replacingPercentEscapes(
-    usingEncoding: NSUTF8StringEncoding))
+    using: NSUTF8StringEncoding))
 
   expectEmpty("%zz".replacingPercentEscapes(
-    usingEncoding: NSUTF8StringEncoding))
+    using: NSUTF8StringEncoding))
 }
 
-NSStringAPIs.test("replacingPercentEscapes(usingEncoding:)/rdar18029471")
+NSStringAPIs.test("replacingPercentEscapes(using:)/rdar18029471")
   .xfail(
     .custom({ true },
     reason: "<rdar://problem/18029471> NSString " +
@@ -1608,7 +1608,7 @@ NSStringAPIs.test("replacingPercentEscapes(usingEncoding:)/rdar18029471")
   .code {
   expectEmpty(
     "abcd%FF".replacingPercentEscapes(
-      usingEncoding: NSASCIIStringEncoding))
+      using: NSASCIIStringEncoding))
 }
 
 NSStringAPIs.test("resolvingSymlinksInPath") {
@@ -1629,16 +1629,16 @@ NSStringAPIs.test("standardizingPath") {
 
 NSStringAPIs.test("trimmingCharacters(in:)") {
   expectEqual("", "".trimmingCharacters(
-    in: NSCharacterSet.decimalDigit()))
+    in: NSCharacterSet.decimalDigits()))
 
   expectEqual("abc", "abc".trimmingCharacters(
-    in: NSCharacterSet.decimalDigit()))
+    in: NSCharacterSet.decimalDigits()))
 
   expectEqual("", "123".trimmingCharacters(
-    in: NSCharacterSet.decimalDigit()))
+    in: NSCharacterSet.decimalDigits()))
 
   expectEqual("abc", "123abc789".trimmingCharacters(
-    in: NSCharacterSet.decimalDigit()))
+    in: NSCharacterSet.decimalDigits()))
 
   // Performs Unicode scalar comparison.
   expectEqual(
@@ -1744,13 +1744,13 @@ NSStringAPIs.test("localizedUppercase") {
   }
 }
 
-NSStringAPIs.test("uppercaseString(with:)") {
-  expectLocalizedEquality("ABCD", { loc in "abCD".uppercaseString(with: loc) }, "en")
+NSStringAPIs.test("uppercased(with:)") {
+  expectLocalizedEquality("ABCD", { loc in "abCD".uppercased(with: loc) }, "en")
 
-  expectLocalizedEquality("АБВГ", { loc in "абВГ".uppercaseString(with: loc) }, "en")
-  expectLocalizedEquality("АБВГ", { loc in "абВГ".uppercaseString(with: loc) }, "ru")
+  expectLocalizedEquality("АБВГ", { loc in "абВГ".uppercased(with: loc) }, "en")
+  expectLocalizedEquality("АБВГ", { loc in "абВГ".uppercased(with: loc) }, "ru")
 
-  expectLocalizedEquality("たちつてと", { loc in "たちつてと".uppercaseString(with: loc) }, "ru")
+  expectLocalizedEquality("たちつてと", { loc in "たちつてと".uppercased(with: loc) }, "ru")
 
   //
   // Special casing.
@@ -1759,12 +1759,12 @@ NSStringAPIs.test("uppercaseString(with:)") {
   // U+0069 LATIN SMALL LETTER I
   // to upper case:
   // U+0049 LATIN CAPITAL LETTER I
-  expectLocalizedEquality("\u{0049}", { loc in "\u{0069}".uppercaseString(with: loc) }, "en")
+  expectLocalizedEquality("\u{0049}", { loc in "\u{0069}".uppercased(with: loc) }, "en")
 
   // U+0069 LATIN SMALL LETTER I
   // to upper case in Turkish locale:
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
-  expectLocalizedEquality("\u{0130}", { loc in "\u{0069}".uppercaseString(with: loc) }, "tr")
+  expectLocalizedEquality("\u{0130}", { loc in "\u{0069}".uppercased(with: loc) }, "tr")
 
   // U+00DF LATIN SMALL LETTER SHARP S
   // to upper case:
@@ -1772,7 +1772,7 @@ NSStringAPIs.test("uppercaseString(with:)") {
   // U+0073 LATIN SMALL LETTER S
   // But because the whole string is converted to uppercase, we just get two
   // U+0053.
-  expectLocalizedEquality("\u{0053}\u{0053}", { loc in "\u{00df}".uppercaseString(with: loc) }, "en")
+  expectLocalizedEquality("\u{0053}\u{0053}", { loc in "\u{00df}".uppercased(with: loc) }, "en")
 
   // U+FB01 LATIN SMALL LIGATURE FI
   // to upper case:
@@ -1780,7 +1780,7 @@ NSStringAPIs.test("uppercaseString(with:)") {
   // U+0069 LATIN SMALL LETTER I
   // But because the whole string is converted to uppercase, we get U+0049
   // LATIN CAPITAL LETTER I.
-  expectLocalizedEquality("\u{0046}\u{0049}", { loc in "\u{fb01}".uppercaseString(with: loc) }, "ru")
+  expectLocalizedEquality("\u{0046}\u{0049}", { loc in "\u{fb01}".uppercased(with: loc) }, "ru")
 }
 
 NSStringAPIs.test("write(toFile:atomically:encoding:error:)") {
