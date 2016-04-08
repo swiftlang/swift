@@ -5,7 +5,7 @@ import Foundation
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static  func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
     var result: Self? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -101,7 +101,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
     return value.description
   }
 
-  override  func isEqual(_ object: AnyObject!) -> Bool {
+  override func isEqual(_ object: AnyObject!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
@@ -182,7 +182,7 @@ class TestObjCEquatableValueTy : NSObject {
     serial = -serial
   }
 
-  override  func isEqual(_ object: AnyObject!) -> Bool {
+  override func isEqual(_ object: AnyObject!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCEquatableValueTy {
         return self.value == otherObjcKey.value
@@ -242,7 +242,7 @@ struct TestBridgedKeyTy
     return TestObjCKeyTy(value)
   }
 
-  static  func _forceBridgeFromObjectiveC(
+  static func _forceBridgeFromObjectiveC(
     _ x: TestObjCKeyTy,
     result: inout TestBridgedKeyTy?
   ) {
@@ -250,7 +250,7 @@ struct TestBridgedKeyTy
     result = TestBridgedKeyTy(x.value)
   }
 
-  static  func _conditionallyBridgeFromObjectiveC(
+  static func _conditionallyBridgeFromObjectiveC(
     _ x: TestObjCKeyTy,
     result: inout TestBridgedKeyTy?
   ) -> Bool {
@@ -303,7 +303,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
     return TestObjCValueTy(value)
   }
 
-  static  func _forceBridgeFromObjectiveC(
+  static func _forceBridgeFromObjectiveC(
     _ x: TestObjCValueTy,
     result: inout TestBridgedValueTy?
   ) {
@@ -311,7 +311,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
     result = TestBridgedValueTy(x.value)
   }
 
-  static  func _conditionallyBridgeFromObjectiveC(
+  static func _conditionallyBridgeFromObjectiveC(
     _ x: TestObjCValueTy,
     result: inout TestBridgedValueTy?
   ) -> Bool {
@@ -357,7 +357,7 @@ struct TestBridgedEquatableValueTy
     return TestObjCEquatableValueTy(value)
   }
 
-  static  func _forceBridgeFromObjectiveC(
+  static func _forceBridgeFromObjectiveC(
     _ x: TestObjCEquatableValueTy,
     result: inout TestBridgedEquatableValueTy?
   ) {
@@ -365,7 +365,7 @@ struct TestBridgedEquatableValueTy
     result = TestBridgedEquatableValueTy(x.value)
   }
 
-  static  func _conditionallyBridgeFromObjectiveC(
+  static func _conditionallyBridgeFromObjectiveC(
     _ x: TestObjCEquatableValueTy,
     result: inout TestBridgedEquatableValueTy?
   ) -> Bool {
