@@ -1500,7 +1500,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 -DSWIFT_VENDOR=Apple
                 -DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift
                 -DSWIFT_VERSION="${SWIFT_USER_VISIBLE_VERSION}"
-                -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
             )
             ;;
         *)
@@ -1523,7 +1522,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DCLANG_COMPILER_VERSION="${CLANG_COMPILER_VERSION}"
-            -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
         )
     fi
     if [[ "${SWIFT_COMPILER_VERSION}" ]] ; then
