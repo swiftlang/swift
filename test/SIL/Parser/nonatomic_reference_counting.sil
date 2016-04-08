@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
 
-// Check that all refernce counting instructions can take the [nonatomic]
+// Check that all reference counting instructions can take the [nonatomic]
 // attribute. SIL parser should be able to parse this attribute and
 // SIL printer should properly print it.
 

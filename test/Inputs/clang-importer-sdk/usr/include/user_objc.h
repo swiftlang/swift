@@ -35,7 +35,7 @@ typedef CF_OPTIONS(UInt32, AudioComponentInstantiationOptions) {
 typedef CF_OPTIONS(UInt32, AudioComponentFlags) {
   kAudioComponentFlag_Unsearchable    = 1,
   kAudioComponentFlag_SandboxSafe     = 2,
-  kAudioComponentFlag_IsV3AudioUnit	= 4
+  kAudioComponentFlag_IsV3AudioUnit   = 4
 };
 
 // ...and this one has both complications.
