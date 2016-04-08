@@ -38,11 +38,10 @@ internal func _abstract(file: StaticString = #file, line: UInt = #line) {
 /// iterator having the same `Element` type, hiding the specifics of the
 /// underlying `IteratorProtocol`.
 ///
-/// - seealso:
-///   - `struct AnySequence<S : Sequence>`
+/// - SeeAlso: `AnySequence`
 public struct AnyIterator<Element> : IteratorProtocol {
-  /// Create a `IteratorProtocol` instance that wraps `base` but whose type
-  /// depends only on the type of `I.Element`.
+  /// Creates an iterator that wraps `base` but whose type depends only on the
+  /// type of `I.Element`.
   ///
   /// Example:
   ///
@@ -59,8 +58,8 @@ public struct AnyIterator<Element> : IteratorProtocol {
     self._box = _IteratorBox(base)
   }
 
-  /// Create a `IteratorProtocol` instance whose `next` method invokes
-  /// `body` and returns the result.
+  /// Creates an iterator whose `next` method invokes `body` and returns the
+  /// result.
   ///
   /// Example:
   ///
@@ -75,7 +74,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
     self._box = _box
   }
 
-  /// Advance to the next element and return it, or `nil` if no next
+  /// Advances to the next element and returns it, or `nil` if no next
   /// element exists.
   public func next() -> Element? {
     return _box.next()
@@ -97,7 +96,7 @@ internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
 }
 
 internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
-  /// Advance to the next element and return it, or `nil` if no next
+  /// Advances to the next element and returns it, or `nil` if no next
   /// element exists.
   ///
   /// - Note: Subclasses must override this method.
@@ -366,9 +365,9 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
 /// same `Element` type, hiding the specifics of the underlying
 /// `Sequence`.
 ///
-/// - SeeAlso: `AnyIterator<Element>`.
+/// - SeeAlso: `AnyIterator`
 public struct AnySequence<Element> : Sequence {
-  /// Wrap and forward operations to `base`.
+  /// Creates a new sequence that wraps and forwards operations to `base`.
   public init<
     S : Sequence
     where
@@ -380,7 +379,7 @@ public struct AnySequence<Element> : Sequence {
     self._box = _SequenceBox(_base: base)
   }
 
-  /// Create a sequence whose `makeIterator()` method forwards to
+  /// Creates a sequence whose `makeIterator()` method forwards to
   /// `makeUnderlyingIterator`.
   public init<I : IteratorProtocol where I.Element == Element>(
     _ makeUnderlyingIterator: () -> I
@@ -519,7 +518,7 @@ internal final class _IndexBox<
 ///
 /// - SeeAlso: `AnyCollection`
 public struct AnyIndex : Comparable {
-  /// Wrap and forward operations to `base`.
+  /// Creates a new index wrapping `base`.
   public init<BaseIndex : Comparable>(_ base: BaseIndex) {
     self._box = _IndexBox(_base: base)
   }
@@ -616,13 +615,13 @@ public func !== <
 /// same `Element` type, hiding the specifics of the underlying
 /// `Collection`.
 ///
-/// - SeeAlso: ${', '.join('`Any%s`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
+/// - SeeAlso: ${', '.join('`Any%s`' % collectionForTraversal(t) for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
 public struct ${Self}<Element>
   : AnyCollectionProtocol, ${SelfProtocol} {
 
 %   for SubTraversal in TRAVERSALS[ti:]:
 %     SubProtocol = collectionForTraversal(SubTraversal)
-  /// Create an `${Self}` that
+  /// Creates an `${Self}` that
   /// stores `base` as its underlying collection.
   ///
   /// - Complexity: O(1).
@@ -650,7 +649,7 @@ public struct ${Self}<Element>
       endIndex: _IndexBox(_base: base.endIndex))
   }
 
-  /// Create an `Any${Traversal}Collection` having the same underlying
+  /// Creates an `Any${Traversal}Collection` having the same underlying
   /// collection as `other`.
   ///
   /// - Postcondition: The result is `===` to `other`.
@@ -665,7 +664,7 @@ public struct ${Self}<Element>
 
 %   for SuperTraversal in TRAVERSALS[:ti]:
   /// If the underlying collection stored by `other` satisfies
-  /// `${SelfProtocol}`, create an `${Self}` having the same
+  /// `${SelfProtocol}`, creates an `${Self}` having the same
   /// underlying collection as `other`.  Otherwise, the result is
   /// `nil`.
   ///
@@ -702,12 +701,12 @@ public struct ${Self}<Element>
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
+  /// `successor(of:)`.
   public var endIndex: AnyIndex {
     return AnyIndex(_box: _box._endIndex)
   }
 
-  /// Access the element indicated by `position`.
+  /// Accesses the element indicated by `position`.
   ///
   /// - Precondition: `position` indicates a valid position in `self` and
   ///   `position != endIndex`.
