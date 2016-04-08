@@ -730,6 +730,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @discardableResult
   public mutating func remove(at i: Index) -> Character {
     return withMutableCharacters {
       (v: inout CharacterView) in v.remove(at: i)

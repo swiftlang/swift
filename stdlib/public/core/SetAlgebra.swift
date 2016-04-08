@@ -85,6 +85,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// `nil`.
   ///
   /// - Postcondition: `self.intersect([member]).isEmpty`
+  @discardableResult
   mutating func remove(_ member: Element) -> Element?
 
   /// Insert all elements of `other` into `self`.

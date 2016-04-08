@@ -167,6 +167,7 @@ public struct LoggingRangeReplaceableCollection<
     base.insert(newElement, at: i)
   }
 
+  @discardableResult
   public mutating func remove(at index: Base.Index) -> Base.Iterator.Element {
     Log.removeAt[selfType] += 1
     return base.remove(at: index)
@@ -182,6 +183,7 @@ public struct LoggingRangeReplaceableCollection<
     return base._customRemoveLast(n)
   }
 
+  @discardableResult
   public mutating func removeFirst() -> Base.Iterator.Element {
     Log.removeFirst[selfType] += 1
     return base.removeFirst()
