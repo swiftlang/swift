@@ -2910,7 +2910,9 @@ namespace {
     ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr) 
       : CS(cs), ParentMap(expr->getParentMap()) { }
 
-    void associateArgumentLabels(Expr *arg, ArrayRef<Identifier> labels,
+    using State = ConstraintSystem::ArgumentLabelState;
+
+    void associateArgumentLabels(Expr *arg, State labels,
                                  bool labelsArePermanent) {
       // Our parent must be a call.
       auto call = dyn_cast_or_null<CallExpr>(ParentMap[arg]);
@@ -2941,21 +2943,28 @@ namespace {
 
       // Record the labels.
       if (!labelsArePermanent)
-        labels = CS.allocateCopy(labels);
+        labels.Labels = CS.allocateCopy(labels.Labels);
       CS.ArgumentLabels[CS.getConstraintLocator(fn)] = labels;
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (auto tuple = dyn_cast<TupleExpr>(expr)) {
         if (tuple->hasElementNames())
-          associateArgumentLabels(expr, tuple->getElementNames(), true);
+          associateArgumentLabels(expr,
+                                  { tuple->getElementNames(),
+                                    tuple->hasTrailingClosure() },
+                                  /*labelsArePermanent*/ true);
         else {
           llvm::SmallVector<Identifier, 4> names(tuple->getNumElements(),
                                                  Identifier()); 
-          associateArgumentLabels(expr, names, false);
+          associateArgumentLabels(expr, { names, tuple->hasTrailingClosure() },
+                                  /*labelsArePermanent*/ false);
         }
       } else if (auto paren = dyn_cast<ParenExpr>(expr)) {
-        associateArgumentLabels(paren, { Identifier() }, false);
+        associateArgumentLabels(paren,
+                                { { Identifier() },
+                                  paren->hasTrailingClosure() },
+                                /*labelsArePermanent*/ false);
       }
 
       return { true, expr };
