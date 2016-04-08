@@ -109,9 +109,17 @@ public func spawnChild(_ args: [String])
   }
 
   var pid: pid_t = -1
-  let spawnResult = withArrayOfCStrings([ Process.arguments[0] ] as Array + args) {
+  var childArgs = args
+  childArgs.insert(Process.arguments[0], at: 0)
+  let interpreter = getenv("SWIFT_INTERPRETER")
+  if interpreter != nil {
+    if let invocation = String(validatingUTF8: interpreter) {
+      childArgs.insert(invocation, at: 0)
+    }
+  }
+  let spawnResult = withArrayOfCStrings(childArgs) {
     swift_posix_spawn(
-      &pid, Process.arguments[0], &fileActions, nil, $0, _getEnviron())
+      &pid, childArgs[0], &fileActions, nil, $0, _getEnviron())
   }
   if spawnResult != 0 {
     print(String(cString: strerror(spawnResult)))

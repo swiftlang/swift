@@ -432,7 +432,14 @@ func _stdlib_getline() -> String? {
 
 func _printDebuggingAdvice(_ fullTestName: String) {
   print("To debug, run:")
-  print("$ \(Process.arguments[0]) " +
+  var invocation = [Process.arguments[0]]
+  let interpreter = getenv("SWIFT_INTERPRETER")
+  if interpreter != nil {
+    if let interpreterCmd = String(validatingUTF8: interpreter) {
+        invocation.insert(interpreterCmd, at: 0)
+    }
+  }
+  print("$ \(invocation.joined(separator: " ")) " +
     "--stdlib-unittest-in-process --stdlib-unittest-filter \"\(fullTestName)\"")
 }
 
