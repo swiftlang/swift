@@ -410,7 +410,7 @@ public struct ${Self}<Pointee>
   @_transparent public
   func _withBridgeObject<U : AnyObject, R>(
     _ buffer: inout U?,
-	@noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
+  @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
