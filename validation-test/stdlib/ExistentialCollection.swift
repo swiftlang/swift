@@ -52,17 +52,19 @@ extension AnyRandomAccessCollection where Element : TestProtocol1 {
 var tests = TestSuite("ExistentialCollection")
 
 tests.test("AnyIterator") {
-  func digits() -> AnyIterator<String> {
-    let lazyStrings = (0..<5).lazy.map { String($0) }
-    
+  func digits() -> AnyIterator<OpaqueValue<Int>> {
+    let integers: CountableRange = 0..<5
+    let lazyIntegers = integers.lazy
+    let lazyStrings = lazyIntegers.map { OpaqueValue($0) }
+
     // This is a really complicated type of no interest to our
     // clients.
     let iterator: LazyMapIterator<
-        IndexingIterator<CountableRange<Int>>, String
+        IndexingIterator<CountableRange<Int>>, OpaqueValue<Int>
       > = lazyStrings.makeIterator()
     return AnyIterator(iterator)
   }
-  expectEqual(["0", "1", "2", "3", "4"], Array(digits()))
+  expectEqual([0, 1, 2, 3, 4], Array(digits()).map { $0.value })
 
   var x = 7
   let iterator = AnyIterator<Int> {
