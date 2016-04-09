@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -generic-specializer | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -generic-specializer -cse | FileCheck %s
 
 // Check that SIL cloner can correctly handle specialization of recursive
 // functions with generic arguments.
@@ -88,4 +88,62 @@ bb0:
   dealloc_stack %4 : $*Double    // id: %12
   %13 = tuple ()                                  // user: %14
   return %13 : $()                                // id: %14
+}
+
+
+public class C : P {}
+
+public protocol P {}
+
+sil hidden [noinline] @helper : $@convention(thin) <T> (@in T, @in P) -> @owned Optional<C> {
+bb0(%0 : $*T, %1 : $*P):
+  %4 = alloc_stack $P
+  copy_addr %1 to [initialization] %4 : $*P
+  %6 = alloc_stack $C
+  checked_cast_addr_br take_always P in %4 : $*P to C in %6 : $*C, bb1, bb2
+bb1:
+  %8 = load %6 : $*C
+  %9 = enum $Optional<C>, #Optional.some!enumelt.1, %8 : $C
+  dealloc_stack %6 : $*C
+  br bb3(%9 : $Optional<C>)
+bb2:
+  %12 = enum $Optional<C>, #Optional.none!enumelt
+  dealloc_stack %6 : $*C
+  br bb3(%12 : $Optional<C>)
+
+bb3(%15 : $Optional<C>):
+  dealloc_stack %4 : $*P
+  destroy_addr %1 : $*P
+  destroy_addr %0 : $*T
+  return %15 : $Optional<C>
+}
+
+// CHECK-LABEL: sil shared @_TTSg5C4main1CS0_S_1PS___lookup
+sil @lookup : $@convention(method) <Self where Self : P> (@owned C, @in_guaranteed Self) -> @owned Optional<C> {
+bb0(%0 : $C, %1 : $*Self):
+  // CHECK: [[HELPER:%.*]] = function_ref @_TTSg5Vs5Int32__helper
+  %4 = function_ref @helper : $@convention(thin) <τ_0_0> (@in τ_0_0, @in P) -> @owned Optional<C>
+  %5 = integer_literal $Builtin.Int32, 1
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %7 = alloc_stack $Int32
+  store %6 to %7 : $*Int32
+  %9 = alloc_stack $P
+  %10 = init_existential_addr %9 : $*P, $Self
+  copy_addr %1 to [initialization] %10 : $*Self
+  // CHECK: apply [[HELPER]]
+  // CHECK-NOT: apply [[HELPER]]
+  %12 = apply %4<Int32>(%7, %9) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in P) -> @owned Optional<C>
+  release_value %12 : $Optional<C>
+  dealloc_stack %9 : $*P
+  dealloc_stack %7 : $*Int32
+  // CHECK: [[LOOKUP:%.*]] = function_ref @_TTSg5C4main1CS0_S_1PS___lookup
+  %16 = function_ref @lookup : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned C, @in_guaranteed τ_0_0) -> @owned Optional<C>
+  %17 = alloc_stack $C
+  store %0 to %17 : $*C
+  strong_retain %0 : $C
+  // CHECK: apply [[LOOKUP]]
+  %20 = apply %16<C>(%0, %17) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned C, @in_guaranteed τ_0_0) -> @owned Optional<C>
+  dealloc_stack %17 : $*C
+  strong_release %0 : $C
+  return %20 : $Optional<C>
 }
