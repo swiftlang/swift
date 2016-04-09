@@ -76,9 +76,12 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 #if SWIFT_OBJC_INTEROP
 struct SwiftObject_s {
   void *isa  __attribute__((unavailable));
-  long refCount  __attribute__((unavailable));
+  uint32_t strongRefCount  __attribute__((unavailable));
+  uint32_t weakRefCount  __attribute__((unavailable));
 };
 
+static_assert(sizeof(SwiftObject_s) == sizeof(HeapObject),
+              "SwiftObject and HeapObject must have the same header");
 static_assert(std::is_trivially_constructible<SwiftObject_s>::value,
               "SwiftObject must be trivially constructible");
 static_assert(std::is_trivially_destructible<SwiftObject_s>::value,
