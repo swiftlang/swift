@@ -44,12 +44,19 @@ Functions:
 - Name: CGRectIntersectsRect
   SwiftName: "CGRect.intersects(self:_:)"
 # The below are not available in Swift
+# TODO: make these unavailable, but they're needed for pre-iOS 9
 - Name: CGColorSpaceCreateDeviceGray
-  Availability: nonswift
+  SwiftName: CGColorSpaceCreateDeviceGray()
 - Name: CGColorSpaceCreateDeviceRGB
-  Availability: nonswift
+  SwiftName: CGColorSpaceCreateDeviceRGB()
 - Name: CGColorSpaceCreateDeviceCMYK
-  Availability: nonswift
+  SwiftName: CGColorSpaceCreateDeviceCMYK()
+# - Name: CGColorSpaceCreateDeviceGray
+#   Availability: nonswift
+# - Name: CGColorSpaceCreateDeviceRGB
+#   Availability: nonswift
+# - Name: CGColorSpaceCreateDeviceCMYK
+#   Availability: nonswift
 
 # The below are attempts at providing better names than inference
 # CGAffineTransform
