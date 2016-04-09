@@ -89,13 +89,7 @@ static_assert(std::is_trivially_destructible<SwiftObject_s>::value,
 __attribute__((objc_root_class))
 #endif
 @interface SwiftObject<NSObject> {
-  // FIXME: rdar://problem/18950072 Clang emits ObjC++ classes as having
-  // non-trivial structors if they contain any struct fields at all, regardless of
-  // whether they in fact have nontrivial default constructors. Dupe the body
-  // of SwiftObject_s into here as a workaround because we don't want to pay
-  // the cost of .cxx_destruct method dispatch at deallocation time.
-  void *magic_isa  __attribute__((unavailable));
-  long magic_refCount  __attribute__((unavailable));
+  SwiftObject_s header;
 }
 
 - (BOOL)isEqual:(id)object;
