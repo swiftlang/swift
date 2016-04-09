@@ -104,8 +104,8 @@ public class CollectionLog : SequenceLog {
   public static var subscriptRange = TypeIndexed(0)
   public static var _failEarlyRangeCheckIndex = TypeIndexed(0)
   public static var _failEarlyRangeCheckRange = TypeIndexed(0)
-  public static var next = TypeIndexed(0)
-  public static var _nextInPlace = TypeIndexed(0)
+  public static var successor = TypeIndexed(0)
+  public static var formSuccessor = TypeIndexed(0)
   public static var indices = TypeIndexed(0)
   public static var prefixUpTo = TypeIndexed(0)
   public static var prefixThrough = TypeIndexed(0)
@@ -126,8 +126,8 @@ public class BidirectionalCollectionLog : SequenceLog {
     return LoggingBidirectionalCollection(
       wrapping: LoggingBidirectionalCollection(wrapping: c))
   }
-  public static var previous = TypeIndexed(0)
-  public static var _previousInPlace = TypeIndexed(0)
+  public static var predecessor = TypeIndexed(0)
+  public static var formPredecessor = TypeIndexed(0)
   public static var last = TypeIndexed(0)
 }
 
@@ -362,12 +362,12 @@ public struct ${Self}<
 
   @warn_unused_result
   public func successor(of i: Index) -> Index {
-    Log.next[selfType] += 1
+    Log.successor[selfType] += 1
     return base.successor(of: i)
   }
 
   public func formSuccessor(i: inout Index) {
-    Log._nextInPlace[selfType] += 1
+    Log.formSuccessor[selfType] += 1
     base.formSuccessor(&i)
   }
 
@@ -545,12 +545,12 @@ public struct ${Self}<
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
   public func predecessor(of i: Index) -> Index {
-    BidirectionalCollectionLog.previous[selfType] += 1
+    BidirectionalCollectionLog.predecessor[selfType] += 1
     return base.predecessor(of: i)
   }
 
   public func formPredecessor(i: inout Index) {
-    BidirectionalCollectionLog._previousInPlace[selfType] += 1
+    BidirectionalCollectionLog.formPredecessor[selfType] += 1
     base.formPredecessor(&i)
   }
 
