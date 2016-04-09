@@ -3,7 +3,6 @@
 // This limit was chosen because multi-threaded compilation broke here on OS X
 // at one point.
 // RUN: for i in {1..1100}; do echo "public func foo$i() {}" > %t/$i.swift; echo "CHECK: foo$i" >> %t/check.txt; done
-// RUN: false
 
 // We're not using %target-swift-build because we don't want to run into any
 // limits *xcrun* has on arguments.
