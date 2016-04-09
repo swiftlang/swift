@@ -224,9 +224,9 @@ Functions:
 - Name: CGContextSetAllowsFontSubpixelQuantization
   SwiftName: CGContextRef.setAllowsFontSubpixelQuantization(self:_:)
 - Name: CGContextBeginTransparencyLayer
-  SwiftName: CGContextRef.beginTransparencyLayer(self:withAuxilaryInfo:)
+  SwiftName: CGContextRef.beginTransparencyLayer(self:withAuxiliaryInfo:)
 - Name: CGContextBeginTransparencyLayerWithRect
-  SwiftName: CGContextRef.beginTransparencyLayer(self:in:auxilaryInfo:)
+  SwiftName: CGContextRef.beginTransparencyLayer(self:in:auxiliaryInfo:)
 # CGEvent
 - Name: CGEventCreateFromData
   SwiftName: CGEventRef.init(withDataAllocator:data:)
