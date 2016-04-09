@@ -147,7 +147,7 @@ internal class _AnySequenceBox<Element> {
 
 internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element> {
   internal subscript(i: _AnyIndexBox) -> Element { _abstract() }
-  internal subscript(start: _AnyIndexBox, end: _AnyIndexBox)
+  internal subscript(start start: _AnyIndexBox, end end: _AnyIndexBox)
     -> _AnyCollectionBox<Element> { _abstract() }
   internal var _count: IntMax { _abstract() }
   // TODO: swift-3-indexing-model: forward the following methods.
@@ -218,6 +218,9 @@ internal class _AnyBidirectionalCollectionBox<Element>
   internal func _predecessor(of i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
   internal func _formPredecessor(i: _AnyIndexBox) { _abstract() }
 
+  internal override subscript(start start: _AnyIndexBox, end end: _AnyIndexBox)
+    -> _AnyBidirectionalCollectionBox<Element> { _abstract() }
+
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
   var last: Iterator.Element? { _abstract() }
@@ -233,6 +236,9 @@ internal class _AnyBidirectionalCollectionBox<Element>
 
 internal class _AnyRandomAccessCollectionBox<Element>
   : _AnyBidirectionalCollectionBox<Element> {
+
+  internal override subscript(start start: _AnyIndexBox, end end: _AnyIndexBox)
+    -> _AnyRandomAccessCollectionBox<Element> { _abstract() }
 
   internal override init(
     _startIndex: _AnyIndexBox,
@@ -251,6 +257,11 @@ internal final class _${Kind}Box<
   S.SubSequence.SubSequence == S.SubSequence
 %   if Kind != 'Sequence':
   ,
+  S.SubSequence.Index == S.Index,
+  S.SubSequence.Indices : ${Kind},
+  S.SubSequence.Indices.Iterator.Element == S.Index,
+  S.SubSequence.Indices.Index == S.Index,
+  S.SubSequence.Indices.SubSequence == S.SubSequence.Indices,
   S.Indices : ${Kind},
   S.Indices.Iterator.Element == S.Index,
   S.Indices.Index == S.Index,
@@ -286,6 +297,13 @@ internal final class _${Kind}Box<
     self._base = _base
   }
 %   else:
+  internal init(_base: S) {
+    self._base = _base
+    super.init(
+      _startIndex: _IndexBox(_base: _base.startIndex),
+      endIndex: _IndexBox(_base: _base.endIndex))
+  }
+
   internal override var _count: IntMax {
     return numericCast(_base.count)
   }
@@ -302,16 +320,15 @@ internal final class _${Kind}Box<
   internal override subscript(position: _AnyIndexBox) -> Element {
     return _base[_unbox(position)]
   }
-  
-  internal init(
-    _base: S,
-    startIndex: _AnyIndexBox,
-    endIndex: _AnyIndexBox
-  ) {
-    self._base = _base
-    super.init(_startIndex: startIndex, endIndex: endIndex)
+
+  internal override subscript(start start: _AnyIndexBox, end end: _AnyIndexBox)
+    -> _Any${Kind}Box<Element>
+  {
+    return _${Kind}Box<S.SubSequence>(_base:
+      _base[_unbox(start)..<_unbox(end)]
+    )
   }
-  
+
   @warn_unused_result
   internal override func _successor(of position: _AnyIndexBox) -> _AnyIndexBox {
     return _IndexBox(_base: _base.successor(of: _unbox(position)))
@@ -619,6 +636,10 @@ public func !== <
 public struct ${Self}<Element>
   : AnyCollectionProtocol, ${SelfProtocol} {
 
+  internal init(_box: _${Self}Box<Element>) {
+    self._box = _box
+  }
+
 %   for SubTraversal in TRAVERSALS[ti:]:
 %     SubProtocol = collectionForTraversal(SubTraversal)
   /// Creates an `${Self}` that
@@ -635,6 +656,10 @@ public struct ${Self}<Element>
     C.SubSequence : ${SubProtocol},
     C.SubSequence.Iterator.Element == Element,
     C.SubSequence.Index == C.Index,
+    C.SubSequence.Indices : ${SubProtocol},
+    C.SubSequence.Indices.Iterator.Element == C.Index,
+    C.SubSequence.Indices.Index == C.Index,
+    C.SubSequence.Indices.SubSequence == C.SubSequence.Indices,
     C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : ${SubProtocol},
     C.Indices.Iterator.Element == C.Index,
@@ -644,9 +669,7 @@ public struct ${Self}<Element>
     // Traversal: ${Traversal}
     // SubTraversal: ${SubTraversal}
     self._box = _${SubProtocol}Box<C>(
-      _base: base,
-      startIndex: _IndexBox(_base: base.startIndex),
-      endIndex: _IndexBox(_base: base.endIndex))
+      _base: base)
   }
 
   /// Creates an `Any${Traversal}Collection` having the same underlying
@@ -714,10 +737,9 @@ public struct ${Self}<Element>
     return _box[position._box]
   }
 
-  public subscript(bounds: Range<AnyIndex>)
-    -> ${Self}<Element>
-  {
-    fatalError("FIXME: swift-3-indexing-model: implement")
+  public subscript(bounds: Range<AnyIndex>) -> ${Self}<Element> {
+    return ${Self}(_box:
+      _box[start: bounds.lowerBound._box, end: bounds.upperBound._box])
   }
 
   /// The number of elements.

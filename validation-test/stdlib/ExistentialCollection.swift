@@ -15,7 +15,6 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-
 // Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
 
@@ -75,93 +74,6 @@ tests.test("AnyIterator") {
   expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(iterator))
 }
 
-let initialCallCounts = [
-  "successor": 0, "predecessor": 0,
-  "_successorInPlace": 0, "_predecessorInPlace": 0,
-  "advance(_:by:)": 0, "distance(from:to:)": 0
-]
-
-var callCounts = initialCallCounts
-
-struct InstrumentedCollection<
-  C : RandomAccessCollection
-> : RandomAccessCollection {
-
-  typealias Index = C.Index
-  typealias Iterator = C.Iterator
-  typealias IndexDistance = C.IndexDistance
-
-  typealias SubSequence = C.SubSequence
-  typealias Indices = C.Indices
-
-  var base: C
-
-  init(_ base: C) {
-    self.base = base
-  }
-
-  static func resetCounts() {
-    callCounts = initialCallCounts
-  }
-
-  @warn_unused_result
-  func next(i: Index) -> Index {
-    callCounts["successor"]! += 1
-    return base.next(i)
-  }
-
-  func _nextInPlace(i: inout Index) {
-    callCounts["_successorInPlace"]! += 1
-    base._nextInPlace(&i)
-  }
-
-  @warn_unused_result
-  func previous(i: Index) -> Index {
-    callCounts["predecessor"]! += 1
-    return base.previous(i)
-  }
-
-  func _previousInPlace(i: inout Index) {
-    callCounts["_predecessorInPlace"]! += 1
-    base._previousInPlace(&i)
-  }
-
-  func index(n: IndexDistance, stepsFrom i: Index) -> Index {
-    callCounts["advance(_:by:)"]! += 1
-    return base.index(n, stepsFrom: i)
-  }
-
-  func distance(from start: Index, to end: Index) -> IndexDistance {
-    callCounts["distance(from:to:)"]! += 1
-    return base.distance(from: start, to: end)
-  }
-
-  var startIndex: Index {
-    return base.startIndex
-  }
-
-  var endIndex: Index {
-    return base.endIndex
-  }
-
-  subscript(i: Index) -> Iterator.Element {
-    fatalError()
-  }
-
-  subscript(bounds: Range<Index>) -> SubSequence {
-    fatalError()
-  }
-
-  func makeIterator() -> Iterator {
-    return base.makeIterator()
-  }
-
-  var indices: Indices {
-    return base.indices
-  }
-
-}
-
 tests.test("AnySequence.init(Sequence)") {
   do {
     let base = MinimalSequence<OpaqueValue<Int>>(elements: [])
@@ -199,43 +111,60 @@ tests.test("AnySequence.init(() -> Generator)") {
 }
 
 tests.test("AnyCollection successor/predecessor") {
-  let c = AnyCollection(InstrumentedCollection(0..<10))
+  typealias Base = LoggingCollection<MinimalCollection<OpaqueValue<Int>>>
+  typealias Log = CollectionLog
+  let base = Base(wrapping:
+    MinimalCollection(elements: (0..<10).map(OpaqueValue.init)))
+  let c = AnyCollection(base)
   var i = c.startIndex
 
-  i = c.next(i)
-  expectEqual(1, callCounts["successor"])
-  expectEqual(0, callCounts["_successorInPlace"])
+  Log.successor.expectIncrement(Base.self) {
+    Log.formSuccessor.expectUnchanged(Base.self) {
+      i = c.successor(of: i)
+    }
+  }
 
-  c._nextInPlace(&i)
-  expectEqual(1, callCounts["successor"])
-  expectEqual(1, callCounts["_successorInPlace"])
+  Log.successor.expectUnchanged(Base.self) {
+    Log.formSuccessor.expectIncrement(Base.self) {
+      c.formSuccessor(&i)
+    }
+  }
 
   var x = i
-  i = c.next(i)
-  expectEqual(2, callCounts["successor"])
-  expectEqual(1, callCounts["_successorInPlace"])
+  Log.successor.expectIncrement(Base.self) {
+    Log.formSuccessor.expectUnchanged(Base.self) {
+      i = c.successor(of: i)
+    }
+  }
   _blackHole(x)
 }
 
 tests.test("AnyBidirectionalCollection successor/predecessor") {
-  let c = AnyBidirectionalCollection(InstrumentedCollection(0..<10))
-  var i = c.startIndex
+  typealias Base = LoggingBidirectionalCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>
+  typealias Log = BidirectionalCollectionLog
+  let base = Base(wrapping:
+    MinimalBidirectionalCollection(elements: (0..<10).map(OpaqueValue.init)))
+  let c = AnyBidirectionalCollection(base)
+  var i = c.endIndex
 
-  expectEqual(0, callCounts["predecessor"])
-  expectEqual(0, callCounts["_predecessorInPlace"])
+  Log.predecessor.expectIncrement(Base.self) {
+    Log.formPredecessor.expectUnchanged(Base.self) {
+      i = c.predecessor(of: i)
+    }
+  }
 
-  i = c.previous(i)
-  expectEqual(1, callCounts["predecessor"])
-  expectEqual(0, callCounts["_predecessorInPlace"])
-
-  c._previousInPlace(&i)
-  expectEqual(1, callCounts["predecessor"])
-  expectEqual(1, callCounts["_predecessorInPlace"])
+  Log.predecessor.expectUnchanged(Base.self) {
+    Log.formPredecessor.expectIncrement(Base.self) {
+      c.formPredecessor(&i)
+    }
+  }
 
   var x = i
-  i = c.previous(i)
-  expectEqual(2, callCounts["predecessor"])
-  expectEqual(1, callCounts["_predecessorInPlace"])
+  Log.predecessor.expectIncrement(Base.self) {
+    Log.formPredecessor.expectUnchanged(Base.self) {
+      i = c.predecessor(of: i)
+    }
+  }
   _blackHole(x)
 }
 
