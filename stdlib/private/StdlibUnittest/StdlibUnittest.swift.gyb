@@ -337,9 +337,18 @@ public func expectIndexable<X : Indexable>(x: X) -> X { return x }
 public func expectCollectionType<
   X : Collection
   where
+
+  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // the 'where' clause, all of these should be required by the protocol.
   X.SubSequence : Collection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.SubSequence == X.SubSequence
+  X.SubSequence.Index == X.Index,
+  // X.SubSequence.Indices == X.Indices, // FIXME: can't have this constraint now.
+  X.SubSequence.SubSequence == X.SubSequence,
+  X.Indices : Collection,
+  X.Indices.Iterator.Element == X.Index,
+  X.Indices.Index == X.Index,
+  X.Indices.SubSequence == X.Indices
 >(x: X) -> X { return x }
 
 /// A slice is a `Collection` that when sliced returns an instance of
@@ -364,11 +373,13 @@ public func expectCollectionAssociatedTypes<
   X : Collection
   where
 
-  // FIXME(compiler limitation): these constraints should be applied to
-  // associated types of Collection.
+  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
   X.SubSequence : Collection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
+  X.SubSequence.Index == X.Index,
+  // X.SubSequence.Indices == X.Indices, // FIXME: can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : Collection,
   X.Indices.Iterator.Element == X.Index,
@@ -389,11 +400,13 @@ public func expectBidirectionalCollectionAssociatedTypes<
   X : BidirectionalCollection
   where
 
-  // FIXME(compiler limitation): these constraints should be applied to
-  // associated types of Collection.
+  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
   X.SubSequence : BidirectionalCollection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
+  X.SubSequence.Index == X.Index,
+  // X.SubSequence.Indices == X.Indices, // FIXME: can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : BidirectionalCollection,
   X.Indices.Iterator.Element == X.Index,
@@ -414,11 +427,13 @@ public func expectRandomAccessCollectionAssociatedTypes<
   X : RandomAccessCollection
   where
 
-  // FIXME(compiler limitation): these constraints should be applied to
-  // associated types of Collection.
+  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
   X.SubSequence : RandomAccessCollection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
+  X.SubSequence.Index == X.Index,
+  // X.SubSequence.Indices == X.Indices, // FIXME: can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : RandomAccessCollection,
   X.Indices.Iterator.Element == X.Index,
