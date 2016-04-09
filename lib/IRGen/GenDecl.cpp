@@ -117,9 +117,9 @@ public:
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
                                                    IGM.ObjCClassPtrTy);
 
-    // We need to make sure the Objective C runtime has initialized our
+    // We need to make sure the Objective-C runtime has initialized our
     // class. If you try to add or replace a method to a class that isn't
-    // initialized yet, the Objective C runtime will crash in the calls
+    // initialized yet, the Objective-C runtime will crash in the calls
     // to class_replaceMethod or class_addProtocol.
     Builder.CreateCall(IGM.getGetInitializedObjCClassFn(), classMetadata);
 
