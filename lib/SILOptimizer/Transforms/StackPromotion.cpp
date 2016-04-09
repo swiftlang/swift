@@ -62,8 +62,8 @@ class StackPromoter {
   //   unreachable  bb2
   //                  \
   //
-  // We want to get bb2 as immediate post-domiator of bb1. This is not the case
-  // with the regualar post-dominator tree.
+  // We want to get bb2 as immediate post-dominator of bb1. This is not the case
+  // with the regular post-dominator tree.
   llvm::DominatorTreeBase<SILBasicBlock> PostDomTree;
 
   bool PostDomTreeValid;

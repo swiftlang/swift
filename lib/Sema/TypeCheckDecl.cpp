@@ -2047,7 +2047,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   }
 }
 
-/// Figure out if a declaration should be exported to Objective C.
+/// Figure out if a declaration should be exported to Objective-C.
 static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
                                              const ValueDecl *VD,
                                              bool allowImplicit = false){

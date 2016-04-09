@@ -1324,7 +1324,7 @@ SWIFT_RT_ENTRY_VISIBILITY
 extern "C" Class swift_getInitializedObjCClass(Class c)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   // Used when we have class metadata and we want to ensure a class has been
-  // initialized by the Objective C runtime. We need to do this because the
+  // initialized by the Objective-C runtime. We need to do this because the
   // class "c" might be valid metadata, but it hasn't been initialized yet.
   return [c class];
 }

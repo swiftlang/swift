@@ -2722,7 +2722,7 @@ Swift 2.2
 
   In many common cases, this will just work.  Unfortunately, values
   are returned from `CF`-style APIs in a wide variety of ways, and
-  unlike Objective C methods, there simply isn't enough consistency
+  unlike Objective-C methods, there simply isn't enough consistency
   for Swift to be able to safely apply the documented conventions
   universally.  The framework teams have already audited many of the
   most important `CF`-style APIs, and those APIs should be imported

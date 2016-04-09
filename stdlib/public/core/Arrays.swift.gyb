@@ -318,7 +318,7 @@ public struct ${Self}<Element>
     if _isClassOrObjCExistential(Element.self) {
       // We are hiding the access to '_buffer.owner' behind
       // _getOwner() to help the compiler hoist uniqueness checks in
-      // the case of class or objective c existential typed array
+      // the case of class or Objective-C existential typed array
       // elements. 
       return _getOwnerWithSemanticLabel_native()
     }
