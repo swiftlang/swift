@@ -41,8 +41,18 @@ extension DictionaryIterator
   }
 }
 
-
 var DictionaryTestSuite = TestSuite("Dictionary")
+
+DictionaryTestSuite.test("AssociatedTypes") {
+  typealias Collection = Dictionary<MinimalHashableValue, OpaqueValue<Int>>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: DictionaryIterator<MinimalHashableValue, OpaqueValue<Int>>.self,
+    subSequenceType: Slice<Collection>.self,
+    indexType: DictionaryIndex<MinimalHashableValue, OpaqueValue<Int>>.self,
+    indexDistanceType: Int.self,
+    indicesType: DefaultIndices<Collection>.self)
+}
 
 DictionaryTestSuite.test("sizeof") {
   var dict = [ 1: "meow", 2: "meow" ]

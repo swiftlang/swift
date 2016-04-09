@@ -725,6 +725,20 @@ ArrayTestSuite.test("${array_type}<Void>/map") {
 //===----------------------------------------------------------------------===//
 
 % for array_type in all_array_types:
+ArrayTestSuite.test("${array_type}/AssociatedTypes") {
+  typealias Collection = ${array_type}<OpaqueValue<Int>>
+  typealias CollectionSlice = ArraySlice<OpaqueValue<Int>>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: IndexingIterator<Collection>.self,
+    subSequenceType: CollectionSlice.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
+% end
+
+% for array_type in all_array_types:
 %     collection_or_slice = 'Slice' if 'Slice' in array_type else 'Collection'
 
 do {

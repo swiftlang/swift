@@ -296,6 +296,17 @@ func getBridgedNSSet_MemberTypesCustomBridged() -> NSSet {
   return bridged
 }
 
+SetTestSuite.test("AssociatedTypes") {
+  typealias Collection = Set<MinimalHashableValue>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: SetIterator<MinimalHashableValue>.self,
+    subSequenceType: Slice<Collection>.self,
+    indexType: SetIndex<MinimalHashableValue>.self,
+    indexDistanceType: Int.self,
+    indicesType: DefaultIndices<Collection>.self)
+}
+
 SetTestSuite.test("sizeof") {
   var s = Set(["Hello", "world"])
 #if arch(i386) || arch(arm)
