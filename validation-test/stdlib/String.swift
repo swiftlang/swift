@@ -57,9 +57,9 @@ func checkUnicodeScalarViewIteration(
     let end = us.endIndex
     var decoded: [UInt32] = []
     while i != end {
-      expectTrue(i < i.successor()) // Check for Comparable conformance
+      expectTrue(i < us.successor(of: i)) // Check for Comparable conformance
       decoded.append(us[i].value)
-      i = i.successor()
+      i = us.successor(of: i)
     }
     expectEqual(expectedScalars, decoded)
   }
@@ -69,7 +69,7 @@ func checkUnicodeScalarViewIteration(
     var i = us.endIndex
     var decoded: [UInt32] = []
     while i != start {
-      i = i.predecessor()
+      i = us.predecessor(of: i)
       decoded.append(us[i].value)
     }
     expectEqual(expectedScalars, decoded)

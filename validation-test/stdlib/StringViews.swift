@@ -612,9 +612,12 @@ tests.test("UTF8 indexes") {
   // CHECK-NEXT: true
   let abc = "abcdefghijklmnop"
   
-  expectEqual(
-    String.UTF8Index(abc.startIndex, within: abc.utf8).successor(),
-    String.UTF8Index(abc.successor(of: abc.startIndex), within: abc.utf8))
+  do {
+    let start = String.UTF8Index(abc.startIndex, within: abc.utf8)
+    expectEqual(
+      abc.utf8.successor(of: start),
+      String.UTF8Index(abc.successor(of: abc.startIndex), within: abc.utf8))
+  }
 
   let diverseCharacters = summer + winter + winter + summer
   let s = diverseCharacters.unicodeScalars
