@@ -23,7 +23,7 @@ import sys
 def _output(args):
     try:
         out = subprocess.check_output(args, stderr=subprocess.PIPE)
-        return out.rstrip()
+        return out.rstrip().decode()
     except subprocess.CalledProcessError:
         return None
 
