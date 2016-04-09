@@ -28,7 +28,7 @@
 
 using namespace swift;
 
-STATISTIC(NumPropertiesReplaced,    "Number of array property calls replaced");
+STATISTIC(NumPropertiesReplaced, "Number of array property calls replaced");
 
 namespace {
 

@@ -36,7 +36,7 @@
 
 using namespace swift;
 
-STATISTIC(NumInstrSunk,   "Number of instructions sunk");
+STATISTIC(NumInstrSunk, "Number of instructions sunk");
 
 namespace {
 
