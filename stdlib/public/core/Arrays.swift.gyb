@@ -551,8 +551,10 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       // unnecessary uniqueness check. We disable inlining here to curb code
       // growth.
       _buffer = ${Self}._allocateBufferUninitialized(minimumCapacity: count)
+      _buffer.count = count
     }
-    _buffer.count = count
+    // Can’t store count here because the buffer might be pointing to the
+    // shared empty array.
   }
 
   /// Entry point for `Array` literal construction; builds and returns

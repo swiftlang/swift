@@ -259,6 +259,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
 
+  if (Module.getOptions().DisableSILPerfOptimizations)
+    return;
+
   if (Module.getOptions().DebugSerialization) {
     SILPassManager PM(&Module);
     PM.addSILLinker();
@@ -526,6 +529,9 @@ PMDescriptor::PMDescriptor(llvm::yaml::SequenceNode *Desc) {
 void swift::runSILOptimizationPassesWithFileSpecification(SILModule &Module,
                                                           StringRef FileName) {
 #ifndef NDEBUG
+  if (Module.getOptions().DisableSILPerfOptimizations)
+    return;
+
   llvm::SmallVector<PMDescriptor, 4> Descriptors;
   PMDescriptor::descriptorsForFile(FileName, Descriptors);
 

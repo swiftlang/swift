@@ -3577,7 +3577,7 @@ static bool diagnoseArgumentLabelError(Expr *expr,
   // emit the catch-all "wrong labels" diagnostic.
   bool plural = (numMissing + numExtra + numWrong) > 1;
   if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-    for(unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
       auto haveName = tuple->getElementName(i);
       if (haveName.empty())
         haveBuffer += '_';

@@ -2623,7 +2623,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
   }
 
   // Successful downcast.
-  if let sCV = s as? Set<TestObjCKeyTy>  {
+  if let sCV = s as? Set<TestObjCKeyTy> {
     expectEqual(3, sCV.count)
     expectTrue(sCV.contains(TestObjCKeyTy(1010)))
     expectTrue(sCV.contains(TestObjCKeyTy(2020)))
@@ -3425,7 +3425,7 @@ class MockSetWithCustomCount : NSSet {
     super.init()
   }
 
-  override init( objects: UnsafePointer<AnyObject?>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }

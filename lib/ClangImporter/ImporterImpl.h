@@ -696,6 +696,11 @@ public:
   void addMacrosToLookupTable(clang::ASTContext &clangCtx,
                               clang::Preprocessor &pp, SwiftLookupTable &table);
 
+  /// Finalize a lookup table, handling any as-yet-unresolved entries
+  /// and emitting diagnostics if necessary.
+  void finalizeLookupTable(clang::ASTContext &clangCtx,
+                           clang::Preprocessor &pp, SwiftLookupTable &table);
+
 public:
   void registerExternalDecl(Decl *D) {
     RegisteredExternalDecls.push_back(D);
@@ -1036,13 +1041,6 @@ public:
   /// be converted.
   DeclContext *importDeclContextOf(const clang::Decl *D,
                                    EffectiveClangContext context);
-
-  /// \brief Import the declaration context of a given Clang
-  /// declaration into Swift.
-  DeclContext *importDeclContextOf(const clang::Decl *D) {
-    return importDeclContextOf(
-             D, const_cast<clang::DeclContext *>(D->getDeclContext()));
-  }
 
   /// \brief Create a new named constant with the given value.
   ///

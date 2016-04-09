@@ -651,7 +651,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
       B.createBranch(NewAI.getLoc(), NormalBB, { ResultValue });
     } else if (ResultCastRequired) {
       // Update all original uses by the new value.
-      for(auto *Use: OriginalResultUses) {
+      for (auto *Use: OriginalResultUses) {
         Use->set(ResultValue);
       }
     }

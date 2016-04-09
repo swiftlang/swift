@@ -90,7 +90,7 @@ return true;
     CHECK_CASE(recommended)
     CHECK_CASE(recommendedover)
 #undef CHECK_CASE
-  } while(!Content.empty());
+  } while (!Content.empty());
   return false;
 }
 
@@ -1302,8 +1302,8 @@ llvm::function_ref<Type(Type)> ArchetypeTransformer::getTransformerFunc() {
     auto *RootArc = cast<ArchetypeType>(Result.getPointer());
     llvm::SmallVector<Identifier, 1> Names;
     bool SelfDerived = false;
-    for(auto *AT = RootArc; AT; AT = AT->getParent()) {
-      if(!AT->getSelfProtocol())
+    for (auto *AT = RootArc; AT; AT = AT->getParent()) {
+      if (!AT->getSelfProtocol())
         Names.insert(Names.begin(), AT->getName());
       else
         SelfDerived = true;
@@ -1622,7 +1622,7 @@ public:
     SmallVector<Module::ImportedModule, 16> FurtherImported;
     CurrDeclContext->getParentSourceFile()->getImportedModules(Imported,
       Module::ImportFilter::All);
-    while(!Imported.empty()) {
+    while (!Imported.empty()) {
       ModuleDecl *MD = Imported.back().second;
       Imported.pop_back();
       if (!ImportedModules.insert(MD->getNameStr()).second)
@@ -4794,7 +4794,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     });
     CurDeclContext->walkContext(Walker);
     bool Success = false;
-    if(auto PE = Walker.ParentFarthest.get<Expr *>()) {
+    if (auto PE = Walker.ParentFarthest.get<Expr *>()) {
       Success = typeCheckUnresolvedExpr(*CurDeclContext, UnresolvedExpr, PE,
                                         PossibleTypes);
       Lookup.getUnresolvedMemberCompletions(

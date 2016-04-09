@@ -4459,7 +4459,7 @@ public:
     default:                                                            \
       llvm_unreachable("not an apply instruction!");                    \
     }                                                                   \
-  } while(0)
+  } while (0)
 
   /// Return the callee operand.
   SILValue getCallee() const {

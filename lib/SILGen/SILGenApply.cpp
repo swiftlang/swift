@@ -1372,7 +1372,7 @@ public:
     auto nominal = ctorRef->getDecl()->getDeclContext()
                      ->getAsNominalTypeOrNominalTypeExtensionContext();
     bool useAllocatingCtor;
-    
+
     // Value types only have allocating initializers.
     if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
       useAllocatingCtor = true;
@@ -1406,7 +1406,11 @@ public:
       selfFormalType = CanMetatypeType::get(
           selfFormalType->getInOutObjectType()->getCanonicalType());
 
-      if (SGF.AllocatorMetatype)
+      // If the initializer is a C function imported as a member,
+      // there is no 'self' parameter. Mark it undef.
+      if (ctorRef->getDecl()->isImportAsMember())
+        self = SGF.emitUndef(expr, selfFormalType);
+      else if (SGF.AllocatorMetatype)
         self = emitCorrespondingSelfValue(
                  ManagedValue::forUnmanaged(SGF.AllocatorMetatype),
                  arg);
@@ -1440,7 +1444,8 @@ public:
     // that's the only thing that's witnessed. For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
-    if (SelfParam.getSubstRValueType()->getRValueInstanceType()->is<ArchetypeType>()
+    if (SelfParam.getSubstRValueType()->getRValueInstanceType()
+          ->is<ArchetypeType>()
         && isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
       // Look up the witness for the constructor.
       auto constant = SILDeclRef(ctorRef->getDecl(),
@@ -1470,13 +1475,17 @@ public:
                   getSubstFnType(), fn));
     } else {
       // Directly call the peer constructor.
-      setCallee(Callee::forDirect(SGF,
-                                  SILDeclRef(ctorRef->getDecl(),
-                                             useAllocatingCtor
-                                               ? SILDeclRef::Kind::Allocator
-                                               : SILDeclRef::Kind::Initializer,
-                               SILDeclRef::ConstructAtBestResilienceExpansion),
-                                  getSubstFnType(useAllocatingCtor), fn));
+      setCallee(
+        Callee::forDirect(
+          SGF,
+          SILDeclRef(ctorRef->getDecl(),
+                     useAllocatingCtor
+                       ? SILDeclRef::Kind::Allocator
+                       : SILDeclRef::Kind::Initializer,
+                     SILDeclRef::ConstructAtBestResilienceExpansion,
+                     SILDeclRef::ConstructAtNaturalUncurryLevel,
+                     requiresForeignEntryPoint(ctorRef->getDecl())),
+            getSubstFnType(useAllocatingCtor), fn));
     }
 
     // Set up the substitutions, if we have any.

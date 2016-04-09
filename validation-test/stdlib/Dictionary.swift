@@ -3349,7 +3349,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditional") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  if let dCV = d as? Dictionary<TestObjCKeyTy, TestBridgedValueTy>  {
+  if let dCV = d as? Dictionary<TestObjCKeyTy, TestBridgedValueTy> {
     assert(dCV.count == 3)
     var v = dCV[TestObjCKeyTy(10)]
     assert(v!.value == 1010)

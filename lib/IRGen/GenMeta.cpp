@@ -1085,6 +1085,10 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   // FIXME: Technically should be "consume", but that introduces barriers in the
   // current LLVM ARM backend.
   auto load = IGF.Builder.CreateLoad(cache);
+  // Make this barrier explicit when building for TSan to avoid false positives.
+  if (IGM.Opts.Sanitize == SanitizerKind::Thread)
+    load->setOrdering(llvm::AtomicOrdering::Acquire);
+
 
   // Compare the load result against null.
   auto isNullBB = IGF.createBasicBlock("cacheIsNull");

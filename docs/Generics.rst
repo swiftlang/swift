@@ -89,7 +89,7 @@ Polymorphism
 ------------
 
 Polymorphism allows one to use different data types with a uniform
-interface. Overloading already allows a form of polymorphism ( ad hoc
+interface. Overloading already allows a form of polymorphism (ad hoc
 polymorphism) in Swift. For example, given::
 
   func +(x : Int, y : Int) -> Int { add... }

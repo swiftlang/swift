@@ -63,7 +63,7 @@ public:
 
   bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                  ReferenceCounting *refcounting) const override {
-    if(refcounting)
+    if (refcounting)
       *refcounting = asDerived().getReferenceCounting();
     return true;
   }

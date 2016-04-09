@@ -1,4 +1,4 @@
-//===--- SwiftReflection.h - Public remote reflection interface -*- C++ -*-===//
+//===--- SwiftRemoteMirror.h - Public remote reflection interf. -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -48,21 +48,21 @@ typedef struct ReflectionSection {
 
 /// \brief An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
-typedef struct ReflectionContext *ReflectionContextRef;
-
-/// \brief Copies Size bytes from the Source in the target
-/// address space to Dest.
-typedef size_t (*CopyFunction)(uintptr_t Source, void *Dest, size_t Size);
+typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
 
 /// \returns An opaque reflection context.
-ReflectionContextRef swift_reflection_createReflectionContext(
-    ReflectionSection *Sections, size_t NumSections, CopyFunction Copier);
-
-/// Clear any caching of field type information for all known heap instances.
-void swift_reflection_clearCaches(ReflectionContexRef Context);
+SwiftReflectionContextRef
+swift_reflection_createReflectionContext(PointerSizeFunction getPointerSize,
+                                         SizeSizeFunction getSizeSize,
+                                         ReadBytesFunction readBytes,
+                                         GetStringLengthFunction getStringLength,
+                                         GetSymbolAddressFunction getSymbolAddress);
 
 /// Destroys an opaque reflection context.
-void swift_reflection_destroyReflectionContext(ReflectionContexRef Context);
+void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
+
+/// Clear any caching of field type information for all known heap instances.
+void swift_reflection_clearCaches(SwiftReflectionContextRef Context);
 
 #ifdef __cplusplus
 } // extern "C"

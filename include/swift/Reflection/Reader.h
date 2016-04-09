@@ -18,7 +18,7 @@
 #ifndef SWIFT_REFLECTION_READER_H
 #define SWIFT_REFLECTION_READER_H
 
-#include "swift/SwiftReflection/MemoryReaderInterface.h"
+#include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 
 #include <dlfcn.h>
 #include <cstdint>
@@ -102,36 +102,32 @@ class InProcessMemoryReader final : public MemoryReader {
 };
 
 class CMemoryReader final : public MemoryReader {
-  std::unique_ptr<MemoryReaderImpl> Impl;
+  MemoryReaderImpl Impl;
 
 public:
-  CMemoryReader() : Impl(nullptr) {}
-
-  CMemoryReader(std::unique_ptr<MemoryReaderImpl> &&Impl)
-    : Impl(std::move(Impl)) {
-      assert(this->Impl && "No Memory reader implementation given!");
-      assert(this->Impl->getPointerSize && "No getPointerSize implementation");
-      assert(this->Impl->readInteger && "No readInteger implementation");
-      assert(this->Impl->getStringLength && "No stringLength implementation");
-      assert(this->Impl->readBytes && "No readBytes implementation");
-      assert(this->Impl->getPointerSize() != 0 && "Invalid target pointer size");
+  CMemoryReader(MemoryReaderImpl Impl)
+    : Impl(Impl) {
+      assert(this->Impl.getPointerSize && "No getPointerSize implementation");
+      assert(this->Impl.getStringLength && "No stringLength implementation");
+      assert(this->Impl.readBytes && "No readBytes implementation");
+      assert(this->Impl.getPointerSize() != 0 && "Invalid target pointer size");
   }
 
   uint8_t getPointerSize() override {
-    return Impl->getPointerSize();
+    return Impl.getPointerSize();
   }
 
   uint8_t getSizeSize() override {
-    return Impl->getSizeSize();
+    return Impl.getSizeSize();
   }
 
   addr_t getSymbolAddress(const std::string &Name) override {
-    auto Address = Impl->getSymbolAddress(Name.c_str(), Name.size());
+    auto Address = Impl.getSymbolAddress(Name.c_str(), Name.size());
     return static_cast<addr_t>(Address);
   }
 
   uint64_t getStringLength(addr_t Address) {
-    return Impl->getStringLength(Address);
+    return Impl.getStringLength(Address);
   }
 
   std::string readString(addr_t Address) override {
@@ -146,7 +142,7 @@ public:
   }
 
   bool readBytes(addr_t Address, uint8_t *Dest, uint64_t Size) override {
-    return Impl->readBytes(Address, Dest, Size);
+    return Impl.readBytes(Address, Dest, Size);
   }
 };
 

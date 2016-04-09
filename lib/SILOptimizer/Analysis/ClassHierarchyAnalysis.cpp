@@ -55,7 +55,7 @@ void ClassHierarchyAnalysis::init() {
   M->getSwiftModule()->getTopLevelDecls(Decls);
 
   NominalTypeWalker Walker(ProtocolImplementationsCache);
-  for(auto *D: Decls) {
+  for (auto *D: Decls) {
     D->walk(Walker);
   }
 

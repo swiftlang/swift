@@ -365,6 +365,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
       // Request new APIs from CoreImage.
       "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
+
+      // Request new APIs from libdispatch.
+      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=1",
     });
 
     // Get the version of this compiler and pass it to
@@ -422,7 +425,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     unsigned major, minor, micro;
     if (triple.isiOS()) {
       triple.getiOSVersion(major, minor, micro);
-    } else if(triple.isWatchOS()) {
+    } else if (triple.isWatchOS()) {
       triple.getWatchOSVersion(major, minor, micro);
     } else {
       assert(triple.isMacOSX());
@@ -790,6 +793,9 @@ void ClangImporter::Implementation::addEntryToLookupTable(
                               ArrayRef<Identifier>()),
                      named, importedName.EffectiveContext);
   } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
+    // If the category is invalid, don't add it.
+    if (category->isInvalidDecl()) return;
+
     table.addCategory(category);
   }
 
@@ -840,6 +846,25 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
       auto name = importMacroName(macro.first, info, clangCtx);
       if (name.empty()) continue;
       table.addEntry(name, info, clangCtx.getTranslationUnitDecl());
+    }
+  }
+}
+
+void ClangImporter::Implementation::finalizeLookupTable(
+       clang::ASTContext &clangCtx,
+       clang::Preprocessor &pp,
+       SwiftLookupTable &table) {
+  // Resolve any unresolved entries.
+  SmallVector<SwiftLookupTable::SingleEntry, 4> unresolved;
+  if (table.resolveUnresolvedEntries(unresolved)) {
+    // Complain about unresolved entries that remain.
+    for (auto entry : unresolved) {
+      auto decl = entry.get<clang::NamedDecl *>();
+      auto swiftName = decl->getAttr<clang::SwiftNameAttr>();
+
+      SwiftContext.Diags.diagnose(SourceLoc(), diag::unresolvable_clang_decl,
+                                  decl->getNameAsString(),
+                                  swiftName->getName());
     }
   }
 }
@@ -919,6 +944,10 @@ bool ClangImporter::Implementation::importHeader(
       Import = createImportDecl(SwiftContext, adapter, ClangImport, {});
     }
   }
+
+  // Finalize the lookup table, which may fail.
+  finalizeLookupTable(getClangASTContext(), getClangPreprocessor(),
+                      BridgingHeaderLookupTable);
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
@@ -1975,6 +2004,36 @@ hasOrInheritsSwiftBridgeAttr(const clang::ObjCInterfaceDecl *objcClass) {
   return false;
 }
 
+/// Whether the decl is from a module who requested import-as-member inference
+static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
+                                        clang::Sema &clangSema) {
+  clang::Module *submodule;
+  if (auto m = decl->getImportedOwningModule()) {
+    submodule = m;
+  } else if (auto m = decl->getLocalOwningModule()) {
+    submodule = m;
+  } else if (auto m = clangSema.getPreprocessor().getCurrentModule()) {
+    submodule = m;
+  } else if (auto m = clangSema.getPreprocessor().getCurrentSubmodule()) {
+    submodule = m;
+  } else {
+    return false;
+  }
+
+  while (submodule) {
+    if (submodule->IsSwiftInferImportAsMember) {
+      // HACK HACK HACK: This is a workaround for some module invalidation issue
+      // and inconsistency. This will go away soon.
+      if (submodule->Name != "CoreGraphics")
+        return false;
+      return true;
+    }
+    submodule = submodule->Parent;
+  }
+
+  return false;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2018,6 +2077,9 @@ auto ClangImporter::Implementation::importFullName(
   // class context.
   if (auto category = dyn_cast_or_null<clang::ObjCCategoryDecl>(
                         result.EffectiveContext.getAsDeclContext())) {
+    // If the enclosing category is invalid, we cannot import the declaration.
+    if (category->isInvalidDecl()) return result;
+
     result.EffectiveContext = category->getClassInterface();
   }
 
@@ -2154,7 +2216,8 @@ auto ClangImporter::Implementation::importFullName(
 
       return result;
     }
-  } else if (InferImportAsMember &&
+  } else if ((InferImportAsMember ||
+              moduleIsInferImportAsMember(D, clangSema)) &&
              (isa<clang::VarDecl>(D) || isa<clang::FunctionDecl>(D)) &&
              dc->isTranslationUnit()) {
     auto inference = IAMResult::infer(SwiftContext, clangSema, D);
@@ -2835,8 +2898,12 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
     auto dc = objcProperty->getDeclContext();
     auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc);
     if (!objcClass) {
-      if (auto objcCategory = dyn_cast<clang::ObjCCategoryDecl>(dc))
+      if (auto objcCategory = dyn_cast<clang::ObjCCategoryDecl>(dc)) {
+        // If the enclosing category is invalid, suppress this declaration.
+        if (objcCategory->isInvalidDecl()) return true;
+
         objcClass = objcCategory->getClassInterface();
+      }
     }
 
     if (objcClass) {
@@ -4043,6 +4110,9 @@ ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionWriter(
 
     // Add macros to the lookup table.
     Impl.addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table);
+
+    // Finalize the lookup table, which may fail.
+    Impl.finalizeLookupTable(sema.Context, sema.getPreprocessor(), table);
   };
 
   return std::unique_ptr<clang::ModuleFileExtensionWriter>(

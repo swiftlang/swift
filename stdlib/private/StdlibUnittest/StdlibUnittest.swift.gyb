@@ -554,6 +554,8 @@ extension ProcessTerminationStatus {
       return false
     case .signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
+    default:
+      fatalError("Bad ProcessTerminationStatus")
     }
   }
 }
@@ -1092,7 +1094,7 @@ public func runAllTests() {
   }
 }
 
-public class TestSuite {
+public final class TestSuite {
   public init(_ name: String) {
     self.name = name
     _precondition(
@@ -1203,7 +1205,7 @@ public class TestSuite {
     var _name: String
     var _data: _Data = _Data()
 
-    class _Data {
+    internal final class _Data {
       var _xfail: [TestRunPredicate] = []
       var _skip: [TestRunPredicate] = []
       var _stdinText: String? = nil

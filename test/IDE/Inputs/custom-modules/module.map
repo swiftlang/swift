@@ -31,6 +31,11 @@ module ImportAsMember {
     requires objc
     header "ImportAsMemberProto.h"
   }
+
+  module Class {
+    requires objc
+    header "ImportAsMemberClass.h"
+  }
 }
 
 module IAMError {

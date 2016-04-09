@@ -604,15 +604,6 @@ internal extension Mirror {
 
 /// The sum of types that can be used as a quick look representation.
 public enum PlaygroundQuickLook {
-  //
-  // This type must be binary-compatible with the 'PlaygroundQuickLook' struct
-  // in stdlib/public/runtime/Reflection.mm, and 'PlaygroundQuickLook?' must be
-  // binary compatible with 'OptionalPlaygroundQuickLook' from the same.
-  //
-  // NB: This type is somewhat carefully laid out to *suppress* enum layout
-  // optimization so that it is easier to manufacture in the C++ runtime
-  // implementation.
-
   /// Plain text.
   case text(String)
 

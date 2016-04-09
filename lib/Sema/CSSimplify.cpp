@@ -490,7 +490,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
   if (potentiallyOutOfOrder) {
     // Build a mapping from arguments to parameters.
     SmallVector<unsigned, 4> argumentBindings(numArgs);
-    for(paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+    for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
       for (auto argIdx : parameterBindings[paramIdx])
         argumentBindings[argIdx] = paramIdx;
     }

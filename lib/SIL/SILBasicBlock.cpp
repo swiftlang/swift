@@ -103,12 +103,6 @@ void SILBasicBlock::eraseFromParent() {
   getParent()->getBlocks().erase(this);
 }
 
-/// This method unlinks 'self' from the containing SILFunction.
-void SILBasicBlock::removeFromParent() {
-  getParent()->getBlocks().remove(this);
-}
-
-
 /// Replace the ith BB argument with a new one with type Ty (and optional
 /// ValueDecl D).
 SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty,

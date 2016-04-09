@@ -58,7 +58,7 @@ var SequenceTypeTests = TestSuite("Sequence")
 // min(), max()
 //===----------------------------------------------------------------------===//
 
-% for algorithmKind in [ 'min', 'max' ]:
+% for algorithmKind in ['min', 'max']:
 %   AlgorithmKind = algorithmKind.capitalize()
 
 SequenceTypeTests.test("${algorithmKind}/WhereElementIsComparable") {
@@ -566,7 +566,7 @@ func callGenericContains<
   return sequence.contains(element)
 }
 
-% for dispatch in [ 'Static', 'Generic' ]:
+% for dispatch in ['Static', 'Generic']:
 
 // FIXME: implement the same optimization for Dictionary.
 // FIXME: move to the file where other Set tests live.
@@ -785,7 +785,7 @@ SequenceTypeTests.test("filter/Sequence/Semantics") {
 
 var MinimalSequenceWithCustomMap_timesMapWasCalled: Int = 0
 
-% for Implementation in [ 'Default', 'Custom' ]:
+% for Implementation in ['Default', 'Custom']:
 
 struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
   init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
@@ -850,9 +850,9 @@ func callGenericSequenceMap<S : Sequence, T>(
   return result
 }
 
-% for Implementation in [ 'Default', 'Custom' ]:
+% for Implementation in ['Default', 'Custom']:
 
-%   for dispatch in [ 'Static', 'Generic' ]:
+%   for dispatch in ['Static', 'Generic']:
 
 SequenceTypeTests.test(
   "map/Sequence/${Implementation}Implementation/${dispatch}"
@@ -1159,7 +1159,7 @@ SequenceTypeTests.test("_copyToNativeArrayBuffer/OverestimatedCount")
 // Standard sequence tests
 //===----------------------------------------------------------------------===//
 
-% for Base in [ 'DefaultedSequence', 'MinimalSequence' ]:
+% for Base in ['DefaultedSequence', 'MinimalSequence']:
 do {
   let checksAdded: Box<Set<String>> = Box([])
   let resiliencyChecks = CollectionMisuseResiliencyChecks.all

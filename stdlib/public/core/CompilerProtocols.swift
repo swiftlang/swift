@@ -215,7 +215,7 @@ public protocol _FileReferenceLiteralConvertible {
 }
 
 /// A container is destructor safe if whether it may store to memory on
-/// destruction only depends on its type parameters.
+/// destruction only depends on its type parameters destructors.
 /// For example, whether `Array<Element>` may store to memory on destruction
 /// depends only on `Element`.
 /// If `Element` is an `Int` we know the `Array<Int>` does not store to memory
@@ -223,6 +223,9 @@ public protocol _FileReferenceLiteralConvertible {
 /// `Array<MemoryUnsafeDestructorClass>` then the compiler will deduce may
 /// store to memory on destruction because `MemoryUnsafeDestructorClass`'s
 /// destructor may store to memory on destruction.
+/// If in this example during `Array`'s destructor we would call a method on any
+/// type parameter - say `Element.extraCleanup()` - that could store to memory,
+/// then Array would no longer be a _DestructorSafeContainer.
 public protocol _DestructorSafeContainer {
 }
 

@@ -136,3 +136,11 @@ let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' not u
 let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
 let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=!}}
 let c = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
+
+// SR-1116
+struct S1116 {
+  var s: Int?
+}
+
+let a1116: [S1116] = []
+var s1116 = Set(1...10).subtract(a1116.map({ $0.s })) // expected-error {{'map' produces '[T]', not the expected contextual result type 'Set<Int>'}}

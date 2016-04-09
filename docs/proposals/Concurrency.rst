@@ -436,7 +436,7 @@ Here is another example of async calls using trailing closures and enums.
                                   }}
 
      //CHECK: Shape: Oval
-     print("Shape: \( res.await() )")
+     print("Shape: \(res.await())")
 
 Notice that the swift compiler infers that ``Shape`` and `String` can be sent
 between the threads.

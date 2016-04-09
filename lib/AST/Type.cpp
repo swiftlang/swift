@@ -1942,8 +1942,7 @@ static ForeignRepresentableKind getObjCObjectRepresentable(Type type) {
     type = dynSelf->getSelfType();
 
   // @objc classes.
-  if (auto classType = type->getAs<ClassType>()) {
-    auto classDecl = classType->getDecl();
+  if (auto classDecl = type->getClassOrBoundGenericClass()) {
     auto &ctx = classDecl->getASTContext();
     if (auto resolver = ctx.getLazyResolver())
       resolver->resolveDeclSignature(classDecl);

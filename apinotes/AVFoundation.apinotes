@@ -1,0 +1,66 @@
+---
+Name: AVFoundation
+Classes:
+- Name: AVAssetWriterInput
+  Methods:
+  - Selector: 'appendSampleBuffer:'
+    SwiftName: 'appendSampleBuffer(_:)'
+    MethodKind: Instance
+- Name: AVAssetWriterInputPixelBufferAdaptor
+  Methods:
+  - Selector: 'appendPixelBuffer:withPresentationTime:'
+    SwiftName: 'appendPixelBuffer(_:withPresentationTime:)'
+    MethodKind: Instance
+- Name: AVAssetWriterInputMetadataAdaptor
+  Methods:
+  - Selector: 'appendTimedMetadataGroup:'
+    SwiftName: 'appendTimedMetadataGroup(_:)'
+    MethodKind: Instance
+- Name: AVMutableComposition
+  Methods:
+  - Selector: 'insertTimeRange:ofAsset:atTime:error:'
+    SwiftName: 'insertTimeRange(_:of:at:)'
+    MethodKind: Instance
+  - Selector: 'insertEmptyTimeRange:'
+    SwiftName: 'insertEmptyTimeRange(_:)'
+    MethodKind: Instance
+  - Selector: 'removeTimeRange:'
+    SwiftName: 'removeTimeRange(_:)'
+    MethodKind: Instance
+- Name: AVPlayerItem
+  Methods:
+  - Selector: 'selectMediaOption:inMediaSelectionGroup:'
+    SwiftName: 'select(_:in:)'
+    MethodKind: Instance
+- Name: AVSampleCursor
+  Methods:
+  - Selector: 'stepByDecodeTime:wasPinned:'
+    SwiftName: 'step(byDecodeTime:wasPinned:)'
+    MethodKind: Instance
+  - Selector: 'samplesWithEarlierDecodeTimeStampsMayHaveLaterPresentationTimeStampsThanCursor:'
+    SwiftName: 'maySamplesWithEarlierDecodeTimeStampsHavePresentationTimeStamps(laterThan:)'
+    MethodKind: Instance
+  - Selector: 'samplesWithLaterDecodeTimeStampsMayHaveEarlierPresentationTimeStampsThanCursor:'
+    SwiftName: 'maySamplesWithLaterDecodeTimeStampsHavePresentationTimeStamps(earlierThan:)'
+    MethodKind: Instance
+- Name: AVVideoComposition
+  Methods:
+  - Selector: 'videoCompositionWithPropertiesOfAsset:'
+    SwiftName: 'init(withPropertiesOf:)'
+    MethodKind: Instance
+- Name: AVMutableVideoCompositionLayerInstruction
+  Methods:
+  - Selector: 'setTransformRampFromStartTransform:toEndTransform:timeRange:'
+    SwiftName: 'setTransformRamp(fromStart:toEnd:timeRange:)'
+    MethodKind: Instance
+Protocols:
+- Name: AVVideoCompositing
+  Methods:
+  - Selector: 'startVideoCompositionRequest:'
+    SwiftName: 'startRequest(_:)'
+    MethodKind: Instance
+- Name: AVVideoCompositionValidationHandling
+  Methods:
+  - Selector: 'videoComposition:shouldContinueValidatingAfterFindingEmptyTimeRange:'
+    SwiftName: 'videoComposition(_:shouldContinueValidatingAfterFindingEmptyTimeRange:)'
+    MethodKind: Instance

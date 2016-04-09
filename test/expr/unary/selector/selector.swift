@@ -88,6 +88,10 @@ func testAmbiguity() {
   _ = #selector(C1.method3) // expected-error{{ambiguous use of 'method3(_:b:)'}}
 }
 
+func testUnusedSelector() {
+    #selector(C1.getC1) // expected-warning{{result of '#selector' is unused}}
+}
+
 func testProperties(c1: C1) {
   _ = #selector(c1.a) // expected-error{{argument of '#selector' cannot refer to a property}}
   _ = #selector(C1.a) // FIXME poor diagnostic: expected-error{{instance member 'a' cannot be used on type 'C1'}}
@@ -98,15 +102,15 @@ func testNonObjC(c1: C1) {
 }
 
 func testParseErrors1() {
-  #selector foo // expected-error{{expected '(' following '#selector'}}
+  _ = #selector foo // expected-error{{expected '(' following '#selector'}}
 }
 
 func testParseErrors2() {
-  #selector( // expected-error{{expected expression naming a method within '#selector(...)'}}
+  _ = #selector( // expected-error{{expected expression naming a method within '#selector(...)'}}
 }
 
 func testParseErrors3(c1: C1) {
-  #selector( // expected-note{{to match this opening '('}}
+  _ = #selector( // expected-note{{to match this opening '('}}
       c1.method1(_:b:) // expected-error{{expected ')' to complete '#selector' expression}}
 }
 

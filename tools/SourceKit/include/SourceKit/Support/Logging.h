@@ -109,9 +109,9 @@ public:
 #define LOG_FUNC_SECTION_WARN LOG_FUNC_SECTION(Warning)
 
 #define LOG(NAME, LEVEL, msg) LOG_SECTION(NAME, LEVEL) \
-  do { *Log << msg; } while(0)
+  do { *Log << msg; } while (0)
 #define LOG_FUNC(LEVEL, msg) LOG_FUNC_SECTION(LEVEL) \
-  do { *Log << msg; } while(0)
+  do { *Log << msg; } while (0)
 #define LOG_WARN(NAME, msg) LOG(NAME, Warning, msg)
 #define LOG_WARN_FUNC(msg) LOG_FUNC(Warning, msg)
 #define LOG_INFO_FUNC(PRIO, msg) LOG_FUNC(Info##PRIO##Prio, msg)

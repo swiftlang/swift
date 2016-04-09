@@ -61,6 +61,11 @@ public:
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
+  /// Should we run any SIL performance optimizations
+  ///
+  /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
+  bool DisableSILPerfOptimizations = false;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 

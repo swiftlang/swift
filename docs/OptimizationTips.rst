@@ -515,19 +515,45 @@ count operations are expensive and unavoidable when using Swift classes.
 Advice: Use unmanaged references to avoid reference counting overhead
 ---------------------------------------------------------------------
 
-In performance-critical code you can use choose to use unmanaged
-references. The ``Unmanaged<T>`` structure allows developers to disable
-automatic reference counting for a specific reference.
+Note, ``Unmanaged<T>._withUnsafeGuaranteedRef`` is not public api and will go
+away in the future. Therefore, don't use it in code that you can not change in
+the future.
+
+In performance-critical code you can choose to use unmanaged references. The
+``Unmanaged<T>`` structure allows developers to disable automatic reference
+counting for a specific reference.
+
+When you do this you need to make sure that there exists another reference to
+instance held by the ``Unmanaged`` struct instance for the duration of the use
+of ``Unmanaged`` (see `Unmanaged.swift`_ for more details) that keeps the instance
+alive.
 
 ::
 
-    var Ref : Unmanaged<Node> = Unmanaged.passUnretained(Head)
+    // The call to ``withExtendedLifetime(Head)`` makes sure that the lifetime of
+    // Head is guaranteed to extend over the region of code that uses Unmanaged
+    // references. Because there exists a reference to Head for the duration
+    // of the scope and we don't modify the list of ``Node``s there also exist a
+    // reference through the chain of ``Head.next``, ``Head.next.next``, ...
+    // instances.
 
-    while let Next = Ref.takeUnretainedValue().next {
-      ...
-      Ref = Unmanaged.passUnretained(Next)
+    withExtendedLifetime(Head) {
+
+      // Create an Unmanaged reference.
+      var Ref : Unmanaged<Node> = Unmanaged.passUnretained(Head)
+
+      // Use the unmanaged reference in a call/variable access. The use of
+      // _withUnsafeGuaranteedRef allows the compiler to remove the ultimate
+      // retain/release across the call/access.
+
+      while let Next = Ref._withUnsafeGuaranteedRef { $0.next } {
+        ...
+        Ref = Unmanaged.passUnretained(Next)
+      }
     }
 
+
+.. _Unmanaged.swift: https://github.com/apple/swift/blob/master/stdlib/public/core/Unmanaged.swift
 
 Protocols
 =========

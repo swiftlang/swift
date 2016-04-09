@@ -62,11 +62,11 @@ static bool isDelayedOperatorDecl(ValueDecl *vd) {
 
 static bool isArithmeticOperatorDecl(ValueDecl *vd) {
   return vd && 
-  ( vd->getName().str() == "+" ||
-    vd->getName().str() == "-" ||
-    vd->getName().str() == "*" ||
-    vd->getName().str() == "/" ||
-    vd->getName().str() == "%" );
+  (vd->getName().str() == "+" ||
+   vd->getName().str() == "-" ||
+   vd->getName().str() == "*" ||
+   vd->getName().str() == "/" ||
+   vd->getName().str() == "%");
 }
 
 namespace {
@@ -1193,7 +1193,7 @@ namespace {
             indexExpr = parenExpr->getSubExpr();
           }
           
-          if(isa<IntegerLiteralExpr>(indexExpr)) {
+          if (isa<IntegerLiteralExpr>(indexExpr)) {
             
             outputTy = baseTy->getAs<BoundGenericType>()->getGenericArgs()[0];
             

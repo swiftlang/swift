@@ -1581,10 +1581,12 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   NameBuf += ".storage";
   auto StorageName = Context.getIdentifier(NameBuf);
   auto StorageTy = OptionalType::get(VD->getType());
+  auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
 
   auto *Storage = new (Context) VarDecl(/*isStatic*/false, /*isLet*/false,
                                         VD->getLoc(), StorageName, StorageTy,
                                         VD->getDeclContext());
+  Storage->setInterfaceType(StorageInterfaceTy);
   Storage->setUserAccessible(false);
   addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
 

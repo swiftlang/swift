@@ -625,7 +625,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   auto BaseType = findBaseTypeForReplacingArchetype(VD, Ty);
   bool InSynthesizedExtension = false;
   if (BaseType) {
-    if(auto Target = BaseType->getAnyNominal()) {
+    if (auto Target = BaseType->getAnyNominal()) {
       SynthesizedExtensionAnalyzer Analyzer(Target,
                                             PrintOptions::printInterface());
       InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);

@@ -1138,9 +1138,9 @@ public:
 
   unsigned size() const { return NumParams; }
   iterator begin() { return getParams().begin(); }
-  iterator end()   { return getParams().end(); }
+  iterator end() { return getParams().end(); }
   const_iterator begin() const { return getParams().begin(); }
-  const_iterator end()   const { return getParams().end(); }
+  const_iterator end() const { return getParams().end(); }
 
   /// Get the total number of parameters, including those from parent generic
   /// parameter lists.

@@ -171,6 +171,17 @@ public protocol _NSSetCore :
 public protocol _NSSet : _NSSetCore {
 }
 
+/// A shadow for the API of NSNumber we will use in the core
+/// stdlib.
+@objc
+public protocol _NSNumber {
+  var doubleValue: Double { get }
+  var floatValue: Float { get }
+  var unsignedLongLongValue: UInt64 { get }
+  var longLongValue: Int64 { get }
+  var objCType: UnsafePointer<Int8> { get }
+}
+
 #else
 
 public protocol _NSArrayCore {}
