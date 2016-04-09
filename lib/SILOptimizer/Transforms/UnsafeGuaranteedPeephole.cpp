@@ -56,7 +56,11 @@ getSingleUnsafeGuaranteedValueResult(BuiltinInst *BI) {
   auto Failed = std::make_pair(nullptr, nullptr);
 
   for (auto *Operand : getNonDebugUses(BI)) {
-    auto *TE = dyn_cast<TupleExtractInst>(Operand->getUser());
+    auto *Usr = Operand->getUser();
+    if (isa<ReleaseValueInst>(Usr) || isa<RetainValueInst>(Usr))
+      continue;
+
+    auto *TE = dyn_cast<TupleExtractInst>(Usr);
     if (!TE || TE->getOperand() != BI)
       return Failed;
 
@@ -97,13 +101,19 @@ findReleaseToMatchUnsafeGuaranteedValue(SILInstruction *UnsafeGuaranteedEndI,
     return BB.end();
   auto LastReleaseIt = std::prev(UnsafeGuaranteedEndIIt);
   while (LastReleaseIt != BB.begin() &&
-         (isa<StrongReleaseInst>(*LastReleaseIt) ||
-          isa<ReleaseValueInst>(*LastReleaseIt)) &&
-         LastReleaseIt->getOperand(0) != UnsafeGuaranteedValue)
+         (((isa<StrongReleaseInst>(*LastReleaseIt) ||
+            isa<ReleaseValueInst>(*LastReleaseIt)) &&
+           LastReleaseIt->getOperand(0) != UnsafeGuaranteedValue &&
+           LastReleaseIt->getOperand(0) !=
+               cast<SILInstruction>(UnsafeGuaranteedValue)->getOperand(0)) ||
+          isa<DebugValueInst>(*LastReleaseIt) ||
+          isa<DebugValueInst>(*LastReleaseIt)))
     --LastReleaseIt;
   if ((!isa<StrongReleaseInst>(*LastReleaseIt) &&
        !isa<ReleaseValueInst>(*LastReleaseIt)) ||
-      LastReleaseIt->getOperand(0) != UnsafeGuaranteedValue) {
+      (LastReleaseIt->getOperand(0) != UnsafeGuaranteedValue &&
+       LastReleaseIt->getOperand(0) !=
+           cast<SILInstruction>(UnsafeGuaranteedValue)->getOperand(0))) {
     return BB.end();
   }
   return LastReleaseIt;
@@ -145,7 +155,9 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F) {
       auto NextInstIter = std::next(SILBasicBlock::iterator(LastRetainInst));
       while (NextInstIter != BB.end() && &*NextInstIter != CurInst &&
              (isa<RetainValueInst>(*NextInstIter) ||
-              isa<StrongRetainInst>(*NextInstIter)))
+              isa<StrongRetainInst>(*NextInstIter) ||
+              isa<DebugValueInst>(*NextInstIter) ||
+              isa<DebugValueAddrInst>(*NextInstIter)))
        ++NextInstIter;
       if (&*NextInstIter != CurInst) {
         DEBUG(llvm::dbgs() << "Last retain right before match failed\n");
@@ -228,6 +240,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F) {
       UnsafeGuaranteedValue->replaceAllUsesWith(Opd);
       UnsafeGuaranteedValue->eraseFromParent();
       UnsafeGuaranteedToken->eraseFromParent();
+      UnsafeGuaranteedI->replaceAllUsesWith(Opd);
       UnsafeGuaranteedI->eraseFromParent();
 
       if (RestartAtBeginningOfBlock)
