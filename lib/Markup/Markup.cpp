@@ -320,7 +320,7 @@ parseElement(MarkupContext &MC, LineList &LL, ParseState State) {
 Document *llvm::markup::parseDocument(MarkupContext &MC, LineList &LL) {
   auto Comment = LL.str();
   auto CMarkDoc = cmark_parse_document(Comment.c_str(), Comment.size(),
-                                       CMARK_OPT_DEFAULT);
+                                       CMARK_OPT_SMART);
 
   if (CMarkDoc == nullptr)
     return nullptr;

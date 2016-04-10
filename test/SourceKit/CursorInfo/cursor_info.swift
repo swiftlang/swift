@@ -257,7 +257,7 @@ typealias MyVoid = ()
 // CHECK6-NEXT: FooSwiftModule
 // CHECK6-NEXT: <Declaration>func fooSwiftFunc() -&gt; <Type usr="s:Si">Int</Type></Declaration>
 // CHECK6-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSwiftFunc</decl.name>() -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
-// CHECK6-NEXT: {{^}}<Function><Name>fooSwiftFunc()</Name><USR>s:F14FooSwiftModule12fooSwiftFuncFT_Si</USR><Declaration>func fooSwiftFunc() -&gt; Int</Declaration><Abstract><Para>This is &apos;fooSwiftFunc&apos; from &apos;FooSwiftModule&apos;.</Para></Abstract></Function>{{$}}
+// CHECK6-NEXT: {{^}}<Function><Name>fooSwiftFunc()</Name><USR>s:F14FooSwiftModule12fooSwiftFuncFT_Si</USR><Declaration>func fooSwiftFunc() -&gt; Int</Declaration><Abstract><Para>This is ‘fooSwiftFunc’ from ‘FooSwiftModule’.</Para></Abstract></Function>{{$}}
 
 // RUN: %sourcekitd-test -req=cursor -pos=14:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK7 %s
 // CHECK7:      source.lang.swift.ref.struct (13:8-13:10)
