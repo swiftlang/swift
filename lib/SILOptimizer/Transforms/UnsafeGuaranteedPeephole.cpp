@@ -106,6 +106,7 @@ findReleaseToMatchUnsafeGuaranteedValue(SILInstruction *UnsafeGuaranteedEndI,
            LastReleaseIt->getOperand(0) != UnsafeGuaranteedValue &&
            LastReleaseIt->getOperand(0) !=
                cast<SILInstruction>(UnsafeGuaranteedValue)->getOperand(0)) ||
+          !LastReleaseIt->mayHaveSideEffects() ||
           isa<DebugValueInst>(*LastReleaseIt) ||
           isa<DebugValueInst>(*LastReleaseIt)))
     --LastReleaseIt;
@@ -156,6 +157,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F) {
       while (NextInstIter != BB.end() && &*NextInstIter != CurInst &&
              (isa<RetainValueInst>(*NextInstIter) ||
               isa<StrongRetainInst>(*NextInstIter) ||
+              !NextInstIter->mayHaveSideEffects() ||
               isa<DebugValueInst>(*NextInstIter) ||
               isa<DebugValueAddrInst>(*NextInstIter)))
        ++NextInstIter;
