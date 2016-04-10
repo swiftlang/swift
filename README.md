@@ -30,7 +30,7 @@ To read the documentation, start by installing the
 More recent versions are currently **not supported.**
 
 Once complete, you can build the Swift documentation by changing directory into
-`docs` and typing `make`. This compiles the `.rst` files in the `docs` directory
+[docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs) directory
 into HTML in the `docs/_build/html` directory.
 
 Many of the docs are out of date, but you can see some historical design
@@ -162,7 +162,7 @@ See [docs/Testing.rst](docs/Testing.rst).
 
 Contributions to Swift are welcomed and encouraged! Please see the [Contributing to Swift guide](https://swift.org/contributing/).
 
-To be a truly great community, Swift.org needs to welcome developers from all
+To be a truly great community, [Swift.org](https://swift.org/) needs to welcome developers from all
 walks of life, with different backgrounds, and with a wide range of experience.
 A diverse and friendly community will have more great ideas, more unique
 perspectives, and produce more great code. We will work diligently to make the
@@ -171,4 +171,4 @@ Swift community welcoming to everyone.
 To give clarity of what is expected of our members, Swift has adopted the
 code of conduct defined by the Contributor Covenant. This document is used
 across many open source communities, and we think it articulates our values
-well. For more, see [the website](https://swift.org/community/#code-of-conduct).
+well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-conduct).
