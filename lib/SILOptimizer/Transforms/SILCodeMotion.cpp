@@ -30,8 +30,8 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
-STATISTIC(NumSunk,   "Number of instructions sunk");
-STATISTIC(NumRefCountOpsSimplified, "number of enum ref count ops simplified.");
+STATISTIC(NumSunk, "Number of instructions sunk");
+STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
 STATISTIC(NumHoisted, "Number of instructions hoisted");
 
 using namespace swift;
