@@ -299,7 +299,7 @@ extension LazySequenceProtocol {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Iterator.Element) -> Bool
+    _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
       _base: self.elements, whereElementsSatisfy: predicate)
@@ -315,7 +315,7 @@ extension LazyCollectionProtocol {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Iterator.Element) -> Bool
+    _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(
       _base: self.elements, whereElementsSatisfy: predicate)

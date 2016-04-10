@@ -23,5 +23,5 @@
 // CHECK-DAG: func copy() -> AnyObject
 // CHECK-DAG: class func hash() -> Int
 // CHECK-WITH-FORWARD-DECLS-DAG: class func description() -> String
-// CHECK-WITH-FORWARD-DECLS-DAG: func forwardInvocation(anInvocation: NSInvocation!)
+// CHECK-WITH-FORWARD-DECLS-DAG: func forwardInvocation(_ anInvocation: NSInvocation!)
 // CHECK: {{^[}]$}}

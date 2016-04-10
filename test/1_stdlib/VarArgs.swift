@@ -11,7 +11,7 @@ import Glibc
 typealias CGFloat = Double
 #endif
 
-func my_printf(format: String, _ arguments: CVarArg...) {
+func my_printf(_ format: String, _ arguments: CVarArg...) {
   withVaList(arguments) {
     vprintf(format, $0)
   }

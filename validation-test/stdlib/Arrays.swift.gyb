@@ -140,7 +140,7 @@ extension ${array_type} where Element : TestProtocol1 {
 }
 
 /// Returns an ${array_type} that does not share its buffer with other arrays.
-func getFresh${array_type}<S : Sequence>(sequence: S)
+func getFresh${array_type}<S : Sequence>(_ sequence: S)
   -> ${array_type}<S.Iterator.Element> {
   var result: ${array_type}<S.Iterator.Element> = []
   result.reserveCapacity(sequence.underestimatedCount)

@@ -10,14 +10,14 @@ import Foundation
 // CHECK-LABEL: sil hidden @_TF10objc_error28NSErrorErrorProtocol_erasureFCSo7NSErrorPs13ErrorProtocol_
 // CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $ErrorProtocol
 // CHECK:         return [[ERROR_TYPE]]
-func NSErrorErrorProtocol_erasure(x: NSError) -> ErrorProtocol {
+func NSErrorErrorProtocol_erasure(_ x: NSError) -> ErrorProtocol {
   return x
 }
 
 // CHECK-LABEL: sil hidden @_TF10objc_error38NSErrorErrorProtocol_archetype_erasure
 // CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $ErrorProtocol
 // CHECK:         return [[ERROR_TYPE]]
-func NSErrorErrorProtocol_archetype_erasure<T : NSError>(t: T) -> ErrorProtocol {
+func NSErrorErrorProtocol_archetype_erasure<T : NSError>(_ t: T) -> ErrorProtocol {
   return t
 }
 

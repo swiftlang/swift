@@ -6,7 +6,7 @@ struct Holder {
   unowned(unsafe) var value: C
 }
 _ = Holder(value: C())
-// CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderC{{.*}} : $@convention(thin) (@owned C, @thin Holder.Type) -> Holder
+// CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderC{{.*}} : $@convention(method) (@owned C, @thin Holder.Type) -> Holder
 // CHECK: bb0([[T0:%.*]] : $C,
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[T0]] : $C to $@sil_unmanaged C
 // CHECK-NEXT:   strong_release [[T0]] : $C

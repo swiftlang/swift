@@ -19,7 +19,7 @@ class RefTypePrintable : CustomStringConvertible {
 }
 
 @inline(never)
-public func run_StringInterpolation(N: Int) {
+public func run_StringInterpolation(_ N: Int) {
   let reps = 100
   let refResult = reps
   let anInt: Int64 = 0x1234567812345678

@@ -23,7 +23,7 @@ import StdlibCollectionUnittest
 
 //===----------------------------------------------------------------------===//
 
-func printSequence<T : Sequence>(x: T) {
+func printSequence<T : Sequence>(_ x: T) {
   print("[", terminator: "")
   var prefix = ""
   for a in x {
@@ -36,12 +36,12 @@ func printSequence<T : Sequence>(x: T) {
 
 typealias BufferID = UnsafePointer<Void>
 
-func bufferID<T : _ArrayProtocol>(x: T) -> BufferID {
+func bufferID<T : _ArrayProtocol>(_ x: T) -> BufferID {
   return x._buffer.identity
 }
 
 func checkReallocation<T : _ArrayProtocol>(
-  x: T, _ lastBuffer: BufferID, _ reallocationExpected: Bool
+  _ x: T, _ lastBuffer: BufferID, _ reallocationExpected: Bool
 ) -> BufferID {
   let currentBuffer = bufferID(x)
   if (currentBuffer != lastBuffer) != reallocationExpected {
@@ -56,7 +56,7 @@ func checkEqual<
   where
   S1.Iterator.Element == S2.Iterator.Element,
   S1.Iterator.Element : Equatable
->(a1: S1, _ a2: S2, _ expected: Bool) {
+>(_ a1: S1, _ a2: S2, _ expected: Bool) {
   if a1.elementsEqual(a2) != expected {
     let un = expected ? "un" : ""
     print("unexpectedly \(un)equal sequences!")
@@ -105,7 +105,7 @@ func test<
   checkEqual(x, y, false)
 
   func checkReallocations(
-    a: T, _ growthDescription: String, _ growBy1: (_: inout T)->()
+    _ a: T, _ growthDescription: String, _ growBy1: (_: inout T)->()
   ) {
     var a = a
     var reallocations = 0
@@ -245,8 +245,13 @@ func testCocoa() {
 testCocoa()
 
 extension ArraySlice {
+<<<<<<< HEAD:validation-test/stdlib/NewArray.swift.gyb
   mutating func qsort(compare: (Element, Element) -> Bool) {
     _introSort(&self, subRange: Range(self.indices), isOrderedBefore: compare)
+=======
+  mutating func qsort(_ compare: (Element, Element) -> Bool) {
+    _introSort(&self, subRange: self.indices, isOrderedBefore: compare)
+>>>>>>> master:test/1_stdlib/NewArray.swift.gyb
   }
 }
 
@@ -315,15 +320,24 @@ let testWidth = 11
 %arrayTypes = ['ContiguousArray', 'Array', 'ArraySlice']
 %for A in arrayTypes:
 
+<<<<<<< HEAD:validation-test/stdlib/NewArray.swift.gyb
 func testReplace(make: () -> ${A}<LifetimeTracked>) {
+=======
+func testReplace(_ make: () -> ${A}<X>) {
+>>>>>>> master:test/1_stdlib/NewArray.swift.gyb
 
   checkRangeReplaceable(
     make, { LifetimeTracked(100)..<LifetimeTracked(100 + $0) })
 }
 
 func testReplace${A}(
+<<<<<<< HEAD:validation-test/stdlib/NewArray.swift.gyb
   makeOne: () -> ${A}<LifetimeTracked> = {
     var x = ${A}<LifetimeTracked>()
+=======
+  _ makeOne: () -> ${A}<X> = {
+    var x = ${A}<X>()
+>>>>>>> master:test/1_stdlib/NewArray.swift.gyb
     // make sure some - but not all - replacements will have to grow the buffer
     x.reserveCapacity(testWidth * 3 / 2)
     x += LifetimeTracked(0)..<LifetimeTracked(testWidth)

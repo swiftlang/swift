@@ -230,7 +230,7 @@ protocol storageWithInitialValue {
 extension storageWithInitialValue {
   var value: Value { get { } }
 
-  static func initStorage(x: Value) -> Value? {
+  static func initStorage(_ x: Value) -> Value? {
     return nil
   }
 }

@@ -116,6 +116,14 @@ enum class ReferenceCounting : unsigned char {
   Error,
 };
 
+/// The atomicity of a reference counting operation to be used.
+enum class Atomicity : bool {
+  /// Atomic reference counting operations should be used.
+  Atomic,
+  /// Non-atomic reference counting operations can be used.
+  NonAtomic,
+};
+
 /// Whether or not an object should be emitted on the heap.
 enum OnHeap_t : unsigned char {
   NotOnHeap,

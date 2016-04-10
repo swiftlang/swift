@@ -313,7 +313,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         if (canGuarantee) {
           capturedArgs.push_back(ManagedValue::forUnmanaged(vl.box));
         } else {
-          B.createStrongRetain(loc, vl.box);
+          B.createStrongRetain(loc, vl.box, Atomicity::Atomic);
           capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
         }
         escapesToMark.push_back(vl.value);

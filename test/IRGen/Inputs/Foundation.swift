@@ -5,10 +5,10 @@
 
 // String/NSString bridging functions.
 @_silgen_name("swift_StringToNSString") internal
-func _convertStringToNSString(string: String) -> NSString
+func _convertStringToNSString(_ string: String) -> NSString
 
 @_silgen_name("swift_NSStringToString") internal
-func _convertNSStringToString(nsstring: NSString?) -> String
+func _convertNSStringToString(_ nsstring: NSString?) -> String
 
 @_silgen_name("swift_ArrayToNSArray") internal
 func _convertArrayToNSArray<T>(array: Array<T>) -> NSArray
@@ -40,18 +40,18 @@ extension String : _ObjectiveCBridgeable {
     return NSString()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSString,
+    _ x: NSString,
     result: inout String?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSString,
+    _ x: NSString,
     result: inout String?
   ) -> Bool {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSString?
+    _ x: NSString?
   ) -> String {
     return String()
   }
@@ -62,18 +62,18 @@ extension Array : _ObjectiveCBridgeable {
     return NSArray()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSArray,
+    _ x: NSArray,
     result: inout Array?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSArray,
+    _ x: NSArray,
     result: inout Array?
   ) -> Bool {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSArray?
+    _ x: NSArray?
   ) -> Array {
     return Array()
   }
@@ -87,18 +87,18 @@ extension Dictionary : _ObjectiveCBridgeable {
     return NSDictionary()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSDictionary,
+    _ x: NSDictionary,
   result: inout Dictionary?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSDictionary,
+    _ x: NSDictionary,
     result: inout Dictionary?
   ) -> Bool {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSDictionary?
+    _ x: NSDictionary?
   ) -> Dictionary {
     return Dictionary()
   }
@@ -112,18 +112,18 @@ extension Set : _ObjectiveCBridgeable {
     return NSSet()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSSet,
+    _ x: NSSet,
     result: inout Set?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSSet,
+    _ x: NSSet,
     result: inout Set?
   ) -> Bool {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSSet?
+    _ x: NSSet?
   ) -> Set {
     return Set()
   }
@@ -137,6 +137,6 @@ extension NSError: ErrorProtocol {
   public var _code: Int { return code }
 }
 
-public func _convertErrorProtocolToNSError(x: ErrorProtocol) -> NSError {
+public func _convertErrorProtocolToNSError(_ x: ErrorProtocol) -> NSError {
   return x as NSError
 }

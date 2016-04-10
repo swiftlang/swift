@@ -3,7 +3,7 @@
 import c_layout
 
 @inline(never)
-func blackHole<T>(t: T) { }
+func blackHole<T>(_ t: T) { }
 
 // CHECK: @staticFloat = internal global float 1.700000e+01, align 4
 // CHECK: define internal void @doubleTrouble() [[CLANG_FUNC_ATTR:#[0-9]+]] {

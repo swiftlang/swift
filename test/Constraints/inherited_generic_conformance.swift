@@ -6,6 +6,6 @@ class GenericBase<T>: P {}
 
 class Derived: GenericBase<Int> {}
 
-func foo<T: P>(x: T) {}
+func foo<T: P>(_ x: T) {}
 
 foo(Derived())

@@ -115,12 +115,12 @@ definition. These kinds are:
    multithreaded mandelbrot example, that does each pixel in "parallel", to
    illustrate some ideas::
 
-     func do_mandelbrot(x : float, y : float) -> int {
+     func do_mandelbrot(_ x : float, y : float) -> int {
        // details elided
      }
      
      actor MandelbrotCalculator {
-       func compute(x : float, y : float, Driver D) {
+       func compute(_ x : float, y : float, Driver D) {
          var num_iters = do_mandelbrot(x, y)
          D.collect_point(x, y, num_iters)
        }
@@ -141,7 +141,7 @@ definition. These kinds are:
          }
        }
      
-       func collect_point(x : float, y : float, num_iters : int) {
+       func collect_point(_ x : float, y : float, num_iters : int) {
          result.setPoint(x, y, Color(num_iters, num_iters, num_iters))
          if (--numpoints == 0)
          draw(result)

@@ -10,7 +10,7 @@ protocol ClassBound2 : class {
   func classBoundMethod2()
 }
 protocol ClassBoundBinary : class, ClassBound {
-  func classBoundBinaryMethod(x: Self)
+  func classBoundBinaryMethod(_ x: Self)
 }
 @objc protocol ObjCClassBound {
   func objCClassBoundMethod()
@@ -20,7 +20,7 @@ protocol ClassBoundBinary : class, ClassBound {
 }
 protocol NotClassBound {
   func notClassBoundMethod()
-  func notClassBoundBinaryMethod(x: Self)
+  func notClassBoundBinaryMethod(_ x: Self)
 }
 
 struct ClassGenericFieldStruct<T:ClassBound> {
@@ -60,7 +60,7 @@ class ClassProtocolFieldClass {
 // CHECK: %V22class_bounded_generics24ClassProtocolFieldStruct = type <{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>
 
 // CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics23class_bounded_archetype{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
-func class_bounded_archetype<T : ClassBound>(x: T) -> T {
+func class_bounded_archetype<T : ClassBound>(_ x: T) -> T {
   return x
 }
 
@@ -68,12 +68,12 @@ class SomeClass {}
 class SomeSubclass : SomeClass {}
 
 // CHECK-LABEL: define hidden %C22class_bounded_generics9SomeClass* @_TF22class_bounded_generics28superclass_bounded_archetype{{.*}}(%C22class_bounded_generics9SomeClass*, %swift.type* %T)
-func superclass_bounded_archetype<T : SomeClass>(x: T) -> T {
+func superclass_bounded_archetype<T : SomeClass>(_ x: T) -> T {
   return x
 }
 
 // CHECK-LABEL: define hidden { %C22class_bounded_generics9SomeClass*, %C22class_bounded_generics12SomeSubclass* } @_TF22class_bounded_generics33superclass_bounded_archetype_call{{.*}}(%C22class_bounded_generics9SomeClass*, %C22class_bounded_generics12SomeSubclass*)
-func superclass_bounded_archetype_call(x: SomeClass, y: SomeSubclass) -> (SomeClass, SomeSubclass) {
+func superclass_bounded_archetype_call(_ x: SomeClass, y: SomeSubclass) -> (SomeClass, SomeSubclass) {
   return (superclass_bounded_archetype(x),
           superclass_bounded_archetype(y));
   // CHECK: [[SOMECLASS_RESULT:%.*]] = call %C22class_bounded_generics9SomeClass* @_TF22class_bounded_generics28superclass_bounded_archetype{{.*}}(%C22class_bounded_generics9SomeClass* {{%.*}}, {{.*}})
@@ -83,7 +83,7 @@ func superclass_bounded_archetype_call(x: SomeClass, y: SomeSubclass) -> (SomeCl
 }
 
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics30class_bounded_archetype_method{{.*}}(%objc_object*, %objc_object*, %swift.type* %T, i8** %T.ClassBoundBinary)
-func class_bounded_archetype_method<T : ClassBoundBinary>(x: T, y: T) {
+func class_bounded_archetype_method<T : ClassBoundBinary>(_ x: T, y: T) {
   x.classBoundMethod()
   // CHECK: [[INHERITED:%.*]] = load i8*, i8** %T.ClassBoundBinary, align 8
   // CHECK: [[INHERITED_WTBL:%.*]] = bitcast i8* [[INHERITED]] to i8**
@@ -99,19 +99,19 @@ func class_bounded_archetype_method<T : ClassBoundBinary>(x: T, y: T) {
 }
 
 // CHECK-LABEL: define hidden { %objc_object*, %objc_object* } @_TF22class_bounded_generics29class_bounded_archetype_tuple{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
-func class_bounded_archetype_tuple<T : ClassBound>(x: T) -> (T, T) {
+func class_bounded_archetype_tuple<T : ClassBound>(_ x: T) -> (T, T) {
   return (x, x)
 }
 
 class ConcreteClass : ClassBoundBinary, NotClassBound {
   func classBoundMethod() {}
-  func classBoundBinaryMethod(x: ConcreteClass) {}
+  func classBoundBinaryMethod(_ x: ConcreteClass) {}
   func notClassBoundMethod() {}
-  func notClassBoundBinaryMethod(x: ConcreteClass) {}
+  func notClassBoundBinaryMethod(_ x: ConcreteClass) {}
 }
 
 // CHECK-LABEL: define hidden %C22class_bounded_generics13ConcreteClass* @_TF22class_bounded_generics28call_class_bounded_archetype{{.*}}(%C22class_bounded_generics13ConcreteClass*) {{.*}} {
-func call_class_bounded_archetype(x: ConcreteClass) -> ConcreteClass {
+func call_class_bounded_archetype(_ x: ConcreteClass) -> ConcreteClass {
   return class_bounded_archetype(x)
   // CHECK: [[IN:%.*]] = bitcast %C22class_bounded_generics13ConcreteClass* {{%.*}} to %objc_object*
   // CHECK: [[OUT_ORIG:%.*]] = call %objc_object* @_TF22class_bounded_generics23class_bounded_archetype{{.*}}(%objc_object* [[IN]], {{.*}})
@@ -120,20 +120,20 @@ func call_class_bounded_archetype(x: ConcreteClass) -> ConcreteClass {
 }
 
 // CHECK: define hidden void @_TF22class_bounded_generics27not_class_bounded_archetype{{.*}}(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.NotClassBound)
-func not_class_bounded_archetype<T : NotClassBound>(x: T) -> T {
+func not_class_bounded_archetype<T : NotClassBound>(_ x: T) -> T {
   return x
 }
 
 // CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics44class_bounded_archetype_to_not_class_bounded{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound, i8** %T.NotClassBound) {{.*}} {
 func class_bounded_archetype_to_not_class_bounded
-<T:protocol<ClassBound, NotClassBound>>(x:T) -> T {
+<T:protocol<ClassBound, NotClassBound>>(_ x:T) -> T {
   // CHECK: alloca %objc_object*, align 8
   return not_class_bounded_archetype(x)
 }
 
 /* TODO Abstraction remapping to non-class-bounded witnesses
 func class_and_not_class_bounded_archetype_methods
-<T:protocol<ClassBound, NotClassBound>>(x:T, y:T) {
+<T:protocol<ClassBound, NotClassBound>>(_ x:T, y:T) {
   x.classBoundMethod()
   x.classBoundBinaryMethod(y)
   x.notClassBoundMethod()
@@ -142,7 +142,7 @@ func class_and_not_class_bounded_archetype_methods
 */
 
 // CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics21class_bounded_erasure{{.*}}(%C22class_bounded_generics13ConcreteClass*) {{.*}} {
-func class_bounded_erasure(x: ConcreteClass) -> ClassBound {
+func class_bounded_erasure(_ x: ConcreteClass) -> ClassBound {
   return x
   // CHECK: [[INSTANCE_OPAQUE:%.*]] = bitcast %C22class_bounded_generics13ConcreteClass* [[INSTANCE:%.*]] to %objc_object*
   // CHECK: [[T0:%.*]] = insertvalue { %objc_object*, i8** } undef, %objc_object* [[INSTANCE_OPAQUE]], 0
@@ -151,7 +151,7 @@ func class_bounded_erasure(x: ConcreteClass) -> ClassBound {
 }
 
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics29class_bounded_protocol_method{{.*}}(%objc_object*, i8**) {{.*}} {
-func class_bounded_protocol_method(x: ClassBound) {
+func class_bounded_protocol_method(_ x: ClassBound) {
   x.classBoundMethod()
   // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* %0)
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_TABLE:%.*]], align 8
@@ -160,7 +160,7 @@ func class_bounded_protocol_method(x: ClassBound) {
 }
 
 // CHECK-LABEL: define hidden %C22class_bounded_generics13ConcreteClass* @_TF22class_bounded_generics28class_bounded_archetype_cast{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
-func class_bounded_archetype_cast<T : ClassBound>(x: T) -> ConcreteClass {
+func class_bounded_archetype_cast<T : ClassBound>(_ x: T) -> ConcreteClass {
   return x as! ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
   // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC22class_bounded_generics13ConcreteClass()
@@ -171,7 +171,7 @@ func class_bounded_archetype_cast<T : ClassBound>(x: T) -> ConcreteClass {
 }
 
 // CHECK-LABEL: define hidden %C22class_bounded_generics13ConcreteClass* @_TF22class_bounded_generics27class_bounded_protocol_cast{{.*}}(%objc_object*, i8**)
-func class_bounded_protocol_cast(x: ClassBound) -> ConcreteClass {
+func class_bounded_protocol_cast(_ x: ClassBound) -> ConcreteClass {
   return x as! ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
   // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC22class_bounded_generics13ConcreteClass()
@@ -182,52 +182,52 @@ func class_bounded_protocol_cast(x: ClassBound) -> ConcreteClass {
 }
 
 // CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics35class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**, i8**) {{.*}} {
-func class_bounded_protocol_conversion_1(x: protocol<ClassBound, ClassBound2>)
+func class_bounded_protocol_conversion_1(_ x: protocol<ClassBound, ClassBound2>)
 -> ClassBound {
   return x
 }
 // CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics35class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**, i8**) {{.*}} {
-func class_bounded_protocol_conversion_2(x: protocol<ClassBound, ClassBound2>)
+func class_bounded_protocol_conversion_2(_ x: protocol<ClassBound, ClassBound2>)
 -> ClassBound2 {
   return x
 }
 
 // CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**) {{.*}} {
 func objc_class_bounded_protocol_conversion_1
-(x:protocol<ClassBound, ObjCClassBound>) -> ClassBound {
+(_ x:protocol<ClassBound, ObjCClassBound>) -> ClassBound {
   return x
 }
 // CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**) {{.*}} {
 func objc_class_bounded_protocol_conversion_2
-(x:protocol<ClassBound, ObjCClassBound>) -> ObjCClassBound {
+(_ x:protocol<ClassBound, ObjCClassBound>) -> ObjCClassBound {
   return x
 }
 // CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*)
 func objc_class_bounded_protocol_conversion_3
-(x:protocol<ObjCClassBound, ObjCClassBound2>) -> ObjCClassBound {
+(_ x:protocol<ObjCClassBound, ObjCClassBound2>) -> ObjCClassBound {
   return x
 }
 // CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*)
 func objc_class_bounded_protocol_conversion_4
-(x:protocol<ObjCClassBound, ObjCClassBound2>) -> ObjCClassBound2 {
+(_ x:protocol<ObjCClassBound, ObjCClassBound2>) -> ObjCClassBound2 {
   return x
 }
 
 // CHECK-LABEL: define hidden { i64, %objc_object*, i64 } @_TF22class_bounded_generics33class_generic_field_struct_fields{{.*}}(i64, %objc_object*, i64, %swift.type* %T, i8** %T.ClassBound)
 func class_generic_field_struct_fields<T : ClassBound>
-(x:ClassGenericFieldStruct<T>) -> (Int, T, Int) {
+(_ x:ClassGenericFieldStruct<T>) -> (Int, T, Int) {
   return (x.x, x.y, x.z)
 }
 
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics34class_protocol_field_struct_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias nocapture sret, %V22class_bounded_generics24ClassProtocolFieldStruct* noalias nocapture dereferenceable({{.*}}))
 func class_protocol_field_struct_fields
-(x:ClassProtocolFieldStruct) -> (Int, ClassBound, Int) {
+(_ x:ClassProtocolFieldStruct) -> (Int, ClassBound, Int) {
   return (x.x, x.y, x.z)
 }
 
 // CHECK-LABEL: define hidden { i64, %objc_object*, i64 } @_TF22class_bounded_generics32class_generic_field_class_fields{{.*}}(%C22class_bounded_generics22ClassGenericFieldClass*)
 func class_generic_field_class_fields<T : ClassBound>
-(x:ClassGenericFieldClass<T>) -> (Int, T, Int) {
+(_ x:ClassGenericFieldClass<T>) -> (Int, T, Int) {
   return (x.x, x.y, x.z)
   // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass, %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 1
   // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass, %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 2
@@ -235,7 +235,7 @@ func class_generic_field_class_fields<T : ClassBound>
 }
 
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics33class_protocol_field_class_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias nocapture sret, %C22class_bounded_generics23ClassProtocolFieldClass*)
-func class_protocol_field_class_fields(x: ClassProtocolFieldClass)
+func class_protocol_field_class_fields(_ x: ClassProtocolFieldClass)
 -> (Int, ClassBound, Int) {
   return (x.x, x.y, x.z)
   // CHECK:  = call i64 %{{[0-9]+}}
@@ -254,7 +254,7 @@ class SomeSwiftClass {
 // CHECK-NEXT: [[T2:%.*]] = bitcast %swift.type* [[T1]] to void (%swift.type*)**
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[T2]], i64 10
 // CHECK-NEXT: load void (%swift.type*)*, void (%swift.type*)** [[T3]], align 8
-func class_bounded_metatype<T: SomeSwiftClass>(t : T) {
+func class_bounded_metatype<T: SomeSwiftClass>(_ t : T) {
   t.dynamicType.foo()
 }
 

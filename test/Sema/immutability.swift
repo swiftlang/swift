@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}}
   get {
@@ -23,7 +23,7 @@ func foreach_variable() {
   }
 }
 
-func takeClosure(fn : (Int) -> Int) {}
+func takeClosure(_ fn : (Int) -> Int) {}
 
 func passClosure() {
   takeClosure { a in
@@ -220,7 +220,7 @@ func test_mutability() {
 }
 
 
-func test_arguments(a : Int,
+func test_arguments(_ a : Int,
                     b : Int,
                     let c : Int) { // expected-error {{'let' as a parameter attribute is not allowed}} {{21-25=}}
   var b = b
@@ -326,7 +326,7 @@ func testSubscriptNoGetter(let iis: SubscriptNoGetter) { // expected-error {{'le
   var _: Int = iis[17]
 }
 
-func testSelectorStyleArguments1(x: Int, bar y: Int) {
+func testSelectorStyleArguments1(_ x: Int, bar y: Int) {
   var x = x
   var y = y
   x += 1
@@ -340,7 +340,7 @@ func testSelectorStyleArguments2(let x: Int, // expected-error {{'let' as a para
                                  
   
 }
-func testSelectorStyleArguments3(x: Int, bar y: Int) {
+func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
@@ -353,7 +353,7 @@ func invalid_var(var x: Int) { // expected-error {{parameters may not have the '
 }
 
 
-func updateInt(x : inout Int) {}
+func updateInt(_ x : inout Int) {}
 
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {
@@ -505,7 +505,7 @@ struct TestSubscriptMutability {
   }
 }
 
-func f(a : TestSubscriptMutability) {
+func f(_ a : TestSubscriptMutability) {
   a.var_arr = []  // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
 }
 

@@ -58,7 +58,7 @@ extension OptionSet {
   /// Returns the set of elements contained in `self`, in `other`, or in
   /// both `self` and `other`.
   @warn_unused_result
-  public func union(other: Self) -> Self {
+  public func union(_ other: Self) -> Self {
     var r: Self = Self(rawValue: self.rawValue)
     r.unionInPlace(other)
     return r
@@ -66,7 +66,7 @@ extension OptionSet {
   
   /// Returns the set of elements contained in both `self` and `other`.
   @warn_unused_result
-  public func intersect(other: Self) -> Self {
+  public func intersect(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.intersectInPlace(other)
     return r
@@ -75,7 +75,7 @@ extension OptionSet {
   /// Returns the set of elements contained in `self` or in `other`,
   /// but not in both `self` and `other`.
   @warn_unused_result
-  public func exclusiveOr(other: Self) -> Self {
+  public func exclusiveOr(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.exclusiveOrInPlace(other)
     return r
@@ -93,7 +93,7 @@ extension OptionSet where Element == Self {
   ///
   /// - Equivalent to `self.intersect([member]) == [member]`
   @warn_unused_result
-  public func contains(member: Self) -> Bool {
+  public func contains(_ member: Self) -> Bool {
     return self.isSupersetOf(member)
   }
   
@@ -101,7 +101,7 @@ extension OptionSet where Element == Self {
   ///
   /// - Equivalent to `self.unionInPlace([member])`
   /// - Postcondition: `self.contains(member)`
-  public mutating func insert(member: Element) {
+  public mutating func insert(_ member: Element) {
     self.unionInPlace(member)
   }
   
@@ -109,7 +109,8 @@ extension OptionSet where Element == Self {
   /// Otherwise, return `nil`.
   ///
   /// - Postcondition: `self.intersect([member]).isEmpty`
-  public mutating func remove(member: Element) -> Element? {
+  @discardableResult
+  public mutating func remove(_ member: Element) -> Element? {
     let r = isSupersetOf(member) ? Optional(member) : nil
     self.subtractInPlace(member)
     return r
@@ -140,7 +141,7 @@ extension OptionSet where RawValue : BitwiseOperations {
   ///
   /// - Equivalent to replacing `self` with `self.union(other)`.
   /// - Postcondition: `self.isSupersetOf(other)`
-  public mutating func unionInPlace(other: Self) {
+  public mutating func unionInPlace(_ other: Self) {
     self = Self(rawValue: self.rawValue | other.rawValue)
   }
   
@@ -149,7 +150,7 @@ extension OptionSet where RawValue : BitwiseOperations {
   ///
   /// - Equivalent to replacing `self` with `self.intersect(other)`
   /// - Postcondition: `self.isSubsetOf(other)`
-  public mutating func intersectInPlace(other: Self) {
+  public mutating func intersectInPlace(_ other: Self) {
     self = Self(rawValue: self.rawValue & other.rawValue)
   }
   
@@ -157,7 +158,7 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// either `self` or `other`, but not both.
   ///
   /// - Equivalent to replacing `self` with `self.exclusiveOr(other)`
-  public mutating func exclusiveOrInPlace(other: Self) {
+  public mutating func exclusiveOrInPlace(_ other: Self) {
     self = Self(rawValue: self.rawValue ^ other.rawValue)
   }
 }

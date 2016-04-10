@@ -29,7 +29,7 @@ let RequestStringLength = "l"
 let RequestExit = "e"
 let RequestPointerSize = "p"
 
-internal func debugLog(message: String) {
+internal func debugLog(_ message: String) {
 #if DEBUG_LOG
   fputs("Child: \(message)\n", stderr)
   fflush(stderr)
@@ -91,7 +91,7 @@ typealias MachHeader = mach_header
 ///   image.
 /// - Returns: A `Section` containing the address and size, or `nil` if there
 ///   is no section by the given name.
-internal func getSectionInfo(name: String,
+internal func getSectionInfo(_ name: String,
   _ imageHeader: UnsafePointer<MachHeader>) -> Section? {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var section: Section? = nil
@@ -160,7 +160,7 @@ internal func sendAddress(of instance: AnyObject) {
 }
 
 /// Send the `value`'s bits to the parent.
-internal func sendValue<T>(value: T) {
+internal func sendValue<T>(_ value: T) {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var value = value
   sendBytes(from: &value, count: sizeof(T.self))
@@ -267,7 +267,7 @@ internal func sendPointerSize() {
 /// - Get the pointer size of this process, which affects assumptions about the
 ///   the layout of runtime structures with pointer-sized fields.
 /// - Read raw bytes out of this process's address space.
-public func reflect(instance: AnyObject) {
+public func reflect(_ instance: AnyObject) {
   while let command = readLine(strippingNewline: true) {
     switch command {
     case String(validatingUTF8: RequestInstanceAddress)!:

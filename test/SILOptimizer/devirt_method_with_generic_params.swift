@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -O %s | FileCheck %s
 
 class S<T> {
-  func f<U>(x: T, _ y: U) -> T { return x }
+  func f<U>(_ x: T, _ y: U) -> T { return x }
 }
 
 // Check that invocation of a method that has its own

@@ -22,7 +22,7 @@ class C {
 class X {
   init() {} 
 
-  @objc func foo(i: Int) { }
+  @objc func foo(_ i: Int) { }
   @objc func bar() { }
 
   @objc func ovl2() -> A { } // expected-note{{found this candidate}}
@@ -30,7 +30,7 @@ class X {
   @objc func ovl4() -> B { }
   @objc func ovl5() -> B { } // expected-note{{found this candidate}}
 
-  @objc class func staticFoo(i : Int) { }
+  @objc class func staticFoo(_ i : Int) { }
 
   @objc func prop3() -> Int { return 5 }
 }
@@ -38,7 +38,7 @@ class X {
 class Y : P {
   init() {} 
 
-  @objc func foo(s: String) { }
+  @objc func foo(_ s: String) { }
   @objc func wibble() { }
 
   @objc func ovl1() -> A { }
@@ -82,7 +82,7 @@ class Z : Y {
   @objc func ovl2() -> C { } // expected-note{{found this candidate}}
   @objc(ovl3_A) func ovl3() -> A { }
   @objc func ovl3() -> B { }
-  func generic4<T>(x : T) { }
+  func generic4<T>(_ x : T) { }
 }
 
 @objc protocol P {
@@ -102,7 +102,7 @@ struct S {
 }
 
 class D<T> {
-  func generic1(x : T) { }
+  func generic1(_ x : T) { }
 }
 
 extension Z {

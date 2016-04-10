@@ -23,7 +23,7 @@ struct Array2D {
 }
 
 @inline(never)
-func workload_2DArrayTest(A: inout Array2D) {
+func workload_2DArrayTest(_ A: inout Array2D) {
   for _ in 0 ..< 10 {
     for r in 0 ..< A.rows {
       for c in 0 ..< A.cols {
@@ -34,7 +34,7 @@ func workload_2DArrayTest(A: inout Array2D) {
 }
 
 @inline(never)
-public func run_Sim2DArray(N : Int) {
+public func run_Sim2DArray(_ N: Int) {
   for _ in 0 ..< N {
     var A = Array2D(numRows:2048, numCols:32)
     workload_2DArrayTest(&A)

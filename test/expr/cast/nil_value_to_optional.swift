@@ -3,7 +3,7 @@
 var t = true
 var f = false
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 markUsed(t != nil) // expected-error {{value of type 'Bool' can never be nil, comparison isn't allowed}}
 markUsed(f != nil) // expected-error {{value of type 'Bool' can never be nil, comparison isn't allowed}}
@@ -14,7 +14,7 @@ func == (lhs: C, rhs: C) -> Bool {
   return true
 }
 
-func test(c: C) {
+func test(_ c: C) {
   if c == nil {} // expected-error {{value of type 'C' can never be nil, comparison isn't allowed}}
 }
 

@@ -29,7 +29,7 @@ let indirect = LoggingSequence(wrapping: direct)
 let dispatchLog = base.log
 
 func expectWrapperDispatch<R1, R2>(
-  @autoclosure directOperation: () -> R1,
+  @autoclosure _ directOperation: () -> R1,
   @autoclosure _ indirectOperation: () -> R2,
   _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//

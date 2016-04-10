@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-func test(s: String)
+func test(_ s: String)
 {
   print(s)
   var s2 = s[s.index(2, stepsFrom: s.startIndex)..<s.index(4, stepsFrom: s.startIndex)]

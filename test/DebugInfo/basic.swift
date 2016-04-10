@@ -26,7 +26,7 @@
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]
 // CHECK-DAG: ![[FOO:[0-9]+]] = distinct !DISubprogram(name: "foo",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[FOOTYPE:[0-9]+]]
 public
-func foo(a: Int64, _ b: Int64) -> Int64 {
+func foo(_ a: Int64, _ b: Int64) -> Int64 {
      var a = a
      var b = b
      // CHECK-DAG: !DILexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-3]], column: 41)

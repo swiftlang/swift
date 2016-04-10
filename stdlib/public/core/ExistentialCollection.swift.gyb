@@ -25,7 +25,7 @@ from gyb_stdlib_support import (
 import SwiftShims
 
 @noreturn @inline(never)
-internal func _abstract(file: StaticString = #file, line: UInt = #line) {
+internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
   fatalError("Method must be overridden", file: file, line: line)
 }
 
@@ -112,7 +112,7 @@ internal final class _IteratorBox<
 }
 
 @warn_unused_result
-internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
+internal func _typeID(_ instance: AnyObject) -> ObjectIdentifier {
   return ObjectIdentifier(instance.dynamicType)
 }
 

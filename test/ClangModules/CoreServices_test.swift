@@ -4,7 +4,7 @@
 
 import CoreServices
 
-func test(url: CFURL, ident: CSIdentity) {
+func test(_ url: CFURL, ident: CSIdentity) {
   _ = CSBackupIsItemExcluded(url, nil) // okay
 
   _ = nil as TypeThatDoesNotExist? // expected-error {{use of undeclared type 'TypeThatDoesNotExist'}}

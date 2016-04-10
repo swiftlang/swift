@@ -8,7 +8,7 @@ struct S {}
 protocol NonClassProto {}
 protocol ClassConstrainedProto : class {}
 
-func takesAnyObject(x: AnyObject) {}
+func takesAnyObject(_ x: AnyObject) {}
 
 func concreteTypes() {
   takesAnyObject(C.self) 

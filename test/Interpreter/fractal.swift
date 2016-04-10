@@ -9,7 +9,7 @@
 
 import complex
 
-func printDensity(d: Int) {
+func printDensity(_ d: Int) {
   if (d > 40) {
      print(" ", terminator: "")
   } else if d > 6 {
@@ -30,7 +30,7 @@ extension Double {
   }
 }
 
-func getMandelbrotIterations(c: Complex, maxIterations: Int) -> Int {
+func getMandelbrotIterations(_ c: Complex, maxIterations: Int) -> Int {
   var n = 0
   var z = Complex()
   while (n < maxIterations && z.magnitude() < 4.0) {
@@ -40,7 +40,7 @@ func getMandelbrotIterations(c: Complex, maxIterations: Int) -> Int {
   return n
 }
 
-func fractal (densityFunc:(c: Complex, maxIterations: Int) -> Int,
+func fractal (_ densityFunc:(c: Complex, maxIterations: Int) -> Int,
               xMin:Double, xMax:Double,
               yMin:Double, yMax:Double,
               rows:Int, cols:Int,
@@ -105,7 +105,7 @@ fractal(getMandelbrotIterations,
 // CHECK: ################################################################################
 
 
-func getBurningShipIterations(c: Complex, maxIterations: Int) -> Int {
+func getBurningShipIterations(_ c: Complex, maxIterations: Int) -> Int {
   var n = 0
   var z = Complex()
   while (n < maxIterations && z.magnitude() < 4.0) {

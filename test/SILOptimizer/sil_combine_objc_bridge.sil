@@ -10,7 +10,7 @@ import Foundation
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self
 }
 
@@ -27,13 +27,13 @@ struct AnArray<T> : _ObjectiveCBridgeable {
     return AnNSArray()
   }
   static func _forceBridgeFromObjectiveC(
-    x: AnNSArray,
+    _ x: AnNSArray,
     result: inout AnArray?
   ) {
     _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: AnNSArray,
+    _ x: AnNSArray,
     result: inout AnArray?
   ) -> Bool {
     _preconditionFailure("implement")

@@ -2047,7 +2047,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   }
 }
 
-/// Figure out if a declaration should be exported to Objective C.
+/// Figure out if a declaration should be exported to Objective-C.
 static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
                                              const ValueDecl *VD,
                                              bool allowImplicit = false){
@@ -3836,8 +3836,10 @@ public:
           return;
         }
 
-        if (Super->hasClangNode() && Super->getGenericParams()) {
-          TC.diagnose(CD, diag::inheritance_from_objc_generic_class,
+        if (Super->hasClangNode() && Super->getGenericParams()
+            && superclassTy->hasTypeParameter()) {
+          TC.diagnose(CD,
+                      diag::inheritance_from_unspecialized_objc_generic_class,
                       Super->getName());
         }
 

@@ -7,7 +7,7 @@ import enum_change_size
 
 var EnumChangeSizeTest = TestSuite("EnumChangeSize")
 
-public func getMySingletonEnumValues(c: ChangeSize)
+public func getMySingletonEnumValues(_ c: ChangeSize)
     -> [SingletonEnum?] {
   return [.X(c), nil]
 }
@@ -30,7 +30,7 @@ EnumChangeSizeTest.test("SingletonEnum") {
   }
 }
 
-public func getMySinglePayloadEnumValues(c: ChangeSize)
+public func getMySinglePayloadEnumValues(_ c: ChangeSize)
     -> [SinglePayloadEnum?] {
   return [.X(c), .Y, .Z, nil]
 }
@@ -57,7 +57,7 @@ EnumChangeSizeTest.test("SinglePayloadEnum") {
   }
 }
 
-public func getMyMultiPayloadEnumValues(c: ChangeSize, _ d: ChangeSize)
+public func getMyMultiPayloadEnumValues(_ c: ChangeSize, _ d: ChangeSize)
     -> [MultiPayloadEnum?] {
   return [.X(c), .Y(d), .Z, nil]
 }

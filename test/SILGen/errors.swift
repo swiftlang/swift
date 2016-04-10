@@ -11,7 +11,7 @@ enum HomeworkError : ErrorProtocol {
 }
 
 // CHECK: sil hidden @_TF6errors10make_a_cat{{.*}} : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol) {
-// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(thin) (@thick Cat.Type) -> @owned Cat
+// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type 
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: return [[T2]] : $Cat
@@ -40,7 +40,7 @@ func dont_make_a_cat() throws -> Cat {
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: destroy_addr %1 : $*T
 // CHECK-NEXT: throw [[BOX]]
-func dont_return<T>(argument: T) throws -> T {
+func dont_return<T>(_ argument: T) throws -> T {
   throw HomeworkError.TooMuch
 }
 
@@ -115,7 +115,7 @@ func dont_return<T>(argument: T) throws -> T {
 
 //   Catch all.
 // CHECK:    [[CATCHALL]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(thin) (@thick Cat.Type) -> @owned Cat
+// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: strong_release [[ERROR]] : $ErrorProtocol
@@ -130,7 +130,7 @@ func dont_return<T>(argument: T) throws -> T {
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[CATCH]]([[T0]] : $ErrorProtocol)
-func all_together_now(flag: Bool) -> Cat {
+func all_together_now(_ flag: Bool) -> Cat {
   do {
     return try dont_return(flag ? make_a_cat() : dont_make_a_cat())
   } catch HomeworkError.CatAteIt(let cat) {
@@ -143,7 +143,7 @@ func all_together_now(flag: Bool) -> Cat {
 //   Catch in non-throwing context.
 // CHECK-LABEL: sil hidden @_TF6errors11catch_a_catFT_CS_3Cat : $@convention(thin) () -> @owned Cat
 // CHECK-NEXT: bb0:
-// CHECK:      [[F:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(thin) (@thick Cat.Type) -> @owned Cat
+// CHECK:      [[F:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[M:%.*]] = metatype $@thick Cat.Type
 // CHECK-NEXT: [[V:%.*]] = apply [[F]]([[M]])
 // CHECK-NEXT: return [[V]] : $Cat
@@ -166,7 +166,7 @@ class HasThrowingInit {
 // CHECK-NEXT: assign %0 to [[T1]] : $*Int
 // CHECK-NEXT: return [[T0]] : $HasThrowingInit
 
-// CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitC{{.*}} : $@convention(thin) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error ErrorProtocol)
+// CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitC{{.*}} : $@convention(method) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error ErrorProtocol)
 // CHECK:      [[SELF:%.*]] = alloc_ref $HasThrowingInit
 // CHECK:      [[T0:%.*]] = function_ref @_TFC6errors15HasThrowingInitc{{.*}} : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error ErrorProtocol)
 // CHECK-NEXT: try_apply [[T0]](%0, [[SELF]]) : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error ErrorProtocol), normal bb1, error bb2
@@ -268,10 +268,10 @@ class HappyClass : Doomed {
   func check() {}
 }
 
-func create<T>(fn: () throws -> T) throws -> T {
+func create<T>(_ fn: () throws -> T) throws -> T {
   return try fn()
 }
-func testThunk(fn: () throws -> Int) throws -> Int {
+func testThunk(_ fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSizoPs13ErrorProtocol__XFo__iSizoPS___ : $@convention(thin) (@owned @callee_owned () -> (Int, @error ErrorProtocol)) -> (@out Int, @error ErrorProtocol)
@@ -285,8 +285,8 @@ func testThunk(fn: () throws -> Int) throws -> Int {
 // CHECK:   builtin "willThrow"([[T0]] : $ErrorProtocol)
 // CHECK:   throw [[T0]] : $ErrorProtocol
 
-func createInt(fn: () -> Int) throws {}
-func testForceTry(fn: () -> Int) {
+func createInt(_ fn: () -> Int) throws {}
+func testForceTry(_ fn: () -> Int) {
   try! createInt(fn)
 }
 // CHECK-LABEL: sil hidden @_TF6errors12testForceTryFFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> ()
@@ -352,7 +352,7 @@ func feedCat() throws -> Int {
 // CHECK:   throw [[ERROR]] : $ErrorProtocol
 
 // Throwing statements inside cases.
-func getHungryCat(food: CatFood) throws -> Cat {
+func getHungryCat(_ food: CatFood) throws -> Cat {
   switch food {
   case .Canned:
     return try make_a_cat()
@@ -377,8 +377,8 @@ func getHungryCat(food: CatFood) throws -> Cat {
 // CHECK: bb8([[ERROR:%.*]] : $ErrorProtocol):
 // CHECK:   throw [[ERROR]] : $ErrorProtocol
 
-func take_many_cats(cats: Cat...) throws {}
-func test_variadic(cat: Cat) throws {
+func take_many_cats(_ cats: Cat...) throws {}
+func test_variadic(_ cat: Cat) throws {
   try take_many_cats(make_a_cat(), cat, make_a_cat(), make_a_cat())
 }
 // CHECK-LABEL: sil hidden @_TF6errors13test_variadicFzCS_3CatT_
@@ -485,7 +485,7 @@ protocol Buildable {
   var firstStructure: Structure { get set }
   subscript(name: String) -> Structure { get set }
 }
-func supportFirstStructure<B: Buildable>(b: inout B) throws {
+func supportFirstStructure<B: Buildable>(_ b: inout B) throws {
   try b.firstStructure.support()
 }
 // CHECK-LABEL: sil hidden @_TF6errors21supportFirstStructure{{.*}} : $@convention(thin) <B where B : Buildable, B.Structure : Supportable> (@inout B) -> @error ErrorProtocol {
@@ -515,7 +515,7 @@ func supportFirstStructure<B: Buildable>(b: inout B) throws {
 // CHECK: dealloc_stack [[MATBUFFER]]
 // CHECK: throw [[ERROR]]
 
-func supportStructure<B: Buildable>(b: inout B, name: String) throws {
+func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
   try b[name].support()
 }
 // CHECK-LABEL: sil hidden @_TF6errors16supportStructure
@@ -561,7 +561,7 @@ struct Bridge {
     set {}
   }
 }
-func supportStructure(b: inout Bridge, name: String) throws {
+func supportStructure(_ b: inout Bridge, name: String) throws {
   try b[name].support()
 }
 // CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_ :
@@ -614,7 +614,7 @@ struct OwnedBridge {
     mutableAddressWithOwner { return (nil, owner) }
   }
 }
-func supportStructure(b: inout OwnedBridge, name: String) throws {
+func supportStructure(_ b: inout OwnedBridge, name: String) throws {
   try b[name].support()
 }
 // CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_ :
@@ -650,7 +650,7 @@ struct PinnedBridge {
     mutableAddressWithPinnedNativeOwner { return (nil, owner) }
   }
 }
-func supportStructure(b: inout PinnedBridge, name: String) throws {
+func supportStructure(_ b: inout PinnedBridge, name: String) throws {
   try b[name].support()
 }
 // CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_ :
@@ -684,7 +684,7 @@ func supportStructure(b: inout PinnedBridge, name: String) throws {
 // ! peepholes its argument with getSemanticsProvidingExpr().
 // Test that that doesn't look through try!.
 // rdar://21515402
-func testForcePeephole(f: () throws -> Int?) -> Int {
+func testForcePeephole(_ f: () throws -> Int?) -> Int {
   let x = (try! f())!
   return x
 }
@@ -763,7 +763,7 @@ func testOptionalTryVar() {
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorProtocol)
 // CHECK: {{^}$}}
-func testOptionalTryAddressOnly<T>(obj: T) {
+func testOptionalTryAddressOnly<T>(_ obj: T) {
   _ = try? dont_return(obj)
 }
 
@@ -793,7 +793,7 @@ func testOptionalTryAddressOnly<T>(obj: T) {
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorProtocol)
 // CHECK: {{^}$}}
-func testOptionalTryAddressOnlyVar<T>(obj: T) {
+func testOptionalTryAddressOnlyVar<T>(_ obj: T) {
   var copy = try? dont_return(obj) // expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
@@ -863,7 +863,7 @@ func testOptionalTryNeverFailsVar() {
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK-NEXT: {{^}$}}
-func testOptionalTryNeverFailsAddressOnly<T>(obj: T) {
+func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
   _ = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 }
 
@@ -879,6 +879,6 @@ func testOptionalTryNeverFailsAddressOnly<T>(obj: T) {
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK-NEXT: {{^}$}}
-func testOptionalTryNeverFailsAddressOnlyVar<T>(obj: T) {
+func testOptionalTryNeverFailsAddressOnlyVar<T>(_ obj: T) {
   var copy = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
 }

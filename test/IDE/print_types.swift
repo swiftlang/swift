@@ -8,7 +8,7 @@ typealias MyInt = Int
 // CHECK: TypeAliasDecl '''MyInt''' MyInt.Type{{$}}
 // FULL:  TypeAliasDecl '''MyInt''' swift_ide_test.MyInt.Type{{$}}
 
-func testVariableTypes(param: Int, param2: inout Double) {
+func testVariableTypes(_ param: Int, param2: inout Double) {
 // CHECK: FuncDecl '''testVariableTypes''' (Int, param2: inout Double) -> (){{$}}
 // FULL:  FuncDecl '''testVariableTypes''' (Swift.Int, param2: inout Swift.Double) -> (){{$}}
 
@@ -91,15 +91,15 @@ func testFuncType6() -> (Int, Int) {}
 // CHECK: FuncDecl '''testFuncType6''' () -> (Int, Int){{$}}
 // FULL:  FuncDecl '''testFuncType6''' () -> (Swift.Int, Swift.Int){{$}}
 
-func testFuncType7(a: Int, withFloat b: Float) {}
+func testFuncType7(_ a: Int, withFloat b: Float) {}
 // CHECK: FuncDecl '''testFuncType7''' (Int, withFloat: Float) -> (){{$}}
 // FULL:  FuncDecl '''testFuncType7''' (Swift.Int, withFloat: Swift.Float) -> (){{$}}
 
-func testVariadicFuncType(a: Int, b: Float...) {}
+func testVariadicFuncType(_ a: Int, b: Float...) {}
 // CHECK: FuncDecl '''testVariadicFuncType''' (Int, b: Float...) -> (){{$}}
 // FULL:  FuncDecl '''testVariadicFuncType''' (Swift.Int, b: Swift.Float...) -> (){{$}}
 
-func testCurriedFuncType1(a: Int) -> (b: Float) -> () {}
+func testCurriedFuncType1(_ a: Int) -> (b: Float) -> () {}
 // CHECK: FuncDecl '''testCurriedFuncType1''' (Int) -> (b: Float) -> (){{$}}
 // FULL:  FuncDecl '''testCurriedFuncType1''' (Swift.Int) -> (b: Swift.Float) -> (){{$}}
 
@@ -109,7 +109,7 @@ protocol QuxProtocol { associatedtype Qux }
 
 struct GenericStruct<A, B : FooProtocol> {}
 
-func testInGenericFunc1<A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>>(a: A, b: B, c: C) {
+func testInGenericFunc1<A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>>(_ a: A, b: B, c: C) {
 // CHECK: FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
 // FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
 

@@ -28,7 +28,7 @@ public // COMPILER_INTRINSIC
 func _convertPointerToPointerArgument<
   FromPointer : _Pointer,
   ToPointer : _Pointer
->(from: FromPointer) -> ToPointer {
+>(_ from: FromPointer) -> ToPointer {
   return ToPointer(from._rawValue)
 }
 
@@ -38,7 +38,7 @@ func _convertPointerToPointerArgument<
 public // COMPILER_INTRINSIC
 func _convertInOutToPointerArgument<
   ToPointer : _Pointer
->(from: Builtin.RawPointer) -> ToPointer {
+>(_ from: Builtin.RawPointer) -> ToPointer {
   return ToPointer(from)
 }
 
@@ -49,7 +49,7 @@ public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
   ToPointer : _Pointer
->(a: inout [FromElement]) -> (AnyObject?, ToPointer) {
+>(_ a: inout [FromElement]) -> (AnyObject?, ToPointer) {
   // TODO: Putting a canary at the end of the array in checked builds might
   // be a good idea
 
@@ -67,7 +67,7 @@ public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer : _Pointer
->(arr: [FromElement]) -> (AnyObject?, ToPointer) {
+>(_ arr: [FromElement]) -> (AnyObject?, ToPointer) {
   let (owner, raw) = arr._cPointerArgs()
   return (owner, ToPointer(raw))
 }
@@ -77,7 +77,7 @@ func _convertConstArrayToPointerArgument<
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
   ToPointer : _Pointer
->(str: String) -> (AnyObject?, ToPointer) {
+>(_ str: String) -> (AnyObject?, ToPointer) {
   // Convert the UTF-8 representation to a null-terminated array.
   var utf8 = Array(str.utf8)
   utf8.append(0)

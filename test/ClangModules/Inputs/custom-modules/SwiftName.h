@@ -1,11 +1,19 @@
 #define SWIFT_NAME(X) __attribute__((swift_name(#X)))
 
+#define SWIFT_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+
 void drawString(const char *, int x, int y) SWIFT_NAME(drawString(_:x:y:));
 
 enum SWIFT_NAME(ColorKind) ColorType {
   CT_red,
   CT_green,
   CT_blue,
+};
+
+typedef SWIFT_ENUM(int, HomeworkExcuse) {
+  HomeworkExcuseDogAteIt,
+  HomeworkExcuseOverslept SWIFT_NAME(tired),
+  HomeworkExcuseTooHard,
 };
 
 typedef struct SWIFT_NAME(Point) {

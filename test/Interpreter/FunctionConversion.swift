@@ -13,7 +13,6 @@
 // REQUIRES: executable_test
 // REQUIRES: rdar24874073
 //
-// XFAIL: interpret
 
 import StdlibUnittest
 

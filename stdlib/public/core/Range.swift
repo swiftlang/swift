@@ -250,7 +250,7 @@ extension HalfOpenRangeProtocol
 ///
 /// However, subscripting that range still works in a generic context:
 ///
-///     func brackets<T>(x: CountableRange<T>, _ i: T) -> T {
+///     func brackets<T>(_ x: CountableRange<T>, _ i: T) -> T {
 ///         return x[i] // Just forward to subscript
 ///     }
 ///     print(brackets(CountableRange<Int>(uncheckedBounds: (-99, 100)), 0))

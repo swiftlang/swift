@@ -42,7 +42,7 @@ final class LinkedNode {
 }
 
 @inline(never)
-func getInt(x: XX) -> Int {
+func getInt(_ x: XX) -> Int {
   return x.xx
 }
 
@@ -57,7 +57,7 @@ func testSingleObject() -> Int {
 }
 
 @inline(never)
-func addInts(t: TreeNode) -> Int {
+func addInts(_ t: TreeNode) -> Int {
   return t.left.xx + t.right.xx
 }
 
@@ -72,7 +72,7 @@ func testTree() -> Int {
 }
 
 @inline(never)
-func addAllInts(n: LinkedNode) -> Int {
+func addAllInts(_ n: LinkedNode) -> Int {
   var s = 0
   var iter: LinkedNode? = n
   while let iter2 = iter {
@@ -93,7 +93,7 @@ func testList() -> Int {
 }
 
 @inline(never)
-func identity(x: Int) -> Int {
+func identity(_ x: Int) -> Int {
   return x
 }
 
@@ -109,7 +109,7 @@ func testArray() -> Int {
 }
 
 @inline(never)
-public func run_ObjectAllocation(N: Int) {
+public func run_ObjectAllocation(_ N: Int) {
 
   var SingleObjectResult = 0
   var TreeResult = 0

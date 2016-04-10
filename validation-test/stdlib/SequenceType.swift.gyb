@@ -254,7 +254,7 @@ extension EnumeratedSequence where Base : TestProtocol1 {
 
 SequenceTypeTests.test("enumerated()") {
   typealias Element = (offset: Int, element: OpaqueValue<Int>)
-  func compareElements(lhs: Element, rhs: Element) -> Bool {
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
     return lhs.0 == rhs.0 && lhs.1.value == rhs.1.value
   }
 
@@ -554,7 +554,7 @@ SequenceTypeTests.test("contains/WhereElementIsEquatable/dispatch") {
 }
 
 func callStaticContains(
-  set: Set<MinimalHashableValue>,
+  _ set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Bool {
   return set.contains(element)
@@ -562,7 +562,7 @@ func callStaticContains(
 
 func callGenericContains<
   S : Sequence where S.Iterator.Element : Equatable
->(sequence: S, _ element: S.Iterator.Element) -> Bool {
+>(_ sequence: S, _ element: S.Iterator.Element) -> Bool {
   return sequence.contains(element)
 }
 
@@ -812,7 +812,7 @@ struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
   }
 
   func map<T>(
-    @noescape transform: (Element) throws -> T
+    @noescape _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     MinimalSequenceWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
@@ -824,7 +824,7 @@ struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
 % end
 
 func callStaticSequenceMap<T>(
-  sequence: MinimalSequenceWithDefaultMap<OpaqueValue<Int>>,
+  _ sequence: MinimalSequenceWithDefaultMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = sequence.map(transform)
@@ -833,7 +833,7 @@ func callStaticSequenceMap<T>(
 }
 
 func callStaticSequenceMap<T>(
-  sequence: MinimalSequenceWithCustomMap<OpaqueValue<Int>>,
+  _ sequence: MinimalSequenceWithCustomMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = sequence.map(transform)
@@ -842,7 +842,7 @@ func callStaticSequenceMap<T>(
 }
 
 func callGenericSequenceMap<S : Sequence, T>(
-  sequence: S,
+  _ sequence: S,
   @noescape transform: (S.Iterator.Element) -> T
 ) -> [T] {
   var result = sequence.map(transform)
@@ -1057,7 +1057,7 @@ extension Zip2Sequence
 
 SequenceTypeTests.test("zip") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
-  func compareElements(lhs: Element, rhs: Element) -> Bool {
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
     return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
   }
 

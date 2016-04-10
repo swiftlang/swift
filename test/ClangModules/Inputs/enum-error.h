@@ -5,9 +5,9 @@
 @class NSString;
 extern NSString *const TestErrorDomain;
 typedef NS_ERROR_ENUM(int, TestError, TestErrorDomain) {
-	TENone,
-	TEOne,
-	TETwo,
+  TENone,
+  TEOne,
+  TETwo,
 };
 
 TestError getErr();

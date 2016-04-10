@@ -10,7 +10,7 @@ class A {
   // CHECK-LABEL: sil hidden @_TFC14objc_metatypes1A3foo
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_metatypes1A3foo
-  dynamic func foo(m: ObjCClass.Type) -> ObjCClass.Type {
+  dynamic func foo(_ m: ObjCClass.Type) -> ObjCClass.Type {
     // CHECK: bb0([[M:%[0-9]+]] : $@objc_metatype ObjCClass.Type, [[SELF:%[0-9]+]] : $A):
     // CHECK:   strong_retain [[SELF]] : $A
     // CHECK:   [[M_AS_THICK:%[0-9]+]] = objc_to_thick_metatype [[M]] : $@objc_metatype ObjCClass.Type to $@thick ObjCClass.Type
@@ -28,11 +28,11 @@ class A {
   // CHECK: bb0([[SELF:%[0-9]+]] : $@objc_metatype A.Type):
   // CHECK-NEXT:   [[OBJC_SELF:%[0-9]+]] = objc_to_thick_metatype [[SELF]] : $@objc_metatype A.Type to $@thick A.Type
   // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TZFC14objc_metatypes1A3bar
-  // CHECK-NEXT:   [[RESULT:%[0-9]+]] = apply [[BAR]]([[OBJC_SELF]]) : $@convention(thin) (@thick A.Type) -> ()
+  // CHECK-NEXT:   [[RESULT:%[0-9]+]] = apply [[BAR]]([[OBJC_SELF]]) : $@convention(method) (@thick A.Type) -> ()
   // CHECK-NEXT:   return [[RESULT]] : $()
   dynamic class func bar() { }
 
-  dynamic func takeGizmo(g: Gizmo.Type) { }
+  dynamic func takeGizmo(_ g: Gizmo.Type) { }
 
   // CHECK-LABEL: sil hidden @_TFC14objc_metatypes1A7callFoo
   func callFoo() {

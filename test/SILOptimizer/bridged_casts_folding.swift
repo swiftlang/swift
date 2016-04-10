@@ -14,11 +14,11 @@
 
 import Foundation
 
-public func forcedCast<NS, T>(ns: NS) -> T {
+public func forcedCast<NS, T>(_ ns: NS) -> T {
   return ns as! T
 }
 
-public func condCast<NS, T>(ns: NS) -> T? {
+public func condCast<NS, T>(_ ns: NS) -> T? {
   return ns as? T
 }
 
@@ -49,7 +49,7 @@ public func testCondCastNStoSwiftString() -> String? {
 
 // Check optimizations of casts from NSNumber to Int
 
-var nsIntNumber = NSNumber(integer: 1)
+var nsIntNumber = NSNumber(value: 1)
 
 // CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding32testForcedCastNSNumberToSwiftIntFT_Si
 // CHECK-NOT: unconditional_checked
@@ -73,7 +73,7 @@ public func testCondCastNSNumberToSwiftInt() -> Int? {
 
 // Check optimizations of casts from NSNumber to Double
 
-var nsDoubleNumber = NSNumber(double: 1.234)
+var nsDoubleNumber = NSNumber(value: 1.234)
 
 // CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding35testForcedCastNSNumberToSwiftDoubleFT_Sd
 // CHECK-NOT: unconditional_checked
@@ -626,7 +626,7 @@ public func testCondCastSwiftToNSSetString() -> NSSet? {
 // CHECK: unconditional_checked
 // CHECK: return
 @inline(never)
-public func testForcedCastFromGeneric<T>(x: T) -> NSString {
+public func testForcedCastFromGeneric<T>(_ x: T) -> NSString {
   var set: NSString = x as! NSString
   return set
 }
@@ -635,7 +635,7 @@ public func testForcedCastFromGeneric<T>(x: T) -> NSString {
 // CHECK: unconditional_checked
 // CHECK: return
 @inline(never)
-public func testForcedCastToGeneric<T>(x: T) -> T {
+public func testForcedCastToGeneric<T>(_ x: T) -> T {
   var set: T = nsString as! T
   return set
 }
@@ -644,7 +644,7 @@ public func testForcedCastToGeneric<T>(x: T) -> T {
 // CHECK: checked_cast_addr_br
 // CHECK: return
 @inline(never)
-public func testCondCastFromGeneric<T>(x: T) -> NSString? {
+public func testCondCastFromGeneric<T>(_ x: T) -> NSString? {
   var setOpt: NSString? = x as? NSString
   return setOpt
 }
@@ -653,7 +653,7 @@ public func testCondCastFromGeneric<T>(x: T) -> NSString? {
 // CHECK: checked_cast_addr_br
 // CHECK: return
 @inline(never)
-public func testCondCastToGeneric<T>(x: T) -> T? {
+public func testCondCastToGeneric<T>(_ x: T) -> T? {
   var setOpt: T? = nsString as? T
   return setOpt
 }

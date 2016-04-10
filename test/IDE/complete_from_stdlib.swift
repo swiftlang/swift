@@ -75,7 +75,7 @@
 // PLAIN_TOP_LEVEL-DAG: Decl[Struct]/OtherModule[Swift]: Array[#Array#]{{; name=.+$}}
 // PLAIN_TOP_LEVEL: End completions
 
-func privateNominalMembers(a: String) {
+func privateNominalMembers(_ a: String) {
   a.#^PRIVATE_NOMINAL_MEMBERS_1^#
 }
 
@@ -86,11 +86,11 @@ func privateNominalMembers(a: String) {
 // PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#Index#]{{; name=.+$}}
 // PRIVATE_NOMINAL_MEMBERS_1: End completions
 
-func protocolExtCollection1a<C : Collection>(a: C) {
+func protocolExtCollection1a<C : Collection>(_ a: C) {
   a.#^PRIVATE_NOMINAL_MEMBERS_2A^#
 }
 
-func protocolExtCollection1b(a: Collection) {
+func protocolExtCollection1b(_ a: Collection) {
   a.#^PRIVATE_NOMINAL_MEMBERS_2B^#
 }
 
@@ -99,7 +99,7 @@ func protocolExtCollection1b(a: Collection) {
 // PRIVATE_NOMINAL_MEMBERS_2: End completions
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2-NOT: Decl{{.*}}: last
 
-func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(a: C) {
+func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(_ a: C) {
   a.#^PRIVATE_NOMINAL_MEMBERS_3^#
 }
 
@@ -110,7 +110,7 @@ func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(a
 // PRIVATE_NOMINAL_MEMBERS_3: End completions
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3-NOT: Decl{{.*}}:         index({#({{.*}}): Self.Iterator.Element
 
-func protocolExtArray<T : Equatable>(a: [T]) {
+func protocolExtArray<T : Equatable>(_ a: [T]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_4^#
 }
 // PRIVATE_NOMINAL_MEMBERS_4: Begin completions
@@ -120,7 +120,7 @@ func protocolExtArray<T : Equatable>(a: [T]) {
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         index({#where: (Equatable) throws -> Bool##(Equatable) throws -> Bool#})[' rethrows'][#Int?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4: End completions
 
-func testArchetypeReplacement1<FOO : Equatable>(a: [FOO]) {
+func testArchetypeReplacement1<FOO : Equatable>(_ a: [FOO]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_5^#
 }
 
@@ -128,7 +128,6 @@ func testArchetypeReplacement1<FOO : Equatable>(a: [FOO]) {
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): Equatable#})[#Void#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): Equatable#}, {#at: Int#})[#Void#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   popLast()[#Equatable?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         makeIterator()[#IndexingIterator<[Equatable]>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceVar]/Super:            isEmpty[#Bool#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceVar]/Super:            first[#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(n): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
@@ -137,7 +136,7 @@ func testArchetypeReplacement1<FOO : Equatable>(a: [FOO]) {
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         suffix({#(maxLength): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 
 
-func testArchetypeReplacement2<BAR : Equatable>(a: [BAR]) {
+func testArchetypeReplacement2<BAR : Equatable>(_ a: [BAR]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_6^#
 }
 
@@ -154,7 +153,7 @@ func testArchetypeReplacement2<BAR : Equatable>(a: [BAR]) {
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(n): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         flatMap({#(transform): (Equatable) throws -> Sequence##(Equatable) throws -> Sequence#})[' rethrows'][#[S.Iterator.Element]#]{{; name=.+}}
 
-func testArchetypeReplacement3 (a : [Int]) {
+func testArchetypeReplacement3 (_ a : [Int]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_7^#
 }
 
@@ -175,7 +174,7 @@ protocol P2 {
 }
 
 extension P2 {
-  func foo(x: MyElement) {}
+  func foo(_ x: MyElement) {}
 }
 
 typealias MyInt = Int
@@ -191,16 +190,16 @@ class MyClass2 : P2 {
 protocol P1{}
 
 class MyClass3 {
-  func foo<T: protocol<P1, P2>>(t : T) {}
+  func foo<T: protocol<P1, P2>>(_ t : T) {}
 }
 
-func testArchetypeReplacement4(a : MyClass1) {
+func testArchetypeReplacement4(_ a : MyClass1) {
   a.#^PRIVATE_NOMINAL_MEMBERS_8^#
 }
 // PRIVATE_NOMINAL_MEMBERS_8: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/Super: foo({#(x): MyInt#})[#Void#]{{; name=.+}}
 
-func testArchetypeReplacement5(a : MyClass2) {
+func testArchetypeReplacement5(_ a : MyClass2) {
   a.#^PRIVATE_NOMINAL_MEMBERS_9^#
 }
 
@@ -219,26 +218,26 @@ func testArchetypeReplacement6() {
 struct Test1000 : Sequence {
   func #^RETURNS_ANY_SEQUENCE^#
 }
-// RETURNS_ANY_SEQUENCE: Decl[InstanceMethod]/Super:         dropFirst(n: Int)
+// RETURNS_ANY_SEQUENCE: Decl[InstanceMethod]/Super:         dropFirst(_ n: Int)
 
-func testPostfixOperator1(x: Int) {
+func testPostfixOperator1(_ x: Int) {
   x#^POSTFIX_INT_1^#
 }
 // POSTFIX_RVALUE_INT-NOT: ++
 // POSTFIX_RVALUE_INT-NOT: --
 
-func testPostfixOperator2(x: inout Int) {
+func testPostfixOperator2(_ x: inout Int) {
   x#^POSTFIX_INT_2^#
 }
 // POSTFIX_LVALUE_INT: Decl[PostfixOperatorFunction]/OtherModule[Swift]: ++[#Int#]; name=
 // POSTFIX_LVALUE_INT: Decl[PostfixOperatorFunction]/OtherModule[Swift]: --[#Int#]; name=
 
-func testPostfixOperator3(x: MyInt??) {
+func testPostfixOperator3(_ x: MyInt??) {
   x#^POSTFIX_OPTIONAL_1^#
 }
 // POSTFIX_OPTIONAL: Pattern/None: ![#MyInt?#]; name=!
 
-func testInfixOperator1(x: Int) {
+func testInfixOperator1(_ x: Int) {
   x#^INFIX_INT_1^#
 }
 // INFIX_INT: Begin completions
@@ -251,7 +250,7 @@ func testInfixOperator1(x: Int) {
 // INFIX_INT: End completions
 // NEGATIVE_INFIX_INT-NOT: &&
 // NEGATIVE_INFIX_INT-NOT: +=
-func testInfixOperator2(x: inout Int) {
+func testInfixOperator2(_ x: inout Int) {
   x#^INFIX_INT_2^#
 }
 // INFIX_LVALUE_INT: Begin completions
@@ -265,7 +264,7 @@ func testInfixOperator2(x: inout Int) {
 // INFIX_LVALUE_INT-NOT: &&
 // INFIX_LVALUE_INT: End completions
 
-func testInfixOperator3(x: String) {
+func testInfixOperator3(_ x: String) {
   x#^INFIX_STRING_1^#
 }
 // INFIX_STRING: Begin completions
@@ -276,7 +275,7 @@ func testInfixOperator3(x: String) {
 // INFIX_STRING-NOT: <<
 // INFIX_STRING: End completions
 
-func testInfixOperator4(x: String) {
+func testInfixOperator4(_ x: String) {
   x == ""#^INFIX_EXT_STRING_1^#
 }
 // INFIX_EXT_STRING: Begin completions

@@ -8,7 +8,7 @@ protocol P2 : P1 {
   func foo() -> Int
 }
 
-func f<C : P2> (elements: C) {
+func f<C : P2> (_ elements: C) {
   var _: Int = elements.foo() // should not error
 }
 
@@ -30,7 +30,7 @@ protocol MutableCollection : Collection {
 func insertionSort<
 C: MutableCollection 
 >(
-  elements: inout C,
+  _ elements: inout C,
   i: C.Index
 ) {
   var _: C.Iterator.Element = elements[i] // should not error

@@ -107,10 +107,11 @@ public:
   /// Shift values from the source explosion to the target explosion
   /// as if by copy-initialization.
   virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
-                    Explosion &targetExplosion) const = 0;
+                    Explosion &targetExplosion, Atomicity atomicity) const = 0;
   
   /// Release reference counts or other resources owned by the explosion.
-  virtual void consume(IRGenFunction &IGF, Explosion &explosion) const = 0;
+  virtual void consume(IRGenFunction &IGF, Explosion &explosion,
+                       Atomicity atomicity) const = 0;
 
   /// Fix the lifetime of the source explosion by creating opaque calls to
   /// swift_fixLifetime for all reference types in the explosion.

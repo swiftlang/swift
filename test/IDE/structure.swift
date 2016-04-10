@@ -9,13 +9,13 @@ class MyCls : OtherClass {
   var anotherBar : Int = 42
   class var cbar : Int = 0
 
-  // CHECK:   <ifunc>func <name>foo(<param>arg1: Int</param>, <param><name>name</name>: String</param>, <param><name>param</name> par: String</param>)</name> {
+  // CHECK:   <ifunc>func <name>foo(<param>_ arg1: Int</param>, <param><name>name</name>: String</param>, <param><name>param</name> par: String</param>)</name> {
   // CHECK:     var abc
   // CHECK:     <if>if <elem-condexpr>1</elem-condexpr> <brace>{
   // CHECK:       <call><name>foo</name>(<param>1</param>, <param><name>name</name>:"test"</param>, <param><name>param</name>:"test2"</param>)</call>
   // CHECK:     }</brace>
   // CHECK:   }</ifunc>
-  func foo(arg1: Int, name: String, param par: String) {
+  func foo(_ arg1: Int, name: String, param par: String) {
     var abc
     if 1 {
       foo(1, name:"test", param:"test2")
@@ -152,8 +152,8 @@ enum Rawness : Int {
   case Two = 2, Three = 3
 }
 
-// CHECK: <ffunc>func <name>rethrowFunc(<param>f: () throws -> ()</param>)</name> rethrows {}</ffunc>
-func rethrowFunc(f: () throws -> ()) rethrows {}
+// CHECK: <ffunc>func <name>rethrowFunc(<param>_ f: () throws -> ()</param>)</name> rethrows {}</ffunc>
+func rethrowFunc(_ f: () throws -> ()) rethrows {}
 
 class NestedPoundIf{
     func foo1() {
@@ -180,7 +180,7 @@ class NestedPoundIf{
 // CHECK: <ifunc>func <name>foo3()</name> {}</ifunc>
 
 class A {
-  func foo(i : Int, animations: () -> ()) {}
+  func foo(_ i : Int, animations: () -> ()) {}
   func perform() {foo(5, animations: {})}
 // CHECK: <ifunc>func <name>perform()</name> {<call><name>foo</name>(<param>5</param>, <param><name>animations</name>: <brace>{}</brace></param>)</call>}</ifunc>
 }

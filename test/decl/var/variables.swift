@@ -14,7 +14,7 @@ var bfx : Int, bfy : Int
 
 _ = 10
 
-func _(x: Int) {} // expected-error {{expected identifier in function declaration}}
+func _(_ x: Int) {} // expected-error {{expected identifier in function declaration}}
 
 
 var self1 = self1 // expected-error {{variable used within its own initial value}}
@@ -75,7 +75,7 @@ let a = b ; let b = a // expected-error{{could not infer type for 'a'}}
 let uselessValue : String?
 
 
-func tuplePatternDestructuring(x : Int, y : Int) {
+func tuplePatternDestructuring(_ x : Int, y : Int) {
   let (b: _, a: h) = (b: x, a: y)
   _ = h
   

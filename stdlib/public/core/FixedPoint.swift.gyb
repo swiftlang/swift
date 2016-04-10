@@ -145,12 +145,12 @@ extension UnsignedInteger {
 /// Typically used to do conversion to any contextually-deduced
 /// integer type:
 ///
-///     func f(x: Int32) {}
-///     func g(x: Int64) { f(numericCast(x)) }
+///     func f(_ x: Int32) {}
+///     func g(_ x: Int64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
   T : _SignedInteger, U : _SignedInteger
->(x: T) -> U {
+>(_ x: T) -> U {
   return U(x.toIntMax())
 }
 
@@ -160,12 +160,12 @@ public func numericCast<
 /// Typically used to do conversion to any contextually-deduced
 /// integer type:
 ///
-///     func f(x: UInt32) {}
-///     func g(x: UInt64) { f(numericCast(x)) }
+///     func f(_ x: UInt32) {}
+///     func g(_ x: UInt64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
   T : UnsignedInteger, U : UnsignedInteger
->(x: T) -> U {
+>(_ x: T) -> U {
   return U(x.toUIntMax())
 }
 
@@ -175,12 +175,12 @@ public func numericCast<
 /// Typically used to do conversion to any contextually-deduced
 /// integer type:
 ///
-///     func f(x: UInt32) {}
-///     func g(x: Int64) { f(numericCast(x)) }
+///     func f(_ x: UInt32) {}
+///     func g(_ x: Int64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
   T : _SignedInteger, U : UnsignedInteger
->(x: T) -> U {
+>(_ x: T) -> U {
   return U(UIntMax(x.toIntMax()))
 }
 
@@ -190,12 +190,12 @@ public func numericCast<
 /// Typically used to do conversion to any contextually-deduced
 /// integer type:
 ///
-///     func f(x: Int32) {}
-///     func g(x: UInt64) { f(numericCast(x)) }
+///     func f(_ x: Int32) {}
+///     func g(_ x: UInt64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
 T : UnsignedInteger, U : _SignedInteger
->(x: T) -> U {
+>(_ x: T) -> U {
   return U(IntMax(x.toUIntMax()))
 }
 
@@ -395,7 +395,7 @@ extension ${Self} {
   /// `Bool` that is `true` iff the operation caused an arithmetic
   /// overflow.
   @_transparent public
-  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
+  static func ${Method}WithOverflow(_ lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
     let tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs._value, rhs._value, false._value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
@@ -406,7 +406,7 @@ extension ${Self} {
   /// ${'a result' if op == 'div' else 'the remainder'} and a `Bool`
   /// that is `true` iff the operation caused an arithmetic overflow.
   @_transparent public
-  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
+  static func ${Method}WithOverflow(_ lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
     if rhs == 0 {
       return (0, true)
     }
@@ -645,7 +645,7 @@ public postfix func -- (x: inout ${Self}) -> ${Self} {
 /// It has only an effect if the argument is a load or call.
 @_transparent
 @warn_unused_result
-public func _assumeNonNegative(x: ${Self}) -> ${Self} {
+public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
   _sanityCheck(x >= 0)
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
@@ -656,7 +656,7 @@ public func _assumeNonNegative(x: ${Self}) -> ${Self} {
 % fixedBitWidths = [2**x for x in range(3, 8) if 2**x <= 2 * word_bits]
 % for bits in fixedBitWidths:
 @_transparent
-public func _leadingZeros(x: Builtin.Int${bits}) -> Builtin.Int${bits} {
+public func _leadingZeros(_ x: Builtin.Int${bits}) -> Builtin.Int${bits} {
   return Builtin.int_ctlz_Int${bits}(x, true._value)
 }
 % end

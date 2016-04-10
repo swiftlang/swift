@@ -43,7 +43,7 @@ func _insertionSort<
   C : protocol<MutableCollection, BidirectionalCollection>
   ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
@@ -90,7 +90,7 @@ func _partition<
   C : protocol<MutableCollection, RandomAccessCollection>
   ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) -> C.Index {
@@ -145,7 +145,7 @@ func _introSort<
   C : protocol<MutableCollection, RandomAccessCollection>
   ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
@@ -171,7 +171,7 @@ func _introSortImpl<
   C : protocol<MutableCollection, RandomAccessCollection>
   ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""},
   depthLimit: Int
@@ -215,7 +215,7 @@ func _siftDown<
   C : protocol<MutableCollection, RandomAccessCollection>
   ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   index: C.Index,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
@@ -254,7 +254,7 @@ func _heapify<
   C : protocol<MutableCollection, RandomAccessCollection>
   ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
@@ -281,7 +281,7 @@ func _heapSort<
   C : protocol<MutableCollection, RandomAccessCollection>
   ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
@@ -309,7 +309,7 @@ func _heapSort<
 /// Exchange the values of `a` and `b`.
 ///
 /// - Precondition: `a` and `b` do not alias each other.
-public func swap<T>(a: inout T, _ b: inout T) {
+public func swap<T>(_ a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
   let p1 = Builtin.addressof(&a)

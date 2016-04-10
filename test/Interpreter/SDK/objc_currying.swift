@@ -4,7 +4,7 @@
 // REQUIRES: objc_interop
 import Foundation
 
-func foo(f: (String) -> String) {
+func foo(_ f: (String) -> String) {
   print(f(", "))
   print(f(" • "))
 }

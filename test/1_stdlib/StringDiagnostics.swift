@@ -5,8 +5,12 @@
 import Foundation
 
 // Common pitfall: trying to subscript a string with integers.
+<<<<<<< HEAD
 func testIntSubscripting(s: String, i: Int) {
   // FIXME swift-3-indexing-model: test new overloads of ..<, ...
+=======
+func testIntSubscripting(_ s: String, i: Int) {
+>>>>>>> master
   _ = s[i] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
   _ = s[17] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
   _ = s[i...i] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}}
@@ -15,7 +19,7 @@ func testIntSubscripting(s: String, i: Int) {
 }
 
 // Common pitfall: trying to access `String.count`.
-func testStringCount(s: String) {
+func testStringCount(_ s: String) {
   _ = s.count // expected-error{{'count' is unavailable: there is no universally good answer, see the documentation comment for discussion}}
 }
 
@@ -27,7 +31,7 @@ func testNonAmbiguousStringComparisons() {
   x = s1 as String > s2
 }
 
-func testAmbiguousStringComparisons(s: String) {
+func testAmbiguousStringComparisons(_ s: String) {
   let nsString = s as NSString
   let a1 = s == nsString
   let a2 = s != nsString
@@ -44,22 +48,23 @@ func testAmbiguousStringComparisons(s: String) {
   let a12 = nsString > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
 }
 
-func acceptsSequence<S : Sequence>(sequence: S) {}
+func acceptsSequence<S : Sequence>(_ sequence: S) {}
 
-func testStringIsNotASequence(s: String) {
+func testStringIsNotASequence(_ s: String) {
   acceptsSequence(s) // expected-error {{argument type 'String' does not conform to expected type 'Sequence'}}
 }
 
-func testStringDeprecation(hello: String) {
+func testStringDeprecation(_ hello: String) {
   let hello2 = hello
-    .addingPercentEscapes(usingEncoding: NSUTF8StringEncoding) // expected-warning{{'addingPercentEscapes(usingEncoding:)' is deprecated}}
+    .addingPercentEscapes(using: NSUTF8StringEncoding) // expected-warning{{'addingPercentEscapes(using:)' is deprecated}}
 
   _ = hello2?
-    .replacingPercentEscapes(usingEncoding: NSUTF8StringEncoding) // expected-warning{{'replacingPercentEscapes(usingEncoding:)' is deprecated}}
+    .replacingPercentEscapes(using: NSUTF8StringEncoding) // expected-warning{{'replacingPercentEscapes(using:)' is deprecated}}
 
 
 }
 
+<<<<<<< HEAD
 // Positive and negative tests for String collection types
 func acceptsCollection<I: Collection>(_: I) {}
 func acceptsBidirectionalCollection<I: BidirectionalCollection>(_: I) {}
@@ -72,6 +77,20 @@ func testStringCollectionTypes(s: String) {
   acceptsRandomAccessCollection(s.unicodeScalars) // expected-error{{argument type 'String.UnicodeScalarView' does not conform to expected type 'RandomAccessCollection'}}
   acceptsBidirectionalCollection(s.characters)
   acceptsRandomAccessCollection(s.characters) // expected-error{{argument type 'String.CharacterView' does not conform to expected type 'RandomAccessCollection'}}
+=======
+// Positive and negative tests for String index types
+func acceptsForwardIndex<I: ForwardIndex>(_ index: I) {}
+func acceptsBidirectionalIndex<I: BidirectionalIndex>(_ index: I) {}
+func acceptsRandomAccessIndex<I: RandomAccessIndex>(_ index: I) {}
+
+func testStringIndexTypes(_ s: String) {
+  acceptsForwardIndex(s.utf8.startIndex)
+  acceptsBidirectionalIndex(s.utf8.startIndex) // expected-error{{argument type 'String.UTF8View.Index' does not conform to expected type 'BidirectionalIndex'}}
+  acceptsBidirectionalIndex(s.unicodeScalars.startIndex)
+  acceptsRandomAccessIndex(s.unicodeScalars.startIndex) // expected-error{{argument type 'String.UnicodeScalarView.Index' does not conform to expected type 'RandomAccessIndex'}}
+  acceptsBidirectionalIndex(s.characters.startIndex)
+  acceptsRandomAccessIndex(s.characters.startIndex) // expected-error{{argument type 'String.CharacterView.Index' does not conform to expected type 'RandomAccessIndex'}}
+>>>>>>> master
   
   // UTF16View.Collection is random-access with Foundation, bidirectional without
   acceptsRandomAccessCollection(s.utf16)

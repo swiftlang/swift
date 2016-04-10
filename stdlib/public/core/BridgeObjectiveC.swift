@@ -43,7 +43,7 @@ public protocol _ObjectiveCBridgeable {
   /// - parameter result: The location where the result is written. The optional
   ///   will always contain a value.
   static func _forceBridgeFromObjectiveC(
-    source: _ObjectiveCType,
+    _ source: _ObjectiveCType,
     result: inout Self?
   )
 
@@ -62,7 +62,7 @@ public protocol _ObjectiveCBridgeable {
   ///   implementation, so that it need not look into the optional representation
   ///   to determine success.
   static func _conditionallyBridgeFromObjectiveC(
-    source: _ObjectiveCType,
+    _ source: _ObjectiveCType,
     result: inout Self?
   ) -> Bool
 
@@ -88,7 +88,7 @@ public protocol _ObjectiveCBridgeable {
   /// implementation of `Swift.Array`'s conformance to
   /// `_ObjectiveCBridgeable` will produce an empty array rather than
   /// dynamically failing.
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self
 }
 
@@ -116,14 +116,14 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(
-    source: AnyObject,
+    _ source: AnyObject,
     result: inout _BridgeableMetatype?
   ) {
     result = _BridgeableMetatype(value: source as! AnyObject.Type)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    source: AnyObject,
+    _ source: AnyObject,
     result: inout _BridgeableMetatype?
   ) -> Bool {
     if let type = source as? AnyObject.Type {
@@ -135,7 +135,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
     return false
   }
 
-  public static func _unconditionallyBridgeFromObjectiveC(source: AnyObject?)
+  public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
       -> _BridgeableMetatype {
     var result: _BridgeableMetatype?
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -162,7 +162,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 ///
 /// - otherwise, the result is empty.
 @warn_unused_result
-public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
+public func _bridgeToObjectiveC<T>(_ x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
   }
@@ -170,7 +170,7 @@ public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
 }
 
 @warn_unused_result
-public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
+public func _bridgeToObjectiveCUnconditional<T>(_ x: T) -> AnyObject {
   let optResult: AnyObject? = _bridgeToObjectiveC(x)
   _precondition(optResult != nil,
       "value failed to bridge from Swift type to a Objective-C type")
@@ -180,7 +180,7 @@ public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
 /// Same as `_bridgeToObjectiveCUnconditional`, but autoreleases the
 /// return value if `T` is bridged non-verbatim.
 @warn_unused_result
-func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
+func _bridgeToObjectiveCUnconditionalAutorelease<T>(_ x: T) -> AnyObject
 {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
@@ -196,7 +196,7 @@ func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
 
 @warn_unused_result
 @_silgen_name("swift_bridgeNonVerbatimToObjectiveC")
-func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
+func _bridgeNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject?
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
@@ -210,7 +210,7 @@ func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 ///   + otherwise, returns the result of `T._forceBridgeFromObjectiveC(x)`;
 /// - otherwise, trap.
 @warn_unused_result
-public func _forceBridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
+public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as! T
   }
@@ -224,7 +224,8 @@ public func _forceBridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
 /// representation.
 @warn_unused_result
 @_silgen_name("_forceBridgeFromObjectiveC_bridgeable")
-public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(x: T._ObjectiveCType, _: T.Type) -> T {
+public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>
+  (_ x: T._ObjectiveCType, _: T.Type) -> T {
   var result: T?
   T._forceBridgeFromObjectiveC(x, result: &result)
   return result!
@@ -246,7 +247,7 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(x: T.
 /// - otherwise, the result is empty.
 @warn_unused_result
 public func _conditionallyBridgeFromObjectiveC<T>(
-  x: AnyObject,
+  _ x: AnyObject,
   _: T.Type
 ) -> T? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
@@ -263,7 +264,7 @@ public func _conditionallyBridgeFromObjectiveC<T>(
 @warn_unused_result
 @_silgen_name("_conditionallyBridgeFromObjectiveC_bridgeable")
 public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
-  x: T._ObjectiveCType,
+  _ x: T._ObjectiveCType,
   _: T.Type
 ) -> T? {
   var result: T?
@@ -273,7 +274,7 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
 
 @_silgen_name("swift_bridgeNonVerbatimFromObjectiveC")
 func _bridgeNonVerbatimFromObjectiveC<T>(
-  x: AnyObject,
+  _ x: AnyObject,
   _ nativeType: T.Type,
   _ result: inout T?
 )
@@ -287,7 +288,7 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
 /// - Returns: `true` to indicate success, `false` to indicate failure.
 @_silgen_name("swift_bridgeNonVerbatimFromObjectiveCConditional")
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(
-  x: AnyObject,
+  _ x: AnyObject,
   _ nativeType: T.Type,
   _ result: inout T?
 ) -> Bool

@@ -122,7 +122,7 @@ ${Self}TestSuite.test("subscript(_:Index)/Set/DifferentCollections") {
 %  SelfSlice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=True)
 %  Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
 
-func getTwoInterchangeable${Self}(elements: [Int])
+func getTwoInterchangeable${Self}(_ elements: [Int])
   -> (${Self}<OpaqueValue<Int>>, ${Self}<OpaqueValue<Int>>) {
   var c1 = ${Self}<OpaqueValue<Int>>()
   c1.append(contentsOf: elements.map(OpaqueValue.init))

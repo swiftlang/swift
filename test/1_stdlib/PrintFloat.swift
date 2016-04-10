@@ -27,7 +27,7 @@ PrintTests.setUp {
 }
 
 PrintTests.test("CustomStringConvertible") {
-  func hasDescription(any: Any) {
+  func hasDescription(_ any: Any) {
     expectTrue(any is CustomStringConvertible)
   }
 
@@ -36,10 +36,10 @@ PrintTests.test("CustomStringConvertible") {
 }
 
 PrintTests.test("Printable") {
-  func asFloat32(f: Float32) -> Float32 { return f }
-  func asFloat64(f: Float64) -> Float64 { return f }
+  func asFloat32(_ f: Float32) -> Float32 { return f }
+  func asFloat64(_ f: Float64) -> Float64 { return f }
 #if arch(i386) || arch(x86_64)
-  func asFloat80(f: Swift.Float80) -> Swift.Float80 { return f }
+  func asFloat80(_ f: Swift.Float80) -> Swift.Float80 { return f }
 #endif
 
   expectPrinted("1.0", Float(1.0))

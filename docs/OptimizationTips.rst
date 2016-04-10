@@ -59,9 +59,9 @@ This mode can be enabled using the Xcode build setting 'Whole Module Optimizatio
 Reducing Dynamic Dispatch
 =========================
 
-Swift by default is a very dynamic language like Objective-C. Unlike Objective
-C, Swift gives the programmer the ability to improve runtime performance when
-necessary by removing or reducing this dynamicism. This section goes through
+Swift by default is a very dynamic language like Objective-C. Unlike Objective-C,
+Swift gives the programmer the ability to improve runtime performance when
+necessary by removing or reducing this dynamism. This section goes through
 several examples of language constructs that can be used to perform such an
 operation.
 
@@ -89,7 +89,7 @@ in the following code snippet, ``a.aProperty``, ``a.doSomething()`` and
     override func doSomething() { ... }
   }
 
-  func usingAnA(a: A) {
+  func usingAnA(_ a: A) {
     a.doSomething()
     a.aProperty = ...
   }
@@ -124,12 +124,12 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
     var array2: [Int]      // 'array2' *can* be overridden by a computed property.
   }
 
-  func usingC(c: C) {
+  func usingC(_ c: C) {
      c.array1[i] = ... // Can directly access C.array without going through dynamic dispatch.
      c.doSomething() = ... // Can directly call C.doSomething without going through virtual dispatch.
   }
 
-  func usingD(d: D) {
+  func usingD(_ d: D) {
      d.array1[i] = ... // Can directly access D.array1 without going through dynamic dispatch.
      d.array2[i] = ... // Will access D.array2 through dynamic dispatch.
   }
@@ -156,13 +156,13 @@ do not have any overriding declarations in the same file:
     private var myPrivateVar : Int
   }
 
-  func usingE(e: E) {
+  func usingE(_ e: E) {
     e.doSomething() // There is no sub class in the file that declares this class.
                     // The compiler can remove virtual calls to doSomething()
                     // and directly call A's doSomething method.
   }
 
-  func usingF(f: F) -> Int {
+  func usingF(_ f: F) -> Int {
     return f.myPrivateVar
   }
 
@@ -239,7 +239,7 @@ end of the callee. This means that if one writes a function like the following:
 
 ::
 
-  func append_one(a: [Int]) -> [Int] {
+  func append_one(_ a: [Int]) -> [Int] {
     a.append(1)
     return a
   }
@@ -313,11 +313,11 @@ generics. Some more examples of generics:
 ::
 
   class MyStack<T> {
-    func push(element: T) { ... }
+    func push(_ element: T) { ... }
     func pop() -> T { ... }
   }
 
-  func myAlgorithm(a: [T], length: Int) { ... }
+  func myAlgorithm(_ a: [T], length: Int) { ... }
 
   // The compiler can specialize code of MyStack[Int]
   var stackOfInts: MyStack[Int]

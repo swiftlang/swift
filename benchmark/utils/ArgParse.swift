@@ -35,7 +35,7 @@ public struct Arguments {
 ///
 /// with opt-name and opt-value not containing any '=' signs. Any
 /// other option passed in is assumed to be a positional argument.
-public func parseArgs(validOptions: [String]? = nil)
+public func parseArgs(_ validOptions: [String]? = nil)
   -> Arguments? {
   let progName = Process.arguments[0]
   var positionalArgs = [String]()
@@ -55,7 +55,7 @@ public func parseArgs(validOptions: [String]? = nil)
       continue
     }
     // Attempt to split it into two components separated by an equals sign.
-    let components = arg.componentsSeparated(by: "=")
+    let components = arg.components(separatedBy: "=")
     let optionName = components[0]
     if validOptions != nil && !validOptions!.contains(optionName) {
       print("Invalid option: \(arg)")

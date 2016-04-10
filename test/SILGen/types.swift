@@ -77,7 +77,7 @@ enum ReferencedFromFunctionEnum {
 // CHECK:         [[F]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()
 // CHECK:         [[G:%.*]] = struct_extract [[X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
 // CHECK:         [[G]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()
-func referencedFromFunctionStructFields(x: ReferencedFromFunctionStruct)
+func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
     -> (ReferencedFromFunctionStruct -> (), ReferencedFromFunctionEnum -> ()) {
   return (x.f, x.g)
 }
@@ -85,7 +85,7 @@ func referencedFromFunctionStructFields(x: ReferencedFromFunctionStruct)
 // CHECK-LABEL: sil hidden @_TF5types32referencedFromFunctionEnumFieldsFOS_26ReferencedFromFunctionEnumTGSqFS0_T__GSqFVS_28ReferencedFromFunctionStructT___
 // CHECK:       bb{{[0-9]+}}([[F:%.*]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()):
 // CHECK:       bb{{[0-9]+}}([[G:%.*]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()):
-func referencedFromFunctionEnumFields(x: ReferencedFromFunctionEnum)
+func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
     -> (
       (ReferencedFromFunctionEnum -> ())?,
       (ReferencedFromFunctionStruct -> ())?

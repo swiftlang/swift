@@ -22,25 +22,25 @@ import Glibc
 
 @_silgen_name("posix_spawn_file_actions_init")
 func swift_posix_spawn_file_actions_init(
-  file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
+  _ file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
 
 @_silgen_name("posix_spawn_file_actions_destroy")
 func swift_posix_spawn_file_actions_destroy(
-  file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
+  _ file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
 
 @_silgen_name("posix_spawn_file_actions_addclose")
-func swift_posix_spawn_file_actions_addclose(file_actions:
+func swift_posix_spawn_file_actions_addclose(_ file_actions:
   UnsafeMutablePointer<posix_spawn_file_actions_t>, _ filedes: CInt) -> CInt
 
 @_silgen_name("posix_spawn_file_actions_adddup2")
 func swift_posix_spawn_file_actions_adddup2(
-  file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>,
+  _ file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>,
   _ filedes: CInt,
   _ newfiledes: CInt) -> CInt
 
 @_silgen_name("posix_spawn")
 func swift_posix_spawn(
-  pid: UnsafeMutablePointer<pid_t>,
+  _ pid: UnsafeMutablePointer<pid_t>,
   _ file: UnsafePointer<Int8>,
   _ file_actions: UnsafePointer<posix_spawn_file_actions_t>,
   _ attrp: UnsafePointer<posix_spawnattr_t>,
@@ -62,7 +62,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 
 /// Start the same executable as a child process, redirecting its stdout and
 /// stderr.
-public func spawnChild(args: [String])
+public func spawnChild(_ args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
   var fileActions: posix_spawn_file_actions_t = _make_posix_spawn_file_actions_t()
   if swift_posix_spawn_file_actions_init(&fileActions) != 0 {
@@ -109,9 +109,17 @@ public func spawnChild(args: [String])
   }
 
   var pid: pid_t = -1
-  let spawnResult = withArrayOfCStrings([ Process.arguments[0] ] as Array + args) {
+  var childArgs = args
+  childArgs.insert(Process.arguments[0], at: 0)
+  let interpreter = getenv("SWIFT_INTERPRETER")
+  if interpreter != nil {
+    if let invocation = String(validatingUTF8: interpreter) {
+      childArgs.insert(invocation, at: 0)
+    }
+  }
+  let spawnResult = withArrayOfCStrings(childArgs) {
     swift_posix_spawn(
-      &pid, Process.arguments[0], &fileActions, nil, $0, _getEnviron())
+      &pid, childArgs[0], &fileActions, nil, $0, _getEnviron())
   }
   if spawnResult != 0 {
     print(String(cString: strerror(spawnResult)))
@@ -148,7 +156,7 @@ internal func _make_posix_spawn_file_actions_t() -> posix_spawn_file_actions_t {
 #endif
 }
 
-internal func _readAll(fd: CInt) -> String {
+internal func _readAll(_ fd: CInt) -> String {
   var buffer = [UInt8](repeating: 0, count: 1024)
   var usedBytes = 0
   while true {
@@ -171,7 +179,7 @@ internal func _readAll(fd: CInt) -> String {
 }
 
 
-internal func _signalToString(signal: Int) -> String {
+internal func _signalToString(_ signal: Int) -> String {
   switch CInt(signal) {
   case SIGILL:  return "SIGILL"
   case SIGTRAP: return "SIGTRAP"
@@ -198,7 +206,7 @@ public enum ProcessTerminationStatus : CustomStringConvertible {
   }
 }
 
-public func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
+public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
   var status: CInt = 0
   if waitpid(pid, &status, 0) < 0 {
     preconditionFailure("waitpid() failed")
@@ -212,7 +220,7 @@ public func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   preconditionFailure("did not understand what happened to child process")
 }
 
-public func runChild(args: [String])
+public func runChild(_ args: [String])
   -> (stdout: String, stderr: String, status: ProcessTerminationStatus) {
   let (pid, _, stdoutFD, stderrFD) = spawnChild(args)
 

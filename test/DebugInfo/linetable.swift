@@ -4,24 +4,24 @@
 // REQUIRES: CPU=i386_or_x86_64
 
 import Swift
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 class MyClass
 {
     var x : Int64
     init(input: Int64) { x = input }
-    func do_something(input: Int64) -> Int64
+    func do_something(_ input: Int64) -> Int64
     {
         return x * input
     }
 }
 
-func call_me(code: () -> Void)
+func call_me(_ code: () -> Void)
 {
     code ()
 }
 
-func main(x: Int64) -> Void
+func main(_ x: Int64) -> Void
 // CHECK: define hidden void @_TF9linetable4main
 {
     var my_class = MyClass(input: 10)

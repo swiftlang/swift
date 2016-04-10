@@ -11,14 +11,14 @@ class B : A {
 }
 
 func f4() -> B { }
-func f5(a: A) { }
-func f6(a: A, _: Int) { }
+func f5(_ a: A) { }
+func f6(_ a: A, _: Int) { }
 
 func createB() -> B { }  // expected-note {{found this candidate}}
-func createB(i: Int) -> B { } // expected-note {{found this candidate}}
+func createB(_ i: Int) -> B { } // expected-note {{found this candidate}}
 
-func f7(a: A, _: () -> Int) -> B { }
-func f7(a: A, _: Int) -> Int { }
+func f7(_ a: A, _: () -> Int) -> B { }
+func f7(_ a: A, _: Int) -> Int { }
 
 // Forgot the '()' to call a function.
 func forgotCall() {
@@ -47,7 +47,7 @@ func forgotCall() {
 /// Forgot the '!' to unwrap an optional.
 func parseInt() -> Int? { }
 
-func forgotOptionalBang(a: A, obj: AnyObject) {
+func forgotOptionalBang(_ a: A, obj: AnyObject) {
   var i: Int = parseInt() // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}{{26-26=!}}
 
   var a = A(), b = B()
@@ -67,13 +67,13 @@ func microwave() -> Dinner {
   return (n: d) // expected-error{{value of optional type 'Dinner?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=!}}
 }
 
-func forgotAnyObjectBang(obj: AnyObject) {
+func forgotAnyObjectBang(_ obj: AnyObject) {
   var a = A()
   a = obj // expected-error{{'AnyObject' is not convertible to 'A'; did you mean to use 'as!' to force downcast?}}{{10-10= as! A}}
   _ = a
 }
 
-func increment(x: inout Int) { }
+func increment(_ x: inout Int) { }
 
 func forgotAmpersand() {
   var i = 5

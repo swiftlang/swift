@@ -38,7 +38,7 @@ extension String {
   }
   
   @warn_unused_result
-  public func _split(separator separator: UnicodeScalar) -> [String] {
+  public func _split(separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
   }
@@ -59,22 +59,22 @@ extension String {
 /// Determines if `theString` starts with `prefix` comparing the strings under
 /// canonical equivalence.
 @_silgen_name("swift_stdlib_NSStringHasPrefixNFD")
-func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, _ prefix: AnyObject) -> Bool
+func _stdlib_NSStringHasPrefixNFD(_ theString: AnyObject, _ prefix: AnyObject) -> Bool
 
 /// Determines if `theString` ends with `suffix` comparing the strings under
 /// canonical equivalence.
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFD")
-func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, _ suffix: AnyObject) -> Bool
+func _stdlib_NSStringHasSuffixNFD(_ theString: AnyObject, _ suffix: AnyObject) -> Bool
 
 extension String {
   /// Returns `true` iff `self` begins with `prefix`.
-  public func hasPrefix(prefix: String) -> Bool {
+  public func hasPrefix(_ prefix: String) -> Bool {
     return _stdlib_NSStringHasPrefixNFD(
       self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
   /// Returns `true` iff `self` ends with `suffix`.
-  public func hasSuffix(suffix: String) -> Bool {
+  public func hasSuffix(_ suffix: String) -> Bool {
     return _stdlib_NSStringHasSuffixNFD(
       self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
   }
@@ -147,7 +147,7 @@ extension String {
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character,
   /// and a boolean value indicating whether any character was found.
-  public func _splitFirstIf(@noescape predicate: (UnicodeScalar) -> Bool)
+  public func _splitFirstIf(@noescape _ predicate: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     let rng = unicodeScalars

@@ -213,7 +213,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   @warn_unused_result
-  internal static func fromNativeObject(x: Builtin.NativeObject) -> _HeapBuffer {
+  internal static func fromNativeObject(_ x: Builtin.NativeObject) -> _HeapBuffer {
     return _HeapBuffer(nativeStorage: x)
   }
 

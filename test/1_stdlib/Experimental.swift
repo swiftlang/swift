@@ -8,8 +8,8 @@ import StdlibUnittest
 var ExperimentalTestSuite = TestSuite("Experimental")
 
 ExperimentalTestSuite.test("ComposeOperator/SmokeTest") {
-  func incr(x: Int) -> Int { return x + 1 }
-  func twice(x: Int) -> Int { return x * 2 }
+  func incr(_ x: Int) -> Int { return x + 1 }
+  func twice(_ x: Int) -> Int { return x * 2 }
 
   expectEqual(7, (incr ∘ twice)(3))
 }
