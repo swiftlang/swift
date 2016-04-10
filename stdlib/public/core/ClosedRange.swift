@@ -197,9 +197,8 @@ public struct ClosedRangeIterator<
 public struct CountableClosedRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
-> : Equatable, RandomAccessCollection,
-  CustomStringConvertible, CustomDebugStringConvertible, 
-  ClosedRangeProtocol {
+> : ClosedRangeProtocol, RandomAccessCollection,
+  CustomStringConvertible, CustomDebugStringConvertible {
 
   /// A type that represents a position in the range.
   public typealias Index = ClosedRangeIndex<Bound>
@@ -300,8 +299,8 @@ extension CountableClosedRange : CustomReflectable {
 ///     lowercase.contains("z")    // true
 public struct ClosedRange<
   Bound : Comparable
-> : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
-    ClosedRangeProtocol {
+> : ClosedRangeProtocol,
+  CustomStringConvertible, CustomDebugStringConvertible {
 
   /// Creates a range with `lowerBound == lower` and `upperBound ==
   /// upper`.

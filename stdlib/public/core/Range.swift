@@ -260,7 +260,7 @@ extension HalfOpenRangeProtocol
 public struct CountableRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
-> : Equatable, RandomAccessCollection,
+> : RandomAccessCollection,
   CustomStringConvertible, CustomDebugStringConvertible, 
   HalfOpenRangeProtocol {
 
@@ -436,8 +436,8 @@ extension CountableRange : CustomReflectable {
 ///     underFive.contains(5.0)     // false
 public struct Range<
   Bound : Comparable
-> : Equatable, CustomStringConvertible, CustomDebugStringConvertible,
-    HalfOpenRangeProtocol {
+> : HalfOpenRangeProtocol,
+    CustomStringConvertible, CustomDebugStringConvertible {
 
   /// Creates a range with `lowerBound == lower` and `upperBound == upper`.
   ///
