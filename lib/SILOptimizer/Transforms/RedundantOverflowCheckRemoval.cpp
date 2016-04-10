@@ -28,7 +28,7 @@
 
 using namespace swift;
 
-STATISTIC(NumCondFailRemoved,   "Number of cond_fail instructions removed");
+STATISTIC(NumCondFailRemoved, "Number of cond_fail instructions removed");
 
 namespace {
 
