@@ -220,6 +220,7 @@ void IterativeTypeChecker::processInheritedProtocols(
   // FIXME: Technically, we only need very basic name binding.
   auto inheritedClause = protocol->getInherited();
   bool anyDependencies = false;
+  bool diagnosedCircularity = false;
   llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     TypeLoc &inherited = inheritedClause[i];
@@ -235,8 +236,20 @@ void IterativeTypeChecker::processInheritedProtocols(
     // FIXME: We'd prefer to keep what the user wrote here.
     SmallVector<ProtocolDecl *, 4> protocols;
     if (inherited.getType()->isExistentialType(protocols)) {
-      allProtocols.insert(protocols.begin(), protocols.end());
-      continue;
+      for (auto inheritedProtocol: protocols) {
+        if (inheritedProtocol == protocol ||
+            inheritedProtocol->inheritsFrom(protocol)) {
+          if (!diagnosedCircularity &&
+			  !protocol->isInheritedProtocolsValid()) {
+            diagnose(protocol,
+                     diag::circular_protocol_def, protocol->getName().str())
+                    .fixItRemove(inherited.getSourceRange());
+            diagnosedCircularity = true;
+          }
+          continue;
+        }
+        allProtocols.insert(inheritedProtocol);
+      }
     }
   }
 
@@ -244,34 +257,11 @@ void IterativeTypeChecker::processInheritedProtocols(
   if (anyDependencies)
     return;
 
-  // Check for circular inheritance.
-  // FIXME: The diagnostics here should be improved... and this should probably
-  // be handled by the normal cycle detection.
-  bool diagnosedCircularity = false;
-  for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
-    if (allProtocols[i] == protocol ||
-        allProtocols[i]->inheritsFrom(protocol)) {
-      if (!diagnosedCircularity &&
-          !protocol->isInheritedProtocolsValid()) {
-        diagnose(protocol,
-                 diag::circular_protocol_def, protocol->getName().str());
-        diagnosedCircularity = true;
-      }
-
-      allProtocols.remove(allProtocols[i]);
-      --n;
-      continue;
-    }
-
-    ++i;
-  }
-
   // FIXME: Hack to deal with recursion elsewhere.
   // We recurse through DeclContext::getLocalProtocols() -- this should be
   // redone to use the IterativeDeclChecker also.
   if (protocol->isInheritedProtocolsValid())
     return;
-
   protocol->setInheritedProtocols(getASTContext().AllocateCopy(allProtocols));
 }
 
