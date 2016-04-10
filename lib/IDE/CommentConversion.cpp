@@ -27,7 +27,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/Index/CommentToXML.h"
 
-using namespace llvm::markup;
+using namespace swift::markup;
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -69,7 +69,7 @@ struct CommentToXMLConverter {
 #include "swift/Markup/SimpleFields.def"
 
   void printDocument(const Document *D) {
-    llvm_unreachable("Can't print an llvm::markup::Document as XML directly");
+    llvm_unreachable("Can't print an swift::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
@@ -400,7 +400,7 @@ std::string ide::extractPlainTextFromComment(const StringRef Text) {
     return {};
 
   RawComment Comment(Comments);
-  llvm::markup::MarkupContext MC;
+  swift::markup::MarkupContext MC;
   return MC.getLineList(Comment).str();
 }
 
@@ -418,7 +418,7 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
     return false;
   }
 
-  llvm::markup::MarkupContext MC;
+  swift::markup::MarkupContext MC;
   auto DC = getDocComment(MC, D);
   if (!DC.hasValue())
     return false;
@@ -478,7 +478,7 @@ break;
 
   void printDocument(const Document *D) {
     // FIXME: Why keep doing this?
-    llvm_unreachable("Can't print an llvm::markup::Document as XML directly");
+    llvm_unreachable("Can't print an swift::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
@@ -656,7 +656,7 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
   if (Brief.hasValue()) {
     SmallString<256> BriefStr;
     llvm::raw_svector_ostream OS(BriefStr);
-    llvm::markup::printInlinesUnder(Brief.getValue(), OS);
+    swift::markup::printInlinesUnder(Brief.getValue(), OS);
     Converter.print(OS.str());
     Converter.printNewline();
     Converter.printNewline();

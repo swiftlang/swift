@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-#ifndef LLVM_MARKUP_AST_H
-#define LLVM_MARKUP_AST_H
+#ifndef SWIFT_MARKUP_AST_H
+#define SWIFT_MARKUP_AST_H
 
 #include "swift/Markup/LineList.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
-namespace llvm {
+namespace swift {
 namespace markup {
 
 class MarkupContext;
@@ -682,6 +682,6 @@ void dump(const MarkupASTNode *Node, llvm::raw_ostream &OS, unsigned indent = 0)
 void printInlinesUnder(const MarkupASTNode *Node, llvm::raw_ostream &OS,
                        bool PrintDecorators = false);
 } // namespace markup
-} // namespace llvm
+} // namespace swift
 
-#endif // LLVM_MARKUP_AST_H
+#endif // SWIFT_MARKUP_AST_H

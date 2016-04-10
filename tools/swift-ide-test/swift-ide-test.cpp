@@ -1970,10 +1970,10 @@ public:
     if (D->isImplicit())
       return true;
 
-    llvm::markup::MarkupContext MC;
+    swift::markup::MarkupContext MC;
     auto DC = getDocComment(MC, D);
     if (DC.hasValue())
-      llvm::markup::dump(DC.getValue()->getDocument(), OS);
+      swift::markup::dump(DC.getValue()->getDocument(), OS);
 
     return true;
   }

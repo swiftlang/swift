@@ -175,7 +175,7 @@ private:
   }
 
   void printDocumentationComment(Decl *D) {
-    llvm::markup::MarkupContext MC;
+    swift::markup::MarkupContext MC;
     auto DC = getDocComment(MC, D);
     if (DC.hasValue())
       ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
