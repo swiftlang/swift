@@ -16,7 +16,7 @@ vfork() // expected-error{{'vfork()' is unavailable}}
 let x_YES = YES // expected-error {{'YES' is unavailable: Use 'Bool' value 'true' instead}}
 let x_NO = NO // expected-error {{'NO' is unavailable: Use 'Bool' value 'false' instead}}
 
-func test_shadow(flag: Bool) -> Bool {
+func test_shadow(_ flag: Bool) -> Bool {
   let YES = true
   let NO = false
   return flag ? YES : NO

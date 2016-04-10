@@ -13,7 +13,7 @@
 import TestsUtils
 
 @inline(never)
-public func run_SetIsSubsetOf(N: Int) {
+public func run_SetIsSubsetOf(_ N: Int) {
   let size = 200
 
   SRand()
@@ -38,11 +38,11 @@ public func run_SetIsSubsetOf(N: Int) {
 }
 
 @inline(never)
-func sink(s: inout Set<Int>) {
+func sink(_ s: inout Set<Int>) {
 }
 
 @inline(never)
-public func run_SetExclusiveOr(N: Int) {
+public func run_SetExclusiveOr(_ N: Int) {
   let size = 400
 
   SRand()
@@ -63,7 +63,7 @@ public func run_SetExclusiveOr(N: Int) {
 }
 
 @inline(never)
-public func run_SetUnion(N: Int) {
+public func run_SetUnion(_ N: Int) {
   let size = 400
 
   SRand()
@@ -84,7 +84,7 @@ public func run_SetUnion(N: Int) {
 }
 
 @inline(never)
-public func run_SetIntersect(N: Int) {
+public func run_SetIntersect(_ N: Int) {
   let size = 400
 
   SRand()
@@ -119,12 +119,12 @@ class Box<T : Hashable where T : Equatable> : Hashable {
 extension Box : Equatable {
 }
 
-func ==<T: Equatable>(lhs: Box<T>,  rhs: Box<T>) -> Bool {
+func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
   return lhs.value == rhs.value
 }
 
 @inline(never)
-public func run_SetIsSubsetOf_OfObjects(N: Int) {
+public func run_SetIsSubsetOf_OfObjects(_ N: Int) {
   let size = 200
 
   SRand()
@@ -149,11 +149,11 @@ public func run_SetIsSubsetOf_OfObjects(N: Int) {
 }
 
 @inline(never)
-func sink(s: inout Set<Box<Int>>) {
+func sink(_ s: inout Set<Box<Int>>) {
 }
 
 @inline(never)
-public func run_SetExclusiveOr_OfObjects(N: Int) {
+public func run_SetExclusiveOr_OfObjects(_ N: Int) {
   let size = 400
 
   SRand()
@@ -174,7 +174,7 @@ public func run_SetExclusiveOr_OfObjects(N: Int) {
 }
 
 @inline(never)
-public func run_SetUnion_OfObjects(N: Int) {
+public func run_SetUnion_OfObjects(_ N: Int) {
   let size = 400
 
   SRand()
@@ -195,7 +195,7 @@ public func run_SetUnion_OfObjects(N: Int) {
 }
 
 @inline(never)
-public func run_SetIntersect_OfObjects(N: Int) {
+public func run_SetIntersect_OfObjects(_ N: Int) {
   let size = 400
 
   SRand()

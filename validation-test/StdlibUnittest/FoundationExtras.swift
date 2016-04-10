@@ -72,7 +72,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(String)") {
 }
 
 @_silgen_name("objc_autorelease")
-func objc_autorelease(ref: AnyObject)
+func objc_autorelease(_ ref: AnyObject)
 
 FoundationExtrasTests.test("objc_autorelease()") {
   autoreleasepool {

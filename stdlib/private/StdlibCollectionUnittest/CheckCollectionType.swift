@@ -383,7 +383,7 @@ extension TestSuite {
     C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -415,12 +415,12 @@ extension TestSuite {
       checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
     func makeWrappedCollectionWithEquatableElement(
-      elements: [MinimalEquatableValue]
+      _ elements: [MinimalEquatableValue]
     ) -> CollectionWithEquatableElement {
       return makeCollectionOfEquatable(elements.map(wrapValueIntoEquatable))
     }
@@ -1059,7 +1059,7 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
     C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -1092,7 +1092,7 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
@@ -1379,7 +1379,7 @@ self.test("\(testNamePrefix).suffix/semantics") {
     C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
     extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
@@ -1415,7 +1415,7 @@ self.test("\(testNamePrefix).suffix/semantics") {
 
     testNamePrefix += String(C.Type)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
+    func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 

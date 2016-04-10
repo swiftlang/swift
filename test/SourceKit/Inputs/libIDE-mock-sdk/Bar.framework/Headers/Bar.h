@@ -13,7 +13,7 @@ enum BarForwardDeclaredEnum {
 #define BAR_MACRO_1 0
 
 typedef struct {
-	int count;
+  int count;
 } SomeItemSet;
 
 typedef SomeItemSet SomeEnvironment;

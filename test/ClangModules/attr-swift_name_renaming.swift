@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -parse -verify %s
 
+// XFAIL: linux
+
 import SwiftName
 
 func test() {
@@ -15,8 +17,13 @@ func test() {
   var excuse: HomeworkExcuse = .dogAteIt
   excuse = .overslept // FIXME: should provide Fix-It  expected-error{{type 'HomeworkExcuse' has no member 'overslept'}}
   excuse = .tired
+<<<<<<< HEAD
   excuse = .tooHard
   excuse = .challenging // expected-error{{type 'HomeworkExcuse' has no member 'challenging'}}
+=======
+  excuse = .tooHard // FIXME: should provide Fix-It expected-error{{type 'HomeworkExcuse' has no member 'tooHard'}}
+  excuse = .challenging
+>>>>>>> master
 
   // Typedef-of-anonymous-type-name renaming
   var p = Point()

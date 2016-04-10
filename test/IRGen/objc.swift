@@ -74,55 +74,55 @@ class Octogenarian : Contrarian {
 // CHECK-NOT:  call {{.*}} @swift_unknownRelease
 // CHECK:      call {{.*}} @swift_unknownRelease
 // CHECK:      ret %objc_object*
-func test0(arg: id) -> id {
+func test0(_ arg: id) -> id {
   var x : id
   x = arg
   var y = x
   return y
 }
 
-func test1(cell: Blammo) {}
+func test1(_ cell: Blammo) {}
 // CHECK:  define hidden void @_TF4objc5test1{{.*}}([[BLAMMO]]*) {{.*}} {
 // CHECK:    call {{.*}} @rt_swift_release
 // CHECK:    ret void
 
 
 // FIXME: These ownership convention tests should become SILGen tests.
-func test2(v: Test2) { v.bar() }
+func test2(_ v: Test2) { v.bar() }
 func test3() -> NSObject {
   return Gizmo()
 }
 // Normal message send with argument, no transfers.
-func test5(g: Gizmo) {
+func test5(_ g: Gizmo) {
   Gizmo.inspect(g)
 }
 // The argument to consume: is __attribute__((ns_consumed)).
-func test6(g: Gizmo) {
+func test6(_ g: Gizmo) {
   Gizmo.consume(g)
 }
 // fork is __attribute__((ns_consumes_self)).
-func test7(g: Gizmo) {
+func test7(_ g: Gizmo) {
   g.fork()
 }
 // clone is __attribute__((ns_returns_retained)).
-func test8(g: Gizmo) {
+func test8(_ g: Gizmo) {
   g.clone()
 }
 // duplicate has an object returned at +0.
-func test9(g: Gizmo) {
+func test9(_ g: Gizmo) {
   g.duplicate()
 }
 
-func test10(g: Gizmo, r: Rect) {
+func test10(_ g: Gizmo, r: Rect) {
   Gizmo.run(with: r, andGizmo:g);
 }
 
 // Force the emission of the Rect metadata.
-func test11_helper<T>(t: T) {}
+func test11_helper<T>(_ t: T) {}
 // NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
 // CHECK-LABEL: define hidden void @_TF4objc6test11FVSC4RectT_
 // CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMVSC4Rect
-func test11(r: Rect) { test11_helper(r) }
+func test11(_ r: Rect) { test11_helper(r) }
 
 class WeakObjC {
   weak var obj: NSObject?

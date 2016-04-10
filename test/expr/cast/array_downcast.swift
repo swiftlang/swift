@@ -4,7 +4,7 @@
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
     var result: Self? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -49,19 +49,19 @@ struct B : _ObjectiveCBridgeable {
     return A()
   }
   static func _forceBridgeFromObjectiveC(
-    x: A,
+    _ x: A,
     result: inout B?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: A,
+    _ x: A,
     result: inout B?
   ) -> Bool {
     return true
   }
 }
 
-func testBridgedDowncastAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?, 
+func testBridgedDowncastAnyObject(_ arr: [AnyObject], arrOpt: [AnyObject]?, 
                                   arrIUO: [AnyObject]!) {
   var b = B()
 
@@ -79,7 +79,7 @@ func testBridgedDowncastAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?,
   _ = b
 }
 
-func testBridgedIsAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?, 
+func testBridgedIsAnyObject(_ arr: [AnyObject], arrOpt: [AnyObject]?, 
                              arrIUO: [AnyObject]!) -> Bool {
   let b = B()
 

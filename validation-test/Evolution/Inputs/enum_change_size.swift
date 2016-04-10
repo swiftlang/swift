@@ -37,7 +37,7 @@ public struct ChangeSize {
   case X(ChangeSize)
 }
 
-public func getSingletonEnumValues(c: ChangeSize)
+public func getSingletonEnumValues(_ c: ChangeSize)
     -> [SingletonEnum?] {
   return [.X(c), nil]
 }
@@ -48,7 +48,7 @@ public func getSingletonEnumValues(c: ChangeSize)
   case Z
 }
 
-public func getSinglePayloadEnumValues(c: ChangeSize)
+public func getSinglePayloadEnumValues(_ c: ChangeSize)
     -> [SinglePayloadEnum?] {
   return [.X(c), .Y, .Z, nil]
 }
@@ -59,7 +59,7 @@ public func getSinglePayloadEnumValues(c: ChangeSize)
   case Z
 }
 
-public func getMultiPayloadEnumValues(c: ChangeSize, _ d: ChangeSize)
+public func getMultiPayloadEnumValues(_ c: ChangeSize, _ d: ChangeSize)
     -> [MultiPayloadEnum?] {
   return [.X(c), .Y(d), .Z, nil]
 }

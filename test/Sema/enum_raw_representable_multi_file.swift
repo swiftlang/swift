@@ -7,7 +7,7 @@ var cooked2: Bar? = Bar(rawValue: 22)
 var cooked3: Baz? = Baz(rawValue: 0)
 var cooked4: Garply? = Garply(rawValue: "A")
 
-func consume<T: RawRepresentable>(obj: T) {}
+func consume<T: RawRepresentable>(_ obj: T) {}
 func test() {
   consume(cooked1!)
   consume(cooked2!)

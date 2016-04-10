@@ -371,11 +371,11 @@ ExistentialToArchetype(o: o, t: o)
 // CHECK-DAG: [[LOAD:%[0-9]+]] = load [[STACK_D]]
 // CHECK: return [[LOAD]]
 @inline(never)
-public func genericDownCast<T, U>(a: T, _ : U.Type) -> U {
+public func genericDownCast<T, U>(_ a: T, _ : U.Type) -> U {
   return a as! U
 }
 
-public func callGenericDownCast(c: C?) -> D {
+public func callGenericDownCast(_ c: C?) -> D {
   return genericDownCast(c, D.self)
 }
 

@@ -36,7 +36,7 @@ public class Foo1 {
   }
 }
 
-public func testClassLet(f: Foo1) -> Int32 {
+public func testClassLet(_ f: Foo1) -> Int32 {
   return f.Prop1 + f.Prop2 + f.Prop3 + f.Prop4
 }
 

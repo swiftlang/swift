@@ -167,7 +167,7 @@ library, but are compatible with the Cocoa guidelines.
     /// mutable contiguous storage.
     ///
     /// Complexity: O(\`count\`)
-    mutating func reserveCapacity(**minimumCapacity**: Int)
+    mutating func reserveCapacity(_ **minimumCapacity**: Int)
     
 * Type parameter names of generic types describe the role of the 
   parameter, e.g.
@@ -198,9 +198,9 @@ Acceptable Short or Non-Descriptive Names
   the resulting construct is supposed to act like a language extension
   and is likely to have side-effects::
 
-    func map<U>(transformation: T->U) -> [U] // not this one
+    func map<U>(_ transformation: T->U) -> [U] // not this one
 
-    func forEach<S: SequenceType>(body: (S.Iterator.Element) -> ())
+    func forEach<S: SequenceType>(_ body: (S.Iterator.Element) -> ())
 
 Prefixes and Suffixes
 ---------------------
@@ -221,8 +221,8 @@ Prefixes and Suffixes
   .. parsed-literal::
 
     extension Set {
-      func union(other: Set) -> Set
-      mutating func union\ **InPlace**\ (other: Set)
+      func union(_ other: Set) -> Set
+      mutating func union\ **InPlace**\ (_ other: Set)
     }
 
 * `with` is used as a prefix to denote a function that executes a

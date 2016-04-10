@@ -10,7 +10,7 @@ class BadMembers1 {
   subscript(i: Int) -> Double {
   }
 }
-func badMembers1(a: BadMembers1) {
+func badMembers1(_ a: BadMembers1) {
   a#^BAD_MEMBERS_1^#
 }
 // BAD_MEMBERS_1: Begin completions
@@ -26,7 +26,7 @@ protocol BadMembers2 {
   subscript(i: Int) -> Double {
   }
 }
-func badMembers2(a: BadMembers2) {
+func badMembers2(_ a: BadMembers2) {
   a#^BAD_MEMBERS_2^#
 }
 // BAD_MEMBERS_2: Begin completions, 2 items
@@ -80,7 +80,7 @@ private protocol RoundRobin : Sendable, Receivable {
 }
 #if TESTING
   extension RoundRobinAS {
-    mutating func appendNextTo(acceptor:#^RDAR_21436558^#
+    mutating func appendNextTo(_ acceptor:#^RDAR_21436558^#
   }
 #endif
 
@@ -90,12 +90,12 @@ class C<T> {
   func test() {
     do {} catch { #^RDAR_21435993^# }
   }
-  func accidentallyNested<U>(x: U) {}
+  func accidentallyNested<U>(_ x: U) {}
 }
 
 // rdar://problem/21149908
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21149908
-@objc func handleTap(recognizer: UIGestureRecognizer) {
+@objc func handleTap(_ recognizer: UIGestureRecognizer) {
   if recognizer.state == .Ended {
     let _ : () = self.suggestion.cata(#^RDAR_21149908^#{ _ in
       listView?.backUpOneGroup()
@@ -109,7 +109,7 @@ class C<T> {
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22036358
 public extension AnyIterator {
   public extension AnySequence {
-    public func take(n: Int) -> AnySequence<Element> {
+    public func take(_ n: Int) -> AnySequence<Element> {
       var xs: [Element] = []
       #^RDAR_22036358^#
       return AnySequence(xs)
@@ -127,8 +127,8 @@ protocol Fooable {
 
 // rdar://problem/22688199
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199 | FileCheck %s -check-prefix=FLIP_CURRIED
-func curried(a: Int)(b1: Int, b2: Int) { }
-func flip<A, B, C>(f: A -> B -> C) -> B -> A -> C { }
+func curried(_ a: Int)(b1: Int, b2: Int) { }
+func flip<A, B, C>(_ f: A -> B -> C) -> B -> A -> C { }
 func rdar22688199() {
   let f = flip(curried)(#^RDAR_22688199^#
 }

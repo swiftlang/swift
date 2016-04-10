@@ -6035,10 +6035,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "addWithOverflow(_:_:)",
         key.usr: "s:ZFSi15addWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::c:@E@FooComparisonResult",
         key.original_usr: "s:ZFSi15addWithOverflowFTSiSi_TSi8overflowSb_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>addWithOverflow(_:_:)</Name><USR>s:ZFSi15addWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func addWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Add <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
         key.offset: 820,
+=======
+        key.doc.full_as_xml: "<Function><Name>addWithOverflow(_:_:)</Name><USR>s:ZFSi15addWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func addWithOverflow(_ lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Add <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
+        key.offset: 740,
+>>>>>>> master
         key.length: 76,
-        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>addWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
+        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>addWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.method.static,
@@ -6068,10 +6073,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "subtractWithOverflow(_:_:)",
         key.usr: "s:ZFSi20subtractWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::c:@E@FooComparisonResult",
         key.original_usr: "s:ZFSi20subtractWithOverflowFTSiSi_TSi8overflowSb_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>subtractWithOverflow(_:_:)</Name><USR>s:ZFSi20subtractWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func subtractWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Subtract <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
         key.offset: 902,
+=======
+        key.doc.full_as_xml: "<Function><Name>subtractWithOverflow(_:_:)</Name><USR>s:ZFSi20subtractWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func subtractWithOverflow(_ lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Subtract <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
+        key.offset: 822,
+>>>>>>> master
         key.length: 81,
-        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtractWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
+        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtractWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.method.static,
@@ -6101,10 +6111,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "multiplyWithOverflow(_:_:)",
         key.usr: "s:ZFSi20multiplyWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::c:@E@FooComparisonResult",
         key.original_usr: "s:ZFSi20multiplyWithOverflowFTSiSi_TSi8overflowSb_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>multiplyWithOverflow(_:_:)</Name><USR>s:ZFSi20multiplyWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func multiplyWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Multiply <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
         key.offset: 989,
+=======
+        key.doc.full_as_xml: "<Function><Name>multiplyWithOverflow(_:_:)</Name><USR>s:ZFSi20multiplyWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func multiplyWithOverflow(_ lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Multiply <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
+        key.offset: 909,
+>>>>>>> master
         key.length: 81,
-        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>multiplyWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
+        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>multiplyWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.method.static,
@@ -6134,10 +6149,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "divideWithOverflow(_:_:)",
         key.usr: "s:ZFSi18divideWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::c:@E@FooComparisonResult",
         key.original_usr: "s:ZFSi18divideWithOverflowFTSiSi_TSi8overflowSb_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>divideWithOverflow(_:_:)</Name><USR>s:ZFSi18divideWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func divideWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Divide <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
         key.offset: 1076,
+=======
+        key.doc.full_as_xml: "<Function><Name>divideWithOverflow(_:_:)</Name><USR>s:ZFSi18divideWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func divideWithOverflow(_ lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Divide <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning a result and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
+        key.offset: 996,
+>>>>>>> master
         key.length: 79,
-        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>divideWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
+        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>divideWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.method.static,
@@ -6167,10 +6187,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "remainderWithOverflow(_:_:)",
         key.usr: "s:ZFSi21remainderWithOverflowFTSiSi_TSi8overflowSb_::SYNTHESIZED::c:@E@FooComparisonResult",
         key.original_usr: "s:ZFSi21remainderWithOverflowFTSiSi_TSi8overflowSb_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>remainderWithOverflow(_:_:)</Name><USR>s:ZFSi21remainderWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func remainderWithOverflow(lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Divide <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning the remainder and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
         key.offset: 1161,
+=======
+        key.doc.full_as_xml: "<Function><Name>remainderWithOverflow(_:_:)</Name><USR>s:ZFSi21remainderWithOverflowFTSiSi_TSi8overflowSb_</USR><Declaration>static func remainderWithOverflow(_ lhs: Int, _ rhs: Int) -&gt; (Int, overflow: Bool)</Declaration><Abstract><Para>Divide <codeVoice>lhs</codeVoice> and <codeVoice>rhs</codeVoice>, returning the remainder and a <codeVoice>Bool</codeVoice> that is <codeVoice>true</codeVoice> iff the operation caused an arithmetic overflow.</Para></Abstract></Function>",
+        key.offset: 1081,
+>>>>>>> master
         key.length: 82,
-        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>remainderWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
+        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>remainderWithOverflow</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr=\"s:Si\">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>overflow</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.static>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.method.static,
@@ -6849,10 +6874,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "union(_:)",
         key.usr: "s:FEsPs9OptionSet5unionFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs9OptionSet5unionFxx",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>union(_:)</Name><USR>s:FEsPs9OptionSet5unionFxx</USR><Declaration>func union(other: Self) -&gt; Self</Declaration><Abstract><Para>Returns the set of elements contained in <codeVoice>self</codeVoice>, in <codeVoice>other</codeVoice>, or in both <codeVoice>self</codeVoice> and <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
         key.offset: 2622,
+=======
+        key.doc.full_as_xml: "<Function><Name>union(_:)</Name><USR>s:FEsPs9OptionSet5unionFxx</USR><Declaration>func union(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns the set of elements contained in <codeVoice>self</codeVoice>, in <codeVoice>other</codeVoice>, or in both <codeVoice>self</codeVoice> and <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
+        key.offset: 2745,
+>>>>>>> master
         key.length: 33,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>union</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>union</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6868,10 +6898,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "intersect(_:)",
         key.usr: "s:FEsPs9OptionSet9intersectFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs9OptionSet9intersectFxx",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>intersect(_:)</Name><USR>s:FEsPs9OptionSet9intersectFxx</USR><Declaration>func intersect(other: Self) -&gt; Self</Declaration><Abstract><Para>Returns the set of elements contained in both <codeVoice>self</codeVoice> and <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
         key.offset: 2661,
+=======
+        key.doc.full_as_xml: "<Function><Name>intersect(_:)</Name><USR>s:FEsPs9OptionSet9intersectFxx</USR><Declaration>func intersect(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns the set of elements contained in both <codeVoice>self</codeVoice> and <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
+        key.offset: 2784,
+>>>>>>> master
         key.length: 37,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>intersect</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>intersect</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6887,10 +6922,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "exclusiveOr(_:)",
         key.usr: "s:FEsPs9OptionSet11exclusiveOrFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs9OptionSet11exclusiveOrFxx",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>exclusiveOr(_:)</Name><USR>s:FEsPs9OptionSet11exclusiveOrFxx</USR><Declaration>func exclusiveOr(other: Self) -&gt; Self</Declaration><Abstract><Para>Returns the set of elements contained in <codeVoice>self</codeVoice> or in <codeVoice>other</codeVoice>, but not in both <codeVoice>self</codeVoice> and <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
         key.offset: 2704,
+=======
+        key.doc.full_as_xml: "<Function><Name>exclusiveOr(_:)</Name><USR>s:FEsPs9OptionSet11exclusiveOrFxx</USR><Declaration>func exclusiveOr(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns the set of elements contained in <codeVoice>self</codeVoice> or in <codeVoice>other</codeVoice>, but not in both <codeVoice>self</codeVoice> and <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
+        key.offset: 2827,
+>>>>>>> master
         key.length: 39,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>exclusiveOr</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>exclusiveOr</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6924,10 +6964,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "contains(_:)",
         key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_8containsFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_8containsFxSb",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>contains(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_8containsFxSb</USR><Declaration>func contains(member: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> if <codeVoice>self</codeVoice> contains <codeVoice>member</codeVoice>.</Para></Abstract><Discussion><List-Bullet><Item><Para>Equivalent to <codeVoice>self.intersect([member]) == [member]</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
         key.offset: 2782,
+=======
+        key.doc.full_as_xml: "<Function><Name>contains(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_8containsFxSb</USR><Declaration>func contains(_ member: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> if <codeVoice>self</codeVoice> contains <codeVoice>member</codeVoice>.</Para></Abstract><Discussion><List-Bullet><Item><Para>Equivalent to <codeVoice>self.intersect([member]) == [member]</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
+        key.offset: 2905,
+>>>>>>> master
         key.length: 37,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>contains</decl.name>(<decl.var.parameter><decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>contains</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6943,10 +6988,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "insert(_:)",
         key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6insertFwxS0_T_::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6insertFwxS0_T_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>insert(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6insertFwxS0_T_</USR><Declaration>mutating func insert(member: Self)</Declaration><Abstract><Para>If <codeVoice>member</codeVoice> is not already contained in <codeVoice>self</codeVoice>, insert it.</Para></Abstract><Discussion><Postcondition><Para><codeVoice>self.contains(member)</codeVoice></Para></Postcondition><List-Bullet><Item><Para>Equivalent to <codeVoice>self.unionInPlace([member])</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
         key.offset: 2825,
+=======
+        key.doc.full_as_xml: "<Function><Name>insert(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6insertFwxS0_T_</USR><Declaration>mutating func insert(_ member: Self)</Declaration><Abstract><Para>If <codeVoice>member</codeVoice> is not already contained in <codeVoice>self</codeVoice>, insert it.</Para></Abstract><Discussion><Postcondition><Para><codeVoice>self.contains(member)</codeVoice></Para></Postcondition><List-Bullet><Item><Para>Equivalent to <codeVoice>self.unionInPlace([member])</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
+        key.offset: 2948,
+>>>>>>> master
         key.length: 36,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>insert</decl.name>(<decl.var.parameter><decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>insert</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6962,10 +7012,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "remove(_:)",
         key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6removeFwxS0_GSqwxS0__::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6removeFwxS0_GSqwxS0__",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>remove(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6removeFwxS0_GSqwxS0__</USR><Declaration>mutating func remove(member: Self) -&gt; Self?</Declaration><Abstract><Para>If <codeVoice>member</codeVoice> is contained in <codeVoice>self</codeVoice>, remove and return it. Otherwise, return <codeVoice>nil</codeVoice>.</Para></Abstract><Discussion><Postcondition><Para><codeVoice>self.intersect([member]).isEmpty</codeVoice></Para></Postcondition></Discussion></Function>",
         key.offset: 2867,
+=======
+        key.doc.full_as_xml: "<Function><Name>remove(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6removeFwxS0_GSqwxS0__</USR><Declaration>mutating func remove(_ member: Self) -&gt; Self?</Declaration><Abstract><Para>If <codeVoice>member</codeVoice> is contained in <codeVoice>self</codeVoice>, remove and return it. Otherwise, return <codeVoice>nil</codeVoice>.</Para></Abstract><Discussion><Postcondition><Para><codeVoice>self.intersect([member]).isEmpty</codeVoice></Para></Postcondition></Discussion></Function>",
+        key.offset: 2990,
+>>>>>>> master
         key.length: 45,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>remove</decl.name>(<decl.var.parameter><decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param>?</decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>remove</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param>?</decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7009,10 +7064,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "unionInPlace(_:)",
         key.usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_12unionInPlaceFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_12unionInPlaceFxT_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>unionInPlace(_:)</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_12unionInPlaceFxT_</USR><Declaration>mutating func unionInPlace(other: Self)</Declaration><Abstract><Para>Insert all elements of <codeVoice>other</codeVoice> into <codeVoice>self</codeVoice>.</Para></Abstract><Discussion><Postcondition><Para><codeVoice>self.isSupersetOf(other)</codeVoice></Para></Postcondition><List-Bullet><Item><Para>Equivalent to replacing <codeVoice>self</codeVoice> with <codeVoice>self.union(other)</codeVoice>.</Para></Item></List-Bullet></Discussion></Function>",
         key.offset: 2975,
+=======
+        key.doc.full_as_xml: "<Function><Name>unionInPlace(_:)</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_12unionInPlaceFxT_</USR><Declaration>mutating func unionInPlace(_ other: Self)</Declaration><Abstract><Para>Insert all elements of <codeVoice>other</codeVoice> into <codeVoice>self</codeVoice>.</Para></Abstract><Discussion><Postcondition><Para><codeVoice>self.isSupersetOf(other)</codeVoice></Para></Postcondition><List-Bullet><Item><Para>Equivalent to replacing <codeVoice>self</codeVoice> with <codeVoice>self.union(other)</codeVoice>.</Para></Item></List-Bullet></Discussion></Function>",
+        key.offset: 3098,
+>>>>>>> master
         key.length: 41,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>unionInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>unionInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7028,10 +7088,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "intersectInPlace(_:)",
         key.usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_16intersectInPlaceFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_16intersectInPlaceFxT_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>intersectInPlace(_:)</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_16intersectInPlaceFxT_</USR><Declaration>mutating func intersectInPlace(other: Self)</Declaration><Abstract><Para>Remove all elements of <codeVoice>self</codeVoice> that are not also present in <codeVoice>other</codeVoice>.</Para></Abstract><Discussion><Postcondition><Para><codeVoice>self.isSubsetOf(other)</codeVoice></Para></Postcondition><List-Bullet><Item><Para>Equivalent to replacing <codeVoice>self</codeVoice> with <codeVoice>self.intersect(other)</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
         key.offset: 3022,
+=======
+        key.doc.full_as_xml: "<Function><Name>intersectInPlace(_:)</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_16intersectInPlaceFxT_</USR><Declaration>mutating func intersectInPlace(_ other: Self)</Declaration><Abstract><Para>Remove all elements of <codeVoice>self</codeVoice> that are not also present in <codeVoice>other</codeVoice>.</Para></Abstract><Discussion><Postcondition><Para><codeVoice>self.isSubsetOf(other)</codeVoice></Para></Postcondition><List-Bullet><Item><Para>Equivalent to replacing <codeVoice>self</codeVoice> with <codeVoice>self.intersect(other)</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
+        key.offset: 3145,
+>>>>>>> master
         key.length: 45,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>intersectInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>intersectInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7047,10 +7112,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "exclusiveOrInPlace(_:)",
         key.usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_18exclusiveOrInPlaceFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_18exclusiveOrInPlaceFxT_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>exclusiveOrInPlace(_:)</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_18exclusiveOrInPlaceFxT_</USR><Declaration>mutating func exclusiveOrInPlace(other: Self)</Declaration><Abstract><Para>Replace <codeVoice>self</codeVoice> with a set containing all elements contained in either <codeVoice>self</codeVoice> or <codeVoice>other</codeVoice>, but not both.</Para></Abstract><Discussion><List-Bullet><Item><Para>Equivalent to replacing <codeVoice>self</codeVoice> with <codeVoice>self.exclusiveOr(other)</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
         key.offset: 3073,
+=======
+        key.doc.full_as_xml: "<Function><Name>exclusiveOrInPlace(_:)</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_18exclusiveOrInPlaceFxT_</USR><Declaration>mutating func exclusiveOrInPlace(_ other: Self)</Declaration><Abstract><Para>Replace <codeVoice>self</codeVoice> with a set containing all elements contained in either <codeVoice>self</codeVoice> or <codeVoice>other</codeVoice>, but not both.</Para></Abstract><Discussion><List-Bullet><Item><Para>Equivalent to replacing <codeVoice>self</codeVoice> with <codeVoice>self.exclusiveOr(other)</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
+        key.offset: 3196,
+>>>>>>> master
         key.length: 47,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>exclusiveOrInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>exclusiveOrInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs9OptionSet4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7128,10 +7198,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "subtractInPlace(_:)",
         key.usr: "s:FEsPs10SetAlgebra15subtractInPlaceFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs10SetAlgebra15subtractInPlaceFxT_",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>subtractInPlace(_:)</Name><USR>s:FEsPs10SetAlgebra15subtractInPlaceFxT_</USR><Declaration>mutating func subtractInPlace(other: Self)</Declaration><Abstract><Para>Removes all elements of <codeVoice>other</codeVoice> from <codeVoice>self</codeVoice>.</Para></Abstract><Discussion><List-Bullet><Item><Para>Equivalent to replacing <codeVoice>self</codeVoice> with <codeVoice>self.subtract(other)</codeVoice>.</Para></Item></List-Bullet></Discussion></Function>",
         key.offset: 3327,
+=======
+        key.doc.full_as_xml: "<Function><Name>subtractInPlace(_:)</Name><USR>s:FEsPs10SetAlgebra15subtractInPlaceFxT_</USR><Declaration>mutating func subtractInPlace(_ other: Self)</Declaration><Abstract><Para>Removes all elements of <codeVoice>other</codeVoice> from <codeVoice>self</codeVoice>.</Para></Abstract><Discussion><List-Bullet><Item><Para>Equivalent to replacing <codeVoice>self</codeVoice> with <codeVoice>self.subtract(other)</codeVoice>.</Para></Item></List-Bullet></Discussion></Function>",
+        key.offset: 3450,
+>>>>>>> master
         key.length: 44,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtractInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtractInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7147,10 +7222,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "isSubsetOf(_:)",
         key.usr: "s:FEsPs10SetAlgebra10isSubsetOfFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs10SetAlgebra10isSubsetOfFxSb",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>isSubsetOf(_:)</Name><USR>s:FEsPs10SetAlgebra10isSubsetOfFxSb</USR><Declaration>func isSubsetOf(other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff every element of <codeVoice>self</codeVoice> is contained in <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
         key.offset: 3377,
+=======
+        key.doc.full_as_xml: "<Function><Name>isSubsetOf(_:)</Name><USR>s:FEsPs10SetAlgebra10isSubsetOfFxSb</USR><Declaration>func isSubsetOf(_ other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff every element of <codeVoice>self</codeVoice> is contained in <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
+        key.offset: 3500,
+>>>>>>> master
         key.length: 38,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSubsetOf</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSubsetOf</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7166,10 +7246,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "isSupersetOf(_:)",
         key.usr: "s:FEsPs10SetAlgebra12isSupersetOfFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs10SetAlgebra12isSupersetOfFxSb",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>isSupersetOf(_:)</Name><USR>s:FEsPs10SetAlgebra12isSupersetOfFxSb</USR><Declaration>func isSupersetOf(other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff every element of <codeVoice>other</codeVoice> is contained in <codeVoice>self</codeVoice>.</Para></Abstract></Function>",
         key.offset: 3421,
+=======
+        key.doc.full_as_xml: "<Function><Name>isSupersetOf(_:)</Name><USR>s:FEsPs10SetAlgebra12isSupersetOfFxSb</USR><Declaration>func isSupersetOf(_ other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff every element of <codeVoice>other</codeVoice> is contained in <codeVoice>self</codeVoice>.</Para></Abstract></Function>",
+        key.offset: 3544,
+>>>>>>> master
         key.length: 40,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSupersetOf</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSupersetOf</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7185,10 +7270,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "isDisjointWith(_:)",
         key.usr: "s:FEsPs10SetAlgebra14isDisjointWithFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs10SetAlgebra14isDisjointWithFxSb",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>isDisjointWith(_:)</Name><USR>s:FEsPs10SetAlgebra14isDisjointWithFxSb</USR><Declaration>func isDisjointWith(other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff <codeVoice>self.intersect(other).isEmpty</codeVoice>.</Para></Abstract></Function>",
         key.offset: 3467,
+=======
+        key.doc.full_as_xml: "<Function><Name>isDisjointWith(_:)</Name><USR>s:FEsPs10SetAlgebra14isDisjointWithFxSb</USR><Declaration>func isDisjointWith(_ other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff <codeVoice>self.intersect(other).isEmpty</codeVoice>.</Para></Abstract></Function>",
+        key.offset: 3590,
+>>>>>>> master
         key.length: 42,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isDisjointWith</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isDisjointWith</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7204,10 +7294,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "subtract(_:)",
         key.usr: "s:FEsPs10SetAlgebra8subtractFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs10SetAlgebra8subtractFxx",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>subtract(_:)</Name><USR>s:FEsPs10SetAlgebra8subtractFxx</USR><Declaration>func subtract(other: Self) -&gt; Self</Declaration><Abstract><Para>Returns the set of elements contained in <codeVoice>self</codeVoice> but not in <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
         key.offset: 3515,
+=======
+        key.doc.full_as_xml: "<Function><Name>subtract(_:)</Name><USR>s:FEsPs10SetAlgebra8subtractFxx</USR><Declaration>func subtract(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns the set of elements contained in <codeVoice>self</codeVoice> but not in <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
+        key.offset: 3638,
+>>>>>>> master
         key.length: 36,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtract</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtract</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7233,10 +7328,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "isStrictSupersetOf(_:)",
         key.usr: "s:FEsPs10SetAlgebra18isStrictSupersetOfFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs10SetAlgebra18isStrictSupersetOfFxSb",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>isStrictSupersetOf(_:)</Name><USR>s:FEsPs10SetAlgebra18isStrictSupersetOfFxSb</USR><Declaration>func isStrictSupersetOf(other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff every element of <codeVoice>other</codeVoice> is contained in <codeVoice>self</codeVoice> and <codeVoice>self</codeVoice> contains an element that is not contained in <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
         key.offset: 3588,
+=======
+        key.doc.full_as_xml: "<Function><Name>isStrictSupersetOf(_:)</Name><USR>s:FEsPs10SetAlgebra18isStrictSupersetOfFxSb</USR><Declaration>func isStrictSupersetOf(_ other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff every element of <codeVoice>other</codeVoice> is contained in <codeVoice>self</codeVoice> and <codeVoice>self</codeVoice> contains an element that is not contained in <codeVoice>other</codeVoice>.</Para></Abstract></Function>",
+        key.offset: 3711,
+>>>>>>> master
         key.length: 46,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSupersetOf</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSupersetOf</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7252,10 +7352,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "isStrictSubsetOf(_:)",
         key.usr: "s:FEsPs10SetAlgebra16isStrictSubsetOfFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FEsPs10SetAlgebra16isStrictSubsetOfFxSb",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>isStrictSubsetOf(_:)</Name><USR>s:FEsPs10SetAlgebra16isStrictSubsetOfFxSb</USR><Declaration>func isStrictSubsetOf(other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff every element of <codeVoice>self</codeVoice> is contained in <codeVoice>other</codeVoice> and <codeVoice>other</codeVoice> contains an element that is not contained in <codeVoice>self</codeVoice>.</Para></Abstract></Function>",
         key.offset: 3640,
+=======
+        key.doc.full_as_xml: "<Function><Name>isStrictSubsetOf(_:)</Name><USR>s:FEsPs10SetAlgebra16isStrictSubsetOfFxSb</USR><Declaration>func isStrictSubsetOf(_ other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff every element of <codeVoice>self</codeVoice> is contained in <codeVoice>other</codeVoice> and <codeVoice>other</codeVoice> contains an element that is not contained in <codeVoice>self</codeVoice>.</Para></Abstract></Function>",
+        key.offset: 3763,
+>>>>>>> master
         key.length: 44,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSubsetOf</decl.name>(<decl.var.parameter><decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSubsetOf</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tPs10SetAlgebra4SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7271,10 +7376,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "element(_:subsumes:)",
         key.usr: "s:ZFEsPs10SetAlgebra7elementFTwx7Element8subsumeswxS0__Sb::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:ZFEsPs10SetAlgebra7elementFTwx7Element8subsumeswxS0__Sb",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>element(_:subsumes:)</Name><USR>s:ZFEsPs10SetAlgebra7elementFTwx7Element8subsumeswxS0__Sb</USR><Declaration>static func element(a: Self.Element, subsumes b: Self.Element) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff <codeVoice>a</codeVoice> subsumes <codeVoice>b</codeVoice>.</Para></Abstract><Discussion><List-Bullet><Item><Para>Equivalent to <codeVoice>([a] as Self).isSupersetOf([b])</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
         key.offset: 3690,
+=======
+        key.doc.full_as_xml: "<Function><Name>element(_:subsumes:)</Name><USR>s:ZFEsPs10SetAlgebra7elementFTwx7Element8subsumeswxS0__Sb</USR><Declaration>static func element(_ a: Self.Element, subsumes b: Self.Element) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff <codeVoice>a</codeVoice> subsumes <codeVoice>b</codeVoice>.</Para></Abstract><Discussion><List-Bullet><Item><Para>Equivalent to <codeVoice>([a] as Self).isSupersetOf([b])</codeVoice></Para></Item></List-Bullet></Discussion></Function>",
+        key.offset: 3813,
+>>>>>>> master
         key.length: 82,
-        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>element</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>subsumes</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.static>",
+        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>element</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>subsumes</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.static>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7297,10 +7407,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "element(_:isDisjointWith:)",
         key.usr: "s:ZFEsPs10SetAlgebra7elementFTwx7Element14isDisjointWithwxS0__Sb::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:ZFEsPs10SetAlgebra7elementFTwx7Element14isDisjointWithwxS0__Sb",
+<<<<<<< HEAD
         key.doc.full_as_xml: "<Function><Name>element(_:isDisjointWith:)</Name><USR>s:ZFEsPs10SetAlgebra7elementFTwx7Element14isDisjointWithwxS0__Sb</USR><Declaration>static func element(a: Self.Element, isDisjointWith b: Self.Element) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff <codeVoice>a</codeVoice> is disjoint with <codeVoice>b</codeVoice>.</Para></Abstract><Discussion><Para>Two elements are disjoint when neither one subsumes the other.</Para><See><Para><codeVoice>Self.element(_, subsumes:_)</codeVoice></Para></See></Discussion></Function>",
         key.offset: 3778,
+=======
+        key.doc.full_as_xml: "<Function><Name>element(_:isDisjointWith:)</Name><USR>s:ZFEsPs10SetAlgebra7elementFTwx7Element14isDisjointWithwxS0__Sb</USR><Declaration>static func element(_ a: Self.Element, isDisjointWith b: Self.Element) -&gt; Bool</Declaration><Abstract><Para>Returns <codeVoice>true</codeVoice> iff <codeVoice>a</codeVoice> is disjoint with <codeVoice>b</codeVoice>.</Para></Abstract><Discussion><Para>Two elements are disjoint when neither one subsumes the other.</Para><See><Para><codeVoice>Self.element(_, subsumes:_)</codeVoice></Para></See></Discussion></Function>",
+        key.offset: 3901,
+>>>>>>> master
         key.length: 88,
-        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>element</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>isDisjointWith</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.static>",
+        key.fully_annotated_decl: "<decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>element</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>isDisjointWith</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.static>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7524,10 +7639,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.function.free,
     key.name: "fooFunc1(_:)",
     key.usr: "c:@F@fooFunc1",
+<<<<<<< HEAD
     key.doc.full_as_xml: "<Function file=Foo.h line=\"65\" column=\"5\"><Name>fooFunc1</Name><USR>c:@F@fooFunc1</USR><Declaration>func fooFunc1(a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  fooFunc1.  Bbb.</Para></Abstract></Function>",
     key.offset: 4286,
+=======
+    key.doc.full_as_xml: "<Function file=Foo.h line=\"65\" column=\"5\"><Name>fooFunc1</Name><USR>c:@F@fooFunc1</USR><Declaration>func fooFunc1(_ a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  fooFunc1.  Bbb.</Para></Abstract></Function>",
+    key.offset: 4409,
+>>>>>>> master
     key.length: 34,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -7544,7 +7664,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFunc1AnonymousParam",
     key.offset: 4321,
     key.length: 48,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc1AnonymousParam</decl.name>(<decl.var.parameter><decl.var.parameter.name>_</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc1AnonymousParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -7560,7 +7680,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFunc3",
     key.offset: 4370,
     key.length: 93,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc3</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>c</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>d</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sp\">UnsafeMutablePointer</ref.struct>&lt;<ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct>&gt;</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc3</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>c</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>d</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sp\">UnsafeMutablePointer</ref.struct>&lt;<ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct>&gt;</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -7598,7 +7718,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFuncWithBlock",
     key.offset: 4464,
     key.length: 49,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncWithBlock</decl.name>(<decl.var.parameter><decl.var.parameter.name>blk</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncWithBlock</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>blk</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -7615,7 +7735,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFuncWithFunctionPointer",
     key.offset: 4514,
     key.length: 60,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncWithFunctionPointer</decl.name>(<decl.var.parameter><decl.var.parameter.name>fptr</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncWithFunctionPointer</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>fptr</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -7691,10 +7811,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.function.free,
     key.name: "redeclaredInMultipleModulesFunc1(_:)",
     key.usr: "c:@F@redeclaredInMultipleModulesFunc1",
+<<<<<<< HEAD
     key.doc.full_as_xml: "<Function file=Foo.h line=\"117\" column=\"5\"><Name>redeclaredInMultipleModulesFunc1</Name><USR>c:@F@redeclaredInMultipleModulesFunc1</USR><Declaration>func redeclaredInMultipleModulesFunc1(a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.</Para></Abstract></Function>",
     key.offset: 4778,
+=======
+    key.doc.full_as_xml: "<Function file=Foo.h line=\"117\" column=\"5\"><Name>redeclaredInMultipleModulesFunc1</Name><USR>c:@F@redeclaredInMultipleModulesFunc1</USR><Declaration>func redeclaredInMultipleModulesFunc1(_ a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.</Para></Abstract></Function>",
+    key.offset: 4901,
+>>>>>>> master
     key.length: 58,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>redeclaredInMultipleModulesFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>redeclaredInMultipleModulesFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -7812,7 +7937,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassBase(im)fooBaseInstanceFunc1:",
         key.offset: 5248,
         key.length: 66,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooBaseInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>anObject</decl.var.parameter.name>: <decl.var.parameter.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class>!</decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooBaseInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>anObject</decl.var.parameter.name>: <decl.var.parameter.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class>!</decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7959,7 +8084,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(im)fooInstanceFunc1:",
         key.offset: 5800,
         key.length: 33,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7976,7 +8101,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(im)fooInstanceFunc2:withB:",
         key.offset: 5839,
         key.length: 49,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooInstanceFunc2</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>withB</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooInstanceFunc2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>withB</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -8408,7 +8533,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooUnavailableMembers(cm)unavailableMembersWithInt:",
         key.offset: 7380,
         key.length: 39,
-        key.fully_annotated_decl: "<decl.function.method.class><syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>withInt</decl.name>(<decl.var.parameter><decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.class usr=\"c:objc(cs)FooUnavailableMembers\">Self</ref.class>!</decl.function.returntype></decl.function.method.class>",
+        key.fully_annotated_decl: "<decl.function.method.class><syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>withInt</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.class usr=\"c:objc(cs)FooUnavailableMembers\">Self</ref.class>!</decl.function.returntype></decl.function.method.class>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -8661,7 +8786,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@FooCFTypeRelease",
     key.offset: 7994,
     key.length: 40,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>FooCFTypeRelease</decl.name>(<decl.var.parameter><decl.var.parameter.name>_</decl.var.parameter.name>: <decl.var.parameter.type><ref.typealias usr=\"c:Foo.h@T@FooCFTypeRef\">FooCFTypeRef</ref.typealias></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>FooCFTypeRelease</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.typealias usr=\"c:Foo.h@T@FooCFTypeRef\">FooCFTypeRef</ref.typealias></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -8677,7 +8802,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooSubFunc1",
     key.offset: 8035,
     key.length: 37,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,

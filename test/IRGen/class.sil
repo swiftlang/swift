@@ -133,7 +133,7 @@ class RequiredBase: NonRequiredBase {
 }
 
 sil public_external @init_NonRequiredBase : $@convention(method) (@owned NonRequiredBase) -> @owned NonRequiredBase
-sil public_external @alloc_RequiredBase : $@convention(thin) (@thick RequiredBase.Type) -> @owned RequiredBase
+sil public_external @alloc_RequiredBase : $@convention(method) (@thick RequiredBase.Type) -> @owned RequiredBase
 sil public_external @init_RequiredBase : $@convention(method) (@owned RequiredBase) -> @owned RequiredBase
 
 sil_vtable NonRequiredBase {

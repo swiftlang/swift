@@ -19,7 +19,7 @@ import Foundation
 import TestsUtils
 
 @inline(never)
-public func run_RGBHistogram(N: Int) {
+public func run_RGBHistogram(_ N: Int) {
     var histogram = [(key: rrggbb_t, value: Int)]()
     for _ in 1...100*N {
         histogram = createSortedSparseRGBHistogram(samples)
@@ -86,7 +86,7 @@ let samples: [rrggbb_t] = [
     0x607F4D9F, 0x9733E55E, 0xA360439D, 0x1DB568FD, 0xB7A5C3A1, 0xBE84492D
 ]
 
-func isCorrectHistogram(histogram: [(key: rrggbb_t, value: Int)]) -> Bool {
+func isCorrectHistogram(_ histogram: [(key: rrggbb_t, value: Int)]) -> Bool {
     return histogram.count  == 157 &&
            histogram[0].0   == 0x00808080 && histogram[0].1   == 54 &&
            histogram[156].0 == 0x003B8D96 && histogram[156].1 == 1
@@ -94,7 +94,7 @@ func isCorrectHistogram(histogram: [(key: rrggbb_t, value: Int)]) -> Bool {
 
 func createSortedSparseRGBHistogram
         <S: Sequence where S.Iterator.Element == rrggbb_t>
-        (samples: S) -> [(key: rrggbb_t, value: Int)] {
+        (_ samples: S) -> [(key: rrggbb_t, value: Int)] {
     var histogram = Dictionary<rrggbb_t, Int>()
 
     for sample in samples {
@@ -126,11 +126,11 @@ class Box<T : Hashable where T : Equatable> : Hashable {
 extension Box : Equatable {
 }
 
-func ==<T: Equatable>(lhs: Box<T>,  rhs: Box<T>) -> Bool {
+func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
   return lhs.value == rhs.value
 }
 
-func isCorrectHistogramOfObjects(histogram: [(key: Box<rrggbb_t>, value: Box<Int>)]) -> Bool {
+func isCorrectHistogramOfObjects(_ histogram: [(key: Box<rrggbb_t>, value: Box<Int>)]) -> Bool {
     return histogram.count  == 157 &&
            histogram[0].0.value   == 0x00808080 && histogram[0].1.value   == 54 &&
            histogram[156].0.value == 0x003B8D96 && histogram[156].1.value == 1
@@ -138,7 +138,7 @@ func isCorrectHistogramOfObjects(histogram: [(key: Box<rrggbb_t>, value: Box<Int
 
 func createSortedSparseRGBHistogramOfObjects
         <S: Sequence where S.Iterator.Element == rrggbb_t>
-        (samples: S) -> [(key: Box<rrggbb_t>, value: Box<Int>)] {
+        (_ samples: S) -> [(key: Box<rrggbb_t>, value: Box<Int>)] {
     var histogram = Dictionary<Box<rrggbb_t>, Box<Int>>()
 
     for sample in samples {
@@ -157,7 +157,7 @@ func createSortedSparseRGBHistogramOfObjects
 }
 
 @inline(never)
-public func run_RGBHistogramOfObjects(N: Int) {
+public func run_RGBHistogramOfObjects(_ N: Int) {
     var histogram = [(key: Box<rrggbb_t>, value: Box<Int>)]()
     for _ in 1...100*N {
         histogram = createSortedSparseRGBHistogramOfObjects(samples)

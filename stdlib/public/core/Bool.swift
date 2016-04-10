@@ -69,7 +69,7 @@ extension Bool : CustomStringConvertible {
 // This is a magic entry point known to the compiler.
 @_transparent
 public // COMPILER_INTRINSIC
-func _getBool(v: Builtin.Int1) -> Bool { return Bool(v) }
+func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
 @_transparent
 extension Bool : Equatable, Hashable {

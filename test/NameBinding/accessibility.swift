@@ -18,7 +18,7 @@ import has_accessibility
 // This deliberately has the wrong import kind.
 import var has_accessibility.zz // expected-error {{no such decl in module}}
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 markUsed(has_accessibility.x)
 markUsed(has_accessibility.y) // expected-error {{module 'has_accessibility' has no member named 'y'}}

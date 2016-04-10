@@ -45,7 +45,7 @@ public enum AddPayloadToSingleton {
 #endif
 }
 
-public func addPayloadToSingletonCases(s: Starfish)
+public func addPayloadToSingletonCases(_ s: Starfish)
     -> [AddPayloadToSingleton] {
 #if BEFORE
   return [.Cats]
@@ -64,7 +64,7 @@ public enum AddPayloadsToSingleton {
 #endif
 }
 
-public func addPayloadsToSingletonCases(s: Starfish)
+public func addPayloadsToSingletonCases(_ s: Starfish)
     -> [AddPayloadsToSingleton] {
 #if BEFORE
   return [.Cats]
@@ -83,7 +83,7 @@ public enum AddNoPayloadToSinglePayload {
 #endif
 }
 
-public func addNoPayloadToSinglePayloadCases(s: Starfish)
+public func addNoPayloadToSinglePayloadCases(_ s: Starfish)
     -> [AddNoPayloadToSinglePayload] {
 #if BEFORE
   return [.Cats(s), .Noses]
@@ -102,7 +102,7 @@ public enum AddPayloadToSinglePayload {
 #endif
 }
 
-public func addPayloadToSinglePayloadCases(s: Starfish)
+public func addPayloadToSinglePayloadCases(_ s: Starfish)
     -> [AddPayloadToSinglePayload] {
 #if BEFORE
   return [.Cats, .Paws(s)]
@@ -122,7 +122,7 @@ public enum AddNoPayloadToMultiPayload {
 #endif
 }
 
-public func addNoPayloadToMultiPayloadCases(s: Starfish)
+public func addNoPayloadToMultiPayloadCases(_ s: Starfish)
     -> [AddNoPayloadToMultiPayload] {
 #if BEFORE
   return [.Cats(s), .Puppies(s)]
@@ -142,7 +142,7 @@ public enum AddPayloadToMultiPayload {
 #endif
 }
 
-public func addPayloadToMultiPayloadCases(s: Starfish)
+public func addPayloadToMultiPayloadCases(_ s: Starfish)
     -> [AddPayloadToMultiPayload] {
 #if BEFORE
   return [.Cats(s), .Ponies(s), .Pandas]

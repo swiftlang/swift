@@ -5,20 +5,20 @@
 
 @autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{1-14=}}
 
-func func1a(@autoclosure v1 : Int) {} // expected-error {{@autoclosure may only be applied to values of function type}}
+func func1a(@autoclosure _ v1 : Int) {} // expected-error {{@autoclosure may only be applied to values of function type}}
 
 
-func func2(@autoclosure fp : () -> Int) { func2(4)}
+func func2(@autoclosure _ fp : () -> Int) { func2(4)}
 
 func func3(@autoclosure fp fpx : () -> Int) {func3(fp: 0)}
-func func4(@autoclosure fp fp : () -> Int) {func4(fp: 0)}
+func func4(@autoclosure fp : () -> Int) {func4(fp: 0)}
 func func6(@autoclosure _: () -> Int) {func6(0)}
 
 // declattr and typeattr on the argument.
 func func7(@autoclosure _: @noreturn () -> Int) {func7(0)}
 
 // autoclosure + inout don't make sense.
-func func8(@autoclosure x: inout () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be applied to values of function type}}
+func func8(@autoclosure _ x: inout () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be applied to values of function type}}
 }
 
 
@@ -49,15 +49,15 @@ protocol P2 : P1 {
   associatedtype Element
 }
 
-func overloadedEach<O: P1>(source: O, _ closure: () -> ()) {
+func overloadedEach<O: P1>(_ source: O, _ closure: () -> ()) {
 }
 
-func overloadedEach<P: P2>(source: P, _ closure: () -> ()) {
+func overloadedEach<P: P2>(_ source: P, _ closure: () -> ()) {
 }
 
 struct S : P2 {
   typealias Element = Int
-  func each(@autoclosure closure: () -> ()) {
+  func each(@autoclosure _ closure: () -> ()) {
     overloadedEach(self, closure) // expected-error {{invalid conversion from non-escaping function of type '@autoclosure () -> ()' to potentially escaping function type '() -> ()'}}
   }
 }
@@ -75,23 +75,23 @@ func func11(@autoclosure(escaping) @noescape _: () -> ()) { } // expected-error{
 
 
 class Super {
-  func f1(@autoclosure(escaping) x: () -> ()) { }
-  func f2(@autoclosure(escaping) x: () -> ()) { }
+  func f1(@autoclosure(escaping) _ x: () -> ()) { }
+  func f2(@autoclosure(escaping) _ x: () -> ()) { }
   func f3(@autoclosure x: () -> ()) { }
 }
 
 class Sub : Super {
-  override func f1(@autoclosure(escaping) x: () -> ()) { }
-  override func f2(@autoclosure x: () -> ()) { } // expected-error{{does not override any method}}
-  override func f3(@autoclosure(escaping) x: () -> ()) { }  // expected-error{{does not override any method}}
+  override func f1(@autoclosure(escaping) _ x: () -> ()) { }
+  override func f2(@autoclosure _ x: () -> ()) { } // expected-error{{does not override any method}}
+  override func f3(@autoclosure(escaping) _ x: () -> ()) { }  // expected-error{{does not override any method}}
 }
 
-func func12_sink(x: () -> Int) { }
+func func12_sink(_ x: () -> Int) { }
 
-func func12a(@autoclosure x: () -> Int) { 
+func func12a(@autoclosure _ x: () -> Int) { 
   func12_sink(x) // expected-error{{invalid conversion from non-escaping function of type '@autoclosure () -> Int' to potentially escaping function type '() -> Int'}}
 }
-func func12b(@autoclosure(escaping) x: () -> Int) { 
+func func12b(@autoclosure(escaping) _ x: () -> Int) { 
   func12_sink(x)
 }
 

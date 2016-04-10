@@ -29,6 +29,6 @@ def find(toolchain, tool):
                                        '--toolchain', toolchain,
                                        '--find', tool],
                                       stderr=subprocess.PIPE)
-        return out.rstrip()
+        return out.rstrip().decode()
     except subprocess.CalledProcessError:
         return None

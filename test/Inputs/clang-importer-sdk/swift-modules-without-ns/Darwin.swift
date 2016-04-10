@@ -30,10 +30,10 @@ public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
 }
 
 public // COMPILER_INTRINSIC
-func _convertBoolToDarwinBoolean(x: Bool) -> DarwinBoolean {
+func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
   return DarwinBoolean(x)
 }
 public // COMPILER_INTRINSIC
-func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
+func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
   return Bool(x)
 }

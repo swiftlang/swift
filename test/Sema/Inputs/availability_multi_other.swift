@@ -72,7 +72,7 @@ extension OtherIntroduced10_51 { // expected-error {{'OtherIntroduced10_51' is o
 
 extension OtherIntroduced10_9 {
   @available(OSX, introduced: 10.51)
-  func extensionMethodOnOtherIntroduced10_9AvailableOn10_51(p: OtherIntroduced10_51) { }
+  func extensionMethodOnOtherIntroduced10_9AvailableOn10_51(_ p: OtherIntroduced10_51) { }
 }
 
 @available(OSX, introduced: 10.51)

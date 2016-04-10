@@ -1,7 +1,7 @@
 
 @_silgen_name("evil") public func _evil()
 
-public func id<U>(u : U) -> U {
+public func id<U>(_ u : U) -> U {
   _evil()
   _evil()
   _evil()
@@ -36,6 +36,6 @@ public struct X : Z {
   public init() {}
 }
 
-public func makeZDoSomething(z : Z) -> Z {
+public func makeZDoSomething(_ z : Z) -> Z {
   return z.f()
 }

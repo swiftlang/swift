@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Foundation
@@ -16,8 +15,8 @@ let objcProtocol: NSObjectProtocol = NSObject()
 
 var FoundationTestSuite = TestSuite("Foundation")
 
-func asNSString(s: String) -> NSString { return s as NSString }
-func asString(ns: NSString) -> String { return ns as String }
+func asNSString(_ s: String) -> NSString { return s as NSString }
+func asString(_ ns: NSString) -> String { return ns as String }
 
 //===----------------------------------------------------------------------===//
 // Strings
@@ -110,7 +109,7 @@ FoundationTestSuite.test("arrayConversions") {
 
   var nsaoa = aoa as NSArray
 
-  func nsArrayToAnyObjectArray(nsa: NSArray) -> [AnyObject] {
+  func nsArrayToAnyObjectArray(_ nsa: NSArray) -> [AnyObject] {
     return nsa as [AnyObject]
   }
 
@@ -154,7 +153,7 @@ FoundationTestSuite.test("NSURL") {
 // Pattern-matching
 //===----------------------------------------------------------------------===//
 
-func matchesEither(input: NSNumber, _ a: NSNumber, _ b: NSNumber) -> Bool {
+func matchesEither(_ input: NSNumber, _ a: NSNumber, _ b: NSNumber) -> Bool {
   switch input {
   case a, b:
     return true
@@ -165,10 +164,10 @@ func matchesEither(input: NSNumber, _ a: NSNumber, _ b: NSNumber) -> Bool {
 
 FoundationTestSuite.test("patternMatching") {
   var one, two, three, oneAgain : NSNumber
-  one = NSNumber(int: 1)
-  two = NSNumber(int: 2)
-  three = NSNumber(int: 3)
-  oneAgain = NSNumber(int: 1)
+  one = NSNumber(value: 1)
+  two = NSNumber(value: 2)
+  three = NSNumber(value: 3)
+  oneAgain = NSNumber(value: 1)
   expectFalse(matchesEither(one, two, three))
   expectTrue(matchesEither(one, oneAgain, three))
   expectTrue(matchesEither(one, two, oneAgain))

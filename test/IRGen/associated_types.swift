@@ -24,14 +24,14 @@ struct Spoon : Runcible {
 
 struct Owl<T : Runcible, U> {
   // CHECK: define hidden void @_TFV16associated_types3Owl3eat{{.*}}(%swift.opaque*
-  func eat(what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
+  func eat(_ what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
 }
 
 class Pussycat<T : Runcible, U> {
   init() {} 
 
   // CHECK: define hidden void @_TFC16associated_types8Pussycat3eat{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %C16associated_types8Pussycat*)
-  func eat(what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
+  func eat(_ what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
 }
 
 func owl() -> Owl<Spoon, Int> {
@@ -66,7 +66,7 @@ protocol FastRuncible {
 // information for archetypes from all paths to that archetype, not just
 // its parent relationships.
 
-func testFastRuncible<T: Runcible, U: FastRuncible where T.RuncerType == U.RuncerType>(t: T, u: U) {
+func testFastRuncible<T: Runcible, U: FastRuncible where T.RuncerType == U.RuncerType>(_ t: T, u: U) {
   U.RuncerType.Runcee.accelerate()
 }
 // CHECK: define hidden void @_TF16associated_types16testFastRuncibleu0_RxS_8Runcible_S_12FastRunciblewx10RuncerTypezw_10RuncerTyperFTx1uq__T_(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.Runcible, i8** %U.FastRuncible)

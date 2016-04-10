@@ -496,7 +496,7 @@ function set_deployment_target_based_options() {
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
             )
-	    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
+            if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
                     llvm_cmake_options=(
                         "${llvm_cmake_options[@]}"
@@ -505,15 +505,15 @@ function set_deployment_target_based_options() {
                     )
                 fi
 
-		llvm_cmake_options=(
-		    "${llvm_cmake_options[@]}"
-		    "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
-		    "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
-		    "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
-		    "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
-		    "-DLLVM_PARALLEL_LINK_JOBS=$(num_llvm_parallel_lto_link_jobs)"
-		)
-	    fi
+                lvm_cmake_options=(
+                    "${llvm_cmake_options[@]}"
+                    "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
+                    "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
+                    "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
+                    "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
+                    "-DLLVM_PARALLEL_LINK_JOBS=$(num_llvm_parallel_lto_link_jobs)"
+                )
+            fi
 
             if [[ $(true_false "${SWIFT_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
@@ -834,6 +834,15 @@ function cmake_needs_to_specify_standard_computed_defaults() {
         echo "TRUE"
     else
         echo "FALSE"
+    fi
+}
+
+function copy_swift_stdlib_tool_substitute() {
+    if [ ! -f "$1" ] ; then
+        echo "--- Copy swift-stdlib-tool ---"
+        set -x
+        cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "$1"
+        { set +x; } 2>/dev/null
     fi
 }
 
@@ -1523,6 +1532,12 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
         )
     fi
+    if [[ "${DARWIN_TOOLCHAIN_VERSION}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DDARWIN_TOOLCHAIN_VERSION="${DARWIN_TOOLCHAIN_VERSION}"
+        )
+    fi
 
     if [[ "${ENABLE_ASAN}" ]] ; then
         swift_cmake_options=(
@@ -1931,16 +1946,23 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
                 XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    # xcodebuild requires swift-stdlib-tool to build a Swift
+                    # framework. This is normally present when building XCTest
+                    # via a packaged .xctoolchain, but here we are using the
+                    # swiftc that was just built--no toolchain exists yet. As a
+                    # result, we must copy swift-stdlib-tool ourselves.
+                    copy_swift_stdlib_tool_substitute "$(build_directory_bin ${deployment_target} swift)/swift-stdlib-tool"
+
+                    # The Linux build places build products in the
+                    # XCTEST_BUILD_DIR. This, and installation of XCTest in
+                    # general, is not supported on OS X.
                     set -x
                     xcodebuild \
                         -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTest \
                         SWIFT_EXEC="${SWIFTC_BIN}" \
                         SWIFT_LINK_OBJC_RUNTIME=YES \
-                        SKIP_INSTALL=NO \
-                        DEPLOYMENT_LOCATION=YES \
-                        DSTROOT="${XCTEST_BUILD_DIR}" \
-                        INSTALL_PATH="/"
+                        DSTROOT="${XCTEST_BUILD_DIR}"
                     { set +x; } 2>/dev/null
                 else
                     FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
@@ -2529,10 +2551,7 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
     echo "--- Creating installable package ---"
     echo "-- Package file: ${INSTALLABLE_PACKAGE} --"
     if [[ "$(uname -s)" == "Darwin" ]] ; then
-      if [ ! -f "${INSTALL_DESTDIR}/${INSTALL_PREFIX}/bin/swift-stdlib-tool" ] ; then
-        echo "--- Copy swift-stdlib-tool ---"
-        cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "${INSTALL_DESTDIR}/${INSTALL_PREFIX}/bin/swift-stdlib-tool"
-      fi
+      copy_swift_stdlib_tool_substitute "${INSTALL_DESTDIR}/${INSTALL_PREFIX}/bin/swift-stdlib-tool"
       
       # Create plist for xctoolchain.
       echo "-- Create Info.plist --"

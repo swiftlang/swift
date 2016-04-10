@@ -4,7 +4,7 @@ struct Bar {
 }
 
 struct Foo<T> {
-  func myFunction(foobar: T) {
+  func myFunction(_ foobar: T) {
   }
 }
 

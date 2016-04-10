@@ -85,11 +85,11 @@ getElement instruction::
       return getElement(index)
      }
 
-  @_semantics("array.check_subscript") func checkSubscript(index: Int) {
+  @_semantics("array.check_subscript") func checkSubscript(_ index: Int) {
     ...
   }
 
-  @_semantics("array.get_element") func getElement(index: Int) -> Element {
+  @_semantics("array.get_element") func getElement(_ index: Int) -> Element {
     return _buffer[index]
   }
 

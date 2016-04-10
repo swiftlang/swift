@@ -245,7 +245,7 @@ Function Parameters
 Function parameters can be explicitly declared ``val``, or ``ref``::
 
   func baz(
-      x: Int      // x is passed by-value
+      _ x: Int      // x is passed by-value
     , val y: Int  // just like "y: Int"
     , ref z: Int  // allocate z on the heap
 
@@ -290,7 +290,7 @@ type parameter, as follows::
 parameters::
 
   // Fill an array with independent copies of x
-  func fill<T:val>(array:[T], x:T) {
+  func fill<T:val>(_ array:[T], x:T) {
     for i in 0...array.length {
       array[i] = x
     }

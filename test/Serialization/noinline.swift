@@ -15,11 +15,11 @@ import def_noinline
 // SIL: store [[RESULT]] to [[RAW]] : $*Bool
 var raw = testNoinline(x: false)
 
-// SIL: [[FUNC2:%.+]] = function_ref @_TFV12def_noinline18NoInlineInitStructCfT1xSb_S0_ : $@convention(thin) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct
-// SIL: apply [[FUNC2]]({{%.+}}, {{%.+}}) : $@convention(thin) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct
+// SIL: [[FUNC2:%.+]] = function_ref @_TFV12def_noinline18NoInlineInitStructCfT1xSb_S0_ : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct
+// SIL: apply [[FUNC2]]({{%.+}}, {{%.+}}) : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct
 
 var a = NoInlineInitStruct(x: false)
 
 // SIL-LABEL: [fragile] [noinline] @_TF12def_noinline12testNoinlineFT1xSb_Sb : $@convention(thin) (Bool) -> Bool
 
-// SIL-LABEL: sil public_external [fragile] [noinline] @_TFV12def_noinline18NoInlineInitStructCfT1xSb_S0_ : $@convention(thin) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {
+// SIL-LABEL: sil public_external [fragile] [noinline] @_TFV12def_noinline18NoInlineInitStructCfT1xSb_S0_ : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {

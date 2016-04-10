@@ -14,7 +14,7 @@ import SpriteKit
 @available(iOS,introduced=8.0)
 @available(tvOS,introduced=8.0)
 @available(watchOS,introduced=2.0)
-func testSubscript(node: SKNode) {
+func testSubscript(_ node: SKNode) {
   var nodes: [SKNode] = node["me"]
 }
 
@@ -30,12 +30,12 @@ print("color \(r) \(g) \(b) \(a)")
 // CHECK: color 1.0 0.0 0.0 1.0
 
 #if os(OSX)
-func f(c: NSColor) {
+func f(_ c: NSColor) {
   print("colortastic")
 }
 #endif
 #if os(iOS) || os(tvOS)
-func f(c: UIColor) {
+func f(_ c: UIColor) {
   print("colortastic")
 }
 #endif

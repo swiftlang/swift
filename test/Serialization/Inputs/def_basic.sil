@@ -152,7 +152,7 @@ bb0:                                         // CHECK: bb0:
 sil [fragile] @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
 
 // Parse SIL generated from the following swift program:
-// func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
+// func x(_ a : Bool) -> Int { if a { return 4 } else {return 5} }
 sil [fragile] @_TFSb13getLogicValuefRSbFT_Bi1_ : $@convention(method) (@inout Bool) -> Builtin.Int1
 sil [fragile] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
 
@@ -215,7 +215,7 @@ bb0:
 }
 
 // Generated from:
-// func archetype_member_ref<T : Runcible>(x: T) {
+// func archetype_member_ref<T : Runcible>(_ x: T) {
 //   x.free_method()
 //   var u = x.associated_method()
 //   T.static_method()
@@ -1255,8 +1255,8 @@ sil_witness_table ConformingAssoc: AssocReqt module def_basic {
 protocol AnyProtocol {
   associatedtype AssocType
   associatedtype AssocWithReqt : AssocReqt
-  func assocTypesMethod(x: AssocType, y: AssocWithReqt)
-  static func staticMethod(x: Self)
+  func assocTypesMethod(_ x: AssocType, y: AssocWithReqt)
+  static func staticMethod(_ x: Self)
 }
 class SomeAssoc {
 }
@@ -1266,8 +1266,8 @@ protocol InheritedProtocol1 : AnyProtocol {
 struct InheritedConformance : InheritedProtocol1 {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
-  func assocTypesMethod(x: SomeAssoc, y: ConformingAssoc)
-  static func staticMethod(x: InheritedConformance)
+  func assocTypesMethod(_ x: SomeAssoc, y: ConformingAssoc)
+  static func staticMethod(_ x: InheritedConformance)
   func inheritedMethod()
 }
 

@@ -13,7 +13,7 @@ struct C {
 struct D {
   var (i, j) : (Int, Double) = (2, 3.5)
 }
-// CHECK-LABEL: sil hidden @_TFV19default_constructor1DC{{.*}} : $@convention(thin) (@thin D.Type) -> D
+// CHECK-LABEL: sil hidden @_TFV19default_constructor1DC{{.*}} : $@convention(method) (@thin D.Type) -> D
 // CHECK: [[THISBOX:%[0-9]+]] = alloc_box $D
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
 // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSiC
@@ -36,9 +36,9 @@ class E {
 // CHECK-LABEL: sil hidden @_TFC19default_constructor1Ec{{.*}} : $@convention(method) (@owned E) -> @owned E
 // CHECK: bb0([[SELFIN:%[0-9]+]] : $E)
 // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
-// CHECK: [[INT64_CTOR:%[0-9]+]] = function_ref @_TFVs5Int64C{{.*}} : $@convention(thin) (@thin Int64.Type) -> Int64
+// CHECK: [[INT64_CTOR:%[0-9]+]] = function_ref @_TFVs5Int64C{{.*}} : $@convention(method) (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int64.Type
-// CHECK-NEXT: [[ZERO:%[0-9]+]] = apply [[INT64_CTOR]]([[INT64]]) : $@convention(thin) (@thin Int64.Type) -> Int64
+// CHECK-NEXT: [[ZERO:%[0-9]+]] = apply [[INT64_CTOR]]([[INT64]]) : $@convention(method) (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[SELF]] : $E, #E.i
 // CHECK-NEXT: assign [[ZERO]] to [[IREF]] : $*Int64
 // CHECK-NEXT: return [[SELF]] : $E

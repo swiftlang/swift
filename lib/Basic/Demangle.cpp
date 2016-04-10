@@ -844,15 +844,29 @@ private:
       auto spec = NodeFactory::create(isNotReAbstracted ?
                               Node::Kind::GenericSpecializationNotReAbstracted :
                               Node::Kind::GenericSpecialization);
+
+      // Create a node if the specialization is externally inlineable.
+      if (Mangled.nextIf("q")) {
+        auto kind = Node::Kind::SpecializationIsFragile;
+        spec->addChild(NodeFactory::create(kind));
+      }
+
       // Create a node for the pass id.
       spec->addChild(NodeFactory::create(Node::Kind::SpecializationPassID,
                                          unsigned(Mangled.next() - 48)));
+
       // And then mangle the generic specialization.
       return demangleGenericSpecialization(spec);
     }
     if (Mangled.nextIf("f")) {
       auto spec =
           NodeFactory::create(Node::Kind::FunctionSignatureSpecialization);
+
+      // Create a node if the specialization is externally inlineable.
+      if (Mangled.nextIf("q")) {
+        auto kind = Node::Kind::SpecializationIsFragile;
+        spec->addChild(NodeFactory::create(kind));
+      }
 
       // Add the pass id.
       spec->addChild(NodeFactory::create(Node::Kind::SpecializationPassID,
@@ -2441,6 +2455,7 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
+    case Node::Kind::SpecializationIsFragile:
     case Node::Kind::SpecializationPassID:
     case Node::Kind::Static:
     case Node::Kind::Subscript:
@@ -3052,12 +3067,24 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       Printer << "generic not re-abstracted specialization <";
     }
     bool hasPrevious = false;
-    // We skip the 0 index since the SpecializationPassID does not contain any
-    // information that is useful to our users.
-    for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {
-      // Ignore empty specializations.
-      if (!pointer->getChild(i)->hasChildren())
+    for (unsigned i = 0, e = pointer->getNumChildren(); i < e; ++i) {
+      auto child = pointer->getChild(i);
+
+      switch (pointer->getChild(i)->getKind()) {
+      case Node::Kind::SpecializationPassID:
+        // We skip the SpecializationPassID since it does not contain any
+        // information that is useful to our users.
         continue;
+
+      case Node::Kind::SpecializationIsFragile:
+        break;
+
+      default:
+        // Ignore empty specializations.
+        if (!pointer->getChild(i)->hasChildren())
+          continue;
+      }
+
       if (hasPrevious)
         Printer << ", ";
       print(pointer->getChild(i));
@@ -3066,6 +3093,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "> of ";
     return;
   }
+  case Node::Kind::SpecializationIsFragile:
+    Printer << "preserving fragile attribute";
+    return;
   case Node::Kind::GenericSpecializationParam:
     print(pointer->getChild(0));
     for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {

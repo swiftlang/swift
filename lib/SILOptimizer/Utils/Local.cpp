@@ -1134,7 +1134,7 @@ SILInstruction *ValueLifetimeAnalysis:: findLastUserInBlock(SILBasicBlock *BB) {
 bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
   bool NoCriticalEdges = true;
 
-  // Exit-blocks from the lifetime region. The value if live at the end of
+  // Exit-blocks from the lifetime region. The value is live at the end of
   // a predecessor block but not in the frontier block itself.
   llvm::SmallSetVector<SILBasicBlock *, 16> FrontierBlocks;
 
@@ -1439,7 +1439,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
          "Parameter should be @owned");
 
   // Emit a retain.
-  Builder.createRetainValue(Loc, SrcOp);
+  Builder.createRetainValue(Loc, SrcOp, Atomicity::Atomic);
 
   Args.push_back(InOutOptionalParam);
   Args.push_back(SrcOp);
@@ -1452,18 +1452,18 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(Inst)) {
     assert(UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways);
     if (UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
-      Builder.createReleaseValue(Loc, SrcOp);
+      Builder.createReleaseValue(Loc, SrcOp, Atomicity::Atomic);
     }
   }
 
   if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(Inst)) {
     if (CCABI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
-      Builder.createReleaseValue(Loc, SrcOp);
+      Builder.createReleaseValue(Loc, SrcOp, Atomicity::Atomic);
     } else if (CCABI->getConsumptionKind() ==
                CastConsumptionKind::TakeOnSuccess) {
       // Insert a release in the success BB.
       Builder.setInsertionPoint(SuccessBB->begin());
-      Builder.createReleaseValue(Loc, SrcOp);
+      Builder.createReleaseValue(Loc, SrcOp, Atomicity::Atomic);
     }
   }
 
@@ -1588,14 +1588,14 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   }
 
   if (ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
-    Builder.createRetainValue(Loc, Src);
+    Builder.createRetainValue(Loc, Src, Atomicity::Atomic);
 
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,
                                     false);
 
   if (ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
-    Builder.createReleaseValue(Loc, Src);
+    Builder.createReleaseValue(Loc, Src, Atomicity::Atomic);
 
   SILInstruction *NewI = NewAI;
 

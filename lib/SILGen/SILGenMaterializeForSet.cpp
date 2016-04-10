@@ -363,6 +363,7 @@ public:
         lv.getSubstFormalType()).getObjectType();
     SILType actualTy = lv.getTypeOfRValue().getObjectType();
     assert(expectedTy == actualTy);
+    (void) expectedTy;
 
     // Reabstract back to the requirement pattern.
     if (actualTy != RequirementStorageType) {
@@ -667,11 +668,11 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
 
     case AddressorKind::Owning:
     case AddressorKind::NativeOwning:
-      gen.B.createStrongRelease(loc, owner);
+      gen.B.createStrongRelease(loc, owner, Atomicity::Atomic);
       break;
 
     case AddressorKind::NativePinning:
-      gen.B.createStrongUnpin(loc, owner);
+      gen.B.createStrongUnpin(loc, owner, Atomicity::Atomic);
       break;
     }
 

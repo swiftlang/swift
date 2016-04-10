@@ -273,16 +273,17 @@ namespace {
     }
 
     void copy(IRGenFunction &IGF, Explosion &src,
-              Explosion &dest) const override {
+              Explosion &dest, Atomicity atomicity) const override {
       src.transferInto(dest, 1);
       auto data = src.claimNext();
-      IGF.emitNativeStrongRetain(data);
+      IGF.emitNativeStrongRetain(data, atomicity);
       dest.add(data);
     }
-    
-    void consume(IRGenFunction &IGF, Explosion &src) const override {
+
+    void consume(IRGenFunction &IGF, Explosion &src,
+                 Atomicity atomicity) const override {
       src.claimNext();
-      IGF.emitNativeStrongRelease(src.claimNext());
+      IGF.emitNativeStrongRelease(src.claimNext(), atomicity);
     }
 
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
@@ -290,14 +291,16 @@ namespace {
       IGF.emitFixLifetime(src.claimNext());
     }
 
-    void strongRetain(IRGenFunction &IGF, Explosion &e) const override {
+    void strongRetain(IRGenFunction &IGF, Explosion &e,
+                      Atomicity atomicity) const override {
       e.claimNext();
-      IGF.emitNativeStrongRetain(e.claimNext());
+      IGF.emitNativeStrongRetain(e.claimNext(), atomicity);
     }
-    
-    void strongRelease(IRGenFunction &IGF, Explosion &e) const override {
+
+    void strongRelease(IRGenFunction &IGF, Explosion &e,
+                       Atomicity atomicity) const override {
       e.claimNext();
-      IGF.emitNativeStrongRelease(e.claimNext());
+      IGF.emitNativeStrongRelease(e.claimNext(), atomicity);
     }
 
     void strongRetainUnowned(IRGenFunction &IGF, Explosion &e) const override {
@@ -341,7 +344,7 @@ namespace {
       auto data = IGF.Builder.CreateLoad(projectData(IGF, addr));
       IGF.emitNativeStrongRelease(data);
     }
-    
+
     void packIntoEnumPayload(IRGenFunction &IGF,
                              EnumPayload &payload,
                              Explosion &src,

@@ -555,7 +555,7 @@ private:
   /// A helper to construct and typecheck call to super.init().
   ///
   /// \returns NULL if the constructed expression does not typecheck.
-  Expr* constructCallToSuperInit(ConstructorDecl *ctor,  ClassDecl *ClDecl);
+  Expr* constructCallToSuperInit(ConstructorDecl *ctor, ClassDecl *ClDecl);
 
 public:
   TypeChecker(ASTContext &Ctx) : TypeChecker(Ctx, Ctx.Diags) { }

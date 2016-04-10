@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
-func makeIncrementor(inc : Int64) -> () -> Int64
+func makeIncrementor(_ inc : Int64) -> () -> Int64
 {
   var sum : Int64 = 0
   // CHECK: define {{.*}}5inner

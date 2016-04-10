@@ -16,10 +16,10 @@ struct D {}
 protocol Runcible {}
 protocol Fungible {}
 
-func meta<T>(m: T.Type) {}
-func meta2<T>(m: T.Type, _ x: Int) {}
+func meta<T>(_ m: T.Type) {}
+func meta2<T>(_ m: T.Type, _ x: Int) {}
 
-func generic<T>(x: T) {}
+func generic<T>(_ x: T) {}
 
 var a, b, c, d : Int
 

@@ -6,7 +6,7 @@ func duplicatesemantics() {}
 
 func func_with_nested_semantics_1() {
    @_semantics("exit") // expected-error {{attribute '_semantics' can only be used in a non-local scope}}
-   func exit(code : UInt32) -> Void
+   func exit(_ code : UInt32) -> Void
    exit(0)
 }
 
@@ -16,6 +16,6 @@ func somethingThatShouldParseFine() {}
 
 func func_with_nested_semantics_2() {
    @_semantics("exit") // expected-error {{attribute '_semantics' can only be used in a non-local scope}}
-   func exit(code : UInt32) -> Void
+   func exit(_ code : UInt32) -> Void
    exit(0)
 }

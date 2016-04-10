@@ -2,7 +2,6 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
-// XFAIL: interpret
 
 import CoreGraphics
 import Foundation

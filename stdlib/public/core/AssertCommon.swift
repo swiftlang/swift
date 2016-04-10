@@ -78,7 +78,7 @@ func _fatalErrorFlags() -> UInt32 {
 @_silgen_name("_swift_stdlib_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
   // FIXME(ABI): add argument labels to conform to API guidelines.
-  prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
+  _ prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt, flags: UInt32)
@@ -86,7 +86,7 @@ func _reportFatalErrorInFile(
 @_silgen_name("_swift_stdlib_reportFatalError")
 func _reportFatalError(
   // FIXME(ABI): add argument labels to conform to API guidelines.
-  prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
+  _ prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
   flags: UInt32)
 
@@ -94,7 +94,7 @@ func _reportFatalError(
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
   // FIXME(ABI): add argument labels to conform to API guidelines.
-  className: UnsafePointer<UInt8>, _ classNameLength: UInt,
+  _ className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt, _ column: UInt,
@@ -104,7 +104,7 @@ func _reportUnimplementedInitializerInFile(
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
   // FIXME(ABI): add argument labels to conform to API guidelines.
-  className: UnsafePointer<UInt8>, _ classNameLength: UInt,
+  _ className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
   flags: UInt32)
 
@@ -118,7 +118,7 @@ func _reportUnimplementedInitializer(
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
   // FIXME(ABI): add argument labels to conform to API guidelines.
-  prefix: StaticString, _ message: StaticString,
+  _ prefix: StaticString, _ message: StaticString,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
 ) {
@@ -150,7 +150,7 @@ func _assertionFailed(
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
   // FIXME(ABI): add argument labels to conform to API guidelines.
-  prefix: StaticString, _ message: String,
+  _ prefix: StaticString, _ message: String,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
 ) {
@@ -183,7 +183,7 @@ func _assertionFailed(
 @_semantics("arc.programtermination_point")
 func _fatalErrorMessage(
   // FIXME(ABI): add argument labels to conform to API guidelines.
-  prefix: StaticString, _ message: StaticString,
+  _ prefix: StaticString, _ message: StaticString,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
 ) {
@@ -223,7 +223,7 @@ func _fatalErrorMessage(
 /// called by the Objective-C runtime.
 @_transparent @noreturn
 public // COMPILER_INTRINSIC
-func _unimplemented_initializer(className className: StaticString,
+func _unimplemented_initializer(className: StaticString,
                                 initName: StaticString = #function,
                                 file: StaticString = #file,
                                 line: UInt = #line,
@@ -268,7 +268,7 @@ func _unimplemented_initializer(className className: StaticString,
 @noreturn
 public // COMPILER_INTRINSIC
 func _undefined<T>(
-  @autoclosure message: () -> String = String(),
+  @autoclosure _ message: () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
   _assertionFailed("fatal error", message(), file, line, flags: 0)

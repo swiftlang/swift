@@ -862,7 +862,7 @@ namespace {
           if (base->getType()->is<LValueType>())
             selfTy = InOutType::get(selfTy);
         base = coerceObjectArgumentToType(
-                 base,  selfTy, member, semantics,
+                 base, selfTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.

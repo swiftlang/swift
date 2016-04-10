@@ -197,7 +197,7 @@ internal enum _CollectionOperation : Equatable {
   case removeAll(keepCapacity: Bool)
 
   internal func _applyTo(
-    elementsLastMutatedStateIds: [Int],
+    _ elementsLastMutatedStateIds: [Int],
     endIndexLastMutatedStateId: Int,
     nextStateId: Int
   ) -> ([Int], Int) {
@@ -428,7 +428,7 @@ internal struct _CollectionStateTransition {
 /// Asserts that the two indices are allowed to participate in a binary
 /// operation.
 internal func _expectCompatibleIndices(
-  first: MinimalIndex,
+  _ first: MinimalIndex,
   _ second: MinimalIndex,
   ${TRACE}
 ) {
@@ -721,13 +721,13 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 
 %     if RangeReplaceable:
-  public mutating func reserveCapacity(n: Int) {
+  public mutating func reserveCapacity(_ n: Int) {
     _willMutate(.reserveCapacity(capacity: n))
     _elements.reserveCapacity(n)
     reservedCapacity = Swift.max(reservedCapacity, n)
   }
 
-  public mutating func append(x: T) {
+  public mutating func append(_ x: T) {
     _willMutate(.append)
     _elements.append(x)
   }
@@ -744,7 +744,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
   public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == T
   >(
-    subRange: Range<MinimalIndex>, with newElements: C
+    _ subRange: Range<MinimalIndex>, with newElements: C
   ) {
     let oldCount = count
     _elements.replaceSubrange(
@@ -758,7 +758,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
         + newCount - oldCount))
   }
 
-  public mutating func insert(newElement: T, at i: MinimalIndex) {
+  public mutating func insert(_ newElement: T, at i: MinimalIndex) {
     _willMutate(.insert(atIndex: i.position))
     _elements.insert(newElement, at: i.position)
   }
@@ -777,17 +777,19 @@ public struct ${Self}<T> : ${SelfProtocols} {
     }
   }
 
+  @discardableResult
   public mutating func remove(at i: MinimalIndex) -> T {
     _willMutate(.removeAtIndex(index: i.position))
     return _elements.remove(at: i.position)
   }
 
+  @discardableResult
   public mutating func removeLast() -> T {
     _willMutate(.removeLast)
     return _elements.removeLast()
   }
 
-  public mutating func removeSubrange(subRange: Range<MinimalIndex>) {
+  public mutating func removeSubrange(_ subRange: Range<MinimalIndex>) {
     if !subRange.isEmpty {
       _willMutate(.removeRange(
         subRange: subRange.lowerBound.position..<subRange.upperBound.position))
@@ -803,7 +805,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
     _elements.removeAll(keepingCapacity: false)
   }
 
-  internal mutating func _willMutate(operation: _CollectionOperation) {
+  internal mutating func _willMutate(_ operation: _CollectionOperation) {
     _collectionState = _CollectionStateTransition(
       previousState: _collectionState,
       operation: operation)._nextState
@@ -1033,7 +1035,7 @@ public struct Defaulted${Traversal}RangeReplaceableSlice<Element>
   public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Element
   >(
-    subRange: Range<Index>,
+    _ subRange: Range<Index>,
     with newElements: C
   ) {
     let startOffset = startIndex.position

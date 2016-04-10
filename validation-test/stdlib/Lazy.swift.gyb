@@ -420,7 +420,7 @@ func expectSequencePassthrough<
   where
   S : LazySequenceProtocol, Base : LoggingType,
   Base.Iterator.Element == S.Iterator.Element
->(s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
+>(_ s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
   let baseType = base.dynamicType
 
   SequenceLog.makeIterator.expectIncrement(baseType) { _ = s.makeIterator() }
@@ -718,7 +718,7 @@ func checkFilterIteratorBase<
   where
   S.Iterator == LazyFilterIterator<I>,
   I.Element == OpaqueValue<Int>
->(s1: S, _ s2: S) {
+>(_ s1: S, _ s2: S) {
   var iter1 = s1.makeIterator()
   expectEqual(0, iter1.next()!.value)
   expectEqual(2, iter1.next()!.value)

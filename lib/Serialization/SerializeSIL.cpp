@@ -271,6 +271,7 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
   // have enough information at the time we emit the function to
   // know if it should be marked fragile or not.
   if (F->getLinkage() == SILLinkage::Shared && !DeclOnly) {
+    assert(F->isThunk() == IsReabstractionThunk || F->hasForeignBody());
     FuncsToEmit[F] = false;
     Worklist.push_back(F);
     return;
@@ -1000,6 +1001,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = (unsigned)MUI->getKind();
     else if (auto *DRI = dyn_cast<DeallocRefInst>(&SI))
       Attr = (unsigned)DRI->canAllocOnStack();
+    else if (auto *RCI = dyn_cast<RefCountingInst>(&SI))
+      Attr = RCI->isNonAtomic();
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }

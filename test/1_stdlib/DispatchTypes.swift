@@ -4,7 +4,7 @@
 
 import Dispatch
 
-func getAnyValue<T>(opt: T?) -> T { return opt! }
+func getAnyValue<T>(_ opt: T?) -> T { return opt! }
 
 // dispatch/io.h
 _ = dispatch_io_create(DISPATCH_IO_STREAM, 0, getAnyValue(nil), getAnyValue(nil))

@@ -123,7 +123,7 @@ func hoistMutableOfAppend(A: inout [Int]) {
 }
 
 @inline(never)
-func use(a: [Int]) {
+func use(_ a: [Int]) {
 }
 
 class ArrayHolder {

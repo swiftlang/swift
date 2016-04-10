@@ -1242,7 +1242,7 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
 
 SILValue
 ProjectionTree::computeExplodedArgumentValue(
-                            SILBuilder &Builder,  SILLocation Loc,
+                            SILBuilder &Builder, SILLocation Loc,
                             llvm::SmallVector<SILValue, 8> &LeafValues) {
   // Construct the leaf index to leaf value map.
   llvm::DenseMap<unsigned, SILValue> LeafIndexToValue;

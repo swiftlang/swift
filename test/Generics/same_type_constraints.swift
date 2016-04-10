@@ -22,25 +22,25 @@ struct Z: Barrable {
 }
 
 protocol TestSameTypeRequirement {
-  func foo<F1: Fooable where F1.Foo == X>(f: F1)
+  func foo<F1: Fooable where F1.Foo == X>(_ f: F1)
 }
 struct SatisfySameTypeRequirement : TestSameTypeRequirement {
-  func foo<F2: Fooable where F2.Foo == X>(f: F2) {}
+  func foo<F2: Fooable where F2.Foo == X>(_ f: F2) {}
 }
 
 protocol TestSameTypeAssocTypeRequirement {
   associatedtype Assoc
-  func foo<F1: Fooable where F1.Foo == Assoc>(f: F1)
+  func foo<F1: Fooable where F1.Foo == Assoc>(_ f: F1)
 }
 struct SatisfySameTypeAssocTypeRequirement : TestSameTypeAssocTypeRequirement {
   typealias Assoc = X
-  func foo<F2: Fooable where F2.Foo == X>(f: F2) {}
+  func foo<F2: Fooable where F2.Foo == X>(_ f: F2) {}
 }
 struct SatisfySameTypeAssocTypeRequirementDependent<T>
   : TestSameTypeAssocTypeRequirement
 {
   typealias Assoc = T
-  func foo<F3: Fooable where F3.Foo == T>(f: F3) {}
+  func foo<F3: Fooable where F3.Foo == T>(_ f: F3) {}
 }
 
 // Pulled in from old standard library to keep the following test
@@ -85,7 +85,7 @@ public struct LazySequenceOf<S : Sequence, A where S.Iterator.Element == A> : Se
   public subscript(i : A) -> A { return i }
 }
 
-public func iterate<A>(f : A -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? {
+public func iterate<A>(_ f : A -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? {
   return { x in nil }
 }
 
@@ -105,7 +105,7 @@ public final class IterateGenerator<A> : IteratorProtocol {
 // rdar://problem/18475138
 public protocol Observable : class {
     associatedtype Output
-    func addObserver(obj : Output -> Void)
+    func addObserver(_ obj : Output -> Void)
 }
 
 public protocol Bindable : class {
@@ -137,12 +137,12 @@ struct Pair<T, U> {
 protocol Seq {
   associatedtype Element
 
-  func zip<OtherSeq: Seq, ResultSeq: Seq where ResultSeq.Element == Pair<Element, OtherSeq.Element>.Type_> (otherSeq: OtherSeq) -> ResultSeq
+  func zip<OtherSeq: Seq, ResultSeq: Seq where ResultSeq.Element == Pair<Element, OtherSeq.Element>.Type_> (_ otherSeq: OtherSeq) -> ResultSeq
 }
 
 // rdar://problem/18435371
 extension Dictionary {
-    func multiSubscript<S : Sequence where S.Iterator.Element == Key>(seq: S) -> [Value?] {
+    func multiSubscript<S : Sequence where S.Iterator.Element == Key>(_ seq: S) -> [Value?] {
         var result = [Value?]()
         for seqElt in seq {
             result.append(self[seqElt])
@@ -166,10 +166,10 @@ class Grass : Food { }
 
 protocol Animal {
     associatedtype EdibleFood:Food
-    func eat(f:EdibleFood)
+    func eat(_ f:EdibleFood)
 }
 class Cow : Animal {
-    func eat(f: Grass) { }
+    func eat(_ f: Grass) { }
 }
 
 struct SpecificAnimal<F:Food> : Animal {
@@ -179,7 +179,7 @@ struct SpecificAnimal<F:Food> : Animal {
     init<A:Animal where A.EdibleFood == F>(_ selfie:A) {
         _eat = { selfie.eat($0) }
     }
-    func eat(f:F) {
+    func eat(_ f:F) {
         _eat(f:f)
     }
 }
@@ -198,19 +198,19 @@ extension Something {
 }
 
 // rdar://problem/18120419
-func TTGenWrap<T, I : IteratorProtocol where I.Element == (T,T)>(iterator: I)
+func TTGenWrap<T, I : IteratorProtocol where I.Element == (T,T)>(_ iterator: I)
 {
   var iterator = iterator
   _ = iterator.next()
 }
 
-func IntIntGenWrap<I : IteratorProtocol where I.Element == (Int,Int)>(iterator: I)
+func IntIntGenWrap<I : IteratorProtocol where I.Element == (Int,Int)>(_ iterator: I)
 {
   var iterator = iterator
   _ = iterator.next()
 }
 
-func GGWrap<I1 : IteratorProtocol, I2 : IteratorProtocol where I1.Element == I2.Element>(i1: I1, _ i2: I2)
+func GGWrap<I1 : IteratorProtocol, I2 : IteratorProtocol where I1.Element == I2.Element>(_ i1: I1, _ i2: I2)
 {
   var i1 = i1
   var i2 = i2
@@ -218,7 +218,7 @@ func GGWrap<I1 : IteratorProtocol, I2 : IteratorProtocol where I1.Element == I2.
   _ = i2.next()
 }
 
-func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
+func testSameTypeTuple(_ a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
   GGWrap(a.makeIterator(), s.makeIterator())
   TTGenWrap(a.makeIterator())
   IntIntGenWrap(s.makeIterator())
@@ -239,7 +239,7 @@ protocol Bar {
     C : FooProtocol
     where
     C.Element == Foo.Element
-  >(elements: C)
+  >(_ elements: C)
 }
 
 // rdar://problem/21620908
@@ -257,7 +257,7 @@ struct XP1<T : P2Base> : P1 {
   func wibble() { }
 }
 
-func sameTypeParameterizedConcrete<C : P2 where C.Q == XP1<C>>(c: C) {
+func sameTypeParameterizedConcrete<C : P2 where C.Q == XP1<C>>(_ c: C) {
   c.getQ().wibble()
 }
 
@@ -276,13 +276,13 @@ struct X3 : P3 {
   typealias AssocP3 = X1
 }
 
-func foo<C : P4 where C.AssocP4 == X3>(c: C) { }
+func foo<C : P4 where C.AssocP4 == X3>(_ c: C) { }
 
 struct X4 : P4 {
   typealias AssocP4 = X3
 }
 
-func testFoo(x3: X4) {
+func testFoo(_ x3: X4) {
   foo(x3)
 }
 
@@ -300,7 +300,7 @@ protocol P8 {
   associatedtype AssocOther
 }
 
-func testP8<C : P8 where C.AssocOther == X6<C.AssocP8.AssocP7>>(c: C) { }
+func testP8<C : P8 where C.AssocOther == X6<C.AssocP8.AssocP7>>(_ c: C) { }
 
 // setGenericSignature() was getting called twice here
 struct Ghost<T> {}
@@ -317,6 +317,6 @@ struct EventHorizon : Timewarp {
   typealias Wormhole = Ghost<Beam>
 }
 
-func activate<T>(t: T) {}
+func activate<T>(_ t: T) {}
 
 activate(Teleporter<EventHorizon, Beam>())

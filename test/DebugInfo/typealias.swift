@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 class DWARF {
 // CHECK-DAG: ![[DIEOFFSET:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_TtaC9typealias5DWARF9DIEOffset",{{.*}} line: [[@LINE+1]], baseType: !"_TtVs6UInt32")

@@ -16,8 +16,6 @@
 // RUN: %S/../../utils/line-directive %t/InputStream.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
-// XFAIL: interpret
-
 import StdlibUnittest
 
 

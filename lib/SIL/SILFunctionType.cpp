@@ -1564,21 +1564,21 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     return getProtocolWitnessRepresentation(proto);
 
   switch (c.kind) {
-    case SILDeclRef::Kind::Func:
-    case SILDeclRef::Kind::Allocator:
-    case SILDeclRef::Kind::EnumElement:
-    case SILDeclRef::Kind::Destroyer:
-    case SILDeclRef::Kind::Deallocator:
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::GlobalGetter:
-      if (c.getDecl()->isInstanceMember())
-        return SILFunctionTypeRepresentation::Method;
-      return SILFunctionTypeRepresentation::Thin;
-
     case SILDeclRef::Kind::DefaultArgGenerator:
       return SILFunctionTypeRepresentation::Thin;
 
+    case SILDeclRef::Kind::Func:
+      if (c.getDecl()->getDeclContext()->isTypeContext())
+        return SILFunctionTypeRepresentation::Method;
+      return SILFunctionTypeRepresentation::Thin;
+
+    case SILDeclRef::Kind::Destroyer:
+    case SILDeclRef::Kind::Deallocator:
+    case SILDeclRef::Kind::Allocator:
     case SILDeclRef::Kind::Initializer:
+    case SILDeclRef::Kind::EnumElement:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
       return SILFunctionTypeRepresentation::Method;

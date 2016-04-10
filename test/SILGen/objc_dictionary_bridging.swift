@@ -11,7 +11,7 @@ import gizmo
 @objc class Foo : NSObject {
   // Bridging dictionary parameters
   // CHECK-LABEL: sil hidden [thunk] @_TToFC24objc_dictionary_bridging3Foo23bridge_Dictionary_param{{.*}} : $@convention(objc_method) (NSDictionary, Foo) -> ()
-  func bridge_Dictionary_param(dict: Dictionary<Foo, Foo>) {
+  func bridge_Dictionary_param(_ dict: Dictionary<Foo, Foo>) {
     // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TZFE10FoundationVs10Dictionary36_unconditionallyBridgeFromObjectiveCfGSqCSo12NSDictionary_GS0_xq__
     // CHECK-NEXT: [[OPT_NSDICT:%[0-9]+]] = enum $Optional<NSDictionary>, #Optional.some!enumelt.1, [[NSDICT]] : $NSDictionary

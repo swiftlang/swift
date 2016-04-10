@@ -66,7 +66,7 @@ public protocol RangeReplaceableCollection
   mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
-    subRange: Range<Index>, with newElements: C
+    _ subRange: Range<Index>, with newElements: C
   )
 
   /*
@@ -103,7 +103,7 @@ public protocol RangeReplaceableCollection
   /// linear data structures like `Array`.  Conforming types may
   /// reserve more than `n`, exactly `n`, less than `n` elements of
   /// storage, or even ignore the request completely.
-  mutating func reserveCapacity(n: IndexDistance)
+  mutating func reserveCapacity(_ n: IndexDistance)
 
   //===--- Derivable Requirements -----------------------------------------===//
 
@@ -122,7 +122,7 @@ public protocol RangeReplaceableCollection
   /// `self.endIndex`.
   ///
   /// - Complexity: Amortized O(1).
-  mutating func append(x: Iterator.Element)
+  mutating func append(_ x: Iterator.Element)
 
   /*
   The 'appendContentsOf' requirement should be an operator, but the compiler crashes:
@@ -150,7 +150,7 @@ public protocol RangeReplaceableCollection
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func insert(newElement: Iterator.Element, at i: Index)
+  mutating func insert(_ newElement: Iterator.Element, at i: Index)
 
   /// Insert `newElements` at index `i`.
   ///
@@ -166,6 +166,7 @@ public protocol RangeReplaceableCollection
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @discardableResult
   mutating func remove(at i: Index) -> Iterator.Element
 
   /// Customization point for `removeLast()`.  Implement this function if you
@@ -180,19 +181,20 @@ public protocol RangeReplaceableCollection
   ///
   /// - Returns: True if the operation was performed.
   @warn_unused_result
-  mutating func _customRemoveLast(n: Int) -> Bool
+  mutating func _customRemoveLast(_ n: Int) -> Bool
 
   /// Remove the element at `startIndex` and return it.
   ///
   /// - Complexity: O(`self.count`)
   /// - Precondition: `!self.isEmpty`.
+  @discardableResult
   mutating func removeFirst() -> Iterator.Element
 
   /// Remove the first `n` elements.
   ///
   /// - Complexity: O(`self.count`)
   /// - Precondition: `n >= 0 && self.count >= n`.
-  mutating func removeFirst(n: Int)
+  mutating func removeFirst(_ n: Int)
 
   /// Remove all elements within `bounds`.
   ///
@@ -201,7 +203,7 @@ public protocol RangeReplaceableCollection
   /// - Complexity: O(`self.count`).
   mutating func removeSubrange<
     Bounds : RangeProtocol where Bounds.Bound == Index
-  >(bounds: Range<Index>)
+  >(_ bounds: Range<Index>)
 
   /// Remove all elements.
   ///
@@ -237,7 +239,7 @@ extension RangeReplaceableCollection {
     append(contentsOf: elements)
   }
 
-  public mutating func append(newElement: Iterator.Element) {
+  public mutating func append(_ newElement: Iterator.Element) {
     insert(newElement, at: endIndex)
   }
 
@@ -253,7 +255,7 @@ extension RangeReplaceableCollection {
   }
 
   public mutating func insert(
-    newElement: Iterator.Element, at i: Index
+    _ newElement: Iterator.Element, at i: Index
   ) {
     replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }
@@ -264,6 +266,7 @@ extension RangeReplaceableCollection {
     replaceSubrange(i..<i, with: newElements)
   }
 
+  @discardableResult
   public mutating func remove(at index: Index) -> Iterator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
     let result: Iterator.Element = self[index]
@@ -273,7 +276,7 @@ extension RangeReplaceableCollection {
 
   internal func _makeHalfOpen<
     R : RangeProtocol where R.Bound == Index
-  >(r: R) -> Range<Index> {
+  >(_ r: R) -> Range<Index> {
     return Range(
       uncheckedBounds: (
         lower: r.lowerBound,
@@ -282,11 +285,11 @@ extension RangeReplaceableCollection {
   
   public mutating func removeSubrange<
     R : RangeProtocol where R.Bound == Index
-  >(bounds: R) {
+  >(_ bounds: R) {
     replaceSubrange(_makeHalfOpen(bounds), with: EmptyCollection())
   }
 
-  public mutating func removeFirst(n: Int) {
+  public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -295,6 +298,7 @@ extension RangeReplaceableCollection {
     removeSubrange(startIndex..<end)
   }
 
+  @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty,
       "can't remove first element from an empty collection")
@@ -312,7 +316,7 @@ extension RangeReplaceableCollection {
     }
   }
 
-  public mutating func reserveCapacity(n: IndexDistance) {}
+  public mutating func reserveCapacity(_ n: IndexDistance) {}
 }
 
 extension RangeReplaceableCollection where SubSequence == Self {
@@ -320,6 +324,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   /// - Precondition: `!self.isEmpty`.
+  @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
@@ -331,7 +336,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   /// - Precondition: `self.count >= n`.
-  public mutating func removeFirst(n: Int) {
+  public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -369,7 +374,7 @@ extension RangeReplaceableCollection {
   }
 
   @warn_unused_result
-  public mutating func _customRemoveLast(n: Int) -> Bool {
+  public mutating func _customRemoveLast(_ n: Int) -> Bool {
     return false
   }
 }
@@ -387,7 +392,7 @@ extension RangeReplaceableCollection
   }
 
   @warn_unused_result
-  public mutating func _customRemoveLast(n: Int) -> Bool {
+  public mutating func _customRemoveLast(_ n: Int) -> Bool {
     self = self[startIndex..<index(numericCast(-n), stepsFrom: endIndex)]
     return true
   }
@@ -434,6 +439,7 @@ extension RangeReplaceableCollection
   ///
   /// - Complexity: O(1)
   /// - Precondition: `!self.isEmpty`
+  @discardableResult
   public mutating func removeLast() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove last element from an empty collection")
     if let result = _customRemoveLast() {
@@ -446,7 +452,7 @@ extension RangeReplaceableCollection
   ///
   /// - Complexity: O(`self.count`)
   /// - Precondition: `n >= 0 && self.count >= n`.
-  public mutating func removeLast(n: Int) {
+  public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -506,18 +512,18 @@ extension RangeReplaceableCollection {
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
-    subRange: Range<Index>, with newElements: C
+    _ subRange: Range<Index>, with newElements: C
   ) {
     fatalError("unavailable function can't be called")
   }
-
+  
   @available(*, unavailable, renamed: "removeAt")
-  public mutating func removeAtIndex(i: Index) -> Iterator.Element {
+  public mutating func removeAtIndex(_ i: Index) -> Iterator.Element {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "removeSubrange")
-  public mutating func removeRange(subRange: Range<Index>) {
+  public mutating func removeRange(_ subRange: Range<Index>) {
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
@@ -525,14 +531,14 @@ extension RangeReplaceableCollection {
     S : Sequence
     where
     S.Iterator.Element == Iterator.Element
-  >(newElements: S) {
+  >(_ newElements: S) {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     C : Collection where C.Iterator.Element == Iterator.Element
-  >(newElements: C, at i: Index) {
+  >(_ newElements: C, at i: Index) {
     fatalError("unavailable function can't be called")
   }
 }

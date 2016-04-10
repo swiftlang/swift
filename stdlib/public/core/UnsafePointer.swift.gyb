@@ -108,7 +108,7 @@ public struct ${Self}<Pointee>
   /// - Precondition: The memory is not initialized.
   ///
   /// - Postcondition: The memory has been deallocated.
-  public func deallocateCapacity(num: Int) {
+  public func deallocateCapacity(_ num: Int) {
     let size = strideof(Pointee.self) * num
     Builtin.deallocRaw(
       _rawValue, size._builtinWordValue, Builtin.alignof(Pointee.self))
@@ -178,7 +178,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Precondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
-  public func assignFrom(source: ${Self}, count: Int) {
+  public func assignFrom(_ source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.assignFrom with negative count")
     _debugPrecondition(
@@ -203,7 +203,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Precondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
-  public func assignBackwardFrom(source: ${Self}, count: Int) {
+  public func assignBackwardFrom(_ source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.assignBackwardFrom with negative count")
     _debugPrecondition(
@@ -233,7 +233,7 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The `Pointee`s at `self..<self + count` are
   ///   initialized and the memory at `source..<source + count` is
   ///   uninitialized.
-  public func moveInitializeFrom(source: ${Self}, count: Int) {
+  public func moveInitializeFrom(_ source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.moveInitializeFrom with negative count")
     _debugPrecondition(
@@ -264,7 +264,7 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The `Pointee`s at `self..<self + count` are
   ///   initialized and the memory at `source..<source + count` is
   ///   uninitialized.
-  public func moveInitializeBackwardFrom(source: ${Self}, count: Int) {
+  public func moveInitializeBackwardFrom(_ source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
     _debugPrecondition(
@@ -295,7 +295,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
-  public func initializeFrom(source: ${Self}, count: Int) {
+  public func initializeFrom(_ source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.initializeFrom with negative count")
     _debugPrecondition(
@@ -318,7 +318,7 @@ public struct ${Self}<Pointee>
   ///   initialized.
   public func initializeFrom<
     C : Collection where C.Iterator.Element == Pointee
-  >(source: C) {
+  >(_ source: C) {
     source._copyContents(initializing: self)
   }
 
@@ -336,7 +336,7 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The `Pointee`s at `self..<self + count` are
   ///   initialized and the `Pointees` at `source..<source + count`
   ///   are uninitialized.
-  public func moveAssignFrom(source: ${Self}, count: Int) {
+  public func moveAssignFrom(_ source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.moveAssignFrom with negative count")
     _debugPrecondition(
@@ -358,7 +358,7 @@ public struct ${Self}<Pointee>
   ///   initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  public func deinitialize(count count: Int = 1) {
+  public func deinitialize(count: Int = 1) {
     _debugPrecondition(count >= 0, "${Self}.deinitialize with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
@@ -396,7 +396,7 @@ public struct ${Self}<Pointee>
   /// If self was converted from `nil`, writes the result of invoking body into
   /// the pointee.
   public // SPI(Foundation)
-  func _setIfNonNil(@noescape body: () -> Pointee) {
+  func _setIfNonNil(@noescape _ body: () -> Pointee) {
     if self != nil {
       pointee = body()
     }
@@ -408,7 +408,8 @@ public struct ${Self}<Pointee>
   /// of a `Pointee` which is written into buffer before this method returns.
   @_transparent public
   func _withBridgeObject<U : AnyObject, R>(
-    buffer: inout U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
+    _ buffer: inout U?,
+  @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -419,7 +420,7 @@ public struct ${Self}<Pointee>
   /// of buffer.
   @_transparent public
   func _withBridgeValue<U, R>(
-    buffer: inout U, @noescape body: UnsafeMutablePointer<U> -> R
+    _ buffer: inout U, @noescape body: UnsafeMutablePointer<U> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -550,12 +551,12 @@ extension ${Self} {
   }
 
   @available(*, unavailable, message: "use the '${Self}(allocatingCapacity:)' initializer")
-  public static func alloc(num: Int) -> ${Self} {
+  public static func alloc(_ num: Int) -> ${Self} {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "deallocateCapacity")
-  public func dealloc(num: Int) {
+  public func dealloc(_ num: Int) {
     fatalError("unavailable function can't be called")
   }
 
@@ -570,7 +571,7 @@ extension ${Self} {
   }
 
   @available(*, unavailable, renamed: "initialize(with:)")
-  public func initialize(newvalue: Pointee) {
+  public func initialize(_ newvalue: Pointee) {
     fatalError("unavailable function can't be called")
   }
 
@@ -580,7 +581,7 @@ extension ${Self} {
   }
 
   @available(*, unavailable, renamed: "deinitialize(count:)")
-  public func destroy(count: Int) {
+  public func destroy(_ count: Int) {
     fatalError("unavailable function can't be called")
   }
 }

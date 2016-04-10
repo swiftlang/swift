@@ -17,7 +17,7 @@ print("\(str == nil) \(nil == url)")
 // CHECK: false false
 
 @inline(never)
-func isNilGeneric<T>(x: T?) -> Bool {
+func isNilGeneric<T>(_ x: T?) -> Bool {
   if let x2 = x {
     return false
   } else {

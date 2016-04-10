@@ -75,10 +75,10 @@ protocol ABO : A, B, O { func abo() }
 // CHECK:   {{.*}}* @_PROTOCOL__TtP17protocol_metadata1O_
 // CHECK: }
 
-func reify_metadata<T>(x: T) {}
+func reify_metadata<T>(_ x: T) {}
 
 // CHECK: define hidden void @_TF17protocol_metadata14protocol_types
-func protocol_types(a: A,
+func protocol_types(_ a: A,
                     abc: protocol<A, B, C>,
                     abco: protocol<A, B, C, O>) {
   // CHECK: store %swift.protocol* @_TMp17protocol_metadata1A

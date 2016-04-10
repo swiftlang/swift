@@ -397,19 +397,19 @@ typedef NS_ENUM(NSUInteger, NSPostingStyle) {
 };
 
 typedef NS_ENUM(NSUInteger, NSXMLNodeKind) {
-	NSXMLInvalidKind = 0,
-	NSXMLDocumentKind,
-	NSXMLElementKind,
-	NSXMLAttributeKind,
-	NSXMLNamespaceKind,
-	NSXMLProcessingInstructionKind,
-	NSXMLCommentKind,
-	NSXMLTextKind,
-	NSXMLDTDKind __attribute__((swift_name("DTDKind"))),
-	NSXMLEntityDeclarationKind,
-	NSXMLAttributeDeclarationKind,
-	NSXMLElementDeclarationKind,
-	NSXMLNotationDeclarationKind
+  NSXMLInvalidKind = 0,
+  NSXMLDocumentKind,
+  NSXMLElementKind,
+  NSXMLAttributeKind,
+  NSXMLNamespaceKind,
+  NSXMLProcessingInstructionKind,
+  NSXMLCommentKind,
+  NSXMLTextKind,
+  NSXMLDTDKind __attribute__((swift_name("DTDKind"))),
+  NSXMLEntityDeclarationKind,
+  NSXMLAttributeDeclarationKind,
+  NSXMLElementDeclarationKind,
+  NSXMLNotationDeclarationKind
 };
 
 // From CoreFoundation
@@ -566,7 +566,7 @@ typedef NS_OPTIONS(NSInteger, AlertBuzzes) {
 typedef NS_OPTIONS(NSUInteger, NSBitmapFormat) {
   NSAlphaFirstBitmapFormat            = 1 << 0, // 0 means is alpha last (RGBA, CMYKA, etc.)
   NSAlphaNonpremultipliedBitmapFormat = 1 << 1, // 0 means is premultiplied
-  NSFloatingPointSamplesBitmapFormat  = 1 << 2,	// 0 is integer
+  NSFloatingPointSamplesBitmapFormat  = 1 << 2, // 0 is integer
 
   NS16BitLittleEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 8),
   NS32BitLittleEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 9),
@@ -582,7 +582,7 @@ typedef NS_OPTIONS(NSUInteger, NSBitmapFormatReversed) {
 
   NSAlphaFirstBitmapFormatR            = 1 << 0, // 0 means is alpha last (RGBA, CMYKA, etc.)
   NSAlphaNonpremultipliedBitmapFormatR = 1 << 1, // 0 means is premultiplied
-  NSFloatingPointSamplesBitmapFormatR  = 1 << 2,	// 0 is integer
+  NSFloatingPointSamplesBitmapFormatR  = 1 << 2, // 0 is integer
 };
 
 typedef NS_OPTIONS(NSUInteger, NSBitmapFormat2) {

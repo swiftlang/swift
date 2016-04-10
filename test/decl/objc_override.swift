@@ -25,9 +25,9 @@ class B : A {
 
   @objc(a) func f() { } // expected-error{{method 'f()' with Objective-C selector 'a' conflicts with method 'a()' from superclass 'A' with the same Objective-C selector}}
 
-  @objc(initWithProp:) func initializeWithProp(prop: Int) { } // expected-error{{method 'initializeWithProp' with Objective-C selector 'initWithProp:' conflicts with initializer 'init(prop:)' from superclass 'A' with the same Objective-C selector}}
+  @objc(initWithProp:) func initializeWithProp(_ prop: Int) { } // expected-error{{method 'initializeWithProp' with Objective-C selector 'initWithProp:' conflicts with initializer 'init(prop:)' from superclass 'A' with the same Objective-C selector}}
 
-  @objc(setProp:) func setProperty(prop: Int) { } // expected-error{{method 'setProperty' with Objective-C selector 'setProp:' conflicts with setter for 'prop' from superclass 'A' with the same Objective-C selector}}
+  @objc(setProp:) func setProperty(_ prop: Int) { } // expected-error{{method 'setProperty' with Objective-C selector 'setProp:' conflicts with setter for 'prop' from superclass 'A' with the same Objective-C selector}}
 
-  @objc(setObject:atIndexedSubscript:) func doSet(x: AnyObject, y: Int) { } // expected-error{{method 'doSet(_:y:)' with Objective-C selector 'setObject:atIndexedSubscript:' conflicts with subscript setter from superclass 'A' with the same Objective-C selector}}
+  @objc(setObject:atIndexedSubscript:) func doSet(_ x: AnyObject, y: Int) { } // expected-error{{method 'doSet(_:y:)' with Objective-C selector 'setObject:atIndexedSubscript:' conflicts with subscript setter from superclass 'A' with the same Objective-C selector}}
 }

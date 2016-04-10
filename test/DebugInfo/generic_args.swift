@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -verify -g -o - | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 protocol AProtocol {
   func f() -> String
@@ -20,7 +20,7 @@ class AnotherClass : AProtocol {
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq_F12generic_args9aFunction{{.*}}, identifier: [[T]])
 // CHECK-DAG: !DILocalVariable(name: "y", arg: 2,{{.*}} type: ![[Q:.*]])
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq0_F12generic_args9aFunction{{.*}}, identifier: [[Q]])
-func aFunction<T : AProtocol, Q : AProtocol>(x: T, _ y: Q, _ z: String) {
+func aFunction<T : AProtocol, Q : AProtocol>(_ x: T, _ y: Q, _ z: String) {
    markUsed("I am in \(z): \(x.f()) \(y.f())")
 }
 
@@ -35,7 +35,7 @@ struct Wrapper<T: AProtocol> {
     _ = wrapped
   }
 
-  func passthrough(t: T) -> T {
+  func passthrough(_ t: T) -> T {
     // The type of local should have the context Wrapper<T>.
     // CHECK-DAG: !DILocalVariable(name: "local",{{.*}} line: [[@LINE+1]],{{.*}} type: !"_TtQq_V12generic_args7Wrapper"
     var local = t
@@ -45,7 +45,7 @@ struct Wrapper<T: AProtocol> {
 }
 
 // CHECK: !DILocalVariable(name: "f", {{.*}}, line: [[@LINE+1]], type: !"_TtFQq_F12generic_args5applyu0_rFTx1fFxq__q_Qq0_F12generic_args5applyu0_rFTx1fFxq__q_")
-func apply<T, U> (x: T, f: (T) -> (U)) -> U {
+func apply<T, U> (_ x: T, f: (T) -> (U)) -> U {
   return f(x)
 }
 
