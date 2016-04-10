@@ -260,9 +260,8 @@ extension HalfOpenRangeProtocol
 public struct CountableRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
-> : RandomAccessCollection,
-  CustomStringConvertible, CustomDebugStringConvertible, 
-  HalfOpenRangeProtocol {
+> : HalfOpenRangeProtocol, RandomAccessCollection,
+  CustomStringConvertible, CustomDebugStringConvertible {
 
   public typealias Element = Bound
   public typealias Index = Element
