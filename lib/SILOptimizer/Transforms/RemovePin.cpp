@@ -33,7 +33,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-STATISTIC(NumPinPairsRemoved, "Num pin pairs removed");
+STATISTIC(NumPinPairsRemoved, "Number of pin pairs removed");
 
 using namespace swift;
 
