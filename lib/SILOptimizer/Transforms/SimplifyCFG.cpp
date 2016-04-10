@@ -34,14 +34,14 @@
 #include "llvm/Support/CommandLine.h"
 using namespace swift;
 
-STATISTIC(NumBlocksDeleted,  "Number of unreachable blocks removed");
-STATISTIC(NumBlocksMerged,   "Number of blocks merged together");
-STATISTIC(NumJumpThreads,    "Number of jumps threaded");
-STATISTIC(NumTermBlockSimplified,  "Number of programterm block simplified");
+STATISTIC(NumBlocksDeleted, "Number of unreachable blocks removed");
+STATISTIC(NumBlocksMerged, "Number of blocks merged together");
+STATISTIC(NumJumpThreads, "Number of jumps threaded");
+STATISTIC(NumTermBlockSimplified, "Number of programterm block simplified");
 STATISTIC(NumConstantFolded, "Number of terminators constant folded");
-STATISTIC(NumDeadArguments,  "Number of unused arguments removed");
+STATISTIC(NumDeadArguments, "Number of unused arguments removed");
 STATISTIC(NumSROAArguments, "Number of aggregate argument levels split by "
-                            "SROA ");
+                            "SROA");
 
 //===----------------------------------------------------------------------===//
 //                             CFG Simplification
