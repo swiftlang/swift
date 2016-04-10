@@ -115,7 +115,7 @@ it next to the other projects and it will be bootstrapped automatically:
     git checkout release
     cat README
 
-#### Install via third-party packaging tool (OSX only)
+#### Install via third-party packaging tool (OS X only)
 
 **[Homebrew](http://brew.sh/)**
 
