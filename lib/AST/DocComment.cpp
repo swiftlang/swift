@@ -276,15 +276,15 @@ bool extractSimpleField(
 
 static DocComment::CommentParts
 extractCommentParts(llvm::markup::MarkupContext &MC,
-                    llvm::markup::Document *Doc) {
+                    llvm::markup::MarkupASTNode *Node) {
 
   DocComment::CommentParts Parts;
-  auto Children = Doc->getChildren();
+  auto Children = Node->getChildren();
   if (Children.empty())
     return Parts;
 
   auto FirstParagraph
-      = dyn_cast<llvm::markup::Paragraph>(Doc->getChildren().front());
+      = dyn_cast<llvm::markup::Paragraph>(Node->getChildren().front());
   if (FirstParagraph)
     Parts.Brief = FirstParagraph;
 
