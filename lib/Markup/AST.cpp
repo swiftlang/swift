@@ -205,7 +205,8 @@ Strong *Strong::create(MarkupContext &MC,
 
 ParamField::ParamField(StringRef Name, ArrayRef<MarkupASTNode *> Children)
     : PrivateExtension(ASTNodeKind::ParamField), NumChildren(Children.size()),
-      Name(Name) {
+      Name(Name),
+      Parts(None) {
   std::uninitialized_copy(Children.begin(), Children.end(),
                           getTrailingObjects<MarkupASTNode *>());
 }

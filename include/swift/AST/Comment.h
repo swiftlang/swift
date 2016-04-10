@@ -22,34 +22,20 @@ class DocComment;
 struct RawComment;
 
 class DocComment {
-public:
-  struct CommentParts {
-    Optional<const swift::markup::Paragraph *>Brief;
-    ArrayRef<const swift::markup::MarkupASTNode *> BodyNodes;
-    ArrayRef<const swift::markup::ParamField *> ParamFields;
-    Optional<const swift::markup::ReturnsField *> ReturnsField;
-    Optional<const swift::markup::ThrowsField *> ThrowsField;
-
-    bool isEmpty() const {
-      return !Brief.hasValue() && !ReturnsField.hasValue() && !ThrowsField.hasValue() && BodyNodes.empty() && ParamFields.empty();
-    }
-  };
-
-private:
   const Decl *D;
   const swift::markup::Document *Doc = nullptr;
-  const CommentParts Parts;
+  const swift::markup::CommentParts Parts;
 
 public:
   DocComment(const Decl *D, swift::markup::Document *Doc,
-             CommentParts Parts)
+             swift::markup::CommentParts Parts)
       : D(D), Doc(Doc), Parts(Parts) {}
 
   const Decl *getDecl() const { return D; }
 
   const swift::markup::Document *getDocument() const { return Doc; }
 
-  CommentParts getParts() const {
+  swift::markup::CommentParts getParts() const {
     return Parts;
   }
 

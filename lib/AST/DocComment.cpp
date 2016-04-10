@@ -70,7 +70,7 @@ Optional<swift::markup::ParamField *> extractParamOutlineItem(
 
 bool extractParameterOutline(
     swift::markup::MarkupContext &MC, swift::markup::List *L,
-    SmallVectorImpl<const swift::markup::ParamField *> &ParamFields) {
+    SmallVectorImpl<swift::markup::ParamField *> &ParamFields) {
   SmallVector<swift::markup::MarkupASTNode *, 8> NormalItems;
   auto Children = L->getChildren();
   if (Children.empty())
@@ -145,7 +145,7 @@ bool extractParameterOutline(
 
 bool extractSeparatedParams(
     swift::markup::MarkupContext &MC, swift::markup::List *L,
-    SmallVectorImpl<const swift::markup::ParamField *> &ParamFields) {
+    SmallVectorImpl<swift::markup::ParamField *> &ParamFields) {
   SmallVector<swift::markup::MarkupASTNode *, 8> NormalItems;
   auto Children = L->getChildren();
 
@@ -209,7 +209,7 @@ bool extractSeparatedParams(
 
 bool extractSimpleField(
     swift::markup::MarkupContext &MC, swift::markup::List *L,
-    DocComment::CommentParts &Parts,
+    swift::markup::CommentParts &Parts,
     SmallVectorImpl<const swift::markup::MarkupASTNode *> &BodyNodes) {
   auto Children = L->getChildren();
   SmallVector<swift::markup::MarkupASTNode *, 8> NormalItems;
@@ -274,11 +274,11 @@ bool extractSimpleField(
   return NormalItems.size() == 0;
 }
 
-static DocComment::CommentParts
+static swift::markup::CommentParts
 extractCommentParts(swift::markup::MarkupContext &MC,
                     swift::markup::MarkupASTNode *Node) {
 
-  DocComment::CommentParts Parts;
+  swift::markup::CommentParts Parts;
   auto Children = Node->getChildren();
   if (Children.empty())
     return Parts;
@@ -289,7 +289,7 @@ extractCommentParts(swift::markup::MarkupContext &MC,
     Parts.Brief = FirstParagraph;
 
   SmallVector<const swift::markup::MarkupASTNode *, 4> BodyNodes;
-  SmallVector<const swift::markup::ParamField *, 8> ParamFields;
+  SmallVector<swift::markup::ParamField *, 8> ParamFields;
 
   // Look for special top-level lists
   size_t StartOffset = FirstParagraph == nullptr ? 0 : 1;
@@ -316,6 +316,11 @@ extractCommentParts(swift::markup::MarkupContext &MC,
   // Copy BodyNodes and ParamFields into the MarkupContext.
   Parts.BodyNodes = MC.allocateCopy(llvm::makeArrayRef(BodyNodes));
   Parts.ParamFields = MC.allocateCopy(llvm::makeArrayRef(ParamFields));
+
+  for (auto Param : Parts.ParamFields) {
+    auto ParamParts = extractCommentParts(MC, Param);
+    Param->setParts(ParamParts);
+  }
 
   return Parts;
 }

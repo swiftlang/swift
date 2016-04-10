@@ -211,13 +211,24 @@ struct CommentToXMLConverter {
   }
 
   void printParamField(const ParamField *PF) {
-    OS << "<Parameter><Name>";
+    OS << "<Parameter>";
+    OS << "<Name>";
     OS << PF->getName();
-    OS << "</Name><Direction isExplicit=\"0\">in</Direction><Discussion>";
-    for (auto Child : PF->getChildren())
-      printASTNode(Child);
+    OS << "</Name>";
+    OS << "<Direction isExplicit=\"0\">in</Direction>";
 
-    OS << "</Discussion></Parameter>";
+    if (PF->isClosureParameter()) {
+      OS << "<ClosureParameter>";
+      visitCommentParts(PF->getParts().getValue());
+      OS << "</ClosureParameter>";
+    } else {
+      OS << "<Discussion>";
+      for (auto Child : PF->getChildren()) {
+        printASTNode(Child);
+      }
+      OS << "</Discussion>";
+    }
+    OS << "</Parameter>";
   }
 
   void printResultDiscussion(const ReturnsField *RF) {
@@ -235,8 +246,39 @@ struct CommentToXMLConverter {
   }
 
   void visitDocComment(const DocComment *DC);
+  void visitCommentParts(const swift::markup::CommentParts &Parts);
 };
 } // unnamed namespace
+
+void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts &Parts) {
+  if (Parts.Brief.hasValue()) {
+    OS << "<Abstract>";
+    printASTNode(Parts.Brief.getValue());
+    OS << "</Abstract>";
+  }
+
+  if (!Parts.ParamFields.empty()) {
+    OS << "<Parameters>";
+    for (const auto *PF : Parts.ParamFields)
+      printParamField(PF);
+
+    OS << "</Parameters>";
+  }
+
+  if (Parts.ReturnsField.hasValue())
+    printResultDiscussion(Parts.ReturnsField.getValue());
+
+  if (Parts.ThrowsField.hasValue())
+    printThrowsDiscussion(Parts.ThrowsField.getValue());
+
+  if (!Parts.BodyNodes.empty()) {
+    OS << "<Discussion>";
+    for (const auto *N : Parts.BodyNodes)
+      printASTNode(N);
+
+    OS << "</Discussion>";
+  }
+}
 
 void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
   const Decl *D = DC->getDecl();
@@ -313,36 +355,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     OS << "</Declaration>";
   }
 
-  auto Brief = DC->getBrief();
-  if (Brief.hasValue()) {
-    OS << "<Abstract>";
-    printASTNode(Brief.getValue());
-    OS << "</Abstract>";
-  }
-
-  if (!DC->getParamFields().empty()) {
-    OS << "<Parameters>";
-    for (const auto *PF : DC->getParamFields())
-      printParamField(PF);
-
-    OS << "</Parameters>";
-  }
-
-  auto RF = DC->getReturnsField();
-  if (RF.hasValue())
-    printResultDiscussion(RF.getValue());
-
-  auto TF = DC->getThrowsField();
-  if (TF.hasValue())
-    printThrowsDiscussion(TF.getValue());
-
-  if (!DC->getBodyNodes().empty()) {
-    OS << "<Discussion>";
-    for (const auto *N : DC->getBodyNodes())
-      printASTNode(N);
-
-    OS << "</Discussion>";
-  }
+  visitCommentParts(DC->getParts());
 
   OS << RootEndTag;
 }
