@@ -381,7 +381,7 @@ macro(swift_common_cxx_warnings)
   check_cxx_compiler_flag("-Werror -Woverloaded-virtual" CXX_SUPPORTS_OVERLOADED_VIRTUAL)
   append_if(CXX_SUPPORTS_OVERLOADED_VIRTUAL "-Woverloaded-virtual" CMAKE_CXX_FLAGS)
 
-  # Check for '-fapplication-extension'.  On OSX/iOS we wish to link all
+  # Check for '-fapplication-extension'.  On OS X/iOS we wish to link all
   # dynamic libraries with this flag.
   check_cxx_compiler_flag("-fapplication-extension" CXX_SUPPORTS_FAPPLICATION_EXTENSION)
 endmacro()
