@@ -141,13 +141,16 @@ Type Solution::computeSubstitutions(
                         &conformance);
       (void)isOpenedAnyObject;
       assert((conforms ||
+              replacement->is<ErrorType>() ||
               firstArchetype->getIsRecursive() ||
               isOpenedAnyObject(replacement) ||
               replacement->is<GenericTypeParamType>()) &&
              "Constraint system missed a conformance?");
       (void)conforms;
 
-      assert(conformance || replacement->hasDependentProtocolConformances());
+      assert(conformance ||
+             replacement->is<ErrorType>() ||
+             replacement->hasDependentProtocolConformances());
       currentConformances.push_back(
                   ProtocolConformanceRef(protoType->getDecl(), conformance));
       break;

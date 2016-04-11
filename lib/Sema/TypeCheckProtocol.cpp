@@ -1006,8 +1006,7 @@ matchWitness(TypeChecker &tc,
             continue;
           }
 
-          // Inner generic parameter of the requirement -- fall through below.
-
+        // Inner generic parameter of the requirement -- fall through below.
         } else if (auto assocType = getReferencedAssocTypeOfProtocol(
                                                     replacement.first, proto)) {
 
