@@ -6,6 +6,7 @@
 
 // PRINTC:      extension CCPowerSupply {
 // PRINTC-NEXT:   /*not inherited*/ init(watts watts: Double)
+// PRINTC-NEXT:   class let semiModular: CCPowerSupply!
 // PRINTC-NEXT: }
 
 // PRINTC:      extension CCRefrigerator {
