@@ -37,9 +37,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
 
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
-                            IsBare, IsTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile,
-                            IsThunk);
+                            IsBare, IsTransparent, IsNotFragile, IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -87,11 +85,15 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
 
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
+
+  SILLinkage linkage = SILLinkage::Private;
+  if (M.getSwiftModule()->getResilienceStrategy()
+      == ResilienceStrategy::Fragile) {
+    linkage = SILLinkage::Public;
+  }
+
   auto thunk =
-      M.getOrCreateFunction(makeModuleFragile
-                                ? SILLinkage::Public
-                                : SILLinkage::Private,
-                            name, overrideInfo.SILFnType,
+      M.getOrCreateFunction(linkage, name, overrideInfo.SILFnType,
                             derivedDecl->getGenericParams(), loc, IsBare,
                             IsNotTransparent, IsNotFragile);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));

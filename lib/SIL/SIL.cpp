@@ -136,18 +136,17 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
       && conformanceModule == typeUnit->getParentModule())
     return SILLinkage::Shared;
 
-  // If we're building with -sil-serialize-all, give the conformance public
-  // linkage.
-  if (conformanceModule->getResilienceStrategy()
-      == ResilienceStrategy::Fragile)
-    return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
-
   // FIXME: This should be using std::min(protocol's access, type's access).
   switch (C->getProtocol()->getEffectiveAccess()) {
     case Accessibility::Private:
       return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
     case Accessibility::Internal:
+      // If we're building with -sil-serialize-all, give the conformance public
+      // linkage.
+      if (conformanceModule->getResilienceStrategy()
+          == ResilienceStrategy::Fragile)
+        return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
       return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
 
     default:
