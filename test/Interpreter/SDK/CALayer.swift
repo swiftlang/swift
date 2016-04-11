@@ -40,7 +40,7 @@ class FooLayer: CALayer {
   }
 }
 
-if true {
+do {
   let layer = FooLayer()
   print("\(layer)")
 }
