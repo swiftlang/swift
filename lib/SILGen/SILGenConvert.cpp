@@ -374,6 +374,30 @@ SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
   Self.OpaqueValues.erase(entry);
 }
 
+RValue
+SILGenFunction::emitPointerToPointer(SILLocation loc,
+                                     ManagedValue input,
+                                     CanType inputType,
+                                     CanType outputType,
+                                     SGFContext C) {
+  auto converter = getASTContext().getConvertPointerToPointerArgument(nullptr);
+
+  // The generic function currently always requires indirection, but pointers
+  // are always loadable.
+  auto origBuf = emitTemporaryAllocation(loc, input.getType());
+  B.createStore(loc, input.forward(*this), origBuf);
+  auto origValue = emitManagedBufferWithCleanup(origBuf);
+  
+  // Invoke the conversion intrinsic to convert to the destination type.
+  Substitution subs[2] = {
+    getPointerSubstitution(inputType),
+    getPointerSubstitution(outputType),
+  };
+  
+  return emitApplyOfLibraryIntrinsic(loc, converter, subs, origValue, C);
+}
+
+
 namespace {
 
 /// This is an initialization for an address-only existential in memory.
