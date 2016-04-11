@@ -2,6 +2,9 @@
 // RUN:    | FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | FileCheck %s
 
+import StdlibUnittest
+@inline(never) func hold(n : Int) { _blackHole(n) }
+
 #sourceLocation(file: "abc.swift", line: 100)
 @inline(__always)
 func h(_ k : Int) -> Int {        // 101
@@ -42,7 +45,7 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK-SAME:                                    line: 301, column: 33)
 // CHECK: ![[L1]] = !DILocation(line: 101, column: 8, scope: ![[H]],
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
-// CHECK: ![[L2]] = !DILocation(line: 202, column: 13, scope: ![[G_SCOPE:.*]],
+// CHECK: ![[L2]] = !DILocation(line: 203, column: 13, scope: ![[G_SCOPE]],
 // CHECK-SAME:                  inlinedAt: ![[L3]])
 // CHECK: ![[G_SCOPE]] = distinct !DILexicalBlock(scope: ![[G]],
 // CHECK-SAME:                                    line: 201, column: 26)
