@@ -69,7 +69,7 @@ struct CommentToXMLConverter {
 #include "swift/Markup/SimpleFields.def"
 
   void printDocument(const Document *D) {
-    llvm_unreachable("Can't print an swift::markup::Document as XML directly");
+    llvm_unreachable("Can't print a swift::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
@@ -491,7 +491,7 @@ break;
 
   void printDocument(const Document *D) {
     // FIXME: Why keep doing this?
-    llvm_unreachable("Can't print an swift::markup::Document as XML directly");
+    llvm_unreachable("Can't print a swift::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
