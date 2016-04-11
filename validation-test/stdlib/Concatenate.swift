@@ -34,21 +34,21 @@ let expected = ContiguousArray(0..<8)
 
 for (expected, source) in samples {
   ConcatenateTests.test("forward-\(source)") {
-    checkBidirectionalCollection(expected, source.flatten())
+    checkBidirectionalCollection(expected, source.flattened())
   }
 
   ConcatenateTests.test("reverse-\(source)") {
     // FIXME: separate 'expected' and 'reversed' variables are a workaround
     // for: <rdar://problem/20789500>
     let expected = ContiguousArray(expected.lazy.reversed())
-    let reversed = source.flatten().reversed()
+    let reversed = source.flattened().reversed()
     checkBidirectionalCollection(expected, reversed)
   }
 
   ConcatenateTests.test("sequence-\(source)") {
     checkSequence(
       ContiguousArray(expected),
-      AnySequence(source).flatten())
+      AnySequence(source).flattened())
   }
 }
 

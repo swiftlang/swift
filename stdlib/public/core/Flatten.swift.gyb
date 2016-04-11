@@ -16,7 +16,7 @@
 /// The elements traversed are the concatenation of those in each
 /// segment produced by the base iterator.
 ///
-/// - Note: This is the `IteratorProtocol` used by `FlattenSequence`,
+/// - Note: This is the `IteratorProtocol` used by `FlattenedSequence`,
 ///   `FlattenCollection`, and `BidirectionalFlattenCollection`.
 public struct FlattenIterator<
   Base : IteratorProtocol where Base.Element : Sequence
@@ -60,16 +60,16 @@ public struct FlattenIterator<
 /// The elements of this view are a concatenation of the elements of
 /// each sequence in the base.
 ///
-/// The `flatten` property is always lazy, but does not implicitly
+/// The `flattened` property is always lazy, but does not implicitly
 /// confer laziness on algorithms applied to its result.  In other
 /// words, for ordinary sequences `s`:
 ///
-/// * `s.flatten()` does not create new storage
-/// * `s.flatten().map(f)` maps eagerly and returns a new array
-/// * `s.lazy.flatten().map(f)` maps lazily and returns a `LazyMapSequence`
+/// * `s.flattened()` does not create new storage
+/// * `s.flattened().map(f)` maps eagerly and returns a new array
+/// * `s.lazy.flattened().map(f)` maps lazily and returns a `LazyMapSequence`
 ///
 /// - See also: `FlattenCollection`
-public struct FlattenSequence<
+public struct FlattenedSequence<
   Base : Sequence where Base.Iterator.Element : Sequence
 > : Sequence {
 
@@ -93,8 +93,8 @@ public struct FlattenSequence<
 extension Sequence where Iterator.Element : Sequence {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
-  public func flatten() -> FlattenSequence<Self> {
-    return FlattenSequence(self)
+  public func flattened() -> FlattenedSequence<Self> {
+    return FlattenedSequence(self)
   }
 }
 
@@ -105,10 +105,10 @@ extension LazySequenceProtocol
 
   /// A concatenation of the elements of `self`.
   @warn_unused_result
-  public func flatten() -> LazySequence<
-    FlattenSequence<Elements>
+  public func flattened() -> LazySequence<
+    FlattenedSequence<Elements>
   > {
-    return FlattenSequence(elements).lazy
+    return FlattenedSequence(elements).lazy
   }
 }
 
@@ -226,9 +226,9 @@ public func == <BaseElements> (
 /// confer laziness on algorithms applied to its result.  In other
 /// words, for ordinary collections `c`:
 ///
-/// * `c.flatten()` does not create new storage
-/// * `c.flatten().map(f)` maps eagerly and returns a new array
-/// * `c.lazy.flatten().map(f)` maps lazily and returns a `LazyMapCollection`
+/// * `c.flattened()` does not create new storage
+/// * `c.flattened().map(f)` maps eagerly and returns a new array
+/// * `c.lazy.flattened().map(f)` maps lazily and returns a `LazyMapCollection`
 ///
 /// - Note: The performance of accessing `startIndex`, `first`, any methods
 ///   that depend on `startIndex`, or of advancing a `${Collection}Index`
@@ -238,7 +238,7 @@ public func == <BaseElements> (
 ///   general operations on `${Collection}` instances may not have the
 ///   documented complexity.
 ///
-/// - See also: `FlattenSequence`
+/// - See also: `FlattenedSequence`
 public struct ${Collection}<
   Base: Collection where ${constraints % {'Base': 'Base.'}}
 > : Collection {
@@ -307,7 +307,7 @@ public struct ${Collection}<
 extension Collection where ${constraints % {'Base': ''}} {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
-  public func flatten() -> ${Collection}<Self> {
+  public func flattened() -> ${Collection}<Self> {
     return ${Collection}(self)
   }
 }
@@ -318,7 +318,7 @@ extension LazyCollectionProtocol
   Iterator.Element == Elements.Iterator.Element {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
-  public func flatten() -> LazyCollection<${Collection}<Elements>> {
+  public func flattened() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy
   }
 }
@@ -330,7 +330,7 @@ public struct FlattenGenerator<
   Base : IteratorProtocol where Base.Element : Sequence
 > {}
 
-extension FlattenSequence {
+extension FlattenedSequence {
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> FlattenIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
@@ -346,4 +346,41 @@ extension ${Collection} {
     fatalError("unavailable function can't be called")
   }
 }
-%end
+
+extension Collection where ${constraints % {'Base': ''}} {
+  @available(*, unavailable, renamed: "flattened")
+  public func flatten() -> ${Collection}<Self> {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension LazyCollectionProtocol
+  where ${constraints % {'Base': ''}}, 
+  ${constraints % {'Base': 'Elements.'}},
+  Iterator.Element == Elements.Iterator.Element {
+  @available(*, unavailable, renamed: "flattened")
+  public func flatten() -> LazyCollection<${Collection}<Elements>> {
+    fatalError("unavailable function can't be called")
+  }
+}
+% end
+
+extension Sequence where Iterator.Element : Sequence {
+  @available(*, unavailable, renamed: "flattened")
+  public func flatten() -> FlattenedSequence<Self> {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension LazySequenceProtocol
+  where
+  Elements.Iterator.Element == Iterator.Element,
+  Iterator.Element : Sequence {
+
+  @available(*, unavailable, renamed: "flattened")
+  public func flatten() -> LazySequence<
+    FlattenedSequence<Elements>
+  > {
+    fatalError("unavailable function can't be called")
+  }
+}

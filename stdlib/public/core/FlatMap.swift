@@ -14,15 +14,15 @@ extension LazySequenceProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
-  ///     self.map(transform).flatten()
+  ///     self.map(transform).flattened()
   ///
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<SegmentOfResult : Sequence>(
     _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazySequence<
-    FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
-    return self.map(transform).flatten()
+    FlattenedSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
+    return self.map(transform).flattened()
   }
 }
 
@@ -30,7 +30,7 @@ extension LazyCollectionProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
-  ///     self.map(transform).flatten()
+  ///     self.map(transform).flattened()
   ///
   /// - Complexity: O(1)
   @warn_unused_result
@@ -40,7 +40,7 @@ extension LazyCollectionProtocol {
     FlattenCollection<
       LazyMapCollection<Elements, SegmentOfResult>>
   > {
-    return self.map(transform).flatten()
+    return self.map(transform).flattened()
   }
 }
 
@@ -49,7 +49,7 @@ extension LazyCollectionProtocol where Elements.Index : BidirectionalIndex
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
-  ///     self.map(transform).flatten()
+  ///     self.map(transform).flattened()
   ///
   /// - Complexity: O(1)
   @warn_unused_result
@@ -62,6 +62,6 @@ extension LazyCollectionProtocol where Elements.Index : BidirectionalIndex
     FlattenBidirectionalCollection<
       LazyMapCollection<Elements, SegmentOfResult>
   >> {
-    return self.map(transform).flatten()
+    return self.map(transform).flattened()
   }
 }
