@@ -246,14 +246,14 @@ extension HalfOpenRangeProtocol
 /// `Bound` is a compile-time error:
 ///
 ///     // error: ambiguous use of 'subscript'
-///     print(CountableRange<Int>(uncheckedBounds: (-99, 100))[0])
+///     print((-99..<100)[0])
 ///
 /// However, subscripting that range still works in a generic context:
 ///
 ///     func brackets<T>(x: CountableRange<T>, _ i: T) -> T {
 ///         return x[i] // Just forward to subscript
 ///     }
-///     print(brackets(CountableRange<Int>(uncheckedBounds: (-99, 100)), 0))
+///     print(brackets((-99..<100), 0))
 ///     // Prints "0"
 ///     
 /// - SeeAlso: `CountableClosedRange`, `Range`, `ClosedRange`
