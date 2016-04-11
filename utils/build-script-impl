@@ -1953,16 +1953,14 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     # result, we must copy swift-stdlib-tool ourselves.
                     copy_swift_stdlib_tool_substitute "$(build_directory_bin ${deployment_target} swift)/swift-stdlib-tool"
 
-                    # The Linux build places build products in the
-                    # XCTEST_BUILD_DIR. This, and installation of XCTest in
-                    # general, is not supported on OS X.
                     set -x
                     xcodebuild \
                         -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTest \
                         SWIFT_EXEC="${SWIFTC_BIN}" \
                         SWIFT_LINK_OBJC_RUNTIME=YES \
-                        DSTROOT="${XCTEST_BUILD_DIR}"
+                        SYMROOT="${XCTEST_BUILD_DIR}" \
+                        OBJROOT="${XCTEST_BUILD_DIR}"
                     { set +x; } 2>/dev/null
                 else
                     FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
@@ -2252,7 +2250,9 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                         -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTestFunctionalTests \
                         SWIFT_EXEC="${SWIFTC_BIN}" \
-                        SWIFT_LINK_OBJC_RUNTIME=YES
+                        SWIFT_LINK_OBJC_RUNTIME=YES \
+                        SYMROOT="${XCTEST_BUILD_DIR}" \
+                        OBJROOT="${XCTEST_BUILD_DIR}"
                     { set +x; } 2>/dev/null
                 else
                     FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
