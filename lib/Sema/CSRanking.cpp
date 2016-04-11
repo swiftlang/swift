@@ -450,8 +450,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   // the second protocol extension.
   ConstraintSystem cs(tc, dc1, None);
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
-  cs.openGeneric(dc2, sig2->getGenericParams(), sig2->getRequirements(),
-                 false, dc2->getGenericTypeContextDepth(),
+  cs.openGeneric(dc2, sig2, false, dc2->getGenericTypeContextDepth(),
                  ConstraintLocatorBuilder(nullptr),
                  replacements);
 

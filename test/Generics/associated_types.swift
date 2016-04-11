@@ -149,14 +149,14 @@ struct V<T> : Fooable {
   func foo(x: T) {}
 }
 
-// FIXME: <rdar://problem/16123805> Inferred associated types can't be used in expression contexts
+// FIXME: <rdar://problem/16123805> associated Inferred types can't be used in expression contexts
 var w = W.AssocType()
 var v = V<String>.AssocType()
 
 //
 // SR-427
 protocol A {
-  func c() // expected-note {{protocol requires function 'c()' with type '() -> ()'}}
+  func c()
 }
 
 protocol B : A {
@@ -164,11 +164,11 @@ protocol B : A {
 }
 
 extension B {
-  func c() { // expected-note {{candidate has non-matching type '<Self> () -> ()' (aka '<τ_0_0> () -> ()')}}
+  func c() {
   }
 }
 
-struct C<a : B> : B { // expected-error {{type 'C<a>' does not conform to protocol 'B'}} expected-error {{type 'C<a>' does not conform to protocol 'A'}}
+struct C<a : B> : B { // expected-error {{type 'C<a>' does not conform to protocol 'B'}}
 }
 
 // SR-511

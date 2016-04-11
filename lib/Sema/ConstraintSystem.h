@@ -1553,6 +1553,12 @@ public:
   /// substituted at all. Since the inner declaration inherits the context
   /// archetypes of the outer function we do not need to open them here.
   void openGeneric(DeclContext *dc,
+                   GenericSignature *signature,
+                   bool skipProtocolSelfConstraint,
+                   unsigned minOpeningDepth,
+                   ConstraintLocatorBuilder locator,
+                   llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+  void openGeneric(DeclContext *dc,
                    ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
