@@ -7,7 +7,7 @@
 //
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
+//t
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_DRIVER_TOOLCHAINS_H
@@ -59,7 +59,7 @@ protected:
   /// default is to return true (and so specify an -rpath).
   virtual bool shouldProvideRPathToLinker() const;
 
-  /// Whether to explicitly specify the target triple as the the linker
+  /// Whether to explicitly specify the target triple as the linker
   /// '--target'. This is not desirable on all platforms, and subclasses may
   /// override this method to return false in those cases.
   virtual bool shouldSpecifyTargetTripleToLinker() const;
