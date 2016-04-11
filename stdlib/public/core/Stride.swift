@@ -150,7 +150,6 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   }
 
   internal init(_start: Element, end: Element, stride: Element.Stride) {
-    _precondition(stride != 0, "stride size must not be zero")
     // Unreachable endpoints are allowed; they just make for an
     // already-empty Sequence.
     self._start = _start
@@ -218,7 +217,6 @@ public struct StrideThrough<
   }
 
   internal init(_start: Element, end: Element, stride: Element.Stride) {
-    _precondition(stride != 0, "stride size must not be zero")
     self._start = _start
     self._end = end
     self._stride = stride
