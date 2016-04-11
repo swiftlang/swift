@@ -143,7 +143,7 @@ RawComment Decl::getRawComment() const {
   if (auto *Unit =
           dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
     if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      llvm::markup::MarkupContext MC;
+      swift::markup::MarkupContext MC;
       Context.setBriefComment(this, C->Brief);
       Context.setRawComment(this, C->Raw);
       return C->Raw;
@@ -191,7 +191,7 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
   if (!D->canHaveComment())
     return StringRef();
 
-  llvm::markup::MarkupContext MC;
+  swift::markup::MarkupContext MC;
   auto DC = getDocComment(MC, D);
   if (!DC.hasValue())
     return StringRef();
@@ -202,7 +202,7 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
 
   SmallString<256> BriefStr("");
   llvm::raw_svector_ostream OS(BriefStr);
-  llvm::markup::printInlinesUnder(Brief.getValue(), OS);
+  swift::markup::printInlinesUnder(Brief.getValue(), OS);
   if (OS.str().empty())
     return StringRef();
 

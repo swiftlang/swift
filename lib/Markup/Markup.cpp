@@ -17,8 +17,9 @@
 #include "swift/Markup/Markup.h"
 #include "cmark.h"
 
-using namespace llvm;
+using namespace swift;
 using namespace markup;
+
 struct ParseState {
   cmark_iter *Iter = nullptr;
   cmark_event_type Event = CMARK_EVENT_NONE;
@@ -317,7 +318,7 @@ parseElement(MarkupContext &MC, LineList &LL, ParseState State) {
   }
 }
 
-Document *llvm::markup::parseDocument(MarkupContext &MC, LineList &LL) {
+Document *swift::markup::parseDocument(MarkupContext &MC, LineList &LL) {
   auto Comment = LL.str();
   auto CMarkDoc = cmark_parse_document(Comment.c_str(), Comment.size(),
                                        CMARK_OPT_SMART);
