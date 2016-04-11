@@ -43,15 +43,48 @@ protected:
   InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,
                                      const JobContext &context) const override;
 
+  /// If provided, and if the user has not already explicitly specified a
+  /// linker to use via the "-fuse-ld=" option, this linker will be passed to
+  /// the compiler invocation via "-fuse-ld=". Return an empty string to not
+  /// specify any specific linker (the "-fuse-ld=" option will not be
+  /// specified).
+  ///
+  /// The default behavior is to use the gold linker on ARM architectures,
+  /// and to not provide a specific linker otherwise.
   virtual std::string getDefaultLinker() const;
 
+  /// Whether to specify a linker -rpath to the Swift runtime library path.
+  /// -rpath is not supported on all platforms, and subclasses may override
+  /// this method to return false on platforms that don't support it. The
+  /// default is to return true (and so specify an -rpath).
   virtual bool shouldProvideRPathToLinker() const;
 
+  /// Whether to explicitly specify the target triple as the the linker
+  /// '--target'. This is not desirable on all platforms, and subclasses may
+  /// override this method to return false in those cases.
   virtual bool shouldSpecifyTargetTripleToLinker() const;
 
+  /// Provides a path to an object that should be linked first. On platforms
+  /// that use ELF binaries, an object that provides markers and sizes for
+  /// metadata sections must be linked first. Platforms that do not need this
+  /// object may return an empty string; no additional objects are linked in
+  /// this case.
+  ///
+  /// \param RuntimeLibraryPath A path to the Swift resource directory, which
+  ///        on ARM architectures will contain metadata "begin" and "end"
+  ///        objects.
   virtual std::string
   getPreInputObjectPath(StringRef RuntimeLibraryPath) const;
 
+  /// Provides a path to an object that should be linked last. On platforms
+  /// that use ELF binaries, an object that provides markers and sizes for
+  /// metadata sections must be linked last. Platforms that do not need this
+  /// object may return an empty string; no additional objects are linked in
+  /// this case.
+  ///
+  /// \param RuntimeLibraryPath A path to the Swift resource directory, which
+  ///        on ARM architectures will contain metadata "begin" and "end"
+  ///        objects.
   virtual std::string
   getPostInputObjectPath(StringRef RuntimeLibraryPath) const;
 
