@@ -650,9 +650,28 @@
           <!-- In general, template parameters with whitespace discussion
                should not be emitted, unless direction is explicitly specified.
                Schema might be more strict here. -->
-          <element name="Discussion">
-            <ref name="BlockContent" />
-          </element>
+          <choice>
+            <element name="ClosureParameter">
+              <optional>
+                <ref name="Abstract" />
+              </optional>
+              <optional>
+                <ref name="Parameters" />
+              </optional>
+              <optional>
+                <ref name="ResultDiscussion" />
+              </optional>
+              <optional>
+                <ref name="ThrowsDiscussion" />
+              </optional>
+              <optional>
+                <ref name="Discussion" />
+              </optional>
+            </element>
+            <element name="Discussion">
+              <ref name="BlockContent" />
+            </element>
+          </choice>
         </element>
       </oneOrMore>
     </element>

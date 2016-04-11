@@ -44,7 +44,7 @@ Optional<std::pair<unsigned, unsigned>> swift::ide::parseLineCol(StringRef LineC
 }
 
 void XMLEscapingPrinter::printText(StringRef Text) {
-  llvm::markup::appendWithXMLEscaping(OS, Text);
+  swift::markup::appendWithXMLEscaping(OS, Text);
 }
 
 void XMLEscapingPrinter::printXML(StringRef Text) {
