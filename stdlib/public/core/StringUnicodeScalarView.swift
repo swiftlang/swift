@@ -35,9 +35,15 @@ extension String {
     CustomDebugStringConvertible
   {
     internal init(_ _core: _StringCore) {
+      self._coreOffset = 0
       self._core = _core
     }
-
+    
+    internal init(_ _core: _StringCore, offset: Int) {
+      self._coreOffset = offset
+      self._core = _core
+    }
+    
     internal struct _ScratchIterator : IteratorProtocol {
       var core: _StringCore
       var idx: Int
@@ -58,58 +64,17 @@ extension String {
 
     /// A position in a `String.UnicodeScalarView`.
     public struct Index : Comparable {
-      public init(_ _position: Int, _ _core: _StringCore) {
+      public init(_ _position: Int) {
         self._position = _position
-        self._core = _core
-      }
-
-      /// Returns the next consecutive value after `self`.
-      ///
-      /// - Precondition: The next value is representable.
-      @warn_unused_result
-      @inline(__always)
-      internal func successor() -> Index {
-        // FIXME: swift-3-indexing-model: remove `successor()`.
-        var scratch = _ScratchIterator(_core, _position)
-        var decoder = UTF16()
-        let (_, length) = decoder._decodeOne(&scratch)
-        return Index(_position + length, _core)
-      }
-
-      /// Returns the previous consecutive value before `self`.
-      ///
-      /// - Precondition: The previous value is representable.
-      @warn_unused_result
-      internal func predecessor() -> Index {
-        // FIXME: swift-3-indexing-model: remove `predecessor()`.
-        var i = _position-1
-        let codeUnit = _core[i]
-        if _slowPath((codeUnit >> 10) == 0b1101_11) {
-          if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
-            i -= 1
-          }
-        }
-        return Index(i, _core)
-      }
-
-      /// The end index that for this view.
-      internal var _viewStartIndex: Index {
-        return Index(_core.startIndex, _core)
-      }
-
-      /// The end index that for this view.
-      internal var _viewEndIndex: Index {
-        return Index(_core.endIndex, _core)
       }
 
       @_versioned internal var _position: Int
-      @_versioned internal var _core: _StringCore
     }
 
     /// The position of the first `UnicodeScalar` if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
-      return Index(_core.startIndex, _core)
+      return Index(_coreOffset)
     }
 
     /// The "past the end" position.
@@ -118,21 +83,33 @@ extension String {
     /// reachable from `startIndex` by zero or more applications of
     /// `successor(of:)`.
     public var endIndex: Index {
-      return Index(_core.endIndex, _core)
+      return Index(_coreOffset + _core.count)
     }
 
-    // TODO: swift-3-indexing-model - add docs
+    /// Returns the position of the next consecutive value after `i`.
+    ///
+    /// - Precondition: The next value is representable.
     @warn_unused_result
     public func successor(of i: Index) -> Index {
-      // FIXME: swift-3-indexing-model: move `successor()` implementation here.
-      return i.successor()
+      var scratch = _ScratchIterator(_core, i._position - _coreOffset)
+      var decoder = UTF16()
+      let (_, length) = decoder._decodeOne(&scratch)
+      return Index(i._position + length)
     }
 
-    // TODO: swift-3-indexing-model - add docs
+    /// Returns the position of the previous consecutive value before `i`.
+    ///
+    /// - Precondition: The previous value is representable.
     @warn_unused_result
     public func predecessor(of i: Index) -> Index {
-      // FIXME: swift-3-indexing-model: move `predecessor()` implementation here.
-      return i.predecessor()
+      var coreIndex = i._position - 1 - _coreOffset
+      let codeUnit = _core[coreIndex]
+      if _slowPath((codeUnit >> 10) == 0b1101_11) {
+        if coreIndex != 0 && (_core[coreIndex - 1] >> 10) == 0b1101_10 {
+          coreIndex -= 1
+        }
+      }
+      return Index(coreIndex + _coreOffset)
     }
 
     /// Access the element at `position`.
@@ -140,7 +117,7 @@ extension String {
     /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     public subscript(position: Index) -> UnicodeScalar {
-      var scratch = _ScratchIterator(_core, position._position)
+      var scratch = _ScratchIterator(_core, position._position - _coreOffset)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
       case .scalarValue(let us):
@@ -158,7 +135,9 @@ extension String {
     ///   O(N) conversion.
     public subscript(r: Range<Index>) -> UnicodeScalarView {
       return UnicodeScalarView(
-        _core[r.lowerBound._position..<r.upperBound._position])
+        _core[r.lowerBound._position - _coreOffset ..<
+          r.upperBound._position - _coreOffset],
+        offset: r.lowerBound._position)
     }
 
     /// A type whose instances can produce the elements of this
@@ -233,13 +212,15 @@ extension String {
     }
 
     public var description: String {
-      return String(_core[startIndex._position..<endIndex._position])
+      return String(_core[startIndex._position - _coreOffset ..<
+        endIndex._position - _coreOffset])
     }
 
     public var debugDescription: String {
       return "StringUnicodeScalarView(\(self.description.debugDescription))"
     }
 
+    internal var _coreOffset: Int
     internal var _core: _StringCore
   }
 
@@ -303,8 +284,8 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
     bounds: Range<Index>, with newElements: C
   ) {
     let rawSubRange: Range<Int> =
-      bounds.lowerBound._position
-      ..< bounds.upperBound._position
+      bounds.lowerBound._position - _coreOffset
+      ..< bounds.upperBound._position - _coreOffset
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
@@ -339,7 +320,7 @@ extension String.UnicodeScalarIndex {
         return nil
       }
     }
-    self.init(utf16Index._offset, unicodeScalars._core)
+    self.init(utf16Index._offset)
   }
 
   /// Construct the position in `unicodeScalars` that corresponds exactly to
@@ -361,7 +342,7 @@ extension String.UnicodeScalarIndex {
     if !utf8Index._isOnUnicodeScalarBoundary {
       return nil
     }
-    self.init(utf8Index._coreIndex, core)
+    self.init(utf8Index._coreIndex)
   }
 
   /// Construct the position in `unicodeScalars` that corresponds
@@ -373,7 +354,7 @@ extension String.UnicodeScalarIndex {
     _ characterIndex: String.Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
-    self.init(characterIndex._base._position, unicodeScalars._core)
+    self.init(characterIndex._base._position)
   }
 
   /// Returns the position in `utf8` that corresponds exactly
@@ -405,28 +386,29 @@ extension String.UnicodeScalarIndex {
   public func samePosition(in characters: String) -> String.Index? {
     return String.Index(self, within: characters)
   }
+}
 
-  internal var _isOnGraphemeClusterBoundary: Bool {
-    let scalars = String.UnicodeScalarView(_core)
-    if self == scalars.startIndex || self == scalars.endIndex {
+extension String.UnicodeScalarView {
+  internal func _isOnGraphemeClusterBoundary(i: Index) -> Bool {
+    if i == startIndex || i == endIndex {
       return true
     }
-    let precedingScalar = scalars[self.predecessor()]
-
+    let precedingScalar = self[predecessor(of: i)]
+    
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-
+    
     let gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
       precedingScalar.value)
-
+    
     if segmenter.isBoundaryAfter(gcb0) {
       return true
     }
-
+    
     let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
-      scalars[self].value)
-
+      self[i].value)
+    
     return segmenter.isBoundary(gcb0, gcb1)
   }
 }

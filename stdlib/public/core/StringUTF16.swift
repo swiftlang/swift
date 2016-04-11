@@ -32,7 +32,7 @@ extension String {
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
-      return Index(_offset: 0)
+      return Index(_offset: _offset)
     }
 
     /// The "past the end" position.
@@ -41,7 +41,7 @@ extension String {
     /// reachable from `startIndex` by zero or more applications of
     /// `successor(of:)`.
     public var endIndex: Index {
-      return Index(_offset: _length)
+      return Index(_offset: _offset + _length)
     }
 
     public struct Indices {
@@ -96,7 +96,7 @@ extension String {
 
     @warn_unused_result
     func _internalIndex(at i: Int) -> Int {
-      return _core.startIndex + _offset + i
+      return _core.startIndex + i
     }
 
     /// Access the element at `position`.
@@ -105,7 +105,7 @@ extension String {
     ///   `position != endIndex`.
     public subscript(i: Index) -> UTF16.CodeUnit {
       let position = i._offset
-      _precondition(position >= 0 && position < _length,
+      _precondition(position >= _offset && position < _offset + _length,
           "out-of-range access on a UTF16View")
 
       let index = _internalIndex(at: position)
@@ -177,8 +177,8 @@ extension String {
     }
 
     public var description: String {
-      let start = _internalIndex(at: 0)
-      let end = _internalIndex(at: _length)
+      let start = _internalIndex(at: _offset)
+      let end = _internalIndex(at: _offset + _length)
       return String(_core[start..<end])
     }
 

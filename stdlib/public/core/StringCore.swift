@@ -269,6 +269,11 @@ public struct _StringCore {
   // slicing
 
   /// Returns the given sub-`_StringCore`.
+  /// 
+  /// - Important: This ranged subscript violates the expectation that a
+  ///   slice of a collection shares indices with its parent collection.
+  ///   All `_StringCore` slices have zero-based indices; it is up to
+  ///   string view implementations to handle offsets correctly.
   public subscript(bounds: Range<Int>) -> _StringCore {
     _precondition(
       bounds.lowerBound >= 0,

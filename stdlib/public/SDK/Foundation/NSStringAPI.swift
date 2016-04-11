@@ -78,7 +78,8 @@ extension String {
   /// representation.
   @warn_unused_result
   func _index(utf16Index: Int) -> Index {
-    return Index(_base: String.UnicodeScalarView.Index(utf16Index, _core))
+    return Index(_base: String.UnicodeScalarView.Index(utf16Index),
+                 _characters: characters)
   }
 
   /// Return a `Range<Index>` corresponding to the given `NSRange` of

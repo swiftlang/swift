@@ -953,10 +953,11 @@ extension String.Index {
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
     within characters: String
   ) {
-    if !unicodeScalarIndex._isOnGraphemeClusterBoundary {
+    if !characters.unicodeScalars._isOnGraphemeClusterBoundary(
+      unicodeScalarIndex) {
       return nil
     }
-    self.init(_base: unicodeScalarIndex)
+    self.init(_base: unicodeScalarIndex, _characters: characters.characters)
   }
 
   /// Construct the position in `characters` that corresponds exactly to
