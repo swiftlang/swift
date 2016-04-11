@@ -64,6 +64,7 @@ KNOWN_SETTINGS=(
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     lldb-extra-cmake-args       ""               "extra command line args to pass to lldb cmake"
     lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
+    lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
@@ -2106,12 +2107,8 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             # the c++ header files.
             BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
 
-            if [[ "${BUILD_RUNTIME_WITH_HOST_COMPILER}" ]]; then
-                echo "Using the host compiler to build Swift."
-            else
-                echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
-                ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
-            fi
+            echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
+            ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
             { set +x; } 2>/dev/null
         fi
     done
@@ -2218,7 +2215,19 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     fi
                 fi
 
-                SWIFTCC="${swift_build_dir}/bin/swiftc" SWIFTLIBS="${swift_build_dir}/lib/swift" "${LLDB_SOURCE_DIR}"/test/dotest.py --executable "${lldb_executable}" --rerun-all-issues -C ${HOST_CC} ${LLDB_FORMATTER_OPTS}
+                # figure out which C/C++ compiler we should use for building test inferiors.
+                if [[ "${LLDB_TEST_CC}" == "host-toolchain" ]]; then
+                    # Use the host toolchain: i.e. the toolchain specified by HOST_CC
+                    LLDB_DOTEST_CC_OPTS="-C ${HOST_CC}"
+                elif [[ -n "${LLDB_TEST_CC}" ]]; then
+                    # Use exactly the compiler path specified by the user.
+                    LLDB_DOTEST_CC_OPTS="-C ${LLDB_TEST_CC}"
+                else
+                    # Use the clang that was just built in the tree.
+                    LLDB_DOTEST_CC_OPTS="-C ${llvm_build_dir}"/bin/clang
+                fi
+                
+                SWIFTCC="${swift_build_dir}/bin/swiftc" SWIFTLIBS="${swift_build_dir}/lib/swift" "${LLDB_SOURCE_DIR}"/test/dotest.py --executable "${lldb_executable}" --rerun-all-issues ${LLDB_DOTEST_CC_OPTS} ${LLDB_FORMATTER_OPTS}
                 popd
                 continue
                 ;;
