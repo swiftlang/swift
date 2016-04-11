@@ -18,6 +18,7 @@
 // PRINT:      extension Struct1 {
 // PRINT-NEXT:   static var globalVar: Double
 // PRINT-NEXT:   init(value value: Double)
+// PRINT-NEXT:   init(specialLabel specialLabel: ())
 // PRINT-NEXT:   func inverted() -> Struct1
 // PRINT-NEXT:   mutating func invert()
 // PRINT-NEXT:   func translate(radians radians: Double) -> Struct1
