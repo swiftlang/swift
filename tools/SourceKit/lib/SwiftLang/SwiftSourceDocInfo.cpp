@@ -743,7 +743,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
           llvm::raw_svector_ostream OSBuf(Buf);
           SwiftLangSupport::printDisplayName(RelatedDecl, OSBuf);
         }
-        llvm::markup::appendWithXMLEscaping(OS, Buf);
+        swift::markup::appendWithXMLEscaping(OS, Buf);
       }
       OS<<"</RelatedName>";
     }

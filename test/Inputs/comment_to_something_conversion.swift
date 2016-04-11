@@ -422,3 +422,39 @@ public func codeListingWithDefaultLanguage() {}
 /// ```
 public func codeListingWithOtherLanguage() {}
 // CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>codeListingWithOtherLanguage()</Name><USR>s:F14swift_ide_test28codeListingWithOtherLanguageFT_T_</USR><Declaration>public func codeListingWithOtherLanguage()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><CodeListing language="c++"><zCodeLineNumbered><![CDATA[Something::Something::create();]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+
+/// Partially applies a binary operator.
+///
+/// - Parameter a: The left-hand side to partially apply.
+/// - Parameter combine: A binary operator.
+///   - Parameter lhs: The left-hand side of the operator
+///   - Parameter rhs: The right-hand side of the operator
+///   - Returns: A result.
+///   - Throws: Nothing.
+public func closureParameterExplodedExploded<T>(a: T, combine: (lhs: T, rhs: T) -> T) {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}} line="{{.*}}" column="{{.*}}"><Name>closureParameterExplodedExploded(a:combine:)</Name><USR>s:F14swift_ide_test32closureParameterExplodedExplodedurFT1ax7combineFT3lhsx3rhsx_x_T_</USR><Declaration>public func closureParameterExplodedExploded&lt;T&gt;(a: T, combine: (lhs: T, rhs: T) -&gt; T)</Declaration><Abstract><Para>Partially applies a binary operator.</Para></Abstract><Parameters><Parameter><Name>a</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side to partially apply.</Para></Discussion></Parameter><Parameter><Name>combine</Name><Direction isExplicit="0">in</Direction><ClosureParameter><Abstract><Para>A binary operator.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side of the operator</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The right-hand side of the operator</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A result.</Para></ResultDiscussion><ThrowsDiscussion><Para>Nothing.</Para></ThrowsDiscussion></ClosureParameter></Parameter></Parameters></Function>] CommentXMLValid
+
+/// Partially applies a binary operator.
+///
+/// - Parameters:
+///   - a: The left-hand side to partially apply.
+///   - combine: A binary operator.
+///     - Parameter lhs: The left-hand side of the operator
+///     - Parameter rhs: The right-hand side of the operator
+///     - Returns: A result.
+///     - Throws: Nothing.
+public func closureParameterOutlineExploded<T>(a: T, combine: (lhs: T, rhs: T) -> T) {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}} line="{{.*}}" column="{{.*}}"><Name>closureParameterOutlineExploded(a:combine:)</Name><USR>s:F14swift_ide_test31closureParameterOutlineExplodedurFT1ax7combineFT3lhsx3rhsx_x_T_</USR><Declaration>public func closureParameterOutlineExploded&lt;T&gt;(a: T, combine: (lhs: T, rhs: T) -&gt; T)</Declaration><Abstract><Para>Partially applies a binary operator.</Para></Abstract><Parameters><Parameter><Name>a</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side to partially apply.</Para></Discussion></Parameter><Parameter><Name>combine</Name><Direction isExplicit="0">in</Direction><ClosureParameter><Abstract><Para>A binary operator.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side of the operator</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The right-hand side of the operator</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A result.</Para></ResultDiscussion><ThrowsDiscussion><Para>Nothing.</Para></ThrowsDiscussion></ClosureParameter></Parameter></Parameters></Function>] CommentXMLValid
+
+/// Partially applies a binary operator.
+///
+/// - Parameters:
+///   - a: The left-hand side to partially apply.
+///   - combine: A binary operator.
+///     - Parameters:
+///       - lhs: The left-hand side of the operator
+///       - rhs: The right-hand side of the operator
+///     - Returns: A result.
+///     - Throws: Nothing.
+public func closureParameterOutlineOutline<T>(a: T, combine: (lhs: T, rhs: T) -> T) {}
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>closureParameterOutlineOutline(a:combine:)</Name><USR>s:F14swift_ide_test30closureParameterOutlineOutlineurFT1ax7combineFT3lhsx3rhsx_x_T_</USR><Declaration>public func closureParameterOutlineOutline&lt;T&gt;(a: T, combine: (lhs: T, rhs: T) -&gt; T)</Declaration><Abstract><Para>Partially applies a binary operator.</Para></Abstract><Parameters><Parameter><Name>a</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side to partially apply.</Para></Discussion></Parameter><Parameter><Name>combine</Name><Direction isExplicit="0">in</Direction><ClosureParameter><Abstract><Para>A binary operator.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side of the operator</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The right-hand side of the operator</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A result.</Para></ResultDiscussion><ThrowsDiscussion><Para>Nothing.</Para></ThrowsDiscussion></ClosureParameter></Parameter></Parameters></Function>]

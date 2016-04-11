@@ -2251,10 +2251,21 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
                instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
+            
     case MemberLookupResult::UR_TypeMemberOnInstance:
-      diagnose(loc, diag::could_not_use_type_member_on_instance,
-               baseObjTy, memberName)
-        .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      if (instanceTy->isExistentialType() && baseObjTy->is<AnyMetatypeType>()) {
+        // If the base of the lookup is an existential metatype, emit an
+        // error specific to that
+        diagnose(loc, diag::could_not_use_type_member_on_existential,
+                 baseObjTy, memberName)
+          .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      } else {
+        // Otherwise the static member lookup was invalid because it was
+        // called on an instance
+        diagnose(loc, diag::could_not_use_type_member_on_instance,
+                 baseObjTy, memberName)
+          .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      }
       return;
         
     case MemberLookupResult::UR_MutatingMemberOnRValue:

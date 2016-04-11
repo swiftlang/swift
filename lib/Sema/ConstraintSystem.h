@@ -820,7 +820,7 @@ struct MemberLookupResult {
     /// Argument labels don't match.
     UR_LabelMismatch,
     
-    /// This uses a type like Self it its signature that cannot be used on an
+    /// This uses a type like Self in its signature that cannot be used on an
     /// existential box.
     UR_UnavailableInExistential,
     
@@ -828,7 +828,7 @@ struct MemberLookupResult {
     /// type.
     UR_InstanceMemberOnType,
     
-    /// This is a static/class member being access through an instance.
+    /// This is a static/class member being accessed through an instance.
     UR_TypeMemberOnInstance,
     
     /// This is a mutating member, being used on an rvalue.

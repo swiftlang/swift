@@ -138,7 +138,7 @@ public:
         if (auto *CBI = dyn_cast<CondBranchInst>(Inst))
           registerBranchFormula(CBI);
 
-          // Handle cond_fail instructions.
+        // Handle cond_fail instructions.
         if (auto *CFI = dyn_cast<CondFailInst>(Inst)) {
           if (tryToRemoveCondFail(CFI)) {
             ToRemove.push_back(CFI);

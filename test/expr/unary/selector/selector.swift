@@ -63,8 +63,8 @@ func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
   // Methods on a protocol.
   _ = #selector(P1.method4)
   _ = #selector(P1.method4(_:b:))
-  _ = #selector(P1.method5) // FIXME: expected-error{{static member 'method5' cannot be used on instance of type 'P1.Protocol'}}
-  _ = #selector(P1.method5(_:b:)) // FIXME: expected-error{{static member 'method5(_:b:)' cannot be used on instance of type 'P1.Protocol'}}
+  _ = #selector(P1.method5) // expected-error{{static member 'method5' cannot be used on protocol metatype 'P1.Protocol'}}
+  _ = #selector(P1.method5(_:b:)) // expected-error{{static member 'method5(_:b:)' cannot be used on protocol metatype 'P1.Protocol'}}
   _ = #selector(p1.method4)
   _ = #selector(p1.method4(_:b:))
   _ = #selector(p1.dynamicType.method5)

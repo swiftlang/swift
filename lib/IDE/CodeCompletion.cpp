@@ -204,7 +204,7 @@ void getClangDocKeyword(ClangImporter &Importer, const Decl *D,
 } // end namespace comments
 } // end namespace clang
 
-namespace llvm {
+namespace swift {
 namespace markup {
 class SwiftDocWordExtractor : public MarkupASTWalker {
   CommandWordsPairs &Pairs;
@@ -242,7 +242,7 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
   }
   if (!Interested)
     return;
-  static llvm::markup::MarkupContext MC;
+  static swift::markup::MarkupContext MC;
   auto DC = getDocComment(MC, D);
   if (!DC.hasValue())
     return;
@@ -260,7 +260,7 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
   }
 }
 } // end namespace markup
-} // end namespace llvm
+} // end namespace swift
 
 typedef llvm::function_ref<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
 DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
@@ -1496,7 +1496,7 @@ private:
     if (auto *CD = VD->getClangDecl()) {
       clang::comments::getClangDocKeyword(*Importer, CD, Pairs);
     } else {
-      llvm::markup::getSwiftDocKeyword(VD, Pairs);
+      swift::markup::getSwiftDocKeyword(VD, Pairs);
     }
     Builder.addDeclDocCommentWords(llvm::makeArrayRef(Pairs));
   }
