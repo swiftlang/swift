@@ -11,6 +11,7 @@ extern double IAMStruct1GlobalVar;
 extern struct IAMStruct1 IAMStruct1CreateCopy(struct IAMStruct1 in);
 extern struct IAMStruct1 IAMStruct1CreateSimple(double value);
 extern struct IAMStruct1 IAMStruct1CreateRedundant(double redundant);
+extern struct IAMStruct1 IAMStruct1CreateSpecialLabel();
 
 /// Methods
 extern struct IAMStruct1 IAMStruct1Invert(struct IAMStruct1 s);

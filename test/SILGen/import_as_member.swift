@@ -46,3 +46,12 @@ extension SomeClass {
     self.init(value: double)
   }
 }
+
+public func useSpecialInit() -> Struct1 {
+  // FIXME: the below triggers an assert, due to number or params mismatch
+  // return Struct1(specialLabel:())
+}
+
+public func useGlobal() -> Double {
+  return Struct1.globalVar
+}

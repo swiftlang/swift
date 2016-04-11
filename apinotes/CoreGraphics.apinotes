@@ -44,13 +44,14 @@ Functions:
 - Name: CGRectIntersectsRect
   SwiftName: "CGRect.intersects(self:_:)"
 # The below are not available in Swift
-# TODO: make these unavailable, but they're needed for pre-iOS 9
+# FIXME: empty-argument-label pattern is currently failing SILGen
 - Name: CGColorSpaceCreateDeviceGray
   SwiftName: CGColorSpaceCreateDeviceGray()
 - Name: CGColorSpaceCreateDeviceRGB
   SwiftName: CGColorSpaceCreateDeviceRGB()
 - Name: CGColorSpaceCreateDeviceCMYK
   SwiftName: CGColorSpaceCreateDeviceCMYK()
+# TODO: make these unavailable, but they're needed for pre-iOS 9
 # - Name: CGColorSpaceCreateDeviceGray
 #   Availability: nonswift
 # - Name: CGColorSpaceCreateDeviceRGB
@@ -83,7 +84,6 @@ Functions:
 - Name: CGRectApplyAffineTransform
   SwiftName: CGRect.applyAffineTransform(self:_:)
 # CGBitmapContext
-# FIXME: below doesn't work
 - Name: CGBitmapContextCreateImage
   SwiftName: CGContextRef.makeImageFromBitmap(self:)
 # CGColor
@@ -305,8 +305,6 @@ Functions:
 - Name: CGPathAddPath
   SwiftName: CGMutablePathRef.addPath(self:_:path:)
 
-
-
 #
 # Global variables
 #
@@ -334,8 +332,10 @@ Globals:
   SwiftName: "kCGColorBlack"
 - Name: kCGColorWhite
   SwiftName: "kCGColorWhite"
+# TODO: clear as well, but for now it's useful for testing
 - Name: kCGColorSpaceSRGB
   SwiftName: "kCGColorSpaceSRGB"
+# TODO: other color spaces as well, but for now it's useful for testing
 
 #
 # Enums
@@ -361,13 +361,10 @@ Enumerators:
 # CGEventTypes
 - Name: kCGEventMouseSubtypeDefault
   SwiftName: CGEventMouseSubtype.defaultType
-
-# FIXME: The below won't import. Find out why
-# - Name: kCGEventTapOptionDefault
-#   SwiftName: CGEventTapOption.defaultTap
-# - Name: kCGEventSourceStatePrivate
-#   SwiftName: CGEventSourceState.privateState
-
+- Name: kCGEventTapOptionDefault
+  SwiftName: CGEventTapOptions.defaultTap
+- Name: kCGEventSourceStatePrivate
+  SwiftName: CGEventSourceStateID.privateState
 # CGImage
 - Name: kCGImageAlphaOnly
   SwiftName: alphaOnly
