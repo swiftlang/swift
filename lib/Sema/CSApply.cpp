@@ -179,6 +179,9 @@ Type Solution::computeSubstitutions(
       currentReplacement = req.getFirstType().subst(currentModule,
                                                     typeSubstitutions,
                                                     None);
+      if (!currentReplacement)
+        currentReplacement = tc.Context.TheErrorType;
+
       break;
     }
   }
