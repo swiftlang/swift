@@ -122,7 +122,7 @@ public func _encodeBitsAsWords<T : CVarArg>(_ x: T) -> [Int] {
 }
 
 // CVarArg conformances for the integer types.  Everything smaller
-// than a CInt must be promoted to CInt or CUnsignedInt before
+// than a Int32 must be promoted to Int32 or CUnsignedInt before
 // encoding.
 
 // Signed types
@@ -161,7 +161,7 @@ extension Int16 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(CInt(self))
+    return _encodeBitsAsWords(Int32(self))
   }
 }
 
@@ -169,7 +169,7 @@ extension Int8 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(CInt(self))
+    return _encodeBitsAsWords(Int32(self))
   }
 }
 
