@@ -58,6 +58,27 @@ private:
   StateChanges tryNonAtomicRC(SILInstruction *I);
 };
 
+/// Try to strip all casts and projections as long they preserve the
+/// uniqueness of the value.
+static SILValue stripUniquenessPreservingCastsAndProjections(SILValue V) {
+  while (V) {
+    V = stripAddressProjections(V);
+    auto V2 = stripCasts(V);
+    if (auto *UAC = dyn_cast<UncheckedAddrCastInst>(V2)) {
+      if (UAC->getType() ==
+          SILType::getNativeObjectType(UAC->getModule().getASTContext())
+              .getAddressType()) {
+        V = UAC->getOperand();
+        continue;
+      }
+    }
+    if (V2 == V)
+      return V;
+    V = V2;
+  }
+  return V;
+}
+
 static void markAsNonAtomic(RefCountingInst *I) {
   SILValue Op = I->getOperand(0);
   I->setNonAtomic();
@@ -69,13 +90,59 @@ bool NonAtomicRCTransformer::isEligableRefCountingInst(SILInstruction *I) {
   return isa<RefCountingInst>(I) && !cast<RefCountingInst>(I)->isNonAtomic();
 }
 
+/// Obtain the underlying object by stripoping casts as well
+/// index and address projections.
+static SILValue obtainUnderlyingObject(SILValue V) {
+  while (true) {
+    SILValue V2 =
+        stripIndexingInsts(stripUniquenessPreservingCastsAndProjections(V));
+    if (V2 == V)
+      return V2;
+    V = V2;
+  }
+}
+
+/// Check if the the parameter \V is based on a local object, e.g. it is an
+/// allocation instruction or a struct/tuple constructed from the local objects.
+/// Returns a found local object. If a local object was not found, returns an
+/// empty SILValue.
+static SILValue getLocalObject(SILValue V) {
+  // It should be a local object.
+  V = obtainUnderlyingObject(V);
+  if (isa<AllocationInst>(V))
+    return V;
+  if (isa<LiteralInst>(V))
+    return V;
+  // Look through strong_pin instructions.
+  if (auto *SPI = dyn_cast<StrongPinInst>(V))
+    return getLocalObject(SPI->getOperand());
+  if (auto *SI = dyn_cast<StructInst>(V)) {
+    for (auto &Op : SI->getAllOperands())
+      if (!getLocalObject(Op.get()))
+        return SILValue();
+    return V;
+  }
+  if (auto *TI = dyn_cast<TupleInst>(V)) {
+    for (auto &Op : TI->getAllOperands())
+      if (!getLocalObject(Op.get()))
+        return SILValue();
+    return V;
+  }
+  return SILValue();
+}
+
 /// Try to promote a reference counting instruction to its non-atomic
 /// variant.
 StateChanges NonAtomicRCTransformer::tryNonAtomicRC(SILInstruction *I) {
   assert(isa<RefCountingInst>(I));
   auto *RCInst = cast<RefCountingInst>(I);
-  auto Root = stripAddressProjections(RCInst->getOperand(0)); // stripUniq...???
-  auto *Node = ConGraph->getNodeOrNull(RCInst->getOperand(0), EA);
+
+  // For the EscapeAnalysis to be correct, it should be a local object.
+  auto LocalObject = getLocalObject(RCInst->getOperand(0));
+  if (!LocalObject)
+    return SILAnalysis::InvalidationKind::Nothing;
+
+  auto *Node = ConGraph->getNodeOrNull(LocalObject, EA);
   if (!Node)
     return SILAnalysis::InvalidationKind::Nothing;
 
