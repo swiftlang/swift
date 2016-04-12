@@ -1123,6 +1123,13 @@ private:
     // we have to duplicate some of the logic from
     // demangleDeclarationName.
     if (Mangled.nextIf('S')) {
+
+      if (Mangled.nextIf('s')) {
+        NodePointer stdlib = NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
+        
+        return demangleProtocolNameGivenContext(stdlib);
+      }
+      
       NodePointer sub = demangleSubstitutionIndex();
       if (!sub) return nullptr;
       if (sub->getKind() == Node::Kind::Protocol)
@@ -1132,12 +1139,6 @@ private:
         return nullptr;
 
       return demangleProtocolNameGivenContext(sub);
-    }
-
-    if (Mangled.nextIf('s')) {
-      NodePointer stdlib = NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
-
-      return demangleProtocolNameGivenContext(stdlib);
     }
 
     return demangleDeclarationName(Node::Kind::Protocol);
