@@ -333,7 +333,8 @@ public struct CountableRange<
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "CountableRange(\(String(reflecting: lowerBound))..<\(String(reflecting: upperBound)))"
+    return "CountableRange(\(String(reflecting: lowerBound))"
+    + "..<\(String(reflecting: upperBound)))"
   }
 
   public // ambiguity resolution between RangeProtocol and Collection defaults
@@ -477,13 +478,15 @@ public struct Range<
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "Range(\(String(reflecting: lowerBound))..<\(String(reflecting: upperBound)))"
+    return "Range(\(String(reflecting: lowerBound))"
+    + "..<\(String(reflecting: upperBound)))"
   }
 }
 
 extension Range : CustomReflectable {
   public var customMirror: Mirror {
-    return Mirror(self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
+    return Mirror(
+      self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
 }
 
