@@ -268,8 +268,19 @@ public protocol Integer : ${IntegerBase} {
   @warn_unused_result
   func isLess(than rhs: Self) -> Bool
 
+  /// Creates an instance of `Self` from the value of any other `Integer`,
+  /// trapping if value of `source` cannot be represented by `Self`.
   init<T : Integer>(_ source: T)
+
+  /// Creates in instance of `Self` from the value of any other `Integer`,
+  /// using bits from `source` up to the available width of `Self`, if `T` is
+  /// wider than `Self`, and filling extra bits on the left with sign bit
+  /// value otherwise.
   init<T : Integer>(extendingOrTruncating source: T)
+
+  /// Creates in instance of `Self` from the value of any other `Integer`,
+  /// resulting in `Self.min` (or `Self.max`) if the value cannot be represented
+  /// by `Self`, and exact value of `source` otherwise.
   init<T : Integer>(clamping source: T)
 
   /// Return n-th word in the underlying representation of `self`.
