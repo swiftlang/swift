@@ -23,6 +23,12 @@ aTuple: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int)
   (enum TypesToReflect.E)
   (struct Swift.Int))
 
+aTupleWithLabels: (a : TypesToReflect.C, s : TypesToReflect.S, e : TypesToReflect.E)
+(tuple
+  (class TypesToReflect.C)
+  (struct TypesToReflect.S)
+  (enum TypesToReflect.E))
+
 aMetatype: TypesToReflect.C.Type
 (metatype
   (class TypesToReflect.C))
@@ -34,6 +40,13 @@ aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> 
   (enum TypesToReflect.E)
   (struct Swift.Int)
   (struct Swift.Int))
+
+aFunctionWithVarArgs: (TypesToReflect.C, Swift.Array<TypesToReflect.S>...) -> ()
+(function
+  (class TypesToReflect.C)
+  (bound-generic struct Swift.Array
+    (struct TypesToReflect.S))
+  (tuple))
 
 TypesToReflect.S
 ----------------

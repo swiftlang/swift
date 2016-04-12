@@ -390,7 +390,8 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
       return fromDemangleNode(Node->getChild(0));
     case NodeKind::ReturnType:
       return fromDemangleNode(Node->getChild(0));
-    case NodeKind::NonVariadicTuple: {
+    case NodeKind::NonVariadicTuple:
+    case NodeKind::VariadicTuple: {
       TypeRefVector Elements;
       for (auto element : *Node) {
         auto elementType = fromDemangleNode(element);
@@ -398,9 +399,12 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
           return nullptr;
         Elements.push_back(elementType);
       }
-      return TupleTypeRef::create(Elements);
+      bool Variadic = (Node->getKind() == NodeKind::VariadicTuple);
+      return TupleTypeRef::create(Elements, Variadic);
     }
     case NodeKind::TupleElement:
+      if (Node->getChild(0)->getKind() == NodeKind::TupleElementName)
+        return fromDemangleNode(Node->getChild(1));
       return fromDemangleNode(Node->getChild(0));
     case NodeKind::DependentGenericType: {
       return fromDemangleNode(Node->getChild(1));

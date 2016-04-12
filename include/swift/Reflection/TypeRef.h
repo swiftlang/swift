@@ -189,13 +189,15 @@ public:
 
 class TupleTypeRef final : public TypeRef {
   TypeRefVector Elements;
+  bool Variadic;
 
 public:
-  TupleTypeRef(TypeRefVector Elements)
-    : TypeRef(TypeRefKind::Tuple), Elements(Elements) {}
+  TupleTypeRef(TypeRefVector Elements, bool Variadic=false)
+    : TypeRef(TypeRefKind::Tuple), Elements(Elements), Variadic(Variadic) {}
 
-  static std::shared_ptr<TupleTypeRef> create(TypeRefVector Elements) {
-    return std::make_shared<TupleTypeRef>(Elements);
+  static std::shared_ptr<TupleTypeRef> create(TypeRefVector Elements,
+                                              bool Variadic=false) {
+    return std::make_shared<TupleTypeRef>(Elements, Variadic);
   }
 
   TypeRefVector getElements() {
@@ -205,6 +207,10 @@ public:
   ConstTypeRefVector getElements() const {
     return Elements;
   };
+
+  bool isVariadic() const {
+    return Variadic;
+  }
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Tuple;
@@ -591,7 +597,7 @@ public:
       else
         return nullptr;
     }
-    return std::make_shared<TupleTypeRef>(Elements);
+    return std::make_shared<TupleTypeRef>(Elements, T->isVariadic());
   }
 
   TypeRefPointer visitFunctionTypeRef(const FunctionTypeRef *F) {

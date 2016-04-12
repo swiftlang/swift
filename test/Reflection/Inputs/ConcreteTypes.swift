@@ -14,15 +14,19 @@ public class C {
   public let aStruct: S
   public let anEnum: E
   public let aTuple: (C, S, E, Int)
+  public let aTupleWithLabels: (a: C, s: S, e: E)
   public let aMetatype: C.Type
   public let aFunction: (C, S, E, Int) -> (Int)
-  public init(aClass: C, aStruct: S, anEnum: E, aTuple: (C, S, E, Int), aMetatype: C.Type, aFunction: (C, S, E, Int) -> Int) {
+  public let aFunctionWithVarArgs: (C, S...) -> ()
+  public init(aClass: C, aStruct: S, anEnum: E, aTuple: (C, S, E, Int), aTupleWithLabels: (a: C, s: S, e: E), aMetatype: C.Type, aFunction: (C, S, E, Int) -> Int, aFunctionWithVarArgs: (C, S...) -> ()) {
     self.aClass = aClass
     self.aStruct = aStruct
     self.anEnum = anEnum
     self.aTuple = aTuple
+    self.aTupleWithLabels = aTupleWithLabels
     self.aMetatype = aMetatype
     self.aFunction = aFunction
+    self.aFunctionWithVarArgs = aFunctionWithVarArgs
   }
 }
 
