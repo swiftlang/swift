@@ -45,14 +45,21 @@ class struct(object):
   def __repr__(self):
     return 'struct(%r)' % self.__dict__
 
-binaryArithmetic = [
-    struct(operator='+', name='adding',      mutatingName='add',           firstArg='_',           llvmName='add', kind='+'),
-    struct(operator='-', name='subtracting', mutatingName='subtract',      firstArg='_',           llvmName='sub', kind='-'),
-    struct(operator='*', name='multiplied',  mutatingName='multiply',      firstArg='by',         llvmName='mul', kind='*'),
-    struct(operator='/', name='divided',     mutatingName='divide',        firstArg='by',         llvmName='div', kind='/'),
+binaryArithmetic = {
+  'Arithmetic' : [
+    struct(operator='+', name='adding',      mutatingName='add',      firstArg='_',  llvmName='add', kind='+'),
+    struct(operator='-', name='subtracting', mutatingName='subtract', firstArg='_',  llvmName='sub', kind='-'),
+    struct(operator='*', name='multiplied',  mutatingName='multiply', firstArg='by', llvmName='mul', kind='*'),
+    struct(operator='/', name='divided',     mutatingName='divide',   firstArg='by', llvmName='div', kind='/'),
+  ],
+  'Integer' : [
     struct(operator='%', name='remainder',   mutatingName='formRemainder', firstArg='dividingBy', llvmName='rem', kind='/'),
-]
+  ],
+}
 
+# We need the same order of operations, so simple itertools.chain(d.values())
+# won't work
+allBinaryArithmetic = binaryArithmetic['Arithmetic'] + binaryArithmetic['Integer']
 
 binaryBitwise = [
     struct(operator='&', name='and'),
@@ -136,11 +143,11 @@ public func _log(@autoclosure _ message: ()->String) {
 /// non-mutating implementations, they will be provided by a protocol extension.
 /// Implementation in that case will copy `self`, perform a mutating operation
 /// on it and return the resulting value.
-public protocol Arithmetic {
+public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
   /// Initialize to zero
   init()
 
-% for x in binaryArithmetic:
+% for x in binaryArithmetic['Arithmetic']:
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
   @warn_unused_result
@@ -151,16 +158,18 @@ public protocol Arithmetic {
 % end
 }
 
-extension Arithmetic {
-% for x in binaryArithmetic:
-%   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
+% for Protocol in binaryArithmetic:
+extension ${Protocol} {
+%   for x in binaryArithmetic[Protocol]:
+%     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
   public func ${x.name}(${x.firstArg} rhs: Self) -> Self {
     var lhs = self
     lhs.${x.mutatingName}(${callLabel}rhs)
     return lhs
   }
-% end
+%   end
 }
+% end
 
 /// SignedArithmetic protocol will only be conformed to by signed numbers,
 /// otherwise it would be possible to negate an unsigned value.
@@ -177,18 +186,20 @@ extension SignedArithmetic {
   }
 }
 
-% for x in binaryArithmetic:
-%   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
+% for Protocol in binaryArithmetic:
+%   for x in binaryArithmetic[Protocol]:
+%     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 @_transparent
 @warn_unused_result
-public func ${x.operator} <T: Arithmetic>(lhs: T, rhs: T) -> T {
+public func ${x.operator} <T: ${Protocol}>(lhs: T, rhs: T) -> T {
   return lhs.${x.name}(${callLabel}rhs)
 }
 
 @_transparent
-public func ${x.operator}= <T: Arithmetic>(lhs: inout T, rhs: T) {
+public func ${x.operator}= <T: ${Protocol}>(lhs: inout T, rhs: T) {
   lhs.${x.mutatingName}(${callLabel}rhs)
 }
+%   end
 % end
 
 @_transparent
@@ -274,6 +285,16 @@ public protocol Integer : ${IntegerBase} {
   /// Has the value -1 if `self` is 0.
   /// Has the value equal to `bitWidth - 1` for fixed width integers.
   var signBitIndex: Word { get }
+
+% for x in binaryArithmetic['Integer']:
+  // defaulted using an in-place counterpart, but can be used as an
+  // optimization hook
+  @warn_unused_result
+  func ${x.name}(${x.firstArg} rhs: Self) -> Self
+
+  // implementation hook
+  mutating func ${x.mutatingName}(${x.firstArg} rhs: Self)
+% end
 }
 
 extension Integer {
@@ -419,7 +440,7 @@ public protocol FixedWidthInteger : Integer {
   static var max: Self { get }
   static var min: Self { get }
 
-% for x in binaryArithmetic:
+% for x in allBinaryArithmetic:
 %{
 comment = '''
   /// Return a pair consisting of `self` {} `rhs`,
@@ -551,7 +572,7 @@ extension FixedWidthInteger {
     else { self = Self(extendingOrTruncating: source) }
   }
 
-% for x in binaryArithmetic:
+% for x in allBinaryArithmetic:
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
   @_transparent
   public mutating func ${x.mutatingName}(${x.firstArg} rhs: Self) {
@@ -616,7 +637,7 @@ extension FixedWidthInteger {
   }
 }
 
-% for x in binaryArithmetic:
+% for x in allBinaryArithmetic:
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 %   if x.kind != '/':
 @warn_unused_result
@@ -763,7 +784,7 @@ public struct ${Self}
     return Bool(Builtin.cmp_${u}lt_Int${bits}(_storage, rhs._storage))
   }
 
-%       for x in binaryArithmetic:
+%       for x in allBinaryArithmetic:
 %         callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
   /// Return a pair consisting of `self` ${x.operator} `rhs`,
   /// truncated to fit if necessary, and a flag indicating whether an
@@ -1008,7 +1029,7 @@ public struct DoubleWidth<
 
   public static var bitWidth : Word { return 2 * T.bitWidth }
 
-% for x in binaryArithmetic[:2]:
+% for x in allBinaryArithmetic[:2]:
 %   highAffectedByLowOverflow = 'T.max' if x.operator == '+' else 'T.min'
   public func ${x.name}WithOverflow(_ rhs: DoubleWidth<T>)
     -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
@@ -1089,7 +1110,7 @@ public struct DoubleWidth<
     return mkResult(carry > 0)
   }
 
-% for x in binaryArithmetic[3:]:
+% for x in allBinaryArithmetic[3:]:
   @warn_unused_result
   public func ${x.name}WithOverflow(
     ${x.firstArg} rhs: DoubleWidth<T>
@@ -1165,7 +1186,7 @@ public struct ${Self}
     return _storage.isLess(than: rhs._storage)
   }
 
-%   for x in binaryArithmetic:
+%   for x in allBinaryArithmetic:
 %     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
   /// Return a pair consisting of `self` ${x.operator} `rhs`,
   /// truncated to fit if necessary, and a flag indicating whether an
