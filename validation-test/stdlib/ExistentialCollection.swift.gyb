@@ -352,10 +352,7 @@ tests.test("ForwardCollection") {
   }
 }
 
-tests.test("BidirectionalCollection")
-  .xfail(.custom({ true }, reason: "swift-3-indexing-model: reversed collection lacks methods"))
-  .code {
-
+tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
   let fc0 = AnyCollection(a0.lazy.reversed())
   

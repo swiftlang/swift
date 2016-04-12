@@ -303,12 +303,7 @@ LazyTestSuite.test("Lazy${TraversalCollection}.array") {
 
 %  if ReversedType is not None:
 
-LazyTestSuite.test("Lazy${TraversalCollection}.reversed")
-%    if Traversal == 'Bidirectional':
-  .xfail(.custom({ true }, reason: "swift-3-indexing-model: missing method implementations in ReversedCollection"))
-  .code
-%    end
-{
+LazyTestSuite.test("Lazy${TraversalCollection}.reversed") {
   let base = Minimal${TraversalCollection}(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
     underestimatedCount: .value(42))
@@ -614,10 +609,7 @@ tests.test("LazyMapCollection/Passthrough") {
 }
 
 //===--- Reverse ----------------------------------------------------------===//
-tests.test("ReversedCollection")
-  .xfail(.custom({ true }, reason: "swift-3-indexing-model: reversed collection lacks methods"))
-  .code {
-
+tests.test("ReversedCollection") {
   let expected = Array(stride(from: 11, through: 0, by: -1))
   let r = 0..<12
   checkRandomAccessCollection(
@@ -650,9 +642,7 @@ struct ExpectType<T> {
   static func test(_: Any) -> _Void { fatalError() }
 }
 
-tests.test("ReversedCollection/Lazy")
-  .xfail(.custom({ true }, reason: "swift-3-indexing-model: reversed collection lacks methods"))
-  .code {
+tests.test("ReversedCollection/Lazy") {
   // Check that reversing a lazy collection, or lazy-ing a reverse
   // collection, produces the same lazy reverse collection.
   do {

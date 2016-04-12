@@ -111,14 +111,12 @@ public struct ReversedCollection<
   @warn_unused_result
   public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    //return ReversedIndex(_base.index(-n, stepsFrom: i.base, limitedBy: ???)
-    fatalError("FIXME: swift-3-indexing-model")
+    return ReversedIndex(_base.index(-n, stepsFrom: i.base, limitedBy: limit.base))
   }
 
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    //return
-    fatalError("FIXME: swift-3-indexing-model")
+    return _base.distance(from: end.base, to: start.base)
   }
 
   public typealias _Element = Base.Iterator.Element

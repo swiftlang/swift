@@ -694,9 +694,7 @@ SequenceTypeTests.test("reverse/Sequence") {
   }
 }
 
-SequenceTypeTests.test("reverse/WhereIndexIsBidirectional,BidirectionalReverseView")
-    .xfail(.custom( { true }, reason: "[swift-3-indexing-model] ReversedCollection.advance is not implemented"))
-    .code {
+SequenceTypeTests.test("reverse/WhereIndexIsBidirectional,BidirectionalReverseView") {
   for test in reverseTests {
     let s = MinimalBidirectionalCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
