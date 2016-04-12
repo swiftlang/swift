@@ -3691,7 +3691,7 @@ shouldApplyAddingLabelFixit(TuplePattern *tuplePattern, TupleType *fromTuple,
   patternParts.push_back(tuplePattern);
   fromParts.push_back(fromTuple);
   toParts.push_back(toTuple);
-  while(!patternParts.empty()) {
+  while (!patternParts.empty()) {
     TuplePattern *curPattern = patternParts.back();
     TupleType *curFrom = fromParts.back();
     TupleType *curTo = toParts.back();
