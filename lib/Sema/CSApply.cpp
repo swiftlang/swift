@@ -368,7 +368,7 @@ namespace {
     /// \param variadicArgs The source indices that are mapped to the variadic
     /// parameter of the resulting tuple, as provided by \c computeTupleShuffle.
     ///
-    /// \param typeFromPattern Optionally, the caller can specifiy the pattern
+    /// \param typeFromPattern Optionally, the caller can specify the pattern
     /// from where the toType is derived, so that we can deliver better fixit.
     Expr *coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                              TupleType *toTuple,
@@ -1088,7 +1088,7 @@ namespace {
     /// \param expr The expression to coerce.
     /// \param toType The type to coerce the expression to.
     /// \param locator Locator used to describe where in this expression we are.
-    /// \param typeFromPattern Optionally, the caller can specifiy the pattern
+    /// \param typeFromPattern Optionally, the caller can specify the pattern
     ///   from where the toType is derived, so that we can deliver better fixit.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
