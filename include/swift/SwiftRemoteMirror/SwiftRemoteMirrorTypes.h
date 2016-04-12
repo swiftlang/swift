@@ -1,4 +1,4 @@
-//===--- SwiftRemoteMirrorTypes.h - Remote reflection types -*- C++ -*-----===//
+//===--- SwiftRemoteMirrorTypes.h - Remote reflection types -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

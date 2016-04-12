@@ -1339,7 +1339,7 @@ public:
   ///
   /// \param expr The expression, which will be updated in place.
   /// \param type The type to convert to.
-  /// \param typeFromPattern Optionally, the caller can specifiy the pattern
+  /// \param typeFromPattern Optionally, the caller can specify the pattern
   ///   from where the toType is derived, so that we can deliver better fixit.
   ///
   /// \returns true if an error occurred, false otherwise.
