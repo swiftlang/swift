@@ -2797,11 +2797,6 @@ namespace {
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
 
-      // If imported as member, the member should be final.
-      if (dc->getAsClassOrClassExtensionContext())
-        result->getAttrs().add(new (Impl.SwiftContext)
-                                 FinalAttr(/*IsImplicit=*/true));
-
       if (!decl->hasExternalStorage())
         Impl.registerExternalDecl(result);
 
