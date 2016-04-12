@@ -49,13 +49,9 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   void printRec(const TypeRef *typeRef) {
     OS << "\n";
 
-    if (typeRef == nullptr)
-      OS << "<<null>>";
-    else {
-      Indent += 2;
-      visit(typeRef);
-      Indent -=2;
-    }
+    Indent += 2;
+    visit(typeRef);
+    Indent -= 2;
   }
 
 public:
@@ -321,9 +317,12 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
       auto mangledName = Demangle::mangleNode(Node->getChild(0));
       auto genericArgs = Node->getChild(1);
       TypeRefVector Args;
-      for (auto genericArg : *genericArgs)
-        if (auto ParamTypeRef = fromDemangleNode(genericArg))
-          Args.push_back(ParamTypeRef);
+      for (auto genericArg : *genericArgs) {
+        auto paramTypeRef = fromDemangleNode(genericArg);
+        if (!paramTypeRef)
+          return nullptr;
+        Args.push_back(paramTypeRef);
+      }
 
       return BoundGenericTypeRef::create(mangledName, Args);
     }
@@ -339,10 +338,14 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     }
     case NodeKind::ExistentialMetatype: {
       auto instance = fromDemangleNode(Node->getChild(0));
+      if (!instance)
+        return nullptr;
       return ExistentialMetatypeTypeRef::create(instance);
     }
     case NodeKind::Metatype: {
       auto instance = fromDemangleNode(Node->getChild(0));
+      if (!instance)
+        return nullptr;
       return MetatypeTypeRef::create(instance);
     }
     case NodeKind::ProtocolList: {
@@ -372,11 +375,15 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     case NodeKind::FunctionType: {
       TypeRefVector arguments;
       auto input = fromDemangleNode(Node->getChild(0));
+      if (!input)
+        return nullptr;
       if (auto tuple = dyn_cast<TupleTypeRef>(input.get()))
         arguments = tuple->getElements();
       else
         arguments = { input };
       auto result = fromDemangleNode(Node->getChild(1));
+      if (!result)
+        return nullptr;
       return FunctionTypeRef::create(arguments, result);
     }
     case NodeKind::ArgumentTuple:
@@ -385,8 +392,12 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
       return fromDemangleNode(Node->getChild(0));
     case NodeKind::NonVariadicTuple: {
       TypeRefVector Elements;
-      for (auto element : *Node)
-        Elements.push_back(fromDemangleNode(element));
+      for (auto element : *Node) {
+        auto elementType = fromDemangleNode(element);
+        if (!elementType)
+          return nullptr;
+        Elements.push_back(elementType);
+      }
       return TupleTypeRef::create(Elements);
     }
     case NodeKind::TupleElement:
@@ -396,23 +407,33 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     }
     case NodeKind::DependentMemberType: {
       auto base = fromDemangleNode(Node->getChild(0));
+      if (!base)
+        return nullptr;
       auto member = Node->getChild(1)->getText();
       auto protocol = fromDemangleNode(Node->getChild(1));
-      cast<ProtocolTypeRef>(protocol.get());
+      if (!protocol)
+        return nullptr;
+      assert(llvm::isa<ProtocolTypeRef>(protocol.get()));
       return DependentMemberTypeRef::create(member, base, protocol);
     }
     case NodeKind::DependentAssociatedTypeRef:
       return fromDemangleNode(Node->getChild(0));
     case NodeKind::Unowned: {
       auto base = fromDemangleNode(Node->getChild(0));
+      if (!base)
+        return nullptr;
       return UnownedStorageTypeRef::create(base);
     }
     case NodeKind::Unmanaged: {
       auto base = fromDemangleNode(Node->getChild(0));
+      if (!base)
+        return nullptr;
       return UnmanagedStorageTypeRef::create(base);
     }
     case NodeKind::Weak: {
       auto base = fromDemangleNode(Node->getChild(0));
+      if (!base)
+        return nullptr;
       return WeakStorageTypeRef::create(base);
     }
     default:

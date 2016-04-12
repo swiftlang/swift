@@ -111,9 +111,14 @@ class ReflectionContext {
   void dumpTypeRef(const std::string &MangledName,
                    std::ostream &OS, bool printTypeName = false) const {
     auto TypeName = Demangle::demangleTypeAsString(MangledName);
+    OS << TypeName << std::endl;
+
     auto DemangleTree = Demangle::demangleTypeAsNode(MangledName);
     auto TR = TypeRef::fromDemangleNode(DemangleTree);
-    OS << TypeName << std::endl;
+    if (!TR) {
+      OS << "!!! Invalid typeref: " << MangledName << std::endl;
+      return;
+    }
     TR->dump(OS);
     OS << std::endl;
   }
