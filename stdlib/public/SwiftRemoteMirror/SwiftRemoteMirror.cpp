@@ -55,3 +55,24 @@ void swift_reflection_clearCaches(SwiftReflectionContextRef ContextRef) {
   Context->clear();
 }
 
+swift_typeref_t
+swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
+                                    uintptr_t metadata) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TR = Context->getTypeRef(metadata);
+  return reinterpret_cast<swift_typeref_t>(TR.get());
+}
+
+swift_typeref_t
+swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
+                                          unsigned Index) {
+  auto TR = reinterpret_cast<TypeRef *>(OpaqueTypeRef);
+
+  if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
+    auto &Params = BG->getGenericParams();
+    if (Index < Params.size()) {
+      return reinterpret_cast<swift_typeref_t>(Params[Index].get());
+    }
+  }
+  return 0;
+}
