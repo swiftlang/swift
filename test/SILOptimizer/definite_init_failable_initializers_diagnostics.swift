@@ -48,13 +48,17 @@ class ErrantClass : ErrantBaseClass {
     y = 10
     do {
       try super.init()
-    } catch {}
+    } catch {
+      _ = error
+    }
   } // expected-error {{'self' used inside 'catch' block reachable from super.init call}}
 
   convenience init(invalidEscapeConvenience: ()) {
     do {
       try self.init()
-    } catch {}
+    } catch {
+      _ = error
+    }
   } // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
 
   init(noEscapeDesignated: ()) throws {

@@ -1315,7 +1315,7 @@ private:
     S->getBody()->walk(*this);
 
     diagnoseNoThrowInDo(S, scope);
-
+    
     return MaxThrowingKind;
   }
 
@@ -1341,11 +1341,35 @@ private:
   void diagnoseNoThrowInDo(DoCatchStmt *S, ContextScope &scope) {
     // Warn if nothing threw within the body, unless this is the
     // implicit do/catch in a debugger function.
-    if (!Flags.has(ContextFlags::HasAnyThrowSite) &&
-        !scope.wasTopLevelDebuggerFunction()) {
-      TC.diagnose(S->getCatches().front()->getCatchLoc(),
-                  diag::no_throw_in_do_with_catch);
+    if (!Flags.has(ContextFlags::HasAnyThrowSite)) {
+      if (!scope.wasTopLevelDebuggerFunction())
+        TC.diagnose(S->getCatches().front()->getCatchLoc(),
+                    diag::no_throw_in_do_with_catch);
+    } else {
+      // if there is a throw in the do, warn if the catch block
+      // doesn't handle errors
+      diagnoseEmptyCatch(S);
     }
+  }
+  
+  void diagnoseEmptyCatch(DoCatchStmt *D) {
+    
+    // if we have a single exhaustive CatchStmt
+    if (D->getCatches().size() == 1 && D->isSyntacticallyExhaustive()) {
+      auto S = D->getCatches().front();
+      
+      // if the catch block is an empty brace stmt '{}'
+      // emit warning
+      if (auto body = dyn_cast_or_null<BraceStmt>(S->getBody()))
+        if (body->getNumElements() == 0) {
+          // warn on uncaught errors in empty catch block
+          TC.diagnose(S->getCatchLoc(),
+                      diag::empty_catch_block)
+            .highlight(S->getCatchLoc()).highlight(body->getSourceRange())
+            .fixItRemove(S->getSourceRange());
+        }
+    }
+    
   }
 
   void checkCatch(CatchStmt *S, ThrowingKind doThrowingKind) {

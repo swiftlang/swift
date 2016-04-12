@@ -87,6 +87,7 @@ func rethrowsDispatchError(handleError: ((ErrorProtocol) throws -> ()), body: ()
   do {
     body()   // expected-error {{call can throw but is not marked with 'try'}}
   } catch {
+    return
   }
 }
 
