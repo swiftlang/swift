@@ -34,7 +34,6 @@ STATISTIC(NumOwnedConvertedToGuaranteed, "Total owned args -> guaranteed args");
 STATISTIC(NumOwnedConvertedToNotOwnedResult, "Total owned result -> not owned result");
 STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
-
 /// Creates a decrement on \p Ptr at insertion point \p InsertPt that creates a
 /// strong_release if \p Ptr has reference semantics itself or a release_value
 /// if \p Ptr is a non-trivial value without reference-semantics.
