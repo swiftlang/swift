@@ -28,6 +28,24 @@ void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context
   delete Context;
 }
 
+void
+swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
+                                   const char *ImageName,
+                                   swift_reflection_section_t fieldmd,
+                                   swift_reflection_section_t typeref,
+                                   swift_reflection_section_t reflstr,
+                                   swift_reflection_section_t assocty) {
+  ReflectionInfo Info {
+    ImageName,
+    FieldSection(fieldmd.Begin, fieldmd.End),
+    AssociatedTypeSection(assocty.Begin, assocty.End),
+    GenericSection(reflstr.Begin, reflstr.End),
+    GenericSection(typeref.Begin, typeref.End)
+  };
+  auto Context = reinterpret_cast<ReflectionContext<InProcess> *>(ContextRef);
+  Context->addReflectionInfo(Info);
+}
+
 void swift_reflection_clearCaches(SwiftReflectionContextRef ContextRef) {
   auto Context = reinterpret_cast<ReflectionContext<InProcess> *>(ContextRef);
   Context->clear();
