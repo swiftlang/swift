@@ -7,8 +7,8 @@ import CoreGraphics
 
 class Colors {
 	// TODO: when issue is fixed, migrate these to CGColor class properties
-	static var black = CGColor.constantColorForName(kCGColorBlack)!
-	static var white = CGColor.constantColorForName(kCGColorWhite)!
+	static var black = CGColor.constantColorForName(CGColor.black)!
+	static var white = CGColor.constantColorForName(CGColor.white)!
 
 	// FIXME: this triggers an assert in SILVerifier
 	static var clear = CGColor.constantColorForName(CGColor.clear)!
@@ -17,7 +17,7 @@ class Colors {
 		print("Colors") // CHECK: Colors
 		print(black)    // CHECK: Generic Gray Profile
 		print(white)    // CHECK: Generic Gray Profile
-		print(clear)
+		print(clear)    // CHECK: Generic Gray Profile
 	}
 }
 
