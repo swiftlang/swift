@@ -241,12 +241,19 @@ extension _ArrayBuffer {
         return _native[bounds]
       }
 
+      let boundsCount = bounds.count
+      if boundsCount == 0 {
+        return _SliceBuffer(
+          _ContiguousArrayBuffer<Element>(),
+          shiftedToStartIndex: bounds.startIndex)
+      }
+
       // Look for contiguous storage in the NSArray
       let nonNative = self._nonNative
       let cocoa = _CocoaArrayWrapper(nonNative)
       let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices)
 
-      if cocoaStorageBaseAddress != nil {
+      if let cocoaStorageBaseAddress = cocoaStorageBaseAddress {
         return _SliceBuffer(
           owner: nonNative,
           subscriptBaseAddress: UnsafeMutablePointer(cocoaStorageBaseAddress),
@@ -255,7 +262,6 @@ extension _ArrayBuffer {
       }
 
       // No contiguous storage found; we must allocate
-      let boundsCount = bounds.count
       let result = _ContiguousArrayBuffer<Element>(
         uninitializedCount: boundsCount, minimumCapacity: 0)
 
@@ -273,19 +279,16 @@ extension _ArrayBuffer {
     }
   }
 
-  public var _unconditionalMutableSubscriptBaseAddress:
-    UnsafeMutablePointer<Element> {
+  /// A pointer to the first element.
+  ///
+  /// - Precondition: The elements are known to be stored contiguously.
+  public var firstElementAddress: UnsafeMutablePointer<Element> {
     _sanityCheck(_isNative, "must be a native buffer")
     return _native.firstElementAddress
   }
 
-  /// If the elements are stored contiguously, a pointer to the first
-  /// element. Otherwise, `nil`.
-  public var firstElementAddress: UnsafeMutablePointer<Element> {
-    if (_fastPath(_isNative)) {
-      return _native.firstElementAddress
-    }
-    return nil
+  public var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    return _fastPath(_isNative) ? firstElementAddress : nil
   }
 
   /// The number of elements the buffer stores.
@@ -419,12 +422,12 @@ extension _ArrayBuffer {
     @noescape _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     _sanityCheck(
-      firstElementAddress != nil || count == 0,
+      _isNative || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
     defer { _fixLifetime(self) }
-    return try body(
-      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
+    return try body(UnsafeMutableBufferPointer(
+      start: firstElementAddressIfContiguous, count: count))
   }
   
   /// An object that keeps the elements stored in this buffer alive.

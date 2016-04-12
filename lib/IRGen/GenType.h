@@ -86,6 +86,7 @@ private:
   const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
+  const LoadableTypeInfo *RawPointerTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
   const LoadableTypeInfo *TypeMetadataPtrTI = nullptr;
   const LoadableTypeInfo *ObjCClassPtrTI = nullptr;
@@ -148,6 +149,7 @@ public:
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
+  const LoadableTypeInfo &getRawPointerTypeInfo();
   const LoadableTypeInfo &getTypeMetadataPtrTypeInfo();
   const LoadableTypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();

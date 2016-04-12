@@ -877,7 +877,7 @@ public:
                               ManagedValue input,
                               CanType inputTy,
                               CanType outputTy,
-                              SGFContext C);
+                              SGFContext C = SGFContext());
 
   ManagedValue emitClassMetatypeToObject(SILLocation loc,
                                          ManagedValue v,

@@ -3620,7 +3620,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
 
     // Pre-populate the foreign-representable cache with known types.
     if (auto stdlib = getStdlibModule()) {
-      addTrivial(getIdentifier("OpaquePointer"), stdlib);
+      addTrivial(getIdentifier("OpaquePointer"), stdlib, true);
 
       // Builtin types
       // FIXME: Layering violation to use the ClangImporter's define.
@@ -3636,13 +3636,13 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     }
 
     if (auto objectiveC = getLoadedModule(Id_ObjectiveC)) {
-      addTrivial(Id_Selector, objectiveC);
+      addTrivial(Id_Selector, objectiveC, true);
 
       // Note: ObjCBool is odd because it's bridged to Bool in APIs,
       // but can also be trivially bridged.
       addTrivial(getIdentifier("ObjCBool"), objectiveC);
 
-      addTrivial(getSwiftId(KnownFoundationEntity::NSZone), objectiveC);
+      addTrivial(getSwiftId(KnownFoundationEntity::NSZone), objectiveC, true);
     }
 
     if (auto coreGraphics = getLoadedModule(getIdentifier("CoreGraphics"))) {

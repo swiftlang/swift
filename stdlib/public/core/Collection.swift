@@ -596,8 +596,7 @@ extension Sequence
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Iterator.Element>
   ) -> UnsafeMutablePointer<Iterator.Element> {
-    let s = self._baseAddressIfContiguous
-    if s != nil {
+    if let s = self._baseAddressIfContiguous {
       let count = self.count
       ptr.initializeFrom(s, count: count)
       _fixLifetime(self._owner)

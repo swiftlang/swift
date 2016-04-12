@@ -25,9 +25,9 @@ extension CGColor {
     return CGColor(withColorSpace: colorSpace, components: components)!
   }
 
-  var r: CGFloat { return components[0] }
-  var g: CGFloat { return components[1] }
-  var b: CGFloat { return components[2] }
+  var r: CGFloat { return components![0] }
+  var g: CGFloat { return components![1] }
+  var b: CGFloat { return components![2] }
 }
 
 let pink = CGColor.create(colorSpace: .deviceRGB(),

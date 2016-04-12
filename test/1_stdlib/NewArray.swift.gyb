@@ -80,7 +80,7 @@ func printSequence<T : Sequence>(_ x: T) {
   print("]")
 }
 
-typealias BufferID = UnsafePointer<Void>
+typealias BufferID = UnsafePointer<Void>?
 
 func bufferID<T : _ArrayProtocol>(_ x: T) -> BufferID {
   return x._buffer.identity
@@ -225,7 +225,7 @@ func nsArrayOfStrings() -> Array<NSString> {
   let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
   return src.withUnsafeBufferPointer {
-    let ns =  NSArray(objects: UnsafePointer($0.baseAddress), count: $0.count)
+    let ns =  NSArray(objects: UnsafePointer($0.baseAddress!), count: $0.count)
     return ns as! [NSString]
   }
 }

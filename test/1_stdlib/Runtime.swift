@@ -329,9 +329,9 @@ Runtime.test("demangleName") {
 
 Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   typealias IntPtr = UnsafeMutablePointer<Int>
-  var origP1 = IntPtr(bitPattern: 0x10101010)
-  var origP2 = IntPtr(bitPattern: 0x20202020)
-  var origP3 = IntPtr(bitPattern: 0x30303030)
+  var origP1 = IntPtr(bitPattern: 0x10101010)!
+  var origP2 = IntPtr(bitPattern: 0x20202020)!
+  var origP3 = IntPtr(bitPattern: 0x30303030)!
 
   do {
     var object = origP1
@@ -1360,10 +1360,9 @@ Reflection.test("MirrorMirror") {
 
 Reflection.test("OpaquePointer/null") {
   // Don't crash on null pointers. rdar://problem/19708338
-  var sequence: OpaquePointer = nil
-  var mirror = Mirror(reflecting: sequence)
-  var child = mirror.children.first!
-  expectEqual("(Opaque Value)", "\(child.1)")
+  let pointer: OpaquePointer? = nil
+  let mirror = Mirror(reflecting: pointer)
+  expectEqual(0, mirror.children.count)
 }
 
 Reflection.test("StaticString/Mirror") {

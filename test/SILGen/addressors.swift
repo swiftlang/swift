@@ -3,8 +3,11 @@
 
 import Swift
 
+func someValidPointer<T>() -> UnsafePointer<T> { fatalError() }
+func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
+
 struct A {
-  var base: UnsafeMutablePointer<Int32> = nil
+  var base: UnsafeMutablePointer<Int32> = someValidPointer()
 
   subscript(index: Int32) -> Int32 {
     unsafeAddress {
@@ -108,8 +111,8 @@ protocol Subscriptable {
 
 struct B : Subscriptable {
   subscript(i: Int32) -> Int32 {
-    unsafeAddress { return nil }
-    unsafeMutableAddress { return nil }
+    unsafeAddress { return someValidPointer() }
+    unsafeMutableAddress { return someValidPointer() }
   }
 }
 
@@ -133,7 +136,7 @@ func test_B(_ b: inout B) {
 
 // Test that we handle abstraction difference.
 struct CArray<T> {
-  var storage: UnsafeMutablePointer<T> = nil
+  var storage: UnsafeMutablePointer<T>
   subscript(index: Int) -> T {
     unsafeAddress { return UnsafePointer(storage) + index }
     unsafeMutableAddress { return storage + index }
@@ -165,7 +168,7 @@ func test_carray(_ array: inout CArray<Int32 -> Int32>) -> Int32 {
 struct D : Subscriptable {
   subscript(i: Int32) -> Int32 {
     get { return i }
-    unsafeMutableAddress { return nil }
+    unsafeMutableAddress { return someValidPointer() }
   }
 }
 // Setter.
@@ -226,8 +229,8 @@ func test_d(_ array: inout D) -> Int32 {
 
 struct E {
   var value: Int32 {
-    unsafeAddress { return nil }
-    nonmutating unsafeMutableAddress { return nil }
+    unsafeAddress { return someValidPointer() }
+    nonmutating unsafeMutableAddress { return someValidPointer() }
   }
 }
 

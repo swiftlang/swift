@@ -3309,6 +3309,7 @@ public:
     // If the expected type is ObjectiveC.Selector, add #selector.
     if (Ctx.LangOpts.EnableObjCInterop) {
       for (auto T : ExpectedTypes) {
+        T = T->lookThroughAllAnyOptionalTypes();
         if (auto structDecl = T->getStructOrBoundGenericStruct()) {
           if (structDecl->getName() == Ctx.Id_Selector &&
               structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {

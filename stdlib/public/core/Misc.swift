@@ -115,7 +115,7 @@ func _typeByName(_ name: String) -> Any.Type? {
 
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
-    let type = _getTypeByMangledName(nameUTF8.baseAddress,
+    let type = _getTypeByMangledName(nameUTF8.baseAddress!,
                                      UInt(nameUTF8.endIndex))
 
     return type
@@ -139,7 +139,7 @@ func _stdlib_demangleName(_ mangledName: String) -> String {
     (mangledNameUTF8) in
     let (_, demangledName) = _withUninitializedString {
       _stdlib_demangleNameImpl(
-        mangledNameUTF8.baseAddress, UInt(mangledNameUTF8.endIndex),
+        mangledNameUTF8.baseAddress!, UInt(mangledNameUTF8.endIndex),
         $0)
     }
     return demangledName

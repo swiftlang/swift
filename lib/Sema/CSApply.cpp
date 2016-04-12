@@ -5001,32 +5001,78 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
-      // Overwrite the l-value access kind to be read-only if we're
-      // converting to a non-mutable pointer type.
+      OptionalTypeKind optionalKind;
+      Type unwrappedTy = toType;
+      if (Type unwrapped = toType->getAnyOptionalObjectType(optionalKind))
+        unwrappedTy = unwrapped;
       PointerTypeKind pointerKind;
-      auto toEltType = toType->getAnyPointerElementType(pointerKind);
+      auto toEltType = unwrappedTy->getAnyPointerElementType(pointerKind);
       assert(toEltType && "not a pointer type?"); (void) toEltType;
       if (pointerKind == PTK_UnsafePointer) {
+        // Overwrite the l-value access kind to be read-only if we're
+        // converting to a non-mutable pointer type.
         cast<InOutExpr>(expr->getValueProvidingExpr())->getSubExpr()
           ->propagateLValueAccessKind(AccessKind::Read, /*overwrite*/ true);
       }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      return new (tc.Context) InOutToPointerExpr(expr, toType);
+      Expr *result = new (tc.Context) InOutToPointerExpr(expr, unwrappedTy);
+      if (optionalKind != OTK_None)
+        result = new (tc.Context) InjectIntoOptionalExpr(result, toType);
+      return result;
     }
     
     case ConversionRestrictionKind::ArrayToPointer: {
+      OptionalTypeKind optionalKind;
+      Type unwrappedTy = toType;
+      if (Type unwrapped = toType->getAnyOptionalObjectType(optionalKind))
+        unwrappedTy = unwrapped;
+
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      return new (tc.Context) ArrayToPointerExpr(expr, toType);
+      Expr *result = new (tc.Context) ArrayToPointerExpr(expr, unwrappedTy);
+      if (optionalKind != OTK_None)
+        result = new (tc.Context) InjectIntoOptionalExpr(result, toType);
+      return result;
     }
     
     case ConversionRestrictionKind::StringToPointer: {
+      OptionalTypeKind optionalKind;
+      Type unwrappedTy = toType;
+      if (Type unwrapped = toType->getAnyOptionalObjectType(optionalKind))
+        unwrappedTy = unwrapped;
+
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      return new (tc.Context) StringToPointerExpr(expr, toType);
+      Expr *result = new (tc.Context) StringToPointerExpr(expr, unwrappedTy);
+      if (optionalKind != OTK_None)
+        result = new (tc.Context) InjectIntoOptionalExpr(result, toType);
+      return result;
     }
     
     case ConversionRestrictionKind::PointerToPointer: {
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
+      Type unwrappedToTy = toType->getAnyOptionalObjectType();
+
+      // Optional to optional.
+      if (Type unwrappedFromTy = expr->getType()->getAnyOptionalObjectType()) {
+        assert(unwrappedToTy && "converting optional to non-optional");
+        Expr *boundOptional =
+          new (tc.Context) BindOptionalExpr(expr, SourceLoc(), /*depth*/0,
+                                            unwrappedFromTy);
+        Expr *converted =
+          new (tc.Context) PointerToPointerExpr(boundOptional, unwrappedToTy);
+        Expr *rewrapped =
+          new (tc.Context) InjectIntoOptionalExpr(converted, toType);
+        return new (tc.Context) OptionalEvaluationExpr(rewrapped, toType);
+      }
+
+      // Non-optional to optional.
+      if (unwrappedToTy) {
+        Expr *converted =
+            new (tc.Context) PointerToPointerExpr(expr, unwrappedToTy);
+        return new (tc.Context) InjectIntoOptionalExpr(converted, toType);
+      }
+
+      // Non-optional to non-optional.
       return new (tc.Context) PointerToPointerExpr(expr, toType);
     }
 

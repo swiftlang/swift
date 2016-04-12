@@ -17,45 +17,52 @@ import Darwin
 import Glibc
 #endif
 
-// swift_posix_spawn isn't available in the public watchOS SDK, we sneak by the
+// FIXME: Come up with a better way to deal with APIs that are pointers on some
+// platforms but not others.
+#if os(Linux)
+typealias swift_posix_spawn_file_actions_t = posix_spawn_file_actions_t
+#else
+typealias swift_posix_spawn_file_actions_t = posix_spawn_file_actions_t?
+#endif
+
+// posix_spawn isn't available in the public watchOS SDK, we sneak by the
 // unavailable attribute declaration here of the APIs that we need.
 
 @_silgen_name("posix_spawn_file_actions_init")
 func swift_posix_spawn_file_actions_init(
-  _ file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
+  _ file_actions: UnsafeMutablePointer<swift_posix_spawn_file_actions_t>
+) -> CInt
 
 @_silgen_name("posix_spawn_file_actions_destroy")
 func swift_posix_spawn_file_actions_destroy(
-  _ file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
+  _ file_actions: UnsafeMutablePointer<swift_posix_spawn_file_actions_t>
+) -> CInt
 
 @_silgen_name("posix_spawn_file_actions_addclose")
-func swift_posix_spawn_file_actions_addclose(_ file_actions:
-  UnsafeMutablePointer<posix_spawn_file_actions_t>, _ filedes: CInt) -> CInt
+func swift_posix_spawn_file_actions_addclose(
+  _ file_actions: UnsafeMutablePointer<swift_posix_spawn_file_actions_t>,
+  _ filedes: CInt) -> CInt
 
 @_silgen_name("posix_spawn_file_actions_adddup2")
 func swift_posix_spawn_file_actions_adddup2(
-  _ file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>,
+  _ file_actions: UnsafeMutablePointer<swift_posix_spawn_file_actions_t>,
   _ filedes: CInt,
   _ newfiledes: CInt) -> CInt
 
 @_silgen_name("posix_spawn")
 func swift_posix_spawn(
-  _ pid: UnsafeMutablePointer<pid_t>,
+  _ pid: UnsafeMutablePointer<pid_t>?,
   _ file: UnsafePointer<Int8>,
-  _ file_actions: UnsafePointer<posix_spawn_file_actions_t>,
-  _ attrp: UnsafePointer<posix_spawnattr_t>,
-  _ argv: UnsafePointer<UnsafeMutablePointer<Int8>>,
-  _ envp: UnsafePointer<UnsafeMutablePointer<Int8>>) -> CInt
+  _ file_actions: UnsafePointer<swift_posix_spawn_file_actions_t>?,
+  _ attrp: UnsafePointer<posix_spawnattr_t>?,
+  _ argv: UnsafePointer<UnsafePointer<Int8>?>,
+  _ envp: UnsafePointer<UnsafeMutablePointer<Int8>?>?) -> CInt
 
 /// Calls POSIX `pipe()`.
 func posixPipe() -> (readFD: CInt, writeFD: CInt) {
   var fds: [CInt] = [ -1, -1 ]
-  var _: Void = fds.withUnsafeMutableBufferPointer {
-    (fds) in
-    let ptr = fds.baseAddress
-    if pipe(ptr) != 0 {
-      preconditionFailure("pipe() failed")
-    }
+  if pipe(&fds) != 0 {
+    preconditionFailure("pipe() failed")
   }
   return (fds[0], fds[1])
 }
@@ -64,7 +71,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 /// stderr.
 public func spawnChild(_ args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
-  var fileActions: posix_spawn_file_actions_t = _make_posix_spawn_file_actions_t()
+  var fileActions = _make_posix_spawn_file_actions_t()
   if swift_posix_spawn_file_actions_init(&fileActions) != 0 {
     preconditionFailure("swift_posix_spawn_file_actions_init() failed")
   }
@@ -148,13 +155,17 @@ public func spawnChild(_ args: [String])
   return (pid, childStdin.writeFD, childStdout.readFD, childStderr.readFD)
 }
 
-internal func _make_posix_spawn_file_actions_t() -> posix_spawn_file_actions_t {
 #if os(Linux)
+internal func _make_posix_spawn_file_actions_t()
+  -> swift_posix_spawn_file_actions_t {
   return posix_spawn_file_actions_t()
-#else
-  return nil
-#endif
 }
+#else
+internal func _make_posix_spawn_file_actions_t()
+  -> swift_posix_spawn_file_actions_t {
+  return nil
+}
+#endif
 
 internal func _readAll(_ fd: CInt) -> String {
   var buffer = [UInt8](repeating: 0, count: 1024)
@@ -162,7 +173,7 @@ internal func _readAll(_ fd: CInt) -> String {
   while true {
     let readResult: ssize_t = buffer.withUnsafeMutableBufferPointer {
       (buffer) in
-      let ptr = UnsafeMutablePointer<Void>(buffer.baseAddress + usedBytes)
+      let ptr = UnsafeMutablePointer<Void>(buffer.baseAddress! + usedBytes)
       return read(fd, ptr, size_t(buffer.count - usedBytes))
     }
     if readResult > 0 {
@@ -242,10 +253,10 @@ public func runChild(_ args: [String])
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 @_silgen_name("_NSGetEnviron")
-func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>>
 #endif
 
-internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
+internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   return _NSGetEnviron().pointee
 #elseif os(FreeBSD)

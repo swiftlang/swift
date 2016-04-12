@@ -69,7 +69,7 @@ extension AudioBufferList {
       "failed to allocate memory for an AudioBufferList")
 
     let abl = UnsafeMutableAudioBufferListPointer(
-        UnsafeMutablePointer<AudioBufferList>(ablMemory))
+        UnsafeMutablePointer<AudioBufferList>(ablMemory!))
     abl.count = maximumBuffers
     return abl
   }
@@ -84,6 +84,12 @@ public struct UnsafeMutableAudioBufferListPointer {
   /// Construct from an `AudioBufferList` pointer.
   public init(_ p: UnsafeMutablePointer<AudioBufferList>) {
     unsafeMutablePointer = p
+  }
+
+  /// Construct from an `AudioBufferList` pointer.
+  public init?(_ p: UnsafeMutablePointer<AudioBufferList>?) {
+    guard let unwrapped = p else { return nil }
+    self.init(unwrapped)
   }
 
   /// The number of `AudioBuffer`s in the `AudioBufferList`

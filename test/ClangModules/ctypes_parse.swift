@@ -76,7 +76,7 @@ func testUnnamedStructs() {
 // FIXME: Import pointers to opaque types as unique types.
 
 func testPointers() {
-  _ = nil as HWND
+  _ = HWND(bitPattern: 0)
 }
 
 // Ensure that imported structs can be extended, even if typedef'ed on the C
@@ -200,11 +200,11 @@ func testFunctionPointers() {
   useFunctionPointer(wrapper.a)
   _ = wrapper.b as (@convention(c) (CInt) -> CInt)
 
-  var anotherFP: @convention(c) (CInt, CLong, UnsafeMutablePointer<Void>) -> Void
+  var anotherFP: @convention(c) (CInt, CLong, UnsafeMutablePointer<Void>!) -> Void
     = getFunctionPointer2()
 
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{cannot assign value of type 'fptr!' to type '@convention(c) (CInt, CLong, UnsafeMutablePointer<Void>) -> Void'}}
+  anotherFP = fp // expected-error {{cannot assign value of type 'fptr!' to type '@convention(c) (CInt, CLong, UnsafeMutablePointer<Void>!) -> Void'}}
 }
 
 func testStructDefaultInit() {

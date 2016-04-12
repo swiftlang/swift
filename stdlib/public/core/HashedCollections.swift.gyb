@@ -272,6 +272,11 @@ internal struct _UnmanagedAnyObjectArray {
     self.value = UnsafeMutablePointer(up)
   }
 
+  internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
+    guard let unwrapped = up else { return nil }
+    self.init(unwrapped)
+  }
+
   internal subscript(i: Int) -> AnyObject {
     get {
       return _reinterpretCastToAnyObject(value[i])
@@ -1805,7 +1810,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
       let alignment = UInt(alignof(UInt))
       let alignMask = alignment &- UInt(1)
       return UnsafeMutablePointer<UInt>(
-          bitPattern:(start &+ alignMask) & ~alignMask)
+          bitPattern:(start &+ alignMask) & ~alignMask)!
     }
   }
 
@@ -1819,7 +1824,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
       let alignment = UInt(alignof(Key))
       let alignMask = alignment &- UInt(1)
       return UnsafeMutablePointer<Key>(
-          bitPattern:(start &+ alignMask) & ~alignMask)
+          bitPattern:(start &+ alignMask) & ~alignMask)!
     }
   }
 
@@ -1832,7 +1837,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
       let alignment = UInt(alignof(Value))
       let alignMask = alignment &- UInt(1)
       return UnsafeMutablePointer<Value>(
-          bitPattern:(start &+ alignMask) & ~alignMask)
+          bitPattern:(start &+ alignMask) & ~alignMask)!
     }
   }
 %end
@@ -2461,8 +2466,8 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
-  internal func countByEnumeratingWith(
-    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
   ) -> Int {
@@ -2564,7 +2569,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc(copyWithZone:)
   @warn_unused_result
-  internal func copy(with zone: _SwiftNSZone) -> AnyObject {
+  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSSet` type, which is immutable.
     return self
@@ -2601,7 +2606,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc(copyWithZone:)
   @warn_unused_result
-  internal func copy(with zone: _SwiftNSZone) -> AnyObject {
+  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
     return self
@@ -2609,8 +2614,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc
   internal func getObjects(
-    _ objects: UnsafeMutablePointer<AnyObject>,
-    andKeys keys: UnsafeMutablePointer<AnyObject>
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?
   ) {
     bridgedAllKeysAndValues(objects, keys)
   }
@@ -2734,50 +2739,44 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   internal func bridgedAllKeysAndValues(
-    _ objects: UnsafeMutablePointer<AnyObject>,
-    _ keys: UnsafeMutablePointer<AnyObject>
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    _ keys: UnsafeMutablePointer<AnyObject>?
   ) {
     bridgeEverything()
     // The user is expected to provide a buffer of the correct size
     var i = 0 // Position in the input buffer
-    var position = 0 // Position in the dictionary storage
     let capacity = bridgedNativeStorage.capacity
-    let unmanagedKeys = _UnmanagedAnyObjectArray(keys)
-    let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
 
-    if keys == nil {
-      if objects == nil {
-        // do nothing, both are null
-      } else {
-        // keys null, objects nonnull
-        while position < capacity {
+    if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
+      if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
+        // keys nonnull, objects nonnull
+        for position in 0..<capacity {
           if bridgedNativeStorage.isInitializedEntry(at: position) {
             unmanagedObjects[i] = bridgedNativeStorage.value(at: position)
+            unmanagedKeys[i] = bridgedNativeStorage.key(at: position)
             i += 1
           }
-          position += 1
+        }
+      } else {
+        // keys nonnull, objects null
+        for position in 0..<capacity {
+          if bridgedNativeStorage.isInitializedEntry(at: position) {
+            unmanagedKeys[i] = bridgedNativeStorage.key(at: position)
+            i += 1
+          }
         }
       }
     } else {
-      if objects == nil {
-        // keys nonnull, objects null
-        while position < capacity {
-          if bridgedNativeStorage.isInitializedEntry(at: position) {
-            unmanagedKeys[i] = bridgedNativeStorage.key(at: position)
-            i += 1
-          }
-          position += 1
-        }
-      } else {
-        // keys nonnull, objects nonnull
-        while position < capacity {
+      if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
+        // keys null, objects nonnull
+        for position in 0..<capacity {
           if bridgedNativeStorage.isInitializedEntry(at: position) {
             unmanagedObjects[i] = bridgedNativeStorage.value(at: position)
-            unmanagedKeys[i] = bridgedNativeStorage.key(at: position)
             i += 1
           }
-          position += 1
         }
+      } else {
+        // do nothing, both are null
       }
     }
   }
@@ -2811,9 +2810,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
-  internal func countByEnumeratingWith(
-    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>,
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?,
     count: Int
   ) -> Int {
     var theState = state.pointee
@@ -2823,7 +2822,15 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       theState.extra.0 = CUnsignedLong(nativeStorage.startIndex.offset)
     }
-    let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
+
+    // Test 'objects' rather than 'count' because (a) this is very rare anyway,
+    // and (b) the optimizer should then be able to optimize away the
+    // unwrapping check below.
+    if _slowPath(objects == nil) {
+      return 0
+    }
+
+    let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
     var currIndex = _Native${Self}Index<${TypeParameters}>(
         nativeStorage: nativeStorage, offset: Int(theState.extra.0))
     let endIndex = nativeStorage.endIndex
@@ -3948,8 +3955,8 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
       // properties, because doing so might introduce a writeback buffer, but
       // fast enumeration relies on the pointer identity of the enumeration
       // state struct.
-      itemCount = cocoa${Self}.countByEnumeratingWith(
-        _fastEnumerationStatePtr,
+      itemCount = cocoa${Self}.countByEnumerating(
+        with: _fastEnumerationStatePtr,
         objects: UnsafeMutablePointer(_fastEnumerationStackBufPtr),
         count: stackBufCount)
       if itemCount == 0 {
@@ -3959,7 +3966,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
       itemIndex = 0
     }
     let itemsPtrUP: UnsafeMutablePointer<AnyObject> =
-      UnsafeMutablePointer(_fastEnumerationState.itemsPtr)
+      UnsafeMutablePointer(_fastEnumerationState.itemsPtr!)
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]
     itemIndex += 1

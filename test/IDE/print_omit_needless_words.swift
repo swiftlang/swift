@@ -47,7 +47,7 @@
 
 // Note: Pointer-to-struct name matching; preposition splitting.
 //
-// CHECK-FOUNDATION: func copy(with: Zone = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(with: Zone? = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func object(forKey: Copying) -> AnyObject?
@@ -97,7 +97,7 @@
 // CHECK-FOUNDATION: var uppercased: String
 
 // Note: don't map base name down to a keyword.
-// CHECK-FOUNDATION: func doSelector(_: Selector)
+// CHECK-FOUNDATION: func doSelector(_: Selector!)
 
 // Note: Strip names preceded by a gerund.
 // CHECK-FOUNDATION: func startSquashing(_: Bee)
@@ -134,11 +134,11 @@
 // CHECK-FOUNDATION: static var reverse: EnumerationOptions
 
 // Note: usingBlock -> body
-// CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], using: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>!) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], using: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>!) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>!) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomething(with: Copying)
@@ -173,7 +173,7 @@
 // CHECK-FOUNDATION: var setShouldBeInfinite: Bool { get }
 
 // "UTF8" initialisms.
-// CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>)
+// CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>!)
 
 // Don't strip prefixes from globals.
 // CHECK-FOUNDATION: let NSGlobalConstant: String
@@ -201,7 +201,7 @@
 // CHECK-APPKIT: func same() -> Self
 
 // Note: Unsafe(Mutable)Pointers don't get defaulted to 'nil'
-// CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8>)
+// CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8>?)
 
 // Note: Skipping over "3D"
 // CHECK-APPKIT: func drawInAir(at: Point3D)
@@ -253,7 +253,7 @@
 // CHECK-APPKIT: func setContentHuggingPriority(_: NSLayoutPriority)
 
 // Look through typedefs of pointers.
-// CHECK-APPKIT: func layout(at: NSPointPointer)
+// CHECK-APPKIT: func layout(at: NSPointPointer!)
 
 // The presence of a property prevents us from stripping redundant
 // type information from the base name.
@@ -273,7 +273,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with: [URL])
 // CHECK-OMIT-NEEDLESS-WORDS: func save(to: URL, forSaveOperation: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed: String)
-// CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>)
+// CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>!)
 
 // CHECK-OMIT-NEEDLESS-WORDS: func type(of: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func type(ofNamedString: String)
@@ -294,10 +294,10 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func slobbering(_: String) -> OmitNeedlessWords
 
 // Elements of C array types
-// CHECK-OMIT-NEEDLESS-WORDS: func drawPolygon(with: UnsafePointer<Point>, count: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func drawPolygon(with: UnsafePointer<Point>!, count: Int)
 
 // Typedef ending in "Array".
-// CHECK-OMIT-NEEDLESS-WORDS: func drawFilledPolygon(with: PointArray, count: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func drawFilledPolygon(with: PointArray!, count: Int)
 
 // Non-parameterized Objective-C class ending in "Array".
 // CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)
