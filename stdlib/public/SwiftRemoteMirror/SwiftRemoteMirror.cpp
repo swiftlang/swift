@@ -1,8 +1,10 @@
 #include "swift/Reflection/ReflectionContext.h"
+#include "swift/Remote/CMemoryReader.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
 using namespace swift;
-using namespace reflection;
+using namespace swift::reflection;
+using namespace swift::remote;
 
 using NativeReflectionContext
   = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;

@@ -17,6 +17,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Reflection/ReflectionContext.h"
+#include "swift/Remote/InProcessMemoryReader.h"
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/MachO.h"
@@ -36,7 +37,8 @@ using llvm::ArrayRef;
 using namespace llvm::object;
 
 using namespace swift;
-using namespace reflection;
+using namespace swift::reflection;
+using namespace swift::remote;
 using namespace Demangle;
 
 enum class ActionType {

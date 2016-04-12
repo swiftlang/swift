@@ -19,7 +19,7 @@
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
 #include "swift/Runtime/Metadata.h"
-#include "swift/Reflection/Reader.h"
+#include "swift/Remote/MemoryReader.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirrorTypes.h"
@@ -32,6 +32,41 @@ class NodePointer;
 
 namespace swift {
 namespace reflection {
+
+using swift::remote::MemoryReader;
+using swift::remote::RemoteAddress;
+
+template <typename Iterator>
+class ReflectionSection {
+  using const_iterator = Iterator;
+  const void * const Begin;
+  const void * const End;
+
+public:
+  ReflectionSection(const void * const Begin,
+                    const void * const End)
+  : Begin(Begin), End(End) {}
+
+  ReflectionSection(uint64_t Begin, uint64_t End)
+  : Begin(reinterpret_cast<const void * const>(Begin)),
+  End(reinterpret_cast<const void * const>(End)) {}
+
+  void *startAddress() {
+    return const_cast<void *>(Begin);
+  }
+
+  const_iterator begin() const {
+    return const_iterator(Begin, End);
+  }
+
+  const_iterator end() const {
+    return const_iterator(End, End);
+  }
+
+  size_t size() const {
+    return (char *)End - (char *)Begin;
+  }
+};
 
 template <typename Runtime>
 using SharedTargetMetadataRef = std::shared_ptr<TargetMetadata<Runtime>>;
@@ -87,7 +122,7 @@ class ReflectionContext {
   SharedTargetMetadataRef<Runtime> _readMetadata(StoredPointer Address,
                                                  size_t Size = sizeof(M)) {
     uint8_t *Buffer = (uint8_t *)malloc(Size);
-    if (!Reader->readBytes(Address, Buffer, Size)) {
+    if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size)) {
       free(Buffer);
       return nullptr;
     }
@@ -202,7 +237,7 @@ public:
       return Cached->second;
 
     StoredPointer KindValue = 0;
-    if (!Reader->readInteger(Address, &KindValue))
+    if (!Reader->readInteger(RemoteAddress(Address), &KindValue))
       return nullptr;
 
     auto Kind = static_cast<MetadataKind>(KindValue);
@@ -219,7 +254,8 @@ public:
         StoredPointer NumProtocolsAddress = Address +
           TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
         StoredPointer NumProtocols;
-        if (!Reader->readInteger(NumProtocolsAddress, &NumProtocols))
+        if (!Reader->readInteger(RemoteAddress(NumProtocolsAddress),
+                                 &NumProtocols))
           return nullptr;
 
         auto TotalSize = sizeof(TargetExistentialTypeMetadata<Runtime>) +
@@ -254,7 +290,8 @@ public:
         auto NumElementsAddress = Address +
           TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
         StoredSize NumElements;
-        if (!Reader->readInteger(NumElementsAddress, &NumElements))
+        if (!Reader->readInteger(RemoteAddress(NumElementsAddress),
+                                 &NumElements))
           return nullptr;
         auto TotalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
           NumElements * sizeof(StoredPointer);
@@ -270,7 +307,7 @@ public:
   template<typename Offset>
   StoredPointer resolveRelativeOffset(StoredPointer targetAddress) {
     Offset relative;
-    if (!Reader->readInteger(targetAddress, &relative))
+    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
       return 0;
     using SignedOffset = typename std::make_signed<Offset>::type;
     using SignedPointer = typename std::make_signed<StoredPointer>::type;
@@ -316,7 +353,7 @@ public:
 
     auto Size = sizeof(TargetNominalTypeDescriptor<Runtime>);
     auto Buffer = (uint8_t *)malloc(Size);
-    if (!Reader->readBytes(DescriptorAddress, Buffer, Size)) {
+    if (!Reader->readBytes(RemoteAddress(DescriptorAddress), Buffer, Size)) {
       free(Buffer);
       return {nullptr, 0};
     }
@@ -340,7 +377,7 @@ public:
   readProtocolDescriptor(StoredPointer Address) {
     auto Size = sizeof(TargetProtocolDescriptor<Runtime>);
     auto Buffer = (uint8_t *)malloc(Size);
-    if (!Reader->readBytes(Address, Buffer, Size)) {
+    if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size)) {
       free(Buffer);
       return nullptr;
     }
@@ -356,7 +393,8 @@ public:
       auto AddressOfParentAddress
         = resolveRelativeOffset<StoredPointer>(MetadataAddress +
                                              ValueMeta->offsetToParentOffset());
-      if (!Reader->readInteger(AddressOfParentAddress, &ParentAddress))
+      if (!Reader->readInteger(RemoteAddress(AddressOfParentAddress),
+                               &ParentAddress))
         return 0;
     } else if (auto Class = dyn_cast<TargetClassMetadata<Runtime>>(Meta.get())){
       StoredPointer DescriptorAddress;
@@ -366,7 +404,8 @@ public:
       TypeRefVector Substitutions;
       auto OffsetToParent
         = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset - 1);
-      if (!Reader->readInteger(MetadataAddress + OffsetToParent, &ParentAddress))
+      if (!Reader->readInteger(RemoteAddress(MetadataAddress + OffsetToParent),
+                               &ParentAddress))
         return 0;
     }
     return ParentAddress;
@@ -393,8 +432,8 @@ public:
     for (ArgIndex i = 0; i < NumGenericParams; ++i,
          AddressOfGenericArgAddress += sizeof(StoredPointer)) {
         StoredPointer GenericArgAddress;
-        if (!Reader->readInteger(AddressOfGenericArgAddress,
-                                &GenericArgAddress))
+        if (!Reader->readInteger(RemoteAddress(AddressOfGenericArgAddress),
+                                 &GenericArgAddress))
           return {};
       if (auto GenericArg = getTypeRef(GenericArgAddress))
         Substitutions.push_back(GenericArg);
@@ -418,8 +457,8 @@ public:
     auto NameAddress
       = resolveRelativeOffset<int32_t>(DescriptorAddress +
                                        Descriptor->offsetToNameOffset());
-    auto MangledName = Reader->readString(NameAddress);
-    if (MangledName.empty())
+    std::string MangledName;
+    if (!Reader->readString(RemoteAddress(NameAddress), MangledName))
       return nullptr;
 
     auto DemangleNode = Demangle::demangleTypeAsNode(MangledName);
@@ -471,7 +510,8 @@ public:
       for (StoredPointer i = 0; i < TupleMeta->NumElements; ++i,
            ElementAddress += sizeof(Element)) {
         Element E;
-        if (!Reader->readBytes(ElementAddress, (uint8_t*)&E, sizeof(Element)))
+        if (!Reader->readBytes(RemoteAddress(ElementAddress),
+                               (uint8_t*)&E, sizeof(Element)))
           return nullptr;
 
         if (auto ElementTypeRef = getTypeRef(E.Type))
@@ -486,7 +526,8 @@ public:
       StoredPointer FlagsAddress = MetadataAddress +
         TargetFunctionTypeMetadata<Runtime>::OffsetToFlags;
       TargetFunctionTypeFlags<Runtime> Flags;
-      if (!Reader->readBytes(FlagsAddress, (uint8_t*)&Flags, sizeof(Flags)))
+      if (!Reader->readBytes(RemoteAddress(FlagsAddress),
+                             (uint8_t*)&Flags, sizeof(Flags)))
         return nullptr;
       TypeRefVector Arguments;
       StoredPointer ArgumentAddress = MetadataAddress +
@@ -494,7 +535,8 @@ public:
       for (StoredPointer i = 0; i < Function->getNumArguments(); ++i,
            ArgumentAddress += sizeof(StoredPointer)) {
         StoredPointer FlaggedArgumentAddress;
-        if (!Reader->readInteger(ArgumentAddress, &FlaggedArgumentAddress))
+        if (!Reader->readInteger(RemoteAddress(ArgumentAddress),
+                                 &FlaggedArgumentAddress))
           return nullptr;
         // TODO: Use target-agnostic FlaggedPointer to mask this!
         FlaggedArgumentAddress &= ~((StoredPointer)1);
@@ -517,8 +559,10 @@ public:
         auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
         if (!ProtocolDescriptor)
           return nullptr;
-        auto MangledName = Reader->readString(ProtocolDescriptor->Name);
-        if (MangledName.empty())
+        
+        std::string MangledName;
+        if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
+                                MangledName))
           return nullptr;
         auto Demangled = Demangle::demangleSymbolAsNode(MangledName);
         auto Protocol = TypeRef::fromDemangleNode(Demangled);
@@ -607,8 +651,8 @@ public:
     auto NameAddress
       = resolveRelativeOffset<int32_t>(DescriptorAddress +
                                        Descriptor->offsetToNameOffset());
-    auto MangledName = Reader->readString(NameAddress);
-    if (MangledName.empty())
+    std::string MangledName;
+    if (!Reader->readString(RemoteAddress(NameAddress), MangledName))
       return {};
 
     auto TR = getTypeRef(MetadataAddress);
