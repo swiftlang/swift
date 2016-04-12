@@ -701,11 +701,11 @@ the number of parallel build jobs to use""",
         action="append", dest="extra_swift_args", default=[])
 
     parser.add_argument(
-        "--extra-cmake-vars", help=textwrap.dedent("""
-    Pass through extra variables to CMake in the form of comma separated vars
-    'CMAKE_VAR1=YES,CMAKE_VAR2=/tmp'. Can be called multiple times to add
-    multiple such vars."""),
-        action="append", dest="extra_cmake_vars", default=[])
+        "--extra-cmake-options", help=textwrap.dedent("""
+    Pass through extra options to CMake in the form of comma separated options
+    '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be called multiple times to add
+    multiple such options."""),
+        action="append", dest="extra_cmake_options", default=[])
 
     parser.add_argument(
         "build_script_impl_args",
@@ -1117,10 +1117,10 @@ the number of parallel build jobs to use""",
 
     # If we have extra_cmake_args, combine all of them together and then add
     # them as one command.
-    if args.extra_cmake_vars:
+    if args.extra_cmake_options:
         build_script_impl_args += [
-            "--extra-cmake-vars",
-            ",".join(args.extra_cmake_vars)]
+            "--extra-cmake-options",
+            ",".join(args.extra_cmake_options)]
 
     build_script_impl_args += args.build_script_impl_args
 
