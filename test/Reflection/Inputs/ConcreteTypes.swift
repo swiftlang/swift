@@ -45,6 +45,12 @@ public enum E {
   case Metatype(E.Type)
 }
 
+public struct References {
+  public let strongRef: C
+  public weak var weakRef: C?
+  public unowned var unownedRef: C
+}
+
 #if _runtime(_ObjC)
 
 public class OC : NSObject {

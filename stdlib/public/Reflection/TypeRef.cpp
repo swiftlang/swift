@@ -174,6 +174,24 @@ public:
     OS << ')';
   }
 
+  void visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    printHeader("unowned-storage");
+    printRec(US->getType().get());
+    OS << ')';
+  }
+
+  void visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    printHeader("weak-storage");
+    printRec(WS->getType().get());
+    OS << ')';
+  }
+
+  void visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    printHeader("weak-storage");
+    printRec(US->getType().get());
+    OS << ')';
+  }
+
   void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
     OS << ')';
@@ -253,16 +271,28 @@ struct TypeRefIsConcrete
     return true;
   }
   
-  bool visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
+  bool visitOpaqueTypeRef(const OpaqueTypeRef *OP) {
     return true;
+  }
+
+  bool visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    return visit(US->getType().get());
+  }
+
+  bool visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    return visit(WS->getType().get());
+  }
+
+  bool visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    return visit(US->getType().get());
   }
 };
 
 const std::shared_ptr<ForeignClassTypeRef>
-ForeignClassTypeRef::Unnamed = std::make_shared<ForeignClassTypeRef>("");
+ForeignClassTypeRef::Unnamed = ForeignClassTypeRef::create("");
 
 const std::shared_ptr<ObjCClassTypeRef>
-ObjCClassTypeRef::Unnamed = std::make_shared<ObjCClassTypeRef>("");
+ObjCClassTypeRef::Unnamed = ObjCClassTypeRef::create("");
 
 const std::shared_ptr<OpaqueTypeRef>
 OpaqueTypeRef::Opaque = std::make_shared<OpaqueTypeRef>();
@@ -373,6 +403,18 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     }
     case NodeKind::DependentAssociatedTypeRef:
       return fromDemangleNode(Node->getChild(0));
+    case NodeKind::Unowned: {
+      auto base = fromDemangleNode(Node->getChild(0));
+      return UnownedStorageTypeRef::create(base);
+    }
+    case NodeKind::Unmanaged: {
+      auto base = fromDemangleNode(Node->getChild(0));
+      return UnmanagedStorageTypeRef::create(base);
+    }
+    case NodeKind::Weak: {
+      auto base = fromDemangleNode(Node->getChild(0));
+      return WeakStorageTypeRef::create(base);
+    }
     default:
       return nullptr;
   }

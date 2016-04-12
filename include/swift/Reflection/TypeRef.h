@@ -470,6 +470,72 @@ public:
   }
 };
 
+class ReferenceStorageTypeRef : public TypeRef {
+  TypeRefPointer Type;
+
+protected:
+  ReferenceStorageTypeRef(TypeRefKind Kind, TypeRefPointer Type)
+    : TypeRef(Kind), Type(Type) {}
+
+public:
+  ConstTypeRefPointer getType() const {
+    return Type;
+  }
+
+  TypeRefPointer getType() {
+    return Type;
+  }
+
+  void setType(TypeRefPointer T) {
+    Type = T;
+  }
+};
+
+class UnownedStorageTypeRef final : public ReferenceStorageTypeRef {
+public:
+  UnownedStorageTypeRef(TypeRefPointer Type)
+    : ReferenceStorageTypeRef(TypeRefKind::UnownedStorage, Type) {}
+
+  static std::shared_ptr<UnownedStorageTypeRef>
+  create(TypeRefPointer Type) {
+    return std::make_shared<UnownedStorageTypeRef>(Type);
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::UnownedStorage;
+  }
+};
+
+class WeakStorageTypeRef final : public ReferenceStorageTypeRef {
+public:
+  WeakStorageTypeRef(TypeRefPointer Type)
+    : ReferenceStorageTypeRef(TypeRefKind::WeakStorage, Type) {}
+
+  static std::shared_ptr<WeakStorageTypeRef>
+  create(TypeRefPointer Type) {
+    return std::make_shared<WeakStorageTypeRef>(Type);
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::WeakStorage;
+  }
+};
+
+class UnmanagedStorageTypeRef final : public ReferenceStorageTypeRef {
+public:
+  UnmanagedStorageTypeRef(TypeRefPointer Type)
+    : ReferenceStorageTypeRef(TypeRefKind::UnmanagedStorage, Type) {}
+
+  static std::shared_ptr<UnmanagedStorageTypeRef>
+  create(TypeRefPointer Type) {
+    return std::make_shared<UnmanagedStorageTypeRef>(Type);
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::UnmanagedStorage;
+  }
+};
+
 template <typename ImplClass, typename RetTy = void, typename... Args>
 class TypeRefVisitor {
 public:
@@ -608,7 +674,29 @@ public:
   TypeRefPointer visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     return std::make_shared<ObjCClassTypeRef>(*OC);
   }
-  
+
+  TypeRefPointer visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    if (auto SubstitutedType = visit(US->getType().get()))
+      return UnownedStorageTypeRef::create(SubstitutedType);
+    else
+      return nullptr;
+  }
+
+  TypeRefPointer visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    if (auto SubstitutedType = visit(WS->getType().get()))
+      return WeakStorageTypeRef::create(SubstitutedType);
+    else
+      return nullptr;
+  }
+
+  TypeRefPointer
+  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    if (auto SubstitutedType = visit(US->getType().get()))
+      return UnmanagedStorageTypeRef::create(SubstitutedType);
+    else
+      return nullptr;
+  }
+
   TypeRefPointer visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
     return std::make_shared<OpaqueTypeRef>(*Op);
   }

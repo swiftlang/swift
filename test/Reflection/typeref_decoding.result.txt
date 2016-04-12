@@ -138,6 +138,20 @@ Metatype: (TypesToReflect.E.Type) -> (TypesToReflect.E.Type) -> TypesToReflect.E
       (enum TypesToReflect.E))
     (enum TypesToReflect.E)))
 
+TypesToReflect.References
+-------------------------
+strongRef: TypesToReflect.C
+(class TypesToReflect.C)
+
+weakRef: weak Swift.Optional<TypesToReflect.C>
+(weak-storage
+  (bound-generic enum Swift.Optional
+    (class TypesToReflect.C)))
+
+unownedRef: unowned TypesToReflect.C
+(unowned-storage
+  (class TypesToReflect.C))
+
 TypesToReflect.C1
 -----------------
 aClass: TypesToReflect.C1<A>
