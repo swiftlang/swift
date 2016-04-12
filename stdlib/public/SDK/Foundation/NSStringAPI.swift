@@ -1686,7 +1686,7 @@ extension String {
   ///
   /// Locale-independent case-insensitive operation, and other needs,
   /// can be achieved by calling
-  /// `rangeOfString(_:options:_,range:_locale:_)`.
+  /// `rangeOfString(_:options:_, range:_locale:_)`.
   ///
   /// Equivalent to
   ///

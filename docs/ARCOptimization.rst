@@ -91,7 +91,7 @@ Definitions
 -----------
 
 Let ``I`` be a SIL instruction with n operands and m results. We say that ``I``
-is a (i,j) RC Identity preserving instruction if performing a ``retain_value``
+is a (i, j) RC Identity preserving instruction if performing a ``retain_value``
 on the ith SSA argument immediately before ``I`` is executed is equivalent to
 performing a ``retain_value`` on the jth SSA result of ``I`` immediately
 following the execution of ``I``. For example in the following, if::
@@ -118,7 +118,7 @@ such that:
 
 - ``%a`` is the jth result of ``I``.
 - ``%b`` is the ith argument of ``I``.
-- ``I`` is (i,j) RC identity preserving.
+- ``I`` is (i, j) RC identity preserving.
 
 Due to the nature of SSA form, we can not even speak of symmetry or
 reflexivity. But we do get transitivity! Easily if ``%b ~rci %a`` and ``%c ~rci

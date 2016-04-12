@@ -152,7 +152,7 @@ def tokenize_python_to_unmatched_close_curly(source_text, start, line_starts):
 
 def tokenize_template(template_text):
     r"""Given the text of a template, returns an iterator over
-    (tokenType,token,match) tuples.
+    (tokenType, token, match) tuples.
 
     **Note**: this is template syntax tokenization, not Python
     tokenization.
@@ -165,13 +165,13 @@ def tokenize_template(template_text):
     then refined by ParseContext.token_generator.
 
     >>> from pprint import *
-    >>> pprint(list((kind, text) for kind,text,_ in tokenize_template(
+    >>> pprint(list((kind, text) for kind, text, _ in tokenize_template(
     ...   '%for x in range(10):\n%  print x\n%end\njuicebox')))
     [('gybLines', '%for x in range(10):\n%  print x'),
      ('gybLinesClose', '%end'),
      ('literal', 'juicebox')]
 
-    >>> pprint(list((kind, text) for kind,text,_ in tokenize_template(
+    >>> pprint(list((kind, text) for kind, text, _ in tokenize_template(
     ... '''Nothing
     ... % if x:
     ... %    for i in range(3):

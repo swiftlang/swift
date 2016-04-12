@@ -6,7 +6,7 @@ import Builtin
 import Swift
 
 class RawBuffer {}
-class HeapBufferStorage<T,U> : RawBuffer {}
+class HeapBufferStorage<T, U> : RawBuffer {}
 
 enum FakeOptional<T> {
   case none
@@ -2604,7 +2604,7 @@ class CC4 {
 // Function that takes different kinds of arguments: @in, @guaranteed, @owned, 
 sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
 
-// Test the peephole performing apply{partial_apply(x,y,z)}(a) -> apply(a,x,y,z)
+// Test the peephole performing apply{partial_apply(x, y, z)}(a) -> apply(a, x, y, z)
 // We need to check the following:
 // - all arguments of a partial_apply, which are either results of a stack_alloc or consumed indirect arguments
 //  should be copied into temporaries. This should happen just before that partial_apply instruction.

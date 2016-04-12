@@ -120,7 +120,7 @@ var unTaggedNSString : NSString {
 
 % for Self in ['_BridgeStorage']:
 allTests.test("${Self}") {
-  typealias B = ${Self}<C,NSString>
+  typealias B = ${Self}<C, NSString>
   
   let oy: NSString = "oy"
   expectTrue(B(objC: oy).objCInstance == oy)

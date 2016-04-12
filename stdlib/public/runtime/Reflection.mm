@@ -933,9 +933,9 @@ extern "C" bool swift_isKind(id object, NSString *className) {
 #error __USER_LABEL_PREFIX__ is undefined
 #endif
 
-#define GLUE_EXPANDED(a,b) a##b
-#define GLUE(a,b) GLUE_EXPANDED(a,b)
-#define SYMBOL_NAME(name) GLUE(__USER_LABEL_PREFIX__,name)
+#define GLUE_EXPANDED(a, b) a##b
+#define GLUE(a, b) GLUE_EXPANDED(a, b)
+#define SYMBOL_NAME(name) GLUE(__USER_LABEL_PREFIX__, name)
 
 #define QUOTE_EXPANDED(literal) #literal
 #define QUOTE(literal) QUOTE_EXPANDED(literal)

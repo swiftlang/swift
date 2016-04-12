@@ -33,7 +33,7 @@ builtinIntLiteralBits = 2048
 def allInts():
     for bits in allIntBits:
         for signed in False, True:
-            yield bits,signed
+            yield bits, signed
 
 def baseIntName(name):
     return 'Int' if name == 'Int' else 'Int' + str(name)

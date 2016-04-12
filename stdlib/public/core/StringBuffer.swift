@@ -43,7 +43,7 @@ struct _StringBufferIVars {
 }
 
 // FIXME: Wanted this to be a subclass of
-// _HeapBuffer<_StringBufferIVars,UTF16.CodeUnit>, but
+// _HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>, but
 // <rdar://problem/15520519> (Can't call static method of derived
 // class of generic class with dependent argument type) prevents it.
 public struct _StringBuffer {

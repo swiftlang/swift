@@ -31,7 +31,7 @@ integerBinaryOps = [
 /// be satisfied by types conforming to that protocol.
 @_show_in_interface
 public protocol _IntegerArithmetic {
-% for name,_,Action,result in integerBinaryOps:
+% for name, _, Action, result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and a `Bool` that is
   /// `true` iff the operation caused an arithmetic overflow.
   static func ${name}WithOverflow(_ lhs: Self, _ rhs: Self) -> (Self, overflow: Bool)
@@ -42,7 +42,7 @@ public protocol _IntegerArithmetic {
 public protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
   // Checked arithmetic functions.  Specific implementations in
   // FixedPoint.swift.gyb support static checking for integer types.
-% for name,op,Action,result in integerBinaryOps:
+% for name, op, Action, result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and trapping in case of
   /// arithmetic overflow (except in -Ounchecked builds).
   @warn_unused_result
@@ -55,7 +55,7 @@ public protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
   func toIntMax() -> IntMax
 }
 
-% for name,op,Action,result in integerBinaryOps:
+% for name, op, Action, result in integerBinaryOps:
 /// ${Action} `lhs` and `rhs`, returning ${result} and trapping in case of
 /// arithmetic overflow (except in -Ounchecked builds).
 @_transparent

@@ -50,7 +50,7 @@ public let partitionExhaustiveTests = [
   PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60, 70 ]),
 ]
 
-public func withInvalidOrderings(_ body: ((Int,Int) -> Bool) -> Void) {
+public func withInvalidOrderings(_ body: ((Int, Int) -> Bool) -> Void) {
   // Test some ordering predicates that don't create strict weak orderings
   body { (_,_) in true }
   body { (_,_) in false }

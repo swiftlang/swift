@@ -316,9 +316,9 @@ simdTestSuite.test("matrix elements") {
     ${mat}[i] = ${type}(i+1)*${basis}[i]
   }
   expectEqual(
-    ${mat}, ${mattype}(diagonal:${range(1,diagsize+1)}), sameValue: same)
+    ${mat}, ${mattype}(diagonal:${range(1, diagsize + 1)}), sameValue: same)
   for i in 0..<${cols} {
-    expectEqual(${mat}[i], ${type}(i+1)*${basis}[i], sameValue: same)
+    expectEqual(${mat}[i], ${type}(i + 1)*${basis}[i], sameValue: same)
   }
 
   //  Check getting and setting elements (and transpose).
