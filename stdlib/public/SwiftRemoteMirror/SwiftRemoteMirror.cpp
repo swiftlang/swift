@@ -4,6 +4,9 @@
 using namespace swift;
 using namespace reflection;
 
+using NativeReflectionContext
+  = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(PointerSizeFunction getPointerSize,
                                          SizeSizeFunction getSizeSize,
@@ -19,7 +22,8 @@ swift_reflection_createReflectionContext(PointerSizeFunction getPointerSize,
   };
 
   auto Reader = std::make_shared<CMemoryReader>(ReaderImpl);
-  auto Context = new ReflectionContext<InProcess>(Reader);
+  auto Context
+    = new ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>(Reader);
   return reinterpret_cast<SwiftReflectionContextRef>(Context);
 }
 
@@ -42,11 +46,12 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
     GenericSection(reflstr.Begin, reflstr.End),
     GenericSection(typeref.Begin, typeref.End)
   };
-  auto Context = reinterpret_cast<ReflectionContext<InProcess> *>(ContextRef);
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   Context->addReflectionInfo(Info);
 }
 
 void swift_reflection_clearCaches(SwiftReflectionContextRef ContextRef) {
-  auto Context = reinterpret_cast<ReflectionContext<InProcess> *>(ContextRef);
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   Context->clear();
 }
+
