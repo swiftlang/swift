@@ -572,8 +572,7 @@ namespace {
       if (auto genericFn = type->getAs<GenericFunctionType>()) {
         // Open up the generic parameters and requirements.
         cs.openGeneric(dc,
-                       genericFn->getGenericParams(),
-                       genericFn->getRequirements(),
+                       genericFn->getGenericSignature(),
                        skipProtocolSelfConstraint,
                        minOpeningDepth,
                        locator,
@@ -892,6 +891,27 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
 void ConstraintSystem::openGeneric(
        DeclContext *dc,
+       GenericSignature *signature,
+       bool skipProtocolSelfConstraint,
+       unsigned minOpeningDepth,
+       ConstraintLocatorBuilder locator,
+       llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
+  // Use the minimized constraints; we can re-derive solutions for all the
+  // implied constraints.
+  auto minimized =
+    signature->getCanonicalManglingSignature(*DC->getParentModule());
+
+  openGeneric(dc,
+              minimized->getGenericParams(),
+              minimized->getRequirements(),
+              skipProtocolSelfConstraint,
+              minOpeningDepth,
+              locator,
+              replacements);
+}
+
+void ConstraintSystem::openGeneric(
+       DeclContext *dc,
        ArrayRef<GenericTypeParamType *> params,
        ArrayRef<Requirement> requirements,
        bool skipProtocolSelfConstraint,
@@ -1111,8 +1131,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto sig = dc->getGenericSignatureOfContext()) {
 
       // Open up the generic parameter list for the container.
-      openGeneric(dc, sig->getGenericParams(), sig->getRequirements(),
-                  /*skipProtocolSelfConstraint=*/true, minOpeningDepth,
+      openGeneric(dc, sig, /*skipProtocolSelfConstraint=*/true, minOpeningDepth,
                   locator, replacements);
 
       // Open up the type of the member.

@@ -23,5 +23,17 @@ _Nonnull CCPowerSupplyRef CCRefrigeratorGetPowerSupply(CCRefrigeratorRef fridge)
 void CCRefrigeratorSetPowerSupply(CCRefrigeratorRef fridge,
                                   CCPowerSupplyRef _Nonnull powerSupply)
   __attribute__((swift_name("setter:CCRefrigerator.powerSupply(self:_:)")));
+
+extern const CCPowerSupplyRef kCCPowerSupplySemiModular
+  __attribute__((swift_name("CCPowerSupplyRef.semiModular")));
+
 #pragma clang arc_cf_code_audited end
 
+extern const double kCCPowerSupplyDefaultPower
+  __attribute__((swift_name("CCPowerSupply.defaultPower")));
+
+extern const _Nonnull CCPowerSupplyRef kCCPowerSupplyAC
+  __attribute__((swift_name("CCPowerSupply.AC")));
+
+extern const _Nullable CCPowerSupplyRef kCCPowerSupplyDC
+  __attribute__((swift_name("CCPowerSupply.DC")));

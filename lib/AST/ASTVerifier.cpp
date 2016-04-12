@@ -1033,7 +1033,7 @@ struct ASTNodeBase {};
       auto fromElement = E->getSubExpr()->getType()->getAnyPointerElementType();
       auto toElement = E->getType()->getAnyPointerElementType();
       
-      if (!fromElement && !toElement) {
+      if (!fromElement || !toElement) {
         Out << "PointerToPointer does not convert between pointer types:\n";
         E->print(Out);
         Out << "\n";

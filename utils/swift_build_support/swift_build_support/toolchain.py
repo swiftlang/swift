@@ -69,7 +69,8 @@ def _first_common_toolchain(tools, suffixes=None):
 
     for suffix in suffixes:
         path_map = dict()
-        for name, tool in tools.iteritems():
+        for name in tools:
+            tool = tools[name]
             path = which(tool + suffix)
             if not path:
                 break

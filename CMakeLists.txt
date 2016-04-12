@@ -347,7 +347,7 @@ set(SWIFT_GYB_FLAGS
 
 # Directory to use as the Clang module cache when building Swift source files.
 set(SWIFT_MODULE_CACHE_PATH
-    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/clang-module-cache")
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/module-cache")
 
 # Xcode: use libc++ and c++11 using proper build settings.
 if(XCODE)

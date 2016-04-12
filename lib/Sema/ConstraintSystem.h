@@ -615,9 +615,14 @@ public:
   /// on a suspicious top-level optional injection (because the caller already
   /// diagnosed it).
   ///
+  /// \param typeFromPattern Optionally, the caller can specifiy the pattern
+  /// from where the toType is derived, so that we can deliver better fixit.
+  ///
   /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator,
-                     bool ignoreTopLevelInjection = false) const;
+  Expr *coerceToType(Expr *expr, Type toType,
+                     ConstraintLocator *locator,
+                     bool ignoreTopLevelInjection = false,
+                     Optional<Pattern*> typeFromPattern = None) const;
 
   /// \brief Convert the given expression to a logic value.
   ///
@@ -1552,6 +1557,12 @@ public:
   /// declaration's signature, but they do not have to, so they might not be
   /// substituted at all. Since the inner declaration inherits the context
   /// archetypes of the outer function we do not need to open them here.
+  void openGeneric(DeclContext *dc,
+                   GenericSignature *signature,
+                   bool skipProtocolSelfConstraint,
+                   unsigned minOpeningDepth,
+                   ConstraintLocatorBuilder locator,
+                   llvm::DenseMap<CanType, TypeVariableType *> &replacements);
   void openGeneric(DeclContext *dc,
                    ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,

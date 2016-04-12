@@ -251,3 +251,12 @@ public func importAsProtocol(_ x: IAMProto_t) {
   // CHECK: function_ref @setSomeValue : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0, Int32) -> Int32
   x.someValue = y
 }
+
+// CHECK-LABEL: sil @_TF10cf_members28importGlobalVarsAsProperties
+public func importGlobalVarsAsProperties()
+    -> (Double, CCPowerSupply, CCPowerSupply?) {
+  // CHECK: global_addr @kCCPowerSupplyDC
+  // CHECK: global_addr @kCCPowerSupplyAC
+  // CHECK: global_addr @kCCPowerSupplyDefaultPower
+  return (CCPowerSupply.defaultPower, CCPowerSupply.AC, CCPowerSupply.DC)
+}

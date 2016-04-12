@@ -2239,7 +2239,8 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
   return expr;
 }
 
-bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
+bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
+                                Optional<Pattern*> typeFromPattern) {
   // TODO: need to add kind arg?
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
@@ -2274,7 +2275,8 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
 
   // Perform the conversion.
   Expr *result = solution.coerceToType(expr, type,
-                                       cs.getConstraintLocator(expr));
+                                       cs.getConstraintLocator(expr),
+                                       false, typeFromPattern);
   if (!result) {
     return true;
   }

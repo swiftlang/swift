@@ -69,7 +69,7 @@ struct CommentToXMLConverter {
 #include "swift/Markup/SimpleFields.def"
 
   void printDocument(const Document *D) {
-    llvm_unreachable("Can't print an swift::markup::Document as XML directly");
+    llvm_unreachable("Can't print a swift::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
@@ -491,7 +491,7 @@ break;
 
   void printDocument(const Document *D) {
     // FIXME: Why keep doing this?
-    llvm_unreachable("Can't print an swift::markup::Document as XML directly");
+    llvm_unreachable("Can't print a swift::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
@@ -632,13 +632,78 @@ break;
     llvm_unreachable("Can't directly print Doxygen for a Swift Markup PrivateExtension");
   }
 
+  void printNestedParamField(const ParamField *PF) {
+    auto Parts = PF->getParts().getValue();
+    if (Parts.Brief.hasValue()) {
+      printASTNode(Parts.Brief.getValue());
+      printNewline();
+    }
+
+    if (!Parts.ParamFields.empty()) {
+      printNewline();
+      print("\\a ");
+      print(PF->getName());
+      print(" parameters:");
+      printNewline();
+
+      print("<ul>");
+      printNewline();
+      for (auto Param : Parts.ParamFields) {
+        print("<li>");
+        printNewline();
+        print(Param->getName());
+        print(": ");
+        printNestedParamField(Param);
+        print("</li>");
+        printNewline();
+      }
+      print("</ul>");
+      printNewline();
+      printNewline();
+    }
+
+    if (Parts.ReturnsField.hasValue()) {
+      printNewline();
+      print("\\a ");
+      print(PF->getName());
+      print(" returns: ");
+
+      for (auto Child : Parts.ReturnsField.getValue()->getChildren()) {
+        printASTNode(Child);
+        printNewline();
+      }
+    }
+
+    if (Parts.ThrowsField.hasValue()) {
+      printNewline();
+      print("\\a ");
+      print(PF->getName());
+      print(" error: ");
+
+      for (auto Child : Parts.ThrowsField.getValue()->getChildren()) {
+        printASTNode(Child);
+        printNewline();
+      }
+    }
+
+    for (auto BodyNode : Parts.BodyNodes) {
+      printASTNode(BodyNode);
+      printNewline();
+    }
+    printNewline();
+  }
+
   void printParamField(const ParamField *PF) {
     print("\\param ");
     print(PF->getName());
     print(" ");
-    for (auto Child : PF->getChildren())
-      printASTNode(Child);
-
+    if (PF->isClosureParameter()) {
+      printNestedParamField(PF);
+    } else {
+      for (auto Child : PF->getChildren()) {
+        printASTNode(Child);
+      }
+    }
     printNewline();
   }
 

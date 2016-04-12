@@ -86,6 +86,84 @@ SWIFT_CLASS("_TtC8comments5Brief")
 @end
 
 
+SWIFT_CLASS("_TtC8comments16ClosureContainer")
+@interface ClosureContainer
+
+/// Partially applies a binary operator.
+///
+/// \param a The left-hand side to partially apply.
+///
+/// \param combine A binary operator.
+///
+/// \a combine parameters:
+/// <ul>
+/// <li>
+/// lhs: The left-hand side of the operator
+///
+/// </li>
+/// <li>
+/// rhs: The right-hand side of the operator
+///
+/// </li>
+/// </ul>
+///
+///
+/// \a combine returns: A result.
+///
+/// \a combine error: Nothing.
+- (void)closureParameterExplodedExplodedWithA:(NSInteger)a combine:(NSInteger (^ _Nonnull)(NSInteger lhs, NSInteger rhs))combine;
+
+/// Partially applies a binary operator.
+///
+/// \param a The left-hand side to partially apply.
+///
+/// \param combine A binary operator.
+///
+/// \a combine parameters:
+/// <ul>
+/// <li>
+/// lhs: The left-hand side of the operator
+///
+/// </li>
+/// <li>
+/// rhs: The right-hand side of the operator
+///
+/// </li>
+/// </ul>
+///
+///
+/// \a combine returns: A result.
+///
+/// \a combine error: Nothing.
+- (void)closureParameterOutlineExplodedWithA:(NSInteger)a combine:(NSInteger (^ _Nonnull)(NSInteger lhs, NSInteger rhs))combine;
+
+/// Partially applies a binary operator.
+///
+/// \param a The left-hand side to partially apply.
+///
+/// \param combine A binary operator.
+///
+/// \a combine parameters:
+/// <ul>
+/// <li>
+/// lhs: The left-hand side of the operator
+///
+/// </li>
+/// <li>
+/// rhs: The right-hand side of the operator
+///
+/// </li>
+/// </ul>
+///
+///
+/// \a combine returns: A result.
+///
+/// \a combine error: Nothing.
+- (void)closureParameterOutlineOutlineWithA:(NSInteger)a combine:(NSInteger (^ _Nonnull)(NSInteger lhs, NSInteger rhs))combine;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
 SWIFT_CLASS("_TtC8comments9CodeBlock")
 @interface CodeBlock
 
