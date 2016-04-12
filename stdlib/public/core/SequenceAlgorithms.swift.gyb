@@ -250,8 +250,8 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 %{
 if preds:
   comment = """
-  /// Returns `true` iff `self` precedes `other` in a lexicographical 
-  /// ("dictionary") ordering, using `isOrderedBefore` as the comparison 
+  /// Returns `true` iff `self` precedes `other` in a lexicographical
+  /// ("dictionary") ordering, using `isOrderedBefore` as the comparison
   /// between elements.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
@@ -277,6 +277,7 @@ else:
 
   ${comment}
   @warn_unused_result
+  @swift3_migration(renamed="lexicographicallyPrecedes")
   public func lexicographicalCompare<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
