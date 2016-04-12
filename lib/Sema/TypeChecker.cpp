@@ -1346,7 +1346,7 @@ private:
 
       // FIXME: This is not quite right: we want to handle AppExtensions
       // properly. For example, on the OSXApplicationExtension platform
-      // we want to chose the OSX spec unless there is an explicit
+      // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
       if (isPlatformActive(VersionSpec->getPlatform(), TC.getLangOpts())) {
         return VersionSpec;
