@@ -2,8 +2,6 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
-// XFAIL: 
-
 import Foundation
 import CoreGraphics
 
