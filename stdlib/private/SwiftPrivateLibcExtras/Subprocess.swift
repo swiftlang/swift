@@ -55,7 +55,7 @@ func swift_posix_spawn(
   _ file: UnsafePointer<Int8>,
   _ file_actions: UnsafePointer<swift_posix_spawn_file_actions_t>?,
   _ attrp: UnsafePointer<posix_spawnattr_t>?,
-  _ argv: UnsafePointer<UnsafePointer<Int8>?>,
+  _ argv: UnsafePointer<UnsafeMutablePointer<Int8>?>,
   _ envp: UnsafePointer<UnsafeMutablePointer<Int8>?>?) -> CInt
 
 /// Calls POSIX `pipe()`.

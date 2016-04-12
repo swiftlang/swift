@@ -73,7 +73,7 @@ public func scatter<T>(_ a: [T], _ idx: [Int]) -> [T] {
 }
 
 public func withArrayOfCStrings<R>(
-  _ args: [String], _ body: ([UnsafePointer<CChar>?]) -> R
+  _ args: [String], _ body: ([UnsafeMutablePointer<CChar>?]) -> R
 ) -> R {
 
   let argsCounts = Array(args.map { $0.utf8.count + 1 })
@@ -87,10 +87,10 @@ public func withArrayOfCStrings<R>(
     argsBuffer.append(0)
   }
 
-  return argsBuffer.withUnsafeBufferPointer {
+  return argsBuffer.withUnsafeMutableBufferPointer {
     (argsBuffer) in
-    let ptr = UnsafePointer<CChar>(argsBuffer.baseAddress!)
-    var cStrings: [UnsafePointer<CChar>?] = argsOffsets.map { ptr + $0 }
+    let ptr = UnsafeMutablePointer<CChar>(argsBuffer.baseAddress!)
+    var cStrings: [UnsafeMutablePointer<CChar>?] = argsOffsets.map { ptr + $0 }
     cStrings[cStrings.count - 1] = nil
     return body(cStrings)
   }
