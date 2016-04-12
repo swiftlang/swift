@@ -449,33 +449,17 @@ bool TypeRef::isConcrete() const {
   return TypeRefIsConcrete().visit(this);
 }
 
-static unsigned _getDepth(TypeRef *TR) {
-  switch (TR->getKind()) {
-  case TypeRefKind::Nominal: {
-    auto Nom = cast<NominalTypeRef>(TR);
-    return Nom->getDepth();
-    break;
+unsigned NominalTypeTrait::getDepth() const {
+  if (auto P = Parent.get()) {
+    switch (P->getKind()) {
+    case TypeRefKind::Nominal:
+      return 1 + cast<NominalTypeRef>(P)->getDepth();
+    case TypeRefKind::BoundGeneric:
+      return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
+    default:
+      assert(false && "Asked for depth on non-nominal typeref");
+    }
   }
-  case TypeRefKind::BoundGeneric: {
-    auto BG = cast<BoundGenericTypeRef>(TR);
-    return BG->getDepth();
-    break;
-  }
-  default:
-    assert(false && "Asked for depth on non-nominal typeref");
-  }
-}
-
-unsigned NominalTypeRef::getDepth() const {
-  if (auto P = Parent.get())
-    return 1 + _getDepth(P);
-
-  return 0;
-}
-
-unsigned BoundGenericTypeRef::getDepth() const {
-  if (auto P = Parent.get())
-    return 1 + _getDepth(P);
 
   return 0;
 }
