@@ -191,6 +191,7 @@ KNOWN_SETTINGS=(
     darwin-deployment-version-tvos    "9.0"      "minimum deployment target version for tvOS"
     darwin-deployment-version-watchos "2.0"      "minimum deployment target version for watchOS"
 
+    extra-cmake-options         ""               "Extra options to pass to CMake for all targets"
     extra-swift-args            ""               "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     sil-verify-all              "0"              "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
     swift-enable-ast-verifier   "1"              "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
@@ -1204,6 +1205,16 @@ if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
         "${COMMON_CMAKE_OPTIONS[@]}"
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     )
+fi
+
+if [[ "${EXTRA_CMAKE_OPTIONS}" ]] ; then
+    for cmake_opt in $(echo "${EXTRA_CMAKE_OPTIONS}" | tr "," "\n")
+    do
+        COMMON_CMAKE_OPTIONS=(
+            "${COMMON_CMAKE_OPTIONS[@]}"
+            "${cmake_opt}"
+        )
+    done
 fi
 
 if [[ "${DISTCC}" ]] ; then
