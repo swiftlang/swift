@@ -127,8 +127,7 @@ RangeTestSuite.test("map()") {
 }
 
 RangeTestSuite.test("reversed()") {
-  let lazyRange = (0..<10).lazy
-  var result = lazyRange.reversed()
+  var result = (0..<10).lazy.reversed()
   typealias Expected = LazyRandomAccessCollection<
     ReversedRandomAccessCollection<CountableRange<Int>>>
     expectType(Expected.self, &result)

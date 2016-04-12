@@ -147,25 +147,19 @@ LazyTestSuite.test("isEmpty") {
 }
 
 LazyTestSuite.test("first") {
-  // FIXME: swift-3-indexing-model: simpler expression `(7..<42).lazy.first`
-  // inside the expect function takes forever to compile (~58 seconds)
-  let lazy = (7..<42).lazy
-  expectOptionalEqual(7 as Int, lazy.first)
+  expectOptionalEqual(7, (7..<42).lazy.first)
 }
 
 LazyTestSuite.test("first empty") {
-  let lazy = (7..<7).lazy
-  expectEmpty(lazy.first)
+  expectEmpty((7..<7).lazy.first)
 }
 
 LazyTestSuite.test("last") {
-  let lazy = (7..<42).lazy
-  expectOptionalEqual(41 as Int, lazy.last)
+  expectOptionalEqual(41, (7..<42).lazy.last)
 }
 
 LazyTestSuite.test("last empty") {
-  let lazy = (7..<7).lazy
-  expectEmpty(lazy.last)
+  expectEmpty((7..<7).lazy.last)
 }
 
 //===----------------------------------------------------------------------===//
@@ -244,10 +238,8 @@ LazyTestSuite.test("LazySequence.array") {
   SequenceWithCustomUnderestimatedCount.timesUnderestimatedCountWasCalled = 0
 
   let base = SequenceWithCustomUnderestimatedCount([ 0, 30, 10, 90 ])
-  let lazySequence = base.lazy
-  let arrayFromLazy = Array(lazySequence)
 
-  expectEqual([ 0, 30, 10, 90 ], arrayFromLazy.map { $0.value })
+  expectEqual([ 0, 30, 10, 90 ], base.lazy.map { $0.value })
 
   // Lazy sequences should use underestimated count to preallocate array
   // storage.
@@ -299,8 +291,7 @@ extension LazyCollection where Base : TestProtocol1 {
 LazyTestSuite.test("Lazy${TraversalCollection}.array") {
   let base = Minimal${TraversalCollection}(
     elements: [ 0, 30, 10, 90 ], underestimatedCount: .value(42))
-  let lazyCollection = base.lazy
-  let arrayFromLazy = Array(lazyCollection)
+  let arrayFromLazy = Array(base.lazy)
 
   expectEqual([ 0, 30, 10, 90 ], arrayFromLazy)
 
@@ -312,15 +303,16 @@ LazyTestSuite.test("Lazy${TraversalCollection}.array") {
 
 %  if ReversedType is not None:
 
-// FIXME: swift-3-indexing-model. Expression too complex...
-#if false
-
-LazyTestSuite.test("Lazy${TraversalCollection}.reversed") {
+LazyTestSuite.test("Lazy${TraversalCollection}.reversed")
+%    if Traversal == 'Bidirectional':
+  .xfail(.custom({ true }, reason: "swift-3-indexing-model: missing method implementations in ReversedCollection"))
+  .code
+%    end
+{
   let base = Minimal${TraversalCollection}(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
     underestimatedCount: .value(42))
-  let lazyCollection = base.lazy
-  var reversed = lazyCollection.reversed()
+  var reversed = base.lazy.reversed()
   expectType(
     Lazy${TraversalCollection}<
       ${ReversedType}<Minimal${TraversalCollection}<OpaqueValue<Int>>>
@@ -340,7 +332,6 @@ LazyTestSuite.test("Lazy${TraversalCollection}.reversed") {
     [ 0, 30, 10, 90 ].map(OpaqueValue.init) as [OpaqueValue<Int>],
     reversedTwice) { $0.value == $1.value }
 }
-#endif
 
 %  end
 
@@ -659,10 +650,9 @@ struct ExpectType<T> {
   static func test(_: Any) -> _Void { fatalError() }
 }
 
-// FIXME: swift-3-indexing-model. Typechecking takes a looong time.
-#if false
-
-tests.test("ReversedCollection/Lazy") {
+tests.test("ReversedCollection/Lazy")
+  .xfail(.custom({ true }, reason: "swift-3-indexing-model: reversed collection lacks methods"))
+  .code {
   // Check that reversing a lazy collection, or lazy-ing a reverse
   // collection, produces the same lazy reverse collection.
   do {
@@ -681,7 +671,8 @@ tests.test("ReversedCollection/Lazy") {
     var calls = 0
     let reversedAndMapped = reversed.map { (x) -> Int in calls += 1; return x }
     expectEqual(0, calls)
-    checkRandomAccessCollection(0...11, reversedAndMapped)
+    // FIXME: swift-3-indexing-model: should be checkRandomAccessCollection(0...11, reversedAndMapped)
+    checkBidirectionalCollection(0...11, reversedAndMapped)
     expectNotEqual(0, calls)
   }
 
@@ -695,7 +686,7 @@ tests.test("ReversedCollection/Lazy") {
       String.CharacterView, Character>
     ExpectType<Base>.test(base)
 
-    typealias LazyReversedBase = LazyCollection<
+    typealias LazyReversedBase = LazyBidirectionalCollection<
       ReversedCollection<Base>>
 
     let reversed = base.reversed()
@@ -708,7 +699,6 @@ tests.test("ReversedCollection/Lazy") {
     expectNotEqual(0, calls)
   }
 }
-#endif
 
 // Given a couple of sequences backed by FilterGenerator's, check that
 // the first selects even numbers and the second selects odd numbers,
@@ -904,8 +894,6 @@ do {
         "unexpected laziness in \(flattened.dynamicType)")
     }
 
-// FIXME: swift-3-indexing-model. Expression too complex...
-#if false
     tests.test("Flatten${TraversalCollection}/Lazy\(data)") {
       // Checking that flatten doesn't remove laziness
       let base = Minimal${TraversalCollection}(
@@ -918,7 +906,6 @@ do {
       _ = flattened.map { _ in calls += 1 }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
     }
-#endif
   % end
   }
 }

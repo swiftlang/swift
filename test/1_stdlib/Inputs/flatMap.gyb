@@ -13,8 +13,7 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
     let closureLifetimeTracker = LifetimeTracked(0)
     var timesClosureWasCalled = 0
 
-    let lazySeq = s.lazy
-    var result = lazySeq.flatMap {
+    var result = s.lazy.flatMap {
       (element: OpaqueValue<Int>) -> ${Minimal}<OpaqueValue<Int32>> in
       _blackHole(closureLifetimeTracker)
       timesClosureWasCalled += 1
