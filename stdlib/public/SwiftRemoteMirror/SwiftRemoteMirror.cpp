@@ -76,3 +76,21 @@ swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
   }
   return 0;
 }
+
+swift_typeinfo_t
+swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
+                                swift_typeref_t OpaqueTypeRef) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TR = reinterpret_cast<TypeRef *>(OpaqueTypeRef);
+  return Context->getInfoForTypeRef(TR);
+}
+
+swift_fieldinfo_t
+swift_reflection_infoForField(SwiftReflectionContextRef ContextRef,
+                              swift_typeref_t OpaqueTypeRef,
+                              unsigned Index) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TR = reinterpret_cast<TypeRef *>(OpaqueTypeRef);
+  return Context->getInfoForField(TR, Index);
+}
+
