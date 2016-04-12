@@ -79,10 +79,11 @@ class BuiltinTypeRef final : public TypeRef {
   std::string MangledName;
 
 public:
-  BuiltinTypeRef(std::string MangledName)
+  BuiltinTypeRef(const std::string &MangledName)
     : TypeRef(TypeRefKind::Builtin), MangledName(MangledName) {}
 
-  static std::shared_ptr<BuiltinTypeRef> create(std::string MangledName) {
+  static std::shared_ptr<BuiltinTypeRef>
+  create(const std::string &MangledName) {
     return std::make_shared<BuiltinTypeRef>(MangledName);
   }
 
@@ -98,9 +99,10 @@ public:
 class NominalTypeTrait {
   std::string MangledName;
 
-public:
-  NominalTypeTrait(std::string MangledName) : MangledName(MangledName) {}
+protected:
+  NominalTypeTrait(const std::string &MangledName) : MangledName(MangledName) {}
 
+public:
   const std::string &getMangledName() const {
     return MangledName;
   }
@@ -114,12 +116,13 @@ class NominalTypeRef final : public TypeRef, public NominalTypeTrait {
   TypeRefPointer Parent;
 
 public:
-  NominalTypeRef(std::string MangledName, TypeRefPointer Parent = nullptr)
+  NominalTypeRef(const std::string &MangledName,
+                 TypeRefPointer Parent = nullptr)
     : TypeRef(TypeRefKind::Nominal), NominalTypeTrait(MangledName),
       Parent(Parent) {}
 
   static std::shared_ptr<NominalTypeRef>
-  create(std::string MangledName, TypeRefPointer Parent = nullptr) {
+  create(const std::string &MangledName, TypeRefPointer Parent = nullptr) {
     return std::make_shared<NominalTypeRef>(MangledName, Parent);
   }
 
@@ -147,7 +150,8 @@ class BoundGenericTypeRef final : public TypeRef, public NominalTypeTrait {
   TypeRefPointer Parent;
 
 public:
-  BoundGenericTypeRef(std::string MangledName, TypeRefVector GenericParams,
+  BoundGenericTypeRef(const std::string &MangledName,
+                      TypeRefVector GenericParams,
                       TypeRefPointer Parent = nullptr)
     : TypeRef(TypeRefKind::BoundGeneric),
       NominalTypeTrait(MangledName),
@@ -155,7 +159,7 @@ public:
       Parent(Parent) {}
 
   static std::shared_ptr<BoundGenericTypeRef>
-  create(std::string MangledName, TypeRefVector GenericParams,
+  create(const std::string &MangledName, TypeRefVector GenericParams,
          TypeRefPointer Parent = nullptr) {
     return std::make_shared<BoundGenericTypeRef>(MangledName, GenericParams,
                                                  Parent);
@@ -246,11 +250,12 @@ class ProtocolTypeRef final : public TypeRef {
   std::string Name;
 
 public:
-  ProtocolTypeRef(std::string ModuleName, std::string Name)
+  ProtocolTypeRef(const std::string &ModuleName,
+                  const std::string &Name)
     : TypeRef(TypeRefKind::Protocol), ModuleName(ModuleName), Name(Name) {}
 
   static std::shared_ptr<ProtocolTypeRef>
-  create(std::string ModuleName, std::string Name) {
+  create(const std::string &ModuleName, const std::string &Name) {
     return std::make_shared<ProtocolTypeRef>(ModuleName, Name);
   }
 
@@ -380,12 +385,14 @@ class DependentMemberTypeRef final : public TypeRef {
   TypeRefPointer Protocol;
 
 public:
-  DependentMemberTypeRef(std::string Member, TypeRefPointer Base,
+  DependentMemberTypeRef(const std::string &Member, TypeRefPointer Base,
                          TypeRefPointer Protocol)
     : TypeRef(TypeRefKind::DependentMember), Member(Member), Base(Base),
       Protocol(Protocol) {}
+
   static std::shared_ptr<DependentMemberTypeRef>
-  create(std::string Member, TypeRefPointer Base, TypeRefPointer Protocol) {
+  create(const std::string &Member, TypeRefPointer Base,
+         TypeRefPointer Protocol) {
     return std::make_shared<DependentMemberTypeRef>(Member, Base, Protocol);
   }
 
@@ -412,10 +419,16 @@ public:
 
 class ForeignClassTypeRef final : public TypeRef {
   std::string Name;
+
 public:
-  ForeignClassTypeRef(std::string Name)
+  ForeignClassTypeRef(const std::string &Name)
     : TypeRef(TypeRefKind::ForeignClass), Name(Name) {}
+
   static const std::shared_ptr<ForeignClassTypeRef> Unnamed;
+
+  static std::shared_ptr<ForeignClassTypeRef> create(const std::string &Name) {
+    return std::make_shared<ForeignClassTypeRef>(Name);
+  }
 
   const std::string &getName() const {
     return Name;
@@ -428,10 +441,16 @@ public:
 
 class ObjCClassTypeRef final : public TypeRef {
   std::string Name;
+
 public:
-  ObjCClassTypeRef(std::string Name)
+  ObjCClassTypeRef(const std::string &Name)
     : TypeRef(TypeRefKind::ObjCClass), Name(Name) {}
+
   static const std::shared_ptr<ObjCClassTypeRef> Unnamed;
+
+  static std::shared_ptr<ObjCClassTypeRef> create(const std::string &Name) {
+    return std::make_shared<ObjCClassTypeRef>(Name);
+  }
 
   const std::string &getName() const {
     return Name;
@@ -536,7 +555,7 @@ public:
 
   TypeRefPointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     if (auto SubstitutedInstance = visit(M->getInstanceType().get()))
-      return std::make_shared<MetatypeTypeRef>(SubstitutedInstance);
+      return MetatypeTypeRef::create(SubstitutedInstance);
     else
       return nullptr;
   }
@@ -544,7 +563,7 @@ public:
   TypeRefPointer
   visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     if (auto SubstitutedInstance = visit(EM->getInstanceType().get()))
-      return std::make_shared<MetatypeTypeRef>(SubstitutedInstance);
+      return MetatypeTypeRef::create(SubstitutedInstance);
     else
       return nullptr;
   }

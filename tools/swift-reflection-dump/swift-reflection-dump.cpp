@@ -87,7 +87,7 @@ getSectionRef(const ObjectFile *objectFile,
       }
     }
   }
-  return llvm::object::SectionRef();
+  return SectionRef();
 }
 
 static llvm::object::SectionRef
