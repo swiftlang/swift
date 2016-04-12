@@ -566,9 +566,7 @@ public:
   TypeRefPointer visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
     TypeRefVector GenericParams;
     for (auto Param : BG->getGenericParams())
-      if (auto Substituted = visit(Param.get()))
-        GenericParams.push_back(Substituted);
-      else return nullptr;
+      GenericParams.push_back(visit(Param.get()));
     return std::make_shared<BoundGenericTypeRef>(BG->getMangledName(),
                                                  GenericParams);
   }
@@ -576,10 +574,7 @@ public:
   TypeRefPointer visitTupleTypeRef(const TupleTypeRef *T) {
     TypeRefVector Elements;
     for (auto Element : T->getElements()) {
-      if (auto SubstitutedElement = visit(Element.get()))
-        Elements.push_back(SubstitutedElement);
-      else
-        return nullptr;
+      Elements.push_back(visit(Element.get()));
     }
     return std::make_shared<TupleTypeRef>(Elements, T->isVariadic());
   }
@@ -587,14 +582,9 @@ public:
   TypeRefPointer visitFunctionTypeRef(const FunctionTypeRef *F) {
     TypeRefVector SubstitutedArguments;
     for (auto Argument : F->getArguments())
-      if (auto SubstitutedArgument = visit(Argument.get()))
-        SubstitutedArguments.push_back(SubstitutedArgument);
-      else
-        return nullptr;
+      SubstitutedArguments.push_back(visit(Argument.get()));
 
     auto SubstitutedResult = visit(F->getResult().get());
-    if (!SubstitutedResult)
-      return nullptr;
 
     return std::make_shared<FunctionTypeRef>(SubstitutedArguments,
                                              SubstitutedResult);
@@ -610,30 +600,26 @@ public:
   }
 
   TypeRefPointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
-    if (auto SubstitutedInstance = visit(M->getInstanceType().get()))
-      return MetatypeTypeRef::create(SubstitutedInstance);
-    else
-      return nullptr;
+    return MetatypeTypeRef::create(visit(M->getInstanceType().get()));
   }
 
   TypeRefPointer
   visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
-    if (auto SubstitutedInstance = visit(EM->getInstanceType().get()))
-      return MetatypeTypeRef::create(SubstitutedInstance);
-    else
-      return nullptr;
+    assert(EM->getInstanceType()->isConcrete());
+    return std::make_shared<ExistentialMetatypeTypeRef>(*EM);
   }
 
   TypeRefPointer
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    return Substitutions[{GTP->getDepth(), GTP->getIndex()}];
+    auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
+    assert(found != Substitutions.end());
+    assert(found->second->isConcrete());
+    return found->second;
   }
 
   TypeRefPointer
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     auto SubstBase = visit(DM->getBase().get());
-    if (!SubstBase || !SubstBase->isConcrete())
-      return nullptr;
 
     TypeRefPointer TypeWitness;
 
@@ -649,12 +635,11 @@ public:
       break;
     }
     default:
-      return nullptr;
+      assert(false && "Unknown base type");
     }
-    if (!TypeWitness)
-      return nullptr;
 
-    return visit(TypeWitness.get());
+    assert(TypeWitness);
+    return TypeWitness->subst(RC, SubstBase->getSubstMap());
   }
 
   TypeRefPointer visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
@@ -666,25 +651,16 @@ public:
   }
 
   TypeRefPointer visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    if (auto SubstitutedType = visit(US->getType().get()))
-      return UnownedStorageTypeRef::create(SubstitutedType);
-    else
-      return nullptr;
+    return UnownedStorageTypeRef::create(visit(US->getType().get()));
   }
 
   TypeRefPointer visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    if (auto SubstitutedType = visit(WS->getType().get()))
-      return WeakStorageTypeRef::create(SubstitutedType);
-    else
-      return nullptr;
+    return WeakStorageTypeRef::create(visit(WS->getType().get()));
   }
 
   TypeRefPointer
   visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    if (auto SubstitutedType = visit(US->getType().get()))
-      return UnmanagedStorageTypeRef::create(SubstitutedType);
-    else
-      return nullptr;
+    return UnmanagedStorageTypeRef::create(visit(US->getType().get()));
   }
 
   TypeRefPointer visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
@@ -695,7 +671,9 @@ public:
 template <typename Runtime>
 TypeRefPointer
 TypeRef::subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs) {
-  return TypeRefSubstitution<Runtime>(RC, Subs).visit(this);
+  TypeRefPointer Result = TypeRefSubstitution<Runtime>(RC, Subs).visit(this);
+  assert(Result->isConcrete());
+  return Result;
 }
 
 } // end namespace reflection
