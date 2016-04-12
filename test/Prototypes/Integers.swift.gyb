@@ -283,7 +283,8 @@ public protocol Integer : ${IntegerBase} {
   /// by `Self`, and exact value of `source` otherwise.
   init<T : Integer>(clamping source: T)
 
-  /// Return n-th word in the underlying representation of `self`.
+  /// Return n-th word (counting from the right) in the underlying
+  /// representation of `self`.
   @warn_unused_result
   func nthWord(_ n: Word) -> UWord
 
@@ -306,11 +307,23 @@ public protocol Integer : ${IntegerBase} {
   // implementation hook
   mutating func ${x.mutatingName}(${x.firstArg} rhs: Self)
 % end
+
+  /// An extension point to provide an efficient implementation of `divRem`
+  /// operation, producing a pair of quotient and remainder of division of
+  /// `self` by `rhs`.
+  /// Default implementation simply invokes `divided(by:)` and
+  /// `remainder(dividingBy:)`, which in case of built-in types will be fused
+  /// into a single instruction by the compiler.
+  func quotientAndRemainder(dividingBy rhs: Self) -> (Self, Self)
 }
 
 extension Integer {
   public var countRepresentedWords: Word {
     return (self.bitWidth + ${word_bits} - 1) / ${word_bits}
+  }
+
+  public func quotientAndRemainder(dividingBy rhs: Self) -> (Self, Self) {
+    return (self.divided(by: rhs), self.remainder(dividingBy: rhs))
   }
 }
 
