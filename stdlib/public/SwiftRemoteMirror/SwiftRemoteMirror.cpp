@@ -57,7 +57,7 @@ swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t metadata) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TR = Context->getTypeRef(metadata);
-  return reinterpret_cast<swift_typeref_t>(TR.get());
+  return reinterpret_cast<swift_typeref_t>(TR);
 }
 
 swift_typeref_t
@@ -68,7 +68,7 @@ swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
   if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
     auto &Params = BG->getGenericParams();
     if (Index < Params.size()) {
-      return reinterpret_cast<swift_typeref_t>(Params[Index].get());
+      return reinterpret_cast<swift_typeref_t>(Params[Index]);
     }
   }
   return 0;
