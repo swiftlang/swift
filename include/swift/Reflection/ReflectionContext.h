@@ -96,8 +96,10 @@ class ReflectionContext {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
 
+  std::vector<std::unique_ptr<TypeRef>> TypeRefPool;
+
   std::vector<ReflectionInfo> ReflectionInfos;
-  std::unordered_map<StoredPointer, TypeRefPointer> TypeRefCache;
+  std::unordered_map<StoredPointer, TypeRef *> TypeRefCache;
   std::unordered_map<StoredPointer, SharedTargetMetadataRef<Runtime>>
   MetadataCache;
 
@@ -109,12 +111,12 @@ class ReflectionContext {
   std::shared_ptr<MemoryReader> Reader;
 
   void dumpTypeRef(const std::string &MangledName,
-                   std::ostream &OS, bool printTypeName = false) const {
+                   std::ostream &OS, bool printTypeName = false) {
     auto TypeName = Demangle::demangleTypeAsString(MangledName);
     OS << TypeName << std::endl;
 
     auto DemangleTree = Demangle::demangleTypeAsNode(MangledName);
-    auto TR = TypeRef::fromDemangleNode(DemangleTree);
+    auto TR = decodeTypeRef(DemangleTree);
     if (!TR) {
       OS << "!!! Invalid typeref: " << MangledName << std::endl;
       return;
@@ -150,10 +152,10 @@ class ReflectionContext {
           continue;
         std::string ProtocolMangledName(AssocTyDescriptor.ProtocolTypeName);
         auto DemangledProto = Demangle::demangleTypeAsNode(ProtocolMangledName);
-        auto TR = TypeRef::fromDemangleNode(DemangledProto);
+        auto TR = decodeTypeRef(DemangledProto);
 
         auto &Conformance = *DependentMember->getProtocol();
-        if (auto Protocol = dyn_cast<ProtocolTypeRef>(TR.get())) {
+        if (auto Protocol = dyn_cast<ProtocolTypeRef>(TR)) {
           if (*Protocol != Conformance)
             continue;
           return &AssocTyDescriptor;
@@ -164,6 +166,7 @@ class ReflectionContext {
   }
 
 public:
+
   ReflectionContext(std::shared_ptr<MemoryReader> Reader)
     : Reader(Reader) {}
 
@@ -171,7 +174,157 @@ public:
     return *Reader;
   }
 
-  void dumpFieldSection(std::ostream &OS) const {
+  template <typename TypeRefTy, typename... Args>
+  TypeRefTy *make_typeref(Args... args) {
+    auto TR = new TypeRefTy(::std::forward<Args>(args)...);
+    TypeRefPool.push_back(std::unique_ptr<TypeRef>(TR));
+    return TR;
+  }
+
+  TypeRef *decodeTypeRef(Demangle::NodePointer Node) {
+    using NodeKind = Demangle::Node::Kind;
+    switch (Node->getKind()) {
+      case NodeKind::Global:
+        return decodeTypeRef(Node->getChild(0));
+      case NodeKind::TypeMangling:
+        return decodeTypeRef(Node->getChild(0));
+      case NodeKind::Type:
+        return decodeTypeRef(Node->getChild(0));
+      case NodeKind::BoundGenericClass:
+      case NodeKind::BoundGenericEnum:
+      case NodeKind::BoundGenericStructure: {
+        auto mangledName = Demangle::mangleNode(Node->getChild(0));
+        auto genericArgs = Node->getChild(1);
+        std::vector<TypeRef *> Args;
+        for (auto genericArg : *genericArgs) {
+          auto paramTypeRef = decodeTypeRef(genericArg);
+          if (!paramTypeRef)
+            return nullptr;
+          Args.push_back(paramTypeRef);
+        }
+
+        return BoundGenericTypeRef::create(*this, mangledName, Args);
+      }
+      case NodeKind::Class:
+      case NodeKind::Enum:
+      case NodeKind::Structure: {
+        auto mangledName = Demangle::mangleNode(Node);
+        return NominalTypeRef::create(*this, mangledName);
+      }
+      case NodeKind::BuiltinTypeName: {
+        auto mangledName = Demangle::mangleNode(Node);
+        return BuiltinTypeRef::create(*this, mangledName);
+      }
+      case NodeKind::ExistentialMetatype: {
+        auto instance = decodeTypeRef(Node->getChild(0));
+        if (!instance)
+          return nullptr;
+        return ExistentialMetatypeTypeRef::create(*this, instance);
+      }
+      case NodeKind::Metatype: {
+        auto instance = decodeTypeRef(Node->getChild(0));
+        if (!instance)
+          return nullptr;
+        return MetatypeTypeRef::create(*this, instance);
+      }
+      case NodeKind::ProtocolList: {
+        std::vector<TypeRef *> Protocols;
+        auto TypeList = Node->getChild(0);
+        for (auto Type : *TypeList) {
+          if (auto Protocol = decodeTypeRef(Type))
+            Protocols.push_back(Protocol);
+          else
+            return nullptr;
+        }
+        if (Protocols.size() == 1)
+          return Protocols.front();
+        else
+          return ProtocolCompositionTypeRef::create(*this, Protocols);
+      }
+      case NodeKind::Protocol: {
+        auto moduleName = Node->getChild(0)->getText();
+        auto name = Node->getChild(1)->getText();
+        return ProtocolTypeRef::create(*this, moduleName, name);
+      }
+      case NodeKind::DependentGenericParamType: {
+        auto depth = Node->getChild(0)->getIndex();
+        auto index = Node->getChild(1)->getIndex();
+        return GenericTypeParameterTypeRef::create(*this, depth, index);
+      }
+      case NodeKind::FunctionType: {
+        std::vector<TypeRef *> arguments;
+        auto input = decodeTypeRef(Node->getChild(0));
+        if (!input)
+          return nullptr;
+        if (auto tuple = dyn_cast<TupleTypeRef>(input))
+          arguments = tuple->getElements();
+        else
+          arguments = { input };
+        auto result = decodeTypeRef(Node->getChild(1));
+        if (!result)
+          return nullptr;
+        return FunctionTypeRef::create(*this, arguments, result);
+      }
+      case NodeKind::ArgumentTuple:
+        return decodeTypeRef(Node->getChild(0));
+      case NodeKind::ReturnType:
+        return decodeTypeRef(Node->getChild(0));
+      case NodeKind::NonVariadicTuple:
+      case NodeKind::VariadicTuple: {
+        std::vector<TypeRef *> Elements;
+        for (auto element : *Node) {
+          auto elementType = decodeTypeRef(element);
+          if (!elementType)
+            return nullptr;
+          Elements.push_back(elementType);
+        }
+        bool Variadic = (Node->getKind() == NodeKind::VariadicTuple);
+        return TupleTypeRef::create(*this, Elements, Variadic);
+      }
+      case NodeKind::TupleElement:
+        if (Node->getChild(0)->getKind() == NodeKind::TupleElementName)
+          return decodeTypeRef(Node->getChild(1));
+        return decodeTypeRef(Node->getChild(0));
+      case NodeKind::DependentGenericType: {
+        return decodeTypeRef(Node->getChild(1));
+      }
+      case NodeKind::DependentMemberType: {
+        auto base = decodeTypeRef(Node->getChild(0));
+        if (!base)
+          return nullptr;
+        auto member = Node->getChild(1)->getText();
+        auto protocol = decodeTypeRef(Node->getChild(1));
+        if (!protocol)
+          return nullptr;
+        assert(llvm::isa<ProtocolTypeRef>(protocol));
+        return DependentMemberTypeRef::create(*this, member, base, protocol);
+      }
+      case NodeKind::DependentAssociatedTypeRef:
+        return decodeTypeRef(Node->getChild(0));
+      case NodeKind::Unowned: {
+        auto base = decodeTypeRef(Node->getChild(0));
+        if (!base)
+          return nullptr;
+        return UnownedStorageTypeRef::create(*this, base);
+      }
+      case NodeKind::Unmanaged: {
+        auto base = decodeTypeRef(Node->getChild(0));
+        if (!base)
+          return nullptr;
+        return UnmanagedStorageTypeRef::create(*this, base);
+      }
+      case NodeKind::Weak: {
+        auto base = decodeTypeRef(Node->getChild(0));
+        if (!base)
+          return nullptr;
+        return WeakStorageTypeRef::create(*this, base);
+      }
+      default:
+        return nullptr;
+    }
+  }
+
+  void dumpFieldSection(std::ostream &OS) {
     for (const auto &sections : ReflectionInfos) {
       for (const auto &descriptor : sections.fieldmd) {
         auto TypeName
@@ -188,7 +341,7 @@ public:
     }
   }
 
-  void dumpAssociatedTypeSection(std::ostream &OS) const {
+  void dumpAssociatedTypeSection(std::ostream &OS) {
     for (const auto &sections : ReflectionInfos) {
       for (const auto &descriptor : sections.assocty) {
         auto conformingTypeName = Demangle::demangleTypeAsString(
@@ -207,7 +360,7 @@ public:
     }
   }
 
-  void dumpAllSections(std::ostream &OS) const {
+  void dumpAllSections(std::ostream &OS) {
     OS << "FIELDS:" << std::endl;
     for (size_t i = 0; i < 7; ++i) OS << '=';
     OS << std::endl;
@@ -219,7 +372,7 @@ public:
     OS << std::endl;
   }
 
-  TypeRefPointer
+  TypeRef *
   getDependentMemberTypeRef(const std::string &MangledTypeName,
                             const DependentMemberTypeRef *DependentMember) {
 
@@ -230,7 +383,7 @@ public:
 
         auto SubstitutedTypeName = AssocTy.getMangledSubstitutedTypeName();
         auto Demangled = Demangle::demangleTypeAsNode(SubstitutedTypeName);
-        return TypeRef::fromDemangleNode(Demangled);
+        return decodeTypeRef(Demangled);
       }
     }
     return nullptr;
@@ -406,7 +559,7 @@ public:
       SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
       std::tie(Descriptor, DescriptorAddress)
         = readNominalTypeDescriptor(MetadataAddress);
-      TypeRefVector Substitutions;
+      std::vector<TypeRef *> Substitutions;
       auto OffsetToParent
         = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset - 1);
       if (!Reader->readInteger(RemoteAddress(MetadataAddress + OffsetToParent),
@@ -422,12 +575,12 @@ public:
     return 0;
   }
 
-  TypeRefVector getGenericSubst(StoredPointer MetadataAddress) {
+  std::vector<TypeRef *> getGenericSubst(StoredPointer MetadataAddress) {
     StoredPointer DescriptorAddress;
     SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
     std::tie(Descriptor, DescriptorAddress)
       = readNominalTypeDescriptor(MetadataAddress);
-    TypeRefVector Substitutions;
+    std::vector<TypeRef *> Substitutions;
     auto NumGenericParams = Descriptor->GenericParams.NumPrimaryParams;
     auto OffsetToGenericArgs
       = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset);
@@ -448,7 +601,7 @@ public:
     return Substitutions;
   }
 
-  TypeRefPointer
+  TypeRef *
   getNominalTypeRef(StoredPointer MetadataAddress) {
     auto Meta = readMetadata(MetadataAddress);
 
@@ -470,19 +623,19 @@ public:
     if (!DemangleNode)
       return nullptr;
 
-    TypeRefPointer Parent;
+    TypeRef *Parent;
     if (auto ParentAddress = getParentAddress(MetadataAddress))
       Parent = getTypeRef(ParentAddress);
 
-    TypeRefPointer Nominal;
+    TypeRef *Nominal;
     if (Descriptor->GenericParams.NumPrimaryParams) {
       auto Args = getGenericSubst(MetadataAddress);
-      auto BG = BoundGenericTypeRef::create(MangledName, Args);
+      auto BG = BoundGenericTypeRef::create(*this, MangledName, Args);
       BG->setParent(Parent);
       Nominal = BG;
     } else {
-      auto TR = TypeRef::fromDemangleNode(DemangleNode);
-      auto N = cast<NominalTypeRef>(TR.get());
+      auto TR = decodeTypeRef(DemangleNode);
+      auto N = cast<NominalTypeRef>(TR);
       N->setParent(Parent);
       Nominal = TR;
     }
@@ -490,7 +643,7 @@ public:
     return Nominal;
   }
 
-  TypeRefPointer getTypeRef(StoredPointer MetadataAddress) {
+  TypeRef *getTypeRef(StoredPointer MetadataAddress) {
     auto Cached = TypeRefCache.find(MetadataAddress);
     if (Cached != TypeRefCache.end())
       return Cached->second;
@@ -508,7 +661,7 @@ public:
       return getNominalTypeRef(MetadataAddress);
     case MetadataKind::Tuple: {
       auto TupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta.get());
-      TypeRefVector Elements;
+      std::vector<TypeRef *> Elements;
       StoredPointer ElementAddress = MetadataAddress +
         sizeof(TargetTupleTypeMetadata<Runtime>);
       using Element = typename TargetTupleTypeMetadata<Runtime>::Element;
@@ -524,7 +677,7 @@ public:
         else
           return nullptr;
       }
-      return TupleTypeRef::create(Elements);
+      return TupleTypeRef::create(*this, Elements);
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta.get());
@@ -534,7 +687,7 @@ public:
       if (!Reader->readBytes(RemoteAddress(FlagsAddress),
                              (uint8_t*)&Flags, sizeof(Flags)))
         return nullptr;
-      TypeRefVector Arguments;
+      std::vector<TypeRef *> Arguments;
       StoredPointer ArgumentAddress = MetadataAddress +
         sizeof(TargetFunctionTypeMetadata<Runtime>);
       for (StoredPointer i = 0; i < Function->getNumArguments(); ++i,
@@ -554,11 +707,11 @@ public:
       auto Result = getTypeRef(Function->ResultType);
       if (!Result)
         return nullptr;
-      return FunctionTypeRef::create(Arguments, Result);
+      return FunctionTypeRef::create(*this, Arguments, Result);
     }
     case MetadataKind::Existential: {
       auto Exist = cast<TargetExistentialTypeMetadata<Runtime>>(Meta.get());
-      TypeRefVector Protocols;
+      std::vector<TypeRef *> Protocols;
       for (size_t i = 0; i < Exist->Protocols.NumProtocols; ++i) {
         auto ProtocolAddress = Exist->Protocols[i];
         auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
@@ -570,52 +723,52 @@ public:
                                 MangledName))
           return nullptr;
         auto Demangled = Demangle::demangleSymbolAsNode(MangledName);
-        auto Protocol = TypeRef::fromDemangleNode(Demangled);
-        if (!llvm::isa<ProtocolTypeRef>(Protocol.get()))
+        auto Protocol = decodeTypeRef(Demangled);
+        if (!llvm::isa<ProtocolTypeRef>(Protocol))
           return nullptr;
 
         Protocols.push_back(Protocol);
       }
-      return ProtocolCompositionTypeRef::create(Protocols);
+      return ProtocolCompositionTypeRef::create(*this, Protocols);
     }
     case MetadataKind::Metatype: {
       auto Metatype = cast<TargetMetatypeMetadata<Runtime>>(Meta.get());
       auto Instance = getTypeRef(Metatype->InstanceType);
-      return MetatypeTypeRef::create(Instance);
+      return MetatypeTypeRef::create(*this, Instance);
     }
     case MetadataKind::ObjCClassWrapper:
-      return ObjCClassTypeRef::Unnamed;
+      return ObjCClassTypeRef::getUnnamed();
     case MetadataKind::ExistentialMetatype: {
       auto Exist = cast<TargetExistentialMetatypeMetadata<Runtime>>(Meta.get());
       auto Instance = getTypeRef(Exist->InstanceType);
-      return ExistentialMetatypeTypeRef::create(Instance);
+      return ExistentialMetatypeTypeRef::create(*this, Instance);
     }
     case MetadataKind::ForeignClass:
-      return ForeignClassTypeRef::Unnamed;
+      return ForeignClassTypeRef::getUnnamed();
     case MetadataKind::HeapLocalVariable:
-      return ForeignClassTypeRef::Unnamed;
+      return ForeignClassTypeRef::getUnnamed();
     case MetadataKind::HeapGenericLocalVariable:
-      return ForeignClassTypeRef::Unnamed;
+      return ForeignClassTypeRef::getUnnamed();
     case MetadataKind::ErrorObject:
-      return ForeignClassTypeRef::Unnamed;
+      return ForeignClassTypeRef::getUnnamed();
     case MetadataKind::Opaque:
-      return OpaqueTypeRef::Opaque;
+      return OpaqueTypeRef::get();
     }
   }
 
-  std::vector<std::pair<std::string, ConstTypeRefPointer>>
-  getFieldTypeRefs(TypeRefPointer TR) {
+  std::vector<std::pair<std::string, TypeRef *>>
+  getFieldTypeRefs(TypeRef *TR) {
     std::string MangledName;
-    if (auto N = dyn_cast<NominalTypeRef>(TR.get()))
+    if (auto N = dyn_cast<NominalTypeRef>(TR))
       MangledName = N->getMangledName();
-    else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR.get()))
+    else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR))
       MangledName = BG->getMangledName();
     else
       return {};
 
     auto Subs = TR->getSubstMap();
 
-    std::vector<std::pair<std::string, ConstTypeRefPointer>> Fields;
+    std::vector<std::pair<std::string, TypeRef *>> Fields;
     for (auto Info : ReflectionInfos) {
       for (auto &FieldDescriptor : Info.fieldmd) {
         auto CandidateMangledName = FieldDescriptor.MangledTypeName.get();
@@ -626,7 +779,7 @@ public:
         for (auto &Field : FieldDescriptor) {
           auto Demangled
           = Demangle::demangleTypeAsNode(Field.getMangledTypeName());
-          auto Unsubstituted = TypeRef::fromDemangleNode(Demangled);
+          auto Unsubstituted = decodeTypeRef(Demangled);
           if (!Unsubstituted)
             return {};
           auto Substituted = Unsubstituted->subst(*this, Subs);
@@ -640,7 +793,7 @@ public:
     return Fields;
   }
 
-  std::vector<std::pair<std::string, ConstTypeRefPointer>>
+  std::vector<std::pair<std::string, TypeRef *>>
   getFieldTypeRefs(StoredPointer MetadataAddress) {
     auto Meta = readMetadata(MetadataAddress);
     if (!Meta)
@@ -680,18 +833,17 @@ public:
       SWIFT_UNKNOWN,
       NULL,
       0,
+      0,
       0
     };
   }
 
-  swift_fieldinfo_t getInfoForField(const TypeRef *TR, unsigned Index) {
+  swift_childinfo_t getInfoForChild(const TypeRef *TR, unsigned Index) {
     // TODO
     return {
-      NOTAPOINTER,
       0,
       NULL,
       0,
-      0
     };
   }
 };

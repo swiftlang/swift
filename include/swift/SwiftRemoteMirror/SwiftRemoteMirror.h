@@ -56,9 +56,6 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_section_t assocty);
 
 
-/// Clear any caching of field type information for all known heap instances.
-void swift_reflection_clearCaches(SwiftReflectionContextRef Context);
-
 /// Returns an opaque type reference for a metadata pointer, or
 /// NULL if one can't be constructed.
 swift_typeref_t
@@ -70,8 +67,8 @@ swift_typeinfo_t
 swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef);
 
-/// Returns the information about a stored property by index.
-swift_fieldinfo_t
+/// Returns the information about a child by index.
+swift_childinfo_t
 swift_reflection_infoForField(SwiftReflectionContextRef ContextRef,
                               swift_typeref_t OpaqueTypeRef,
                               unsigned Index);

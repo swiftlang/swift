@@ -2,4 +2,5 @@ add_swift_library(swiftReflection IS_STDLIB IS_HOST
   Demangle.cpp
   Remangle.cpp
   TypeRef.cpp
-  INSTALL_IN_COMPONENT dev)
+  INSTALL_IN_COMPONENT dev
+  COMPONENT_DEPENDS Support)
