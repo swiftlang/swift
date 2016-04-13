@@ -1210,11 +1210,11 @@ std::string toolchains::GenericUnix::getDefaultLinker() const {
   }
 }
 
-bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
-  return true;
+std::string toolchains::GenericUnix::getTargetForLinker() const {
+  return getTriple().str();
 }
 
-bool toolchains::GenericUnix::shouldSpecifyTargetTripleToLinker() const {
+bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
   return true;
 }
 
@@ -1266,9 +1266,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
   }
 
-  // Explicitly pass the target to the linker
-  if (shouldSpecifyTargetTripleToLinker()) {
-    Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
+  std::string Target = getTargetForLinker();
+  if (!Target.empty()) {
+    Arguments.push_back("-target");
+    Arguments.push_back(context.Args.MakeArgString(Target));
   }
 
   // Add the runtime library link path, which is platform-specific and found
@@ -1340,13 +1341,29 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   return {"clang++", Arguments};
 }
 
+std::string
+toolchains::Android::getTargetForLinker() const {
+  // Explicitly set the linker target to "androideabi", as opposed to the
+  // llvm::Triple representation of "armv7-none-linux-android".
+  // This is the only ABI we currently support for Android.
+  assert(
+    getTriple().getArch() == llvm::Triple::arm &&
+    getTriple().getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7 &&
+    "Only armv7 targets are supported for Android");
+  return "armv7-none-linux-androideabi";
+}
+
+bool toolchains::Android::shouldProvideRPathToLinker() const {
+  return false;
+}
+
 std::string toolchains::Cygwin::getDefaultLinker() const {
   // Cygwin uses the default BFD linker, even on ARM.
   return "";
 }
 
-bool toolchains::Cygwin::shouldSpecifyTargetTripleToLinker() const {
-  return false;
+std::string toolchains::Cygwin::getTargetForLinker() const {
+  return "";
 }
 
 std::string toolchains::Cygwin::getPreInputObjectPath(

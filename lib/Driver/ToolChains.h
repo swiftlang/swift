@@ -53,16 +53,16 @@ protected:
   /// and to not provide a specific linker otherwise.
   virtual std::string getDefaultLinker() const;
 
+  /// The target to be passed to the compiler invocation. By default, this
+  /// is the target triple, but this may be overridden to accomodate some
+  /// platforms.
+  virtual std::string getTargetForLinker() const;
+
   /// Whether to specify a linker -rpath to the Swift runtime library path.
   /// -rpath is not supported on all platforms, and subclasses may override
   /// this method to return false on platforms that don't support it. The
   /// default is to return true (and so specify an -rpath).
   virtual bool shouldProvideRPathToLinker() const;
-
-  /// Whether to explicitly specify the target triple as the linker
-  /// '--target'. This is not desirable on all platforms, and subclasses may
-  /// override this method to return false in those cases.
-  virtual bool shouldSpecifyTargetTripleToLinker() const;
 
   /// Provides a path to an object that should be linked first. On platforms
   /// that use ELF binaries, an object that provides markers and sizes for
@@ -96,11 +96,21 @@ public:
   ~GenericUnix() = default;
 };
 
+class LLVM_LIBRARY_VISIBILITY Android : public GenericUnix {
+protected:
+  std::string getTargetForLinker() const override;
+
+  bool shouldProvideRPathToLinker() const override;
+public:
+  Android(const Driver &D, const llvm::Triple &Triple) : GenericUnix(D, Triple) {}
+  ~Android() = default;
+};
+
 class LLVM_LIBRARY_VISIBILITY Cygwin : public GenericUnix {
 protected:
   std::string getDefaultLinker() const override;
 
-  bool shouldSpecifyTargetTripleToLinker() const override;
+  std::string getTargetForLinker() const override;
 
   std::string getPreInputObjectPath(
     StringRef RuntimeLibraryPath) const override;

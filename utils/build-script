@@ -647,6 +647,11 @@ also build for watchOS, but disallow tests that require an watchOS device""",
         action="store_true")
 
     parser.add_argument(
+        "--android",
+        help="also build for Android",
+        action="store_true")
+
+    parser.add_argument(
         "--swift-analyze-code-coverage",
         help="""enable code coverage analysis in Swift (false, not-merged,
         merged).""",
@@ -700,6 +705,41 @@ the number of parallel build jobs to use""",
     a '\'"""),
         action="append", dest="extra_swift_args", default=[])
 
+    android_group = parser.add_argument_group(
+        title="Build settings for Android")
+    android_group.add_argument(
+        "--android-ndk",
+        help="An absolute path to the NDK that will be used as a libc "
+             "implementation for Android builds",
+        metavar="PATH")
+    android_group.add_argument(
+        "--android-ndk-version",
+        help="A version of the NDK to use when building for Android. "
+             "Currently only 21 or above is supported",
+        default="21")
+    android_group.add_argument(
+        "--android-ndk-toolchain-version",
+        help="A version of the toolchain to use when building for Android. "
+             "Use 4.8 for 32-bit builds, 4.9 for 64-bit builds",
+        choices=["4.8", "4.9"],
+        default="4.8")
+    android_group.add_argument(
+        "--android-icu-uc",
+        help="Path to a directory containing libicuuc.so",
+        metavar="PATH")
+    android_group.add_argument(
+        "--android-icu-uc-include",
+        help="Path to a directory containing headers for libicuuc",
+        metavar="PATH")
+    android_group.add_argument(
+        "--android-icu-i18n",
+        help="Path to a directory containing libicui18n.so",
+        metavar="PATH")
+    android_group.add_argument(
+        "--android-icu-i18n-include",
+        help="Path to a directory containing headers libicui18n",
+        metavar="PATH")
+
     parser.add_argument(
         "--extra-cmake-options", help=textwrap.dedent("""
     Pass through extra options to CMake in the form of comma separated options
@@ -746,6 +786,20 @@ the number of parallel build jobs to use""",
             print_with_argv0(
                 "--install-symroot is required when specifying "
                 "--symbols-package.")
+            return 1
+
+    if args.android:
+        if args.android_ndk is None or \
+                args.android_ndk_version is None or \
+                args.android_icu_uc is None or \
+                args.android_icu_uc_include is None or \
+                args.android_icu_i18n is None or \
+                args.android_icu_i18n_include is None:
+            print_with_argv0("When building for Android, --android-ndk, "
+                             "--android-ndk-version, --android-icu-uc, "
+                             "--android-icu-uc-include, --android-icu-i18n, "
+                             "and --android-icu-i18n-include must be "
+                             "specified.")
             return 1
 
     # Build cmark if any cmark-related options were specified.
@@ -903,6 +957,11 @@ the number of parallel build jobs to use""",
             "--skip-test-watchos-host",
         ]
 
+    if not args.android:
+        build_script_impl_inferred_args += [
+            "--skip-build-android",
+        ]
+
     if not args.build_lldb:
         build_script_impl_inferred_args += [
             "--skip-build-lldb"
@@ -956,6 +1015,7 @@ the number of parallel build jobs to use""",
             "--skip-build-watchos",
             "--skip-build-watchos-device",
             "--skip-build-watchos-simulator",
+            "--skip-build-android",
             "--skip-build-lldb",
             "--skip-build-llbuild",
             "--skip-build-swiftpm",
@@ -1080,6 +1140,16 @@ the number of parallel build jobs to use""",
     if args.cmake_generator == 'Ninja' and \
        not swift_build_support.ninja.is_ninja_installed():
         build_script_impl_args += ["--build-ninja"]
+    if args.android:
+        build_script_impl_args += [
+            "--android-ndk", args.android_ndk,
+            "--android-ndk-version", args.android_ndk_version,
+            "--android-ndk-toolchain-version", args.android_ndk_toolchain_version, # noqa
+            "--android-icu-uc", args.android_icu_uc,
+            "--android-icu-uc-include", args.android_icu_uc_include,
+            "--android-icu-i18n", args.android_icu_i18n,
+            "--android-icu-i18n-include", args.android_icu_i18n_include,
+        ]
     if args.skip_build_linux:
         build_script_impl_args += ["--skip-build-linux"]
     if args.skip_build_freebsd:
@@ -1106,6 +1176,18 @@ the number of parallel build jobs to use""",
         build_script_impl_args += ["--skip-test-watchos-simulator"]
     if args.build_runtime_with_host_compiler:
         build_script_impl_args += ["--build-runtime-with-host-compiler"]
+
+    if args.android:
+        build_script_impl_args += [
+            "--android-ndk", args.android_ndk,
+            "--android-ndk-version", args.android_ndk_version,
+            "--android-ndk-toolchain-version", args.android_ndk_toolchain_version,
+            "--android-icu-uc", args.android_icu_uc,
+            "--android-icu-uc-include", args.android_icu_uc_include,
+            "--android-icu-i18n", args.android_icu_i18n,
+            "--android-icu-i18n-include", args.android_icu_i18n_include,
+        ]
+
     build_script_impl_args += build_script_impl_inferred_args
 
     # If we have extra_swift_args, combine all of them together and then add
