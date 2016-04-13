@@ -234,29 +234,6 @@ internal func _make_posix_spawn_file_actions_t()
 #endif
 #endif
 
-internal func _readAll(_ fd: CInt) -> String {
-  var buffer = [UInt8](repeating: 0, count: 1024)
-  var usedBytes = 0
-  while true {
-    let readResult: ssize_t = buffer.withUnsafeMutableBufferPointer {
-      (buffer) in
-      let ptr = UnsafeMutablePointer<Void>(buffer.baseAddress! + usedBytes)
-      return read(fd, ptr, size_t(buffer.count - usedBytes))
-    }
-    if readResult > 0 {
-      usedBytes += readResult
-      continue
-    }
-    if readResult == 0 {
-      break
-    }
-    preconditionFailure("read() failed")
-  }
-  return String._fromCodeUnitSequenceWithRepair(
-    UTF8.self, input: buffer[0..<usedBytes]).0
-}
-
-
 internal func _signalToString(_ signal: Int) -> String {
   switch CInt(signal) {
   case SIGILL:  return "SIGILL"
@@ -296,26 +273,6 @@ public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
     return .signal(Int(WTERMSIG(status)))
   }
   preconditionFailure("did not understand what happened to child process")
-}
-
-public func runChild(_ args: [String])
-  -> (stdout: String, stderr: String, status: ProcessTerminationStatus) {
-  let (pid, _, stdoutFD, stderrFD) = spawnChild(args)
-
-  // FIXME: reading stdout and stderr sequentially can block.  Should use
-  // select().  This is not so simple to implement because of:
-  // <rdar://problem/17828358> Darwin module is missing fd_set-related macros
-  let stdout = _readAll(stdoutFD)
-  let stderr = _readAll(stderrFD)
-
-  if close(stdoutFD) != 0 {
-    preconditionFailure("close() failed")
-  }
-  if close(stderrFD) != 0 {
-    preconditionFailure("close() failed")
-  }
-  let status = posixWaitpid(pid)
-  return (stdout, stderr, status)
 }
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
