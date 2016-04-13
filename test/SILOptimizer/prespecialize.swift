@@ -7,17 +7,17 @@
 
 // CHECK-LABEL: sil [noinline] @_TF13prespecialize4testFTRGSaSi_4sizeSi_T_ 
 //
-// function_ref specialized CountableRange.makeIterator() -> CountableRangeIterator<A>
-// CHECK: function_ref @_TTSg5SiSis10Strideables_SiSis12SignedNumbers_SiSis33_BuiltinIntegerLiteralConvertibles___TFVs17CountableRange12makeIteratorfT_GVs25CountableRangeIteratorx_
+// function_ref specialized Collection<A where ...>.makeIterator() -> IndexingIterator<A>
+// CHECK: function_ref @_TTSg5GVs14CountableRangeSi_GS_Si_s10Collections_SiSis10Comparables_SiSis13SignedIntegers_SiSis33_BuiltinIntegerLiteralConvertibles_SiSis12SignedNumbers_SiSiS3_s_Si_GS_Si_GS_Si_s13IndexableBasesGS_Si_s8Sequences_SiSiS1_s_GVs16IndexingIteratorGS_Si__GS7_GS_Si__s16IteratorProtocols_Si_GS_Si__Si_GS_Si_GS_Si_S5_sGS_Si_S6_s_SiSiS1_s_GS7_GS_Si__GS7_GS_Si__S8_s_Si_GS_Si__Si_Si___TFesRxs10Collectionwx8IteratorzGVs16IndexingIteratorx_wx8_ElementzWxS0_7Element_rS_12makeIteratorfT_GS1_x_
 //
-// function_ref specialized CountableRangeIterator.next() -> A?
-// CHECK: function_ref @_TTSg5SiSis10Strideables_SiSis12SignedNumbers_SiSis33_BuiltinIntegerLiteralConvertibles___TFVs25CountableRangeIterator4nextfT_GSqx_
+// function_ref specialized IndexingIterator.next() -> A._Element?
+// CHECK: function_ref @_TTSg5GVs14CountableRangeSi_GS_Si_s13IndexableBases_SiSis10Comparables_GS_Si__Si___TFVs16IndexingIterator4nextfT_GSqwx8_Element_
 //
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
 // CHECK: function_ref {{@_TTSg5Si___TFSag9subscriptFSix|@_TTSg5Si___TFSaap9subscriptFSix}}
 // CHECK: return
 @inline(never)
-public func test(a: inout [Int], size: Int) {
+public func test(_ a: inout [Int], size: Int) {
   for i in 0..<size {
     for j in 0..<size {
       a[i] = a[j]
