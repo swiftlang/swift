@@ -18,13 +18,13 @@ import TestsUtils
 class Integrate {
   static let epsilon = 1.0e-9;
 
-  let fun:(Double)->Double;
+  let fun: (Double) -> Double;
 
-  init (f:(Double)->Double) {
+  init (f: (Double) -> Double) {
     fun = f;
   }
     
-  private func recEval(_ l:Double, fl:Double, r:Double, fr:Double, a:Double)->Double {
+  private func recEval(_ l: Double, fl: Double, r: Double, fr: Double, a: Double) -> Double {
     let h = (r - l) / 2
     let hh = h / 2
     let c = l + h
@@ -43,7 +43,7 @@ class Integrate {
   }
 
   @inline(never)
-  func computeArea(_ left: Double, right:Double)->Double {
+  func computeArea(_ left: Double, right: Double) -> Double {
     return recEval(left, fl:fun(left), r:right, fr:fun(right), a:0)
   }
 }

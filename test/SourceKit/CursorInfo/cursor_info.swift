@@ -78,7 +78,7 @@ class C3 {
 }
 
 struct S2<T, U where T == U> {
-  func foo<V, W where V == W> (_ closure: ()->()) -> ()->() { return closure }
+  func foo<V, W where V == W> (_ closure: () -> ()) -> () -> () { return closure }
 }
 class C4<T, U where T == U> {}
 enum E1<T, U where T == U> {}
@@ -127,7 +127,7 @@ func genReq<U, V: P1 where V.T == U>(_ u: U, v: V) {}
 }
 
 let tupleVar1: (((Int, Int), y: Int), z: Int)
-let tupleVar2: (f: ()->(), g: (x: Int)->Int)
+let tupleVar2: (f: () -> (), g: (x: Int) -> Int)
 let tupleVar3: (f: (inout x: (Int, Int)) throws ->(), Int)
 
 enum E4: Int {
@@ -152,9 +152,9 @@ protocol P2: class, P1 {}
 typealias MyAlias<T, U> = (T, U, T, U)
 typealias MyAlias2<A, B> = MyAlias<A, B>
 
-func paramAutoclosureNoescape1(@noescape _ msg: ()->String) {}
-func paramAutoclosureNoescape2(@autoclosure _ msg: ()->String) {}
-func paramAutoclosureNoescape3(@autoclosure(escaping) _ msg: ()->String) {}
+func paramAutoclosureNoescape1(@noescape _ msg: () -> String) {}
+func paramAutoclosureNoescape2(@autoclosure _ msg: () -> String) {}
+func paramAutoclosureNoescape3(@autoclosure(escaping) _ msg: () -> String) {}
 
 func paramDefaultPlaceholder(_ f: StaticString = #function, file: StaticString = #file, line: UInt = #line, col: UInt = #column, arr: [Int] = [], dict: [Int:Int] = [:], opt: Int? = nil, reg: Int = 1) {}
 

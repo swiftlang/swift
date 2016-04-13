@@ -144,7 +144,7 @@ func test<
   checkEqual(x, y, false)
 
   func checkReallocations(
-    _ a: T, _ growthDescription: String, _ growBy1: (_: inout T)->()
+    _ a: T, _ growthDescription: String, _ growBy1: (_: inout T) -> ()
   ) {
     var a = a
     var reallocations = 0
