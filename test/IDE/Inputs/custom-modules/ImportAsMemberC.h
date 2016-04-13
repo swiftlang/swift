@@ -27,6 +27,8 @@ void CCRefrigeratorSetPowerSupply(CCRefrigeratorRef fridge,
 extern const CCPowerSupplyRef kCCPowerSupplySemiModular
   __attribute__((swift_name("CCPowerSupplyRef.semiModular")));
 
+_Nonnull CCPowerSupplyRef CCPowerSupplyCreateDangerous(void)
+  __attribute__((swift_name("CCPowerSupply.init(dangerous:)")));
 #pragma clang arc_cf_code_audited end
 
 extern const double kCCPowerSupplyDefaultPower

@@ -6,6 +6,14 @@ import ImportAsMember
 
 func makeMetatype() -> Struct1.Type { return Struct1.self }
 
+// CHECK-LABEL: sil @_TF10cf_members17importAsUnaryInitFT_T_
+public func importAsUnaryInit() {
+  // CHECK: function_ref @CCPowerSupplyCreateDangerous : $@convention(c) () -> @owned CCPowerSupply
+  var a = CCPowerSupply(dangerous: ())
+  let f: () -> CCPowerSupply = CCPowerSupply.init(dangerous:)
+  a = f()
+}
+
 // CHECK-LABEL: sil @_TF10cf_members3foo
 public func foo(_ x: Double) {
 // CHECK: bb0([[X:%.*]] : $Double):
