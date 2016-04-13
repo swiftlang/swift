@@ -161,7 +161,7 @@ public func expectationFailure(
 }
 
 public func expectEqual<T>(
-  _ expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T) -> Bool
+  _ expected: T, _ actual: T, ${TRACE}, sameValue equal: (T, T) -> Bool
 ) {
   if !equal(expected, actual) {
     expectationFailure(
@@ -190,7 +190,7 @@ public func expectOptionalEqual<T : Equatable>(
 }
 
 public func expectOptionalEqual<T>(
-  _ expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T,T) -> Bool
+  _ expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T, T) -> Bool
 ) {
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
@@ -2265,8 +2265,8 @@ public func check${traversal}Collection<
   checkRandomAccessIndex(
     instances,
     distances: distances,
-    distanceOracle: { (x:Int,y:Int) in Distance(IntMax(y - x)) },
-    advanceOracle: { x,y in nextN(distances[y], instances[x]) },
+    distanceOracle: { (x: Int, y: Int) in Distance(IntMax(y - x)) },
+    advanceOracle: { x, y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), ${trace})
 % end

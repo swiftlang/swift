@@ -637,7 +637,7 @@ can be done in a fairly simple way: a function can declare that it
 throws if any of a set of named arguments do.  As an example (using
 strawman syntax)::
 
-  func map<T,U>(_ array: [T], fn: T -> U) throwsIf(fn) -> [U] {
+  func map<T, U>(_ array: [T], fn: T -> U) throwsIf(fn) -> [U] {
     ...
   }
 

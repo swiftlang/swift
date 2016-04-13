@@ -788,7 +788,7 @@ class ApplyInstBase<Impl, Base, true>
 protected:
   template <class... As>
   ApplyInstBase(As &&...args)
-    : ApplyInstBase<Impl,Base,false>(std::forward<As>(args)...) {}
+    : ApplyInstBase<Impl, Base, false>(std::forward<As>(args)...) {}
 
 public:
   using super::getCallee;

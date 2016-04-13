@@ -584,14 +584,14 @@ code runs significantly faster.
     var product = Matrix(A.size)
     // Extract 4 quarters from matrices A and B.
     let half = A.size/2
-    let A11 = A.slice(half ,0   , 0)
-    let A12 = A.slice(half ,0   , half)
-    let A21 = A.slice(half ,half, 0)
-    let A22 = A.slice(half ,half, half)
-    let B11 = B.slice(half ,0   , 0)
-    let B12 = B.slice(half ,0   , half)
-    let B21 = B.slice(half ,half, 0)
-    let B22 = B.slice(half ,half, half)
+    let A11 = A.slice(half, 0,    0)
+    let A12 = A.slice(half, 0,    half)
+    let A21 = A.slice(half, half, 0)
+    let A22 = A.slice(half, half, half)
+    let B11 = B.slice(half, 0,    0)
+    let B12 = B.slice(half, 0,    half)
+    let B21 = B.slice(half, half, 0)
+    let B22 = B.slice(half, half, half)
 
     // Multiply each of the sub blocks.
     let C11_1 = async((A11, B11), callback: ParallelMatMul)
@@ -610,8 +610,8 @@ code runs significantly faster.
     let C22 = C22_1.await() +  C22_2.await()
 
     // Save the matrix slices into the correct locations.
-    product.update(C11, 0   , 0)
-    product.update(C12, 0   , half)
+    product.update(C11, 0,    0)
+    product.update(C12, 0,    half)
     product.update(C21, half, 0)
     product.update(C22, half, half)
     return product

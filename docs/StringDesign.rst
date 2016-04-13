@@ -744,7 +744,7 @@ Indexing
          doSomethingWith(\ **someString[i]**\ )
        }
 
-       var (i,j) = **someString.indices().bounds**
+       var (i, j) = **someString.indices().bounds**
        while (i != j) {
          doSomethingElseWith(\ **someString[i]**\ )
          ++i
@@ -981,7 +981,7 @@ Building
 :Swift:
   .. parsed-literal::
         func **+** (lhs: String, rhs: String) -> String
-        func [infix,assignment] **+=** (lhs: [inout] String, rhs: String)
+        func [infix, assignment] **+=** (lhs: [inout] String, rhs: String)
         func **append**\ (_ suffix: String)
 
 

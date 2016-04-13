@@ -52,7 +52,7 @@ could be written as follows:
     ...
     @mutating
     func quickSort(_ compare: (StreamType.Element, StreamType.Element) -> Bool) {
-      let (start,end) = (startIndex, endIndex)
+      let (start, end) = (startIndex, endIndex)
       if start != end && start.succ() != end {
         let pivot = self[start]
         let mid = partition({compare($0, pivot)})

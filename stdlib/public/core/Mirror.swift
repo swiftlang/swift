@@ -701,7 +701,7 @@ public protocol CustomPlaygroundQuickLookable {
 ///
 ///     struct IntPairs {
 ///       var elements: [(Int, Int)]
-///       init(_ pairs: DictionaryLiteral<Int,Int>) {
+///       init(_ pairs: DictionaryLiteral<Int, Int>) {
 ///         elements = Array(pairs)
 ///       }
 ///     }

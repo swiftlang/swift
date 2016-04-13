@@ -168,7 +168,7 @@ Unnecessary subobject accesses
 
 The first is that they may load or store more than is necessary.
 
-As an obvious example, imagine a variable of type ``(Int,Int)``; even
+As an obvious example, imagine a variable of type ``(Int, Int)``; even
 if my code only accesses the first element of the tuple, full-value
 accesses force me to read or write the second element as well.  That
 means that, even if I'm purely overwriting the first element, I
@@ -177,7 +177,7 @@ value to use for the second element when performing the full-value
 store.
 
 Additionally, while unnecessarily loading the second element of an
-``(Int,Int)`` pair might seem trivial, consider that the tuple could
+``(Int, Int)`` pair might seem trivial, consider that the tuple could
 actually have twenty elements, or that the second element might be
 non-trivial to copy (e.g. if it's a retainable pointer).
 

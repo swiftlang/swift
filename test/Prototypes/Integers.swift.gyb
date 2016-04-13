@@ -402,16 +402,16 @@ public func > <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
 // These two versions of the operators are not ordered with respect to
 // one another:
 //
-//     <T : Comparable>(T,T) -> Bool
-//     <T : Integer, U : Integer>(T,U) -> Bool
+//     <T : Comparable>(T, T) -> Bool
+//     <T : Integer, U : Integer>(T, U) -> Bool
 //
 // so we define:
 //
-//     <T : Integer>(T,T) -> Bool
+//     <T : Integer>(T, T) -> Bool
 
 @_transparent
 @warn_unused_result
-public func != <T : Integer>(lhs:T, rhs: T) -> Bool {
+public func != <T : Integer>(lhs: T, rhs: T) -> Bool {
   return !(lhs == rhs)
 }
 
