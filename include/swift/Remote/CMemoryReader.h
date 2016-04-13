@@ -1,4 +1,4 @@
-//===- CMemoryReader.h - MemoryReader wrapper for C impls -------*- C++ -*-===//
+//===--- CMemoryReader.h - MemoryReader wrapper for C impls -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
