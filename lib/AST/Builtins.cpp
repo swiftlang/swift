@@ -1214,13 +1214,28 @@ static bool isValidStoreOrdering(StringRef Ordering) {
 static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
   using namespace llvm;
   return StringSwitch<AtomicOrdering>(O)
-    .Case("unordered", Unordered)
-    .Case("monotonic", Monotonic)
-    .Case("acquire", Acquire)
-    .Case("release", Release)
-    .Case("acqrel", AcquireRelease)
-    .Case("seqcst", SequentiallyConsistent)
-    .Default(NotAtomic);
+    .Case("unordered", AtomicOrdering::Unordered)
+    .Case("monotonic", AtomicOrdering::Monotonic)
+    .Case("acquire", AtomicOrdering::Acquire)
+    .Case("release", AtomicOrdering::Release)
+    .Case("acqrel", AtomicOrdering::AcquireRelease)
+    .Case("seqcst", AtomicOrdering::SequentiallyConsistent)
+    .Default(AtomicOrdering::NotAtomic);
+}
+
+static bool isUnknownOrUnordered(AtomicOrdering ordering) {
+  switch (ordering) {
+  case AtomicOrdering::NotAtomic:
+  case AtomicOrdering::Unordered:
+    return true;
+
+  case AtomicOrdering::Monotonic:
+  case AtomicOrdering::Acquire:
+  case AtomicOrdering::Release:
+  case AtomicOrdering::AcquireRelease:
+  case AtomicOrdering::SequentiallyConsistent:
+    return false;
+  }
 }
 
 static bool isValidCmpXChgOrdering(StringRef SuccessString, 
@@ -1230,13 +1245,15 @@ static bool isValidCmpXChgOrdering(StringRef SuccessString,
   AtomicOrdering FailureOrdering = decodeLLVMAtomicOrdering(FailureString);
 
   // Unordered and unknown values are not allowed.
-  if (SuccessOrdering <= Unordered  ||  FailureOrdering <= Unordered)
+  if (isUnknownOrUnordered(SuccessOrdering) ||
+      isUnknownOrUnordered(FailureOrdering))
     return false;
   // Success must be at least as strong as failure.
-  if (SuccessOrdering < FailureOrdering)
+  if (!isAtLeastOrStrongerThan(SuccessOrdering, FailureOrdering))
     return false;
   // Failure may not release because no store occurred.
-  if (FailureOrdering == Release  ||  FailureOrdering == AcquireRelease)
+  if (FailureOrdering == AtomicOrdering::Release ||
+      FailureOrdering == AtomicOrdering::AcquireRelease)
     return false;
 
   return true;
