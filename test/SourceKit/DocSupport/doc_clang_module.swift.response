@@ -7683,7 +7683,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.function.free,
     key.name: "fooFunc1(_:)",
     key.usr: "c:@F@fooFunc1",
-    key.doc.full_as_xml: "<Function file=Foo.h line=\"65\" column=\"5\"><Name>fooFunc1</Name><USR>c:@F@fooFunc1</USR><Declaration>@discardableResult func fooFunc1(_ a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  fooFunc1.  Bbb.</Para></Abstract></Function",
+    key.doc.full_as_xml: "<Function file=Foo.h line=\"65\" column=\"5\"><Name>fooFunc1</Name><USR>c:@F@fooFunc1</USR><Declaration>@discardableResult func fooFunc1(_ a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  fooFunc1.  Bbb.</Para></Abstract></Function>",
     key.offset: 4409,
     key.length: 34,
     key.fully_annotated_decl: "<decl.function.free><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
