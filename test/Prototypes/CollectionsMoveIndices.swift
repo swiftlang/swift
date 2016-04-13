@@ -324,7 +324,7 @@
 // a small number of commonly used algorithms that require that
 // property, and they can be provided as methods on the collection,
 // for example removeAll(in: Range<Index>) and
-// removeAll(_: (Element) -> Bool).
+// removeAll(_: (Element)->Bool).
 //
 // If we were to allow reference-counted indices (basically, the
 // current collections model), then an additional design is possible
