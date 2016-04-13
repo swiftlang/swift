@@ -1786,6 +1786,68 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   return Func;
 }
 
+/// Check for existence of a function with a given name and required linkage.
+/// This function is modelled after readSILFunction. But it does not
+/// create a SILFunction object.
+bool SILDeserializer::hasSILFunction(StringRef Name,
+                                     SILLinkage Linkage) {
+  if (!FuncTable)
+    return false;
+  auto iter = FuncTable->find(Name);
+  if (iter == FuncTable->end())
+    return false;
+
+  // There is a function with the required name.
+  // Find out which linkage it has.
+  auto FID = *iter;
+  auto &cacheEntry = Funcs[FID-1];
+  if (cacheEntry.isFullyDeserialized() ||
+      (cacheEntry.isDeserialized()))
+    return cacheEntry.get()->getLinkage() == Linkage ||
+           Linkage == SILLinkage::Private;
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  SILCursor.JumpToBit(cacheEntry.getOffset());
+
+  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind == llvm::BitstreamEntry::Error) {
+    DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction.\n");
+    MF->error();
+    return false;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  assert(kind == SIL_FUNCTION && "expect a sil function");
+  (void)kind;
+
+  // Read function properties only, e.g. its linkage and other attributes.
+  // TODO: If this results in any noticable performance problems, Cache the
+  // linkage to avoid re-reading it from the bitcode each time?
+  TypeID funcTyID;
+  unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
+    inlineStrategy, effect, numSpecAttrs;
+  ArrayRef<uint64_t> SemanticsIDs;
+  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
+                                isThunk, isGlobal, inlineStrategy, effect,
+                                numSpecAttrs, funcTyID, SemanticsIDs);
+  auto linkage = fromStableSILLinkage(rawLinkage);
+  if (!linkage) {
+    DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
+                       << " for SIL function " << Name << "\n");
+    return false;
+  }
+
+  // Bail if it is not a required linkage.
+  if (linkage.getValue() != Linkage && Linkage != SILLinkage::Private)
+    return false;
+
+  DEBUG(llvm::dbgs() << "Found SIL Function: " << Name << "\n");
+  return true;
+}
+
+
 SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
                                                 bool declarationOnly) {
   if (!FuncTable)
