@@ -459,9 +459,49 @@ struct TuxedoPanda : Panda { }
 // CHECK: }
 
 
+// Test for materializeForSet vs lazy properties of structs.
+
+struct LazyStructProperty {
+  lazy var cat: Int = 5
+}
+
+// CHECK-LABEL: sil hidden @_TF17materializeForSet31inoutAccessOfLazyStructPropertyFT1lRVS_18LazyStructProperty_T_
+// CHECK:   function_ref @_TFV17materializeForSet18LazyStructPropertyg3catSi
+// CHECK:   function_ref @_TFV17materializeForSet18LazyStructPropertys3catSi
+func inoutAccessOfLazyStructProperty(l: inout LazyStructProperty) {
+  increment(&l.cat)
+}
+
+// Test for materializeForSet vs lazy properties of classes.
+
+// CHECK-LABEL: sil hidden [transparent] @_TFC17materializeForSet17LazyClassPropertym3catSi
+
+class LazyClassProperty {
+  lazy var cat: Int = 5
+}
+
+// CHECK-LABEL: sil hidden @_TF17materializeForSet30inoutAccessOfLazyClassPropertyFT1lRCS_17LazyClassProperty_T_
+// CHECK:    class_method {{.*}} : $LazyClassProperty, #LazyClassProperty.cat!materializeForSet.1
+func inoutAccessOfLazyClassProperty(l: inout LazyClassProperty) {
+  increment(&l.cat)
+}
+
+// Test for materializeForSet vs lazy properties of final classes.
+
+final class LazyFinalClassProperty {
+  lazy var cat: Int = 5
+}
+
+// CHECK-LABEL: sil hidden @_TF17materializeForSet35inoutAccessOfLazyFinalClassPropertyFT1lRCS_22LazyFinalClassProperty_T_
+// CHECK:    function_ref @_TFC17materializeForSet22LazyFinalClassPropertyg3catSi
+// CHECK:    function_ref @_TFC17materializeForSet22LazyFinalClassPropertys3catSi
+func inoutAccessOfLazyFinalClassProperty(l: inout LazyFinalClassProperty) {
+  increment(&l.cat)
+}
+
+
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module materializeForSet {
 // CHECK:   method #Totalled.total!getter.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_g5totalSi
 // CHECK:   method #Totalled.total!setter.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_s5totalSi
 // CHECK:   method #Totalled.total!materializeForSet.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_m5totalSi
 // CHECK: }
-

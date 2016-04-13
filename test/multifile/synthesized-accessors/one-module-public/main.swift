@@ -19,5 +19,11 @@ protocol Beverage {
 
 extension Beer : Beverage {}
 
+protocol PurrExtractor {
+  var purrs: Int { get set }
+}
+
+extension LazyCat : PurrExtractor {}
+
 // Dummy statement
 _ = ()
