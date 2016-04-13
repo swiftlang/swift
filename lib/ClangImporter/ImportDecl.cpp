@@ -5604,6 +5604,12 @@ void ClangImporter::Implementation::importAttributes(
     MappedDecl->getAttrs().add(new (C) WarnUnusedResultAttr(SourceLoc(),
                                                             SourceLoc(),
                                                             false));
+  } else {
+    if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
+      if (!MD->getResultType()->isVoid()) {
+        MD->getAttrs().add(new (C) DiscardableResultAttr(/*implicit*/false));
+      }
+    }
   }
   // Map __attribute__((const)).
   if (ClangDecl->hasAttr<clang::ConstAttr>()) {

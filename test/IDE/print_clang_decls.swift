@@ -80,13 +80,14 @@
 // Skip through unavailable typedefs when importing types.
 // TAG_DECLS_AND_TYPEDEFS: @available(*, unavailable, message: "use double")
 // TAG_DECLS_AND_TYPEDEFS-NEXT: typealias real_t = Double
+// TAG_DECLS_AND_TYPEDEFS-NEXT: @discardableResult
 // TAG_DECLS_AND_TYPEDEFS-NEXT: func realSin(_ value: Double) -> Double
 
 // NEGATIVE-NOT: typealias FooStructTypedef2
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
-// FOUNDATION-NEXT  func objectAtIndex(_ index: Int) -> AnyObject!
+// FOUNDATION-NEXT: subscript(idx: Int) -> AnyObject { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
