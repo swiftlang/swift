@@ -108,7 +108,8 @@ static int doDumpReflectionSections(std::string BinaryFilename,
 
   if (auto o = dyn_cast<ObjectFile>(binaryFile)) {
     objectFile = o;
-  } else if (auto universal = dyn_cast<MachOUniversalBinary>(binaryFile)) {
+  } else {
+    auto universal = cast<MachOUniversalBinary>(binaryFile);
     objectOwner = unwrap(universal->getObjectForArch(arch));
     objectFile = objectOwner.get();
   }
