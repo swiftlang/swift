@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTLANGSUPPORT_H
 
 #include "CodeCompletion.h"
+#include "SwiftIndexing.h"
 #include "SwiftInterfaceGenContext.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/Concurrency.h"
@@ -245,6 +246,9 @@ public:
       swift::ide::SyntaxStructureKind Kind);
   static SourceKit::UIdent getUIDForSyntaxStructureElementKind(
       swift::ide::SyntaxStructureElementKind Kind);
+
+  static SourceKit::UIdent getUIDForSymbol(SymbolKind kind,
+                                           SymbolSubKind subKind, bool isRef);
 
   static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 

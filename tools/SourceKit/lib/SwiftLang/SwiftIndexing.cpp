@@ -84,8 +84,220 @@ public:
   }
 };
 
+struct IndexSymbol {
+  enum TypeKind { Base, FuncDecl, CallReference };
+  TypeKind entityType = Base;
+
+  SymbolKind kind;
+  SymbolSubKind subKind = SymbolSubKind::None;
+  bool isRef;
+  llvm::SmallString<32> name;
+  llvm::SmallString<64> USR;
+  llvm::SmallString<16> group;
+  unsigned line = 0;
+  unsigned column = 0;
+
+  IndexSymbol() = default;
+
+protected:
+  IndexSymbol(TypeKind TK) : entityType(TK) {}
+};
+
+struct FuncDeclIndexSymbol : public IndexSymbol {
+  bool IsTestCandidate = false;
+
+  FuncDeclIndexSymbol() : IndexSymbol(FuncDecl) {}
+};
+
+struct CallRefIndexSymbol : public IndexSymbol {
+  llvm::SmallString<64> ReceiverUSR;
+  bool IsDynamic = false;
+
+  CallRefIndexSymbol() : IndexSymbol(CallReference) {}
+};
+
+class IndexDataConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~IndexDataConsumer() {}
+
+  virtual void failed(StringRef error) = 0;
+  virtual bool recordHash(StringRef hash, bool isKnown) = 0;
+  virtual bool startDependency(SymbolKind kind, StringRef name, StringRef path,
+                               bool isSystem, StringRef hash) = 0;
+  virtual bool finishDependency(SymbolKind kind) = 0;
+  virtual bool startSourceEntity(const IndexSymbol &symbol) = 0;
+  virtual bool recordRelatedEntity(const IndexSymbol &symbol) = 0;
+  virtual bool finishSourceEntity(SymbolKind kind, SymbolSubKind subKind,
+                                  bool isRef) = 0;
+};
+
+void IndexDataConsumer::anchor() {}
+
+static UIdent getUIDForDependencyKind(SymbolKind depKind) {
+  switch (depKind) {
+  case SymbolKind::Module:
+    return KindImportModuleSwift;
+  case SymbolKind::ClangModule:
+    return KindImportModuleClang;
+  case SymbolKind::SourceFile:
+    return KindImportSourceFile;
+  default:
+    return UIdent();
+  }
+}
+
+class SKIndexDataConsumer : public IndexDataConsumer {
+public:
+  SKIndexDataConsumer(IndexingConsumer &C) : impl(C) {}
+
+private:
+  void failed(StringRef error) override { impl.failed(error); }
+
+  bool recordHash(StringRef hash, bool isKnown) override {
+    return impl.recordHash(hash, isKnown);
+  }
+
+  bool startDependency(SymbolKind kind, StringRef name, StringRef path,
+                       bool isSystem, StringRef hash) override {
+    auto kindUID = getUIDForDependencyKind(kind);
+    return impl.startDependency(kindUID, name, path, isSystem, hash);
+  }
+
+  bool finishDependency(SymbolKind kind) override {
+    return impl.finishDependency(getUIDForDependencyKind(kind));
+  }
+
+  bool startSourceEntity(const IndexSymbol &symbol) override {
+    return withEntityInfo(symbol, [this](const EntityInfo &info) {
+      return impl.startSourceEntity(info);
+    });
+  }
+
+  bool recordRelatedEntity(const IndexSymbol &symbol) override {
+    return withEntityInfo(symbol, [this](const EntityInfo &info) {
+      return impl.recordRelatedEntity(info);
+    });
+  }
+
+  bool finishSourceEntity(SymbolKind kind, SymbolSubKind subKind,
+                          bool isRef) override {
+    auto UID = SwiftLangSupport::getUIDForSymbol(kind, subKind, isRef);
+    return impl.finishSourceEntity(UID);
+  }
+
+  template <typename F>
+  bool withEntityInfo(const IndexSymbol &symbol, F func) {
+    auto initEntity = [](EntityInfo &info, const IndexSymbol &symbol) {
+      info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKind,
+                                                    symbol.isRef);
+      info.Name = symbol.name;
+      info.USR = symbol.USR;
+      info.Group = symbol.group;
+      info.Line = symbol.line;
+      info.Column = symbol.column;
+    };
+
+    switch (symbol.entityType) {
+    case IndexSymbol::Base: {
+      EntityInfo info;
+      initEntity(info, symbol);
+      return func(info);
+    }
+    case IndexSymbol::FuncDecl: {
+      FuncDeclEntityInfo info;
+      initEntity(info, symbol);
+      info.IsTestCandidate =
+          static_cast<const FuncDeclIndexSymbol &>(symbol).IsTestCandidate;
+      return func(info);
+    }
+    case IndexSymbol::CallReference: {
+      CallRefEntityInfo info;
+      initEntity(info, symbol);
+      auto call = static_cast<const CallRefIndexSymbol &>(symbol);
+      info.ReceiverUSR = call.ReceiverUSR;
+      info.IsDynamic = call.IsDynamic;
+      return func(info);
+    }
+    }
+    llvm_unreachable("unexpected symbol kind");
+  }
+
+private:
+  IndexingConsumer &impl;
+};
+
+static SymbolKind getFuncSymbolKind(const FuncDecl *FD) {
+  if (FD->isAccessor())
+    return SymbolKind::Accessor;
+
+  if (auto *op = FD->getOperatorDecl()) {
+    switch (op->getKind()) {
+    case DeclKind::PrefixOperator:  return SymbolKind::PrefixOperator;
+    case DeclKind::PostfixOperator: return SymbolKind::PostfixOperator;
+    case DeclKind::InfixOperator:   return SymbolKind::InfixOperator;
+    default:
+      llvm_unreachable("unexpected operator kind");
+    }
+  }
+
+  if (FD->getDeclContext()->isTypeContext()) {
+    if (FD->isStatic()) {
+      if (FD->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
+        return SymbolKind::ClassMethod;
+      return SymbolKind::StaticMethod;
+    }
+    return SymbolKind::InstanceMethod;
+  }
+
+  return SymbolKind::Function;
+}
+
+static SymbolKind getVarSymbolKind(const VarDecl *VD) {
+  auto *DC = VD->getDeclContext();
+  if (DC->isTypeContext()) {
+    if (VD->isStatic()) {
+      if (VD->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
+        return SymbolKind::ClassProperty;
+      return SymbolKind::StaticProperty;
+    }
+    return SymbolKind::InstanceProperty;
+  }
+
+  if (DC->isLocalContext())
+    return SymbolKind::LocalVariable;
+  return SymbolKind::GlobalVariable;
+}
+
+static SymbolKind getSymbolKindForDecl(const Decl *D) {
+  switch (D->getKind()) {
+  case DeclKind::Enum:             return SymbolKind::Enum;
+  case DeclKind::Struct:           return SymbolKind::Struct;
+  case DeclKind::Class:            return SymbolKind::Class;
+  case DeclKind::Protocol:         return SymbolKind::Protocol;
+  case DeclKind::Extension:        return SymbolKind::Extension;
+  case DeclKind::TypeAlias:        return SymbolKind::TypeAlias;
+  case DeclKind::AssociatedType:   return SymbolKind::AssociatedType;
+  case DeclKind::GenericTypeParam: return SymbolKind::GenericTypeParam;
+  case DeclKind::EnumElement:      return SymbolKind::EnumElement;
+  case DeclKind::Subscript:        return SymbolKind::Subscript;
+  case DeclKind::Constructor:      return SymbolKind::Constructor;
+  case DeclKind::Destructor:       return SymbolKind::Destructor;
+  case DeclKind::Param:            return SymbolKind::ParamVariable;
+
+  case DeclKind::Func:
+    return getFuncSymbolKind(cast<FuncDecl>(D));
+  case DeclKind::Var:
+    return getVarSymbolKind(cast<VarDecl>(D));
+
+  default:
+    return SymbolKind::Unknown;
+  }
+}
+
 class IndexSwiftASTWalker : public SourceEntityWalker {
-  IndexingConsumer &IdxConsumer;
+  IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
   unsigned BufferID;
 
@@ -93,19 +305,18 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   bool isSystemModule = false;
   struct Entity {
     Decl *D;
-    UIdent Kind;
+    SymbolKind Kind;
+    SymbolSubKind SubKind;
+    bool IsRef;
   };
   SmallVector<Entity, 6> EntitiesStack;
   SmallVector<Expr *, 8> ExprStack;
   bool Cancelled = false;
 
 public:
-  IndexSwiftASTWalker(IndexingConsumer &IdxConsumer,
-                      ASTContext &Ctx,
+  IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       unsigned BufferID)
-    : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
-      BufferID(BufferID) {
-  }
+      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), BufferID(BufferID) {}
   ~IndexSwiftASTWalker() {
     assert(Cancelled || EntitiesStack.empty());
   }
@@ -211,7 +422,7 @@ private:
 
   bool startEntityDecl(ValueDecl *D);
   bool startEntityRef(ValueDecl *D, SourceLoc Loc);
-  bool startEntity(ValueDecl *D, const EntityInfo &Info);
+  bool startEntity(ValueDecl *D, const IndexSymbol &Info);
 
   bool passRelated(ValueDecl *D, SourceLoc Loc);
   bool passInheritedTypes(ArrayRef<TypeLoc> Inherited);
@@ -231,18 +442,20 @@ private:
 
   bool finishCurrentEntity() {
     Entity CurrEnt = EntitiesStack.pop_back_val();
-    assert(CurrEnt.Kind.isValid());
-    if (!IdxConsumer.finishSourceEntity(CurrEnt.Kind)) {
+    assert(CurrEnt.Kind != SymbolKind::Unknown);
+    if (!IdxConsumer.finishSourceEntity(CurrEnt.Kind, CurrEnt.SubKind,
+                                        CurrEnt.IsRef)) {
       Cancelled = true;
       return false;
     }
     return true;
   }
 
-  bool initEntityInfo(ValueDecl *D, SourceLoc Loc,bool IsRef, EntityInfo &Info);
-  bool initFuncDeclEntityInfo(ValueDecl *D, FuncDeclEntityInfo &Info);
-  bool initCallRefEntityInfo(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
-                             SourceLoc Loc, CallRefEntityInfo &Info);
+  bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
+                       IndexSymbol &Info);
+  bool initFuncDeclIndexSymbol(ValueDecl *D, FuncDeclIndexSymbol &Info);
+  bool initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
+                              SourceLoc Loc, CallRefIndexSymbol &Info);
 
   std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
     if (Loc.isInvalid())
@@ -356,32 +569,35 @@ bool IndexSwiftASTWalker::visitImports(SourceFileOrModule TopMod,
     if (Path.empty() || Path == TopMod.getFilename())
       continue; // this is a submodule.
 
-    UIdent ImportKind;
+    SymbolKind ImportKind = SymbolKind::Unknown;
     for (auto File : Mod->getFiles()) {
       switch (File->getKind()) {
       case FileUnitKind::Source:
-        assert(ImportKind.isInvalid() && "cannot handle multi-file modules");
-        ImportKind = KindImportSourceFile;
+        assert(ImportKind == SymbolKind::Unknown &&
+               "cannot handle multi-file modules");
+        ImportKind = SymbolKind::SourceFile;
         break;
       case FileUnitKind::Builtin:
       case FileUnitKind::Derived:
         break;
       case FileUnitKind::SerializedAST:
-        assert(ImportKind.isInvalid() && "cannot handle multi-file modules");
-        ImportKind = KindImportModuleSwift;
+        assert(ImportKind == SymbolKind::Unknown &&
+               "cannot handle multi-file modules");
+        ImportKind = SymbolKind::Module;
         break;
       case FileUnitKind::ClangModule:
-        assert(ImportKind.isInvalid() && "cannot handle multi-file modules");
-        ImportKind = KindImportModuleClang;
+        assert(ImportKind == SymbolKind::Unknown &&
+               "cannot handle multi-file modules");
+        ImportKind = SymbolKind::ClangModule;
         break;
       }
     }
-    if (ImportKind.isInvalid())
+    if (ImportKind == SymbolKind::Unknown)
       continue;
 
     StringRef Hash;
     SmallString<32> HashBuf;
-    if (ImportKind != KindImportModuleClang) {
+    if (ImportKind != SymbolKind::ClangModule) {
       llvm::raw_svector_ostream HashOS(HashBuf);
       getModuleHash(*Mod, HashOS);
       Hash = HashOS.str();
@@ -390,7 +606,7 @@ bool IndexSwiftASTWalker::visitImports(SourceFileOrModule TopMod,
     if (!IdxConsumer.startDependency(ImportKind, Mod->getName().str(), Path,
                                      Mod->isSystemModule(), Hash))
       return false;
-    if (ImportKind != KindImportModuleClang)
+    if (ImportKind != SymbolKind::ClangModule)
       if (!visitImports(*Mod, Visited))
         return false;
     if (!IdxConsumer.finishDependency(ImportKind))
@@ -409,15 +625,15 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     return false;
 
   if (isa<FuncDecl>(D)) {
-    FuncDeclEntityInfo Info;
-    if (initFuncDeclEntityInfo(D, Info))
+    FuncDeclIndexSymbol Info;
+    if (initFuncDeclIndexSymbol(D, Info))
       return false;
 
     return startEntity(D, Info);
 
   } else {
-    EntityInfo Info;
-    if (initEntityInfo(D, Loc, /*isRef=*/false, Info))
+    IndexSymbol Info;
+    if (initIndexSymbol(D, Loc, /*isRef=*/false, Info))
       return false;
 
     return startEntity(D, Info);
@@ -432,28 +648,28 @@ bool IndexSwiftASTWalker::startEntityRef(ValueDecl *D, SourceLoc Loc) {
     return false;
 
   if (isa<AbstractFunctionDecl>(D)) {
-    CallRefEntityInfo Info;
-    if (initCallRefEntityInfo(ExprStack.back(), getParentExpr(), D, Loc, Info))
+    CallRefIndexSymbol Info;
+    if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
       return false;
 
     return startEntity(D, Info);
 
   } else {
-    EntityInfo Info;
-    if (initEntityInfo(D, Loc, /*isRef=*/true, Info))
+    IndexSymbol Info;
+    if (initIndexSymbol(D, Loc, /*isRef=*/true, Info))
       return false;
 
     return startEntity(D, Info);
   }
 }
 
-bool IndexSwiftASTWalker::startEntity(ValueDecl *D, const EntityInfo &Info) {
+bool IndexSwiftASTWalker::startEntity(ValueDecl *D, const IndexSymbol &Info) {
   if (!IdxConsumer.startSourceEntity(Info)) {
     Cancelled = true;
     return false;
   }
 
-  EntitiesStack.push_back({ D, Info.Kind });
+  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.isRef});
   return true;
 }
 
@@ -461,8 +677,8 @@ bool IndexSwiftASTWalker::passRelated(ValueDecl *D, SourceLoc Loc) {
   if (!shouldIndex(D))
     return false;
 
-  EntityInfo Info;
-  if (initEntityInfo(D, Loc, /*isRef=*/true, Info))
+  IndexSymbol Info;
+  if (initIndexSymbol(D, Loc, /*isRef=*/true, Info))
     return false;
 
   if (!IdxConsumer.recordRelatedEntity(Info)) {
@@ -501,17 +717,33 @@ bool IndexSwiftASTWalker::passRelatedType(const TypeLoc &Ty) {
   return true;
 }
 
+static SymbolSubKind getSubKindForAccessor(AccessorKind AK) {
+  switch (AK) {
+  case AccessorKind::NotAccessor: return SymbolSubKind::None;
+  case AccessorKind::IsGetter:    return SymbolSubKind::AccessorGetter;
+  case AccessorKind::IsSetter:    return SymbolSubKind::AccessorSetter;
+  case AccessorKind::IsWillSet:   return SymbolSubKind::AccessorWillSet;
+  case AccessorKind::IsDidSet:    return SymbolSubKind::AccessorDidSet;
+  case AccessorKind::IsMaterializeForSet:
+    return SymbolSubKind::AccessorMaterializeForSet;
+  case AccessorKind::IsAddressor: return SymbolSubKind::AccessorAddressor;
+  case AccessorKind::IsMutableAddressor:
+    return SymbolSubKind::AccessorMutableAddressor;
+  }
+}
+
 bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
                                                AccessorKind AccKind,
                                                bool IsRef, SourceLoc Loc) {
   if (!shouldIndex(D))
     return true; // continue walking.
 
-  auto handleInfo = [this, D, AccKind, IsRef](EntityInfo &Info) {
-    Info.Kind = SwiftLangSupport::getUIDForAccessor(D, AccKind, IsRef);
-    Info.Name.clear();
+  auto handleInfo = [this, D, AccKind](IndexSymbol &Info) {
+    Info.kind = SymbolKind::Accessor;
+    Info.subKind = getSubKindForAccessor(AccKind);
+    Info.name.clear();
     Info.USR.clear();
-    Info.Group.clear();
+    Info.group.clear();
     llvm::raw_svector_ostream OS(Info.USR);
     SwiftLangSupport::printAccessorUSR(D, AccKind, OS);
 
@@ -519,7 +751,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
       Cancelled = true;
       return false;
     }
-    if (!IdxConsumer.finishSourceEntity(Info.Kind)) {
+    if (!IdxConsumer.finishSourceEntity(Info.kind, Info.subKind, Info.isRef)) {
       Cancelled = true;
       return false;
     }
@@ -527,15 +759,15 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
   };
 
   if (IsRef) {
-    CallRefEntityInfo Info;
-    if (initCallRefEntityInfo(ExprStack.back(), getParentExpr(), D, Loc, Info))
+    CallRefIndexSymbol Info;
+    if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
       return true; // continue walking.
 
     return handleInfo(Info);
 
   } else {
-    EntityInfo Info;
-    if (initEntityInfo(D, Loc, IsRef, Info))
+    IndexSymbol Info;
+    if (initIndexSymbol(D, Loc, IsRef, Info))
       return true; // continue walking.
 
     return handleInfo(Info);
@@ -565,10 +797,21 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (!shouldIndex(NTD))
     return true;
 
-  EntityInfo Info;
-  if (initEntityInfo(NTD, Loc, /*isRef=*/true, Info))
+  IndexSymbol Info;
+  if (initIndexSymbol(NTD, Loc, /*isRef=*/false, Info))
     return true;
-  Info.Kind = SwiftLangSupport::getUIDForDecl(D);
+
+  Info.kind = getSymbolKindForDecl(D);
+  if (isa<StructDecl>(NTD))
+    Info.subKind = SymbolSubKind::ExtensionOfStruct;
+  else if (isa<ClassDecl>(NTD))
+    Info.subKind = SymbolSubKind::ExtensionOfClass;
+  else if (isa<EnumDecl>(NTD))
+    Info.subKind = SymbolSubKind::ExtensionOfEnum;
+  else if (isa<ProtocolDecl>(NTD))
+    Info.subKind = SymbolSubKind::ExtensionOfProtocol;
+
+  assert(Info.subKind != SymbolSubKind::None);
 
   if (!IdxConsumer.startSourceEntity(Info)) {
     Cancelled = true;
@@ -579,7 +822,7 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (Cancelled)
     return false;
 
-  EntitiesStack.push_back({ D, Info.Kind });
+  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.isRef});
   return true;
 }
 
@@ -682,26 +925,30 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc) {
   return !Cancelled;
 }
 
-bool IndexSwiftASTWalker::initEntityInfo(ValueDecl *D,
-                                         SourceLoc Loc,
-                                         bool IsRef,
-                                         EntityInfo &Info) {
+bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
+                                          bool IsRef, IndexSymbol &Info) {
   assert(D);
-  Info.Kind = SwiftLangSupport::getUIDForDecl(D, IsRef);
-  if (Info.Kind.isInvalid())
+  Info.kind = getSymbolKindForDecl(D);
+  if (Info.kind == SymbolKind::Unknown)
     return true;
 
-  Info.Name.clear();
-  llvm::raw_svector_ostream NameOS(Info.Name);
+  if (Info.kind == SymbolKind::Accessor)
+    Info.subKind = getSubKindForAccessor(cast<FuncDecl>(D)->getAccessorKind());
+  // Cannot be extension, which is not a ValueDecl.
+
+  Info.isRef = IsRef;
+
+  Info.name.clear();
+  llvm::raw_svector_ostream NameOS(Info.name);
   SwiftLangSupport::printDisplayName(D, NameOS);
 
   llvm::raw_svector_ostream OS(Info.USR);
   if (SwiftLangSupport::printUSR(D, OS))
     return true;
-  std::tie(Info.Line, Info.Column) = getLineCol(Loc);
+  std::tie(Info.line, Info.column) = getLineCol(Loc);
   if (auto Group = D->getGroupName()) {
-    Info.Group.clear();
-    Info.Group.append(Group.getValue());
+    Info.group.clear();
+    Info.group.append(Group.getValue());
   }
   return false;
 }
@@ -740,15 +987,15 @@ static bool isTestCandidate(ValueDecl *D) {
   return false;
 }
 
-bool IndexSwiftASTWalker::initFuncDeclEntityInfo(ValueDecl *D,
-                                                 FuncDeclEntityInfo &Info) {
-  if (initEntityInfo(D, D->getLoc(), /*IsRef=*/false, Info))
+bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(ValueDecl *D,
+                                                  FuncDeclIndexSymbol &Info) {
+  if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
 
   Info.IsTestCandidate = isTestCandidate(D);
   if (auto Group = D->getGroupName()) {
-    Info.Group.clear();
-    Info.Group.append(Group.getValue());
+    Info.group.clear();
+    Info.group.append(Group.getValue());
   }
   return false;
 }
@@ -783,13 +1030,13 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
   return true;
 }
 
-bool IndexSwiftASTWalker::initCallRefEntityInfo(Expr *CurrentE, Expr *ParentE,
-                                                ValueDecl *D, SourceLoc Loc,
-                                                CallRefEntityInfo &Info) {
+bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
+                                                 ValueDecl *D, SourceLoc Loc,
+                                                 CallRefIndexSymbol &Info) {
   if (!ParentE)
     return true;
 
-  if (initEntityInfo(D, Loc, /*IsRef=*/true, Info))
+  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 
   Expr *BaseE = nullptr;
@@ -1008,7 +1255,8 @@ static void indexModule(llvm::MemoryBuffer *Input,
   // Setup a typechecker for protocol conformance resolving.
   OwnedResolver TypeResolver = createLazyResolver(Ctx);
 
-  IndexSwiftASTWalker Walker(IdxConsumer, Ctx, /*BufferID=*/-1);
+  SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
+  IndexSwiftASTWalker Walker(IdxDataConsumer, Ctx, /*BufferID=*/-1);
   Walker.visitModule(*Mod, Hash);
 }
 
@@ -1109,6 +1357,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   OwnedResolver TypeResolver = createLazyResolver(CI.getASTContext());
 
   unsigned BufferID = CI.getPrimarySourceFile()->getBufferID().getValue();
-  IndexSwiftASTWalker Walker(IdxConsumer, CI.getASTContext(), BufferID);
+  SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
+  IndexSwiftASTWalker Walker(IdxDataConsumer, CI.getASTContext(), BufferID);
   Walker.visitModule(*CI.getMainModule(), Hash);
 }
