@@ -170,9 +170,6 @@ public:
   UIdent visitVarDecl(const VarDecl *D);
   UIdent visitParamDecl(const ParamDecl *D);
   UIdent visitExtensionDecl(const ExtensionDecl *D);
-  UIdent visitAssociatedTypeDecl(const AssociatedTypeDecl *D) {
-    return IsRef ? KindRefAssociatedType : KindDeclAssociatedType;
-  }
 
 #define UID_FOR(CLASS) \
   UIdent visit##CLASS##Decl(const CLASS##Decl *) { \
@@ -184,6 +181,7 @@ public:
   UID_FOR(EnumElement)
   UID_FOR(Protocol)
   UID_FOR(TypeAlias)
+  UID_FOR(AssociatedType)
   UID_FOR(GenericTypeParam)
   UID_FOR(Constructor)
   UID_FOR(Destructor)
