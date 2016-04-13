@@ -44,7 +44,7 @@ enum class StmtKind {
 /// Stmt - Base class for all statements in swift.
 class alignas(8) Stmt {
   Stmt(const Stmt&) = delete;
-  void operator=(const Stmt&) = delete;
+  Stmt& operator=(const Stmt&) = delete;
 
   /// Kind - The subclass of Stmt that this is.
   unsigned Kind : 31;
