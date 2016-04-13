@@ -2478,7 +2478,7 @@ namespace {
         auto function = dyn_cast<clang::FunctionDecl>(decl);
         if (!function) continue;
 
-        if (function == accessor) {
+        if (function->getCanonicalDecl() == accessor->getCanonicalDecl()) {
           foundAccessor = true;
           continue;
         }

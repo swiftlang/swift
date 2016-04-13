@@ -22,6 +22,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Sema/Lookup.h"
 #include "llvm/ADT/Statistic.h"
@@ -164,6 +165,32 @@ static unsigned dropWordUniq(StringRef str, StringRef word, NameBuffer &out) {
 
   return numDropped;
 }
+
+static clang::Module *getSubmodule(const clang::NamedDecl *decl, clang::Sema &clangSema) {
+  if (auto m = decl->getImportedOwningModule())
+    return m;
+  if (auto m = decl->getLocalOwningModule())
+    return m;
+  if (auto m = clangSema.getPreprocessor().getCurrentModule())
+    return m;
+  if (auto m = clangSema.getPreprocessor().getCurrentSubmodule())
+    return m;
+
+  return nullptr;
+}
+
+static clang::Module *getTopModule(clang::Module *m) {
+  while (m->Parent)
+    m = m->Parent;
+  return m;
+}
+static clang::Module *getTopModule(const clang::NamedDecl *decl, clang::Sema &clangSema) {
+  auto m = getSubmodule(decl, clangSema);
+  if (!m)
+    return nullptr;
+  return getTopModule(m);
+}
+
 
 namespace {
 class IAMInference {
@@ -613,6 +640,19 @@ bool IAMInference::validToImportAsProperty(
 
   auto getterDecl = isGet ? originalDecl : pairedAccessor;
   auto setterDecl = isGet ? pairedAccessor : originalDecl;
+
+  if (getTopModule(getterDecl, clangSema) !=
+      getTopModule(setterDecl, clangSema)) {
+    // We paired up decls from two different modules, so either we still infer
+    // as a getter with no setter, or we cannot be a property
+    if (isGet) {
+      pairedAccessor = nullptr;
+      return true;
+    }
+
+    // This is set-only as far as we're concerned
+    return false;
+  }
 
   if (!selfIndex)
     return isValidAsStaticProperty(getterDecl, setterDecl);
