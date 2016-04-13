@@ -680,18 +680,17 @@ public:
       SWIFT_UNKNOWN,
       NULL,
       0,
+      0,
       0
     };
   }
 
-  swift_fieldinfo_t getInfoForField(const TypeRef *TR, unsigned Index) {
+  swift_childinfo_t getInfoForChild(const TypeRef *TR, unsigned Index) {
     // TODO
     return {
-      NOTAPOINTER,
       0,
       NULL,
       0,
-      0
     };
   }
 };

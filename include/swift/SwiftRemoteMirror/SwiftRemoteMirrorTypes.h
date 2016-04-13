@@ -39,14 +39,18 @@ typedef struct swift_reflection_section_t {
 } swift_reflection_section_t;
 
 /// The kind of a Swift type.
-typedef enum swift_typeref_kind_t {
-  SWIFT_CLASS,
+typedef enum swift_layout_kind_t {
+  SWIFT_STRONG_POINTER,
+  SWIFT_WEAK_POINTER,
+  SWIFT_UNOWNED_POINTER,
+  SWIFT_UNMANAGED_POINTER,
   SWIFT_STRUCT,
   SWIFT_TUPLE,
+  SWIFT_THICK_FUNCTION,
+  SWIFT_THIN_FUNCTION,
+  OBJC_BLOCK,
   SWIFT_CLOSURE_CONTEXT,
-  SWIFT_DICTIONARY_OWNER,
-  SWIFT_SET_OWNER,
-  SWIFT_ARRAY_OWNER,
+  SWIFT_BOX,
   SWIFT_UNKNOWN
 } swift_layout_kind_t;
 
@@ -54,33 +58,22 @@ typedef enum swift_typeref_kind_t {
 typedef struct swift_typeinfo_t {
   swift_layout_kind_t LayoutKind;
 
-  /// The demangled type name.
-  const char *TypeName;
+  const char *MangledTypeName;
 
   size_t Size;
-  size_t Stride;
+  size_t InstanceSize;
+  size_t Alignment;
 } swift_typeinfo_t;
 
-typedef enum swift_reference_kind_t {
-  STRONG,
-  WEAK,
-  UNOWNED,
-  UNMANAGED,
-  NOTAPOINTER
-} swift_reference_kind_t;
-
-typedef struct swift_fieldinfo_t {
-  swift_reference_kind_t ReferenceKind;
+typedef struct swift_childinfo_t {
   swift_typeref_t TypeRef;
-  const char *FieldName;
+  const char *Name;
   size_t Offset;
-  size_t Size;
-} swift_fieldinfo_t;
+} swift_childinfo_t;
 
 /// \brief An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
 typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
-
 
 #ifdef __cplusplus
 } // extern "C"
