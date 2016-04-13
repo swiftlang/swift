@@ -343,6 +343,45 @@ public struct CountableRange<
   }
 }
 
+extension RangeProtocol {
+  /// Return true if this is not a closed range type.
+  ///
+  /// - parameter x: any arbitrary value of type `Bound`.
+  internal static func _isNotClosed(_ x: Bound) -> Bool {
+    return Self(uncheckedBounds: (lower: x, upper: x)).isEmpty
+  }
+}
+
+/// Conversion from one range to another.
+extension RangeProtocol where Bound : Strideable, Bound.Stride : Integer {
+  /// Creates an instance equivalent to `other`.
+  ///
+  /// - Precondition: an equivalent range is representable as an
+  ///   instance of `Self`.  For example, `Range(0...Int.max)`
+  ///   violates this precondition because `Range<Int>` is half-open
+  ///   and would need an `upperBound` equal to `Int.max + 1`, which
+  ///   is unrepresentable as an `Int`.
+  @inline(__always)
+  public init<
+    Other: RangeProtocol where Other.Bound == Bound
+  >(_ other: Other) {
+    let lowerBound = other.lowerBound
+    let upperBound: Bound
+    switch (Self._isNotClosed(lowerBound), Other._isNotClosed(lowerBound)) {
+    case (true, false):
+      upperBound = other.upperBound + 1
+    case (false, true):
+      _precondition(!other.isEmpty, "Can't form an empty closed range")
+      upperBound = other.upperBound - 1
+    default:
+      upperBound = other.upperBound
+    }
+    self.init(
+      uncheckedBounds: (lower: lowerBound, upper: upperBound)
+    )
+  }
+}
+
 //===--- Protection against 0-based indexing assumption -------------------===//
 // The following two extensions provide subscript overloads that
 // create *intentional* ambiguities to prevent the use of integers as
