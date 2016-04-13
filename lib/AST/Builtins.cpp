@@ -1223,7 +1223,8 @@ static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
     .Default(AtomicOrdering::NotAtomic);
 }
 
-static bool isUnknownOrUnordered(AtomicOrdering ordering) {
+static bool isUnknownOrUnordered(llvm::AtomicOrdering ordering) {
+  using namespace llvm;
   switch (ordering) {
   case AtomicOrdering::NotAtomic:
   case AtomicOrdering::Unordered:
