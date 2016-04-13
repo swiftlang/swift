@@ -50,36 +50,36 @@ struct RemoteReflectionInfo {
   const std::string ImageName;
   const Section<Runtime> fieldmd;
   const Section<Runtime> assocty;
-  const llvm::Optional<Section<Runtime>> reflstr;
+  const Section<Runtime> builtin;
   const Section<Runtime> typeref;
+  const Section<Runtime> reflstr;
   const StoredPointer StartAddress;
   const StoredSize TotalSize;
 
   RemoteReflectionInfo(std::string ImageName,
                        Section<Runtime> fieldmd,
                        Section<Runtime> assocty,
-                       llvm::Optional<Section<Runtime>> reflstr,
-                       Section<Runtime> typeref)
+                       Section<Runtime> builtin,
+                       Section<Runtime> typeref,
+                       Section<Runtime> reflstr)
     : ImageName(ImageName),
       fieldmd(fieldmd),
       assocty(assocty),
-      reflstr(reflstr),
+      builtin(builtin),
       typeref(typeref),
+      reflstr(reflstr),
       StartAddress(std::min({
         fieldmd.StartAddress,
-        typeref.StartAddress,
-        reflstr.hasValue()
-          ? reflstr.getValue().StartAddress
-          : fieldmd.StartAddress,
-        assocty.StartAddress})),
+  assocty.StartAddress,
+  builtin.StartAddress,
+  typeref.StartAddress,
+  reflstr.StartAddress})),
       TotalSize(std::max({
         fieldmd.getEndAddress(),
         assocty.getEndAddress(),
-        reflstr.hasValue()
-          ? reflstr.getValue().getEndAddress()
-          : fieldmd.getEndAddress(),
-        typeref.getEndAddress()
-      }) - StartAddress) {}
+  builtin.getEndAddress(),
+  typeref.getEndAddress(),
+  reflstr.getEndAddress()}) - StartAddress) {}
 };
 }
 
@@ -206,30 +206,33 @@ public:
 
       StoredPointer fieldmd_start;
       StoredPointer fieldmd_size;
+      StoredPointer assocty_start;
+      StoredPointer assocty_size;
+      StoredPointer builtin_start;
+      StoredPointer builtin_size;
       StoredPointer typeref_start;
       StoredPointer typeref_size;
       StoredPointer reflstr_start;
       StoredPointer reflstr_size;
-      StoredPointer assocty_start;
-      StoredPointer assocty_size;
 
       collectBytesFromPipe(&fieldmd_start, sizeof(fieldmd_start));
       collectBytesFromPipe(&fieldmd_size, sizeof(fieldmd_size));
+      collectBytesFromPipe(&assocty_start, sizeof(assocty_start));
+      collectBytesFromPipe(&assocty_size, sizeof(assocty_size));
+      collectBytesFromPipe(&builtin_start, sizeof(builtin_start));
+      collectBytesFromPipe(&builtin_size, sizeof(builtin_size));
       collectBytesFromPipe(&typeref_start, sizeof(typeref_start));
       collectBytesFromPipe(&typeref_size, sizeof(typeref_size));
       collectBytesFromPipe(&reflstr_start, sizeof(reflstr_start));
       collectBytesFromPipe(&reflstr_size, sizeof(reflstr_size));
-      collectBytesFromPipe(&assocty_start, sizeof(assocty_start));
-      collectBytesFromPipe(&assocty_size, sizeof(assocty_size));
 
       RemoteInfos.push_back({
         ImageName,
         {fieldmd_start, fieldmd_size},
-        {typeref_start, typeref_size},
-        reflstr_size > 0
-          ? llvm::Optional<Section<Runtime>>({reflstr_start, reflstr_size})
-          : llvm::None,
         {assocty_start, assocty_size},
+        {builtin_start, builtin_size},
+        {typeref_start, typeref_size},
+        {reflstr_start, reflstr_size},
       });
     }
 
@@ -244,23 +247,21 @@ public:
 
       auto fieldmd_base
         = buffer + RemoteInfo.fieldmd.StartAddress - RemoteInfo.StartAddress;
+      auto assocty_base
+        = buffer + RemoteInfo.assocty.StartAddress - RemoteInfo.StartAddress;
+      auto builtin_base
+	= buffer + RemoteInfo.builtin.StartAddress - RemoteInfo.StartAddress;
       auto typeref_base
         = buffer + RemoteInfo.typeref.StartAddress - RemoteInfo.StartAddress;
       auto reflstr_base
-        = RemoteInfo.reflstr.hasValue()
-          ? buffer + RemoteInfo.reflstr.getValue().StartAddress
-             - RemoteInfo.StartAddress
-          : 0;
-      auto assocty_base
-        = buffer + RemoteInfo.assocty.StartAddress - RemoteInfo.StartAddress;
+        = buffer + RemoteInfo.reflstr.StartAddress - RemoteInfo.StartAddress;
       ReflectionInfo Info {
         RemoteInfo.ImageName,
         {fieldmd_base, fieldmd_base + RemoteInfo.fieldmd.Size},
-        {typeref_base, typeref_base + RemoteInfo.typeref.Size},
-        {reflstr_base, reflstr_base + (RemoteInfo.reflstr.hasValue()
-          ? RemoteInfo.reflstr.getValue().Size
-          : 0)},
         {assocty_base, assocty_base + RemoteInfo.assocty.Size},
+        {builtin_base, builtin_base + RemoteInfo.builtin.Size},
+        {typeref_base, typeref_base + RemoteInfo.typeref.Size},
+        {reflstr_base, reflstr_base + RemoteInfo.reflstr.Size},
       };
       Infos.push_back(Info);
     }
@@ -366,6 +367,7 @@ int main(int argc, char *argv[]) {
   std::string arch(argv[1]);
   std::string BinaryFilename(argv[2]);
 
+  // FIXME: get this from LLVM
   unsigned PointerSize = 0;
   if (arch == "x86_64")
     PointerSize = 8;

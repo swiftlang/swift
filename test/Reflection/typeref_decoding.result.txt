@@ -597,3 +597,6 @@ typealias Second = B
 (generic-type-parameter depth=0 index=1)
 
 
+BUILTIN TYPES:
+==============
+

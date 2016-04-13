@@ -582,8 +582,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       // In JIT mode these are manually registered above.
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
-      IGM.emitFieldTypeMetadataRecords();
-      IGM.emitAssociatedTypeMetadataRecords();
+      IGM.emitReflectionMetadataRecords();
     }
 
     IGM.emitSwiftReflectionVersion();
@@ -723,12 +722,8 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   
   IRGenModule *PrimaryGM = dispatcher.getPrimaryIGM();
 
-  // Emit protocol conformances.
   dispatcher.emitProtocolConformances();
-
-  dispatcher.emitFieldTypeMetadataRecords();
-
-  dispatcher.emitAssociatedTypeMetadataRecords();
+  dispatcher.emitReflectionMetadataRecords();
 
   // Okay, emit any definitions that we suddenly need.
   dispatcher.emitLazyDefinitions();

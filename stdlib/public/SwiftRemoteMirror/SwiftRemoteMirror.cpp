@@ -38,15 +38,17 @@ void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    const char *ImageName,
                                    swift_reflection_section_t fieldmd,
+                                   swift_reflection_section_t assocty,
+                                   swift_reflection_section_t builtin,
                                    swift_reflection_section_t typeref,
-                                   swift_reflection_section_t reflstr,
-                                   swift_reflection_section_t assocty) {
+                                   swift_reflection_section_t reflstr) {
   ReflectionInfo Info {
     ImageName,
     FieldSection(fieldmd.Begin, fieldmd.End),
     AssociatedTypeSection(assocty.Begin, assocty.End),
-    GenericSection(reflstr.Begin, reflstr.End),
-    GenericSection(typeref.Begin, typeref.End)
+    BuiltinTypeSection(builtin.Begin, builtin.End),
+    GenericSection(typeref.Begin, typeref.End),
+    GenericSection(reflstr.Begin, reflstr.End)
   };
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   Context->addReflectionInfo(Info);

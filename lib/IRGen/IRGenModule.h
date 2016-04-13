@@ -214,11 +214,8 @@ public:
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
 
-  /// Emit field type records for nominal types for reflection purposes.
-  void emitFieldTypeMetadataRecords();
-
-  /// Emit associated type references for nominal types for reflection purposes.
-  void emitAssociatedTypeMetadataRecords();
+  /// Emit reflection metadata records for nominal types.
+  void emitReflectionMetadataRecords();
 
   // Stamp the binary with the major and minor language version.
   void emitSwiftReflectionVersion();
@@ -617,11 +614,11 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
-  llvm::Constant *emitFieldTypeMetadataRecords();
-  llvm::Constant *emitAssociatedTypeMetadataRecords();
-  llvm::Constant *emitSwiftReflectionVersion();
+  void emitReflectionMetadataRecords();
+  void emitSwiftReflectionVersion();
   llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
+  std::string getBuiltinTypeMetadataSectionName();
   std::string getFieldTypeMetadataSectionName();
   std::string getAssociatedTypeMetadataSectionName();
   std::string getReflectionStringsSectionName();

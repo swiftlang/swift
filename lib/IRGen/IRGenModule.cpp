@@ -935,18 +935,15 @@ void IRGenModuleDispatcher::emitSwiftReflectionVersion() {
   }
 }
 
-llvm::Constant*
-IRGenModule::emitSwiftReflectionVersion() {
-  auto Init = llvm::ConstantInt::get(Int32Ty, REFLECTION_VERSION);
+void IRGenModule::emitSwiftReflectionVersion() {
+  auto init = llvm::ConstantInt::get(Int32Ty, REFLECTION_VERSION);
 
-  auto Version = new llvm::GlobalVariable(Module, Int32Ty,
-                                               /*constant*/ true,
-                                          llvm::GlobalValue::LinkOnceODRLinkage,
-                                               Init,
-                                               "__swift_reflection_version");
-  addUsedGlobal(Version);
-
-  return Version;
+  auto var = new llvm::GlobalVariable(Module, Int32Ty,
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::LinkOnceODRLinkage,
+                                      init,
+                                      "__swift_reflection_version");
+  addUsedGlobal(var);
 }
 
 void IRGenModule::cleanupClangCodeGenMetadata() {

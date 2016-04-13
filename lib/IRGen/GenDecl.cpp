@@ -879,15 +879,9 @@ void IRGenModuleDispatcher::emitTypeMetadataRecords() {
   }
 }
 
-void IRGenModuleDispatcher::emitFieldTypeMetadataRecords() {
+void IRGenModuleDispatcher::emitReflectionMetadataRecords() {
   for (auto &m : *this) {
-    m.second->emitFieldTypeMetadataRecords();
-  }
-}
-
-void IRGenModuleDispatcher::emitAssociatedTypeMetadataRecords() {
-  for (auto &m : *this) {
-    m.second->emitAssociatedTypeMetadataRecords();
+    m.second->emitReflectionMetadataRecords();
   }
 }
 

@@ -39,17 +39,17 @@ using swift::remote::RemoteAddress;
 template <typename Iterator>
 class ReflectionSection {
   using const_iterator = Iterator;
-  const void * const Begin;
-  const void * const End;
+  const void * Begin;
+  const void * End;
 
 public:
-  ReflectionSection(const void * const Begin,
-                    const void * const End)
+  ReflectionSection(const void * Begin,
+                    const void * End)
   : Begin(Begin), End(End) {}
 
   ReflectionSection(uint64_t Begin, uint64_t End)
-  : Begin(reinterpret_cast<const void * const>(Begin)),
-  End(reinterpret_cast<const void * const>(End)) {}
+  : Begin(reinterpret_cast<const void *>(Begin)),
+    End(reinterpret_cast<const void *>(End)) {}
 
   void *startAddress() {
     return const_cast<void *>(Begin);
@@ -177,14 +177,16 @@ public:
 
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
+using BuiltinTypeSection = ReflectionSection<BuiltinTypeDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
   std::string ImageName;
   FieldSection fieldmd;
   AssociatedTypeSection assocty;
-  GenericSection reflstr;
+  BuiltinTypeSection builtin;
   GenericSection typeref;
+  GenericSection reflstr;
 };
 
 
@@ -295,15 +297,33 @@ public:
     }
   }
 
+  void dumpBuiltinTypeSection(std::ostream &OS) {
+    for (const auto &sections : ReflectionInfos) {
+      for (const auto &descriptor : sections.builtin) {
+        auto typeName = Demangle::demangleTypeAsString(
+          descriptor.getMangledTypeName());
+
+        OS << typeName << " :\n";
+        OS << "Size: " << descriptor.Size << "\n";
+        OS << "Alignment: " << descriptor.Alignment << "\n";
+        OS << "Stride: " << descriptor.Stride << "\n";
+        OS << "NumExtraInhabitants: " << descriptor.NumExtraInhabitants << "\n";
+      }
+    }
+  }
+
   void dumpAllSections(std::ostream &OS) {
     OS << "FIELDS:\n";
-    for (size_t i = 0; i < 7; ++i) OS << '=';
-    OS << '\n';
+    OS << "=======\n";
     dumpFieldSection(OS);
-    OS << "\nASSOCIATED TYPES:\n";
-    for (size_t i = 0; i < 17; ++i) OS << '=';
     OS << '\n';
+    OS << "ASSOCIATED TYPES:\n";
+    OS << "=================\n";
     dumpAssociatedTypeSection(OS);
+    OS << '\n';
+    OS << "BUILTIN TYPES:\n";
+    OS << "==============\n";
+    dumpBuiltinTypeSection(OS);
     OS << '\n';
   }
 
