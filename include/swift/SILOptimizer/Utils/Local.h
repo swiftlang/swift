@@ -270,6 +270,9 @@ public:
   /// It is assumed that \p Inst is located after the value's definition.
   bool isWithinLifetime(SILInstruction *Inst);
 
+  /// For debug dumping.
+  void dump() const;
+
 private:
 
   /// The value.
