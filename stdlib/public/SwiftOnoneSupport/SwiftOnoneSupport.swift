@@ -152,6 +152,10 @@ struct _Prespecialize {
     for i in 0..<a.count {
       count += a[i]
     }
+    // Specialize Range for integers
+    for j in 0...a.count - 1{
+      count += a[j]
+    }
     return count
   }
 }

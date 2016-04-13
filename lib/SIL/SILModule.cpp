@@ -484,12 +484,48 @@ bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
 }
 
 SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
-  assert(!lookUpFunction(Name) && "hasFunction should be only called for "
-                                  "functions that are not contained in the "
-                                  "SILModule yet");
-  return SILLinkerVisitor(*this, getSILLoader(),
-                          SILModule::LinkingMode::LinkNormal)
-      .lookupFunction(Name, Linkage);
+  SILFunction *F = lookUpFunction(Name);
+
+  assert((Linkage == SILLinkage::Public ||
+          Linkage == SILLinkage::PublicExternal) &&
+         "Only a lookup of public functions is supported currently");
+
+  // Nothing to do if the current module has a required function
+  // with a proper linkage.
+  if (F && F->getLinkage() == Linkage)
+    return F;
+
+  assert((!F || F->getLinkage() != Linkage) &&
+         "hasFunction should be only called for functions that are not "
+         "contained  in the SILModule yet or do not have a required linkage");
+  (void)F;
+
+  SILLinkerVisitor Visitor(*this, getSILLoader(),
+                          SILModule::LinkingMode::LinkNormal);
+
+  if (Visitor.hasFunction(Name, Linkage)) {
+    if (!F) {
+      // Load the function.
+      F = Visitor.lookupFunction(Name, Linkage);
+      assert(F && "Function should be present");
+      assert(F->getLinkage() == Linkage &&
+             "SILFunction has a wrong linkage");
+    }
+    // If a function exists already and it is a non-optimizing
+    // compilaiton, simply convert it into an external declaration,
+    // so that a compiled version from the shared library is used.
+    if (F->isDefinition() &&
+        F->getModule().getOptions().Optimization <
+            SILOptions::SILOptMode::Optimize) {
+      F->convertToDeclaration();
+    }
+    if (F->isExternalDeclaration())
+      F->setFragile(IsFragile_t::IsNotFragile);
+    F->setLinkage(Linkage);
+  } else {
+    F = nullptr;
+  }
+  return F;
 }
 
 void SILModule::linkAllWitnessTables() {
