@@ -54,7 +54,7 @@ protected:
   virtual std::string getDefaultLinker() const;
 
   /// The target to be passed to the compiler invocation. By default, this
-  /// is the target triple, but this may be overridden to accomodate some
+  /// is the target triple, but this may be overridden to accommodate some
   /// platforms.
   virtual std::string getTargetForLinker() const;
 
