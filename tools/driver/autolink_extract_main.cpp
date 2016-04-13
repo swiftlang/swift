@@ -181,9 +181,14 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   for (const auto &BinaryFileName : Invocation.getInputFilenames()) {
     auto BinaryOwner = llvm::object::createBinary(BinaryFileName);
     if (!BinaryOwner) {
+      std::string message;
+      {
+        llvm::raw_string_ostream os(message);
+        logAllUnhandledErrors(BinaryOwner.takeError(), os, "");
+      }
+
       Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
-                                   BinaryFileName,
-                                   BinaryOwner.getError().message());
+                                   BinaryFileName, message);
       return 1;
     }
 

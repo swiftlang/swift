@@ -104,7 +104,11 @@ getSectionRef(const Binary *binaryFile, StringRef arch,
 static int doDumpReflectionSections(std::string BinaryFilename,
                                     StringRef arch) {
   auto binaryOrError = llvm::object::createBinary(BinaryFilename);
-  guardError(binaryOrError.getError());
+  if (!binaryOrError) {
+    logAllUnhandledErrors(binaryOrError.takeError(), llvm::errs(),
+                          "swift-reflection-test error: ");
+    exit(EXIT_FAILURE);
+  }
 
   const auto binary = binaryOrError.get().getBinary();
 

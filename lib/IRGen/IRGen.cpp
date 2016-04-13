@@ -272,8 +272,10 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
     return true;
 
   auto BinaryOwner = object::createBinary(OutputFilename);
-  if (!BinaryOwner)
+  if (!BinaryOwner) {
+    consumeError(BinaryOwner.takeError());
     return true;
+  }
   auto *ObjectFile = dyn_cast<object::ObjectFile>(BinaryOwner->getBinary());
   if (!ObjectFile)
     return true;
