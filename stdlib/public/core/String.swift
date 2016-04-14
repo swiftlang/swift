@@ -584,7 +584,9 @@ extension String {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(
+    n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  ) -> Index? {
     return characters.index(n, stepsFrom: i, limitedBy: limit)
   }
 

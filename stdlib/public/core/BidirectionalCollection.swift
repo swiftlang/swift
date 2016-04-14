@@ -100,14 +100,14 @@ extension BidirectionalIndexable {
   @warn_unused_result
   public func index(
     n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
-  ) -> Index {
+  ) -> Index? {
     if n >= 0 {
       return _advanceForward(i, by: n, limitedBy: limit)
     }
     var i = i
     for _ in stride(from: 0, to: n, by: -1) {
-      if (limit == i) {
-        break;
+      if i == limit {
+        return nil
       }
       formPredecessor(&i)
     }
@@ -157,13 +157,13 @@ extension BidirectionalIndexable where Index : Strideable {
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index? {
     // FIXME: swift-3-indexing-model: range check i
 
     // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
     let i = i.advanced(by: n)
-    if (i >= limit) {
-      return limit
+    if (i > limit) {
+      return nil
     }
     return i
   }
@@ -235,7 +235,10 @@ extension BidirectionalCollection {
   public func dropLast(n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
-    let end = index(numericCast(-n), stepsFrom: endIndex, limitedBy: startIndex)
+    let end = index(
+      numericCast(-n),
+      stepsFrom: endIndex,
+      limitedBy: startIndex) ?? startIndex
     return self[startIndex..<end]
   }
 
@@ -252,7 +255,10 @@ extension BidirectionalCollection {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    let start = index(numericCast(-maxLength), stepsFrom: endIndex, limitedBy: startIndex)
+    let start = index(
+      numericCast(-maxLength),
+      stepsFrom: endIndex,
+      limitedBy: startIndex) ?? startIndex
     return self[start..<endIndex]
   }
 }

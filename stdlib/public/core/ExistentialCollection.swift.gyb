@@ -232,7 +232,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
     n: IntMax,
     stepsFrom i: _AnyIndexBox,
     limitedBy limit: _AnyIndexBox
-  ) -> _AnyIndexBox {
+  ) -> _AnyIndexBox? {
     _abstract()
   }
   internal func _formIndex(n: IntMax, stepsFrom i: inout _AnyIndexBox) {
@@ -242,7 +242,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
     n: IntMax,
     stepsFrom i: inout _AnyIndexBox,
     limitedBy limit: _AnyIndexBox
-  ) {
+  ) -> Bool {
     _abstract()
   }
   @warn_unused_result
@@ -493,20 +493,20 @@ internal final class _${Kind}Box<
     n: IntMax,
     stepsFrom i: _AnyIndexBox,
     limitedBy limit: _AnyIndexBox
-  ) -> _AnyIndexBox {
-    return _IndexBox(_base:
-      _base.index(
+  ) -> _AnyIndexBox? {
+    return _base.index(
         numericCast(n),
         stepsFrom: _unbox(i),
-        limitedBy: _unbox(limit)))
+        limitedBy: _unbox(limit))
+      .map { _IndexBox(_base: $0) }
   }
 
   internal override func _formIndex(
     n: IntMax,
     stepsFrom i: inout _AnyIndexBox
   ) {
-    if let i = i as? _IndexBox<S.Index> {
-      return _base.formIndex(numericCast(n), stepsFrom: &i._base)
+    if let box = i as? _IndexBox<S.Index> {
+      return _base.formIndex(numericCast(n), stepsFrom: &box._base)
     }
     fatalError("Index type mismatch!")
   }
@@ -515,11 +515,11 @@ internal final class _${Kind}Box<
     n: IntMax,
     stepsFrom i: inout _AnyIndexBox,
     limitedBy limit: _AnyIndexBox
-  ) {
-    if let i = i as? _IndexBox<S.Index> {
+  ) -> Bool {
+    if let box = i as? _IndexBox<S.Index> {
       return _base.formIndex(
         numericCast(n),
-        stepsFrom: &i._base,
+        stepsFrom: &box._base,
         limitedBy: _unbox(limit))
     }
     fatalError("Index type mismatch!")
@@ -1029,9 +1029,9 @@ public struct ${Self}<Element>
     n: IntMax,
     stepsFrom i: AnyIndex,
     limitedBy limit: AnyIndex
-  ) -> AnyIndex {
-    return AnyIndex(
-      _box: _box._index(n, stepsFrom: i._box, limitedBy: limit._box))
+  ) -> AnyIndex? {
+    return _box._index(n, stepsFrom: i._box, limitedBy: limit._box)
+      .map { AnyIndex(_box:$0) }
   }
 
   public func formIndex(n: IntMax, stepsFrom i: inout AnyIndex) {
@@ -1046,12 +1046,16 @@ public struct ${Self}<Element>
     n: IntMax,
     stepsFrom i: inout AnyIndex,
     limitedBy limit: AnyIndex
-  ) {
+  ) -> Bool {
     if _isUnique(&i._box) {
       return _box._formIndex(n, stepsFrom: &i._box, limitedBy: limit._box)
-    } else {
-      i = index(n, stepsFrom: i, limitedBy: limit)
     }
+    if let advanced = index(n, stepsFrom: i, limitedBy: limit) {
+      i = advanced
+      return true
+    }
+    i = limit
+    return false
   }
 
   @warn_unused_result
