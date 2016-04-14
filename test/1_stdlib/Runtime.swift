@@ -9,6 +9,37 @@ import StdlibUnittest
 import SwiftShims
 
 
+@warn_unused_result
+@_silgen_name("swift_demangle")
+public
+func _stdlib_demangleImpl(
+  mangledName: UnsafePointer<UInt8>?,
+  mangledNameLength: UInt,
+  outputBuffer: UnsafeMutablePointer<UInt8>?,
+  outputBufferSize: UnsafeMutablePointer<UInt>?,
+  flags: UInt32
+) -> UnsafeMutablePointer<CChar>?
+
+@warn_unused_result
+func _stdlib_demangleName(_ mangledName: String) -> String {
+  return mangledName.nulTerminatedUTF8.withUnsafeBufferPointer {
+    (mangledNameUTF8) in
+
+    let demangledNamePtr = _stdlib_demangleImpl(
+      mangledName: mangledNameUTF8.baseAddress,
+      mangledNameLength: UInt(mangledNameUTF8.count - 1),
+      outputBuffer: nil,
+      outputBufferSize: nil,
+      flags: 0)
+
+    if let demangledNamePtr = demangledNamePtr {
+      let demangledName = String(cString: demangledNamePtr)
+      _swift_stdlib_free(demangledNamePtr)
+      return demangledName
+    }
+    return mangledName
+  }
+}
 
 var swiftObjectCanaryCount = 0
 class SwiftObjectCanary {
