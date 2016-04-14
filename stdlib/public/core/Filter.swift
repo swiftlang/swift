@@ -233,7 +233,9 @@ public struct LazyFilterCollection<
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(
+    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  ) -> Index? {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
@@ -241,7 +243,7 @@ public struct LazyFilterCollection<
     var index = i.base
     for _ in stride(from: 0, to: n, by: 1) {
       if index == limit.base {
-        break
+        return nil
       }
       _nextFilteredInPlace(&index)
     }

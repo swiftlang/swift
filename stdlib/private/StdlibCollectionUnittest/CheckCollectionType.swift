@@ -682,7 +682,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
   }
 }
 
-// FIXME: swift-3-indexing-model - add tests for the follow?
+// FIXME: swift-3-indexing-model - add tests for the following?
 //          successor(of: i: Index) -> Index
 //          formSuccessor(i: inout Index)
 //          advance(i: Index, by n: IndexDistance) -> Index

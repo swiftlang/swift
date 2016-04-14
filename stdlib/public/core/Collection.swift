@@ -159,14 +159,14 @@ public protocol Indexable : IndexableBase {
   @warn_unused_result
   func index(_ n: IndexDistance, stepsFrom i: Index) -> Index
 
-  /// Returns the result of advancing `i` by `n` positions, or until it
-  /// equals `limit`.
+  /// Returns the result of advancing `i` by `n` positions, or `nil` if it
+  /// reaches the `limit`.
   ///
   /// - Returns:
-  ///   - If `n > 0`, the `n`th successor of `i` or `limit`, whichever
-  ///     is reached first.
-  ///   - If `n < 0`, the `n`th predecessor of `i` or `limit`, whichever
-  ///     is reached first.
+  ///   - If `n > 0`, the `n`th successor of `i` or `nil` if the `limit` has
+  ///     been reached.
+  ///   - If `n < 0`, the `n`th predecessor of `i` or `nil` if the `limit` has
+  ///     been reached.
   ///   - Otherwise, `i` unmodified.
   ///
   /// - Precondition: `n >= 0` unless `Self` conforms to
@@ -178,7 +178,7 @@ public protocol Indexable : IndexableBase {
   @warn_unused_result
   func index(
     _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
-  ) -> Index
+  ) -> Index?
 
   /// Advances `i` by `n` positions.
   ///
@@ -195,6 +195,9 @@ public protocol Indexable : IndexableBase {
 
   /// Advances `i` by `n` positions, or until it equals `limit`.
   ///
+  /// - Returns `true` if index has been advanced by exactly `n` steps without
+  ///   reaching the `limit`, and `false` otherwise.
+  ///
   /// - Precondition: `n >= 0` unless `Self` conforms to
   ///   `BidirectionalCollection`.
   ///
@@ -203,7 +206,7 @@ public protocol Indexable : IndexableBase {
   ///   - O(`abs(n)`) otherwise.
   func formIndex(
     _ n: IndexDistance, stepsFrom i: inout Index, limitedBy limit: Index
-  )
+  ) -> Bool
 
   /// Returns the distance between `start` and `end`.
   ///
@@ -406,14 +409,14 @@ public protocol Collection : Indexable, Sequence {
   func index(_ n: IndexDistance, stepsFrom i: Index) -> Index
 
   // FIXME: swift-3-indexing-model: Should this mention preconditions on `n`?
-  /// Returns the result of advancing `i` by `n` positions, or until it
-  /// equals `limit`.
+  /// Returns the result of advancing `i` by `n` positions, or `nil` if it
+  /// reaches the `limit`.
   ///
   /// - Returns:
-  ///   - If `n > 0`, the `n`th successor of `i` or `limit`, whichever
-  ///     is reached first.
-  ///   - If `n < 0`, the `n`th predecessor of `i` or `limit`, whichever
-  ///     is reached first.
+  ///   - If `n > 0`, the `n`th successor of `i` or `nil` if the `limit` has
+  ///     been reached.
+  ///   - If `n < 0`, the `n`th predecessor of `i` or `nil` if the `limit` has
+  ///     been reached.
   ///   - Otherwise, `i` unmodified.
   ///
   /// - Precondition: `n >= 0` unless `Self` conforms to
@@ -425,7 +428,7 @@ public protocol Collection : Indexable, Sequence {
   @warn_unused_result
   func index(
     _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
-  ) -> Index
+  ) -> Index?
 
   /// Returns the distance between `start` and `end`.
   ///
@@ -481,7 +484,7 @@ extension Indexable {
   @warn_unused_result
   public func index(
     _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
-  ) -> Index {
+  ) -> Index? {
     // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n, limitedBy: limit)
   }
@@ -492,8 +495,13 @@ extension Indexable {
 
   public func formIndex(
     _ n: IndexDistance, stepsFrom i: inout Index, limitedBy limit: Index
-  ) {
-    i = index(n, stepsFrom: i, limitedBy: limit)
+  ) -> Bool {
+    if let advancedIndex = index(n, stepsFrom: i, limitedBy: limit) {
+      i = advancedIndex
+      return true
+    }
+    i = limit
+    return false
   }
   
   @warn_unused_result
@@ -529,14 +537,16 @@ extension Indexable {
   @inline(__always)
   @warn_unused_result
   internal
-  func _advanceForward(_ i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  func _advanceForward(
+    _ i: Index, by n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
 
     var i = i
     for _ in stride(from: 0, to: n, by: 1) {
-      if (limit == i) {
-        break;
+      if i == limit {
+        return nil
       }
       formSuccessor(&i)
     }
@@ -567,7 +577,9 @@ extension Indexable where Index : Strideable {
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(
+    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  ) -> Index? {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: range check i
@@ -575,7 +587,7 @@ extension Indexable where Index : Strideable {
     // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
     let i = i.advanced(by: n)
     if (i >= limit) {
-      return limit
+      return nil
     }
     return i
   }
@@ -728,7 +740,8 @@ extension Collection {
   @warn_unused_result
   public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-    let start = index(numericCast(n), stepsFrom: startIndex, limitedBy: endIndex)
+    let start = index(numericCast(n),
+      stepsFrom: startIndex, limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
 
@@ -741,7 +754,8 @@ extension Collection {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
-    let end = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
+    let end = index(numericCast(amount),
+      stepsFrom: startIndex, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
 
@@ -758,7 +772,8 @@ extension Collection {
     _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
-    let end = index(numericCast(maxLength), stepsFrom: startIndex, limitedBy: endIndex)
+    let end = index(numericCast(maxLength),
+      stepsFrom: startIndex, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
 
@@ -776,7 +791,8 @@ extension Collection {
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
     let amount = Swift.max(0, numericCast(count) - maxLength)
-    let start = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
+    let start = index(numericCast(amount),
+      stepsFrom: startIndex, limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
 

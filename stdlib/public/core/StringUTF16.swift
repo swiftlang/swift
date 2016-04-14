@@ -78,11 +78,13 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+    public func index(
+      _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+    ) -> Index? {
       // FIXME: swift-3-indexing-model: range check i?
       let d = i._offset.distance(to: limit._offset)
-      if d == 0 || (d > 0 ? d <= n : d >= n) {
-        return limit
+      if (d > 0) ? (d < n) : (d > n) {
+        return nil
       }
       return Index(_offset: i._offset.advanced(by: n))
     }
@@ -403,7 +405,9 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(
+    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  ) -> Index? {
     // FIXME: swift-3-indexing-model: range check i?
     return _elements.index(n, stepsFrom: i, limitedBy: limit)
   }

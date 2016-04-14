@@ -41,6 +41,9 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   if (hasUnboundGenericTypes(InterfaceSubs)) {
     DEBUG(llvm::dbgs() <<
           "    Cannot specialize with unbound interface substitutions.\n");
+    DEBUG(for (auto Sub : ParamSubs) {
+            Sub.dump();
+          });
     return;
   }
   if (hasDynamicSelfTypes(InterfaceSubs)) {
@@ -165,8 +168,12 @@ SILFunction *GenericFuncSpecializer::lookupSpecialization() {
     assert(ReInfo.getSpecializedType()
            == SpecializedF->getLoweredFunctionType() &&
            "Previously specialized function does not match expected type.");
+    DEBUG(llvm::dbgs() << "Found an existing specialization for: " << ClonedName
+                       << "\n");
     return SpecializedF;
   }
+  DEBUG(llvm::dbgs() << "Could not find an existing specialization for: "
+                     << ClonedName << "\n");
   return nullptr;
 }
 
@@ -392,7 +399,8 @@ void swift::trySpecializeApplyOfGeneric(
 
   auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
 
-  DEBUG(llvm::dbgs() << "  ApplyInst: " << *Apply.getInstruction());
+  DEBUG(llvm::dbgs() << "  ApplyInst:\n";
+        Apply.getInstruction()->dumpInContext());
 
   ReabstractionInfo ReInfo(F, Apply.getSubstitutions());
   if (!ReInfo.getSpecializedType())
@@ -442,6 +450,9 @@ void swift::trySpecializeApplyOfGeneric(
     assert(ReInfo.getSpecializedType()
            == SpecializedF->getLoweredFunctionType() &&
            "Previously specialized function does not match expected type.");
+    // Even if the pre-specialization exists already, try to preserve it
+    // if it is whitelisted.
+    linkSpecialization(M, SpecializedF);
   } else {
     SpecializedF = FuncSpecializer.tryCreateSpecialization();
     if (!SpecializedF)
@@ -506,8 +517,29 @@ void swift::trySpecializeApplyOfGeneric(
 // This uses the SIL linker to checks for the does not load the body of the pres
 // =============================================================================
 
+static void keepSpecializationAsPublic(SILFunction *F) {
+  DEBUG(auto DemangledNameString =
+            swift::Demangle::demangleSymbolAsString(F->getName());
+        StringRef DemangledName = DemangledNameString;
+        llvm::dbgs() << "Keep specialization public: " << DemangledName << " : "
+                     << F->getName() << "\n");
+  // Make it public, so that others can refer to it.
+  //
+  // NOTE: This function may refer to non-public symbols, which may lead to
+  // problems, if you ever try to inline this function. Therefore, these
+  // specializations should only be used to refer to them, but should never
+  // be inlined!  The general rule could be: Never inline specializations
+  // from stdlib!
+  //
+  // NOTE: Making these specializations public at this point breaks
+  // some optimizations. Therefore, just mark the function.
+  // DeadFunctionElimination pass will check if the function is marked
+  // and preserve it if required.
+  F->setKeepAsPublic(true);
+}
+
 /// Link a specialization for generating prespecialized code.
-/// 
+///
 /// For now, it is performed only for specializations in the
 /// standard library. But in the future, one could think of
 /// maintaining a cache of optimized specializations.
@@ -517,34 +549,14 @@ void swift::trySpecializeApplyOfGeneric(
 /// the library, but only used only by client code compiled at -Onone. They
 /// should be never inlined.
 static bool linkSpecialization(SILModule &M, SILFunction *F) {
+  if (F->isKeepAsPublic())
+    return true;
   // Do not remove functions from the white-list. Keep them around.
   // Change their linkage to public, so that other applications can refer to it.
-
   if (M.getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
-      F->getLinkage() != SILLinkage::Public &&
       F->getModule().getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT) {
-    if (F->getLinkage() != SILLinkage::Public &&
-        isWhitelistedSpecialization(F->getName())) {
-
-      DEBUG(
-        auto DemangledNameString =
-          swift::Demangle::demangleSymbolAsString(F->getName());
-        StringRef DemangledName = DemangledNameString;
-        llvm::dbgs() << "Keep specialization: " << DemangledName << " : "
-                     << F->getName() << "\n");
-      // Make it public, so that others can refer to it.
-      //
-      // NOTE: This function may refer to non-public symbols, which may lead to
-      // problems, if you ever try to inline this function. Therefore, these
-      // specializations should only be used to refer to them, but should never
-      // be inlined!  The general rule could be: Never inline specializations
-      // from stdlib!
-      //
-      // NOTE: Making these specializations public at this point breaks
-      // some optimizations. Therefore, just mark the function.
-      // DeadFunctionElimination pass will check if the function is marked
-      // and preserve it if required.
-      F->setKeepAsPublic(true);
+    if (isWhitelistedSpecialization(F->getName())) {
+      keepSpecializationAsPublic(F);
       return true;
     }
   }
@@ -562,6 +574,18 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
       "_ContiguousArrayBuffer",
       "Range",
       "RangeIterator",
+      "CountableRange",
+      "CountableRangeIterator",
+      "ClosedRange",
+      "ClosedRangeIterator",
+      "CountableClosedRange",
+      "CountableClosedRangeIterator",
+      "IndexingIterator",
+      "Collection",
+      "MutableCollection",
+      "BidirectionalCollection",
+      "RandomAccessCollection",
+      "RangeReplaceableCollection",
       "_allocateUninitializedArray",
       "UTF8",
       "UTF16",
@@ -579,7 +603,10 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
 
   StringRef DemangledName = DemangledNameString;
 
+  DEBUG(llvm::dbgs() << "Check if whitelisted: " << DemangledName << "\n");
+
   auto pos = DemangledName.find("generic ", 0);
+  auto oldpos = pos;
   if (pos == StringRef::npos)
     return false;
 
@@ -590,11 +617,22 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
   buffer << STDLIB_NAME <<'.';
 
   StringRef OfStr = buffer.str();
+  DEBUG(llvm::dbgs() << "Check substring: " << OfStr << "\n");
 
-  pos = DemangledName.find(OfStr, pos);
+  pos = DemangledName.find(OfStr, oldpos);
 
-  if (pos == StringRef::npos)
-    return false;
+  if (pos == StringRef::npos) {
+    // Create "of (extension in Swift).Swift"
+    llvm::SmallString<64> OfString;
+    llvm::raw_svector_ostream buffer(OfString);
+    buffer << "of (extension in " << STDLIB_NAME << "):";
+    buffer << STDLIB_NAME << '.';
+    OfStr = buffer.str();
+    pos = DemangledName.find(OfStr, oldpos);
+    DEBUG(llvm::dbgs() << "Check substring: " << OfStr << "\n");
+    if (pos == StringRef::npos)
+      return false;
+  }
 
   pos += OfStr.size();
 
@@ -631,8 +669,10 @@ SILFunction *swift::lookupPrespecializedSymbol(SILModule &M,
                                                StringRef FunctionName) {
   // First check if the module contains a required specialization already.
   auto *Specialization = M.lookUpFunction(FunctionName);
-  if (Specialization)
-    return Specialization;
+  if (Specialization) {
+    if (Specialization->getLinkage() == SILLinkage::PublicExternal)
+      return Specialization;
+  }
 
   // Then check if the required specialization can be found elsewhere.
   Specialization = lookupExistingSpecialization(M, FunctionName);

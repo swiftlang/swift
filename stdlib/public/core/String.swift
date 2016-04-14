@@ -586,7 +586,7 @@ extension String {
   @warn_unused_result
   public func index(
     _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
-  ) -> Index {
+  ) -> Index? {
     return characters.index(n, stepsFrom: i, limitedBy: limit)
   }
 

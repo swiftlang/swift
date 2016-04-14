@@ -111,6 +111,7 @@ public struct Mirror {
   /// method.
   public typealias Child = (label: String?, value: Any)
 
+  // FIXME: swift-3-indexing-model: update code in comment to reflect reality
   /// The type used to represent sub-structure.
   ///
   /// Depending on your needs, you may find it useful to "upgrade"
@@ -404,6 +405,7 @@ extension Mirror {
     var customMirror: Mirror { return mirror }
   }
 
+  // FIXME: swift-3-indexing-model: update code in comment to reflect reality
   /// Return a specific descendant of the reflected subject, or `nil`
   /// Returns a specific descendant of the reflected subject, or `nil`
   /// if no such descendant exists.
@@ -453,7 +455,7 @@ extension Mirror {
         position = children.index(offset,
           stepsFrom: 
           children.startIndex,
-          limitedBy: children.endIndex)
+          limitedBy: children.endIndex) ?? children.endIndex
       }
       else {
         _preconditionFailure(

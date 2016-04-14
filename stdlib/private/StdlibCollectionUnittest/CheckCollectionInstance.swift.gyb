@@ -109,7 +109,7 @@ internal func _checkIncrementalAdvance<
     var offset: BaseCollection.IndexDistance = 0
     for _ in 0...(d * sign).toIntMax() {
       let j = baseCollection.index(offset, stepsFrom: i)
-      let k = baseCollection.index(offset + sign, stepsFrom: i, limitedBy: limit)
+      let k = baseCollection.index(offset + sign, stepsFrom: i, limitedBy: limit) ?? limit
       let jAtLimit = offset == d
       if jAtLimit {
         expectEqual(limit, j, ${trace})
