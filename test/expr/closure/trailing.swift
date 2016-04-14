@@ -3,6 +3,7 @@
 func takeFunc(_ f: (Int) -> Int) -> Int {}
 func takeValueAndFunc(_ value: Int, _ f: (Int) -> Int) {}
 func takeTwoFuncs(_ f: (Int) -> Int, _ g: (Int) -> Int) {}
+// expected-note @+1 {{use '_' to remove the argument label for 'takeFuncWithDefault'}}{{26-26=_ }}
 func takeFuncWithDefault(f : ((Int) -> Int)? = nil) {}
 func takeTwoFuncsWithDefaults(f1 : (Int -> Int)? = nil, f2 : (String -> String)? = nil) {}
 
@@ -78,7 +79,8 @@ func labeledArgumentAndTrailingClosure() {
   takeFuncWithDefault { $0 + 1 }
   takeFuncWithDefault() { $0 + 1 }
   // ... but not non-trailing closures.
-  takeFuncWithDefault({ $0 + 1 }) // expected-error {{missing argument label 'f:' in call}} {{23-23=f: }}
+  // expected-note @+1 {{add missing argument label 'f:'}} {{23-23=f: }}
+  takeFuncWithDefault({ $0 + 1 }) // expected-error {{missing argument label 'f:' in call}}
   takeFuncWithDefault(f: { $0 + 1 })
 
   // Trailing closure binds to last parameter, always.

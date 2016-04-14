@@ -132,13 +132,11 @@ public:
   
   void getAsArgumentLabel(SmallVectorImpl<char> &buffer) const {
     bool isReserved = !canBeArgumentLabel();
-    llvm::SmallString<16> newStr;
     if (isReserved)
-      newStr += '`';
-    newStr += str();
+      buffer.append(1, '`');
+    buffer.append(str().begin(), str().end());
     if (isReserved)
-      newStr += '`';
-    buffer = newStr;
+      buffer.append(1, '`');
   }
 
   bool isEditorPlaceholder() const {

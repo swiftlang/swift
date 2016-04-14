@@ -26,8 +26,10 @@ func testExtra2(_ policy : Policy) {
 }
 
 // Single missing keyword argument (scalar-to-tuple)
+// expected-note @+1 {{use '_' to remove the argument label for 'f2'}}{{9-9=_ }}
 func f2(a: Int) { }
-f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
+// expected-note @+1 {{add missing argument label 'a:'}}{{4-4=a: }}
+f2(5) // expected-error{{missing argument label 'a:' in call}}
 
 struct X2 {
   init(a: Int) { }
@@ -40,12 +42,14 @@ X2(5).f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
 // Missing keywords
 // -------------------------------------------
 
+// expected-note @+1 {{use '_' to remove the argument label for 'allkeywords1'}}{{19-19=_ }}
 func allkeywords1(x: Int, y: Int) { }
 
 // Missing keywords.
 allkeywords1(1, 2) // expected-error{{missing argument labels}} {{14-14=x: }} {{17-17=y: }}
 allkeywords1(x: 1, 2) // expected-error{{missing argument label 'y:' in call}} {{20-20=y: }}
-allkeywords1(1, y: 2) // expected-error{{missing argument label 'x:' in call}} {{14-14=x: }}
+// expected-note @+1 {{add missing argument label 'x:'}}{{14-14=x: }}
+allkeywords1(1, y: 2) // expected-error{{missing argument label 'x:' in call}}
 
 // If keyword is reserved, make sure to quote it. rdar://problem/21392294
 func reservedLabel(_ x: Int, `repeat`: Bool) {}
@@ -298,10 +302,12 @@ acceptAutoclosure(f: produceInt) // expected-error{{function produces expected t
 // -------------------------------------------
 // Trailing closures
 // -------------------------------------------
+// expected-note @+1 {{use '_' to remove the argument label for 'trailingclosure1'}}{{23-23=_ }}
 func trailingclosure1(x: Int, f: () -> Int) {}
 
 trailingclosure1(x: 1) { return 5 }
-trailingclosure1(1) { return 5 } // expected-error{{missing argument label 'x:' in call}}{{18-18=x: }}
+// expected-note @+1 {{add missing argument label 'x:'}} {{18-18=x: }}
+trailingclosure1(1) { return 5 } // expected-error{{missing argument label 'x:' in call}}
 
 trailingclosure1(x: 1, { return 5 }) // expected-error{{missing argument label 'f:' in call}} {{24-24=f: }}
 
@@ -320,10 +326,12 @@ func trailingclosure4(f: () -> Int) {}
 trailingclosure4 { 5 }
 
 func trailingClosure5<T>(_ file: String = #file, line: UInt = #line, expression: () -> T?) { }
+// expected-note @+1 {{use '_' to remove the argument label for 'trailingClosure6'}}{{26-26=_ }}
 func trailingClosure6<T>(value: Int, expression: () -> T?) { }
 
 trailingClosure5(file: "hello", line: 17) { return Optional.Some(5) } // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
-trailingClosure6(5) { return Optional.Some(5) } // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
+// expected-note @+1 {{add missing argument label 'value:'}}{{18-18=value: }}
+trailingClosure6(5) { return Optional.Some(5) } // expected-error{{missing argument label 'value:' in call}}
 
 class MismatchOverloaded1 {
   func method1(_ x: Int!, arg: ((Int) -> Int)!) { }

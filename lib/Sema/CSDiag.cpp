@@ -3490,12 +3490,14 @@ static bool diagnoseArgumentLabelError(Expr *expr,
                                        Expr *fnExpr,
                                        ArrayRef<Identifier> newNames,
                                        ConstraintSystem &CS) {
-  
+ 
   auto funcDeclRefExpr = dyn_cast<DeclRefExpr>(fnExpr);
   auto func = funcDeclRefExpr ? dyn_cast<FuncDecl>(funcDeclRefExpr->getDecl())
-                              : nullptr;
+                              : nullptr; 
   bool declIsInModule = func &&
     func->getParentModule() == CS.DC->getParentModule();
+
+  bool isSubscript = fnExpr ? isa<SubscriptExpr>(fnExpr) : false;
   
   auto emitFirstParamImplicitDeclFixIt = [&]() {
     // If attempting to call a function with an implicitly hidden
@@ -3510,7 +3512,6 @@ static bool diagnoseArgumentLabelError(Expr *expr,
          .fixItInsert(firstParam->getNameLoc(), "_ ");
   };
   
-  bool isSubscript = fnExpr ? isa<SubscriptExpr>(fnExpr) : false;
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
     if (newNames[0].empty()) {
@@ -5213,7 +5214,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     for (auto &arg : arguments)
       expectedNames.push_back(arg.Label);
 
-    return diagnoseArgumentLabelError(argExpr, candidateInfo[0].getExpr(),
+    return diagnoseArgumentLabelError(argExpr,
+                                      candidateInfo[0].getExpr(),
                                       expectedNames, *CS);
   }
   
