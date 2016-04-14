@@ -205,6 +205,7 @@ extension BidirectionalCollection where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   /// - Precondition: `!self.isEmpty`
+  @discardableResult
   public mutating func removeLast() -> Iterator.Element {
     let element = last!
     self = self[startIndex..<predecessor(of: endIndex)]

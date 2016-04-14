@@ -19,7 +19,6 @@
 // RUN: %target-run-stdlib-swift %s | FileCheck %s
 // REQUIRES: executable_test
 //
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Swift

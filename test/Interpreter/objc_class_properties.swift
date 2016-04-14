@@ -5,7 +5,6 @@
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Foundation
@@ -176,7 +175,9 @@ class NamingConflictSubclass : PropertyNamingConflict {
   override class var prop: AnyObject? { return NamingConflictSubclass() }
 }
 
-ClassProperties.test("namingConflict") {
+ClassProperties.test("namingConflict")
+  .skip(.osxMinorRange(10, 0..<11, reason: "unexpected failures on 10.10"))
+  .code {
   let obj = PropertyNamingConflict()
   expectTrue(obj === obj.prop)
   expectEmpty(obj.dynamicType.prop)
@@ -199,7 +200,9 @@ extension NamingConflictSubclass : PropertyNamingConflictProto {
   }
 }
 
-ClassProperties.test("namingConflict/protocol") {
+ClassProperties.test("namingConflict/protocol")
+  .skip(.osxMinorRange(10, 0..<11, reason: "unexpected failures on 10.10"))
+  .code {
   let obj: PropertyNamingConflictProto = NamingConflictSubclass()
   expectTrue(obj === obj.protoProp)
   expectEmpty(obj.dynamicType.protoProp)

@@ -1,4 +1,4 @@
-// Make sure that we can deserialize objective c.
+// Make sure that we can deserialize Objective-C.
 // RUN: %target-sil-opt %platform-sdk-overlay-dir/ObjectiveC.swiftmodule > /dev/null
 // RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/ObjectiveC.swiftmodule | FileCheck %s
 

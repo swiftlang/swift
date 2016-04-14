@@ -510,16 +510,19 @@ public struct ${Self}<
     base.removeAll(keepingCapacity: keepCapacity)
   }
 
+  @discardableResult
   public mutating func remove(at index: Index) -> Base.Iterator.Element {
     Log.removeAt[selfType] += 1
     return base.remove(at: index)
   }
 
+  @discardableResult
   public mutating func removeFirst() -> Base.Iterator.Element {
     Log.removeFirst[selfType] += 1
     return base.removeFirst()
   }
 
+  @discardableResult
   public mutating func removeFirst(_ n: Int) {
     Log.removeFirstN[selfType] += 1
     base.removeFirst(n)

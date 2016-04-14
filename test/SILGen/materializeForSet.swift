@@ -146,8 +146,8 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[SELF:%.*]] = upcast %2 : $@thick Derived.Type to $@thick Base.Type
 // CHECK-NEXT: [[OUT:%.*]] = alloc_stack $@callee_owned () -> Int
-// CHECK:      [[GETTER:%.*]] = function_ref @_TZFC17materializeForSet4Baseg14staticFunctionFT_Si : $@convention(thin) (@thick Base.Type) -> @owned @callee_owned () -> Int
-// CHECK-NEXT: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]]) : $@convention(thin) (@thick Base.Type) -> @owned @callee_owned () -> Int
+// CHECK:      [[GETTER:%.*]] = function_ref @_TZFC17materializeForSet4Baseg14staticFunctionFT_Si : $@convention(method) (@thick Base.Type) -> @owned @callee_owned () -> Int
+// CHECK-NEXT: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]]) : $@convention(method) (@thick Base.Type) -> @owned @callee_owned () -> Int
 // CHECK-NEXT: store [[VALUE]] to [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: [[VALUE:%.*]] = load [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: strong_retain [[VALUE]] : $@callee_owned () -> Int
@@ -171,8 +171,8 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[VALUE:%.*]] = load [[BUFFER]] : $*@callee_owned () -> @out Int
 // CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__iSi_XFo__dSi_ : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]]) : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
-// CHECK:      [[SETTER_FN:%.*]] = function_ref @_TZFC17materializeForSet4Bases14staticFunctionFT_Si : $@convention(thin) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
-// CHECK-NEXT: apply [[SETTER_FN]]([[NEWVALUE]], [[BASE_SELF]]) : $@convention(thin) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
+// CHECK:      [[SETTER_FN:%.*]] = function_ref @_TZFC17materializeForSet4Bases14staticFunctionFT_Si : $@convention(method) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
+// CHECK-NEXT: apply [[SETTER_FN]]([[NEWVALUE]], [[BASE_SELF]]) : $@convention(method) (@owned @callee_owned () -> Int, @thick Base.Type) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 

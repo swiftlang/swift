@@ -3,8 +3,6 @@
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
-// XFAIL: interpret
-
 import StdlibUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This

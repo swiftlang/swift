@@ -129,3 +129,33 @@ extension GenericClass {
     _ = #selector(GenericClass.doesntUseGenericParam3)
   }
 }
+
+// expected-error@+1{{inheritance from a generic Objective-C class 'GenericClass' must bind type parameters of 'GenericClass' to specific concrete types}}
+class SwiftGenericSubclassA<X: AnyObject>: GenericClass<X> {}
+// expected-error@+1{{inheritance from a generic Objective-C class 'GenericClass' must bind type parameters of 'GenericClass' to specific concrete types}}
+class SwiftGenericSubclassB<X: AnyObject>: GenericClass<GenericClass<X>> {}
+// expected-error@+1{{inheritance from a generic Objective-C class 'GenericClass' must bind type parameters of 'GenericClass' to specific concrete types}}
+class SwiftGenericSubclassC<X: NSCopying>: GenericClass<X> {}
+
+class SwiftConcreteSubclassA: GenericClass<AnyObject> {
+  override init(thing: AnyObject) { }
+  override func thing() -> AnyObject? { }
+  override func count() -> Int32 { }
+  override class func classThing() -> AnyObject? { }
+  override func arrayOfThings() -> [AnyObject] {}
+}
+class SwiftConcreteSubclassB: GenericClass<NSString> {
+  override init(thing: NSString) { }
+  override func thing() -> NSString? { }
+  override func count() -> Int32 { }
+  override class func classThing() -> NSString? { }
+  override func arrayOfThings() -> [NSString] {}
+}
+class SwiftConcreteSubclassC<T>: GenericClass<NSString> {
+  override init(thing: NSString) { }
+  override func thing() -> NSString? { }
+  override func count() -> Int32 { }
+  override class func classThing() -> NSString? { }
+  override func arrayOfThings() -> [NSString] {}
+}
+

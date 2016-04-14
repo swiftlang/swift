@@ -15,8 +15,6 @@
 // RUN: %target-run %t/Builtins
 // REQUIRES: executable_test
 
-// XFAIL: interpret
-
 import Swift
 import SwiftShims
 import StdlibUnittest

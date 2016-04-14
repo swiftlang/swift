@@ -104,6 +104,9 @@ class LinkEntity {
     /// An Objective-C class reference.  The pointer is a ClassDecl*.
     ObjCClass,
 
+    /// An Objective-C class reference reference.  The pointer is a ClassDecl*.
+    ObjCClassRef,
+
     /// An Objective-C metaclass reference.  The pointer is a ClassDecl*.
     ObjCMetaclass,
 
@@ -320,6 +323,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forObjCClassRef(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ObjCClassRef, decl, 0);
+    return entity;
+  }
+
   static LinkEntity forObjCClass(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ObjCClass, decl, 0);
@@ -495,11 +504,6 @@ public:
   /// in a different module.
   ///
   bool isAvailableExternally(IRGenModule &IGM) const;
-
-  /// Returns true if this function or global variable may be inlined into
-  /// another module.
-  ///
-  bool isFragile(IRGenModule &IGM) const;
 
   ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));

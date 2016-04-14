@@ -93,6 +93,9 @@ ERROR(could_not_use_type_member,none,
 ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
+ERROR(could_not_use_type_member_on_existential,none,
+      "static member %1 cannot be used on protocol metatype %0",
+      (Type, DeclName))
 ERROR(could_not_use_instance_member_on_type,none,
       "instance member %1 cannot be used on type %0",
       (Type, DeclName))
@@ -1457,8 +1460,9 @@ NOTE(class_here,none,
      "class %0 declared here", (Identifier))
 ERROR(inheritance_from_final_class,none,
       "inheritance from a final class %0", (Identifier))
-ERROR(inheritance_from_objc_generic_class,none,
-      "inheritance from a generic Objective-C class %0", (Identifier))
+ERROR(inheritance_from_unspecialized_objc_generic_class,none,
+      "inheritance from a generic Objective-C class %0 must bind "
+      "type parameters of %0 to specific concrete types", (Identifier))
 ERROR(inheritance_from_objc_runtime_visible_class,none,
       "inheritance from an Objective-C class %0 only visible via the runtime", (Identifier))
 

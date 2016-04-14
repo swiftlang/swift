@@ -194,11 +194,20 @@ public func expectOptionalEqual<T>(
 }
 
 public func expectEqual<T : Equatable>(_ expected: T?, _ actual: T?, ${TRACE}) {
-  if (actual == nil) != (expected == nil)
-    || actual != nil && expected! != actual! {
+  if expected != actual {
     expectationFailure(
       "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      trace: ${trace})
+  }
+}
+
+public func expectNotEqual<T : Equatable>(
+  _ expected: T?, _ actual: T?, ${TRACE}
+) {
+  if expected == actual {
+    expectationFailure(
+      "unexpected value: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
   }
 }
@@ -579,7 +588,14 @@ func _stdlib_getline() -> String? {
 
 func _printDebuggingAdvice(_ fullTestName: String) {
   print("To debug, run:")
-  print("$ \(Process.arguments[0]) " +
+  var invocation = [Process.arguments[0]]
+  let interpreter = getenv("SWIFT_INTERPRETER")
+  if interpreter != nil {
+    if let interpreterCmd = String(validatingUTF8: interpreter) {
+        invocation.insert(interpreterCmd, at: 0)
+    }
+  }
+  print("$ \(invocation.joined(separator: " ")) " +
     "--stdlib-unittest-in-process --stdlib-unittest-filter \"\(fullTestName)\"")
 }
 
@@ -1998,7 +2014,7 @@ public func checkComparable<T : Comparable>(
 ) {
   checkComparable(
     [lhs, rhs],
-    oracle: { [[ .eq,  expected], [ expected.flip(), .eq]][$0][$1] },
+    oracle: { [[ .eq, expected], [ expected.flip(), .eq]][$0][$1] },
     ${trace})
 }
 

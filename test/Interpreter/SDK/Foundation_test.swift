@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Foundation
@@ -165,10 +164,10 @@ func matchesEither(_ input: NSNumber, _ a: NSNumber, _ b: NSNumber) -> Bool {
 
 FoundationTestSuite.test("patternMatching") {
   var one, two, three, oneAgain : NSNumber
-  one = NSNumber(int: 1)
-  two = NSNumber(int: 2)
-  three = NSNumber(int: 3)
-  oneAgain = NSNumber(int: 1)
+  one = NSNumber(value: 1)
+  two = NSNumber(value: 2)
+  three = NSNumber(value: 3)
+  oneAgain = NSNumber(value: 1)
   expectFalse(matchesEither(one, two, three))
   expectTrue(matchesEither(one, oneAgain, three))
   expectTrue(matchesEither(one, two, oneAgain))

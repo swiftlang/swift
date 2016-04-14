@@ -168,6 +168,7 @@ public protocol RangeReplaceableCollection
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @discardableResult
   mutating func remove(at i: Index) -> Iterator.Element
 
   /// Customization point for `removeLast()`.  Implement this function if you
@@ -188,6 +189,7 @@ public protocol RangeReplaceableCollection
   ///
   /// - Complexity: O(`self.count`)
   /// - Precondition: `!self.isEmpty`.
+  @discardableResult
   mutating func removeFirst() -> Iterator.Element
 
   /// Remove the first `n` elements.
@@ -267,6 +269,7 @@ extension RangeReplaceableCollection {
     replaceSubrange(i..<i, with: newElements)
   }
 
+  @discardableResult
   public mutating func remove(at index: Index) -> Iterator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
     let result: Iterator.Element = self[index]
@@ -298,6 +301,7 @@ extension RangeReplaceableCollection {
     removeSubrange(startIndex..<end)
   }
 
+  @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty,
       "can't remove first element from an empty collection")
@@ -323,6 +327,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   /// - Precondition: `!self.isEmpty`.
+  @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
@@ -439,6 +444,7 @@ extension RangeReplaceableCollection
   ///
   /// - Complexity: O(1)
   /// - Precondition: `!self.isEmpty`
+  @discardableResult
   public mutating func removeLast() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove last element from an empty collection")
     if let result = _customRemoveLast() {

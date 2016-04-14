@@ -114,7 +114,7 @@ func nonNativeBridgeObject(_ o: AnyObject) -> Builtin.BridgeObject {
 // Try with a (probably) tagged pointer. No bits may be masked into a
 // non-native object.
 if true {
-  let x = NSNumber(integer: 22)
+  let x = NSNumber(value: 22)
   let bo = nonNativeBridgeObject(x)
   let bo2 = bo
   let x1: NSNumber = Builtin.castReferenceFromBridgeObject(bo)
@@ -124,7 +124,7 @@ if true {
   // CHECK-NEXT: true
   print(x === x2)
 
-  var bo3 = nonNativeBridgeObject(NSNumber(integer: 22))
+  var bo3 = nonNativeBridgeObject(NSNumber(value: 22))
   print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)

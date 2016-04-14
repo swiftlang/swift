@@ -173,19 +173,19 @@ extension Int : _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    self = number.integerValue
+    self = number.intValue
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(integer: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
     _ x: NSNumber,
     result: inout Int?
   ) {
-    result = x.integerValue
+    result = x.intValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
@@ -199,7 +199,7 @@ extension Int : _ObjectiveCBridgeable {
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSNumber?
   ) -> Int {
-    return source!.integerValue
+    return source!.intValue
   }
 }
 
@@ -209,19 +209,19 @@ extension UInt : _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    self = number.unsignedIntegerValue
+    self = number.uintValue
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(unsignedInteger: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
     _ x: NSNumber,
     result: inout UInt?
   ) {
-    result = x.unsignedIntegerValue
+    result = x.uintValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
@@ -235,7 +235,7 @@ extension UInt : _ObjectiveCBridgeable {
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSNumber?
   ) -> UInt {
-    return source!.unsignedIntegerValue
+    return source!.uintValue
   }
 }
 
@@ -250,7 +250,7 @@ extension Float : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(float: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -286,7 +286,7 @@ extension Double : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(double: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -322,7 +322,7 @@ extension Bool: _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(bool: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -392,17 +392,17 @@ extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
                      BooleanLiteralConvertible {
   /// Create an instance initialized to `value`.
   public required convenience init(integerLiteral value: Int) {
-    self.init(integer: value)
+    self.init(value: value)
   }
 
   /// Create an instance initialized to `value`.
   public required convenience init(floatLiteral value: Double) {
-    self.init(double: value)
+    self.init(value: value)
   }
 
   /// Create an instance initialized to `value`.
   public required convenience init(booleanLiteral value: Bool) {
-    self.init(bool: value)
+    self.init(value: value)
   }
 }
 
@@ -1347,7 +1347,7 @@ extension NSKeyedUnarchiver {
 
 extension NSURL : _FileReferenceLiteralConvertible {
   private convenience init(failableFileReferenceLiteral path: String) {
-    let fullPath = NSBundle.main().path(forResource: path, ofType: nil)!
+    let fullPath = NSBundle.main().pathForResource(path, ofType: nil)!
     self.init(fileURLWithPath: fullPath)
   }
 

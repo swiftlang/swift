@@ -52,10 +52,10 @@ func testStringIsNotASequence(s: String) {
 
 func testStringDeprecation(hello: String) {
   let hello2 = hello
-    .addingPercentEscapes(usingEncoding: NSUTF8StringEncoding) // expected-warning{{'addingPercentEscapes(usingEncoding:)' is deprecated}}
+    .addingPercentEscapes(using: NSUTF8StringEncoding) // expected-warning{{'addingPercentEscapes(using:)' is deprecated}}
 
   _ = hello2?
-    .replacingPercentEscapes(usingEncoding: NSUTF8StringEncoding) // expected-warning{{'replacingPercentEscapes(usingEncoding:)' is deprecated}}
+    .replacingPercentEscapes(using: NSUTF8StringEncoding) // expected-warning{{'replacingPercentEscapes(using:)' is deprecated}}
 
 
 }

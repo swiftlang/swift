@@ -8,5 +8,5 @@ import Foundation
 // CHECK: 1 is the loneliest number that you'll ever do
 NSLog(
   "%@ is the loneliest number that you'll ever %@", 
-  NSNumber(integer: 1), "do"
+  NSNumber(value: 1), "do"
 )

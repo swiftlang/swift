@@ -135,6 +135,7 @@ class GenericFuncSpecializer {
   SILModule &M;
   SILFunction *GenericFunc;
   ArrayRef<Substitution> ParamSubs;
+  IsFragile_t Fragile;
   const ReabstractionInfo &ReInfo;
 
   TypeSubstitutionMap ContextSubs;
@@ -142,6 +143,7 @@ class GenericFuncSpecializer {
 public:
   GenericFuncSpecializer(SILFunction *GenericFunc,
                          ArrayRef<Substitution> ParamSubs,
+                         IsFragile_t Fragile,
                          const ReabstractionInfo &ReInfo);
 
   /// If we already have this specialization, reuse it.

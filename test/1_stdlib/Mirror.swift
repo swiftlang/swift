@@ -164,7 +164,7 @@ mirrors.test("Legacy") {
   let mb = Mirror(reflecting: B())
   
   func expectBMirror(
-    _ mb: Mirror,   stackTrace: SourceLocStack = SourceLocStack(),
+    _ mb: Mirror, stackTrace: SourceLocStack = SourceLocStack(),
     file: String = #file, line: UInt = #line
   ) {
     expectTrue(mb.subjectType == B.self,

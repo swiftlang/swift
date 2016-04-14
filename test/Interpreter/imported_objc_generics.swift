@@ -6,7 +6,6 @@
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Foundation
@@ -78,13 +77,13 @@ ImportedObjCGenerics.test("SwiftGenerics") {
   expectEqual("i-missed-you-so-so-bad", openStringContainer(strContainer))
   expectEqual("i-missed-you-so-so-bad", openArbitraryContainer(strContainer))
 
-  let numContainer = Container<NSNumber>(object: NSNumber(integer: 21))
-  expectEqual(NSNumber(integer: 21), openContainer(numContainer))
-  expectEqual(NSNumber(integer: 21), openArbitraryContainer(numContainer))
+  let numContainer = Container<NSNumber>(object: NSNumber(value: 21))
+  expectEqual(NSNumber(value: 21), openContainer(numContainer))
+  expectEqual(NSNumber(value: 21), openArbitraryContainer(numContainer))
 
-  let subNumContainer = SubContainer<NSNumber>(object: NSNumber(integer: 22))
-  expectEqual(NSNumber(integer: 22), openContainer(subNumContainer))
-  expectEqual(NSNumber(integer: 22), openArbitraryContainer(subNumContainer))
+  let subNumContainer = SubContainer<NSNumber>(object: NSNumber(value: 22))
+  expectEqual(NSNumber(value: 22), openContainer(subNumContainer))
+  expectEqual(NSNumber(value: 22), openArbitraryContainer(subNumContainer))
 }
 
 ImportedObjCGenerics.test("SwiftGenerics/Creation") {
@@ -92,8 +91,8 @@ ImportedObjCGenerics.test("SwiftGenerics/Creation") {
     return Container(object: x)
   }
 
-  let c = makeContainer(NSNumber(integer: 22))
-  expectEqual(NSNumber(integer: 22), c.object)
+  let c = makeContainer(NSNumber(value: 22))
+  expectEqual(NSNumber(value: 22), c.object)
 }
 
 ImportedObjCGenerics.test("ProtocolConstraints") {
@@ -144,6 +143,49 @@ ImportedObjCGenerics.test("InheritanceFromNongeneric") {
   expectTrue(Container<NSString>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.self == Container<NSString>.self)
+}
+
+public class InheritInSwift: Container<NSString> {
+  public override init(object: NSString) {
+    super.init(object: object.lowercased)
+  }
+  public override var object: NSString {
+    get {
+      return super.object.uppercased
+    }
+    set {
+      super.object = newValue.lowercased
+    }
+  }
+
+  public var superObject: NSString {
+    get {
+      return super.object
+    }
+  }
+}
+
+ImportedObjCGenerics.test("InheritInSwift") {
+  let s = InheritInSwift(object: "HEllo")
+  let sup: Container = s
+
+  expectEqual(s.superObject, "hello")
+  expectEqual(s.object, "HELLO")
+  expectEqual(sup.object, "HELLO")
+
+  s.object = "GOodbye"
+  expectEqual(s.superObject, "goodbye")
+  expectEqual(s.object, "GOODBYE")
+  expectEqual(sup.object, "GOODBYE")
+
+  s.processObject { o in
+    expectEqual(o, "GOODBYE")
+  }
+
+  s.updateObject { "Aloha" }
+  expectEqual(s.superObject, "aloha")
+  expectEqual(s.object, "ALOHA")
+  expectEqual(sup.object, "ALOHA")
 }
 
 runAllTests()

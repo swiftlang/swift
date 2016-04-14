@@ -131,22 +131,22 @@ class TestComputedOutlet : NSObject {
 }
 
 class Singleton : NSObject {
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(thin) (@thick Singleton.Type) -> @owned Singleton
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(method) (@thick Singleton.Type) -> @owned Singleton
   // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
   static let sharedInstance = Singleton()
 
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1iSi : $@convention(thin) (@thick Singleton.Type) -> Int
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1iSi : $@convention(method) (@thick Singleton.Type) -> Int
   // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong1iSi : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
   static let i = 2
 
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1jSS : $@convention(thin) (@thick Singleton.Type) -> @owned String
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1jSS : $@convention(method) (@thick Singleton.Type) -> @owned String
   // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong1jSS : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletons1jSS : $@convention(thin) (@owned String, @thick Singleton.Type) -> ()
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletons1jSS : $@convention(method) (@owned String, @thick Singleton.Type) -> ()
   // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletons1jSS : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
   static var j = "Hello"
 
   // CHECK-DAG: sil hidden [thunk] @_TToZFC15objc_properties9Singletong1kSd : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
-  // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletong1kSd : $@convention(thin) (@thick Singleton.Type) -> Double
+  // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletong1kSd : $@convention(method) (@thick Singleton.Type) -> Double
   static var k: Double {
     return 7.7
   }

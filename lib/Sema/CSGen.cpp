@@ -3156,22 +3156,45 @@ Type swift::checkMemberType(DeclContext &DC, Type BaseTy,
   return Type();
 }
 
-bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
-                               const ExtensionDecl *ED) {
+static ArrayRef<Identifier> getSubstitutableTypeNames(SubstitutableType *Ty,
+                                           std::vector<Identifier> &Scratch,
+                                                      bool &IsSelfDependent) {
+  IsSelfDependent = false;
+  for (auto Cur = Ty; Cur; Cur = Cur->getParent()) {
+    if (Cur->getName().str() == "Self") {
+      IsSelfDependent = true;
+      break;
+    }
+    Scratch.insert(Scratch.begin(), Cur->getName());
+  }
+  return llvm::makeArrayRef(Scratch);
+}
 
-  // We need to make sure the extension is about the give type decl.
-  bool FoundExtension = false;
-  if (auto ND = BaseTy->getNominalOrBoundGenericNominal()) {
-    for (auto ET : ND->getExtensions()) {
-      if (ET == ED) {
-        FoundExtension = true;
-        break;
-      }
+static ArrayRef<Identifier> getDependentMemberNames(DependentMemberType *Dep,
+                                            std::vector<Identifier> &Scratch,
+                                                    bool &IsSelfDependent) {
+  DependentMemberType *Prev = nullptr;
+  IsSelfDependent = false;
+  for (DependentMemberType *Cur = Dep; Cur;
+       Prev = Cur, Cur = Cur->getBase()->getAs<DependentMemberType>()) {
+    Scratch.insert(Scratch.begin(), Cur->getName());
+    Prev = Cur;
+  }
+  if (Type Base = Prev->getBase()) {
+    if (SubstitutableType *Sub = Base->getAs<SubstitutableType>()) {
+      getSubstitutableTypeNames(Sub, Scratch, IsSelfDependent);
     }
   }
-  assert(FoundExtension && "Cannot find the extension.");
-  ConstraintSystemOptions Options;
+  return llvm::makeArrayRef(Scratch);
+}
 
+bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
+                               const ExtensionDecl *ED) {
+  ConstraintSystemOptions Options;
+  NominalTypeDecl *Nominal = BaseTy->getNominalOrBoundGenericNominal();
+  if (!Nominal || !BaseTy->isSpecialized() ||
+      ED->getGenericRequirements().empty())
+    return true;
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
@@ -3179,32 +3202,45 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     CreatedTC.reset(new TypeChecker(DC.getASTContext()));
     TC = CreatedTC.get();
   }
-
-  // Build substitution map for the given type.
-  SmallVector<Type, 3> Scratch;
-  auto genericArgs = BaseTy->getAllGenericArgs(Scratch);
-  TypeSubstitutionMap substitutions;
-  auto genericParams = BaseTy->getNominalOrBoundGenericNominal()
-                         ->getInnermostGenericParamTypes();
-  assert(genericParams.size() == genericArgs.size());
-  for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
-    auto gp = genericParams[i]->getCanonicalType()->castTo<GenericTypeParamType>();
-    substitutions[gp] = genericArgs[i];
-  }
   ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
-  if (ED->getGenericRequirements().empty())
-    return true;
+  std::vector<Identifier> Scratch;
+  bool Failed = false;
+  SmallVector<Type, 3> TypeScratch;
+
+  // Prepare type substitution map.
+  auto GenericArgs = BaseTy->getAllGenericArgs(TypeScratch);
+  TypeSubstitutionMap Substitutions;
+  auto GenericParams = Nominal->getInnermostGenericParamTypes();
+  assert(GenericParams.size() == GenericArgs.size());
+  for (unsigned I = 0, N = GenericParams.size(); I != N; ++I) {
+    auto GP = GenericParams[I]->getCanonicalType()->castTo<GenericTypeParamType>();
+    Substitutions[GP] = GenericArgs[I];
+  }
+  auto resolveType = [&](Type Ty) {
+    ArrayRef<Identifier> Names;
+    bool IsSelfDependent = false;
+    if (SubstitutableType *Sub = Ty->getAs<SubstitutableType>()) {
+      Scratch.clear();
+      Names = getSubstitutableTypeNames(Sub, Scratch, IsSelfDependent);
+    } else if (DependentMemberType *Dep = Ty->getAs<DependentMemberType>()) {
+      Scratch.clear();
+      Names = getDependentMemberNames(Dep, Scratch, IsSelfDependent);
+    } else
+      return Ty;
+    return IsSelfDependent ? checkMemberType(DC, BaseTy, Names)
+      :Ty.subst(DC.getParentModule(), Substitutions,
+                                       SubstFlags::IgnoreMissing);
+  };
   auto createMemberConstraint = [&](Requirement &Req, ConstraintKind Kind) {
-
-    // Use the substitution map of the given type to substitute the parameter of
-    // the extension.
-    auto First = Req.getFirstType().subst(ED->getParentModule(), substitutions,
-      SubstFlags::IgnoreMissing);
-
+    auto First = resolveType(Req.getFirstType());
+    auto Second = resolveType(Req.getSecondType());
+    if (First.isNull() || Second.isNull()) {
+      Failed = true;
+      return;
+    }
     // Add constraints accordingly.
-    CS.addConstraint(Constraint::create(CS, Kind, First, Req.getSecondType(),
-                                        DeclName(), Loc));
+    CS.addConstraint(Constraint::create(CS, Kind, First, Second, DeclName(), Loc));
   };
 
   // For every requirement, add a constraint.
@@ -3223,6 +3259,8 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
         break;
     }
   }
+  if (Failed)
+    return true;
 
   // Having a solution implies the extension's requirements have been fulfilled.
   return CS.solveSingle().hasValue();

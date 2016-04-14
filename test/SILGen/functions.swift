@@ -44,7 +44,7 @@ class SomeClass {
   // CHECK-LABEL: sil hidden @_TFC9functions9SomeClassc{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> @owned SomeClass
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClassC{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClassC{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
   init(x:Int, y:Int) {}
 
@@ -52,7 +52,7 @@ class SomeClass {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $SomeClass):
   func method(_ x: Int) {}
 
-  // CHECK-LABEL: sil hidden @_TZFC9functions9SomeClass13static_method{{.*}} : $@convention(thin) (Builtin.Int64, @thick SomeClass.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TZFC9functions9SomeClass13static_method{{.*}} : $@convention(method) (Builtin.Int64, @thick SomeClass.Type) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $@thick SomeClass.Type):
   class func static_method(_ x: Int) {}
 
@@ -118,11 +118,11 @@ func calls(_ i:Int, j:Int, k:Int) {
   // -- Curry 'self' onto struct method argument lists.
 
   // CHECK: [[ST_ADDR:%.*]] = alloc_box $SomeStruct
-  // CHECK: [[CTOR:%.*]] = function_ref @_TFV9functions10SomeStructC{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
+  // CHECK: [[CTOR:%.*]] = function_ref @_TFV9functions10SomeStructC{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   // CHECK: [[METATYPE:%.*]] = metatype $@thin SomeStruct.Type
   // CHECK: [[I:%.*]] = load [[IADDR]]
   // CHECK: [[J:%.*]] = load [[JADDR]]
-  // CHECK: apply [[CTOR]]([[I]], [[J]], [[METATYPE]]) : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
+  // CHECK: apply [[CTOR]]([[I]], [[J]], [[METATYPE]]) : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   var st = SomeStruct(x: i, y: j)
 
   // -- Use of unapplied struct methods as values.
@@ -136,7 +136,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[CBOX:%[0-9]+]] = alloc_box $SomeClass
   // CHECK: [[CADDR:%.*]] = project_box [[CBOX]]
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TFC9functions9SomeClassC{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TFC9functions9SomeClassC{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeClass.Type
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
@@ -233,7 +233,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[GBOX:%[0-9]+]] = alloc_box $SomeGeneric<Builtin.Int64>
   // CHECK: [[GADDR:%.*]] = project_box [[GBOX]]
-  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericC{{.*}} : $@convention(thin) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
+  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericC{{.*}} : $@convention(method) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
   // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
   var g = SomeGeneric<Builtin.Int64>()

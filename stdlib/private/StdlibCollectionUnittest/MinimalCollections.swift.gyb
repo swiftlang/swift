@@ -777,11 +777,13 @@ public struct ${Self}<T> : ${SelfProtocols} {
     }
   }
 
+  @discardableResult
   public mutating func remove(at i: MinimalIndex) -> T {
     _willMutate(.removeAtIndex(index: i.position))
     return _elements.remove(at: i.position)
   }
 
+  @discardableResult
   public mutating func removeLast() -> T {
     _willMutate(.removeLast)
     return _elements.removeLast()

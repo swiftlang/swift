@@ -47,9 +47,9 @@ namespace irgen {
                                CastConsumptionKind consumptionKind,
                                CheckedCastMode mode);
 
-  void emitValueCheckedCast(IRGenFunction &IGF, Explosion &value,
-                            SILType valueType, SILType loweredTargetType,
-                            CheckedCastMode mode, Explosion &out);
+  void emitScalarCheckedCast(IRGenFunction &IGF, Explosion &value,
+                             SILType valueType, SILType loweredTargetType,
+                             CheckedCastMode mode, Explosion &out);
 
   /// \brief Convert a class object to the given destination type,
   /// using a runtime-checked cast.
@@ -95,11 +95,10 @@ namespace irgen {
                                   Explosion &ex);
 
   /// Emit a checked cast from a metatype to AnyObject.
-  void emitMetatypeToObjectDowncast(IRGenFunction &IGF,
-                                    llvm::Value *metatypeValue,
-                                    CanAnyMetatypeType type,
-                                    CheckedCastMode mode,
-                                    Explosion &ex);
+  llvm::Value *emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
+                                            llvm::Value *metatypeValue,
+                                            CanAnyMetatypeType type,
+                                            CheckedCastMode mode);
 
   /// Emit a Protocol* value referencing an ObjC protocol.
   llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,

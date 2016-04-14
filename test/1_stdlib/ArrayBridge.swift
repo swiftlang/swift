@@ -366,7 +366,7 @@ func testExplicitlyBridged() {
   // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]
   print("bridgedBackSwifts      = \(bridgedBackSwifts)")
   
-  // all: verbatim,  not, and doesn't bridge
+  // all: verbatim, not, and doesn't bridge
   // implicit conversions to/from NSArray 
   // [Base] -> [Derived] and [Derived] -> [Base] where Base can be AnyObject
   // defining @objc method taking [T] and returning [T]
@@ -536,7 +536,7 @@ func testRoundTrip() {
   let test = Test()
   
   let array = [
-    BridgedSwift(10), BridgedSwift(20),  BridgedSwift(30),
+    BridgedSwift(10), BridgedSwift(20), BridgedSwift(30),
     BridgedSwift(40), BridgedSwift(50) ]
   
   BridgedSwift.resetStats()

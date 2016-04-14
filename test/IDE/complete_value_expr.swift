@@ -267,7 +267,7 @@ struct FooStruct {
   mutating
   func selectorStringFunc1(_ a: Int, b x: Float) -> String {}
   mutating
-  func selectorStringFunc2(_ a: Int,  b x: Float, c y: Double) -> String {}
+  func selectorStringFunc2(_ a: Int, b x: Float, c y: Double) -> String {}
   mutating
   func selectorStringFunc3(_ a: Int, b _: (Float, Double)) -> String{}
 

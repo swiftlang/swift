@@ -14,7 +14,7 @@
 // CHECK: function_ref @_TTSg5GVs14CountableRangeSi_GS_Si_s13IndexableBases_SiSis10Comparables_GS_Si__Si___TFVs16IndexingIterator4nextfT_GSqwx8_Element_
 //
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
-// CHECK: function_ref {{@_TTSg5Si___TFSag9subscriptFSix|@_TTSg5Si___TFSaap9subscriptFSix}}
+// CHECK: function_ref {{@_TTSgq5Si___TFSag9subscriptFSix|@_TTSg5Si___TFSaap9subscriptFSix}}
 // CHECK: return
 @inline(never)
 public func test(_ a: inout [Int], size: Int) {
@@ -27,7 +27,7 @@ public func test(_ a: inout [Int], size: Int) {
 
 // CHECK-LABEL: sil [noinline] @_TF13prespecialize3runFT_T_
 // Look for generic specialization <Swift.Int> of Swift.Array.init (repeating : A, count : Swift.Int) -> Swift.Array<A>
-// CHECK: function_ref @_TTSg5Si___TFSaCfT9repeatingx5countSi_GSax_
+// CHECK: function_ref @_TTSgq5Si___TFSaCfT9repeatingx5countSi_GSax_
 // CHECK: return
 @inline(never)
 public func run() {

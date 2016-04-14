@@ -294,8 +294,8 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   _ = p.mut // expected-error{{instance member 'mut' cannot be used on type 'P'}}
 
   // Static member of metatype -- not allowed
-  _ = pp.tum // expected-error{{static member 'tum' cannot be used on instance of type 'P.Protocol'}}
-  _ = P.tum // expected-error{{static member 'tum' cannot be used on instance of type 'P.Protocol'}}
+  _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
+  _ = P.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
 
   // Static member of extension returning Self)
   let _: () -> P = id(p.returnSelfStatic)

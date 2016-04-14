@@ -52,7 +52,7 @@ func cast0(_ o: AnyObject) -> Bool {
 // CHECK: return
 @inline(never)
 func test0() -> Bool {
-  return cast0(NSNumber(integer:1))
+  return cast0(NSNumber(value:1))
 }
 
 // Check that this cast does not get eliminated, because

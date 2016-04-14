@@ -6,11 +6,5 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-protocol b {
-typealias d : Collection where g.startIndex, T where k.Element>>?) -> a {
-}
-func b: Any) {
-}
-}
-class d
-public var d = b.b in
+// REQUIRES: asserts
+enum b<T{var e:d=}typealias d<T where h:T>:N

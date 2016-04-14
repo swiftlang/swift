@@ -25,7 +25,7 @@ using namespace constraints;
 // Statistics
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver overall"
-STATISTIC(NumDiscardedSolutions, "# of solutions discarded");
+STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
 void ConstraintSystem::increaseScore(ScoreKind kind) {
   unsigned index = static_cast<unsigned>(kind);

@@ -57,7 +57,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
     SILBasicBlock *hasSlotBB = gen.createBasicBlock();
     gen.B.createSwitchEnum(loc, foreignErrorSlot, nullptr,
                  { { ctx.getOptionalSomeDecl(errorPtrOptKind), hasSlotBB },
-                   { ctx.getOptionalNoneDecl(errorPtrOptKind),  noSlotBB } });
+                   { ctx.getOptionalNoneDecl(errorPtrOptKind), noSlotBB } });
 
     // If we have the slot, emit a store to it.
     gen.B.emitBlock(hasSlotBB);

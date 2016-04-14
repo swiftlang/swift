@@ -226,10 +226,18 @@ internal protocol _HashStorage {
   @warn_unused_result
   func maybeGet(_ key: Key) -> Value?
 
+  @discardableResult
   mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
+
+  @discardableResult
   mutating func remove(at index: Index) -> SequenceElement
+
+  @discardableResult
   mutating func removeValue(forKey key: Key) -> Value?
+
+  @discardableResult
   mutating func removeAll(keepingCapacity keepCapacity: Bool)
+
   var count: Int { get }
 
   @warn_unused_result
@@ -387,11 +395,13 @@ public struct Set<Element : Hashable> :
   }
 
   /// Remove the member from the set and return it if it was present.
+  @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
     return _variantStorage.removeValue(forKey: member)
   }
 
   /// Remove the element at the given `position`.
+  @discardableResult
   public mutating func remove(at position: Index) -> Element {
     return _variantStorage.remove(at: position)
   }
@@ -405,6 +415,7 @@ public struct Set<Element : Hashable> :
   /// Removes and returns the first element.
   ///
   /// - Precondition: `!isEmpty`.
+  @discardableResult
   public mutating func removeFirst() -> Element {
     _precondition(!isEmpty, "can't removeFirst from an empty Set")
     return remove(at: startIndex)
@@ -1101,6 +1112,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///
   /// Returns the value that was replaced, or `nil` if a new key-value pair
   /// was added.
+  @discardableResult
   public mutating func updateValue(
     _ value: Value, forKey key: Key
   ) -> Value? {
@@ -1112,6 +1124,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
+  @discardableResult
   public mutating func remove(at index: Index) -> Element {
     return _variantStorage.remove(at: index)
   }
@@ -1119,6 +1132,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Remove a given key and the associated value from the dictionary.
   /// Returns the value that was removed, or `nil` if the key was not present
   /// in the dictionary.
+  @discardableResult
   public mutating func removeValue(forKey key: Key) -> Value? {
     return _variantStorage.removeValue(forKey: key)
   }
@@ -2264,16 +2278,19 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return nil
   }
 
+  @discardableResult
   internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
 
+  @discardableResult
   internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
 
+  @discardableResult
   internal mutating func removeValue(forKey key: Key) -> Value? {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
@@ -2951,14 +2968,17 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 
   }
 
+  @discardableResult
   internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
+  @discardableResult
   internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
+  @discardableResult
   internal mutating func removeValue(forKey key: Key) -> Value? {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
@@ -3353,6 +3373,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     return oldValue
   }
 
+  @discardableResult
   internal mutating func updateValue(
     _ value: Value, forKey key: Key
   ) -> Value? {
@@ -3493,6 +3514,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     return result
   }
 
+  @discardableResult
   internal mutating func remove(at index: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
       return nativeRemove(at: index._nativeIndex)
@@ -3527,6 +3549,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
+  @discardableResult
   internal mutating func removeValue(forKey key: Key) -> Value? {
     if _fastPath(guaranteedNative) {
       return nativeRemoveObject(forKey: key)
@@ -3700,6 +3723,7 @@ internal func < <${TypeParametersDecl}> (
 // TODO: swift-3-indexing-model: forward all Comparable operations.
 
 #if _runtime(_ObjC)
+@_versioned
 internal struct _Cocoa${Self}Index : Comparable {
   // Assumption: we rely on NSDictionary.getObjects when being
   // repeatedly called on the same NSDictionary, returning items in the same
@@ -4212,6 +4236,7 @@ extension ${Self} {
   /// elements, otherwise return `nil`.
   ///
   /// - Complexity: Amortized O(1)
+  @warn_unused_result
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
     return remove(at: startIndex)

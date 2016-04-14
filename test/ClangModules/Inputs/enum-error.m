@@ -3,5 +3,5 @@
 NSString *const TestErrorDomain;
 
 TestError getErr() {
-	return TEOne;
+  return TEOne;
 }

@@ -48,7 +48,7 @@
    ;; SIL Declaration
    `(,(regexp-opt '("getter" "setter" "allocator" "initializer" "enumelt"
                     "destroyer" "globalaccessor" "objc") 'words) .
-		    font-lock-keyword-face)
+                    font-lock-keyword-face)
 
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
@@ -56,7 +56,7 @@
                     "dealloc_stack" "dealloc_box" "project_box" "dealloc_ref"
                     "dealloc_partial_ref" "dealloc_value_buffer"
                     "project_value_buffer")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Debug Information.
    `(,(regexp-opt '("debug_value" "debug_value_addr")
@@ -66,7 +66,7 @@
    `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
                     "mark_function_escape" "copy_addr" "destroy_addr"
                     "index_addr" "index_raw_pointer" "to")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Reference Counting.
    `(,(regexp-opt '("strong_retain"
@@ -78,7 +78,7 @@
                     "is_unique" "is_unique_or_pinned"
                     "copy_block"
                     "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref"
                     "integer_literal" "float_literal" "string_literal"
@@ -90,7 +90,7 @@
                   'words) . font-lock-keyword-face)
    ;; Function Application
    `(,(regexp-opt '("apply" "partial_apply" "builtin" "try_apply")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
    ;; Metatypes
    `(,(regexp-opt '("metatype" "value_metatype"
                     "existential_metatype" "init_existential_metatype")
@@ -112,7 +112,7 @@
                     "open_existential_addr"
                     "init_existential_ref"
                     "open_existential_ref")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
    ;; Unchecked Conversions
    `(,(regexp-opt '("upcast"
                     "address_to_pointer" "pointer_to_address"
@@ -139,10 +139,10 @@
 
    ;; Checked Conversions
    `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
    ;; Runtime Failures
    `(,(regexp-opt '("cond_fail")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
    ;; Terminators
    `(,(regexp-opt '("unreachable" "return" "br"
                     "cond_br" "switch_value" "switch_enum"

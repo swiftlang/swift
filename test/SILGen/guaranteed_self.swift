@@ -25,7 +25,7 @@ protocol Barrable: class {
 struct S: Fooable {
   var x: C? // Make the type nontrivial, so +0/+1 is observable.
 
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1SC{{.*}} : $@convention(thin) (@thin S.Type) -> @owned S
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1SC{{.*}} : $@convention(method) (@thin S.Type) -> @owned S
   init() {}
   // TODO: Way too many redundant r/r pairs here. Should use +0 rvalues.
   // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3foo{{.*}} : $@convention(method) (Int, @guaranteed S) -> () {
@@ -270,7 +270,7 @@ struct AO<T>: Fooable {
 
 class C: Fooable, Barrable {
   // Allocating initializer
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1CC{{.*}} : $@convention(thin) (@thick C.Type) -> @owned C
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1CC{{.*}} : $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:         [[SELF1:%.*]] = alloc_ref $C
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
@@ -345,7 +345,7 @@ class C: Fooable, Barrable {
 }
 
 class D: C {
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1DC{{.*}} : $@convention(thin) (@thick D.Type) -> @owned D
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1DC{{.*}} : $@convention(method) (@thick D.Type) -> @owned D
   // CHECK:         [[SELF1:%.*]] = alloc_ref $D
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
