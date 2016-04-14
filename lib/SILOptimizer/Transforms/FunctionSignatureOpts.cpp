@@ -9,16 +9,6 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// I looked through many functions in the Stdlib. This is what i feel how FSO
-// can be further improved.
-//
-// TODO: Most of the O2G for function arguments are done. but we are still
-// missing a lot of things on O2G for return result. We maybe able to improve
-// the ConsumedResultToEpilogueRetainMatcher. Right now it is kept conservative
-// in present of complex control flows and release instructions.
-//
-//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-function-signature-opt"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
@@ -548,7 +538,6 @@ public:
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *CA = PM->getAnalysis<CallerAnalysis>();
-
 
     SILFunction *F = getFunction();
     llvm::BumpPtrAllocator Allocator;

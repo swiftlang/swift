@@ -260,7 +260,7 @@ bool FunctionSignatureInfo::analyzeParameters() {
     bool HaveOptimizedArg = false;
 
     // Whether we will explode the argument or not.
-    A.Explode = A.shouldExplode(ArgToReturnReleaseMap);
+    A.Explode = A.shouldExplode();
 
     bool isABIRequired = isArgumentABIRequired(Args[i]);
     auto OnlyRelease = getNonTrivialNonDebugReleaseUse(Args[i]);

@@ -739,10 +739,6 @@ processMatchingReleases() {
     if (releaseArgument(Arg.second, Arg.first))
       continue;
 
-    // OK. we did find some epilogue releases, just not all.
-    if (!Arg.second.empty())
-      FoundSomeReleases.insert(Arg.first);
-
     ArgToRemove.insert(Arg.first);
   }
 
