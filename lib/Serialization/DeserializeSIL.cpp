@@ -1799,7 +1799,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
 }
 
 /// Check for existence of a function with a given name and required linkage.
-/// This function is modelled after readSILFunction. But it does not
+/// This function is modeled after readSILFunction. But it does not
 /// create a SILFunction object.
 bool SILDeserializer::hasSILFunction(StringRef Name,
                                      SILLinkage Linkage) {
