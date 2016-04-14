@@ -31,28 +31,28 @@ typealias swift_posix_spawn_file_actions_t = posix_spawn_file_actions_t
 typealias swift_posix_spawn_file_actions_t = posix_spawn_file_actions_t?
 #endif
 
-@_silgen_name("posix_spawn_file_actions_init")
+@_silgen_name("swift_posix_spawn_file_actions_init")
 func swift_posix_spawn_file_actions_init(
   _ file_actions: UnsafeMutablePointer<swift_posix_spawn_file_actions_t>
 ) -> CInt
 
-@_silgen_name("posix_spawn_file_actions_destroy")
+@_silgen_name("swift_posix_spawn_file_actions_destroy")
 func swift_posix_spawn_file_actions_destroy(
   _ file_actions: UnsafeMutablePointer<swift_posix_spawn_file_actions_t>
 ) -> CInt
 
-@_silgen_name("posix_spawn_file_actions_addclose")
+@_silgen_name("swift_posix_spawn_file_actions_addclose")
 func swift_posix_spawn_file_actions_addclose(
   _ file_actions: UnsafeMutablePointer<swift_posix_spawn_file_actions_t>,
   _ filedes: CInt) -> CInt
 
-@_silgen_name("posix_spawn_file_actions_adddup2")
+@_silgen_name("swift_posix_spawn_file_actions_adddup2")
 func swift_posix_spawn_file_actions_adddup2(
   _ file_actions: UnsafeMutablePointer<swift_posix_spawn_file_actions_t>,
   _ filedes: CInt,
   _ newfiledes: CInt) -> CInt
 
-@_silgen_name("posix_spawn")
+@_silgen_name("swift_posix_spawn")
 func swift_posix_spawn(
   _ pid: UnsafeMutablePointer<pid_t>?,
   _ file: UnsafePointer<Int8>,
@@ -276,7 +276,7 @@ public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
 }
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
-@_silgen_name("_NSGetEnviron")
+@_silgen_name("swift_SwiftPrivateLibcExtras_NSGetEnviron")
 func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>>
 #endif
 
