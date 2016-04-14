@@ -457,12 +457,34 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     CanType IUOptNSStringTy
       = ImplicitlyUnwrappedOptionalType::get(NSStringTy)->getCanonicalType();
 
+    // Look up UIApplicationMain.
+    // FIXME: Doing an AST lookup here is gross and not entirely sound;
+    // we're getting away with it because the types are guaranteed to already
+    // be imported.
+    ASTContext &ctx = getASTContext();
+    Module *UIKit = ctx.getLoadedModule(ctx.getIdentifier("UIKit"));
+    SmallVector<ValueDecl *, 1> results;
+    UIKit->lookupQualified(UIKit->getDeclaredType(),
+                           ctx.getIdentifier("UIApplicationMain"),
+                           NL_QualifiedDefault,
+                           /*resolver*/nullptr,
+                           results);
+    assert(!results.empty() && "couldn't find UIApplicationMain in UIKit");
+    assert(results.size() == 1 && "more than one UIApplicationMain?");
+
+    SILDeclRef mainRef{results.front(), ResilienceExpansion::Minimal,
+                       SILDeclRef::ConstructAtNaturalUncurryLevel,
+                       /*isForeign*/true};
+    auto UIApplicationMainFn = SGM.M.getOrCreateFunction(mainClass, mainRef,
+                                                         NotForDefinition);
+    auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
+
     // Get the class name as a string using NSStringFromClass.
     CanType mainClassTy = mainClass->getDeclaredTypeInContext()->getCanonicalType();
     CanType mainClassMetaty = CanMetatypeType::get(mainClassTy,
                                                    MetatypeRepresentation::ObjC);
     ProtocolDecl *anyObjectProtocol =
-      getASTContext().getProtocol(KnownProtocolKind::AnyObject);
+      ctx.getProtocol(KnownProtocolKind::AnyObject);
     auto mainClassAnyObjectConformance = ProtocolConformanceRef(
       *SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
                                                 nullptr));
@@ -482,7 +504,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILResultInfo(OptNSStringTy,
                                 ResultConvention::Autoreleased),
                   /*error result*/ None,
-                  getASTContext());
+                  ctx);
     auto NSStringFromClassFn
       = SGM.M.getOrCreateFunction(mainClass, "NSStringFromClass",
                                   SILLinkage::PublicExternal,
@@ -493,22 +515,35 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
                           SILType::getPrimitiveObjectType(anyObjectMetaTy),
-                          getASTContext().AllocateCopy(
+                          ctx.AllocateCopy(
                             llvm::makeArrayRef(mainClassAnyObjectConformance)));
     SILValue optName = B.createApply(mainClass,
                                NSStringFromClass,
                                NSStringFromClass->getType(),
                                SILType::getPrimitiveObjectType(OptNSStringTy),
                                {}, metaTy);
-    SILValue iuoptName = B.createUncheckedBitCast(mainClass, optName,
-                              SILType::getPrimitiveObjectType(IUOptNSStringTy));
 
-    // Call UIApplicationMain.
-    auto UIApplicationMainFn = SGM.M.lookUpFunction("UIApplicationMain");
-    assert(UIApplicationMainFn && "UIKit not imported?");
+    // Fix up the string parameters to have the right type.
+    SILType nameArgTy = fnTy->getSILArgumentType(3);
+    assert(nameArgTy == fnTy->getSILArgumentType(2));
+    auto managedName = ManagedValue::forUnmanaged(optName);
+    SILValue nilValue;
+    if (optName->getType() == nameArgTy) {
+      nilValue = getOptionalNoneValue(mainClass,
+                                      getTypeLowering(OptNSStringTy));
+    } else {
+      assert(nameArgTy.getSwiftRValueType() == IUOptNSStringTy);
+      nilValue = getOptionalNoneValue(mainClass,
+                                      getTypeLowering(IUOptNSStringTy));
+      managedName = emitOptionalToOptional(
+          mainClass, managedName,
+          SILType::getPrimitiveObjectType(IUOptNSStringTy),
+          [](SILGenFunction &, SILLocation, ManagedValue input, SILType) {
+        return input;
+      });
+    }
 
     // Fix up argv to have the right type.
-    auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
     auto argvTy = fnTy->getSILArgumentType(1);
 
     SILType unwrappedTy = argvTy;
@@ -517,35 +552,36 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       unwrappedTy = SILType::getPrimitiveObjectType(canInnerTy);
     }
 
+    auto managedArgv = ManagedValue::forUnmanaged(argv);
+
     if (unwrappedTy != argv->getType()) {
       auto converted =
-          emitPointerToPointer(mainClass, ManagedValue::forUnmanaged(argv),
+          emitPointerToPointer(mainClass, managedArgv,
                                argv->getType().getSwiftRValueType(),
                                unwrappedTy.getSwiftRValueType());
-      argv = converted.getUnmanagedSingleValue(*this, mainClass);
+      managedArgv = std::move(converted).getAsSingleValue(*this, mainClass);
     }
 
     if (unwrappedTy != argvTy) {
-      argv = getOptionalSomeValue(mainClass, ManagedValue::forUnmanaged(argv),
-                                  getTypeLowering(argvTy)).getUnmanagedValue();
+      managedArgv = getOptionalSomeValue(mainClass, managedArgv,
+                                         getTypeLowering(argvTy));
     }
 
     auto UIApplicationMain = B.createFunctionRef(mainClass, UIApplicationMainFn);
-    auto nil = B.createEnum(mainClass, SILValue(),
-                      getASTContext().getImplicitlyUnwrappedOptionalNoneDecl(),
-                      SILType::getPrimitiveObjectType(IUOptNSStringTy));
 
-    SILValue args[] = { argc, argv, nil, iuoptName };
+    SILValue args[] = {argc, managedArgv.getValue(), nilValue,
+                       managedName.getValue()};
 
     B.createApply(mainClass, UIApplicationMain,
                   UIApplicationMain->getType(),
                   argc->getType(), {}, args);
     SILValue r = B.createIntegerLiteral(mainClass,
-                        SILType::getBuiltinIntegerType(32, getASTContext()), 0);
+                        SILType::getBuiltinIntegerType(32, ctx), 0);
     auto rType = F.getLoweredFunctionType()->getSingleResult().getSILType();
     if (r->getType() != rType)
       r = B.createStruct(mainClass, rType, r);
 
+    Cleanups.emitCleanupsForReturn(mainClass);
     B.createReturn(mainClass, r);
     return;
   }
