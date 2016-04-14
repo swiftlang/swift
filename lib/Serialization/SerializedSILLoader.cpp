@@ -104,6 +104,18 @@ SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
   return retVal;
 }
 
+bool SerializedSILLoader::hasSILFunction(StringRef Name, SILLinkage Linkage) {
+  // It is possible that one module has a declaration of a SILFunction, while
+  // another has the full definition.
+  SILFunction *retVal = nullptr;
+  for (auto &Des : LoadedSILSections) {
+    if (Des->hasSILFunction(Name, Linkage))
+      return true;
+  }
+  return retVal;
+}
+
+
 SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
   for (auto &Des : LoadedSILSections) {
     if (auto VT = Des->lookupVTable(Name))
