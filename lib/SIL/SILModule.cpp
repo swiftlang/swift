@@ -497,7 +497,7 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
 
   assert((!F || F->getLinkage() != Linkage) &&
          "hasFunction should be only called for functions that are not "
-         "contained  in the SILModule yet or do not have a required linkage");
+         "contained in the SILModule yet or do not have a required linkage");
   (void)F;
 
   SILLinkerVisitor Visitor(*this, getSILLoader(),
@@ -512,7 +512,7 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
              "SILFunction has a wrong linkage");
     }
     // If a function exists already and it is a non-optimizing
-    // compilaiton, simply convert it into an external declaration,
+    // compilation, simply convert it into an external declaration,
     // so that a compiled version from the shared library is used.
     if (F->isDefinition() &&
         F->getModule().getOptions().Optimization <
