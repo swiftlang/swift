@@ -221,6 +221,16 @@ enum class TypeTraitResult {
   Is,
 };
 
+/// Specifies which normally-unsafe type mismatches should be accepted when
+/// checking overrides.
+enum class OverrideMatchMode {
+  /// Only accept overrides that are properly covariant.
+  Strict,
+  /// Allow a parameter with IUO type to be overridden by a parameter with non-
+  /// optional type.
+  AllowNonOptionalForIUOParam,
+};
+
 /// TypeBase - Base class for all types in Swift.
 class alignas(1 << TypeAlignInBits) TypeBase {
   
@@ -653,7 +663,7 @@ public:
 
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.
-  bool canOverride(Type other, bool allowUnsafeParameterOverride,
+  bool canOverride(Type other, OverrideMatchMode matchMode,
                    LazyResolver *resolver);
 
   /// \brief Determines whether this type has a retainable pointer

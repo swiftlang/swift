@@ -2232,7 +2232,7 @@ bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
 /// Is t1 not just a subtype of t2, but one such that its values are
 /// trivially convertible to values of the other?
 static bool canOverride(CanType t1, CanType t2,
-                        bool allowUnsafeParameterOverride,
+                        OverrideMatchMode matchMode,
                         bool isParameter,
                         bool insideOptional,
                         LazyResolver *resolver) {
@@ -2246,7 +2246,7 @@ static bool canOverride(CanType t1, CanType t2,
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1)
         return canOverride(t1, tuple2.getElementType(0),
-                           allowUnsafeParameterOverride,
+                           matchMode,
                            isParameter,
                            /*insideOptional=*/false,
                            resolver);
@@ -2256,7 +2256,7 @@ static bool canOverride(CanType t1, CanType t2,
     for (auto i : indices(tuple1.getElementTypes())) {
       if (!canOverride(tuple1.getElementType(i),
                        tuple2.getElementType(i),
-                       allowUnsafeParameterOverride,
+                       matchMode,
                        isParameter,
                        /*insideOptional=*/false,
                        resolver))
@@ -2283,12 +2283,12 @@ static bool canOverride(CanType t1, CanType t2,
 
     // Inputs are contravariant, results are covariant.
     return (canOverride(fn2.getInput(), fn1.getInput(),
-                        allowUnsafeParameterOverride,
+                        matchMode,
                         /*isParameter=*/true,
                         /*insideOptional=*/false,
                         resolver) &&
             canOverride(fn1.getResult(), fn2.getResult(),
-                        allowUnsafeParameterOverride,
+                        matchMode,
                         /*isParameter=*/false,
                         /*insideOptional=*/false,
                         resolver));
@@ -2301,14 +2301,14 @@ static bool canOverride(CanType t1, CanType t2,
       // Optional-to-optional.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         // Allow T? and T! to freely override one another.
-        return canOverride(obj1, obj2, allowUnsafeParameterOverride,
+        return canOverride(obj1, obj2, matchMode,
                            /*isParameter=*/false,
                            /*insideOptional=*/true,
                            resolver);
       }
 
       // Value-to-optional.
-      return canOverride(t1, obj2, allowUnsafeParameterOverride,
+      return canOverride(t1, obj2, matchMode,
                          /*isParameter=*/false,
                          /*insideOptional=*/true,
                          resolver);
@@ -2316,7 +2316,8 @@ static bool canOverride(CanType t1, CanType t2,
   }
 
   // Allow T to override T! in certain cases.
-  if (allowUnsafeParameterOverride && isParameter && !insideOptional) {
+  if (matchMode == OverrideMatchMode::AllowNonOptionalForIUOParam &&
+      isParameter && !insideOptional) {
     if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
       t1 = obj1->getCanonicalType();
       if (t1 == t2) return true;
@@ -2327,10 +2328,10 @@ static bool canOverride(CanType t1, CanType t2,
   return t2->isExactSuperclassOf(t1, resolver);
 }
 
-bool TypeBase::canOverride(Type other, bool allowUnsafeParameterOverride,
+bool TypeBase::canOverride(Type other, OverrideMatchMode matchMode,
                            LazyResolver *resolver) {
   return ::canOverride(getCanonicalType(), other->getCanonicalType(),
-                       allowUnsafeParameterOverride,
+                       matchMode,
                        /*isParameter=*/false,
                        /*insideOptional=*/false,
                        resolver);
