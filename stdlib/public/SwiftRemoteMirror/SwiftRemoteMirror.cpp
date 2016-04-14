@@ -81,13 +81,3 @@ swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
   auto TR = reinterpret_cast<TypeRef *>(OpaqueTypeRef);
   return Context->getInfoForTypeRef(TR);
 }
-
-swift_childinfo_t
-swift_reflection_infoForChild(SwiftReflectionContextRef ContextRef,
-                              swift_typeref_t OpaqueTypeRef,
-                              unsigned Index) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = reinterpret_cast<TypeRef *>(OpaqueTypeRef);
-  return Context->getInfoForChild(TR, Index);
-}
-
