@@ -261,8 +261,10 @@ private:
 
 public:
 
-  ReflectionContext(std::shared_ptr<MemoryReader> Reader)
+  explicit ReflectionContext(std::shared_ptr<MemoryReader> Reader)
     : Reader(Reader) {}
+
+  ReflectionContext(const ReflectionContext&) = delete;
 
   MemoryReader &getReader() {
     return *Reader;
