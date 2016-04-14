@@ -1576,6 +1576,8 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
          "variable not validated yet");
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
+  maybeAddMaterializeForSet(VD, *this);
+
   // Create the storage property as an optional of VD's type.
   SmallString<64> NameBuf = VD->getName().str();
   NameBuf += ".storage";
