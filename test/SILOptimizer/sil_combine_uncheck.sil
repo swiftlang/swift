@@ -6,7 +6,7 @@ import Builtin
 import Swift
 
 class RawBuffer {}
-class HeapBufferStorage<T,U> : RawBuffer {}
+class HeapBufferStorage<T, U> : RawBuffer {}
 
 class C {
 }

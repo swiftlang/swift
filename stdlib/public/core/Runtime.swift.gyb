@@ -24,13 +24,17 @@ import SwiftShims
 @warn_unused_result
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtrImpl(
-  object target: UnsafeMutablePointer<OpaquePointer>,
-  expected: UnsafeMutablePointer<OpaquePointer>,
-  desired: OpaquePointer) -> Bool {
+  object target: UnsafeMutablePointer<OpaquePointer?>,
+  expected: UnsafeMutablePointer<OpaquePointer?>,
+  desired: OpaquePointer?) -> Bool {
 
-  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_RawPointer(
-    target._rawValue, expected.pointee._rawValue, desired._rawValue)
-  expected.pointee._rawValue = oldValue
+  // Bit-cast directly from 'OpaquePointer?' to 'Builtin.Word' because
+  // Builtin.RawPointer can't be nil.
+  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
+    target._rawValue,
+    unsafeBitCast(expected.pointee, to: Builtin.Word.self),
+    unsafeBitCast(desired, to: Builtin.Word.self))
+  expected.pointee = OpaquePointer(bitPattern: Int(oldValue))
   return Bool(won)
 }
 
@@ -79,7 +83,7 @@ public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
-  var expected: OpaquePointer = nil
+  var expected: OpaquePointer? = nil
   let desiredPtr = OpaquePointer(bitPattern: Unmanaged.passRetained(desired))
   let wonRace = _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
@@ -236,9 +240,9 @@ public func _swift_stdlib_atomicLoadInt(
 public // @testable
 func _swift_stdlib_atomicLoadPtrImpl(
   object target: UnsafeMutablePointer<OpaquePointer>
-) -> OpaquePointer {
-  let value = Builtin.atomicload_seqcst_RawPointer(target._rawValue)
-  return OpaquePointer(value)
+) -> OpaquePointer? {
+  let value = Builtin.atomicload_seqcst_Word(target._rawValue)
+  return OpaquePointer(bitPattern: Int(value))
 }
 
 @_transparent
@@ -249,8 +253,8 @@ func _stdlib_atomicLoadARCRef(
 ) -> AnyObject? {
   let result = _swift_stdlib_atomicLoadPtrImpl(
     object: UnsafeMutablePointer(target))
-  if result != nil {
-    return Unmanaged<AnyObject>.fromOpaque(result).takeUnretainedValue()
+  if let unwrapped = result {
+    return Unmanaged<AnyObject>.fromOpaque(unwrapped).takeUnretainedValue()
   }
   return nil
 }

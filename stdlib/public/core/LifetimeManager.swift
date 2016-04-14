@@ -37,7 +37,7 @@ extension String {
     @noescape _ f: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     return try self.nulTerminatedUTF8.withUnsafeBufferPointer {
-      try f(UnsafePointer($0.baseAddress))
+      try f(UnsafePointer($0.baseAddress!))
     }
   }
 }

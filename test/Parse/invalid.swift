@@ -67,7 +67,7 @@ func g573() { f573(Starfish(), Salmon()) }
 func SR698(_ a: Int, b: Int) {}
 SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 
-//SR-979 - Two inout crash compiler
+// SR-979 - Two inout crash compiler
 func SR979a(a : inout inout Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-23=}}
 func SR979b(inout inout b: Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{19-25=}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }}

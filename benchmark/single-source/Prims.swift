@@ -183,7 +183,7 @@ extension Edge : Hashable {
   }
 }
 
-func Prims(_ graph : Array<GraphNode>, _ fun : (Int,Int)->Double) -> Array<Int?> {
+func Prims(_ graph : Array<GraphNode>, _ fun : (Int, Int) -> Double) -> Array<Int?> {
   var treeEdges = Array<Int?>(repeating:nil, count:graph.count)
 
   let queue = PriorityQueue(Num:graph.count)
@@ -226,7 +226,7 @@ public func run_Prims(_ N: Int) {
 
     // Prim's algorithm is designed for undirected graphs.
     // Due to that, in our set all the edges are paired, i.e. for any
-    // edge (start,end,C) there is also an edge (end,start,C).
+    // edge (start, end, C) there is also an edge (end, start, C).
     let edges : [(Int, Int, Double)] = [
       (26, 47, 921),
       (20, 25, 971),

@@ -155,7 +155,8 @@ RawComment Decl::getRawComment() const {
 }
 
 Optional<StringRef> Decl::getGroupName() const {
-
+  if (hasClangNode())
+    return None;
   // We can only get group information from deserialized module files.
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
@@ -165,7 +166,8 @@ Optional<StringRef> Decl::getGroupName() const {
 }
 
 Optional<StringRef> Decl::getSourceFileName() const {
-
+  if (hasClangNode())
+    return None;
   // We can only get group information from deserialized module files.
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
@@ -175,7 +177,8 @@ Optional<StringRef> Decl::getSourceFileName() const {
 }
 
 Optional<unsigned> Decl::getSourceOrder() const {
-
+  if (hasClangNode())
+    return None;
   // We can only get source orders from deserialized module files.
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {

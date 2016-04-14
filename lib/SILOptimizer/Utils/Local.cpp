@@ -1240,6 +1240,18 @@ bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *Inst) {
   llvm_unreachable("Expected to find use of value in block!");
 }
 
+void ValueLifetimeAnalysis::dump() const {
+  llvm::errs() << "lifetime of def: " << *DefValue;
+  for (SILInstruction *Use : UserSet) {
+    llvm::errs() << "  use: " << *Use;
+  }
+  llvm::errs() << "  live blocks:";
+  for (SILBasicBlock *BB : LiveBlocks) {
+    llvm::errs() << ' ' << BB->getDebugID();
+  }
+  llvm::errs() << '\n';
+}
+
 //===----------------------------------------------------------------------===//
 //                    Casts Optimization and Simplification
 //===----------------------------------------------------------------------===//

@@ -2798,7 +2798,7 @@ bool TypeChecker::isRepresentableInObjC(
       return false;
     }
 
-    // The error type is always AutoreleasingUnsafeMutablePointer<NSError?>.
+    // The error type is always 'AutoreleasingUnsafeMutablePointer<NSError?>?'.
     Type errorParameterType = getNSErrorType(dc);
     if (errorParameterType) {
       errorParameterType = OptionalType::get(errorParameterType);
@@ -2807,6 +2807,7 @@ bool TypeChecker::isRepresentableInObjC(
             Context.getAutoreleasingUnsafeMutablePointerDecl(),
             nullptr,
             errorParameterType);
+      errorParameterType = OptionalType::get(errorParameterType);
     }
 
     // Determine the parameter index at which the error will go.

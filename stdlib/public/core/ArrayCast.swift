@@ -72,11 +72,15 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     return result!
     
   case (.value, .verbatim):
+    if source.isEmpty {
+      return Array()
+    }
+
     var buf = _ContiguousArrayBuffer<TargetElement>(
       uninitializedCount: source.count, minimumCapacity: 0)
     
     let _: Void = buf.withUnsafeMutableBufferPointer {
-      var p = $0.baseAddress
+      var p = $0.baseAddress!
       for value in source {
         let bridged: AnyObject? = _bridgeToObjectiveC(value)
         _precondition(

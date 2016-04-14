@@ -54,7 +54,7 @@ definition. These kinds are:
    compiler rejects) immutable data that is pointing to mutable data. For
    example::
 
-     struct [immutable,inout] IList { data : int, next : List }
+     struct [immutable, inout] IList { data : int, next : List }
      ...
      var a = IList(1, IList(2, IList(3, nil)))
      ...

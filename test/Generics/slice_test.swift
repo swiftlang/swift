@@ -30,7 +30,7 @@ func testslice(_ s: Array<Int>) {
 class Vector<T> {
   var length : Int
   var capacity : Int
-  var base : UnsafeMutablePointer<T>
+  var base : UnsafeMutablePointer<T>!
 
   init() {
     length = 0

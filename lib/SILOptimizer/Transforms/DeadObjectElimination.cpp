@@ -580,15 +580,12 @@ static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
     auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
     if (!TupleElt)
       return false;
-    switch (TupleElt->getFieldNo()) {
-    default:
-      return false;
-    case 0:
+    if (TupleElt->getFieldNo() == 0 && !ArrayDef) {
       ArrayDef = TupleElt;
-      break;
-    case 1:
+    } else if (TupleElt->getFieldNo() == 1 && !StorageAddress) {
       StorageAddress = TupleElt;
-      break;
+    } else {
+      return false;
     }
   }
   if (!ArrayDef)
@@ -623,7 +620,7 @@ static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
     return false;
 
   // Find array object lifetime.
-  ValueLifetimeAnalysis VLA(ArrayDef, DeadArray.getAllUsers());
+  ValueLifetimeAnalysis VLA(NewArrayValue, DeadArray.getAllUsers());
 
   // Check that all storage users are in the Array's live blocks.
   for (auto *User : DeadStorage.getAllUsers()) {

@@ -36,6 +36,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 
@@ -92,18 +93,21 @@ getSingleUnsafeGuaranteedValueResult(BuiltinInst *BI) {
 ///    strong_release %6 : $Foo // Ignore.
 ///    %12 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
 ///
-static SILBasicBlock::iterator
-findReleaseToMatchUnsafeGuaranteedValue(SILInstruction *UnsafeGuaranteedEndI,
-                                        SILValue UnsafeGuaranteedValue,
-                                        SILBasicBlock &BB) {
+static SILBasicBlock::iterator findReleaseToMatchUnsafeGuaranteedValue(
+    SILInstruction *UnsafeGuaranteedEndI, SILValue UnsafeGuaranteedValue,
+    SILBasicBlock &BB, RCIdentityFunctionInfo &RCIA) {
+
   auto UnsafeGuaranteedEndIIt = SILBasicBlock::iterator(UnsafeGuaranteedEndI);
   if (UnsafeGuaranteedEndIIt == BB.begin())
     return BB.end();
   auto LastReleaseIt = std::prev(UnsafeGuaranteedEndIIt);
+  auto UnsafeGuaranteedRCIdentityRoot =
+      RCIA.getRCIdentityRoot(UnsafeGuaranteedValue);
   while (LastReleaseIt != BB.begin() &&
          (((isa<StrongReleaseInst>(*LastReleaseIt) ||
             isa<ReleaseValueInst>(*LastReleaseIt)) &&
-           LastReleaseIt->getOperand(0) != UnsafeGuaranteedValue &&
+           RCIA.getRCIdentityRoot(LastReleaseIt->getOperand(0)) !=
+               UnsafeGuaranteedRCIdentityRoot &&
            LastReleaseIt->getOperand(0) !=
                cast<SILInstruction>(UnsafeGuaranteedValue)->getOperand(0)) ||
           !LastReleaseIt->mayHaveSideEffects() ||
@@ -112,7 +116,8 @@ findReleaseToMatchUnsafeGuaranteedValue(SILInstruction *UnsafeGuaranteedEndI,
     --LastReleaseIt;
   if ((!isa<StrongReleaseInst>(*LastReleaseIt) &&
        !isa<ReleaseValueInst>(*LastReleaseIt)) ||
-      (LastReleaseIt->getOperand(0) != UnsafeGuaranteedValue &&
+      (RCIA.getRCIdentityRoot(LastReleaseIt->getOperand(0)) !=
+           UnsafeGuaranteedRCIdentityRoot &&
        LastReleaseIt->getOperand(0) !=
            cast<SILInstruction>(UnsafeGuaranteedValue)->getOperand(0))) {
     return BB.end();
@@ -122,7 +127,9 @@ findReleaseToMatchUnsafeGuaranteedValue(SILInstruction *UnsafeGuaranteedEndI,
 
 /// Remove retain/release pairs around builtin "unsafeGuaranteed" instruction
 /// sequences.
-static bool removeGuaranteedRetainReleasePairs(SILFunction &F) {
+static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
+                                               RCIdentityFunctionInfo &RCIA) {
+  DEBUG(llvm::dbgs() << "Running on function " << F.getName() << "\n");
   bool Changed = false;
   for (auto &BB : F) {
     auto It = BB.begin(), End = BB.end();
@@ -133,7 +140,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F) {
 
       // Memorize the last retain.
       if (isa<StrongRetainInst>(CurInst) || isa<RetainValueInst>(CurInst)) {
-        LastRetain[CurInst->getOperand(0)] = CurInst;
+        LastRetain[RCIA.getRCIdentityRoot(CurInst->getOperand(0))] = CurInst;
         continue;
       }
 
@@ -145,14 +152,15 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F) {
         continue;
 
       auto Opd = UnsafeGuaranteedI->getOperand(0);
-      if (!LastRetain.count(Opd)) {
+      auto RCIdOpd = RCIA.getRCIdentityRoot(UnsafeGuaranteedI->getOperand(0));
+      if (!LastRetain.count(RCIdOpd)) {
         DEBUG(llvm::dbgs() << "LastRetain failed\n");
         continue;
       }
 
       // This code is very conservative. Check that there is a matching retain
       // before the unsafeGuaranteed builtin with only retains inbetween.
-      auto *LastRetainInst = LastRetain[Opd];
+      auto *LastRetainInst = LastRetain[RCIdOpd];
       auto NextInstIter = std::next(SILBasicBlock::iterator(LastRetainInst));
       while (NextInstIter != BB.end() && &*NextInstIter != CurInst &&
              (isa<RetainValueInst>(*NextInstIter) ||
@@ -216,7 +224,8 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F) {
       // Find the release to match with the unsafeGuaranteedValue.
       auto &UnsafeGuaranteedEndBB = *UnsafeGuaranteedEndI->getParent();
       auto LastReleaseIt = findReleaseToMatchUnsafeGuaranteedValue(
-          UnsafeGuaranteedEndI, UnsafeGuaranteedValue, UnsafeGuaranteedEndBB);
+          UnsafeGuaranteedEndI, UnsafeGuaranteedValue, UnsafeGuaranteedEndBB,
+          RCIA);
       if (LastReleaseIt == UnsafeGuaranteedEndBB.end()) {
         DEBUG(llvm::dbgs() << "  no release before unsafeGuaranteedEnd found\n");
         continue;
@@ -258,7 +267,8 @@ namespace {
 class UnsafeGuaranteedPeephole : public swift::SILFunctionTransform {
 
   void run() override {
-    if (removeGuaranteedRetainReleasePairs(*getFunction()))
+    auto &RCIA = *getAnalysis<RCIdentityAnalysis>()->get(getFunction());
+    if (removeGuaranteedRetainReleasePairs(*getFunction(), RCIA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 

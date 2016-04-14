@@ -410,7 +410,7 @@ public struct ${Self}<Element>
   @warn_unused_result
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
-    return _buffer._unconditionalMutableSubscriptBaseAddress + index
+    return _buffer.subscriptBaseAddress + index
   }
 
 %if Self == 'Array':
@@ -581,7 +581,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     
     return (
       Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
-      innerBuffer.firstElementAddress)
+        innerBuffer.firstElementAddress)
   }
 
   /// Entry point for aborting literal construction: deallocates
@@ -611,8 +611,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  public var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {
-    return _buffer.firstElementAddress
+  public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    return _buffer.firstElementAddressIfContiguous
   }
 
 %if Self != 'Array': # // Array does not necessarily have contiguous storage
@@ -651,9 +651,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   @inline(never)
   internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount + 1
-    var newBuffer = Optional(
-      _forceCreateUniqueMutableBuffer(
-        &_buffer, countForNewBuffer: oldCount, minNewCapacity: newCount))
+    var newBuffer = _forceCreateUniqueMutableBuffer(
+      &_buffer, countForNewBuffer: oldCount, minNewCapacity: newCount)
     _arrayOutOfPlaceUpdate(
       &_buffer, &newBuffer, oldCount, 0, _IgnorePointer())
   }
@@ -777,7 +776,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      let r = try body(bufferPointer.baseAddress, bufferPointer.count)
+      let r = try body(bufferPointer.baseAddress!, bufferPointer.count)
       return r
     }
   }
@@ -837,13 +836,13 @@ extension ${Self} {
   @_versioned
   @_transparent
   @warn_unused_result
-  internal func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
+  internal func _cPointerArgs() -> (AnyObject?, UnsafePointer<Void>?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
-      return (_owner, p._rawValue)
+      return (_owner, UnsafePointer(p))
     }
     let n = _extractOrCopyToNativeArrayBuffer(self._buffer)
-    return (n.owner, n.firstElementAddress._rawValue)
+    return (n.owner, UnsafePointer(n.firstElementAddress))
   }
 
 }
@@ -952,9 +951,8 @@ internal func _arrayOutOfPlaceReplace<
 ) {
   let growth = insertCount - bounds.count
   let newCount = source.count + growth
-  var newBuffer = Optional(
-    _forceCreateUniqueMutableBuffer(
-      &source, newCount: newCount, requiredCapacity: newCount))
+  var newBuffer = _forceCreateUniqueMutableBuffer(
+    &source, newCount: newCount, requiredCapacity: newCount)
 
   _arrayOutOfPlaceUpdate(
     &source, &newBuffer,
@@ -1128,7 +1126,7 @@ internal func _arrayOutOfPlaceUpdate<
   _Buffer.Index == Int
 >(
   _ source: inout _Buffer,
-  _ dest: inout _ContiguousArrayBuffer<_Buffer.Element>?,
+  _ dest: inout _ContiguousArrayBuffer<_Buffer.Element>,
   _ headCount: Int, // Count of initial source elements to copy/move
   _ newCount: Int,  // Number of new elements to insert
   _ initializeNewElements: Initializer
@@ -1137,12 +1135,12 @@ internal func _arrayOutOfPlaceUpdate<
   _sanityCheck(newCount >= 0)
 
   // Count of trailing source elements to copy/move
-  let tailCount = dest!.count - headCount - newCount
+  let tailCount = dest.count - headCount - newCount
   _sanityCheck(headCount + tailCount <= source.count)
 
   let sourceCount = source.count
   let oldCount = sourceCount - headCount - tailCount
-  let destStart = dest!.firstElementAddress
+  let destStart = dest.firstElementAddress
   let newStart = destStart + headCount
   let newEnd = newStart + newCount
 
@@ -1188,7 +1186,7 @@ internal func _arrayOutOfPlaceUpdate<
     let tailEnd = source.endIndex
     source._copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
   }
-  source = _Buffer(dest!, shiftedToStartIndex: source.startIndex)
+  source = _Buffer(dest, shiftedToStartIndex: source.startIndex)
 }
 
 internal struct _InitializePointer<T> : _PointerFunction {
@@ -1224,9 +1222,8 @@ internal func _outlinedMakeUniqueBuffer<
     return
   }
 
-  var newBuffer = Optional(
-    _forceCreateUniqueMutableBuffer(
-      &buffer, newCount: bufferCount, requiredCapacity: bufferCount))
+  var newBuffer = _forceCreateUniqueMutableBuffer(
+    &buffer, newCount: bufferCount, requiredCapacity: bufferCount)
   _arrayOutOfPlaceUpdate(&buffer, &newBuffer, bufferCount, 0, _IgnorePointer())
 }
 
@@ -1245,9 +1242,8 @@ internal func _arrayReserve<
     return
   }
 
-  var newBuffer = Optional(
-    _forceCreateUniqueMutableBuffer(
-      &buffer, newCount: count, requiredCapacity: requiredCapacity))
+  var newBuffer = _forceCreateUniqueMutableBuffer(
+    &buffer, newCount: count, requiredCapacity: requiredCapacity)
   _arrayOutOfPlaceUpdate(&buffer, &newBuffer, count, 0, _IgnorePointer())
 }
 

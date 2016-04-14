@@ -119,7 +119,10 @@ class A<T> {
 }
 
 class B<T> {
-  var ptr : UnsafeMutablePointer<T> = nil
+  var ptr : UnsafeMutablePointer<T>
+  init(ptr: UnsafeMutablePointer<T>) {
+    self.ptr = ptr
+  }
   deinit {
     ptr.deinitialize()
   }

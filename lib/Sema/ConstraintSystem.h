@@ -615,9 +615,14 @@ public:
   /// on a suspicious top-level optional injection (because the caller already
   /// diagnosed it).
   ///
+  /// \param typeFromPattern Optionally, the caller can specify the pattern
+  /// from where the toType is derived, so that we can deliver better fixit.
+  ///
   /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator,
-                     bool ignoreTopLevelInjection = false) const;
+  Expr *coerceToType(Expr *expr, Type toType,
+                     ConstraintLocator *locator,
+                     bool ignoreTopLevelInjection = false,
+                     Optional<Pattern*> typeFromPattern = None) const;
 
   /// \brief Convert the given expression to a logic value.
   ///

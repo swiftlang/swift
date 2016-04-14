@@ -48,9 +48,9 @@ extension BenchResults : CustomStringConvertible {
 struct Test {
   let name: String
   let index: Int
-  let f: (Int)->()
+  let f: (Int) -> ()
   var run: Bool
-  init(name: String, n: Int, f: (Int)->()) {
+  init(name: String, n: Int, f: (Int) -> ()) {
     self.name = name
     self.index = n
     self.f = f
@@ -58,8 +58,8 @@ struct Test {
   }
 }
 
-public var precommitTests: [String : (Int)->()] = [:]
-public var otherTests: [String : (Int)->()] = [:]
+public var precommitTests: [String : (Int) -> ()] = [:]
+public var otherTests: [String : (Int) -> ()] = [:]
 
 enum TestAction {
   case Run

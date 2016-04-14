@@ -871,6 +871,14 @@ public:
                                       SILType loweredResultTy,
                                       const ValueTransform &transform);
 
+  /// Emit a reinterpret-cast from one pointer type to another, using a library
+  /// intrinsic.
+  RValue emitPointerToPointer(SILLocation loc,
+                              ManagedValue input,
+                              CanType inputTy,
+                              CanType outputTy,
+                              SGFContext C = SGFContext());
+
   ManagedValue emitClassMetatypeToObject(SILLocation loc,
                                          ManagedValue v,
                                          SILType resultTy);

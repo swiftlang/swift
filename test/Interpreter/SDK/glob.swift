@@ -12,7 +12,7 @@ func Glob(_ g: String) -> Array<String> {
 	if rv == 0 {
 		var result = Array<String>()
 		for x in 0..<Int(gt.gl_pathc) {
-			var str = String(cString: gt.gl_pathv[x])
+			var str = String(cString: gt.gl_pathv[x]!)
 			result.append(str)
 		}
 		globfree(&gt)

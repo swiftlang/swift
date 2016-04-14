@@ -191,15 +191,14 @@ dump(emptyCollectionOfInt)
 // CHECK-NEXT: by: 3.14
 dump(stride(from: 1.0, through: 12.15, by: 3.14))
 
-// CHECK-NEXT: 0x0000
-// CHECK-NEXT: - pointerValue: 0
-var nilUnsafeMutablePointerString: UnsafeMutablePointer<String> = nil
+// CHECK-NEXT: nil
+var nilUnsafeMutablePointerString: UnsafeMutablePointer<String>? = nil
 dump(nilUnsafeMutablePointerString)
 
 // CHECK-NEXT: 123456
 // CHECK-NEXT: - pointerValue: 1193046
 var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(
-  bitPattern: 0x123456)
+  bitPattern: 0x123456)!
 dump(randomUnsafeMutablePointerString)
 
 // CHECK-NEXT: Hello panda

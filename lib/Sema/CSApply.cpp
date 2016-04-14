@@ -367,11 +367,15 @@ namespace {
     ///
     /// \param variadicArgs The source indices that are mapped to the variadic
     /// parameter of the resulting tuple, as provided by \c computeTupleShuffle.
+    ///
+    /// \param typeFromPattern Optionally, the caller can specify the pattern
+    /// from where the toType is derived, so that we can deliver better fixit.
     Expr *coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                              TupleType *toTuple,
                              ConstraintLocatorBuilder locator,
                              SmallVectorImpl<int> &sources,
-                             SmallVectorImpl<unsigned> &variadicArgs);
+                             SmallVectorImpl<unsigned> &variadicArgs,
+                             Optional<Pattern*> typeFromPattern = None);
 
     /// \brief Coerce the given scalar value to the given tuple type.
     ///
@@ -407,7 +411,8 @@ namespace {
     /// \brief Coerce an expression of (possibly unchecked) optional
     /// type to have a different (possibly unchecked) optional type.
     Expr *coerceOptionalToOptional(Expr *expr, Type toType,
-                                   ConstraintLocatorBuilder locator);
+                                   ConstraintLocatorBuilder locator,
+                                   Optional<Pattern*> typeFromPattern = None);
 
     /// \brief Coerce an expression of implicitly unwrapped optional type to its
     /// underlying value type, in the correct way for an implicit
@@ -1083,10 +1088,13 @@ namespace {
     /// \param expr The expression to coerce.
     /// \param toType The type to coerce the expression to.
     /// \param locator Locator used to describe where in this expression we are.
+    /// \param typeFromPattern Optionally, the caller can specify the pattern
+    ///   from where the toType is derived, so that we can deliver better fixit.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *coerceToType(Expr *expr, Type toType,
-                       ConstraintLocatorBuilder locator);
+                       ConstraintLocatorBuilder locator,
+                       Optional<Pattern*> typeFromPattern = None);
 
     /// \brief Coerce the given expression (which is the argument to a call) to
     /// the given parameter type.
@@ -3673,6 +3681,56 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
   return nullptr;
 }
 
+static bool
+shouldApplyAddingLabelFixit(TuplePattern *tuplePattern, TupleType *fromTuple,
+                            TupleType *toTuple,
+                std::vector<std::pair<SourceLoc, std::string>> &locInsertPairs) {
+  std::vector<TuplePattern*> patternParts;
+  std::vector<TupleType*> fromParts;
+  std::vector<TupleType*> toParts;
+  patternParts.push_back(tuplePattern);
+  fromParts.push_back(fromTuple);
+  toParts.push_back(toTuple);
+  while (!patternParts.empty()) {
+    TuplePattern *curPattern = patternParts.back();
+    TupleType *curFrom = fromParts.back();
+    TupleType *curTo = toParts.back();
+    patternParts.pop_back();
+    fromParts.pop_back();
+    toParts.pop_back();
+    unsigned n = curPattern->getElements().size();
+    if (curFrom->getElements().size() != n ||
+        curTo->getElements().size() != n)
+      return false;
+    for (unsigned i = 0; i < n; i ++) {
+      Pattern* subPat = curPattern->getElement(i).getPattern();
+      const TupleTypeElt &subFrom = curFrom->getElement(i);
+      const TupleTypeElt &subTo = curTo->getElement(i);
+      if ((subFrom.getType()->getKind() == TypeKind::Tuple) ^
+          (subTo.getType()->getKind() == TypeKind::Tuple))
+        return false;
+      auto addLabelFunc = [&]() {
+        if (subFrom.getName().empty() && !subTo.getName().empty()) {
+          llvm::SmallString<8> Name;
+          Name.append(subTo.getName().str());
+          Name.append(": ");
+          locInsertPairs.push_back({subPat->getStartLoc(), Name.str()});
+        }
+      };
+      if (auto subFromTuple = subFrom.getType()->getAs<TupleType>()) {
+        fromParts.push_back(subFromTuple);
+        toParts.push_back(subTo.getType()->getAs<TupleType>());
+        patternParts.push_back(static_cast<TuplePattern*>(subPat));
+        addLabelFunc();
+      } else if (subFrom.getType()->isEqual(subTo.getType())) {
+        addLabelFunc();
+      } else
+        return false;
+    }
+  }
+  return true;
+}
+
 /// Produce the caller-side default argument for this default argument, or
 /// null if the default argument will be provided by the callee.
 static std::pair<Expr *, DefaultArgumentKind>
@@ -3792,7 +3850,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                        TupleType *toTuple,
                                        ConstraintLocatorBuilder locator,
                                        SmallVectorImpl<int> &sources,
-                                       SmallVectorImpl<unsigned> &variadicArgs){
+                                       SmallVectorImpl<unsigned> &variadicArgs,
+                                       Optional<Pattern*> typeFromPattern){
   auto &tc = cs.getTypeChecker();
 
   // Capture the tuple expression, if there is one.
@@ -3883,9 +3942,19 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // We need to convert the source element to the destination type.
     if (!fromTupleExpr) {
       // FIXME: Lame! We can't express this in the AST.
-      tc.diagnose(expr->getLoc(),
-                  diag::tuple_conversion_not_expressible,
-                  fromTuple, toTuple);
+      InFlightDiagnostic diag = tc.diagnose(expr->getLoc(),
+                                        diag::tuple_conversion_not_expressible,
+                                            fromTuple, toTuple);
+      if (typeFromPattern) {
+        std::vector<std::pair<SourceLoc, std::string>> locInsertPairs;
+        TuplePattern *tupleP = dyn_cast<TuplePattern>(typeFromPattern.getValue());
+        if (tupleP && shouldApplyAddingLabelFixit(tupleP, toTuple, fromTuple,
+                                                  locInsertPairs)) {
+          for (auto &Pair : locInsertPairs) {
+            diag.fixItInsert(Pair.first, Pair.second);
+          }
+        }
+      }
       return nullptr;
     }
 
@@ -4238,7 +4307,8 @@ static Type getOptionalBaseType(const Type &type) {
 }
 
 Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
-                                             ConstraintLocatorBuilder locator) {
+                                             ConstraintLocatorBuilder locator,
+                                          Optional<Pattern*> typeFromPattern) {
   auto &tc = cs.getTypeChecker();
   Type fromType = expr->getType();
   
@@ -4287,7 +4357,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   expr = new (tc.Context) BindOptionalExpr(expr, expr->getSourceRange().End,
                                            /*depth*/ 0, fromValueType);
   expr->setImplicit(true);
-  expr = coerceToType(expr, toValueType, locator);
+  expr = coerceToType(expr, toValueType, locator, typeFromPattern);
   if (!expr) return nullptr;
       
   expr = new (tc.Context) InjectIntoOptionalExpr(expr, toType);
@@ -4743,7 +4813,8 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
 }
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
-                                 ConstraintLocatorBuilder locator) {
+                                 ConstraintLocatorBuilder locator,
+                                 Optional<Pattern*> typeFromPattern) {
   auto &tc = cs.getTypeChecker();
 
   // The type we're converting from.
@@ -4769,7 +4840,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       assert(!failed && "Couldn't convert tuple to tuple?");
       (void)failed;
       return coerceTupleToTuple(expr, fromTuple, toTuple, locator, sources,
-                                variadicArgs);
+                                variadicArgs, typeFromPattern);
     }
 
     case ConversionRestrictionKind::ScalarToTuple: {
@@ -4876,7 +4947,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
     case ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional:
     case ConversionRestrictionKind::OptionalToOptional:
-      return coerceOptionalToOptional(expr, toType, locator);
+      return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
 
     case ConversionRestrictionKind::ForceUnchecked: {
       auto valueTy = fromType->getImplicitlyUnwrappedOptionalObjectType();
@@ -4930,32 +5001,78 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
-      // Overwrite the l-value access kind to be read-only if we're
-      // converting to a non-mutable pointer type.
+      OptionalTypeKind optionalKind;
+      Type unwrappedTy = toType;
+      if (Type unwrapped = toType->getAnyOptionalObjectType(optionalKind))
+        unwrappedTy = unwrapped;
       PointerTypeKind pointerKind;
-      auto toEltType = toType->getAnyPointerElementType(pointerKind);
+      auto toEltType = unwrappedTy->getAnyPointerElementType(pointerKind);
       assert(toEltType && "not a pointer type?"); (void) toEltType;
       if (pointerKind == PTK_UnsafePointer) {
+        // Overwrite the l-value access kind to be read-only if we're
+        // converting to a non-mutable pointer type.
         cast<InOutExpr>(expr->getValueProvidingExpr())->getSubExpr()
           ->propagateLValueAccessKind(AccessKind::Read, /*overwrite*/ true);
       }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      return new (tc.Context) InOutToPointerExpr(expr, toType);
+      Expr *result = new (tc.Context) InOutToPointerExpr(expr, unwrappedTy);
+      if (optionalKind != OTK_None)
+        result = new (tc.Context) InjectIntoOptionalExpr(result, toType);
+      return result;
     }
     
     case ConversionRestrictionKind::ArrayToPointer: {
+      OptionalTypeKind optionalKind;
+      Type unwrappedTy = toType;
+      if (Type unwrapped = toType->getAnyOptionalObjectType(optionalKind))
+        unwrappedTy = unwrapped;
+
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      return new (tc.Context) ArrayToPointerExpr(expr, toType);
+      Expr *result = new (tc.Context) ArrayToPointerExpr(expr, unwrappedTy);
+      if (optionalKind != OTK_None)
+        result = new (tc.Context) InjectIntoOptionalExpr(result, toType);
+      return result;
     }
     
     case ConversionRestrictionKind::StringToPointer: {
+      OptionalTypeKind optionalKind;
+      Type unwrappedTy = toType;
+      if (Type unwrapped = toType->getAnyOptionalObjectType(optionalKind))
+        unwrappedTy = unwrapped;
+
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      return new (tc.Context) StringToPointerExpr(expr, toType);
+      Expr *result = new (tc.Context) StringToPointerExpr(expr, unwrappedTy);
+      if (optionalKind != OTK_None)
+        result = new (tc.Context) InjectIntoOptionalExpr(result, toType);
+      return result;
     }
     
     case ConversionRestrictionKind::PointerToPointer: {
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
+      Type unwrappedToTy = toType->getAnyOptionalObjectType();
+
+      // Optional to optional.
+      if (Type unwrappedFromTy = expr->getType()->getAnyOptionalObjectType()) {
+        assert(unwrappedToTy && "converting optional to non-optional");
+        Expr *boundOptional =
+          new (tc.Context) BindOptionalExpr(expr, SourceLoc(), /*depth*/0,
+                                            unwrappedFromTy);
+        Expr *converted =
+          new (tc.Context) PointerToPointerExpr(boundOptional, unwrappedToTy);
+        Expr *rewrapped =
+          new (tc.Context) InjectIntoOptionalExpr(converted, toType);
+        return new (tc.Context) OptionalEvaluationExpr(rewrapped, toType);
+      }
+
+      // Non-optional to optional.
+      if (unwrappedToTy) {
+        Expr *converted =
+            new (tc.Context) PointerToPointerExpr(expr, unwrappedToTy);
+        return new (tc.Context) InjectIntoOptionalExpr(converted, toType);
+      }
+
+      // Non-optional to non-optional.
       return new (tc.Context) PointerToPointerExpr(expr, toType);
     }
 
@@ -5175,7 +5292,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   if (toType->getAnyOptionalObjectType() &&
       expr->getType()->getAnyOptionalObjectType()) {
-    return coerceOptionalToOptional(expr, toType, locator);
+    return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
   }
 
   // Coercion to Optional<T>.
@@ -6193,12 +6310,13 @@ Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
 
 Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator,
-                             bool ignoreTopLevelInjection) const {
+                             bool ignoreTopLevelInjection,
+                             Optional<Pattern*> typeFromPattern) const {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this,
                         /*suppressDiagnostics=*/false,
                         /*skipClosures=*/false);
-  Expr *result = rewriter.coerceToType(expr, toType, locator);
+  Expr *result = rewriter.coerceToType(expr, toType, locator, typeFromPattern);
   if (!result)
     return nullptr;
 

@@ -83,10 +83,10 @@ public protocol CustomDebugStringConvertible {
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("swift_EnumCaseName")
-func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>
+func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
 
 @_silgen_name("swift_OpaqueSummary")
-func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>
+func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
 /// Do our best to print a value that cannot be printed directly.
 internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
@@ -136,8 +136,8 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
         }
         target.write(")")
       case .`enum`:
-        let cString = _getEnumCaseName(value)
-        if cString != nil, let caseName = String(validatingUTF8: cString) {
+        if let cString = _getEnumCaseName(value),
+            let caseName = String(validatingUTF8: cString) {
           // Write the qualified type name in debugPrint.
           if isDebugPrint {
             printTypeName(mirror.subjectType)
@@ -165,8 +165,8 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
     printTypeName(metatypeValue)
   } else {
     // Fall back to the type or an opaque summary of the kind
-    let cString = _opaqueSummary(mirror.subjectType)
-    if cString != nil, let opaqueSummary = String(validatingUTF8: cString) {
+    if let cString = _opaqueSummary(mirror.subjectType),
+        let opaqueSummary = String(validatingUTF8: cString) {
       target.write(opaqueSummary)
     } else {
       target.write(_typeName(mirror.subjectType, qualified: true))
@@ -305,8 +305,8 @@ internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
       return
     case .`enum`:
       target.write(_typeName(mirror.subjectType, qualified: true))
-      let cString = _getEnumCaseName(value)
-      if cString != nil, let caseName = String(validatingUTF8: cString) {
+      if let cString = _getEnumCaseName(value),
+          let caseName = String(validatingUTF8: cString) {
         target.write(".")
         target.write(caseName)
       }

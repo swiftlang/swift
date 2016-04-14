@@ -30,9 +30,9 @@ public protocol _ShadowProtocol {}
 @objc
 public protocol _NSFastEnumeration : _ShadowProtocol {
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumeratingWith(
-    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
 }
 
@@ -50,7 +50,7 @@ public typealias _SwiftNSZone = OpaquePointer
 @objc
 public protocol _NSCopying : _ShadowProtocol {
   @objc(copyWithZone:)
-  func copy(with zone: _SwiftNSZone) -> AnyObject
+  func copy(with zone: _SwiftNSZone?) -> AnyObject
 }
 
 /// A shadow for the "core operations" of NSArray.
@@ -67,9 +67,9 @@ public protocol _NSArrayCore :
   func getObjects(_: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
 
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumeratingWith(
-         _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafeMutablePointer<AnyObject>, count: Int
+  func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
 
   var count: Int { get }
@@ -101,15 +101,15 @@ public protocol _NSDictionaryCore :
   // We also override the following methods for efficiency.
 
   @objc(copyWithZone:)
-  func copy(with zone: _SwiftNSZone) -> AnyObject
+  func copy(with zone: _SwiftNSZone?) -> AnyObject
 
-  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>,
-    andKeys keys: UnsafeMutablePointer<AnyObject>)
+  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?)
 
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumeratingWith(
-    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
 }
 
@@ -125,9 +125,9 @@ public protocol _NSDictionaryCore :
 public protocol _NSDictionary : _NSDictionaryCore {
   // Note! This API's type is different from what is imported by the clang
   // importer.
-  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>,
-      andKeys keys: UnsafeMutablePointer<AnyObject>)
-}
+  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
+      andKeys keys: UnsafeMutablePointer<AnyObject>?)
+    }
 
 /// A shadow for the "core operations" of NSSet.
 ///
@@ -150,12 +150,12 @@ public protocol _NSSetCore :
   // We also override the following methods for efficiency.
 
   @objc(copyWithZone:)
-  func copy(with zone: _SwiftNSZone) -> AnyObject
+  func copy(with zone: _SwiftNSZone?) -> AnyObject
 
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumeratingWith(
-    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
 }
 

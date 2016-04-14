@@ -64,6 +64,28 @@ func _countFormatSpecifiers(_ a: String) -> Int {
   return count
 }
 
+// We only need this for UnsafeMutablePointer, but there's not currently a way
+// to write that constraint.
+extension Optional {
+  /// Invokes `body` with `nil` if `self` is `nil`; otherwise, passes the
+  /// address of `object` to `body`.
+  ///
+  /// This is intended for use with Foundation APIs that return an Objective-C
+  /// type via out-parameter where it is important to be able to *ignore* that
+  /// parameter by passing `nil`. (For some APIs, this may allow the
+  /// implementation to avoid some work.)
+  ///
+  /// In most cases it would be simpler to just write this code inline, but if
+  /// `body` is complicated than that results in unnecessarily repeated code.
+  internal func _withNilOrAddress<NSType : AnyObject, ResultType>(
+    of object: inout NSType?,
+    body: @noescape AutoreleasingUnsafeMutablePointer<NSType?>? -> ResultType
+  ) -> ResultType {
+    return self == nil ? body(nil) : body(&object)
+  }
+}
+
+
 extension String {
 
   //===--- Bridging Helpers -----------------------------------------------===//
@@ -102,14 +124,12 @@ extension String {
   /// non-`nil`, convert the buffer to an `Index` and write it into the
   /// memory referred to by `index`
   func _withOptionalOutParameter<Result>(
-    _ index: UnsafeMutablePointer<Index>,
-    @noescape body: (UnsafeMutablePointer<Int>) -> Result
+    _ index: UnsafeMutablePointer<Index>?,
+    @noescape body: (UnsafeMutablePointer<Int>?) -> Result
   ) -> Result {
     var utf16Index: Int = 0
-    let result = index._withBridgeValue(&utf16Index) {
-      body($0)
-    }
-    index._setIfNonNil { self._index(utf16Index) }
+    let result = (index != nil ? body(&utf16Index) : body(nil))
+    index?.pointee = self._index(utf16Index)
     return result
   }
 
@@ -117,14 +137,12 @@ extension String {
   /// from non-`nil`, convert the buffer to a `Range<Index>` and write
   /// it into the memory referred to by `range`
   func _withOptionalOutParameter<Result>(
-    _ range: UnsafeMutablePointer<Range<Index>>,
-    @noescape body: (UnsafeMutablePointer<NSRange>) -> Result
+    _ range: UnsafeMutablePointer<Range<Index>>?,
+    @noescape body: (UnsafeMutablePointer<NSRange>?) -> Result
   ) -> Result {
     var nsRange = NSRange(location: 0, length: 0)
-    let result = range._withBridgeValue(&nsRange) {
-      body($0)
-    }
-    range._setIfNonNil { self._range(nsRange) }
+    let result = (range != nil ? body(&nsRange) : body(nil))
+    range?.pointee = self._range(nsRange)
     return result
   }
 
@@ -363,20 +381,30 @@ extension String {
   /// Returns the actual number of matching paths.
   @warn_unused_result
   public func completePath(
-    into outputName: UnsafeMutablePointer<String> = nil,
+    into outputName: UnsafeMutablePointer<String>? = nil,
     caseSensitive: Bool,
-    matchesInto matchesIntoArray: UnsafeMutablePointer<[String]> = nil,
+    matchesInto outputArray: UnsafeMutablePointer<[String]>? = nil,
     filterTypes: [String]? = nil
   ) -> Int {
     var nsMatches: NSArray?
     var nsOutputName: NSString?
 
-    let result = outputName._withBridgeObject(&nsOutputName) {
-      outputName in matchesIntoArray._withBridgeObject(&nsMatches) {
-        matchesIntoArray in
-        self._ns.completePath(
-          into: outputName, caseSensitive: caseSensitive,
-          matchesInto: matchesIntoArray, filterTypes: filterTypes
+    let result: Int = outputName._withNilOrAddress(of: &nsOutputName) {
+      outputName in outputArray._withNilOrAddress(of: &nsMatches) {
+        outputArray in
+        // FIXME: completePath(...) is incorrectly annotated as requiring
+        // non-optional output parameters. rdar://problem/25494184
+        let outputNonOptionalName = AutoreleasingUnsafeMutablePointer<NSString>(
+          UnsafeMutablePointer<NSString>(outputName)
+        )
+        let outputNonOptionalArray = AutoreleasingUnsafeMutablePointer<NSArray>(
+          UnsafeMutablePointer<NSArray>(outputArray)
+        )
+        return self._ns.completePath(
+          into: outputNonOptionalName,
+          caseSensitive: caseSensitive,
+          matchesInto: outputNonOptionalArray,
+          filterTypes: filterTypes
         )
       }
     }
@@ -384,11 +412,11 @@ extension String {
     if let matches = nsMatches {
       // Since this function is effectively a bridge thunk, use the
       // bridge thunk semantics for the NSArray conversion
-      matchesIntoArray._setIfNonNil { return matches as! [String] }
+      outputArray?.pointee = matches as! [String]
     }
 
     if let n = nsOutputName {
-      outputName._setIfNonNil { n as String }
+      outputName?.pointee = n as String
     }
     return result
   }
@@ -839,7 +867,7 @@ extension String {
   /// interpret the file.
   public init(
     contentsOfFile path: String,
-    usedEncoding: UnsafeMutablePointer<NSStringEncoding> = nil
+    usedEncoding: UnsafeMutablePointer<NSStringEncoding>? = nil
   ) throws {
     let ns = try NSString(contentsOfFile: path, usedEncoding: usedEncoding)
     self = ns as String
@@ -871,7 +899,7 @@ extension String {
   /// data.  Errors are written into the inout `error` argument.
   public init(
     contentsOf url: NSURL,
-    usedEncoding enc: UnsafeMutablePointer<NSStringEncoding> = nil
+    usedEncoding enc: UnsafeMutablePointer<NSStringEncoding>? = nil
   ) throws {
     let ns = try NSString(contentsOf: url, usedEncoding: enc)
     self = ns as String
@@ -1021,20 +1049,18 @@ extension String {
     scheme tagScheme: String,
     options opts: NSLinguisticTaggerOptions = [],
     orthography: NSOrthography? = nil,
-    tokenRanges: UnsafeMutablePointer<[Range<Index>]> = nil // FIXME:Can this be nil?
+    tokenRanges: UnsafeMutablePointer<[Range<Index>]>? = nil // FIXME:Can this be nil?
   ) -> [String] {
     var nsTokenRanges: NSArray? = nil
-    let result = tokenRanges._withBridgeObject(&nsTokenRanges) {
+    let result = tokenRanges._withNilOrAddress(of: &nsTokenRanges) {
       self._ns.linguisticTags(
         in: _toNSRange(range), scheme: tagScheme, options: opts,
-        orthography: orthography != nil ? orthography! : nil, tokenRanges: $0) as NSArray
+        orthography: orthography, tokenRanges: $0) as NSArray
     }
 
     if nsTokenRanges != nil {
-      tokenRanges._setIfNonNil {
-        (nsTokenRanges! as [AnyObject]).map {
-          self._range($0.rangeValue)
-        }
+      tokenRanges?.pointee = (nsTokenRanges! as [AnyObject]).map {
+        self._range($0.rangeValue)
       }
     }
 
@@ -1660,7 +1686,7 @@ extension String {
   ///
   /// Locale-independent case-insensitive operation, and other needs,
   /// can be achieved by calling
-  /// `rangeOfString(_:options:_,range:_locale:_)`.
+  /// `rangeOfString(_:options:_, range:_locale:_)`.
   ///
   /// Equivalent to
   ///
@@ -1712,9 +1738,9 @@ extension String {
 
   @available(*, unavailable, renamed: "completePath(into:outputName:caseSensitive:matchesInto:filterTypes:)")
   public func completePathInto(
-    _ outputName: UnsafeMutablePointer<String> = nil,
+    _ outputName: UnsafeMutablePointer<String>? = nil,
     caseSensitive: Bool,
-    matchesInto matchesIntoArray: UnsafeMutablePointer<[String]> = nil,
+    matchesInto matchesIntoArray: UnsafeMutablePointer<[String]>? = nil,
     filterTypes: [String]? = nil
   ) -> Int {
     fatalError("unavailable function can't be called")
@@ -1818,7 +1844,7 @@ extension String {
     scheme tagScheme: String,
     options opts: NSLinguisticTaggerOptions = [],
     orthography: NSOrthography? = nil,
-    tokenRanges: UnsafeMutablePointer<[Range<Index>]> = nil
+    tokenRanges: UnsafeMutablePointer<[Range<Index>]>? = nil
   ) -> [String] {
     fatalError("unavailable function can't be called")
   }

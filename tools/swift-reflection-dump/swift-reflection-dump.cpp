@@ -17,6 +17,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Reflection/ReflectionContext.h"
+#include "swift/Remote/InProcessMemoryReader.h"
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/MachO.h"
@@ -36,7 +37,8 @@ using llvm::ArrayRef;
 using namespace llvm::object;
 
 using namespace swift;
-using namespace reflection;
+using namespace swift::reflection;
+using namespace swift::remote;
 using namespace Demangle;
 
 enum class ActionType {
@@ -67,9 +69,11 @@ Architecture("arch", llvm::cl::desc("Architecture to inspect in the binary"),
              llvm::cl::Required);
 } // end namespace options
 
-static void guardError(std::error_code error) {
-  if (!error) return;
-  std::cerr << "swift-reflection-test error: " << error.message() << "\n";
+template<typename T>
+static T unwrap(llvm::ErrorOr<T> value) {
+  if (!value.getError())
+    return std::move(value.get());
+  std::cerr << "swift-reflection-test error: " << value.getError().message() << "\n";
   exit(EXIT_FAILURE);
 }
 
@@ -85,30 +89,32 @@ getSectionRef(const ObjectFile *objectFile,
       }
     }
   }
-  return llvm::object::SectionRef();
-}
-
-static llvm::object::SectionRef
-getSectionRef(const Binary *binaryFile, StringRef arch,
-              ArrayRef<StringRef> anySectionNames) {
-  if (auto objectFile = dyn_cast<ObjectFile>(binaryFile))
-    return getSectionRef(objectFile, anySectionNames);
-  if (auto machoUniversal = dyn_cast<MachOUniversalBinary>(binaryFile)) {
-    const auto objectOrError = machoUniversal->getObjectForArch(arch);
-    guardError(objectOrError.getError());
-    return getSectionRef(objectOrError.get().get(), anySectionNames);
-  }
   return SectionRef();
 }
 
 static int doDumpReflectionSections(std::string BinaryFilename,
                                     StringRef arch) {
-  auto binaryOrError = llvm::object::createBinary(BinaryFilename);
-  guardError(binaryOrError.getError());
+  // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
+  // once they go out of scope, we can no longer do anything.
+  OwningBinary<Binary> binaryOwner;
+  std::unique_ptr<llvm::object::ObjectFile> objectOwner;
 
-  const auto binary = binaryOrError.get().getBinary();
+  binaryOwner = unwrap(llvm::object::createBinary(BinaryFilename));
+  const llvm::object::Binary *binaryFile = binaryOwner.getBinary();
 
-  auto FieldSectionRef = getSectionRef(binary, arch, {
+  // The object file we are doing lookups in -- either the binary itself, or
+  // a particular slice of a universal binary.
+  const ObjectFile *objectFile;
+
+  if (auto o = dyn_cast<ObjectFile>(binaryFile)) {
+    objectFile = o;
+  } else {
+    auto universal = cast<MachOUniversalBinary>(binaryFile);
+    objectOwner = unwrap(universal->getObjectForArch(arch));
+    objectFile = objectOwner.get();
+  }
+
+  auto FieldSectionRef = getSectionRef(objectFile, {
     "__swift3_fieldmd", ".swift3_fieldmd"
   });
 
@@ -118,7 +124,7 @@ static int doDumpReflectionSections(std::string BinaryFilename,
     return EXIT_FAILURE;
   }
 
-  auto AssociatedTypeSectionRef = getSectionRef(binary, arch, {
+  auto AssociatedTypeSectionRef = getSectionRef(objectFile, {
     "__swift3_assocty", ".swift3_assocty"
   });
 
@@ -128,7 +134,7 @@ static int doDumpReflectionSections(std::string BinaryFilename,
     return EXIT_FAILURE;
   }
 
-  auto ReflectionStringsSectionRef = getSectionRef(binary, arch, {
+  auto ReflectionStringsSectionRef = getSectionRef(objectFile, {
     "__swift3_reflstr", ".swift3_reflstr"
   });
 
@@ -138,7 +144,7 @@ static int doDumpReflectionSections(std::string BinaryFilename,
     return EXIT_FAILURE;
   }
 
-  auto TypeRefSectionRef = getSectionRef(binary, arch, {
+  auto TypeRefSectionRef = getSectionRef(objectFile, {
     "__swift3_typeref", ".swift3_typeref"
   });
 

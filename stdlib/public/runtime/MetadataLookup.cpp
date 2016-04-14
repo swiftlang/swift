@@ -29,7 +29,7 @@
 #if defined(__APPLE__) && defined(__MACH__)
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
-#elif defined(__ELF__)
+#elif defined(__ELF__) || defined(__ANDROID__)
 #include <elf.h>
 #include <link.h>
 #endif

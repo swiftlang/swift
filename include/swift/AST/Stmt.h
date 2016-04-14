@@ -1196,7 +1196,7 @@ public:
     return S->getKind() == StmtKind::Throw;
   }
 };
-  
+
 } // end namespace swift
 
-#endif
+#endif // SWIFT_AST_STMT_H

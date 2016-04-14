@@ -22,7 +22,8 @@
 #include <unistd.h>
 
 using namespace swift;
-using namespace reflection;
+using namespace swift::reflection;
+using namespace swift::remote;
 using namespace Demangle;
 
 static void errorAndExit(const std::string &message) {
@@ -142,9 +143,9 @@ public:
     }
   }
 
-  bool readBytes(addr_t Address, uint8_t *Dest, uint64_t Size) override {
+  bool readBytes(RemoteAddress Address, uint8_t *Dest, uint64_t Size) override {
 
-    StoredPointer TargetAddress = (StoredPointer)Address;
+    StoredPointer TargetAddress = (StoredPointer)Address.getAddressData();
     write(getParentWriteFD(), REQUEST_READ_BYTES, 2);
     write(getParentWriteFD(), &TargetAddress, sizeof(TargetAddress));
     write(getParentWriteFD(), &Size, sizeof(StoredSize));
@@ -160,13 +161,13 @@ public:
     return static_cast<uint64_t>(Length);
   }
 
-  addr_t getSymbolAddress(const std::string &SymbolName) override {
+  RemoteAddress getSymbolAddress(const std::string &SymbolName) override {
     StoredPointer Address = 0;
     write(getParentWriteFD(), REQUEST_SYMBOL_ADDRESS, 2);
     write(getParentWriteFD(), SymbolName.c_str(), SymbolName.size());
     write(getParentWriteFD(), "\n", 1);
     collectBytesFromPipe(&Address, sizeof(Address));
-    return static_cast<StoredPointer>(Address);
+    return RemoteAddress(static_cast<StoredPointer>(Address));
   }
 
   StoredPointer receiveInstanceAddress() {
@@ -237,7 +238,8 @@ public:
 
       auto buffer = (uint8_t *)malloc(RemoteInfo.TotalSize);
 
-      if (!readBytes(RemoteInfo.StartAddress, buffer, RemoteInfo.TotalSize))
+      if (!readBytes(RemoteAddress(RemoteInfo.StartAddress), buffer,
+                     RemoteInfo.TotalSize))
         errorAndExit("Couldn't read reflection information");
 
       auto fieldmd_base
@@ -265,23 +267,26 @@ public:
     return Infos;
   }
 
-  uint64_t getStringLength(StoredPointer Address) {
+  uint64_t getStringLength(RemoteAddress addr) {
     write(getParentWriteFD(), REQUEST_STRING_LENGTH, 2);
-    StoredPointer Length;
+    StoredPointer Address = addr.getAddressData();
     write(getParentWriteFD(), &Address, sizeof(Address));
+    StoredPointer Length;
     collectBytesFromPipe(&Length, sizeof(Length));
     return static_cast<uint64_t>(Length);
   }
 
-  std::string readString(addr_t Address) override {
+  bool readString(RemoteAddress Address, std::string &Dest) override {
     auto NameSize = getStringLength(Address);
     if (!NameSize)
-      return "";
+      return false;
 
     auto NameBuffer = std::unique_ptr<uint8_t>(new uint8_t[NameSize + 1]);
     if (!readBytes(Address, NameBuffer.get(), NameSize + 1))
-      return "";
-    return std::string(reinterpret_cast<const char *>(NameBuffer.get()));
+      return false;
+
+    Dest = reinterpret_cast<const char *>(NameBuffer.get());
+    return true;
   }
 };
 
@@ -321,7 +326,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
       std::cout << std::hex << instance << std::endl;
 
       StoredPointer isa;
-      if (!Pipe->readInteger(instance, &isa))
+      if (!Pipe->readInteger(RemoteAddress(instance), &isa))
         errorAndExit("Couldn't get heap object's metadata address");
 
       for (auto &Info : Pipe->receiveReflectionInfo())

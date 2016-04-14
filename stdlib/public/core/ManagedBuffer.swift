@@ -20,7 +20,7 @@ public class NonObjectiveCBase {
   public init() {}
 }
 
-/// A base class of `ManagedBuffer<Value,Element>`, used during
+/// A base class of `ManagedBuffer<Value, Element>`, used during
 /// instance creation.
 ///
 /// During instance creation, in particular during
@@ -35,7 +35,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// idea to store this information in the "value" area when
   /// an instance is created.
   public final var capacity: Int {
-    let p = ManagedBufferPointer<Value,Element>(self)
+    let p = ManagedBufferPointer<Value, Element>(self)
     return p.capacity
   }
 
@@ -102,7 +102,7 @@ public class ManagedBuffer<Value, Element>
     initialValue: (ManagedProtoBuffer<Value, Element>) -> Value
   ) -> ManagedBuffer<Value, Element> {
 
-    let p = ManagedBufferPointer<Value,Element>(
+    let p = ManagedBufferPointer<Value, Element>(
       bufferClass: self,
       minimumCapacity: minimumCapacity,
       initialValue: { buffer, _ in
@@ -146,7 +146,7 @@ public class ManagedBuffer<Value, Element>
 /// --------------------
 ///
 ///      class MyBuffer<Element> { // non-@objc
-///        typealias Manager = ManagedBufferPointer<(Int,String), Element>
+///        typealias Manager = ManagedBufferPointer<(Int, String), Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToValue, pointerToElements) -> Void in

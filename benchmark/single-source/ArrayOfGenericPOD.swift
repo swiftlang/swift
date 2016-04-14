@@ -53,7 +53,7 @@ struct S<T> {
 }
 @inline(never)
 func genStructArray() {
-  _ = RefArray<S<Int>>(S(x:3,y:4))
+  _ = RefArray<S<Int>>(S(x:3, y:4))
   // should be a nop
 }
 

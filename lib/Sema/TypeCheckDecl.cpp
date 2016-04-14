@@ -4050,7 +4050,7 @@ public:
 
           // If we found both, point at them.
           if (prefixOp) {
-            TC.diagnose(prefixOp, diag::unary_operator_declaration_here,false)
+            TC.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
               .fixItInsert(FD->getLoc(), "prefix ");
             TC.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
               .fixItInsert(FD->getLoc(), "postfix ");

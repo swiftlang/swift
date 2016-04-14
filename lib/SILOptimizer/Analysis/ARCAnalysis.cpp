@@ -233,8 +233,12 @@ static bool canTerminatorUseValue(TermInst *TI, SILValue Ptr,
   return doOperandsAlias(CCBI->getAllOperands(), Ptr, AA);
 }
 
-bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
-                        AliasAnalysis *AA) {
+
+bool swift::mayUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
+  // Check whether releasing this value can call deinit and interfere with User.
+  if (AA->mayValueReleaseInterfereWithInstruction(User, Ptr))
+    return true;
+  
   // If Inst is an instruction that we know can never use values with reference
   // semantics, return true.
   if (canNeverUseValues(User))

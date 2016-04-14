@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "libsil"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/Fallthrough.h"
@@ -261,10 +262,16 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               cast<TupleType>(getType()).getElementType(index));
-  case Kind::ClangFunctionParamTupleType:
+  case Kind::ClangFunctionParamTupleType: {
+    // Handle the (label: ()) param used by functions imported as labeled
+    // nullary initializers.
+    if (isVoidLike(getType()))
+      return AbstractionPattern(getType()->getASTContext().TheEmptyTupleType);
+    
     return AbstractionPattern(getGenericSignature(),
                               cast<TupleType>(getType()).getElementType(index),
                           getClangFunctionParameterType(getClangType(), index));
+  }
 
   case Kind::ObjCMethodFormalParamTupleType: {
     auto swiftEltType = cast<TupleType>(getType()).getElementType(index);

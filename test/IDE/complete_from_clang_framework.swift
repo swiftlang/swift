@@ -70,7 +70,7 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    fooIntVar[#Int32#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFunc1AnonymousParam({#Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafeMutablePointer<Int32>#})[#Int32#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafeMutablePointer<Int32>!#})[#Int32#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithBlock({#(blk): ((Float) -> Int32)!##(Float) -> Int32#})[#Void#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment1()[#Void#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment2()[#Void#]{{; name=.+$}}
@@ -157,7 +157,7 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG: Decl[Enum]/OtherModule[Foo]:         .FooComparisonResult[#FooComparisonResult#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFunc1AnonymousParam({#Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafeMutablePointer<Int32>#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafeMutablePointer<Int32>!#})[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncNoreturn1()[#Void#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncNoreturn2()[#Void#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFuncWithBlock({#(blk): ((Float) -> Int32)!##(Float) -> Int32#})[#Void#]{{; name=.+$}}

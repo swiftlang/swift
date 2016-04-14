@@ -1794,11 +1794,16 @@ static std::pair<ManagedValue, ManagedValue>
 emitForeignErrorArgument(SILGenFunction &gen,
                          SILLocation loc,
                          SILParameterInfo errorParameter) {
-  // We assume that there's no interesting reabstraction here.
-  auto errorPtrType = errorParameter.getType();
+  // We assume that there's no interesting reabstraction here beyond a layer of
+  // optional.
+  OptionalTypeKind optKind;
+  CanType errorPtrType = errorParameter.getType();
+  CanType unwrappedPtrType = errorPtrType;
+  if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
+    unwrappedPtrType = unwrapped->getCanonicalType();
 
   PointerTypeKind ptrKind;
-  auto errorType = CanType(errorPtrType->getAnyPointerElementType(ptrKind));
+  auto errorType = CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
   auto &errorTL = gen.getTypeLowering(errorType);
 
   // Allocate a temporary.
@@ -1816,8 +1821,14 @@ emitForeignErrorArgument(SILGenFunction &gen,
                                      AbstractionPattern(errorType),
                                      errorType);
   auto pointerValue = gen.emitLValueToPointer(loc, std::move(lvalue),
-                                              errorPtrType, ptrKind,
+                                              unwrappedPtrType, ptrKind,
                                               AccessKind::ReadWrite);
+
+  // Wrap up in an Optional if called for.
+  if (optKind != OTK_None) {
+    auto &optTL = gen.getTypeLowering(errorPtrType);
+    pointerValue = gen.getOptionalSomeValue(loc, pointerValue, optTL);
+  }
 
   return {managedErrorTemp, pointerValue};
 }

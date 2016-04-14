@@ -64,6 +64,7 @@ KNOWN_SETTINGS=(
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     lldb-extra-cmake-args       ""               "extra command line args to pass to lldb cmake"
     lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
+    lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
@@ -76,6 +77,7 @@ KNOWN_SETTINGS=(
     llvm-enable-lto             "0"              "enable LTO compilation of LLVM/Clang."
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
+    swift-stdlib-enable-reflection-metadata "0"  "build the Swift stdlib and overlays with remote reflection metadata"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
     swift-stdlib-sil-serialize-all "1"           "build the Swift stdlib and overlays with all method bodies serialized"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
@@ -121,6 +123,7 @@ KNOWN_SETTINGS=(
     skip-build-watchos          ""               "set to skip building Swift stdlibs for Apple watchOS"
     skip-build-watchos-device   ""               "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator ""              "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
+    skip-build-android          ""               "set to skip building Swift stdlibs for Android"
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip building llbuild"
     skip-build-swiftpm          ""               "set to skip building swiftpm"
@@ -190,6 +193,7 @@ KNOWN_SETTINGS=(
     darwin-deployment-version-tvos    "9.0"      "minimum deployment target version for tvOS"
     darwin-deployment-version-watchos "2.0"      "minimum deployment target version for watchOS"
 
+    extra-cmake-options         ""               "Extra options to pass to CMake for all targets"
     extra-swift-args            ""               "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     sil-verify-all              "0"              "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
     swift-enable-ast-verifier   "1"              "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
@@ -204,6 +208,13 @@ KNOWN_SETTINGS=(
     darwin-toolchain-installer-package ""        "The path to installer pkg"
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
+    android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
+    android-ndk-version                ""        "A version of the NDK to use when building for Android. Currently only 21 or above is supported"
+    android-ndk-toolchain-version      ""        "A version of the toolchain to use when building for Android. Use 4.8 for 32-bit builds, 4.9 for 64-bit builds"
+    android-icu-uc                     ""        "Path to a directory containing libicuuc.so"
+    android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
+    android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
+    android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
     export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
 )
 
@@ -846,6 +857,14 @@ function copy_swift_stdlib_tool_substitute() {
     fi
 }
 
+function make_relative_symlink() {
+    local SOURCE=$1
+    local TARGET=$2
+    local TARGET_DIR=$(dirname $2)
+    local RELATIVE_SOURCE=$(python -c "import os.path; print(os.path.relpath(\""${SOURCE}"\", \""${TARGET_DIR}"\"))")
+    ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
+}
+
 # A list of deployment targets to cross-compile the Swift host tools for.
 # We can't run the resulting binaries on the build machine.
 CROSS_TOOLS_DEPLOYMENT_TARGETS=()
@@ -885,6 +904,7 @@ case "$(uname -s -m)" in
     Linux\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "linux-x86_64"
+            "android-armv7"
         )
         ;;
     Linux\ armv6*)
@@ -1001,14 +1021,14 @@ if [ ! -e "${WORKSPACE}/clang" ] ; then
     fi
 fi
 if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-    ln -sf "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
+    make_relative_symlink "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
 fi
 
 # Symlink compiler-rt into the llvm tree, if it exists.
 COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
 if [ -e "${WORKSPACE}/compiler-rt" ] ; then
     if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
-        ln -sf "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
+        make_relative_symlink "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
     fi
 fi
 
@@ -1101,6 +1121,12 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         watchsimulator-*)
             build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_SIMULATOR})
             test_this_target=$(not ${SKIP_TEST_WATCHOS_SIMULATOR})
+            ;;
+        android-*)
+            build_for_this_target=$(not ${SKIP_BUILD_ANDROID})
+            # FIXME: Allow Android host tests to be enabled/disabled by the
+            #        build script.
+            test_this_target=
             ;;
         *)
             echo "Unknown compiler deployment target: ${deployment_target}"
@@ -1195,6 +1221,16 @@ if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
         "${COMMON_CMAKE_OPTIONS[@]}"
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     )
+fi
+
+if [[ "${EXTRA_CMAKE_OPTIONS}" ]] ; then
+    for cmake_opt in $(echo "${EXTRA_CMAKE_OPTIONS}" | tr "," "\n")
+    do
+        COMMON_CMAKE_OPTIONS=(
+            "${COMMON_CMAKE_OPTIONS[@]}"
+            "${cmake_opt}"
+        )
+    done
 fi
 
 if [[ "${DISTCC}" ]] ; then
@@ -1349,6 +1385,9 @@ function common_cross_c_flags() {
             ;;
         watchos-armv7k)
             echo "-arch armv7k -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+            ;;
+        android-armv7)
+            echo "-arch armv7"
             ;;
     esac
 }
@@ -1694,6 +1733,19 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     )
                 fi
 
+                if [[ ! "${SKIP_BUILD_ANDROID}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
+                        -DSWIFT_ANDROID_NDK_TOOLCHAIN_VERSION:STRING="${ANDROID_NDK_TOOLCHAIN_VERSION}"
+                        -DSWIFT_ANDROID_SDK_PATH:STRING="${ANDROID_NDK}/platforms/android-${ANDROID_NDK_VERSION}/arch-arm"
+                        -DSWIFT_ANDROID_ICU_UC:STRING="${ANDROID_ICU_UC}"
+                        -DSWIFT_ANDROID_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
+                        -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
+                        -DSWIFT_ANDROID_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
+                    )
+                fi
+
                 native_llvm_tools_path=""
                 native_clang_tools_path=""
                 native_swift_tools_path=""
@@ -1751,6 +1803,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
+                    -DSWIFT_STDLIB_ENABLE_REFLECTION_METADATA:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_REFLECTION_METADATA}")
                     -DSWIFT_STDLIB_ENABLE_RESILIENCE:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_RESILIENCE}")
                     -DSWIFT_STDLIB_SIL_SERIALIZE_ALL:BOOL=$(true_false "${SWIFT_STDLIB_SIL_SERIALIZE_ALL}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
@@ -2104,12 +2157,8 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             # the c++ header files.
             BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
 
-            if [[ "${BUILD_RUNTIME_WITH_HOST_COMPILER}" ]]; then
-                echo "Using the host compiler to build Swift."
-            else
-                echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
-                ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
-            fi
+            echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
+            ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
             { set +x; } 2>/dev/null
         fi
     done
@@ -2128,7 +2177,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         linux-* | freebsd-* | macosx-* | cygwin-*)
             # OK, we can run tests directly.
             ;;
-        iphoneos-* | iphonesimulator-* | appletvos-* | appletvsimulator-* | watchos-* | watchsimulator-*)
+        iphoneos-* | iphonesimulator-* | appletvos-* | appletvsimulator-* | watchos-* | watchsimulator-* | android-* )
             # FIXME: remove this
             # echo "Don't know how to run tests for ${deployment_target}"
             continue
@@ -2216,7 +2265,19 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     fi
                 fi
 
-                SWIFTCC="${swift_build_dir}/bin/swiftc" SWIFTLIBS="${swift_build_dir}/lib/swift" "${LLDB_SOURCE_DIR}"/test/dotest.py --executable "${lldb_executable}" --rerun-all-issues -C ${HOST_CC} ${LLDB_FORMATTER_OPTS}
+                # figure out which C/C++ compiler we should use for building test inferiors.
+                if [[ "${LLDB_TEST_CC}" == "host-toolchain" ]]; then
+                    # Use the host toolchain: i.e. the toolchain specified by HOST_CC
+                    LLDB_DOTEST_CC_OPTS="-C ${HOST_CC}"
+                elif [[ -n "${LLDB_TEST_CC}" ]]; then
+                    # Use exactly the compiler path specified by the user.
+                    LLDB_DOTEST_CC_OPTS="-C ${LLDB_TEST_CC}"
+                else
+                    # Use the clang that was just built in the tree.
+                    LLDB_DOTEST_CC_OPTS="-C ${llvm_build_dir}"/bin/clang
+                fi
+                
+                SWIFTCC="${swift_build_dir}/bin/swiftc" SWIFTLIBS="${swift_build_dir}/lib/swift" "${LLDB_SOURCE_DIR}"/test/dotest.py --executable "${lldb_executable}" --rerun-all-issues ${LLDB_DOTEST_CC_OPTS} ${LLDB_FORMATTER_OPTS}
                 popd
                 continue
                 ;;

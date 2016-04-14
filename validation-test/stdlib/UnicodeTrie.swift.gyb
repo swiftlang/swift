@@ -35,7 +35,7 @@ import Foundation
 var graphemeBreakPropertyTable = [
 // 'as Int' annotations are needed to help prevent the type-checker from
 // blowing the stack. <rdar://problem/17539704>
-% for start_code_point,end_code_point,value in grapheme_cluster_break_property_table.property_value_ranges:
+% for start_code_point, end_code_point, value in grapheme_cluster_break_property_table.property_value_ranges:
   (${start_code_point} as Int, ${end_code_point} as Int, _GraphemeClusterBreakPropertyValue.${value}),
 % end
 ]
@@ -106,8 +106,7 @@ class NonContiguousNSString : NSString {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
-
+  override func copy(with zone: NSZone?) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -165,7 +164,7 @@ UnicodeTrie.test("GraphemeClusterSegmentation/UnicodeSpec") {
   // Test segmentation algorithm using test data from the Unicode
   // specification.
 
-% for code_points,expected_boundaries in grapheme_cluster_break_tests:
+% for code_points, expected_boundaries in grapheme_cluster_break_tests:
   do {
     let scalars: [UInt32] =
         [ ${", ".join([ str(cp) for cp in code_points ])} ]

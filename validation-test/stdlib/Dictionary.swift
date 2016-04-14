@@ -1238,8 +1238,8 @@ class ParallelArrayDictionary : NSDictionary {
   }
 
   override init(
-    objects: UnsafePointer<AnyObject?>,
-    forKeys keys: UnsafePointer<NSCopying?>,
+    objects: UnsafePointer<AnyObject>,
+    forKeys keys: UnsafePointer<NSCopying>,
     count: Int) {
     super.init(objects: objects, forKeys: keys, count: count)
   }
@@ -1249,7 +1249,7 @@ class ParallelArrayDictionary : NSDictionary {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     // Ensure that copying this dictionary does not produce a CoreFoundation
     // object.
     return self
@@ -1257,7 +1257,7 @@ class ParallelArrayDictionary : NSDictionary {
 
   override func countByEnumerating(
       with state: UnsafeMutablePointer<NSFastEnumerationState>,
-      objects: AutoreleasingUnsafeMutablePointer<AnyObject?>, count: Int) -> Int {
+      objects: AutoreleasingUnsafeMutablePointer<AnyObject>, count: Int) -> Int {
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1
@@ -1300,8 +1300,8 @@ class CustomImmutableNSDictionary : NSDictionary {
   }
 
   override init(
-    objects: UnsafePointer<AnyObject?>,
-    forKeys keys: UnsafePointer<NSCopying?>,
+    objects: UnsafePointer<AnyObject>,
+    forKeys keys: UnsafePointer<NSCopying>,
     count: Int) {
     expectUnreachable()
     super.init(objects: objects, forKeys: keys, count: count)
@@ -1312,7 +1312,7 @@ class CustomImmutableNSDictionary : NSDictionary {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     CustomImmutableNSDictionary.timesCopyWithZoneWasCalled += 1
     return self
   }
@@ -3424,8 +3424,8 @@ class MockDictionaryWithCustomCount : NSDictionary {
   }
 
   override init(
-    objects: UnsafePointer<AnyObject?>,
-    forKeys keys: UnsafePointer<NSCopying?>,
+    objects: UnsafePointer<AnyObject>,
+    forKeys keys: UnsafePointer<NSCopying>,
     count: Int) {
     expectUnreachable()
     super.init(objects: objects, forKeys: keys, count: count)
@@ -3436,7 +3436,7 @@ class MockDictionaryWithCustomCount : NSDictionary {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     // Ensure that copying this dictionary produces an object of the same
     // dynamic type.
     return self
@@ -3831,16 +3831,15 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
     start: UnsafeMutablePointer<NSNumber>(allocatingCapacity: 2), count: 2)
   var values = UnsafeMutableBufferPointer(
     start: UnsafeMutablePointer<NSString>(allocatingCapacity: 2), count: 2)
-  var kp = AutoreleasingUnsafeMutablePointer<AnyObject?>(keys.baseAddress)
-  var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress)
-  var null: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil
+  var kp = AutoreleasingUnsafeMutablePointer<AnyObject>(keys.baseAddress!)
+  var vp = AutoreleasingUnsafeMutablePointer<AnyObject>(values.baseAddress!)
 
-  d.getObjects(null, andKeys: null) // don't segfault
+  d.getObjects(nil, andKeys: nil) // don't segfault
 
-  d.getObjects(null, andKeys: kp)
+  d.getObjects(nil, andKeys: kp)
   expectEqual([2, 1] as [NSNumber], Array(keys))
 
-  d.getObjects(vp, andKeys: null)
+  d.getObjects(vp, andKeys: nil)
   expectEqual(["two", "one"] as [NSString], Array(values))
 
   d.getObjects(vp, andKeys: kp)

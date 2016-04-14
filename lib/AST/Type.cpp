@@ -14,8 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Types.h"
+#include "ForeignRepresentationInfo.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -2115,10 +2116,6 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
   // Pointers may be representable in ObjC.
   PointerTypeKind pointerKind;
   if (auto pointerElt = type->getAnyPointerElementType(pointerKind)) {
-    // FIXME: Optionality should be embedded in the pointer types.
-    if (wasOptional)
-      return failure();
-
     switch (pointerKind) {
     case PTK_UnsafeMutablePointer:
     case PTK_UnsafePointer:
@@ -2150,17 +2147,11 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 
   // Determine whether this nominal type is known to be representable
   // in this foreign language.
-  auto result = ctx.getForeignRepresentable(nominal, language, dc);
-  if (result.first == ForeignRepresentableKind::None)
-    return result;
+  auto result = ctx.getForeignRepresentationInfo(nominal, language, dc);
+  if (result.getKind() == ForeignRepresentableKind::None)
+    return failure();
 
-  // The ability to bridge an optional is currently tied to the
-  // _ObjectiveCBridgeable protocol.
-  // FIXME: This will eventually be wrong, but it is convenient for now.
-  if (wasOptional &&
-      (!result.second ||
-       !result.second->getProtocol()->isSpecificProtocol(
-          KnownProtocolKind::ObjectiveCBridgeable)))
+  if (wasOptional && !result.isRepresentableAsOptional())
     return failure();
 
   // If our nominal type has type arguments, make sure they are
@@ -2203,7 +2194,7 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
     }
   }
 
-  return result;
+  return { result.getKind(), result.getConformance() };
 }
 
 std::pair<ForeignRepresentableKind, ProtocolConformance *>

@@ -33,8 +33,7 @@
 /// - Memory is allocated and value is initialized.
 @_fixed_layout
 public struct ${Self}<Pointee>
-  : RandomAccessIndex, Hashable,
-    NilLiteralConvertible, _Pointer {
+  : RandomAccessIndex, Hashable, _Pointer {
 
   public typealias Distance = Int
 
@@ -49,19 +48,30 @@ public struct ${Self}<Pointee>
 
   /// Convert from an opaque pointer to a typed pointer.
   @_transparent
-  public init(_ other : OpaquePointer) {
-    _rawValue = other._rawValue
+  public init(_ from : OpaquePointer) {
+    _rawValue = from._rawValue
+  }
+
+  /// Convert from an opaque pointer to a typed pointer.
+  ///
+  /// Returns nil if `from` is nil.
+  @_transparent
+  public init?(_ from : OpaquePointer?) {
+    guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
   }
 
   /// Construct ${a_Self} with a given pattern of bits.
   @_transparent
-  public init(bitPattern: Int) {
+  public init?(bitPattern: Int) {
+    if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Construct ${a_Self} with a given pattern of bits.
   @_transparent
-  public init(bitPattern: UInt) {
+  public init?(bitPattern: UInt) {
+    if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
@@ -75,6 +85,19 @@ public struct ${Self}<Pointee>
     _rawValue = from._rawValue
   }
 
+  /// Convert from any `UnsafeMutablePointer`, possibly with a
+  /// different `Pointee`.
+  ///
+  /// Returns nil if `from` is nil.
+  ///
+  /// - Warning: the behavior of accesses to pointee as a type
+  ///   different from that to which it was initialized is undefined.
+  @_transparent
+  public init?<U>(_ from : UnsafeMutablePointer<U>?) {
+    guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
+  }
+
   /// Convert from any `UnsafePointer`, possibly with a
   /// different `Pointee`.
   ///
@@ -85,10 +108,17 @@ public struct ${Self}<Pointee>
     _rawValue = from._rawValue
   }
 
-  /// Create an instance initialized with `nil`.
+  /// Convert from any `UnsafePointer`, possibly with a
+  /// different `Pointee`.
+  ///
+  /// Returns nil if `from` is nil.
+  ///
+  /// - Warning: the behavior of accesses to pointee as a type
+  ///   different from that to which it was initialized is undefined.
   @_transparent
-  public init(nilLiteral: ()) {
-    self._rawValue = _nilRawPointer
+  public init?<U>(_ from : UnsafePointer<U>?) {
+    guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
   }
 
 %  if mutable:
@@ -367,11 +397,6 @@ public struct ${Self}<Pointee>
   }
 %  end
 
-  @_transparent public
-  var _isNull : Bool {
-    return self == nil
-  }
-
   /// Access the pointee at `self + i`.
   ///
   /// - Precondition: the pointee at `self + i` is initialized.
@@ -392,40 +417,6 @@ public struct ${Self}<Pointee>
     }
 %  end
   }
-
-% if mutable:
-  /// If self was converted from `nil`, writes the result of invoking body into
-  /// the pointee.
-  public // SPI(Foundation)
-  func _setIfNonNil(@noescape _ body: () -> Pointee) {
-    if self != nil {
-      pointee = body()
-    }
-  }
-
-#if _runtime(_ObjC)
-  /// Returns the result of invoking body.  If self was converted from
-  /// `nil`, passes `nil` as the argument.  Otherwise, passes the address
-  /// of a `Pointee` which is written into buffer before this method returns.
-  @_transparent public
-  func _withBridgeObject<U : AnyObject, R>(
-    _ buffer: inout U?,
-  @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
-  ) -> R {
-    return self != nil ? body(&buffer) : body(nil)
-  }
-#endif
-
-  /// Returns the result of invoking body.  If self was converted from
-  /// `nil`, passes `nil` as the argument.  Otherwise, passes the address
-  /// of buffer.
-  @_transparent public
-  func _withBridgeValue<U, R>(
-    _ buffer: inout U, @noescape body: UnsafeMutablePointer<U> -> R
-  ) -> R {
-    return self != nil ? body(&buffer) : body(nil)
-  }
-% end
 
   //
   // Protocol conformance
