@@ -175,7 +175,7 @@ Time warp
     ```swift
     enum Foo: Int { case A = 0, B = 1, C = 2 }
     let foo = Foo(rawValue: 2)! // formerly 'Foo.fromRaw(2)!'
-    println(foo.rawValue)  // formerly 'foo.toRaw()'
+    println(foo.rawValue) // formerly 'foo.toRaw()'
     ```
 
 2014-09-02
