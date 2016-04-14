@@ -32,32 +32,32 @@ func testCFunction() {
 
 
 class Derived : Base {
-  override func safeOverride(arg: NSObject) -> ForwardClass { // no-warning
+  override func safeOverride(_ arg: NSObject) -> ForwardClass { // no-warning
     return ForwardClass()
   }
 
-  override func unsafeOverrideParam(arg: ForwardClass) -> NSObject { // expected-error{{does not override}}
+  override func unsafeOverrideParam(_ arg: ForwardClass) -> NSObject { // expected-error{{does not override}}
     return arg
   }
 
-  override func unsafeOverrideReturn(arg: ForwardClass) -> NSObject { // expected-error{{does not override}}
+  override func unsafeOverrideReturn(_ arg: ForwardClass) -> NSObject { // expected-error{{does not override}}
     return arg
   }
 
-  override func safeOverridePartialSub(arg: NSObject?) -> PartialSubClass { // no-warning
+  override func safeOverridePartialSub(_ arg: NSObject?) -> PartialSubClass { // no-warning
     return PartialSubClass()
   }
 
-  override func unsafeOverridePartialSubParam(arg: PartialSubClass) -> NSObject { // expected-error{{does not override}}
+  override func unsafeOverridePartialSubParam(_ arg: PartialSubClass) -> NSObject { // expected-error{{does not override}}
     return arg
   }
 
-  override func unsafeOverridePartialSubReturn(arg: PartialSubClass) -> NSObject { // expected-error{{does not override}}
+  override func unsafeOverridePartialSubReturn(_ arg: PartialSubClass) -> NSObject { // expected-error{{does not override}}
     return arg
   }
 }
 
-func testMethod(container: Base, input: ForwardClass, inputProto: ForwardProto, inputPartial: PartialSubClass) {
+func testMethod(_ container: Base, input: ForwardClass, inputProto: ForwardProto, inputPartial: PartialSubClass) {
   _ = container.unsafeOverrideReturn(input) as ForwardClass// no-warning
   _ = container.unsafeOverrideProtoReturn(inputProto) as ForwardProto // no-warning
   _ = container.unsafeOverridePartialSubReturn(inputPartial) as PartialSubClass// no-warning
@@ -65,12 +65,12 @@ func testMethod(container: Base, input: ForwardClass, inputProto: ForwardProto, 
 
 
 class ProtoConformer : ForwardClassUser {
-  @objc func consumeForwardClass(arg: ForwardClass) {}
+  @objc func consumeForwardClass(_ arg: ForwardClass) {}
 
   @objc var forward = ForwardClass()
 }
 
-func testProtocolWrapper(conformer: ForwardClassUser) {
+func testProtocolWrapper(_ conformer: ForwardClassUser) {
   conformer.consumeForwardClass(conformer.forward)
 }
 testProtocolWrapper(ProtoConformer())

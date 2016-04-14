@@ -44,7 +44,7 @@ func testAmbiguousStringComparisons(s: String) {
   let a12 = nsString > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
 }
 
-func acceptsSequence<S : Sequence>(sequence: S) {}
+func acceptsSequence<S : Sequence>(_ sequence: S) {}
 
 func testStringIsNotASequence(s: String) {
   acceptsSequence(s) // expected-error {{argument type 'String' does not conform to expected type 'Sequence'}}

@@ -4,7 +4,7 @@
 
 // CHECK-LABEL: specialize_self.cast <A, B> (A) -> Swift.Optional<B>
 // CHECK-NEXT: sil hidden @_TF15specialize_self4cast{{.*}} : $@convention(thin) <T, R> (@in T) -> @out Optional<R>
-func cast<T,R>(x: T) -> R? {
+func cast<T,R>(_ x: T) -> R? {
   return x as? R
 }
 
@@ -13,7 +13,7 @@ func cast<T,R>(x: T) -> R? {
 // CHECK: [[CAST:%[0-9]+]] = function_ref @_TF15specialize_self4cast
 // CHECK: apply [[CAST]]<AnyObject, Self>
 class Base {
-  class func returnIfSelf(x: AnyObject) -> Self? {
+  class func returnIfSelf(_ x: AnyObject) -> Self? {
     return cast(x)
   }
 }

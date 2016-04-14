@@ -297,8 +297,8 @@ extension Magic {
   }
 }
 struct Wizard : Magic {}
-func improve(x: inout Int) {}
-func improveWizard(wizard: inout Wizard) {
+func improve(_ x: inout Int) {}
+func improveWizard(_ wizard: inout Wizard) {
   improve(&wizard.hocus)
 }
 // CHECK-LABEL: sil hidden @_TF17materializeForSet13improveWizardFRVS_6WizardT_
@@ -356,7 +356,7 @@ struct Foo<T>: AddressOnlySubscript {
   }
 }
 
-func increment(x: inout Int) { x += 1 }
+func increment(_ x: inout Int) { x += 1 }
 
 // Test for materializeForSet vs static properties of structs.
 
@@ -384,7 +384,7 @@ struct Wine<Color> : Beverage {
 
 // Make sure we can perform an inout access of such a property too.
 
-func inoutAccessOfStaticProperty<T : Beverage>(t: T.Type) {
+func inoutAccessOfStaticProperty<T : Beverage>(_ t: T.Type) {
   increment(&t.abv)
 }
 
@@ -412,7 +412,7 @@ protocol Panda {
   var x: Self -> Self { get set }
 }
 
-func id<T>(t: T) -> T { return t }
+func id<T>(_ t: T) -> T { return t }
 
 extension Panda {
   var x: Self -> Self {

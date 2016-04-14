@@ -13,7 +13,7 @@ protocol CP : class {
   func g() -> Self
 }
 
-func callDynamicSelfExistential(p: P) {
+func callDynamicSelfExistential(_ p: P) {
   print("Before first call")
   var p2 = p.f()
   print("Between calls")
@@ -21,7 +21,7 @@ func callDynamicSelfExistential(p: P) {
   print("After second call")
 }
 
-func callDynamicSelfClassExistential(cp: CP) {
+func callDynamicSelfClassExistential(_ cp: CP) {
   print("Before first call")
   var cp2 = cp.f()
   print("Between calls")

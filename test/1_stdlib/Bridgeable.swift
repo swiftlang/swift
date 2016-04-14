@@ -6,7 +6,7 @@
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
     var result: Self? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -30,7 +30,7 @@ func bridgedStatus<T>(_: T.Type) -> String {
     : "is unbridged"
 }
 
-func testBridging<T>(x: T, _ name: String) {
+func testBridging<T>(_ x: T, _ name: String) {
   print("\(name) \(bridgedStatus(T.self))")
   var b : String
   if let result = _bridgeToObjectiveC(x) {
@@ -53,13 +53,13 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     return C()
   }
   static func _forceBridgeFromObjectiveC(
-    x: C,
+    _ x: C,
     result: inout BridgedValueType?
   ) {
     _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: C,
+    _ x: C,
     result: inout BridgedValueType?
   ) -> Bool {
     _preconditionFailure("implement")
@@ -90,13 +90,13 @@ struct ConditionallyBridged<T> : _ObjectiveCBridgeable {
     return C()
   }
   static func _forceBridgeFromObjectiveC(
-    x: C,
+    _ x: C,
     result: inout ConditionallyBridged<T>?
   ) {
     _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: C,
+    _ x: C,
     result: inout ConditionallyBridged<T>?
   ) -> Bool {
     _preconditionFailure("implement")

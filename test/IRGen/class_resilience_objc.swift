@@ -16,7 +16,7 @@ public class FixedLayoutObjCSubclass : NSObject {
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* %1, i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
-func testConstantDirectFieldAccess(o: FixedLayoutObjCSubclass) {
+func testConstantDirectFieldAccess(_ o: FixedLayoutObjCSubclass) {
   o.field = 10
 }
 
@@ -34,7 +34,7 @@ public class NonFixedLayoutObjCSubclass : NSCoder {
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
-func testNonConstantDirectFieldAccess(o: NonFixedLayoutObjCSubclass) {
+func testNonConstantDirectFieldAccess(_ o: NonFixedLayoutObjCSubclass) {
   o.field = 10
 }
 
@@ -76,7 +76,7 @@ public class GenericObjCSubclass<T> : NSCoder {
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
-func testConstantIndirectFieldAccess<T>(o: GenericObjCSubclass<T>) {
+func testConstantIndirectFieldAccess<T>(_ o: GenericObjCSubclass<T>) {
   // This field uses constant indirect access because NSCoder has resilient
   // layout. Non-constant indirect is never needed for Objective-C classes
   // because the field offset vector only contains Swift field offsets.

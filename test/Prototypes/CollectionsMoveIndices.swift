@@ -352,25 +352,25 @@ public protocol MySequenceType {
 
   @warn_unused_result
   func map<T>(
-    @noescape transform: (Generator.Element) throws -> T
+    @noescape _ transform: (Generator.Element) throws -> T
   ) rethrows -> [T]
 
   @warn_unused_result
-  func dropFirst(n: Int) -> SubSequence
+  func dropFirst(_ n: Int) -> SubSequence
 
   @warn_unused_result
-  func dropLast(n: Int) -> SubSequence
+  func dropLast(_ n: Int) -> SubSequence
 
   @warn_unused_result
-  func prefix(maxLength: Int) -> SubSequence
+  func prefix(_ maxLength: Int) -> SubSequence
 
   @warn_unused_result
-  func suffix(maxLength: Int) -> SubSequence
+  func suffix(_ maxLength: Int) -> SubSequence
 }
 extension MySequenceType {
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Generator.Element) throws -> T
+    @noescape _ transform: (Generator.Element) throws -> T
   ) rethrows -> [T] {
     var result: [T] = []
     for element in OldSequence(self) {
@@ -380,25 +380,25 @@ extension MySequenceType {
   }
 
   @warn_unused_result
-  public func dropFirst(n: Int) -> SubSequence {
+  public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     fatalError("implement")
   }
 
   @warn_unused_result
-  public func dropLast(n: Int) -> SubSequence {
+  public func dropLast(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     fatalError("implement")
   }
 
   @warn_unused_result
-  public func prefix(maxLength: Int) -> SubSequence {
+  public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a prefix of negative length from a collection")
     fatalError("implement")
   }
 
   @warn_unused_result
-  public func suffix(maxLength: Int) -> SubSequence {
+  public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
     fatalError("implement")
   }
@@ -444,9 +444,9 @@ public protocol MyIndexableType {
   @warn_unused_result
   func successor(of i: Index) -> Index
 
-  func formSuccessor(i: inout Index)
+  func formSuccessor(_ i: inout Index)
 
-  func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>)
+  func _failEarlyRangeCheck(_ index: Index, bounds: MyRange<Index>)
 
   func _failEarlyRangeCheck2(
     rangeStart rangeStart: Index,
@@ -456,7 +456,7 @@ public protocol MyIndexableType {
 }
 extension MyIndexableType {
   @inline(__always)
-  public func formSuccessor(i: inout Index) {
+  public func formSuccessor(_ i: inout Index) {
     i = successor(of: i)
   }
 }
@@ -485,15 +485,15 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   func successor(of i: Index) -> Index
 
   @warn_unused_result
-  func advance(i: Index, by: IndexDistance) -> Index
+  func advance(_ i: Index, by: IndexDistance) -> Index
 
   @warn_unused_result
-  func advance(i: Index, by: IndexDistance, limitedBy limit: Index) -> Index
+  func advance(_ i: Index, by: IndexDistance, limitedBy limit: Index) -> Index
 
   @warn_unused_result
-  func distanceFrom(start: Index, to: Index) -> IndexDistance
+  func distanceFrom(_ start: Index, to: Index) -> IndexDistance
 
-  func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>)
+  func _failEarlyRangeCheck(_ index: Index, bounds: MyRange<Index>)
 
   func _failEarlyRangeCheck2(
     rangeStart rangeStart: Index,
@@ -504,7 +504,7 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   var indices: IndexRange { get }
 
   @warn_unused_result
-  func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
+  func _customIndexOfEquatableElement(_ element: Generator.Element) -> Index??
 
   var first: Generator.Element? { get }
 
@@ -517,7 +517,7 @@ extension MyForwardCollectionType {
   /// Do not use this method directly; call advancedBy(n) instead.
   @inline(__always)
   @warn_unused_result
-  internal func _advanceForward(i: Index, by n: IndexDistance) -> Index {
+  internal func _advanceForward(_ i: Index, by n: IndexDistance) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
 
@@ -532,7 +532,7 @@ extension MyForwardCollectionType {
   @inline(__always)
   @warn_unused_result
   internal func _advanceForward(
-    i: Index, by n: IndexDistance, limitedBy limit: Index
+    _ i: Index, by n: IndexDistance, limitedBy limit: Index
   ) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
@@ -545,17 +545,17 @@ extension MyForwardCollectionType {
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     return self._advanceForward(i, by: n)
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     return self._advanceForward(i, by: n, limitedBy: limit)
   }
 
   @warn_unused_result
-  public func distanceFrom(start: Index, to end: Index) -> IndexDistance {
+  public func distanceFrom(_ start: Index, to end: Index) -> IndexDistance {
     var start = start
     var count: IndexDistance = 0
     while start != end {
@@ -566,7 +566,7 @@ extension MyForwardCollectionType {
   }
 
   public func _failEarlyRangeCheck(
-    index: Index, bounds: MyRange<Index>) {
+    _ index: Index, bounds: MyRange<Index>) {
     // Can't perform range checks in O(1) on forward indices.
   }
 
@@ -581,7 +581,7 @@ extension MyForwardCollectionType {
 
   @warn_unused_result
   public func _customIndexOfEquatableElement(
-    element: Generator.Element
+    _ element: Generator.Element
   ) -> Index?? {
     return nil
   }
@@ -599,14 +599,14 @@ extension MyForwardCollectionType {
   }
 
   @warn_unused_result
-  public func dropFirst(n: Int) -> SubSequence {
+  public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(numericCast(n), stepsFrom: startIndex, limitedBy: endIndex)
     return self[start..<*endIndex]
   }
 
   @warn_unused_result
-  public func dropLast(n: Int) -> SubSequence {
+  public func dropLast(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = max(0, numericCast(count) - n)
     let end = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
@@ -614,14 +614,14 @@ extension MyForwardCollectionType {
   }
 
   @warn_unused_result
-  public func prefix(maxLength: Int) -> SubSequence {
+  public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a prefix of negative length from a collection")
     let end = index(numericCast(maxLength), stepsFrom: startIndex, limitedBy: endIndex)
     return self[startIndex..<*end]
   }
 
   @warn_unused_result
-  public func suffix(maxLength: Int) -> SubSequence {
+  public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
     let amount = max(0, numericCast(count) - maxLength)
     let start = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
@@ -674,14 +674,14 @@ extension MyForwardCollectionType
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     _precondition(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     return i.advancedBy(n)
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     let d = i.distanceTo(limit)
@@ -710,7 +710,7 @@ extension MyForwardCollectionType
     return nil
   }
 
-  public func indexOf_optimized(element: Generator.Element) -> Index? {
+  public func indexOf_optimized(_ element: Generator.Element) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
     }
@@ -740,17 +740,17 @@ public protocol MyBidirectionalCollectionType : MyForwardCollectionType {
   @warn_unused_result
   func predecessor(of i: Index) -> Index
 
-  func formPredecessor(i: inout Index)
+  func formPredecessor(_ i: inout Index)
 }
 
 extension MyBidirectionalCollectionType {
   @inline(__always)
-  public func formPredecessor(i: inout Index) {
+  public func formPredecessor(_ i: inout Index) {
     i = predecessor(of: i)
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
@@ -762,7 +762,7 @@ extension MyBidirectionalCollectionType {
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n, limitedBy: limit)
     }
@@ -785,12 +785,12 @@ extension MyBidirectionalCollectionType
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     return i.advancedBy(n)
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     let d = i.distanceTo(limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit
@@ -1008,7 +1008,7 @@ public struct MySlice<Collection : MyIndexableType /* : MyForwardCollectionType 
     return _base.successor(of: i)
   }
 
-  public func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>) {
+  public func _failEarlyRangeCheck(_ index: Index, bounds: MyRange<Index>) {
     fatalError("FIXME")
   }
 
@@ -1098,7 +1098,7 @@ public struct MySliceIndexRange<Collection : MyIndexableType /* MyForwardCollect
     return Collection(from: _unownedCollection).successor(of: i)
   }
 
-  public func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>) {
+  public func _failEarlyRangeCheck(_ index: Index, bounds: MyRange<Index>) {
   }
 
   public func _failEarlyRangeCheck2(
@@ -1174,17 +1174,17 @@ public protocol MyRandomAccessIndexType : MyBidirectionalIndexType, MyStrideable
   _RandomAccessAmbiguity {
 
   @warn_unused_result
-  func distanceTo(other: Self) -> Distance
+  func distanceTo(_ other: Self) -> Distance
 
   @warn_unused_result
-  func advancedBy(n: Distance) -> Self
+  func advancedBy(_ n: Distance) -> Self
 
   @warn_unused_result
-  func advancedBy(n: Distance, limitedBy limit: Self) -> Self
+  func advancedBy(_ n: Distance, limitedBy limit: Self) -> Self
 }
 
 extension MyRandomAccessIndexType {
-  public func _failEarlyRangeCheck(index: Self, bounds: MyRange<Self>) {
+  public func _failEarlyRangeCheck(_ index: Self, bounds: MyRange<Self>) {
     _precondition(
       bounds.lowerBound <= index,
       "index is out of bounds: index designates a position before bounds.lowerBound")
@@ -1218,7 +1218,7 @@ extension MyRandomAccessIndexType {
 
   @transparent
   @warn_unused_result
-  public func advancedBy(n: Distance, limitedBy limit: Self) -> Self {
+  public func advancedBy(_ n: Distance, limitedBy limit: Self) -> Self {
     let d = self.distanceTo(limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit
@@ -1280,7 +1280,7 @@ extension MyRandomAccessCollectionType
   IndexRange.Index == Index
 {
   public func lowerBoundOf(
-    element: Generator.Element,
+    _ element: Generator.Element,
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) -> Index {
     var low = startIndex
@@ -1305,7 +1305,7 @@ extension MyRandomAccessCollectionType
   IndexRange.Generator.Element == Index,
   IndexRange.Index == Index
 {
-  public func lowerBoundOf(element: Generator.Element) -> Index {
+  public func lowerBoundOf(_ element: Generator.Element) -> Index {
     return lowerBoundOf(element) { $0 < $1 }
   }
 }
@@ -1316,10 +1316,10 @@ public protocol MyStrideable : Comparable {
   associatedtype Distance : SignedNumberType
 
   @warn_unused_result
-  func distanceTo(other: Self) -> Distance
+  func distanceTo(_ other: Self) -> Distance
 
   @warn_unused_result
-  func advancedBy(n: Distance) -> Self
+  func advancedBy(_ n: Distance) -> Self
 }
 
 extension Int : MyStrideable {}
@@ -1491,12 +1491,12 @@ public struct MySimplestRandomAccessCollectionIndex : MyStrideable {
   }
 
   @warn_unused_result
-  public func distanceTo(other: MySimplestRandomAccessCollectionIndex) -> Int {
+  public func distanceTo(_ other: MySimplestRandomAccessCollectionIndex) -> Int {
     return other._index - _index
   }
 
   @warn_unused_result
-  public func advancedBy(n: Int) -> MySimplestRandomAccessCollectionIndex {
+  public func advancedBy(_ n: Int) -> MySimplestRandomAccessCollectionIndex {
     return MySimplestRandomAccessCollectionIndex(_index + n)
   }
 }
@@ -1525,12 +1525,12 @@ public struct MySimplestStrideable : MyStrideable {
   }
 
   @warn_unused_result
-  public func distanceTo(other: MySimplestStrideable) -> Int {
+  public func distanceTo(_ other: MySimplestStrideable) -> Int {
     return _value.distanceTo(other._value)
   }
 
   @warn_unused_result
-  public func advancedBy(n: Int) -> MySimplestStrideable {
+  public func advancedBy(_ n: Int) -> MySimplestStrideable {
     return MySimplestStrideable(_value.advancedBy(n))
   }
 }
@@ -1702,12 +1702,12 @@ public struct MyBinaryTree<Element : Comparable> {
     self = MyBinaryTree(_root: nil)
   }
 
-  public mutating func insert(element: Element) {
+  public mutating func insert(_ element: Element) {
     self = MyBinaryTree(_root: MyBinaryTree._insert(element, into: _root))
   }
 
   internal static func _insert(
-    element: Element,
+    _ element: Element,
     into root: _NodeReference<Element>?
   ) -> _NodeReference<Element> {
     guard let root = root else {

@@ -101,7 +101,7 @@ extension ${Self} : Sequence {
   }
 
   public func _customContainsEquatableElement(
-    element: Base.Iterator.Element
+    _ element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
@@ -171,7 +171,7 @@ extension ${Self} : ${TraversalCollection} {
   ///
   /// - Complexity: O(N).
   public func _customIndexOfEquatableElement(
-    element: Base.Iterator.Element
+    _ element: Base.Iterator.Element
   ) -> Index?? {
     return _base._customIndexOfEquatableElement(element)
   }
@@ -183,13 +183,15 @@ extension ${Self} : ${TraversalCollection} {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(n: Base.IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: Base.IndexDistance, stepsFrom i: Index) -> Index {
     return _base.index(n, stepsFrom: i)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(n: Base.IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(
+    _ n: Base.IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  ) -> Index {
     return _base.index(n, stepsFrom: i, limitedBy: limit)
   }
 

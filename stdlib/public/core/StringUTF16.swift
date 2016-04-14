@@ -71,14 +71,14 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+    public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: i._offset.advanced(by: n))
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+    public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       let d = i._offset.distance(to: limit._offset)
       if d == 0 || (d > 0 ? d <= n : d >= n) {
@@ -380,7 +380,7 @@ extension String.UTF16View.Indices : BidirectionalCollection {
     return _elements.successor(of: i)
   }
 
-  public func formSuccessor(i: inout Index) {
+  public func formSuccessor(_ i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _elements.formSuccessor(&i)
   }
@@ -391,19 +391,19 @@ extension String.UTF16View.Indices : BidirectionalCollection {
     return _elements.predecessor(of: i)
   }
 
-  public func formPredecessor(i: inout Index) {
+  public func formPredecessor(_ i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _elements.formPredecessor(&i)
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
     return _elements.index(n, stepsFrom: i)
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
     return _elements.index(n, stepsFrom: i, limitedBy: limit)
   }

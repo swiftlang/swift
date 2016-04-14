@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 %{
-from gyb_stdlib_unittest_support import TRACE, TRACE1, stackTrace, trace
+from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 }%
 
 import StdlibUnittest
@@ -28,7 +28,7 @@ public func checkIterator<
   ${genericParam}, I : IteratorProtocol
   where I.Element == ${Element}
 >(
-  expected: ${Expected},
+  _ expected: ${Expected},
   _ iterator: I,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -56,7 +56,7 @@ public func checkIterator<
   ${genericParam}, I : IteratorProtocol
   where I.Element == ${Element}, ${Element} : Equatable
 >(
-  expected: ${Expected},
+  _ expected: ${Expected},
   _ iterator: I,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
@@ -72,7 +72,7 @@ public func checkSequence<
   where
   S.Iterator.Element == ${Element}
 >(
-  expected: ${Expected},
+  _ expected: ${Expected},
   _ sequence: S,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -111,7 +111,7 @@ public func checkSequence<
   S.Iterator.Element == ${Element},
   S.Iterator.Element : Equatable
 >(
-  expected: ${Expected},
+  _ expected: ${Expected},
   _ sequence: S,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all

@@ -32,11 +32,11 @@ enum MembersReferenceRawType : Int {
   }
 }
 
-func serialize<T : RawRepresentable>(values: [T]) -> [T.RawValue] {
+func serialize<T : RawRepresentable>(_ values: [T]) -> [T.RawValue] {
   return values.map { $0.rawValue }
 }
 
-func deserialize<T : RawRepresentable>(serialized: [T.RawValue]) -> [T] {
+func deserialize<T : RawRepresentable>(_ serialized: [T.RawValue]) -> [T] {
   return serialized.map { T(rawValue: $0)! }
 }
 

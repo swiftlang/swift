@@ -82,7 +82,7 @@ ClassProperties.test("direct") {
   expectEqual(1, Subclass.setCount)
 }
 
-func testExistential(e: ProtoWithClassProperty.Type) {
+func testExistential(_ e: ProtoWithClassProperty.Type) {
   e.reset()
   expectEqual(0, e.value)
   e.value = 4
@@ -102,7 +102,7 @@ ClassProperties.test("existentials") {
   expectEqual(1, Subclass.setCount)
 }
 
-func testGeneric<T: ProtoWithClassProperty>(e: T.Type) {
+func testGeneric<T: ProtoWithClassProperty>(_ e: T.Type) {
   e.reset()
   expectEqual(0, e.value)
   e.value = 4
@@ -122,7 +122,7 @@ ClassProperties.test("generics") {
   expectEqual(1, Subclass.setCount)
 }
 
-func testInheritance(e: ClassWithClassProperty.Type) {
+func testInheritance(_ e: ClassWithClassProperty.Type) {
   e.reset()
   expectEqual(0, e.value)
   e.value = 4
@@ -138,7 +138,7 @@ ClassProperties.test("inheritance") {
   expectEqual(1, Subclass.setCount)
 }
 
-func testInheritanceGeneric<T: ClassWithClassProperty>(e: T.Type) {
+func testInheritanceGeneric<T: ClassWithClassProperty>(_ e: T.Type) {
   e.reset()
   expectEqual(0, e.value)
   e.value = 4

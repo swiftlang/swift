@@ -58,7 +58,7 @@ public protocol RangeProtocol : Equatable {
   /// `lowerBound < x < upperBound`. `RangeProtocol` makes no requirement as
   /// to whether individual range types must contain either their lower or
   /// upper bound.
-  func contains(value: Bound) -> Bool
+  func contains(_ value: Bound) -> Bool
   
   /// Returns `true` iff `self` and `other` contain a value in common.
   /// 
@@ -66,7 +66,7 @@ public protocol RangeProtocol : Equatable {
   /// `lowerBound < x < upperBound`. `RangeProtocol` makes no requirement as
   /// to whether individual range types must contain either their lower or
   /// upper bound.
-  func overlaps(other: Self) -> Bool
+  func overlaps(_ other: Self) -> Bool
 
   /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
   var isEmpty: Bool { get }
@@ -104,8 +104,8 @@ extension RangeProtocol {
   /// Returns `true` iff `self` and `other` contain a value in common.
   @inline(__always)
   public func overlaps<
-    Other: RangeProtocol where Other.Bound == Bound
-  >(other: Other) -> Bool {
+    Other : RangeProtocol where Other.Bound == Bound
+  >(_ other: Other) -> Bool {
     return (!other.isEmpty && self.contains(other.lowerBound))
         || (!self.isEmpty && other.contains(lowerBound))
   }
@@ -169,7 +169,7 @@ extension HalfOpenRangeProtocol {
   
   /// Returns `true` iff `lowerBound <= value && upperBound > value`.
   @inline(__always)
-  public func contains(value: Bound) -> Bool {
+  public func contains(_ value: Bound) -> Bool {
     return lowerBound <= value && upperBound > value
   }
 
@@ -250,12 +250,12 @@ extension HalfOpenRangeProtocol
 ///
 /// However, subscripting that range still works in a generic context:
 ///
-///     func brackets<T>(x: CountableRange<T>, _ i: T) -> T {
+///     func brackets<T>(_ x: CountableRange<T>, _ i: T) -> T {
 ///         return x[i] // Just forward to subscript
 ///     }
 ///     print(brackets((-99..<100), 0))
 ///     // Prints "0"
-///     
+///
 /// - SeeAlso: `CountableClosedRange`, `Range`, `ClosedRange`
 public struct CountableRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
@@ -327,7 +327,7 @@ public struct CountableRange<
   public typealias Indices = CountableRange<Bound>
 
   @warn_unused_result
-  public func _customContainsEquatableElement(element: Element) -> Bool? {
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     return element >= self.lowerBound && element < self.upperBound
   }
 
@@ -363,7 +363,7 @@ extension RangeProtocol where Bound : Strideable, Bound.Stride : Integer {
   ///   is unrepresentable as an `Int`.
   @inline(__always)
   public init<
-    Other: RangeProtocol where Other.Bound == Bound
+    Other : RangeProtocol where Other.Bound == Bound
   >(_ other: Other) {
     let lowerBound = other.lowerBound
     let upperBound: Bound
@@ -506,7 +506,7 @@ public struct Range<
   /// equal to `lowerBound`. A `Range` instance does not contain its
   /// `upperBound`.
   @warn_unused_result
-  public func contains(element: Bound) -> Bool {
+  public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element < self.upperBound
   }
 

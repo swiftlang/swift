@@ -81,7 +81,7 @@ C::
 
   enum Foo { case A, B, C, D }
   
-  func use(x:Foo) {
+  func use(_ x:Foo) {
     switch x {
     case .A:
     case .B:
@@ -95,7 +95,7 @@ together::
 
   enum Foo { case A, B, C, D, Other(String) }
   
-  func use(x:Foo) {
+  func use(_ x:Foo) {
     switch x {
     case .A:
     case .B:
@@ -212,7 +212,7 @@ structs, including nested types, methods, constructors, and properties::
       this = .Int(0)
     }
 
-    func min(x:IntOrInfinity) -> IntOrInfinity {
+    func min(_ x:IntOrInfinity) -> IntOrInfinity {
       switch (self, x) {
       case (.NegInfinity, _):
       case (_, .NegInfinity):
@@ -330,7 +330,7 @@ methods. The NSChangeDictionaryKey definition behaves as if defined::
       }
     }
 
-    static func fromRaw(s:String) -> NSChangeDictionaryKey? {
+    static func fromRaw(_ s:String) -> NSChangeDictionaryKey? {
       switch s {
       case "NSKeyValueChangeKindKey":
         return .NSKeyValueChangeKindKey

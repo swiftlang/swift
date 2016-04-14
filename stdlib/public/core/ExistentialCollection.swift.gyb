@@ -25,7 +25,7 @@ from gyb_stdlib_support import (
 import SwiftShims
 
 @noreturn @inline(never)
-internal func _abstract(file: StaticString = #file, line: UInt = #line) {
+internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
   fatalError("Method must be overridden", file: file, line: line)
 }
 
@@ -66,7 +66,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///     var x = 7
   ///     let iterator = AnyIterator { x < 15 ? x++ : nil }
   ///     let a = Array(iterator) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
-  public init(body: () -> Element?) {
+  public init(_ body: () -> Element?) {
     self._box = _IteratorBox(_ClosureBasedIterator(body))
   }
 
@@ -112,7 +112,7 @@ internal final class _IteratorBox<
 }
 
 @warn_unused_result
-internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
+internal func _typeID(_ instance: AnyObject) -> ObjectIdentifier {
   return ObjectIdentifier(instance.dynamicType)
 }
 
@@ -144,34 +144,34 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   @warn_unused_result
   internal func _map<T>(
-    @noescape transform: (Element) throws -> T
+    @noescape _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     _abstract()
   }
 
   @warn_unused_result
   internal func _filter(
-    @noescape includeElement: (Element) throws -> Bool
+    @noescape _ includeElement: (Element) throws -> Bool
   ) rethrows -> [Element] {
     _abstract()
   }
 
   internal func _forEach(
-    @noescape body: (Element) throws -> Void
+    @noescape _ body: (Element) throws -> Void
   ) rethrows {
     _abstract()
   }
 
   @warn_unused_result
   internal func __customContainsEquatableElement(
-    element: Element
+    _ element: Element
   ) -> Bool? {
     _abstract()
   }
 
   @warn_unused_result
   internal func __preprocessingPass<R>(
-    @noescape preprocess: () throws -> R
+    @noescape _ preprocess: () throws -> R
   ) rethrows -> R? {
     _abstract()
   }
@@ -191,28 +191,28 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 %   override = 'override' if Kind != 'Sequence' else ''
   @warn_unused_result
-  internal ${override} func _dropFirst(n: Int) -> _Any${Kind}Box<Element> {
+  internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
   @warn_unused_result
-  internal ${override} func _dropLast(n: Int) -> _Any${Kind}Box<Element> {
+  internal ${override} func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
   @warn_unused_result
-  internal ${override} func _prefix(maxLength: Int) -> _Any${Kind}Box<Element> {
+  internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
   @warn_unused_result
-  internal ${override} func _suffix(maxLength: Int) -> _Any${Kind}Box<Element> {
+  internal ${override} func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
   @warn_unused_result
   internal func _split(
-    maxSplits maxSplits: Int, omittingEmptySubsequences: Bool,
+    maxSplits: Int, omittingEmptySubsequences: Bool,
     @noescape isSeparator: (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     _abstract()
@@ -222,24 +222,24 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal subscript(i: _AnyIndexBox) -> Element { _abstract() }
   @warn_unused_result
   internal func _successor(of i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func _formSuccessor(i: _AnyIndexBox) { _abstract() }
+  internal func _formSuccessor(_ i: _AnyIndexBox) { _abstract() }
   @warn_unused_result
-  internal func _index(n: IntMax, stepsFrom i: _AnyIndexBox) -> _AnyIndexBox {
+  internal func _index(_ n: IntMax, stepsFrom i: _AnyIndexBox) -> _AnyIndexBox {
     _abstract()
   }
   @warn_unused_result
   internal func _index(
-    n: IntMax,
+    _ n: IntMax,
     stepsFrom i: _AnyIndexBox,
     limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox {
     _abstract()
   }
-  internal func _formIndex(n: IntMax, stepsFrom i: inout _AnyIndexBox) {
+  internal func _formIndex(_ n: IntMax, stepsFrom i: inout _AnyIndexBox) {
     _abstract()
   }
   internal func _formIndex(
-    n: IntMax,
+    _ n: IntMax,
     stepsFrom i: inout _AnyIndexBox,
     limitedBy limit: _AnyIndexBox
   ) {
@@ -301,7 +301,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 %   if Kind == 'BidirectionalCollection':
   internal func _predecessor(of i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func _formPredecessor(i: _AnyIndexBox) { _abstract() }
+  internal func _formPredecessor(_ i: _AnyIndexBox) { _abstract() }
   internal var _last: Element? { _abstract() }
 
   internal override init(
@@ -367,30 +367,30 @@ internal final class _${Kind}Box<
   }
   @warn_unused_result
   internal override func _map<T>(
-    @noescape transform: (Element) throws -> T
+    @noescape _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
   @warn_unused_result
   internal override func _filter(
-    @noescape includeElement: (Element) throws -> Bool
+    @noescape _ includeElement: (Element) throws -> Bool
   ) rethrows -> [Element] {
     return try _base.filter(includeElement)
   }
   internal override func _forEach(
-    @noescape body: (Element) throws -> Void
+    @noescape _ body: (Element) throws -> Void
   ) rethrows {
     return try _base.forEach(body)
   }
   @warn_unused_result
   internal override func __customContainsEquatableElement(
-    element: Element
+    _ element: Element
   ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
   @warn_unused_result
   internal override func __preprocessingPass<R>(
-    @noescape preprocess: () throws -> R
+    @noescape _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
@@ -404,25 +404,25 @@ internal final class _${Kind}Box<
     return _base._copyContents(initializing: ptr)
   }
   @warn_unused_result
-  internal override func _dropFirst(n: Int) -> _Any${Kind}Box<Element> {
+  internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropFirst(n))
   }
   @warn_unused_result
-  internal override func _dropLast(n: Int) -> _Any${Kind}Box<Element> {
+  internal override func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropLast(n))
   }
   @warn_unused_result
-  internal override func _prefix(maxLength: Int) -> _Any${Kind}Box<Element> {
+  internal override func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.prefix(maxLength))
   }
   @warn_unused_result
-  internal override func _suffix(maxLength: Int) -> _Any${Kind}Box<Element> {
+  internal override func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.suffix(maxLength))
   }
 %   for ResultKind in EqualAndWeakerKinds:
   @warn_unused_result
   internal override func _split(
-    maxSplits maxSplits: Int, omittingEmptySubsequences: Bool,
+    maxSplits: Int, omittingEmptySubsequences: Bool,
     @noescape isSeparator: (Element) throws -> Bool
   ) rethrows -> [Any${ResultKind}<Element>] {
     return try _base.split(
@@ -448,7 +448,7 @@ internal final class _${Kind}Box<
   }
 
   internal func _unbox(
-    position: _AnyIndexBox, file: StaticString = #file, line: UInt = #line
+    _ position: _AnyIndexBox, file: StaticString = #file, line: UInt = #line
   ) -> S.Index {
     if let i = position._unbox() as S.Index? {
       return i
@@ -473,7 +473,7 @@ internal final class _${Kind}Box<
     return _IndexBox(_base: _base.successor(of: _unbox(position)))
   }
 
-  internal override func _formSuccessor(position: _AnyIndexBox) {
+  internal override func _formSuccessor(_ position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
       return _base.formSuccessor(&p._base)
     }
@@ -482,7 +482,7 @@ internal final class _${Kind}Box<
 
   @warn_unused_result
   internal override func _index(
-    n: IntMax,
+    _ n: IntMax,
     stepsFrom i: _AnyIndexBox
   ) -> _AnyIndexBox {
     return _IndexBox(_base: _base.index(numericCast(n), stepsFrom: _unbox(i)))
@@ -490,7 +490,7 @@ internal final class _${Kind}Box<
 
   @warn_unused_result
   internal override func _index(
-    n: IntMax,
+    _ n: IntMax,
     stepsFrom i: _AnyIndexBox,
     limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox {
@@ -502,7 +502,7 @@ internal final class _${Kind}Box<
   }
 
   internal override func _formIndex(
-    n: IntMax,
+    _ n: IntMax,
     stepsFrom i: inout _AnyIndexBox
   ) {
     if let i = i as? _IndexBox<S.Index> {
@@ -512,7 +512,7 @@ internal final class _${Kind}Box<
   }
 
   internal override func _formIndex(
-    n: IntMax,
+    _ n: IntMax,
     stepsFrom i: inout _AnyIndexBox,
     limitedBy limit: _AnyIndexBox
   ) {
@@ -547,7 +547,7 @@ internal final class _${Kind}Box<
     return _IndexBox(_base: _base.predecessor(of: _unbox(position)))
   }
 
-  internal override func _formPredecessor(position: _AnyIndexBox) {
+  internal override func _formPredecessor(_ position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
       return _base.formPredecessor(&p._base)
     }
@@ -633,47 +633,47 @@ extension Any${Kind} {
 
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Element) throws -> T
+    @noescape _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     return try _box._map(transform)
   }
 
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Element) throws -> Bool
+    @noescape _ includeElement: (Element) throws -> Bool
   ) rethrows -> [Element] {
     return try _box._filter(includeElement)
   }
 
   public func forEach(
-    @noescape body: (Element) throws -> Void
+    @noescape _ body: (Element) throws -> Void
   ) rethrows {
     return try _box._forEach(body)
   }
 
   @warn_unused_result
-  public func dropFirst(n: Int) -> Any${Kind}<Element> {
+  public func dropFirst(_ n: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropFirst(n))
   }
 
   @warn_unused_result
-  public func dropLast(n: Int) -> Any${Kind}<Element> {
+  public func dropLast(_ n: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropLast(n))
   }
 
   @warn_unused_result
-  public func prefix(maxLength: Int) -> Any${Kind}<Element> {
+  public func prefix(_ maxLength: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._prefix(maxLength))
   }
 
   @warn_unused_result
-  public func suffix(maxLength: Int) -> Any${Kind}<Element> {
+  public func suffix(_ maxLength: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._suffix(maxLength))
   }
 
   @warn_unused_result
   public func split(
-    maxSplits maxSplits: Int = Int.max,
+    maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
     @noescape isSeparator: (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
@@ -685,7 +685,7 @@ extension Any${Kind} {
 
   @warn_unused_result
   public func _preprocessingPass<R>(
-    @noescape preprocess: () throws -> R
+    @noescape _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _box.__preprocessingPass(preprocess)
   }
@@ -741,7 +741,7 @@ internal final class _IndexBox<
   }
 
   @warn_unused_result
-  internal func _unsafeUnbox(other: _AnyIndexBox) -> BaseIndex {
+  internal func _unsafeUnbox(_ other: _AnyIndexBox) -> BaseIndex {
     return unsafeDowncast(other, to: _IndexBox.self)._base
   }
 
@@ -990,13 +990,13 @@ public struct ${Self}<Element>
       _box[start: bounds.lowerBound._box, end: bounds.upperBound._box])
   }
 
-  public func _failEarlyRangeCheck(index: AnyIndex, bounds: Range<AnyIndex>) {
+  public func _failEarlyRangeCheck(_ index: AnyIndex, bounds: Range<AnyIndex>) {
     // Do nothing.  Doing a range check would involve unboxing indices,
     // performing dynamic dispatch etc.  This seems to be too costly for a fast
     // range check for QoI purposes.
   }
 
-  public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
+  public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     // Do nothing.  Doing a range check would involve unboxing indices,
     // performing dynamic dispatch etc.  This seems to be too costly for a fast
     // range check for QoI purposes.
@@ -1007,7 +1007,7 @@ public struct ${Self}<Element>
     return AnyIndex(_box: _box._successor(of: i._box))
   }
 
-  public func formSuccessor(i: inout AnyIndex) {
+  public func formSuccessor(_ i: inout AnyIndex) {
     if _isUnique(&i._box) {
       _box._formSuccessor(i._box)
     }
@@ -1018,7 +1018,7 @@ public struct ${Self}<Element>
 
   @warn_unused_result
   public func index(
-    n: IntMax,
+    _ n: IntMax,
     stepsFrom i: AnyIndex
   ) -> AnyIndex {
     return AnyIndex(_box: _box._index(n, stepsFrom: i._box))
@@ -1026,7 +1026,7 @@ public struct ${Self}<Element>
 
   @warn_unused_result
   public func index(
-    n: IntMax,
+    _ n: IntMax,
     stepsFrom i: AnyIndex,
     limitedBy limit: AnyIndex
   ) -> AnyIndex {
@@ -1034,7 +1034,7 @@ public struct ${Self}<Element>
       _box: _box._index(n, stepsFrom: i._box, limitedBy: limit._box))
   }
 
-  public func formIndex(n: IntMax, stepsFrom i: inout AnyIndex) {
+  public func formIndex(_ n: IntMax, stepsFrom i: inout AnyIndex) {
     if _isUnique(&i._box) {
       return _box._formIndex(n, stepsFrom: &i._box)
     } else {
@@ -1043,7 +1043,7 @@ public struct ${Self}<Element>
   }
 
   public func formIndex(
-    n: IntMax,
+    _ n: IntMax,
     stepsFrom i: inout AnyIndex,
     limitedBy limit: AnyIndex
   ) {
@@ -1075,7 +1075,7 @@ public struct ${Self}<Element>
     return AnyIndex(_box: _box._predecessor(of: i._box))
   }
 
-  public func formPredecessor(i: inout AnyIndex) {
+  public func formPredecessor(_ i: inout AnyIndex) {
     if _isUnique(&i._box) {
       _box._formPredecessor(i._box)
     }

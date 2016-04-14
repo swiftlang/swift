@@ -13,14 +13,14 @@
 import TestsUtils
 
 @inline(never)
-func memset(a: inout [Int], _ c: Int) {
+func memset(_ a: inout [Int], _ c: Int) {
   for i in 0..<a.count {
     a[i] = c
   }
 }
 
 @inline(never)
-public func run_Memset(N: Int) {
+public func run_Memset(_ N: Int) {
   var a = [Int](repeating: 0, count: 10_000)
   for _ in 1...50*N {
     memset(&a, 1)

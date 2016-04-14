@@ -23,9 +23,9 @@ var raw = runcing.rawValue
 var eq = runcing == .quinceSliced
 var hash = runcing.hashValue
 
-func testEm<E: Equatable>(x: E, _ y: E) {}
-func hashEm<H: Hashable>(x: H) {}
-func rawEm<R: RawRepresentable>(x: R) {}
+func testEm<E: Equatable>(_ x: E, _ y: E) {}
+func hashEm<H: Hashable>(_ x: H) {}
+func rawEm<R: RawRepresentable>(_ x: R) {}
 
 testEm(NSRuncingOptions.mince, .quinceSliced)
 hashEm(NSRuncingOptions.mince)

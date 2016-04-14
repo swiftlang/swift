@@ -13,7 +13,7 @@ import resilient_enum
 
 // CHECK-LABEL: define{{( protected)?}} void @_TF17struct_resilience26functionWithResilientTypesFTV16resilient_struct4Size1fFS1_S1__S1_(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.refcounted*)
 
-public func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
+public func functionWithResilientTypes(_ s: Size, f: Size -> Size) -> Size {
 
 // CHECK: [[RESULT:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
 
@@ -53,7 +53,7 @@ public func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
 // field offsets from it.
 
 // CHECK-LABEL: define{{( protected)?}} void @_TF17struct_resilience26functionWithResilientTypesFV16resilient_struct9RectangleT_(%V16resilient_struct9Rectangle* noalias nocapture)
-public func functionWithResilientTypes(r: Rectangle) {
+public func functionWithResilientTypes(_ r: Rectangle) {
 
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct9Rectangle()
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
@@ -82,7 +82,7 @@ public struct MySize {
 }
 
 // CHECK-LABEL: define{{( protected)?}} void @_TF17struct_resilience28functionWithMyResilientTypesFTVS_6MySize1fFS0_S0__S0_(%V17struct_resilience6MySize* {{.*}}, %V17struct_resilience6MySize* {{.*}}, i8*, %swift.refcounted*)
-public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySize {
+public func functionWithMyResilientTypes(_ s: MySize, f: MySize -> MySize) -> MySize {
 
 // CHECK: [[TEMP:%.*]] = alloca %V17struct_resilience6MySize
 // CHECK: bitcast

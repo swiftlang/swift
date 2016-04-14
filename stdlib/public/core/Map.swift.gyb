@@ -102,7 +102,7 @@ public struct ${Self}<
   @warn_unused_result
   public func successor(of i: Index) -> Index { return _base.successor(of: i) }
 
-  public func formSuccessor(i: inout Index) {
+  public func formSuccessor(_ i: inout Index) {
     _base.formSuccessor(&i)
   }
 
@@ -110,7 +110,7 @@ public struct ${Self}<
   @warn_unused_result
   public func predecessor(of i: Index) -> Index { return _base.predecessor(of: i) }
 
-  public func formPredecessor(i: inout Index) {
+  public func formPredecessor(_ i: inout Index) {
     _base.formPredecessor(&i)
   }
 %   end
@@ -163,12 +163,12 @@ public struct ${Self}<
 %   end
 
   @warn_unused_result
-  public func index(n: Base.IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: Base.IndexDistance, stepsFrom i: Index) -> Index {
     return _base.index(n, stepsFrom: i)
   }
 
   @warn_unused_result
-  public func index(n: Base.IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: Base.IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     return _base.index(n, stepsFrom: i, limitedBy: limit)
   }
 
@@ -209,7 +209,7 @@ extension LazySequenceProtocol {
   /// calling `transform` function on a base element.
   @warn_unused_result
   public func map<U>(
-    transform: (Elements.Iterator.Element) -> U
+    _ transform: (Elements.Iterator.Element) -> U
   ) -> LazyMapSequence<Self.Elements, U> {
     return LazyMapSequence(_base: self.elements, transform: transform)
   }
@@ -227,7 +227,7 @@ extension LazyCollectionProtocol
   /// calling `transform` function on a base element.
   @warn_unused_result
   public func map<U>(
-    transform: (Elements.Iterator.Element) -> U
+    _ transform: (Elements.Iterator.Element) -> U
   ) -> LazyMap${collectionForTraversal(Traversal)}<Self.Elements, U> {
     return LazyMap${collectionForTraversal(Traversal)}(
       _base: self.elements,

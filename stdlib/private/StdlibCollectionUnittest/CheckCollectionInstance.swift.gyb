@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 %{
-from gyb_stdlib_unittest_support import TRACE, TRACE1, stackTrace, trace
+from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
 }%
 
@@ -63,7 +63,7 @@ public func check${inc.capitalize()}rementable<
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index
 >(
-  instances: Instances,
+  _ instances: Instances,
   of baseCollection: BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   ${end}Index: Instances.Iterator.Element, ${TRACE}
@@ -93,7 +93,7 @@ internal func _checkIncrementalAdvance<
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index
 >(
-  instances: Instances,
+  _ instances: Instances,
   of baseCollection : BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   limit: Instances.Iterator.Element,
@@ -138,7 +138,7 @@ public func checkForwardIndex<
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index
 >(
-  instances: Instances,
+  _ instances: Instances,
   of baseCollection: BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   endIndex: Instances.Iterator.Element, ${TRACE}
@@ -170,7 +170,7 @@ public func checkBidirectionalIndex<
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index
 >(
-  instances: Instances,
+  _ instances: Instances,
   of baseCollection: BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   startIndex: Instances.Iterator.Element,
@@ -211,7 +211,7 @@ public func checkRandomAccessIndex<
   Instances.Indices.Iterator.Element == Instances.Index,
   Distances.Indices.Iterator.Element == Distances.Index
 >(
-  instances: Instances, distances: Distances,
+  _ instances: Instances, distances: Distances,
   of baseCollection: BaseCollection,
   distanceOracle:
     (Instances.Index, Instances.Index) -> Distances.Iterator.Element,
@@ -247,7 +247,7 @@ public func checkAdvancesAndDistances<
   Instances.Indices.Iterator.Element == Instances.Index,
   Distances.Indices.Iterator.Element == Distances.Index
 >(
-  instances: Instances, distances: Distances,
+  _ instances: Instances, distances: Distances,
   of baseCollection: BaseCollection,
   distanceOracle:
     (Instances.Index, Instances.Index) -> Distances.Iterator.Element,
@@ -295,7 +295,7 @@ public func check${Traversal}Collection<
   C.Iterator.Element == ${Element},
   C.Indices.Iterator.Element == C.Index
 >(
-  expected: ${Expected}, _ collection: C,
+  _ expected: ${Expected}, _ collection: C,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
@@ -354,7 +354,7 @@ public func check${Traversal}Collection<
     x + offset0 >= 0 && x + offset1 <= count
   }
 
-  func nextN(n: Distance, _ i: C.Index) -> C.Index {
+  func nextN(_ n: Distance, _ i: C.Index) -> C.Index {
     return collection.index(n, stepsFrom: i)
   }
 
@@ -468,7 +468,7 @@ public func check${Traversal}Collection<
   , C.Index.Stride == C.IndexDistance
 %     end
 >(
-  expected: ${Expected}, _ collection: C,
+  _ expected: ${Expected}, _ collection: C,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) {
@@ -490,7 +490,7 @@ public func checkSliceableWithBidirectionalIndex<
   S.SubSequence.Indices.Iterator.Element == S.SubSequence.Index,
   ${Element} : Equatable
 >(
-  expected: ${Expected}, _ sliceable: S, ${TRACE}
+  _ expected: ${Expected}, _ sliceable: S, ${TRACE}
 ) {
   // A `Sliceable` is a `Collection`.
   checkBidirectionalCollection(expected, sliceable, ${trace})
@@ -542,7 +542,7 @@ public func checkRangeReplaceable<
   C.Iterator.Element == N.Iterator.Element,
   C.Indices.Iterator.Element == C.Index
 >(
-  makeCollection: () -> C,
+  _ makeCollection: () -> C,
   _ makeNewValues: (Int) -> N
 ) {
   typealias A = C
@@ -559,7 +559,7 @@ public func checkRangeReplaceable<
       for newCount in 0..<(2 * oldCount) {
         let newValues = makeNewValues(newCount)
 
-        func reportFailure(a: inout A, _ message: String) {
+        func reportFailure(_ a: inout A, _ message: String) {
           print("\(message) when replacing indices \(ix)...\(jx)")
           print("  in \(Array(source)) with \(Array(newValues))")
           print("  yielding \(Array(a))")
@@ -603,7 +603,7 @@ public func checkCollection<
   where
   C.Iterator.Element == Expected.Iterator.Element
 >(
-  subject: C,
+  _ subject: C,
   expected: Expected,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,

@@ -74,7 +74,7 @@ public struct ${Self}<
     return _elements.successor(of: i)
   }
 
-  public func formSuccessor(i: inout Index) {
+  public func formSuccessor(_ i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _elements.formSuccessor(&i)
   }
@@ -86,7 +86,7 @@ public struct ${Self}<
     return _elements.predecessor(of: i)
   }
 
-  public func formPredecessor(i: inout Index) {
+  public func formPredecessor(_ i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _elements.formPredecessor(&i)
   }

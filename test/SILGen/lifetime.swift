@@ -22,7 +22,7 @@ func local_valtype() {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime20local_valtype_branch
-func local_valtype_branch(a: Bool) {
+func local_valtype_branch(_ a: Bool) {
     var a = a
     // CHECK: [[A:%[0-9]+]] = alloc_box $Bool
 
@@ -113,7 +113,7 @@ func local_valtype_branch(a: Bool) {
 }
 
 func reftype_func() -> Ref {}
-func reftype_func_with_arg(x: Ref) -> Ref {}
+func reftype_func_with_arg(_ x: Ref) -> Ref {}
 
 // CHECK-LABEL: sil hidden @_TF8lifetime14reftype_returnFT_CS_3Ref
 func reftype_return() -> Ref {
@@ -126,7 +126,7 @@ func reftype_return() -> Ref {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime11reftype_arg
-func reftype_arg(a: Ref) {
+func reftype_arg(_ a: Ref) {
     var a = a
     // CHECK: bb0([[A:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
@@ -137,7 +137,7 @@ func reftype_arg(a: Ref) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime17reftype_inout_arg
-func reftype_inout_arg(a: inout Ref) {
+func reftype_inout_arg(_ a: inout Ref) {
     // CHECK: bb0([[A:%[0-9]+]] : $*Ref):
     // -- initialize local box for inout
     // CHECK: [[A_LOCAL:%.*]] = alloc_box $Ref
@@ -185,7 +185,7 @@ func reftype_call_arg() {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime21reftype_call_with_arg
-func reftype_call_with_arg(a: Ref) {
+func reftype_call_with_arg(_ a: Ref) {
     var a = a
     // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
@@ -202,7 +202,7 @@ func reftype_call_with_arg(a: Ref) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime16reftype_reassign
-func reftype_reassign(a: inout Ref, b: Ref) {
+func reftype_reassign(_ a: inout Ref, b: Ref) {
     var b = b
     // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : $Ref):
     // CHECK: [[A_LOCAL:%[0-9]+]] = alloc_box $Ref
@@ -349,7 +349,7 @@ class RefWithProp {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime23logical_lvalue_lifetimeFTCS_11RefWithPropSiVS_3Val_T_ : $@convention(thin) (@owned RefWithProp, Int, Val) -> () {
-func logical_lvalue_lifetime(r: RefWithProp, _ i: Int, _ v: Val) {
+func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   var r = r
   var i = i
   var v = v
@@ -656,7 +656,7 @@ class D : B {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime8downcast
-func downcast(b: B) {
+func downcast(_ b: B) {
   var b = b
   // CHECK: [[BADDR:%[0-9]+]] = alloc_box $B
   // CHECK: [[PB:%[0-9]+]] = project_box [[BADDR]]
@@ -671,8 +671,8 @@ func downcast(b: B) {
   // CHECK: return
 }
 
-func int(x: Int) {}
-func ref(x: Ref) {}
+func int(_ x: Int) {}
+func ref(_ x: Ref) {}
 
 func tuple() -> (Int, Ref) { return (1, Ref()) }
 

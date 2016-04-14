@@ -1,9 +1,9 @@
 // RUN: %target-parse-verify-swift
 
 // Positive and negative tests for String index types
-func acceptsCollection<I: Collection>(index: I) {}
-func acceptsBidirectionalCollection<I: BidirectionalCollection>(index: I) {}
-func acceptsRandomAccessCollection<I: RandomAccessCollection>(index: I) {}
+func acceptsCollection<I: Collection>(_: I) {}
+func acceptsBidirectionalCollection<I: BidirectionalCollection>(_: I) {}
+func acceptsRandomAccessCollection<I: RandomAccessCollection>(_: I) {}
 
 func testStringCollectionTypes(s: String) {
   acceptsCollection(s.utf8)

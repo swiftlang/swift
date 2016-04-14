@@ -46,7 +46,7 @@ internal struct _CocoaArrayWrapper : Collection {
   ///   contiguous storage exists, e.g., if array doesn't have a smart
   /// implementation of countByEnumeratingWith.
   func contiguousStorage(
-    subRange: Range<Int>
+    _ subRange: Range<Int>
   ) -> UnsafeMutablePointer<AnyObject>
   {
     var enumerationState = _makeSwiftNSFastEnumerationState()

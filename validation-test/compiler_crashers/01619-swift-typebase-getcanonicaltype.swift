@@ -6,8 +6,11 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-protocol A{func<
-associatedtype f:A
-protocol A{
-class a
-associatedtype f:a
+protocol b {
+typealias d : Collection where g.startIndex, T where k.Element>>?) -> a {
+}
+func b: Any) {
+}
+}
+class d
+public var d = b.b in

@@ -17,7 +17,7 @@ public class C {
 // Check that runtime functions use a proper calling convention.
 // OPT-CHECK: tail call void @rt_swift_release
 
-public func foo(c: C) {
+public func foo(_ c: C) {
 }
 
 // Check that wrappers were generated, have a proper calling convention, linkage

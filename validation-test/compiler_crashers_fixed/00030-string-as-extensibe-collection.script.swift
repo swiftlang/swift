@@ -11,7 +11,7 @@
 
 extension String : RangeReplaceableCollection {}
 
-func f<S : RangeReplaceableCollection>(seq: S) -> S {
+func f<S : RangeReplaceableCollection>(_ seq: S) -> S {
     return S() + seq
 }
 

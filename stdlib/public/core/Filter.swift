@@ -219,7 +219,7 @@ public struct LazyFilterCollection<
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
@@ -233,7 +233,7 @@ public struct LazyFilterCollection<
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
@@ -251,7 +251,7 @@ public struct LazyFilterCollection<
   /// Returns the next `index` of an element that `self._predicate` matches
   /// otherwise `self._base.endIndex`
   @inline(__always)
-  internal func _nextFiltered(index: Base.Index) -> Base.Index {
+  internal func _nextFiltered(_ index: Base.Index) -> Base.Index {
     var index = index
     _nextFilteredInPlace(&index)
     return index
@@ -263,7 +263,7 @@ public struct LazyFilterCollection<
   /// - Precondition: `index != endIndex`
   /// - Postcondition: `i > index`
   @inline(__always)
-  internal func _nextFilteredInPlace(index: inout Base.Index) {
+  internal func _nextFilteredInPlace(_ index: inout Base.Index) {
     _precondition(index != _base.endIndex, "can't advance past endIndex")
     repeat {
       _base.formSuccessor(&index)
@@ -299,7 +299,7 @@ extension LazySequenceProtocol {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Iterator.Element) -> Bool
+    _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
       _base: self.elements, whereElementsSatisfy: predicate)
@@ -315,7 +315,7 @@ extension LazyCollectionProtocol {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Iterator.Element) -> Bool
+    _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(
       _base: self.elements, whereElementsSatisfy: predicate)

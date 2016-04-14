@@ -6,7 +6,7 @@ import resilient_struct
 
 // CHECK-LABEL: sil hidden @_TF17struct_resilience26functionWithResilientTypesFTV16resilient_struct4Size1fFS1_S1__S1_ : $@convention(thin) (@in Size, @owned @callee_owned (@in Size) -> @out Size) -> @out Size
 // CHECK:       bb0(%0 : $*Size, %1 : $*Size, %2 : $@callee_owned (@in Size) -> @out Size):
-func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
+func functionWithResilientTypes(_ s: Size, f: Size -> Size) -> Size {
 
   // Stored properties of resilient structs from outside our resilience
   // domain are accessed through accessors
@@ -35,11 +35,11 @@ func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
 // Use materializeForSet for inout access of properties in resilient structs
 // from a different resilience domain
 
-func inoutFunc(x: inout Int) {}
+func inoutFunc(_ x: inout Int) {}
 
 // CHECK-LABEL: sil hidden @_TF17struct_resilience18resilientInOutTestFRV16resilient_struct4SizeT_ : $@convention(thin) (@inout Size) -> ()
 
-func resilientInOutTest(s: inout Size) {
+func resilientInOutTest(_ s: inout Size) {
 
 // CHECK:         function_ref @_TF17struct_resilience9inoutFuncFRSiT_
 // CHECK:         function_ref @_TFV16resilient_struct4Sizem1wSi
@@ -53,7 +53,7 @@ func resilientInOutTest(s: inout Size) {
 
 // CHECK-LABEL: sil hidden @_TF17struct_resilience28functionWithFixedLayoutTypesFTV16resilient_struct5Point1fFS1_S1__S1_ : $@convention(thin) (Point, @owned @callee_owned (Point) -> Point) -> Point
 // CHECK:       bb0(%0 : $Point, %1 : $@callee_owned (Point) -> Point):
-func functionWithFixedLayoutTypes(p: Point, f: Point -> Point) -> Point {
+func functionWithFixedLayoutTypes(_ p: Point, f: Point -> Point) -> Point {
 
   // Stored properties of fixed layout structs are accessed directly
   var p2 = p
@@ -75,7 +75,7 @@ func functionWithFixedLayoutTypes(p: Point, f: Point -> Point) -> Point {
 
 // CHECK-LABEL: sil hidden @_TF17struct_resilience39functionWithFixedLayoutOfResilientTypesFTV16resilient_struct9Rectangle1fFS1_S1__S1_ : $@convention(thin) (@in Rectangle, @owned @callee_owned (@in Rectangle) -> @out Rectangle) -> @out Rectangle
 // CHECK:        bb0(%0 : $*Rectangle, %1 : $*Rectangle, %2 : $@callee_owned (@in Rectangle) -> @out Rectangle):
-func functionWithFixedLayoutOfResilientTypes(r: Rectangle, f: Rectangle -> Rectangle) -> Rectangle {
+func functionWithFixedLayoutOfResilientTypes(_ r: Rectangle, f: Rectangle -> Rectangle) -> Rectangle {
   return f(r)
 }
 
@@ -125,7 +125,7 @@ public struct MySize {
 }
 
 // CHECK-LABEL: sil @_TF17struct_resilience28functionWithMyResilientTypesFTVS_6MySize1fFS0_S0__S0_ : $@convention(thin) (@in MySize, @owned @callee_owned (@in MySize) -> @out MySize) -> @out MySize
-public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySize {
+public func functionWithMyResilientTypes(_ s: MySize, f: MySize -> MySize) -> MySize {
 
   // Stored properties of resilient structs from inside our resilience
   // domain are accessed directly
@@ -150,7 +150,7 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
 }
 
 // CHECK-LABEL: sil [transparent] [fragile] @_TF17struct_resilience25publicTransparentFunctionFVS_6MySizeSi : $@convention(thin) (@in MySize) -> Int
-@_transparent public func publicTransparentFunction(s: MySize) -> Int {
+@_transparent public func publicTransparentFunction(_ s: MySize) -> Int {
 
   // Since the body of a public transparent function might be inlined into
   // other resilience domains, we have to use accessors
@@ -168,7 +168,7 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
 }
 
 // CHECK-LABEL: sil [transparent] [fragile] @_TF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_Si : $@convention(thin) (@in MySize) -> @owned @callee_owned () -> Int
-@_transparent public func publicTransparentLocalFunction(s: MySize) -> () -> Int {
+@_transparent public func publicTransparentLocalFunction(_ s: MySize) -> () -> Int {
 
 // CHECK-LABEL: sil shared [fragile] @_TFF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_SiU_FT_Si : $@convention(thin) (@owned @box MySize) -> Int
 // CHECK: function_ref @_TFV17struct_resilience6MySizeg1wSi : $@convention(method) (@in_guaranteed MySize) -> Int
@@ -179,7 +179,7 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
 }
 
 // CHECK-LABEL: sil hidden [transparent] @_TF17struct_resilience27internalTransparentFunctionFVS_6MySizeSi : $@convention(thin) (@in MySize) -> Int
-@_transparent func internalTransparentFunction(s: MySize) -> Int {
+@_transparent func internalTransparentFunction(_ s: MySize) -> Int {
 
   // The body of an internal transparent function will not be inlined into
   // other resilience domains, so we can access storage directly
@@ -192,7 +192,7 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
 }
 
 // CHECK-LABEL: sil [fragile] [always_inline] @_TF17struct_resilience26publicInlineAlwaysFunctionFVS_6MySizeSi : $@convention(thin) (@in MySize) -> Int
-@inline(__always) public func publicInlineAlwaysFunction(s: MySize) -> Int {
+@inline(__always) public func publicInlineAlwaysFunction(_ s: MySize) -> Int {
 
   // Since the body of a public transparent function might be inlined into
   // other resilience domains, we have to use accessors
@@ -224,7 +224,7 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
 
 // CHECK-LABEL: sil [transparent] [fragile] @_TF17struct_resilience27useVersionedResilientStructFVS_24VersionedResilientStructS0_ : $@convention(thin) (@in VersionedResilientStruct) -> @out VersionedResilientStruct
 @_versioned
-@_transparent func useVersionedResilientStruct(s: VersionedResilientStruct)
+@_transparent func useVersionedResilientStruct(_ s: VersionedResilientStruct)
     -> VersionedResilientStruct {
   // CHECK:       function_ref @_TFV17struct_resilience24VersionedResilientStructCfT1xSi1ySi_S0_
   // CHECK:       function_ref @_TFV17struct_resilience24VersionedResilientStructg1ySi

@@ -47,7 +47,7 @@ enum NSDecimalResult: StringLiteralConvertible, Equatable, CustomStringConvertib
     }
   }
 
-  func pow10(power: Int) -> NSDecimalResult {
+  func pow10(_ power: Int) -> NSDecimalResult {
     switch self {
     case .Some(var decimal):
       var result = NSDecimal()

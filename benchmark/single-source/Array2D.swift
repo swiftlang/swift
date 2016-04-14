@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @inline(never)
-public func run_Array2D(N: Int) {
+public func run_Array2D(_ N: Int) {
   var A: [[Int]] = []
   for _ in 0 ..< 1024 {
     var B: [Int] = []

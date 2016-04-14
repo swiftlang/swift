@@ -5,7 +5,7 @@
 
 import Foundation
 
-func Glob(g: String) -> Array<String> {
+func Glob(_ g: String) -> Array<String> {
 	var gt = glob_t()
 	var rv = glob_b((g as NSString).utf8String, 0, nil, &gt)
 

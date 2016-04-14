@@ -13,11 +13,6 @@ TRACE = '''@autoclosure _ message: () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line'''
 
-# When the parameter list would start with a ${TRACE}, we use
-# ${TRACE1} instead, to avoid the warning about an extraneous
-# '_' on the first parameter.
-TRACE1 = TRACE.replace(' _ ', ' ', 1)
-
 stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'
 
 trace = 'message(),\n  stackTrace: ' + stackTrace

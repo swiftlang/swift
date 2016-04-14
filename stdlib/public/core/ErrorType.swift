@@ -28,14 +28,14 @@ extension ErrorProtocol {
 // code as Objective-C values.
 @warn_unused_result
 @_silgen_name("swift_stdlib_getErrorDomainNSString")
-public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>(x: UnsafePointer<T>)
+public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>(_ x: UnsafePointer<T>)
 -> AnyObject {
   return x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
 @warn_unused_result
 @_silgen_name("swift_stdlib_getErrorCode")
-public func _stdlib_getErrorCode<T : ErrorProtocol>(x: UnsafePointer<T>) -> Int {
+public func _stdlib_getErrorCode<T : ErrorProtocol>(_ x: UnsafePointer<T>) -> Int {
   return x.pointee._code
 }
 
@@ -43,19 +43,19 @@ public func _stdlib_getErrorCode<T : ErrorProtocol>(x: UnsafePointer<T>) -> Int 
 // to `NSError`.
 @warn_unused_result
 @_silgen_name("swift_bridgeErrorProtocolToNSError")
-public func _bridgeErrorProtocolToNSError(error: ErrorProtocol) -> AnyObject
+public func _bridgeErrorProtocolToNSError(_ error: ErrorProtocol) -> AnyObject
 #endif
 
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
 @_silgen_name("swift_unexpectedError")
-public func _unexpectedError(error: ErrorProtocol) {
+public func _unexpectedError(_ error: ErrorProtocol) {
   preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.
 @_silgen_name("swift_errorInMain")
-public func _errorInMain(error: ErrorProtocol) {
+public func _errorInMain(_ error: ErrorProtocol) {
   fatalError("Error raised at top level: \(String(reflecting: error))")
 }
 

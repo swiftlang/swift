@@ -40,7 +40,7 @@ extension ClosedRangeProtocol {
   }
   
   @inline(__always)
-  public func contains(value: Bound) -> Bool {
+  public func contains(_ value: Bound) -> Bool {
     return lowerBound <= value && upperBound >= value
   }
 
@@ -84,8 +84,8 @@ public struct ClosedRangeIndex<
     }
   }
   
-  internal func _advancedBy(
-    n: Bound.Stride, upperBound limit: Bound
+  internal func _advanced(
+    by n: Bound.Stride, upperBound limit: Bound
   ) -> ClosedRangeIndex {
     switch _value {
     case .inRange(let x):
@@ -96,7 +96,7 @@ public struct ClosedRangeIndex<
     case .pastEnd:
       return n == 0
       ? self :
-      ClosedRangeIndex(limit)._advancedBy(n, upperBound: limit)
+      ClosedRangeIndex(limit)._advanced(by: n, upperBound: limit)
     }
   }
   
@@ -257,7 +257,7 @@ public struct CountableClosedRange<
   public let upperBound: Bound
   
   @warn_unused_result
-  public func _customContainsEquatableElement(element: Bound) -> Bool? {
+  public func _customContainsEquatableElement(_ element: Bound) -> Bool? {
     return element >= self.lowerBound && element < self.upperBound
   }
 
@@ -325,7 +325,7 @@ public struct ClosedRange<
   /// Returns `true` iff `element` is between `lowerBound` and `upperBound` or
   /// equal to either bound.
   @warn_unused_result
-  public func contains(element: Bound) -> Bool {
+  public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
   }
 

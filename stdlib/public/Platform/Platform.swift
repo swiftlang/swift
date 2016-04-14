@@ -63,12 +63,12 @@ public func ==(lhs: DarwinBoolean, rhs: DarwinBoolean) -> Bool {
 
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _convertBoolToDarwinBoolean(x: Bool) -> DarwinBoolean {
+func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
   return DarwinBoolean(x)
 }
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
+func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
   return Bool(x)
 }
 
@@ -158,14 +158,15 @@ public var stderr : UnsafeMutablePointer<FILE> {
 @warn_unused_result
 @_silgen_name("_swift_Platform_open")
 func _swift_Platform_open(
-  path: UnsafePointer<CChar>,
+  _ path: UnsafePointer<CChar>,
   _ oflag: CInt,
   _ mode: mode_t
 ) -> CInt
 
 @warn_unused_result
 @_silgen_name("_swift_Platform_openat")
-func _swift_Platform_openat(fd: CInt,
+func _swift_Platform_openat(
+  _ fd: CInt,
   _ path: UnsafePointer<CChar>,
   _ oflag: CInt,
   _ mode: mode_t
@@ -173,7 +174,7 @@ func _swift_Platform_openat(fd: CInt,
 
 @warn_unused_result
 public func open(
-  path: UnsafePointer<CChar>,
+  _ path: UnsafePointer<CChar>,
   _ oflag: CInt
 ) -> CInt {
   return _swift_Platform_open(path, oflag, 0)
@@ -181,7 +182,7 @@ public func open(
 
 @warn_unused_result
 public func open(
-  path: UnsafePointer<CChar>,
+  _ path: UnsafePointer<CChar>,
   _ oflag: CInt,
   _ mode: mode_t
 ) -> CInt {
@@ -190,7 +191,7 @@ public func open(
 
 @warn_unused_result
 public func openat(
-  fd: CInt,
+  _ fd: CInt,
   _ path: UnsafePointer<CChar>,
   _ oflag: CInt
 ) -> CInt {
@@ -199,7 +200,7 @@ public func openat(
 
 @warn_unused_result
 public func openat(
-  fd: CInt,
+  _ fd: CInt,
   _ path: UnsafePointer<CChar>,
   _ oflag: CInt,
   _ mode: mode_t
@@ -210,7 +211,7 @@ public func openat(
 @warn_unused_result
 @_silgen_name("_swift_Platform_fcntl")
 internal func _swift_Platform_fcntl(
-  fd: CInt,
+  _ fd: CInt,
   _ cmd: CInt,
   _ value: CInt
 ) -> CInt
@@ -218,14 +219,14 @@ internal func _swift_Platform_fcntl(
 @warn_unused_result
 @_silgen_name("_swift_Platform_fcntlPtr")
 internal func _swift_Platform_fcntlPtr(
-  fd: CInt,
+  _ fd: CInt,
   _ cmd: CInt,
   _ ptr: UnsafeMutablePointer<Void>
 ) -> CInt
 
 @warn_unused_result
 public func fcntl(
-  fd: CInt,
+  _ fd: CInt,
   _ cmd: CInt
 ) -> CInt {
   return _swift_Platform_fcntl(fd, cmd, 0)
@@ -233,7 +234,7 @@ public func fcntl(
 
 @warn_unused_result
 public func fcntl(
-  fd: CInt,
+  _ fd: CInt,
   _ cmd: CInt,
   _ value: CInt
 ) -> CInt {
@@ -242,7 +243,7 @@ public func fcntl(
 
 @warn_unused_result
 public func fcntl(
-  fd: CInt,
+  _ fd: CInt,
   _ cmd: CInt,
   _ ptr: UnsafeMutablePointer<Void>
 ) -> CInt {
@@ -349,14 +350,14 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
 @warn_unused_result
 @_silgen_name("_swift_Platform_sem_open2")
 internal func _swift_Platform_sem_open2(
-  name: UnsafePointer<CChar>,
+  _ name: UnsafePointer<CChar>,
   _ oflag: CInt
 ) -> UnsafeMutablePointer<sem_t>
 
 @warn_unused_result
 @_silgen_name("_swift_Platform_sem_open4")
 internal func _swift_Platform_sem_open4(
-  name: UnsafePointer<CChar>,
+  _ name: UnsafePointer<CChar>,
   _ oflag: CInt,
   _ mode: mode_t,
   _ value: CUnsignedInt
@@ -364,7 +365,7 @@ internal func _swift_Platform_sem_open4(
 
 @warn_unused_result
 public func sem_open(
-  name: UnsafePointer<CChar>,
+  _ name: UnsafePointer<CChar>,
   _ oflag: CInt
 ) -> UnsafeMutablePointer<sem_t> {
   return _swift_Platform_sem_open2(name, oflag)
@@ -372,7 +373,7 @@ public func sem_open(
 
 @warn_unused_result
 public func sem_open(
-  name: UnsafePointer<CChar>,
+  _ name: UnsafePointer<CChar>,
   _ oflag: CInt,
   _ mode: mode_t,
   _ value: CUnsignedInt

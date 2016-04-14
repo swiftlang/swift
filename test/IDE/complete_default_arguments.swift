@@ -23,16 +23,16 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_4 | FileCheck %s -check-prefix=DEFAULT_ARG_INIT
 
 func freeFuncWithDefaultArgs1(
-    a: Int, b: Int = 42, file: String = #file, line: Int = #line,
+    _ a: Int, b: Int = 42, file: String = #file, line: Int = #line,
     column: Int = #column, function: String = #function) {
 }
-func freeFuncWithDefaultArgs2(file file: String = #file) {}
-func freeFuncWithDefaultArgs3(a a: Int = 0) {}
-func freeFuncWithDefaultArgs4(a: Int, b: Int = 0, c: Int = 0) {}
+func freeFuncWithDefaultArgs2(file: String = #file) {}
+func freeFuncWithDefaultArgs3(a: Int = 0) {}
+func freeFuncWithDefaultArgs4(_ a: Int, b: Int = 0, c: Int = 0) {}
 
 struct A {
-  func methodWithDefaultArgs1(a a: Int = 0) {}
-  static func staticMethodWithDefaultArgs1(a a: Int = 0) {}
+  func methodWithDefaultArgs1(a: Int = 0) {}
+  static func staticMethodWithDefaultArgs1(a: Int = 0) {}
 }
 
 struct B {
@@ -40,12 +40,12 @@ struct B {
 }
 
 class C1 {
-  func methodWithDefaultArgs1(a a: Int = 0) {}
-  func methodWithDefaultArgsInSub1(a: Int) {}
+  func methodWithDefaultArgs1(a: Int = 0) {}
+  func methodWithDefaultArgsInSub1(_ a: Int) {}
 }
 class C2 : C1 {
-  override func methodWithDefaultArgs1(a a: Int) {}
-  override func methodWithDefaultArgsInSub1(a: Int = 0) {}
+  override func methodWithDefaultArgs1(a: Int) {}
+  override func methodWithDefaultArgsInSub1(_ a: Int = 0) {}
 }
 
 // NO_ERRORS_UP_TO_HERE
@@ -79,7 +79,7 @@ func testDefaultArgs3() {
 // DEFAULT_ARGS_3-DAG: Pattern/ExprSpecific:      ({#a: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_3: End completions
 
-func testDefaultArgs4(x: A) {
+func testDefaultArgs4(_ x: A) {
   x.#^DEFAULT_ARGS_4^#
 }
 // DEFAULT_ARGS_4: Begin completions
@@ -87,7 +87,7 @@ func testDefaultArgs4(x: A) {
 // DEFAULT_ARGS_4-DAG: Decl[InstanceMethod]/CurrNominal:      methodWithDefaultArgs1({#a: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_4: End completions
 
-func testDefaultArgs5(x: A) {
+func testDefaultArgs5(_ x: A) {
   x.methodWithDefaultArgs1#^DEFAULT_ARGS_5^#
 }
 // DEFAULT_ARGS_5: Begin completions
@@ -112,7 +112,7 @@ func testDefaultArgs7() {
 // DEFAULT_ARGS_7-DAG: Decl[Constructor]/CurrNominal:      ({#a: Int#})[#B#]{{; name=.+$}}
 // DEFAULT_ARGS_7: End completions
 
-func testDefaultArgs8(x: C1) {
+func testDefaultArgs8(_ x: C1) {
   x.#^DEFAULT_ARGS_8^#
 }
 // DEFAULT_ARGS_8: Begin completions
@@ -122,7 +122,7 @@ func testDefaultArgs8(x: C1) {
 // DEFAULT_ARGS_8: End completions
 // NEGATIVE_DEFAULT_ARGS_8-NOT: methodWithDefaultArgsInSub1()
 
-func testDefaultArgs9(x: C2) {
+func testDefaultArgs9(_ x: C2) {
   x.#^DEFAULT_ARGS_9^#
 }
 // DEFAULT_ARGS_9: Begin completions
@@ -136,7 +136,7 @@ let globalVar = 1
 func testDefaultArgInit1(x = #^DEFAULT_ARG_INIT_1^#) { }
 func testDefaultArgInit2(_: Int = #^DEFAULT_ARG_INIT_2^#) { }
 func testDefaultArgInit3(Int = #^DEFAULT_ARG_INIT_3^#) { }
-func testDefaultArgInit4(x: Int = #^DEFAULT_ARG_INIT_4^#) { }
+func testDefaultArgInit4(_ x: Int = #^DEFAULT_ARG_INIT_4^#) { }
 // DEFAULT_ARG_INIT: Begin completions
 // DEFAULT_ARG_INIT: Decl[GlobalVar]/CurrModule:         globalVar[#Int#]{{; name=.+$}}
 // DEFAULT_ARG_INIT: End completions

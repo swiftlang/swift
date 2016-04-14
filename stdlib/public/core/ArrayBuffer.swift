@@ -132,9 +132,8 @@ extension _ArrayBuffer {
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns `nil`.
   @warn_unused_result
-  public mutating func requestUniqueMutableBackingBuffer(
-    minimumCapacity minimumCapacity: Int
-  ) -> NativeBuffer? {
+  public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
+	-> NativeBuffer? {
     if _fastPath(isUniquelyReferenced()) {
       let b = _native
       if _fastPath(b.capacity >= minimumCapacity) {
@@ -170,7 +169,7 @@ extension _ArrayBuffer {
   // handle loops atm. and so can get blocked by the presence of a loop (over
   // the range). This loop is not necessary for a single element access.
   @inline(never)
-  internal func _typeCheckSlowPath(index: Int) {
+  internal func _typeCheckSlowPath(_ index: Int) {
     if _fastPath(_isNative) {
       let element: AnyObject = cast(toBufferOf: AnyObject.self)._native[index]
       _precondition(
@@ -185,7 +184,7 @@ extension _ArrayBuffer {
     }
   }
 
-  func _typeCheck(subRange: Range<Int>) {
+  func _typeCheck(_ subRange: Range<Int>) {
     if !_isClassOrObjCExistential(Element.self) {
       return
     }
@@ -306,7 +305,7 @@ extension _ArrayBuffer {
   /// wasNative == _isNative in the absence of inout violations.
   /// Because the optimizer can hoist the original check it might have
   /// been invalidated by illegal user code.
-  internal func _checkInoutAndNativeBounds(index: Int, wasNative: Bool) {
+  internal func _checkInoutAndNativeBounds(_ index: Int, wasNative: Bool) {
     _precondition(
       _isNative == wasNative,
       "inout rules were violated: the array was overwritten")
@@ -325,7 +324,7 @@ extension _ArrayBuffer {
   /// inout violations.  Because the optimizer can hoist the original
   /// check it might have been invalidated by illegal user code.
   internal func _checkInoutAndNativeTypeCheckedBounds(
-    index: Int, wasNativeTypeChecked: Bool
+    _ index: Int, wasNativeTypeChecked: Bool
   ) {
     _precondition(
       _isNativeTypeChecked == wasNativeTypeChecked,
@@ -344,7 +343,7 @@ extension _ArrayBuffer {
   @_versioned
   @inline(__always)
   @warn_unused_result
-  func getElement(i: Int, wasNativeTypeChecked: Bool) -> Element {
+  func getElement(_ i: Int, wasNativeTypeChecked: Bool) -> Element {
     if _fastPath(wasNativeTypeChecked) {
       return _nativeTypeChecked[i]
     }
@@ -354,7 +353,7 @@ extension _ArrayBuffer {
   @_versioned
   @inline(never)
   @warn_unused_result
-  func _getElementSlowPath(i: Int) -> AnyObject {
+  func _getElementSlowPath(_ i: Int) -> AnyObject {
     _sanityCheck(
       _isClassOrObjCExistential(Element.self),
       "Only single reference elements can be indexed here.")
@@ -403,7 +402,7 @@ extension _ArrayBuffer {
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   public func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<Element>) throws -> R
+    @noescape _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     if _fastPath(_isNative) {
       defer { _fixLifetime(self) }
@@ -418,7 +417,7 @@ extension _ArrayBuffer {
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
   public mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
+    @noescape _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     _sanityCheck(
       firstElementAddress != nil || count == 0,

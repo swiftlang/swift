@@ -140,7 +140,7 @@ For array parameters, the exact point of mutation inside the callee cannot be
 known, so a copy-on-write array buffer must be eagerly uniqued prior to the
 address of the array being taken::
 
-  func loadFloatsFromData(data: NSData) {
+  func loadFloatsFromData(_ data: NSData) {
     var a: [Float] = [0.0, 0.0, 0.0, 0.0]
     var b = a
 
@@ -249,7 +249,7 @@ inout reference. The protocol is defined as follows::
 
     /// Create a value of the conforming type using the address of an inout
     /// argument.
-    class func _convertFromInOutAddress(p: Builtin.RawPointer) -> Self
+    class func _convertFromInOutAddress(_ p: Builtin.RawPointer) -> Self
   }
 
 An example of a conformance for ``CMutablePointer``::
@@ -260,13 +260,13 @@ An example of a conformance for ``CMutablePointer``::
     typealias InOutType = T
 
     @_transparent
-    static func _convertFromInOutAddress(p: Builtin.RawPointer)
+    static func _convertFromInOutAddress(_ p: Builtin.RawPointer)
     -> CMutablePointer {
       return CMutablePointer(p)
     }
   }
 
-  func foo(p: CMutablePointer<Int>) { }
+  func foo(_ p: CMutablePointer<Int>) { }
 
   var i = 0
   foo(&i)
@@ -301,7 +301,7 @@ taken::
 
     /// Create a value of the conforming type using the address of the writeback
     /// temporary.
-    class func _convertFromWritebackAddress(p: Builtin.RawPointer) -> Self
+    class func _convertFromWritebackAddress(_ p: Builtin.RawPointer) -> Self
 
     /// Write the writeback temporary back to the original value.
     class func _commitWriteback(inout InOutType, WritebackType)
@@ -332,7 +332,7 @@ An example of a conformance for ``ObjCInOut``::
     }
 
     @_transparent
-    static func _convertFromWritebackAddress(value: Builtin.RawPointer) {
+    static func _convertFromWritebackAddress(_ value: Builtin.RawPointer) {
       return ObjCInOut(value)
     }
   }

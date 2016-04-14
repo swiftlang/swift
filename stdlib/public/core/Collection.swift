@@ -97,7 +97,7 @@ public protocol IndexableBase {
   /// range check.
   ///
   /// - Complexity: O(1).
-  func _failEarlyRangeCheck(index: Index, bounds: Range<Index>)
+  func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>)
 
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
@@ -120,7 +120,7 @@ public protocol IndexableBase {
   /// range check.
   ///
   /// - Complexity: O(1).
-  func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
+  func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>)
 
   /// Returns the position immediately after `i`.
   ///
@@ -129,7 +129,7 @@ public protocol IndexableBase {
   func successor(of i: Index) -> Index
 
   /// Replaces `i` with its successor.
-  func formSuccessor(i: inout Index)
+  func formSuccessor(_ i: inout Index)
 }
 
 public protocol Indexable : IndexableBase {
@@ -157,7 +157,7 @@ public protocol Indexable : IndexableBase {
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
-  func index(n: IndexDistance, stepsFrom i: Index) -> Index
+  func index(_ n: IndexDistance, stepsFrom i: Index) -> Index
 
   /// Returns the result of advancing `i` by `n` positions, or until it
   /// equals `limit`.
@@ -177,7 +177,7 @@ public protocol Indexable : IndexableBase {
   ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
   func index(
-    n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
   ) -> Index
 
   /// Advances `i` by `n` positions.
@@ -191,7 +191,7 @@ public protocol Indexable : IndexableBase {
   /// - Complexity:
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
-  func formIndex(n: IndexDistance, stepsFrom i: inout Index)
+  func formIndex(_ n: IndexDistance, stepsFrom i: inout Index)
 
   /// Advances `i` by `n` positions, or until it equals `limit`.
   ///
@@ -202,7 +202,7 @@ public protocol Indexable : IndexableBase {
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
   func formIndex(
-    n: IndexDistance, stepsFrom i: inout Index, limitedBy limit: Index
+    _ n: IndexDistance, stepsFrom i: inout Index, limitedBy limit: Index
   )
 
   /// Returns the distance between `start` and `end`.
@@ -381,7 +381,7 @@ public protocol Collection : Indexable, Sequence {
   ///
   /// - Complexity: O(N).
   @warn_unused_result
-  func _customIndexOfEquatableElement(element: Iterator.Element) -> Index??
+  func _customIndexOfEquatableElement(_ element: Iterator.Element) -> Index??
 
   /// The first element of `self`, or `nil` if `self` is empty.
   var first: Iterator.Element? { get }
@@ -403,7 +403,7 @@ public protocol Collection : Indexable, Sequence {
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
-  func index(n: IndexDistance, stepsFrom i: Index) -> Index
+  func index(_ n: IndexDistance, stepsFrom i: Index) -> Index
 
   // FIXME: swift-3-indexing-model: Should this mention preconditions on `n`?
   /// Returns the result of advancing `i` by `n` positions, or until it
@@ -424,7 +424,7 @@ public protocol Collection : Indexable, Sequence {
   ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
   func index(
-    n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
   ) -> Index
 
   /// Returns the distance between `start` and `end`.
@@ -441,12 +441,12 @@ public protocol Collection : Indexable, Sequence {
 /// Default implementation for forward collections.
 extension Indexable {
   @inline(__always)
-  public func formSuccessor(i: inout Index) {
+  public func formSuccessor(_ i: inout Index) {
     // FIXME: swift-3-indexing-model: tests.
     i = successor(of: i)
   }
 
-  public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
       bounds.lowerBound <= index,
@@ -456,7 +456,7 @@ extension Indexable {
       "out of bounds: index >= endIndex")
   }
 
-  public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
+  public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
       bounds.lowerBound <= range.lowerBound,
@@ -473,25 +473,25 @@ extension Indexable {
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n)
   }
 
   @warn_unused_result
   public func index(
-    n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
   ) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n, limitedBy: limit)
   }
 
-  public func formIndex(n: IndexDistance, stepsFrom i: inout Index) {
+  public func formIndex(_ n: IndexDistance, stepsFrom i: inout Index) {
     i = index(n, stepsFrom: i)
   }
 
   public func formIndex(
-    n: IndexDistance, stepsFrom i: inout Index, limitedBy limit: Index
+    _ n: IndexDistance, stepsFrom i: inout Index, limitedBy limit: Index
   ) {
     i = index(n, stepsFrom: i, limitedBy: limit)
   }
@@ -514,7 +514,7 @@ extension Indexable {
   /// Do not use this method directly; call advanced(by: n) instead.
   @inline(__always)
   @warn_unused_result
-  internal func _advanceForward(i: Index, by n: IndexDistance) -> Index {
+  internal func _advanceForward(_ i: Index, by n: IndexDistance) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
 
@@ -529,7 +529,7 @@ extension Indexable {
   @inline(__always)
   @warn_unused_result
   internal
-  func _advanceForward(i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
+  func _advanceForward(_ i: Index, by n: IndexDistance, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
 
@@ -557,7 +557,7 @@ extension Indexable where Index : Strideable {
 
   /*
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: range check i
@@ -567,7 +567,7 @@ extension Indexable where Index : Strideable {
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: range check i
@@ -700,7 +700,7 @@ extension Collection {
   /// - Complexity: O(N).
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Iterator.Element) throws -> T
+    @noescape _ transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     let count: Int = numericCast(self.count)
     if count == 0 {
@@ -726,7 +726,7 @@ extension Collection {
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
-  public func dropFirst(n: Int) -> SubSequence {
+  public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(numericCast(n), stepsFrom: startIndex, limitedBy: endIndex)
     return self[start..<endIndex]
@@ -737,7 +737,7 @@ extension Collection {
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
-  public func dropLast(n: Int) -> SubSequence {
+  public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
@@ -754,7 +754,7 @@ extension Collection {
   /// - Precondition: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
-  public func prefix(maxLength: Int) -> SubSequence {
+  public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
@@ -771,7 +771,7 @@ extension Collection {
   /// - Precondition: `maxLength >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
-  public func suffix(maxLength: Int) -> SubSequence {
+  public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
@@ -826,7 +826,7 @@ extension Collection {
   /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    maxSplits maxSplits: Int = Int.max,
+    maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
@@ -835,7 +835,7 @@ extension Collection {
     var result: [SubSequence] = []
     var subSequenceStart: Index = startIndex
 
-    func appendSubsequence(end end: Index) -> Bool {
+    func appendSubsequence(end: Index) -> Bool {
       if subSequenceStart == end && omittingEmptySubsequences {
         return false
       }
@@ -891,7 +891,7 @@ extension Collection where Iterator.Element : Equatable {
   /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    separator separator: Iterator.Element,
+    separator: Iterator.Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true
   ) -> [SubSequence] {
@@ -921,7 +921,7 @@ extension Collection where SubSequence == Self {
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`
   ///   - O(n) otherwise
   /// - Precondition: `n >= 0 && self.count >= n`.
-  public mutating func removeFirst(n: Int) {
+  public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -956,7 +956,7 @@ extension Sequence
 
 extension Collection {
   public func _preprocessingPass<R>(
-    @noescape preprocess: () throws -> R
+    @noescape _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try preprocess()
   }
@@ -985,9 +985,9 @@ extension Collection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message: "Please use split(_:omittingEmptySubsequences:isSeparator:) instead")
+  @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:isSeparator:) instead")
   public func split(
-    maxSplit: Int = Int.max,
+    _ maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
@@ -998,7 +998,7 @@ extension Collection {
 extension Collection where Iterator.Element : Equatable {
   @available(*, unavailable, message: "Please use split(separator:maxSplits:omittingEmptySubsequences:) instead")
   public func split(
-    separator: Iterator.Element,
+    _ separator: Iterator.Element,
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
   ) -> [SubSequence] {

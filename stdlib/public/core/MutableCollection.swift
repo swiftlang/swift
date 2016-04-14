@@ -80,7 +80,7 @@ public protocol MutableIndexable : Indexable {
   /// range check.
   ///
   /// - Complexity: O(1).
-  func _failEarlyRangeCheck(index: Index, bounds: Range<Index>)
+  func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>)
 
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
@@ -103,7 +103,7 @@ public protocol MutableIndexable : Indexable {
   /// range check.
   ///
   /// - Complexity: O(1).
-  func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
+  func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>)
 
   /// Returns the next consecutive `Index` in a discrete sequence of
   /// `Index` values.
@@ -112,7 +112,7 @@ public protocol MutableIndexable : Indexable {
   @warn_unused_result
   func successor(of i: Index) -> Index
 
-  func formSuccessor(i: inout Index)
+  func formSuccessor(_ i: inout Index)
 }
 
 // TODO: swift-3-indexing-model - review the following
@@ -161,10 +161,10 @@ public protocol MutableCollection : MutableIndexable, Collection {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    @noescape _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R?
-  // FIXME: the signature should use UnsafeMutableBufferPointer, but the
-  // compiler can't handle that.
+  // FIXME(ABI)(compiler limitation): the signature should use
+  // UnsafeMutableBufferPointer, but the compiler can't handle that.
   //
   // <rdar://problem/21933004> Restore the signature of
   // _withUnsafeMutableBufferPointerIfSupported() that mentions
@@ -174,7 +174,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    @noescape _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     return nil
   }

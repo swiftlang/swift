@@ -348,7 +348,7 @@ each isa pointer.
     ...
   }
 
-  func getSymbolicTypeOfObject(isa: void*) -> SymbolicTypeReference
+  func getSymbolicTypeOfObject(_ isa: void*) -> SymbolicTypeReference
 
 Next, we define an "instantiation" operation, which takes a completely
 substituted symbolic type reference, and returns a list of concrete field types
@@ -384,7 +384,7 @@ tools.
     let layout: FieldLayout
   }
 
-  func instantiateSymbolicType(ref: SymbolicTypeReference) -> [FieldTypeDescriptor]
+  func instantiateSymbolicType(_ ref: SymbolicTypeReference) -> [FieldTypeDescriptor]
 
 Field type metadata can have circular references — for example, consider two
 classes which contain optionals of each other. In order to calculate field

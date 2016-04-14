@@ -35,7 +35,7 @@ public protocol BidirectionalIndexable : Indexable {
   func predecessor(of i: Index) -> Index
 
   /// Replaces `i` with its predecessor.
-  func formPredecessor(i: inout Index)
+  func formPredecessor(_ i: inout Index)
 }
 
 /// A collection that supports backward as well as forward traversal.
@@ -60,7 +60,7 @@ public protocol BidirectionalCollection
   /// Replaces `i` with its predecessor.
   ///
   /// - Precondition: `i > startIndex && i <= endIndex`
-  func formPredecessor(i: inout Index)
+  func formPredecessor(_ i: inout Index)
 
   associatedtype SubSequence : BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
@@ -81,12 +81,12 @@ public protocol BidirectionalCollection
 extension BidirectionalIndexable {
 
   @inline(__always)
-  public func formPredecessor(i: inout Index) {
+  public func formPredecessor(_ i: inout Index) {
     i = predecessor(of: i)
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
@@ -99,7 +99,7 @@ extension BidirectionalIndexable {
 
   @warn_unused_result
   public func index(
-    n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
   ) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n, limitedBy: limit)
@@ -149,7 +149,7 @@ extension BidirectionalIndexable where Index : Strideable {
 
   /*
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i
 
     // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
@@ -157,7 +157,7 @@ extension BidirectionalIndexable where Index : Strideable {
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i
 
     // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
@@ -217,7 +217,7 @@ extension BidirectionalCollection where SubSequence == Self {
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`
   ///   - O(n) otherwise
   /// - Precondition: `n >= 0 && self.count >= n`.
-  public mutating func removeLast(n: Int) {
+  public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -232,7 +232,7 @@ extension BidirectionalCollection {
   /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
-  public func dropLast(n: Int) -> SubSequence {
+  public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let end = index(numericCast(-n), stepsFrom: endIndex, limitedBy: startIndex)
@@ -248,7 +248,7 @@ extension BidirectionalCollection {
   /// - Precondition: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
-  public func suffix(maxLength: Int) -> SubSequence {
+  public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")

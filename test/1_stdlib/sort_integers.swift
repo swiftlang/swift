@@ -3,7 +3,7 @@
 
 // Generate all possible permutes.
 func _permuteInternal(
-  elem: Int, _ size: Int,
+  _ elem: Int, _ size: Int,
   _ perm: inout [Int], _ visited: inout [Bool],
   _ verify: ([Int]) -> Void
 ) {
@@ -24,7 +24,7 @@ func _permuteInternal(
 }
 
 // Convenience wrapper for the permute method.
-func permute(size: Int, _ verify: ([Int]) -> Void) {
+func permute(_ size: Int, _ verify: ([Int]) -> Void) {
   var perm = [Int](repeating: 0, count: size)
   var visited = [Bool](repeating: false, count: size)
   _permuteInternal(0, size, &perm, &visited, verify)
@@ -32,7 +32,7 @@ func permute(size: Int, _ verify: ([Int]) -> Void) {
 
 
 // A simple random number generator.
-func randomize(size: Int, _ verify: ([Int]) -> Void) {
+func randomize(_ size: Int, _ verify: ([Int]) -> Void) {
   var arr : [Int] = []
   var N = 1
   var M = 1

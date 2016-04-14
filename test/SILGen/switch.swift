@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-patterns -emit-silgen %s | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -1187,7 +1187,7 @@ enum ABC { case A, B, C }
 // CHECK:         function_ref @_TF6switch1dFT_T_
 // CHECK:       [[X_NOT_C]]:
 // CHECK:         function_ref @_TF6switch1eFT_T_
-func testTupleWildcards(x: ABC, _ y: ABC) {
+func testTupleWildcards(_ x: ABC, _ y: ABC) {
   switch (x, y) {
   case (.A, _):
     a()
@@ -1207,7 +1207,7 @@ enum LabeledScalarPayload {
 }
 
 // CHECK-LABEL: sil hidden @_TF6switch24testLabeledScalarPayloadFOS_20LabeledScalarPayloadP_
-func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
+func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
   // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt.1: bb1
   switch lsp {
   // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):
@@ -1221,7 +1221,7 @@ func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
 
 // There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch19testOptionalPatternFGSqSi_T_
-func testOptionalPattern(value : Int?) {
+func testOptionalPattern(_ value : Int?) {
   // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch value {
   case 1?: a()
@@ -1235,7 +1235,7 @@ func testOptionalPattern(value : Int?) {
 // x? and .none should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch19testOptionalEnumMixFGSqSi_Si
-func testOptionalEnumMix(a : Int?) -> Int {
+func testOptionalEnumMix(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch a {
@@ -1257,7 +1257,7 @@ func testOptionalEnumMix(a : Int?) -> Int {
 // x? and nil should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch26testOptionalEnumMixWithNilFGSqSi_Si
-func testOptionalEnumMixWithNil(a : Int?) -> Int {
+func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch a {

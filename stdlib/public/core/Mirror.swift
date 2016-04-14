@@ -143,7 +143,7 @@ public struct Mirror {
   /// corresponding to the superclass of `staticSubclass`.
   @warn_unused_result
   internal static func _legacyMirror(
-    subject: AnyObject, asClass targetSuperclass: AnyClass) -> _Mirror? {
+    _ subject: AnyObject, asClass targetSuperclass: AnyClass) -> _Mirror? {
     
     // get a legacy mirror and the most-derived type
     var cls: AnyClass = subject.dynamicType
@@ -163,7 +163,7 @@ public struct Mirror {
   
   @warn_unused_result
   internal static func _superclassIterator<Subject : Any>(
-    subject: Subject, _ ancestorRepresentation: AncestorRepresentation
+    _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {
 
     if let subject = subject as? AnyObject,
@@ -440,7 +440,7 @@ extension Mirror {
   /// efficient.
   @warn_unused_result
   public func descendant(
-    first: MirrorPath, _ rest: MirrorPath...
+    _ first: MirrorPath, _ rest: MirrorPath...
   ) -> Any? {
     var result: Any = _Dummy(mirror: self)
     for e in [first] + rest {
@@ -487,7 +487,7 @@ extension Mirror.DisplayStyle {
 }
 
 @warn_unused_result
-internal func _isClassSuperMirror(t: Any.Type) -> Bool {
+internal func _isClassSuperMirror(_ t: Any.Type) -> Bool {
 #if  _runtime(_ObjC)
   return t == _ClassSuperMirror.self || t == _ObjCSuperMirror.self
 #else

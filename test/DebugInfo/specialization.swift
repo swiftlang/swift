@@ -8,11 +8,11 @@
 // CHECK:  debug_value %1 : $Int, let, name "j", argno 2
   
 @inline(never)
-public func sum<T : IntegerArithmetic>(i : T, _ j : T) -> T {
+public func sum<T : IntegerArithmetic>(_ i : T, _ j : T) -> T {
   let result = i + j
   return result
 }
 
-public func inc(i: inout Int) {
+public func inc(_ i: inout Int) {
   i = sum(i, 1)
 }

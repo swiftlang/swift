@@ -17,7 +17,7 @@ struct Foo<T, U> {
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
 // CHECK:         return [[F_SUBST]]
-func getF(x: Foo<Int, Int>) -> Int -> Int {
+func getF(_ x: Foo<Int, Int>) -> Int -> Int {
   return x.f
 }
 
@@ -26,11 +26,11 @@ func getF(x: Foo<Int, Int>) -> Int -> Int {
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]({{%.*}})
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
-func setF(x: inout Foo<Int, Int>, f: Int -> Int) {
+func setF(_ x: inout Foo<Int, Int>, f: Int -> Int) {
   x.f = f
 }
 
-func inOutFunc(f: inout (Int -> Int)) { }
+func inOutFunc(_ f: inout (Int -> Int)) { }
 
 // CHECK-LABEL: sil hidden @_TF20property_abstraction6inOutF
 // CHECK:         [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFunc
@@ -45,7 +45,7 @@ func inOutFunc(f: inout (Int -> Int)) { }
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_SUBST_OUT]])
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
-func inOutF(x: Foo<Int, Int>) {
+func inOutF(_ x: Foo<Int, Int>) {
   var x = x
   inOutFunc(&x.f)
 }
@@ -53,7 +53,7 @@ func inOutF(x: Foo<Int, Int>) {
 // Don't produce a writeback for generic lvalues when there's no real
 // abstraction difference. <rdar://problem/16530674>
 // CHECK-LABEL: sil hidden @_TF20property_abstraction23noAbstractionDifference
-func noAbstractionDifference(x: Foo<Int, Int>) {
+func noAbstractionDifference(_ x: Foo<Int, Int>) {
   var x = x
   // CHECK: [[ADDR:%.*]] = struct_element_addr {{%.*}}, #Foo.g
   // CHECK: apply {{%.*}}([[ADDR]])
@@ -73,7 +73,7 @@ struct AddressOnlyLet<T> {
 // CHECK:         [[REABSTRACT:%.*]] = function_ref
 // CHECK:         [[CLOSURE_SUBST:%.*]] = partial_apply [[REABSTRACT]]([[CLOSURE_ORIG]])
 // CHECK:         return [[CLOSURE_SUBST]]
-func getAddressOnlyReabstractedProperty(x: AddressOnlyLet<Int>) -> Int -> Int {
+func getAddressOnlyReabstractedProperty(_ x: AddressOnlyLet<Int>) -> Int -> Int {
   return x.f
 }
 
@@ -81,14 +81,14 @@ enum Bar<T, U> {
   case F(T -> U)
 }
 
-func getF(x: Bar<Int, Int>) -> Int -> Int {
+func getF(_ x: Bar<Int, Int>) -> Int -> Int {
   switch x {
   case .F(var f):
     return f
   }
 }
 
-func makeF(f: Int -> Int) -> Bar<Int, Int> {
+func makeF(_ f: Int -> Int) -> Bar<Int, Int> {
   return Bar.F(f)
 }
 
@@ -117,7 +117,7 @@ protocol Factory {
   associatedtype Product
   var builder : () -> Product { get set }
 }
-func setBuilder<F: Factory where F.Product == MyClass>(factory: inout F) {
+func setBuilder<F: Factory where F.Product == MyClass>(_ factory: inout F) {
   factory.builder = { return MyClass() }
 }
 // CHECK: sil hidden @_TF20property_abstraction10setBuilder{{.*}} : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()

@@ -89,7 +89,7 @@ tests.test("Overlaps") {
   
   func expectOverlaps<
     I0: RangeProtocol, I1: RangeProtocol where I0.Bound == I1.Bound
-  >(expectation: Bool, _ lhs: I0, _ rhs: I1) {
+  >(_ expectation: Bool, _ lhs: I0, _ rhs: I1) {
     if expectation {
       expectTrue(lhs.overlaps(rhs))
       expectTrue(rhs.overlaps(lhs))

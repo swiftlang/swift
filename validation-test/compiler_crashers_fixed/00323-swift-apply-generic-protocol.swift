@@ -13,7 +13,7 @@
 protocol C {
     static func c(o: AnyObject) -> Self?
 }
-func d<A,B>(a : A, _ f : A -> B) -> B {
+func d<A,B>(_ a : A, _ f : A -> B) -> B {
 } // expected-error {{missing return in a function expected to return 'B'}}
 class D<A:C> {
     func e(o: AnyObject) {

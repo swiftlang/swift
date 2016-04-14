@@ -13,7 +13,7 @@
 import TestsUtils
 
 @inline(never)
-public func run_XorLoop(N: Int) {
+public func run_XorLoop(_ N: Int) {
   for _ in 1...5*N {
     let size = 100000
     let ref_result = 47813324

@@ -1,13 +1,13 @@
 
 
 @inline(never)
-func testProto(c: Container) {
+func testProto(_ c: Container) {
 	// call the dead witness method abc()
 	c.p.abc()
 }
 
 @inline(never)
-func testClass(c: ClassContainer) {
+func testClass(_ c: ClassContainer) {
 	// call the dead vtable method def()
 	c.p.def()
 }
@@ -22,7 +22,7 @@ func callPublicClass() {
 }
 
 @inline(never)
-func testPublicClass(c: PublicBase) {
+func testPublicClass(_ c: PublicBase) {
 	// call the dead private vtable method ghi()
 	c.ghi()
 }

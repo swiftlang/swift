@@ -44,7 +44,7 @@ struct MrMcRange : Collection {
   var base: Base
 }
 
-func printSequence<T : Sequence>(x: T) {
+func printSequence<T : Sequence>(_ x: T) {
   print("<", terminator: "")
   var prefix = ""
   for a in x {

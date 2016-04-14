@@ -2,7 +2,7 @@
 
 // <rdar://problem/18571392> Passing a var to immediately called Swift closure causes segfault in Xcode 6.1 (6A1042b)
 
-func p<T>(obj : T) {}
+func p<T>(_ obj : T) {}
 
 var index = 1
 _ = {

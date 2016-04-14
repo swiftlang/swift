@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 %{
-from gyb_stdlib_unittest_support import TRACE, TRACE1, stackTrace, trace
+from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 }%
 
 /// A type that has different `CustomStringConvertible` and
@@ -124,7 +124,7 @@ public func expectPrinted<T>(
 }
 
 public func expectPrinted<T>(
-  expected: String, _ object: T, ${TRACE}
+  _ expected: String, _ object: T, ${TRACE}
 ) {
   expectPrinted(expectedOneOf: [expected], object, ${trace})
 }
@@ -136,13 +136,13 @@ public func expectDebugPrinted<T>(
 }
 
 public func expectDebugPrinted<T>(
-  expected: String, _ object: T, ${TRACE}
+  _ expected: String, _ object: T, ${TRACE}
 ) {
   expectDebugPrinted(expectedOneOf: [expected], object, ${trace})
 }
 
 public func expectDumped<T>(
-  expected: String, _ object: T, ${TRACE}
+  _ expected: String, _ object: T, ${TRACE}
 ) {
   var actual = ""
   dump(object, to: &actual)

@@ -3,14 +3,14 @@
 struct XXX<T> {
   init(t : T) {m_t = t}
   mutating
-  func foo(t : T) -> Int {m_t = t; return 4}
+  func foo(_ t : T) -> Int {m_t = t; return 4}
   var m_t : T
 }
 
 extension XXX {
   @inline(never)
   mutating
-  func bar(x : T) { self.m_t = x}
+  func bar(_ x : T) { self.m_t = x}
 }
 
 public func exp1() {

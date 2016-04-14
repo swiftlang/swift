@@ -62,7 +62,7 @@ class Derived: Base<String> {
   }
 }
 
-func presentBase<T>(base: Base<T>) {
+func presentBase<T>(_ base: Base<T>) {
   base.present()
 }
 

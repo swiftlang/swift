@@ -20,19 +20,19 @@ public protocol MySequence {
   var underestimatedCount: Int { get }
 
   func map<T>(
-    @noescape transform: (Iterator.Element) -> T
+    @noescape _ transform: (Iterator.Element) -> T
   ) -> [T]
 
   func filter(
-    @noescape includeElement: (Iterator.Element) -> Bool
+    @noescape _ includeElement: (Iterator.Element) -> Bool
   ) -> [Iterator.Element]
 
   func _customContainsEquatableElement(
-    element: Iterator.Element
+    _ element: Iterator.Element
   ) -> Bool?
 
   func _preprocessingPass<R>(
-    @noescape preprocess: (Self) -> R
+    @noescape _ preprocess: (Self) -> R
   ) -> R?
 
   func _copyToNativeArrayBuffer()
@@ -48,25 +48,25 @@ extension MySequence {
   }
 
   public func map<T>(
-    @noescape transform: (Iterator.Element) -> T
+    @noescape _ transform: (Iterator.Element) -> T
   ) -> [T] {
     return []
   }
 
   public func filter(
-    @noescape includeElement: (Iterator.Element) -> Bool
+    @noescape _ includeElement: (Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
     return []
   }
 
   public func _customContainsEquatableElement(
-    element: Iterator.Element
+    _ element: Iterator.Element
   ) -> Bool? {
     return nil
   }
 
   public func _preprocessingPass<R>(
-    @noescape preprocess: (Self) -> R
+    @noescape _ preprocess: (Self) -> R
   ) -> R? {
     return nil
   }
@@ -104,19 +104,19 @@ public protocol MyCollection : MyIndexable {
   var isEmpty: Bool { get }
   var count: Index.Distance { get }
 
-  func _customIndexOfEquatableElement(element: Iterator.Element) -> Index??
+  func _customIndexOfEquatableElement(_ element: Iterator.Element) -> Index??
 }
 extension MyCollection {
   public var isEmpty: Bool {
     return startIndex == endIndex
   }
   public func _preprocessingPass<R>(
-    @noescape preprocess: (Self) -> R
+    @noescape _ preprocess: (Self) -> R
   ) -> R? {
     return preprocess(self)
   }
   public var count: Index.Distance { return 0 }
-  public func _customIndexOfEquatableElement(element: Iterator.Element) -> Index?? {
+  public func _customIndexOfEquatableElement(_ element: Iterator.Element) -> Index?? {
     return nil
   }
 }
@@ -187,8 +187,8 @@ extension LoggingType {
 }
 
 public class IteratorLog {
-  public static func dispatchTester<G: IteratorProtocol>(
-    g: G
+  public static func dispatchTester<G : IteratorProtocol>(
+    _ g: G
   ) -> LoggingIterator<LoggingIterator<G>> {
     return LoggingIterator(LoggingIterator(g))
   }
@@ -214,7 +214,7 @@ public struct LoggingIterator<Base: IteratorProtocol>
 
 public class SequenceLog {
   public static func dispatchTester<S: MySequence>(
-    s: S
+    _ s: S
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(LoggingSequence(s))
   }
@@ -249,21 +249,21 @@ extension LoggingSequenceType
   }
 
   public func map<T>(
-    @noescape transform: (Base.Iterator.Element) -> T
+    @noescape _ transform: (Base.Iterator.Element) -> T
   ) -> [T] {
     ++Log.map[selfType]
     return base.map(transform)
   }
 
   public func filter(
-    @noescape includeElement: (Base.Iterator.Element) -> Bool
+    @noescape _ includeElement: (Base.Iterator.Element) -> Bool
   ) -> [Base.Iterator.Element] {
     ++Log.filter[selfType]
     return base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Iterator.Element
+    _ element: Base.Iterator.Element
   ) -> Bool? {
     ++Log._customContainsEquatableElement[selfType]
     return base._customContainsEquatableElement(element)
@@ -273,7 +273,7 @@ extension LoggingSequenceType
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    @noescape preprocess: (Self) -> R
+    @noescape _ preprocess: (Self) -> R
   ) -> R? {
     ++Log._preprocessingPass[selfType]
     return base._preprocessingPass { _ in preprocess(self) }
@@ -311,7 +311,7 @@ public struct LoggingSequence<
 
 public class CollectionLog : SequenceLog {
   public class func dispatchTester<C: MyCollection>(
-    c: C
+    _ c: C
   ) -> LoggingCollection<LoggingCollection<C>> {
     return LoggingCollection(LoggingCollection(c))
   }
@@ -361,7 +361,7 @@ where Index == Base.Index {
     return base.count
   }
   
-  public func _customIndexOfEquatableElement(element: Base.Iterator.Element) -> Base.Index?? {
+  public func _customIndexOfEquatableElement(_ element: Base.Iterator.Element) -> Base.Index?? {
     ++CollectionLog._customIndexOfEquatableElement[selfType]
     return base._customIndexOfEquatableElement(element)
   }

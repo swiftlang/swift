@@ -133,7 +133,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
     return _base.successor(of: i)
   }
 
-  public func formSuccessor(i: inout Index) {
+  public func formSuccessor(_ i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _base.formSuccessor(&i)
   }
@@ -145,20 +145,20 @@ public struct ${Self}<Base : ${BaseRequirements}>
     return _base.predecessor(of: i)
   }
 
-  public func formPredecessor(i: inout Index) {
+  public func formPredecessor(_ i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _base.formPredecessor(&i)
   }
 %     end
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(n, stepsFrom: i)
   }
 
   @warn_unused_result
-  public func index(n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(n, stepsFrom: i, limitedBy: limit)
   }
@@ -169,11 +169,11 @@ public struct ${Self}<Base : ${BaseRequirements}>
     return _base.distance(from: start, to: end)
   }
 
-  public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(index, bounds: bounds)
   }
 
-  public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
+  public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(range, bounds: bounds)
   }
 
@@ -201,7 +201,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Base._Element
   >(
-    subRange: Range<Index>, with newElements: C
+    _ subRange: Range<Index>, with newElements: C
   ) {
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
@@ -238,7 +238,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  public mutating func insert(newElement: Base._Element, at i: Index) {
+  public mutating func insert(_ newElement: Base._Element, at i: Index) {
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
     let sliceOffset: IndexDistance =
@@ -331,7 +331,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  public mutating func removeSubrange(bounds: Range<Index>) {
+  public mutating func removeSubrange(_ bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
     let sliceOffset: IndexDistance =

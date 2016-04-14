@@ -58,7 +58,7 @@ func genStructArray() {
 }
 
 @inline(never)
-public func run_ArrayOfGenericPOD(N: Int) {
+public func run_ArrayOfGenericPOD(_ N: Int) {
   for _ in 0...N {
     genEnumArray()
     genIOUArray()

@@ -6,7 +6,7 @@ enum MyError : ErrorProtocol {
   case WithObj(Obj)
 }
 
-func simple(placeholder: Int64) throws -> () {
+func simple(_ placeholder: Int64) throws -> () {
   // CHECK: define {{.*}}void @_TF6Errors6simpleFzVs5Int64T_(i64, %swift.refcounted*, %swift.error**)
   // CHECK: call void @llvm.dbg.declare
   // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[ERROR:[0-9]+]], metadata ![[DEREF:[0-9]+]])

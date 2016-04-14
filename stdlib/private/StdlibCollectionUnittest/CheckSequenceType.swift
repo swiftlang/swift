@@ -489,7 +489,7 @@ public let findTests = [
 
 /// For a number of form `NNN_MMM`, returns an array of `NNN` numbers that all
 /// have `MMM` as their last three digits.
-func flatMapTransformation(x: Int) -> [Int32] {
+func flatMapTransformation(_ x: Int) -> [Int32] {
   let repetitions = x / 1000
   let identity = x % 1000
   let range = (1..<(repetitions+1))
@@ -1440,7 +1440,7 @@ public let zipTests = [
     leftovers: [], []),
 ]
 
-public func callGenericUnderestimatedCount<S : Sequence>(s: S) -> Int {
+public func callGenericUnderestimatedCount<S : Sequence>(_ s: S) -> Int {
   return s.underestimatedCount
 }
 
@@ -1454,7 +1454,7 @@ extension TestSuite {
     S.SubSequence.Iterator.Element == S.Iterator.Element,
     S.SubSequence.SubSequence == S.SubSequence
   >(
-    testNamePrefix: String = "",
+    _ testNamePrefix: String = "",
     makeSequence: ([S.Iterator.Element]) -> S,
     wrapValue: (OpaqueValue<Int>) -> S.Iterator.Element,
     extractValue: (S.Iterator.Element) -> OpaqueValue<Int>,
@@ -1473,12 +1473,12 @@ extension TestSuite {
     }
     checksAdded.value.insert(#function)
 
-    func makeWrappedSequence(elements: [OpaqueValue<Int>]) -> S {
+    func makeWrappedSequence(_ elements: [OpaqueValue<Int>]) -> S {
       return makeSequence(elements.map(wrapValue))
     }
 
     func makeWrappedSequenceWithEquatableElement(
-      elements: [MinimalEquatableValue]
+      _ elements: [MinimalEquatableValue]
     ) -> SequenceWithEquatableElement {
       return makeSequenceOfEquatable(elements.map(wrapValueIntoEquatable))
     }

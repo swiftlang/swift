@@ -102,7 +102,7 @@ protocol ThrowingProto {
   static func bar() throws
 }
 
-func testExistential(p : ThrowingProto) throws {
+func testExistential(_ p : ThrowingProto) throws {
   try p.foo()
   try p.dynamicType.bar()
 }
@@ -112,18 +112,18 @@ func testGeneric<P : ThrowingProto>(p : P) throws {
 }
 
 // Don't warn about the "useless" try in these cases.
-func nine_helper(x: Int, y: Int) throws {}
+func nine_helper(_ x: Int, y: Int) throws {}
 func nine() throws {
   try nine_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}}
 }
-func ten_helper(x: Int) {}
-func ten_helper(x: Int, y: Int) throws {}
+func ten_helper(_ x: Int) {}
+func ten_helper(_ x: Int, y: Int) throws {}
 func ten() throws {
   try ten_helper(y: 0) // expected-error {{extraneous argument label 'y:' in call}} {{18-21=}}
 }
 
 // rdar://21074857
-func eleven_helper(fn: () -> ()) {}
+func eleven_helper(_ fn: () -> ()) {}
 func eleven_one() {
   eleven_helper {
     do {
@@ -143,7 +143,7 @@ func eleven_two() {
 }
 
 enum Twelve { case Payload(Int) }
-func twelve_helper(fn: (Int, Int) -> ()) {}
+func twelve_helper(_ fn: (Int, Int) -> ()) {}
 func twelve() {
   twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(_, _) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
     do {
@@ -156,7 +156,7 @@ func twelve() {
 struct Thirteen : ErrorProtocol, Equatable {}
 func ==(a: Thirteen, b: Thirteen) -> Bool { return true }
 
-func thirteen_helper(fn: (Thirteen) -> ()) {}
+func thirteen_helper(_ fn: (Thirteen) -> ()) {}
 func thirteen() {
   thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(_) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
     do {

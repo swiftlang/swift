@@ -14,7 +14,7 @@
 ///
 /// If `x == y`, returns `x`.
 @warn_unused_result
-public func min<T : Comparable>(x: T, _ y: T) -> T {
+public func min<T : Comparable>(_ x: T, _ y: T) -> T {
   // In case `x == y` we pick `x`.
   // This preserves any pre-existing order in case `T` has identity,
   // which is important for e.g. the stability of sorting algorithms.
@@ -26,7 +26,7 @@ public func min<T : Comparable>(x: T, _ y: T) -> T {
 ///
 /// If there are multiple equal least arguments, returns the first one.
 @warn_unused_result
-public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
+public func min<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var minValue = min(min(x, y), z)
   // In case `value == minValue`, we pick `minValue`. See min(_:_:).
   for value in rest where value < minValue {
@@ -39,7 +39,7 @@ public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///
 /// If `x == y`, returns `y`.
 @warn_unused_result
-public func max<T : Comparable>(x: T, _ y: T) -> T {
+public func max<T : Comparable>(_ x: T, _ y: T) -> T {
   // In case `x == y`, we pick `y`. See min(_:_:).
   return y >= x ? y : x
 }
@@ -48,7 +48,7 @@ public func max<T : Comparable>(x: T, _ y: T) -> T {
 ///
 /// If there are multiple equal greatest arguments, returns the last one.
 @warn_unused_result
-public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
+public func max<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var maxValue = max(max(x, y), z)
   // In case `value == maxValue`, we pick `value`. See min(_:_:).
   for value in rest where value >= maxValue {
