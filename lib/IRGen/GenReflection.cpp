@@ -126,13 +126,12 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   const uint32_t fieldRecordSize = 12;
   ArrayRef<const NominalTypeDecl *> NominalTypeDecls;
 
-  void addFieldDecl(const ValueDecl *value) {
+  void addFieldDecl(const ValueDecl *value, CanType type) {
     swift::reflection::FieldRecordFlags Flags;
     Flags.setIsObjC(value->isObjC());
 
     addConstantInt32(Flags.getRawValue());
 
-    auto type = value->getInterfaceType()->getCanonicalType();
     addTypeRef(value->getModuleContext(), type);
 
     if (IGM.Opts.StripReflectionNames) {
@@ -155,7 +154,9 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       addConstantInt32(std::distance(properties.begin(), properties.end()));
       addConstantInt32(fieldRecordSize);
       for (auto property : properties)
-        addFieldDecl(property);
+        addFieldDecl(property,
+                     property->getInterfaceType()
+                       ->getCanonicalType());
       break;
     }
     case DeclKind::Enum: {
@@ -164,7 +165,9 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       addConstantInt32(std::distance(cases.begin(), cases.end()));
       addConstantInt32(fieldRecordSize);
       for (auto enumCase : cases)
-        addFieldDecl(enumCase);
+        addFieldDecl(enumCase,
+                     enumCase->getArgumentInterfaceType()
+                       ->getCanonicalType());
       break;
     }
     default:
