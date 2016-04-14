@@ -77,7 +77,7 @@ bool isInstructionTriviallyDead(SILInstruction *I);
 bool isIntermediateRelease(SILInstruction *I,
                            ConsumedArgToEpilogueReleaseMatcher &ERM); 
 
-/// \brief Recursively collect all the uses and transistive uses of the
+/// \brief Recursively collect all the uses and transitive uses of the
 /// instruction.
 void collectUsesOfValue(SILValue V, llvm::DenseSet<SILInstruction *> &Insts);
 
