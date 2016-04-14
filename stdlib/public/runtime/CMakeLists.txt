@@ -47,6 +47,7 @@ set(swift_runtime_sources
     MetadataLookup.cpp
     Mutex.cpp
     Once.cpp
+    Portability.cpp
     ProtocolConformance.cpp
     Reflection.cpp
     RuntimeEntrySymbols.cpp

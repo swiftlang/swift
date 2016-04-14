@@ -17,6 +17,7 @@
 #include "swift/Runtime/Enum.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Portability.h"
 #include "Private.h"
 #include <cassert>
 #include <cstdio>
@@ -1247,6 +1248,6 @@ extern "C" char *swift_demangle(const char *mangledName,
   }
 
   // Copy into the provided buffer.
-  strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
+  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
   return outputBuffer;
 }
