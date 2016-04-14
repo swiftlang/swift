@@ -336,7 +336,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
       std::cout << std::hex << isa << std::endl;
 
       std::cout << "Decoding type reference ..." << std::endl;
-      auto TR = RC.getTypeRef(isa);
+      auto TR = RC.readTypeFromMetadata(isa);
       TR->dump(std::cout, 0);
 
       auto Fields = RC.getFieldTypeRefs(isa);

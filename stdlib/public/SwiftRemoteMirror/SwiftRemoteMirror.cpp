@@ -56,7 +56,7 @@ swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t metadata) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = Context->getTypeRef(metadata);
+  auto TR = Context->readTypeFromMetadata(metadata);
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 

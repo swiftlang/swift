@@ -96,10 +96,104 @@ class ReflectionContext {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
 
-  std::vector<std::unique_ptr<TypeRef>> TypeRefPool;
+public:
+  class BuilderType {
+  public:
+    using Type = TypeRef*;
 
+  private:
+    std::vector<std::unique_ptr<TypeRef>> TypeRefPool;
+
+  public:
+    template <typename TypeRefTy, typename... Args>
+    TypeRefTy *make_typeref(Args... args) {
+      auto TR = new TypeRefTy(::std::forward<Args>(args)...);
+      TypeRefPool.push_back(std::unique_ptr<TypeRef>(TR));
+      return TR;
+    }
+
+    BuiltinTypeRef *createBuiltinType(const std::string &mangledName) {
+      return BuiltinTypeRef::create(*this, mangledName);
+    }
+
+    NominalTypeRef *createNominalType(const std::string &mangledName) {
+      return NominalTypeRef::create(*this, mangledName);
+    }
+
+    BoundGenericTypeRef *createBoundGenericType(const std::string &mangledName,
+                                          const std::vector<TypeRef *> &args) {
+      return BoundGenericTypeRef::create(*this, mangledName, args);
+    }
+
+    TupleTypeRef *createTupleType(const std::vector<TypeRef *> &elements,
+                                  bool isVariadic) {
+      return TupleTypeRef::create(*this, elements, isVariadic);
+    }
+
+    FunctionTypeRef *createFunctionType(const std::vector<TypeRef *> &args,
+                                        const std::vector<bool> &inOutArgs,
+                                        TypeRef *result) {
+      // FIXME: don't ignore inOutArgs.
+      return FunctionTypeRef::create(*this, args, result);
+    }
+
+    ProtocolTypeRef *createProtocolType(const std::string &moduleName,
+                                        const std::string &protocolName) {
+      return ProtocolTypeRef::create(*this, moduleName, protocolName);
+    }
+
+    ProtocolCompositionTypeRef *
+    createProtocolCompositionType(const std::vector<TypeRef*> &protocols) {
+      return ProtocolCompositionTypeRef::create(*this, protocols);
+    }
+
+    ExistentialMetatypeTypeRef *
+    createExistentialMetatypeType(TypeRef *instance) {
+      return ExistentialMetatypeTypeRef::create(*this, instance);
+    }
+
+    MetatypeTypeRef *createMetatypeType(TypeRef *instance) {
+      return MetatypeTypeRef::create(*this, instance);
+    }
+
+    GenericTypeParameterTypeRef *
+    createGenericTypeParameterType(unsigned depth, unsigned index) {
+      return GenericTypeParameterTypeRef::create(*this, depth, index);
+    }
+
+    DependentMemberTypeRef *createDependentMemberType(const std::string &member,
+                                                      TypeRef *base,
+                                                      TypeRef *protocol) {
+      return DependentMemberTypeRef::create(*this, member, base, protocol);
+    }
+
+    UnownedStorageTypeRef *createUnownedStorageType(TypeRef *base) {
+      return UnownedStorageTypeRef::create(*this, base);
+    }
+
+    UnmanagedStorageTypeRef *createUnmanagedStorageType(TypeRef *base) {
+      return UnmanagedStorageTypeRef::create(*this, base);
+    }
+
+    WeakStorageTypeRef *createWeakStorageType(TypeRef *base) {
+      return WeakStorageTypeRef::create(*this, base);
+    }
+
+    ForeignClassTypeRef *getUnnamedForeignClassType() {
+      return ForeignClassTypeRef::getUnnamed();
+    }
+
+    OpaqueTypeRef *getOpaqueType() {
+      return OpaqueTypeRef::get();
+    }
+  };
+  BuilderType Builder;
+
+  using Type = typename BuilderType::Type;
+
+private:
   std::vector<ReflectionInfo> ReflectionInfos;
-  std::unordered_map<StoredPointer, TypeRef *> TypeRefCache;
+  std::unordered_map<StoredPointer, Type> TypeCache;
   std::unordered_map<StoredPointer, SharedTargetMetadataRef<Runtime>>
   MetadataCache;
 
@@ -116,7 +210,7 @@ class ReflectionContext {
     OS << TypeName << std::endl;
 
     auto DemangleTree = Demangle::demangleTypeAsNode(MangledName);
-    auto TR = decodeTypeRef(DemangleTree);
+    auto TR = decodeMangledType(DemangleTree);
     if (!TR) {
       OS << "!!! Invalid typeref: " << MangledName << std::endl;
       return;
@@ -152,7 +246,7 @@ class ReflectionContext {
           continue;
         std::string ProtocolMangledName(AssocTyDescriptor.ProtocolTypeName);
         auto DemangledProto = Demangle::demangleTypeAsNode(ProtocolMangledName);
-        auto TR = decodeTypeRef(DemangledProto);
+        auto TR = decodeMangledType(DemangledProto);
 
         auto &Conformance = *DependentMember->getProtocol();
         if (auto Protocol = dyn_cast<ProtocolTypeRef>(TR)) {
@@ -174,153 +268,150 @@ public:
     return *Reader;
   }
 
-  template <typename TypeRefTy, typename... Args>
-  TypeRefTy *make_typeref(Args... args) {
-    auto TR = new TypeRefTy(::std::forward<Args>(args)...);
-    TypeRefPool.push_back(std::unique_ptr<TypeRef>(TR));
-    return TR;
-  }
-
-  TypeRef *decodeTypeRef(Demangle::NodePointer Node) {
+  Type decodeMangledType(const Demangle::NodePointer &Node) {
     using NodeKind = Demangle::Node::Kind;
     switch (Node->getKind()) {
       case NodeKind::Global:
-        return decodeTypeRef(Node->getChild(0));
+        return decodeMangledType(Node->getChild(0));
       case NodeKind::TypeMangling:
-        return decodeTypeRef(Node->getChild(0));
+        return decodeMangledType(Node->getChild(0));
       case NodeKind::Type:
-        return decodeTypeRef(Node->getChild(0));
+        return decodeMangledType(Node->getChild(0));
       case NodeKind::BoundGenericClass:
       case NodeKind::BoundGenericEnum:
       case NodeKind::BoundGenericStructure: {
         auto mangledName = Demangle::mangleNode(Node->getChild(0));
         auto genericArgs = Node->getChild(1);
-        std::vector<TypeRef *> Args;
+        std::vector<TypeRef *> args;
         for (auto genericArg : *genericArgs) {
-          auto paramTypeRef = decodeTypeRef(genericArg);
+          auto paramTypeRef = decodeMangledType(genericArg);
           if (!paramTypeRef)
-            return nullptr;
-          Args.push_back(paramTypeRef);
+            return Type();
+          args.push_back(paramTypeRef);
         }
 
-        return BoundGenericTypeRef::create(*this, mangledName, Args);
+        return Builder.createBoundGenericType(mangledName, args);
       }
       case NodeKind::Class:
       case NodeKind::Enum:
       case NodeKind::Structure: {
         auto mangledName = Demangle::mangleNode(Node);
-        return NominalTypeRef::create(*this, mangledName);
+        return Builder.createNominalType(mangledName);
       }
       case NodeKind::BuiltinTypeName: {
         auto mangledName = Demangle::mangleNode(Node);
-        return BuiltinTypeRef::create(*this, mangledName);
+        return Builder.createBuiltinType(mangledName);
       }
       case NodeKind::ExistentialMetatype: {
-        auto instance = decodeTypeRef(Node->getChild(0));
+        auto instance = decodeMangledType(Node->getChild(0));
         if (!instance)
-          return nullptr;
-        return ExistentialMetatypeTypeRef::create(*this, instance);
+          return Type();
+        return Builder.createExistentialMetatypeType(instance);
       }
       case NodeKind::Metatype: {
-        auto instance = decodeTypeRef(Node->getChild(0));
+        auto instance = decodeMangledType(Node->getChild(0));
         if (!instance)
-          return nullptr;
-        return MetatypeTypeRef::create(*this, instance);
+          return Type();
+        return Builder.createMetatypeType(instance);
       }
       case NodeKind::ProtocolList: {
-        std::vector<TypeRef *> Protocols;
+        std::vector<TypeRef *> protocols;
         auto TypeList = Node->getChild(0);
-        for (auto Type : *TypeList) {
-          if (auto Protocol = decodeTypeRef(Type))
-            Protocols.push_back(Protocol);
+        for (auto componentType : *TypeList) {
+          if (auto protocol = decodeMangledType(componentType))
+            protocols.push_back(protocol);
           else
-            return nullptr;
+            return Type();
         }
-        if (Protocols.size() == 1)
-          return Protocols.front();
+        if (protocols.size() == 1)
+          return protocols.front();
         else
-          return ProtocolCompositionTypeRef::create(*this, Protocols);
+          return Builder.createProtocolCompositionType(protocols);
       }
       case NodeKind::Protocol: {
         auto moduleName = Node->getChild(0)->getText();
         auto name = Node->getChild(1)->getText();
-        return ProtocolTypeRef::create(*this, moduleName, name);
+        return Builder.createProtocolType(moduleName, name);
       }
       case NodeKind::DependentGenericParamType: {
         auto depth = Node->getChild(0)->getIndex();
         auto index = Node->getChild(1)->getIndex();
-        return GenericTypeParameterTypeRef::create(*this, depth, index);
+        return Builder.createGenericTypeParameterType(depth, index);
       }
       case NodeKind::FunctionType: {
-        std::vector<TypeRef *> arguments;
-        auto input = decodeTypeRef(Node->getChild(0));
+        auto input = decodeMangledType(Node->getChild(0));
         if (!input)
-          return nullptr;
+          return Type();
+
+        std::vector<TypeRef *> arguments;
         if (auto tuple = dyn_cast<TupleTypeRef>(input))
           arguments = tuple->getElements();
         else
           arguments = { input };
-        auto result = decodeTypeRef(Node->getChild(1));
+
+        std::vector<bool> argIsInOut(arguments.size(), false); // FIXME
+
+        auto result = decodeMangledType(Node->getChild(1));
         if (!result)
-          return nullptr;
-        return FunctionTypeRef::create(*this, arguments, result);
+          return Type();
+        return Builder.createFunctionType(arguments, argIsInOut, result);
       }
       case NodeKind::ArgumentTuple:
-        return decodeTypeRef(Node->getChild(0));
+        return decodeMangledType(Node->getChild(0));
       case NodeKind::ReturnType:
-        return decodeTypeRef(Node->getChild(0));
+        return decodeMangledType(Node->getChild(0));
       case NodeKind::NonVariadicTuple:
       case NodeKind::VariadicTuple: {
         std::vector<TypeRef *> Elements;
         for (auto element : *Node) {
-          auto elementType = decodeTypeRef(element);
+          auto elementType = decodeMangledType(element);
           if (!elementType)
-            return nullptr;
+            return Type();
           Elements.push_back(elementType);
         }
         bool Variadic = (Node->getKind() == NodeKind::VariadicTuple);
-        return TupleTypeRef::create(*this, Elements, Variadic);
+        return Builder.createTupleType(Elements, Variadic);
       }
       case NodeKind::TupleElement:
         if (Node->getChild(0)->getKind() == NodeKind::TupleElementName)
-          return decodeTypeRef(Node->getChild(1));
-        return decodeTypeRef(Node->getChild(0));
+          return decodeMangledType(Node->getChild(1));
+        return decodeMangledType(Node->getChild(0));
       case NodeKind::DependentGenericType: {
-        return decodeTypeRef(Node->getChild(1));
+        return decodeMangledType(Node->getChild(1));
       }
       case NodeKind::DependentMemberType: {
-        auto base = decodeTypeRef(Node->getChild(0));
+        auto base = decodeMangledType(Node->getChild(0));
         if (!base)
-          return nullptr;
+          return Type();
         auto member = Node->getChild(1)->getText();
-        auto protocol = decodeTypeRef(Node->getChild(1));
+        auto protocol = decodeMangledType(Node->getChild(1));
         if (!protocol)
-          return nullptr;
+          return Type();
         assert(llvm::isa<ProtocolTypeRef>(protocol));
-        return DependentMemberTypeRef::create(*this, member, base, protocol);
+        return Builder.createDependentMemberType(member, base, protocol);
       }
       case NodeKind::DependentAssociatedTypeRef:
-        return decodeTypeRef(Node->getChild(0));
+        return decodeMangledType(Node->getChild(0));
       case NodeKind::Unowned: {
-        auto base = decodeTypeRef(Node->getChild(0));
+        auto base = decodeMangledType(Node->getChild(0));
         if (!base)
-          return nullptr;
-        return UnownedStorageTypeRef::create(*this, base);
+          return Type();
+        return Builder.createUnownedStorageType(base);
       }
       case NodeKind::Unmanaged: {
-        auto base = decodeTypeRef(Node->getChild(0));
+        auto base = decodeMangledType(Node->getChild(0));
         if (!base)
-          return nullptr;
-        return UnmanagedStorageTypeRef::create(*this, base);
+          return Type();
+        return Builder.createUnmanagedStorageType(base);
       }
       case NodeKind::Weak: {
-        auto base = decodeTypeRef(Node->getChild(0));
+        auto base = decodeMangledType(Node->getChild(0));
         if (!base)
-          return nullptr;
-        return WeakStorageTypeRef::create(*this, base);
+          return Type();
+        return Builder.createWeakStorageType(base);
       }
       default:
-        return nullptr;
+        return Type();
     }
   }
 
@@ -383,7 +474,7 @@ public:
 
         auto SubstitutedTypeName = AssocTy.getMangledSubstitutedTypeName();
         auto Demangled = Demangle::demangleTypeAsNode(SubstitutedTypeName);
-        return decodeTypeRef(Demangled);
+        return decodeMangledType(Demangled);
       }
     }
     return nullptr;
@@ -575,7 +666,7 @@ public:
     return 0;
   }
 
-  std::vector<TypeRef *> getGenericSubst(StoredPointer MetadataAddress) {
+  std::vector<Type> getGenericSubst(StoredPointer MetadataAddress) {
     StoredPointer DescriptorAddress;
     SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
     std::tie(Descriptor, DescriptorAddress)
@@ -593,7 +684,7 @@ public:
         if (!Reader->readInteger(RemoteAddress(AddressOfGenericArgAddress),
                                  &GenericArgAddress))
           return {};
-      if (auto GenericArg = getTypeRef(GenericArgAddress))
+      if (auto GenericArg = readTypeFromMetadata(GenericArgAddress))
         Substitutions.push_back(GenericArg);
       else
         return {};
@@ -601,8 +692,7 @@ public:
     return Substitutions;
   }
 
-  TypeRef *
-  getNominalTypeRef(StoredPointer MetadataAddress) {
+  Type readNominalTypeFromMetadata(StoredPointer MetadataAddress) {
     auto Meta = readMetadata(MetadataAddress);
 
     StoredPointer DescriptorAddress;
@@ -610,58 +700,60 @@ public:
     std::tie(Descriptor, DescriptorAddress)
       = readNominalTypeDescriptor(MetadataAddress);
     if (!Descriptor)
-      return nullptr;
+      return Type();
 
     auto NameAddress
       = resolveRelativeOffset<int32_t>(DescriptorAddress +
                                        Descriptor->offsetToNameOffset());
     std::string MangledName;
     if (!Reader->readString(RemoteAddress(NameAddress), MangledName))
-      return nullptr;
+      return Type();
 
     auto DemangleNode = Demangle::demangleTypeAsNode(MangledName);
     if (!DemangleNode)
-      return nullptr;
+      return Type();
 
-    TypeRef *Parent;
-    if (auto ParentAddress = getParentAddress(MetadataAddress))
-      Parent = getTypeRef(ParentAddress);
+    Type Parent;
+    if (auto ParentAddress = getParentAddress(MetadataAddress)) {
+      Parent = readTypeFromMetadata(ParentAddress);
+      if (!Parent) return Type();
+    }
 
-    TypeRef *Nominal;
+    Type Nominal;
     if (Descriptor->GenericParams.NumPrimaryParams) {
       auto Args = getGenericSubst(MetadataAddress);
-      auto BG = BoundGenericTypeRef::create(*this, MangledName, Args);
+      auto BG = Builder.createBoundGenericType(MangledName, Args);
       BG->setParent(Parent);
       Nominal = BG;
     } else {
-      auto TR = decodeTypeRef(DemangleNode);
+      auto TR = decodeMangledType(DemangleNode);
       auto N = cast<NominalTypeRef>(TR);
       N->setParent(Parent);
       Nominal = TR;
     }
-    TypeRefCache.insert({MetadataAddress, Nominal});
+    TypeCache.insert({MetadataAddress, Nominal});
     return Nominal;
   }
 
-  TypeRef *getTypeRef(StoredPointer MetadataAddress) {
-    auto Cached = TypeRefCache.find(MetadataAddress);
-    if (Cached != TypeRefCache.end())
+  Type readTypeFromMetadata(StoredPointer MetadataAddress) {
+    auto Cached = TypeCache.find(MetadataAddress);
+    if (Cached != TypeCache.end())
       return Cached->second;
 
     auto Meta = readMetadata(MetadataAddress);
-    if (!Meta) return nullptr;
+    if (!Meta) return Type();
 
     switch (Meta->getKind()) {
     case MetadataKind::Class:
-      return getNominalTypeRef(MetadataAddress);
+      return readNominalTypeFromMetadata(MetadataAddress);
     case MetadataKind::Struct:
-      return getNominalTypeRef(MetadataAddress);
+      return readNominalTypeFromMetadata(MetadataAddress);
     case MetadataKind::Enum:
     case MetadataKind::Optional:
-      return getNominalTypeRef(MetadataAddress);
+      return readNominalTypeFromMetadata(MetadataAddress);
     case MetadataKind::Tuple: {
       auto TupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta.get());
-      std::vector<TypeRef *> Elements;
+      std::vector<Type> Elements;
       StoredPointer ElementAddress = MetadataAddress +
         sizeof(TargetTupleTypeMetadata<Runtime>);
       using Element = typename TargetTupleTypeMetadata<Runtime>::Element;
@@ -670,14 +762,14 @@ public:
         Element E;
         if (!Reader->readBytes(RemoteAddress(ElementAddress),
                                (uint8_t*)&E, sizeof(Element)))
-          return nullptr;
+          return Type();
 
-        if (auto ElementTypeRef = getTypeRef(E.Type))
+        if (auto ElementTypeRef = readTypeFromMetadata(E.Type))
           Elements.push_back(ElementTypeRef);
         else
-          return nullptr;
+          return Type();
       }
-      return TupleTypeRef::create(*this, Elements);
+      return Builder.createTupleType(Elements, /*variadic*/ false);
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta.get());
@@ -686,8 +778,9 @@ public:
       TargetFunctionTypeFlags<Runtime> Flags;
       if (!Reader->readBytes(RemoteAddress(FlagsAddress),
                              (uint8_t*)&Flags, sizeof(Flags)))
-        return nullptr;
+        return Type();
       std::vector<TypeRef *> Arguments;
+      std::vector<bool> ArgumentIsInOut;
       StoredPointer ArgumentAddress = MetadataAddress +
         sizeof(TargetFunctionTypeMetadata<Runtime>);
       for (StoredPointer i = 0; i < Function->getNumArguments(); ++i,
@@ -695,19 +788,23 @@ public:
         StoredPointer FlaggedArgumentAddress;
         if (!Reader->readInteger(RemoteAddress(ArgumentAddress),
                                  &FlaggedArgumentAddress))
-          return nullptr;
+          return Type();
+
         // TODO: Use target-agnostic FlaggedPointer to mask this!
-        FlaggedArgumentAddress &= ~((StoredPointer)1);
-        if (auto ArgumentTypeRef = getTypeRef(FlaggedArgumentAddress))
+        const auto InOutMask = (StoredPointer) 1;
+        ArgumentIsInOut.push_back((FlaggedArgumentAddress & InOutMask) != 0);
+        FlaggedArgumentAddress &= ~InOutMask;
+
+        if (auto ArgumentTypeRef = readTypeFromMetadata(FlaggedArgumentAddress))
           Arguments.push_back(ArgumentTypeRef);
         else
-          return nullptr;
+          return Type();
       }
 
-      auto Result = getTypeRef(Function->ResultType);
+      auto Result = readTypeFromMetadata(Function->ResultType);
       if (!Result)
-        return nullptr;
-      return FunctionTypeRef::create(*this, Arguments, Result);
+        return Type();
+      return Builder.createFunctionType(Arguments, ArgumentIsInOut, Result);
     }
     case MetadataKind::Existential: {
       auto Exist = cast<TargetExistentialTypeMetadata<Runtime>>(Meta.get());
@@ -716,43 +813,45 @@ public:
         auto ProtocolAddress = Exist->Protocols[i];
         auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
         if (!ProtocolDescriptor)
-          return nullptr;
+          return Type();
         
         std::string MangledName;
         if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
                                 MangledName))
-          return nullptr;
+          return Type();
         auto Demangled = Demangle::demangleSymbolAsNode(MangledName);
-        auto Protocol = decodeTypeRef(Demangled);
+        auto Protocol = decodeMangledType(Demangled);
         if (!llvm::isa<ProtocolTypeRef>(Protocol))
-          return nullptr;
+          return Type();
 
         Protocols.push_back(Protocol);
       }
-      return ProtocolCompositionTypeRef::create(*this, Protocols);
+      return Builder.createProtocolCompositionType(Protocols);
     }
     case MetadataKind::Metatype: {
       auto Metatype = cast<TargetMetatypeMetadata<Runtime>>(Meta.get());
-      auto Instance = getTypeRef(Metatype->InstanceType);
-      return MetatypeTypeRef::create(*this, Instance);
+      auto Instance = readTypeFromMetadata(Metatype->InstanceType);
+      if (!Instance) return Type();
+      return Builder.createMetatypeType(Instance);
     }
     case MetadataKind::ObjCClassWrapper:
       return ObjCClassTypeRef::getUnnamed();
     case MetadataKind::ExistentialMetatype: {
       auto Exist = cast<TargetExistentialMetatypeMetadata<Runtime>>(Meta.get());
-      auto Instance = getTypeRef(Exist->InstanceType);
-      return ExistentialMetatypeTypeRef::create(*this, Instance);
+      auto Instance = readTypeFromMetadata(Exist->InstanceType);
+      if (!Instance) return Type();
+      return Builder.createExistentialMetatypeType(Instance);
     }
     case MetadataKind::ForeignClass:
-      return ForeignClassTypeRef::getUnnamed();
+      return Builder.getUnnamedForeignClassType();
     case MetadataKind::HeapLocalVariable:
-      return ForeignClassTypeRef::getUnnamed();
+      return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::HeapGenericLocalVariable:
-      return ForeignClassTypeRef::getUnnamed();
+      return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::ErrorObject:
-      return ForeignClassTypeRef::getUnnamed();
+      return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::Opaque:
-      return OpaqueTypeRef::get();
+      return Builder.getOpaqueType(); // FIXME?
     }
   }
 
@@ -779,7 +878,7 @@ public:
         for (auto &Field : FieldDescriptor) {
           auto Demangled
           = Demangle::demangleTypeAsNode(Field.getMangledTypeName());
-          auto Unsubstituted = decodeTypeRef(Demangled);
+          auto Unsubstituted = decodeMangledType(Demangled);
           if (!Unsubstituted)
             return {};
           auto Substituted = Unsubstituted->subst(*this, Subs);
@@ -813,12 +912,12 @@ public:
     if (!Reader->readString(RemoteAddress(NameAddress), MangledName))
       return {};
 
-    auto TR = getTypeRef(MetadataAddress);
+    auto TR = readTypeFromMetadata(MetadataAddress);
     return getFieldTypeRefs(TR);
   }
 
   void clear() {
-    TypeRefCache.clear();
+    TypeCache.clear();
     MetadataCache.clear();
     NominalTypeDescriptorCache.clear();
   }
