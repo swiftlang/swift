@@ -23,7 +23,7 @@ func testCall(_ f: (() -> ())?) {
 // CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br bb2
 
-func testAddrOnlyCallResult<T>(_ f: (()->T)?) {
+func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var f = f
   var x = f?()
 }

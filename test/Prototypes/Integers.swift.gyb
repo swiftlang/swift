@@ -126,7 +126,7 @@ public func _assertCond(
 /// Prints the message if the body is uncommented; used for
 /// diagnostics.
 @_transparent
-public func _log(@autoclosure _ message: ()->String) {
+public func _log(@autoclosure _ message: () -> String) {
   print(message())
 }
 
