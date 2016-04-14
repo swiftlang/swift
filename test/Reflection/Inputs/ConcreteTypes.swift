@@ -37,6 +37,10 @@ public struct S {
   public let aTuple: (C, Box<S>, Box<E>, Int)
   public let aMetatype: C.Type
   public let aFunction: (C, S, E, Int) -> (Int)
+
+  public struct NestedS {
+    public let aField: Int
+  }
 }
 
 public enum E {
@@ -47,6 +51,7 @@ public enum E {
   case Tuple(C, S, Int)
   indirect case IndirectTuple(C, S, E, Int)
   case Metatype(E.Type)
+  case NestedStruct(S.NestedS)
 }
 
 public struct References {

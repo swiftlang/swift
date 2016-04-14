@@ -48,6 +48,11 @@ aFunctionWithVarArgs: (TypesToReflect.C, Swift.Array<TypesToReflect.S>...) -> ()
     (struct TypesToReflect.S))
   (tuple))
 
+TypesToReflect.S.NestedS
+------------------------
+aField: Swift.Int
+(struct Swift.Int)
+
 TypesToReflect.S
 ----------------
 aClass: TypesToReflect.C
@@ -149,6 +154,15 @@ Metatype: (TypesToReflect.E.Type) -> (TypesToReflect.E.Type) -> TypesToReflect.E
   (function
     (metatype
       (enum TypesToReflect.E))
+    (enum TypesToReflect.E)))
+
+NestedStruct: (TypesToReflect.E.Type) -> (TypesToReflect.S.NestedS) -> TypesToReflect.E
+(function
+  (metatype
+    (enum TypesToReflect.E))
+  (function
+    (struct TypesToReflect.S.NestedS
+      (struct TypesToReflect.S))
     (enum TypesToReflect.E)))
 
 TypesToReflect.References

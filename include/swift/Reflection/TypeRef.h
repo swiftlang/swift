@@ -117,10 +117,6 @@ public:
     return Parent;
   }
 
-  void setParent(TypeRef *P) {
-    Parent = P;
-  }
-
   unsigned getDepth() const;
 };
 

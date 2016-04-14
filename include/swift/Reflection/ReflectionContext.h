@@ -116,13 +116,15 @@ public:
       return BuiltinTypeRef::create(*this, mangledName);
     }
 
-    NominalTypeRef *createNominalType(const std::string &mangledName) {
-      return NominalTypeRef::create(*this, mangledName);
+    NominalTypeRef *createNominalType(const std::string &mangledName,
+                                      TypeRef *parent) {
+      return NominalTypeRef::create(*this, mangledName, parent);
     }
 
     BoundGenericTypeRef *createBoundGenericType(const std::string &mangledName,
-                                          const std::vector<TypeRef *> &args) {
-      return BoundGenericTypeRef::create(*this, mangledName, args);
+                                          const std::vector<TypeRef *> &args,
+                                          TypeRef *parent) {
+      return BoundGenericTypeRef::create(*this, mangledName, args, parent);
     }
 
     TupleTypeRef *createTupleType(const std::vector<TypeRef *> &elements,
@@ -270,6 +272,28 @@ public:
     return *Reader;
   }
 
+  std::pair<std::string, Type>
+  decodeNominalType(const Demangle::NodePointer &Node) {
+    using NodeKind = Demangle::Node::Kind;
+    if (Node->getKind() == NodeKind::Type)
+      return decodeNominalType(Node->getChild(0));
+
+    assert(Node->getNumChildren() == 2);
+    auto moduleOrParentType = Node->getChild(0);
+
+    // Nested types are handled a bit funny here because a
+    // nominal typeref always stores its full mangled name,
+    // in addition to a reference to the parent type. The
+    // mangled name already includes the module and parent
+    // types, if any.
+    TypeRef *parent = nullptr;
+    if (moduleOrParentType->getKind() != NodeKind::Module)
+      parent = decodeMangledType(moduleOrParentType);
+
+    auto mangledName = Demangle::mangleNode(Node);
+    return std::make_pair(mangledName, parent);
+  }
+
   Type decodeMangledType(const Demangle::NodePointer &Node) {
     using NodeKind = Demangle::Node::Kind;
     switch (Node->getKind()) {
@@ -279,26 +303,38 @@ public:
         return decodeMangledType(Node->getChild(0));
       case NodeKind::Type:
         return decodeMangledType(Node->getChild(0));
-      case NodeKind::BoundGenericClass:
-      case NodeKind::BoundGenericEnum:
-      case NodeKind::BoundGenericStructure: {
-        auto mangledName = Demangle::mangleNode(Node->getChild(0));
-        auto genericArgs = Node->getChild(1);
-        std::vector<TypeRef *> args;
-        for (auto genericArg : *genericArgs) {
-          auto paramTypeRef = decodeMangledType(genericArg);
-          if (!paramTypeRef)
-            return Type();
-          args.push_back(paramTypeRef);
-        }
-
-        return Builder.createBoundGenericType(mangledName, args);
-      }
       case NodeKind::Class:
       case NodeKind::Enum:
       case NodeKind::Structure: {
-        auto mangledName = Demangle::mangleNode(Node);
-        return Builder.createNominalType(mangledName);
+        std::string mangledName;
+        Type parent;
+
+        std::tie(mangledName, parent) = decodeNominalType(Node);
+        return Builder.createNominalType(mangledName, parent);
+      }
+      case NodeKind::BoundGenericClass:
+      case NodeKind::BoundGenericEnum:
+      case NodeKind::BoundGenericStructure: {
+        assert(Node->getNumChildren() == 2);
+
+        std::string mangledName;
+        Type parent;
+
+        std::tie(mangledName, parent) = decodeNominalType(Node->getChild(0));
+
+        std::vector<Type> args;
+
+        auto genericArgs = Node->getChild(1);
+        assert(genericArgs->getKind() == NodeKind::TypeList);
+
+        for (auto genericArg : *genericArgs) {
+          auto paramType = decodeMangledType(genericArg);
+          if (!paramType)
+            return Type();
+          args.push_back(paramType);
+        }
+
+        return Builder.createBoundGenericType(mangledName, args, parent);
       }
       case NodeKind::BuiltinTypeName: {
         auto mangledName = Demangle::mangleNode(Node);
@@ -724,14 +760,9 @@ public:
     Type Nominal;
     if (Descriptor->GenericParams.NumPrimaryParams) {
       auto Args = getGenericSubst(MetadataAddress);
-      auto BG = Builder.createBoundGenericType(MangledName, Args);
-      BG->setParent(Parent);
-      Nominal = BG;
+      Nominal = Builder.createBoundGenericType(MangledName, Args, Parent);
     } else {
-      auto TR = decodeMangledType(DemangleNode);
-      auto N = cast<NominalTypeRef>(TR);
-      N->setParent(Parent);
-      Nominal = TR;
+      Nominal = decodeMangledType(DemangleNode);
     }
     TypeCache.insert({MetadataAddress, Nominal});
     return Nominal;
