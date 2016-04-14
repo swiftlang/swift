@@ -77,9 +77,12 @@ bool isInstructionTriviallyDead(SILInstruction *I);
 bool isIntermediateRelease(SILInstruction *I,
                            ConsumedArgToEpilogueReleaseMatcher &ERM); 
 
+/// \brief Recursively collect all the uses and transistive uses of the
+/// instruction.
+void collectUsesOfValue(SILValue V, llvm::DenseSet<SILInstruction *> &Insts);
+
 /// \brief Recursively erase all of the uses of the instruction (but not the
-/// instruction itself) and delete instructions that will become trivially
-/// dead when this instruction is removed.
+/// instruction itself)
 void eraseUsesOfInstruction(
     SILInstruction *Inst,
     std::function<void(SILInstruction *)> C = [](SILInstruction *){});
