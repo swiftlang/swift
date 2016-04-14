@@ -4432,7 +4432,11 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
     return emitLoadOfHeapMetadataRef(IGF, object,
                                      getIsaEncodingForType(IGF.IGM, objectType),
                                      suppressCast);
-
+  // Is it an opened class existential?
+  if (objectType.isAnyClassReferenceType() && isa<ArchetypeType>(objectType))
+    return emitLoadOfHeapMetadataRef(IGF, object,
+                                     getIsaEncodingForType(IGF.IGM, objectType),
+                                     suppressCast);
   // OK, ask the runtime for the class pointer of this potentially-ObjC object.
   return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
 }

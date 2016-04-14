@@ -443,14 +443,31 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
 
 static SILFunction *getTargetClassMethod(SILModule &M,
                                          SILType ClassOrMetatypeType,
-                                         SILDeclRef Member) {
+                                         MethodInst *MI) {
+  SILDeclRef Member = MI->getMember();
   if (ClassOrMetatypeType.is<MetatypeType>())
     ClassOrMetatypeType = ClassOrMetatypeType.getMetatypeInstanceType(M);
 
   auto *CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
-  return M.lookUpFunctionInVTable(CD, Member);
-}
 
+  if (isa<ClassMethodInst>(MI))
+    return M.lookUpFunctionInVTable(CD, Member);
+  else if (WitnessMethodInst *WMI = dyn_cast<WitnessMethodInst>(MI)) {
+    auto CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
+    ArrayRef<Substitution> Subs;
+    SILWitnessTable *WT;
+    auto Conformances = CD->getAllConformances();
+    SILDeclRef Member = WMI->getMember();
+    for (auto &C : Conformances) {
+      if (C->getProtocol() == WMI->getLookupProtocol()) {
+        SILFunction *F = nullptr;
+        std::tie(F, WT, Subs) = M.lookUpFunctionInWitnessTable(ProtocolConformanceRef(C), Member);
+        return F;
+      }
+    }
+  }
+  return nullptr;
+}
 
 /// \brief Check if it is possible to devirtualize an Apply instruction
 /// and a class member obtained using the class_method instruction into
@@ -470,10 +487,12 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   // either be a metatype or an alloc_ref.
   DEBUG(llvm::dbgs() << "        Origin Type: " << ClassOrMetatypeType);
 
-  auto *MI = cast<MethodInst>(AI.getCallee());
+  SILFunction *F = nullptr;
+  //auto *MI = cast<MethodInst>(AI.getCallee());
 
   // Find the implementation of the member which should be invoked.
-  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI->getMember());
+  F = getTargetClassMethod(Mod, ClassOrMetatypeType,
+                           dyn_cast<MethodInst>(AI.getCallee()));
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
@@ -547,7 +566,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   SILModule &Mod = AI.getModule();
   auto *MI = cast<MethodInst>(AI.getCallee());
   auto ClassOrMetatypeType = ClassOrMetatype->getType();
-  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI->getMember());
+  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI);
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 

@@ -114,10 +114,11 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
 
-  ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
+  //ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
+  MethodInst *CMI = cast<MethodInst>(AI.getCallee());
 
   CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
-                                       CMI->getOperand(), SubType, Iden,
+                                       CMI->getOperand(0), SubType, Iden,
                                        Virt);
   It = CCBI->getIterator();
 
@@ -134,8 +135,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // apply. If it exists, move it into position in the diamond.
   if (auto *Release =
           dyn_cast<StrongReleaseInst>(std::next(Continue->begin()))) {
-    if (Release->getOperand() == CMI->getOperand()) {
-      VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand(),
+    if (Release->getOperand() == CMI->getOperand(0)) {
+      VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand(0),
                                       Atomicity::Atomic);
       IdenBuilder.createStrongRelease(
           Release->getLoc(), DownCastedClassInstance, Atomicity::Atomic);
@@ -310,9 +311,8 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 /// \brief Try to speculate the call target for the call \p AI. This function
 /// returns true if a change was made.
 static bool tryToSpeculateTarget(FullApplySite AI,
-                                 ClassHierarchyAnalysis *CHA) {
-  ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
-
+                                 ClassHierarchyAnalysis *CHA,
+                                 ClassMethodInst *CMI) {
   // We cannot devirtualize in cases where dynamic calls are
   // semantically required.
   if (CMI->isVolatile())
@@ -516,6 +516,140 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   return Changed;
 }
 
+/// \brief Try to speculate the call target for the call \p AI. This function
+/// returns true if a change was made.
+static bool tryToSpeculateTarget(FullApplySite AI,
+                                 ClassHierarchyAnalysis *CHA,
+                                 WitnessMethodInst *CMI) {
+  // We cannot devirtualize in cases where dynamic calls are
+  // semantically required.
+  if (CMI->isVolatile())
+    return false;
+
+  ProtocolDecl *WMIProtocol = CMI->getLookupProtocol();
+  if (!WMIProtocol->requiresClass())
+    return false;
+
+  // Strip any upcasts off of our 'self' value, potentially leaving us
+  // with a value whose type is closer (in the class hierarchy) to the
+  // actual dynamic type.
+  auto SubTypeValue = CMI->getOperand();//.stripUpCasts();
+  SILType SubType = SubTypeValue->getType();
+
+  auto &M = CMI->getModule();
+  auto ClassType = SubType;
+  if (SubType.is<MetatypeType>())
+    ClassType = SubType.getMetatypeInstanceType(M);
+
+  if (!CHA->hasKnownImplementations(WMIProtocol)) {
+    return false;
+  }
+
+  auto &Impls = CHA->getProtocolImplementations(WMIProtocol);
+
+  SmallVector<NominalTypeDecl *, 8> Subs(Impls);
+
+  if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
+    // Filter out any subclasses that do not inherit from this
+    // specific bound class.
+    auto RemovedIt = std::remove_if(Subs.begin(),
+        Subs.end(),
+        [&ClassType, &M](NominalTypeDecl *Sub){
+          auto SubCanTy = Sub->getDeclaredType()->getCanonicalType();
+          // Unbound generic type can override a method from
+          // a bound generic class, but this unbound generic
+          // class is not considered to be a subclass of a
+          // bound generic class in a general case.
+          if (isa<UnboundGenericType>(SubCanTy))
+            return false;
+          // Handle the usual case here: the class in question
+          // should be a real subclass of a bound generic class.
+          return !ClassType.isBindableToSuperclassOf(
+              SILType::getPrimitiveObjectType(SubCanTy));
+        });
+    Subs.erase(RemovedIt, Subs.end());
+  }
+
+  if (Subs.size() > MaxNumSpeculativeTargets) {
+    DEBUG(llvm::dbgs() << "Protocol " << WMIProtocol->getName() << " has too many (" <<
+          Subs.size() << ") implementations. Not speculating.\n");
+    return false;
+  }
+
+  DEBUG(llvm::dbgs() << "Protocol " << WMIProtocol->getName()
+                     << " has multiple known implementations. "
+                        "Inserting polymorphic speculative call.\n");
+
+  // Perform a speculative devirtualization of a method invocation.
+  // It replaces an indirect witness_method-based call by a code to perform
+  // a direct call of the method implementation based on the dynamic class
+  // of the instance.
+  //
+  // The code is generated according to the following principles:
+  //
+  // - For each class implementing a protocol, a dedicated checked_cast_br instruction
+  // is generated to check if a dynamic class of the instance is exactly
+  // this class.
+  //
+  // - If this check succeeds, then it jumps to the code which performs a
+  // direct call of a method implementation specific to this class.
+  //
+  // - If this check fails, then a different class is checked by means of
+  // checked_cast_br in a similar way.
+  //
+  // TODO: The ordering of checks may benefit from using a PGO, because
+  // the most probable alternatives could be checked first.
+
+  // Number of subclasses which cannot be handled by checked_cast_br checks.
+  int NotHandledSubsNum = 0;
+  // True if any instructions were changed or generated.
+  bool Changed = false;
+
+  for (auto S : Subs) {
+    DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
+          << WMIProtocol->getName() << " and implementation " << S->getName() << "\n");
+
+    CanType CanClassType = S->getDeclaredType()->getCanonicalType();
+    SILType ClassType = SILType::getPrimitiveObjectType(CanClassType);
+    if (!ClassType.getClassOrBoundGenericClass()) {
+      // This subclass cannot be handled. This happens e.g. if it is
+      // a generic class.
+      NotHandledSubsNum++;
+      continue;
+    }
+
+    auto ClassOrMetatypeType = ClassType;
+    if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
+      auto InstTy = ClassType.getSwiftRValueType();
+      auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
+      auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+      ClassOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);
+    }
+
+    // Pass the metatype of the subclass.
+    CheckedCastBranchInst *LastCCBI = nullptr;
+    auto NewAI = speculateMonomorphicTarget(AI, ClassOrMetatypeType, LastCCBI);
+    if (!NewAI) {
+      NotHandledSubsNum++;
+      continue;
+    }
+    AI = NewAI;
+    Changed = true;
+  }
+
+  return Changed;
+}
+
+static bool tryToSpeculateTarget(FullApplySite AI,
+                                 ClassHierarchyAnalysis *CHA) {
+  if (auto *CMI = dyn_cast<ClassMethodInst>(AI.getCallee()))
+      return tryToSpeculateTarget(AI, CHA, CMI);
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI.getCallee())) {
+      return tryToSpeculateTarget(AI, CHA, WMI);
+  }
+  return false;
+}
+
 namespace {
   /// Speculate the targets of virtual calls by assuming that the requested
   /// class is at the bottom of the class hierarchy.
@@ -533,8 +667,14 @@ namespace {
       for (auto &BB : *getFunction()) {
         for (auto II = BB.begin(), IE = BB.end(); II != IE; ++II) {
           FullApplySite AI = FullApplySite::isa(&*II);
-          if (AI && isa<ClassMethodInst>(AI.getCallee()))
+          if (AI && isa<ClassMethodInst>(AI.getCallee())) {
             ToSpecialize.push_back(AI);
+            continue;
+          }
+          if (AI && isa<WitnessMethodInst>(AI.getCallee())) {
+            ToSpecialize.push_back(AI);
+            continue;
+          }
         }
       }
 
