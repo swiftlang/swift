@@ -51,6 +51,57 @@ def host_target():
     return None
 
 
+def stdlib_deployment_targets():
+    """
+    Return deployment targets for the Swift stdlib, based on the host machine.
+    If the host machine is not one of the recognized ones, return None.
+    """
+    system = platform.system()
+    machine = platform.machine()
+
+    if system == 'Linux':
+        if machine == 'x86_64':
+            return [
+                'linux-x86_64',
+                'android-armv7',
+            ]
+        elif machine.startswith('armv6'):
+            # linux-armv6* is canonicalized to 'linux-armv6'
+            return ['linux-armv6']
+        elif machine.startswith('armv7'):
+            # linux-armv7* is canonicalized to 'linux-armv7'
+            return ['linux-armv7']
+        elif machine == 'aarch64':
+            return ['linux-aarch64']
+        elif machine == 'ppc64':
+            return ['linux-ppc64']
+        elif machine == 'ppc64le':
+            return ['linux-ppc64le']
+    elif system == 'Darwin':
+        if machine == 'x86_64':
+            return [
+                'macosx-x86_64',
+                'iphonesimulator-i386',
+                'iphonesimulator-x86_64',
+                'appletvsimulator-x86_64',
+                'watchsimulator-i386',
+                # Put iOS native targets last so that we test them last
+                # (it takes a long time).
+                'iphoneos-arm64',
+                'iphoneos-armv7',
+                'appletvos-arm64',
+                'watchos-armv7k',
+            ]
+    elif system == 'FreeBSD':
+        if machine == 'amd64':
+            return ['freebsd-x86_64']
+    elif system == 'CYGWIN_NT-10.0':
+        if machine == 'x86_64':
+            return ['cygwin-x86_64']
+
+    return None
+
+
 def install_prefix():
     """
     Returns the default path at which built Swift products (like bin, lib,
