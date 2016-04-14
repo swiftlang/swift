@@ -21,7 +21,7 @@ func g(_ j : Int) -> Int {      // 201
 
 #sourceLocation(file: "abc.swift", line: 301)
 public func f(_ i : Int) -> Int { // 301
-  return g(i)                     // 303
+  return g(i)                     // 302
 }
 
 // CHECK-SIL: sil {{.*}}@_TF9inlinedAt1fFSiSi :
