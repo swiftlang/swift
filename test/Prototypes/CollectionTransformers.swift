@@ -246,7 +246,7 @@ struct _ForkJoinMutex {
 }
 
 struct _ForkJoinCond {
-  var _cond: UnsafeMutablePointer<pthread_cond_t> = nil
+  var _cond: UnsafeMutablePointer<pthread_cond_t>
 
   init() {
     _cond = UnsafeMutablePointer(allocatingCapacity: 1)

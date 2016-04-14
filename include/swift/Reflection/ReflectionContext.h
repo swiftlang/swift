@@ -22,6 +22,7 @@
 #include "swift/Reflection/Reader.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Reflection/TypeRef.h"
+#include "swift/SwiftRemoteMirror/SwiftRemoteMirrorTypes.h"
 
 #include <iostream>
 #include <vector>
@@ -622,6 +623,27 @@ public:
 
   void addReflectionInfo(ReflectionInfo I) {
     ReflectionInfos.push_back(I);
+  }
+
+  swift_typeinfo_t getInfoForTypeRef(const TypeRef *TR) {
+    // TODO
+    return {
+      SWIFT_UNKNOWN,
+      NULL,
+      0,
+      0
+    };
+  }
+
+  swift_fieldinfo_t getInfoForField(const TypeRef *TR, unsigned Index) {
+    // TODO
+    return {
+      NOTAPOINTER,
+      0,
+      NULL,
+      0,
+      0
+    };
   }
 };
 

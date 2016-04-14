@@ -322,7 +322,7 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
 
 var CStringTests = TestSuite("CStringTests")
 
-func getNullCString() -> UnsafeMutablePointer<CChar> {
+func getNullCString() -> UnsafeMutablePointer<CChar>? {
   return nil
 }
 

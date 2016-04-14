@@ -8,7 +8,7 @@ func markUsed<T>(_ t: T) {}
 
 
 // CHECK-LABEL: sil @main
-// CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
+// CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
 // -- initialize x
 // CHECK: alloc_global @_Tv8toplevel1xSi

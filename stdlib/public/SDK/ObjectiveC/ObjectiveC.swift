@@ -98,7 +98,7 @@ func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
 ///
 /// The compiler has special knowledge of this type.
 @_fixed_layout
-public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
+public struct Selector : StringLiteralConvertible {
   var ptr : OpaquePointer
 
   /// Create a selector from a string.
@@ -121,12 +121,6 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   /// Create an instance initialized to `value`.
   public init(stringLiteral value: String) {
     self = sel_registerName(value)
-  }
-
-  /// Create an instance initialized with `nil`.
-  @_transparent
-  public init(nilLiteral: ()) {
-    ptr = nil
   }
 }
 
@@ -179,16 +173,8 @@ extension Selector : CustomReflectable {
 //===----------------------------------------------------------------------===//
 
 @_fixed_layout
-public struct NSZone : NilLiteralConvertible {
+public struct NSZone {
   var pointer : OpaquePointer
-
-  public init() { pointer = nil }
-
-  /// Create an instance initialized with `nil`.
-  @_transparent
-  public init(nilLiteral: ()) {
-    pointer = nil
-  }
 }
 
 // Note: NSZone becomes Zone in Swift 3.

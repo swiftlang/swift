@@ -43,7 +43,7 @@ CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
       mData: UnsafeMutablePointer<Void>(bitPattern: 0x1234_5678))
     let result: UnsafeBufferPointer<Float> = UnsafeBufferPointer(audioBuffer)
     expectEqual(
-      UnsafePointer<Float>(audioBuffer.mData),
+      UnsafePointer<Float>(audioBuffer.mData!),
       result.baseAddress)
     expectEqual(256, result.count)
   }
@@ -66,7 +66,7 @@ CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
     let result: UnsafeMutableBufferPointer<Float> =
       UnsafeMutableBufferPointer(audioBuffer)
     expectEqual(
-      UnsafeMutablePointer<Float>(audioBuffer.mData),
+      UnsafeMutablePointer<Float>(audioBuffer.mData!),
       result.baseAddress)
     expectEqual(256, result.count)
   }
@@ -166,19 +166,30 @@ CoreAudioTestSuite.test(
   "UnsafeMutableAudioBufferListPointer.unsafeMutablePointer") {
   do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(nil)
-    expectEqual(nil, ablPtrWrapper.unsafePointer)
-    expectEqual(nil, ablPtrWrapper.unsafeMutablePointer)
+    expectEmpty(ablPtrWrapper)
   }
 
   do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(
-      UnsafeMutablePointer<AudioBufferList>(bitPattern: 0x1234_5678))
+      UnsafeMutablePointer<AudioBufferList>(bitPattern: 0x1234_5678)!)
     expectEqual(
       UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
       ablPtrWrapper.unsafePointer)
     expectEqual(
       UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
       ablPtrWrapper.unsafeMutablePointer)
+  }
+
+  do {
+    let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(
+      UnsafeMutablePointer<AudioBufferList>(bitPattern: 0x1234_5678))
+    expectNotEmpty(ablPtrWrapper)
+    expectEqual(
+      UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
+      ablPtrWrapper!.unsafePointer)
+    expectEqual(
+      UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
+      ablPtrWrapper!.unsafeMutablePointer)
   }
 }
 

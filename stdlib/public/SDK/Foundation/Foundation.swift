@@ -415,11 +415,8 @@ public let NSNotFound: Int = .max
 extension NSArray : ArrayLiteralConvertible {
   /// Create an instance initialized with `elements`.
   public required convenience init(arrayLiteral elements: AnyObject...) {
-    // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
-    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
-    self.init(
-      objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
-    _fixLifetime(x)
+    // Let bridging take care of it.
+    self.init(array: elements)
   }
 }
 
@@ -526,8 +523,8 @@ extension NSDictionary : DictionaryLiteralConvertible {
     dictionaryLiteral elements: (NSCopying, AnyObject)...
   ) {
     self.init(
-      objects: elements.map { (AnyObject?)($0.1) },
-      forKeys: elements.map { (NSCopying?)($0.0) },
+      objects: elements.map { $0.1 },
+      forKeys: elements.map { $0.0 },
       count: elements.count)
   }
 }
@@ -661,15 +658,9 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
   var count: Int
 
   /// Size of ObjectsBuffer, in ids.
-  var STACK_BUF_SIZE: Int { return 4 }
+  static var STACK_BUF_SIZE: Int { return 4 }
 
-  // FIXME: Replace with _CocoaFastEnumerationStackBuf.
-  /// Must have enough space for STACK_BUF_SIZE object references.
-  struct ObjectsBuffer {
-    var buf: (OpaquePointer, OpaquePointer, OpaquePointer, OpaquePointer) =
-      (nil, nil, nil, nil)
-  }
-  var objects: [ObjectsBuffer]
+  var objects: [Unmanaged<AnyObject>?]
 
   public func next() -> AnyObject? {
     if n == count {
@@ -678,18 +669,20 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
       refresh()
       if count == 0 { return nil }
     }
-    let next: AnyObject = state[0].itemsPtr[n]!
+    let next: AnyObject = state[0].itemsPtr![n]!
     n += 1
     return next
   }
 
   func refresh() {
+    _sanityCheck(objects.count > 0)
     n = 0
-    count = enumerable.countByEnumerating(
-      with: state._baseAddressIfContiguous,
-      objects: AutoreleasingUnsafeMutablePointer(
-        objects._baseAddressIfContiguous),
-      count: STACK_BUF_SIZE)
+    objects.withUnsafeMutableBufferPointer {
+      count = enumerable.countByEnumerating(
+        with: &state,
+        objects: AutoreleasingUnsafeMutablePointer($0.baseAddress!),
+        count: $0.count)
+    }
   }
 
   public init(_ enumerable: NSFastEnumeration) {
@@ -698,7 +691,8 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
       state: 0, itemsPtr: nil,
       mutationsPtr: _fastEnumerationStorageMutationsPtr,
       extra: (0, 0, 0, 0, 0)) ]
-    self.objects = [ ObjectsBuffer() ]
+    self.objects = Array(
+      repeating: nil, count: NSFastEnumerationIterator.STACK_BUF_SIZE)
     self.n = -1
     self.count = -1
   }
@@ -1006,7 +1000,7 @@ extension CGRectEdge {
 // NSError (as an out parameter).
 //===----------------------------------------------------------------------===//
 
-public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
+public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>?
 
 // Note: NSErrorPointer becomes ErrorPointer in Swift 3.
 public typealias ErrorPointer = NSErrorPointer
@@ -1099,14 +1093,7 @@ extension NSMutableString {
 extension NSArray {
   // Overlay: - (instancetype)initWithObjects:(id)firstObj, ...
   public convenience init(objects elements: AnyObject...) {
-    // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
-    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
-    // Use Imported:
-    // @objc(initWithObjects:count:)
-    //    init(withObjects objects: UnsafePointer<AnyObject?>,
-    //    count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
-    _fixLifetime(x)
+    self.init(array: elements)
   }
 }
 

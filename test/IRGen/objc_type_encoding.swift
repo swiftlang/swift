@@ -30,10 +30,16 @@ import gizmo
 // CHECK-tvos: private unnamed_addr constant [11 x i8] c"v24@0:8q16\00"
 
   @objc func testPrimitives(_ b: CBool, i: Int, f: Float, d: Double)
-    -> OpaquePointer { return nil }
+    -> OpaquePointer { fatalError() }
 // CHECK-macosx: private unnamed_addr constant [21 x i8] c"^v40@0:8c16q20f28d32\00"
 // CHECK-ios: private unnamed_addr constant [21 x i8] c"^v40@0:8B16q20f28d32\00"
 // CHECK-tvos: private unnamed_addr constant [21 x i8] c"^v40@0:8B16q20f28d32\00"
+
+  @objc func testOptionalPrimitives()
+    -> OpaquePointer? { return nil }
+    // CHECK-macosx: private unnamed_addr constant [9 x i8] c"^v16@0:8\00"
+    // CHECK-ios: private unnamed_addr constant [9 x i8] c"^v16@0:8\00"
+    // CHECK-tvos: private unnamed_addr constant [9 x i8] c"^v16@0:8\00"
 
   @objc func testCSignedTypes(_ a: CSignedChar, b: CShort, c: CInt, d: CLong, e: CLongLong) {}
 // CHECK-macosx: private unnamed_addr constant [23 x i8] c"v44@0:8c16s20i24q28q36\00"

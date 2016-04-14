@@ -176,7 +176,7 @@ class NamingConflictSubclass : PropertyNamingConflict {
 }
 
 ClassProperties.test("namingConflict")
-  .skip(.osxMinorRange(10, 0..<11, reason: "unexpected failures on 10.10"))
+  .skip(.osxMinorRange(10, 0...10, reason: "unexpected failures on 10.10"))
   .code {
   let obj = PropertyNamingConflict()
   expectTrue(obj === obj.prop)
@@ -201,7 +201,7 @@ extension NamingConflictSubclass : PropertyNamingConflictProto {
 }
 
 ClassProperties.test("namingConflict/protocol")
-  .skip(.osxMinorRange(10, 0..<11, reason: "unexpected failures on 10.10"))
+  .skip(.osxMinorRange(10, 0...10, reason: "unexpected failures on 10.10"))
   .code {
   let obj: PropertyNamingConflictProto = NamingConflictSubclass()
   expectTrue(obj === obj.protoProp)

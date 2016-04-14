@@ -256,10 +256,13 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return true
   }
 
-  /// If the elements are stored contiguously, a pointer to the first
-  /// element. Otherwise, `nil`.
+  /// A pointer to the first element.
   public var firstElementAddress: UnsafeMutablePointer<Element> {
     return __bufferPointer._elementPointer
+  }
+
+  public var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    return firstElementAddress
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
@@ -464,7 +467,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Two buffers address the same elements when they have the same
   /// identity and count.
   public var identity: UnsafePointer<Void> {
-    return withUnsafeBufferPointer { UnsafePointer($0.baseAddress) }
+    return UnsafePointer(firstElementAddress)
   }
   
   /// Returns `true` iff we have storage for elements of the given

@@ -28,13 +28,13 @@
 public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
-  public var _baseAddress: OpaquePointer
+  public var _baseAddress: OpaquePointer?
   var _countAndFlags: UInt
   public var _owner: AnyObject?
 
   /// (private) create the implementation of a string from its component parts.
   init(
-    baseAddress: OpaquePointer,
+    baseAddress: OpaquePointer?,
     _countAndFlags: UInt,
     owner: AnyObject?
   ) {
@@ -68,8 +68,8 @@ public struct _StringCore {
       _sanityCheck(!hasCocoaBuffer)
       _sanityCheck(elementWidth == buffer.elementWidth,
         "_StringCore elementWidth doesn't match its buffer's")
-      _sanityCheck(UnsafeMutablePointer(_baseAddress) >= buffer.start)
-      _sanityCheck(UnsafeMutablePointer(_baseAddress) <= buffer.usedEnd)
+      _sanityCheck(UnsafeMutablePointer(_baseAddress!) >= buffer.start)
+      _sanityCheck(UnsafeMutablePointer(_baseAddress!) <= buffer.usedEnd)
       _sanityCheck(
           UnsafeMutablePointer(_pointer(toElementAt: count)) <= buffer.usedEnd)
     }
@@ -101,7 +101,7 @@ public struct _StringCore {
   func _pointer(toElementAt n: Int) -> OpaquePointer {
     _sanityCheck(hasContiguousStorage && n >= 0 && n <= count)
     return OpaquePointer(
-      UnsafeMutablePointer<_RawByte>(_baseAddress) + (n << elementShift))
+      UnsafeMutablePointer<_RawByte>(_baseAddress!) + (n << elementShift))
   }
 
   static func _copyElements(
@@ -144,7 +144,7 @@ public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Initialization
   public init(
-    baseAddress: OpaquePointer,
+    baseAddress: OpaquePointer?,
     count: Int,
     elementShift: Int,
     hasCocoaBuffer: Bool,
@@ -228,7 +228,7 @@ public struct _StringCore {
 
   public var startASCII: UnsafeMutablePointer<UTF8.CodeUnit> {
     _sanityCheck(elementWidth == 1, "String does not contain contiguous ASCII")
-    return UnsafeMutablePointer(_baseAddress)
+    return UnsafeMutablePointer(_baseAddress!)
   }
 
   /// True iff a contiguous ASCII buffer available.
@@ -240,7 +240,7 @@ public struct _StringCore {
     _sanityCheck(
       count == 0 || elementWidth == 2,
       "String does not contain contiguous UTF-16")
-    return UnsafeMutablePointer(_baseAddress)
+    return UnsafeMutablePointer(_baseAddress!)
   }
 
   /// the native _StringBuffer, if any, or `nil`.
@@ -338,7 +338,7 @@ public struct _StringCore {
     if _fastPath(_baseAddress != nil) {
       if _fastPath(elementWidth == 1) {
         for x in UnsafeBufferPointer(
-          start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress),
+          start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress!),
           count: count
         ) {
           Encoding.encode(UnicodeScalar(UInt32(x)), sendingOutputTo: output)
@@ -347,7 +347,7 @@ public struct _StringCore {
       else {
         let hadError = transcode(
           UnsafeBufferPointer(
-            start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
+            start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress!),
             count: count
           ).makeIterator(),
           from: UTF16.self,
@@ -384,7 +384,7 @@ public struct _StringCore {
   ///   the existing buffer's storage.
   @warn_unused_result
   mutating func _claimCapacity(
-    _ newSize: Int, minElementWidth: Int) -> (Int, OpaquePointer) {
+    _ newSize: Int, minElementWidth: Int) -> (Int, OpaquePointer?) {
     if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
       var buffer = nativeBuffer!
 
@@ -424,7 +424,7 @@ public struct _StringCore {
       = _claimCapacity(newSize, minElementWidth: minElementWidth)
 
     if _fastPath(existingStorage != nil) {
-      return existingStorage
+      return existingStorage!
     }
 
     let oldCount = count
@@ -458,7 +458,7 @@ public struct _StringCore {
 
     if hasContiguousStorage {
       _StringCore._copyElements(
-        _baseAddress, srcElementWidth: elementWidth,
+        _baseAddress!, srcElementWidth: elementWidth,
         dstStart: OpaquePointer(newStorage.start),
         dstElementWidth: newElementWidth, count: oldCount)
     }
@@ -537,7 +537,7 @@ public struct _StringCore {
 
     if _fastPath(rhs.hasContiguousStorage) {
       _StringCore._copyElements(
-        rhs._baseAddress, srcElementWidth: rhs.elementWidth,
+        rhs._baseAddress!, srcElementWidth: rhs.elementWidth,
         dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
     }
     else {

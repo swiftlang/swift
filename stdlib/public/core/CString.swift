@@ -24,7 +24,6 @@ extension String {
   ///
   /// - Precondition: `cString != nil`
   public init(cString: UnsafePointer<CChar>) {
-    _precondition(cString != nil, "cString must not be nil")
     self = String.decodeCString(UnsafePointer(cString), as: UTF8.self,
       repairingInvalidCodeUnits: true)!.result
   }
@@ -37,9 +36,8 @@ extension String {
   ///
   /// - Precondition: `cString != nil`
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
-    _precondition(cString != nil, "cString must not be nil")
     guard let (result, _) = String.decodeCString(
-      UnsafePointer(cString),
+        UnsafePointer(cString),
         as: UTF8.self,
         repairingInvalidCodeUnits: false) else {
       return nil
@@ -50,17 +48,17 @@ extension String {
   /// Create a new `String` by copying the nul-terminated data
   /// referenced by a `cString` using `encoding`.
   ///
-  /// Returns `nil` if the `cString` is `NULL` or if it contains ill-formed code
+  /// Returns `nil` if the `cString` is `nil` or if it contains ill-formed code
   /// units and no repairing has been requested. Otherwise replaces
   /// ill-formed code units with replacement characters (U+FFFD).
   @warn_unused_result
   public static func decodeCString<Encoding : UnicodeCodec>(
-    _ cString: UnsafePointer<Encoding.CodeUnit>,
+    _ cString: UnsafePointer<Encoding.CodeUnit>?,
     as encoding: Encoding.Type,
     repairingInvalidCodeUnits isRepairing: Bool = true)
       -> (result: String, repairsMade: Bool)? {
 
-    if cString._isNull {
+    guard let cString = cString else {
       return nil
     }
     let len = Int(_swift_stdlib_strlen(UnsafePointer(cString)))
@@ -80,8 +78,8 @@ extension String {
 /// with possibly-transient lifetime, create a null-terminated array of 'C' char.
 /// Returns `nil` if passed a null pointer.
 @warn_unused_result
-public func _persistCString(_ s: UnsafePointer<CChar>) -> [CChar]? {
-  if s == nil {
+public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
+  guard let s = p else {
     return nil
   }
   let count = Int(_swift_stdlib_strlen(s))

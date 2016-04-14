@@ -300,9 +300,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
       Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
                                                  nullptr,
                                                  Int8Decl->getDeclaredType());
+      Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
       PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
                                            nullptr,
-                                           PointerInt8Ty)
+                                           OptPointerInt8Ty)
         ->getCanonicalType();
     }
   }

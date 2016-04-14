@@ -3,6 +3,29 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 -------
 
+* As part of the changes for SE-0055 (see below), the *pointee* types of
+  imported pointers (e.g. the `id` in `id *`) are no longer assumed to always
+  be `_Nullable` even if annotated otherwise. However, an implicit or explicit
+  annotation of `_Null_unspecified` on a pointee type is still imported as
+  `Optional`.
+
+* [SE-0055](https://github.com/apple/swift-evolution/blob/master/proposals/0055-optional-unsafe-pointers.md):
+  The types `UnsafePointer`, `UnsafeMutablePointer`,
+  `AutoreleasingUnsafeMutablePointer`, `OpaquePointer`, `Selector`, and `Zone`
+  (formerly `NSZone`) now represent non-nullable pointers, i.e. pointers that
+  are never `nil`. A nullable pointer is now represented using `Optional`, e.g.
+  `UnsafePointer<Int>?` For types imported from C, non-object pointers (such as
+  `int *`) now have their nullability taken into account.
+
+  One possible area of difficulty is passing a nullable pointer to a function
+  that uses C variadics. Swift will not permit this directly, so as a
+  workaround please use the following idiom to pass it as a pointer-sized
+  integer value instead:
+
+  ```swift
+  unsafeBitCast(nullablePointer, to: Int.self)
+  ```
+
 * [SE-0046] (https://github.com/apple/swift-evolution/blob/master/proposals/0046-first-label.md) Function parameters now have consistent labelling across all function parameters. With this update the first parameter declarations will now match the existing behavior of the second and later parameters. This change makes the language simpler. 
 
     Functions that were written and called as follows 

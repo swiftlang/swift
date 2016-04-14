@@ -1178,7 +1178,7 @@ class CustomImmutableNSSet : NSSet {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }
@@ -1188,7 +1188,7 @@ class CustomImmutableNSSet : NSSet {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     CustomImmutableNSSet.timesCopyWithZoneWasCalled += 1
     return self
   }
@@ -3425,7 +3425,7 @@ class MockSetWithCustomCount : NSSet {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }
@@ -3435,7 +3435,7 @@ class MockSetWithCustomCount : NSSet {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     // Ensure that copying this set produces an object of the same
     // dynamic type.
     return self

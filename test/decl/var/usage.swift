@@ -128,7 +128,7 @@ func test() {
 
 func test4() {
   // expected-warning @+1 {{variable 'dest' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
-  var dest = UnsafeMutablePointer<Int>(bitPattern: 0)
+  var dest = UnsafeMutablePointer<Int>(bitPattern: 0)!
 
   dest[0] = 0
 }

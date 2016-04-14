@@ -2116,10 +2116,6 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
   // Pointers may be representable in ObjC.
   PointerTypeKind pointerKind;
   if (auto pointerElt = type->getAnyPointerElementType(pointerKind)) {
-    // FIXME: Optionality should be embedded in the pointer types.
-    if (wasOptional)
-      return failure();
-
     switch (pointerKind) {
     case PTK_UnsafeMutablePointer:
     case PTK_UnsafePointer:

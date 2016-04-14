@@ -124,6 +124,10 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     return subscriptBaseAddress + startIndex
   }
 
+  public var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    return firstElementAddress
+  }
+
   /// [63:1: 63-bit index][0: has a native buffer]
   var endIndexAndFlags: UInt
 
@@ -345,7 +349,8 @@ extension _SliceBuffer {
     let result = _ContiguousArrayBuffer<Element>(
       uninitializedCount: count,
       minimumCapacity: 0)
-    result.firstElementAddress.initializeFrom(firstElementAddress, count: count)
+    result.firstElementAddress.initializeFrom(
+      firstElementAddress, count: count)
     return result
   }
 }

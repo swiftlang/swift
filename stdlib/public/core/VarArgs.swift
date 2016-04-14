@@ -113,9 +113,10 @@ public func _encodeBitsAsWords<T : CVarArg>(_ x: T) -> [Int] {
   let result = [Int](
     repeating: 0,
     count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self))
+  _sanityCheck(result.count > 0)
   var tmp = x
   // FIXME: use UnsafeMutablePointer.assignFrom() instead of memcpy.
-  _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous),
+  _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
           src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
           size: UInt(sizeof(T.self)))
   return result
@@ -314,7 +315,11 @@ final internal class _VaListBuilder {
 
   @warn_unused_result
   func va_list() -> CVaListPointer {
-    return CVaListPointer(_fromUnsafeMutablePointer: storage)
+    // Use Builtin.addressof to emphasize that we are deliberately escaping this
+    // pointer and assuming it is safe to do so.
+    let emptyAddr = UnsafeMutablePointer<Int>(
+      Builtin.addressof(&_VaListBuilder.alignedStorageForEmptyVaLists))
+    return CVaListPointer(_fromUnsafeMutablePointer: storage ?? emptyAddr)
   }
 
   // Manage storage that is accessed as Words
@@ -329,18 +334,19 @@ final internal class _VaListBuilder {
       let oldCount = count
 
       allocated = max(newCount, allocated * 2)
-      storage = allocStorage(wordCount: allocated)
+      let newStorage = allocStorage(wordCount: allocated)
+      storage = newStorage
       // count is updated below
 
-      if oldStorage != nil {
-        storage.moveInitializeFrom(oldStorage, count: oldCount)
-        deallocStorage(wordCount: oldAllocated,
-          storage: oldStorage)
+      if let allocatedOldStorage = oldStorage {
+        newStorage.moveInitializeFrom(allocatedOldStorage, count: oldCount)
+        deallocStorage(wordCount: oldAllocated, storage: allocatedOldStorage)
       }
     }
 
+    let allocatedStorage = storage!
     for word in words {
-      storage[count] = word
+      allocatedStorage[count] = word
       count += 1
     }
   }
@@ -367,8 +373,8 @@ final internal class _VaListBuilder {
   }
 
   deinit {
-    if storage != nil {
-      deallocStorage(wordCount: allocated, storage: storage)
+    if let allocatedStorage = storage {
+      deallocStorage(wordCount: allocated, storage: allocatedStorage)
     }
   }
 
@@ -376,7 +382,9 @@ final internal class _VaListBuilder {
   let requiredAlignmentInBytes = alignof(Double.self)
   var count = 0
   var allocated = 0
-  var storage: UnsafeMutablePointer<Int> = nil
+  var storage: UnsafeMutablePointer<Int>? = nil
+
+  static var alignedStorageForEmptyVaLists: Double = 0
 }
 
 #else
@@ -388,13 +396,13 @@ final internal class _VaListBuilder {
   struct Header {
     var gp_offset = CUnsignedInt(0)
     var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * strideof(Int.self))
-    var overflow_arg_area: UnsafeMutablePointer<Int> = nil
-    var reg_save_area: UnsafeMutablePointer<Int> = nil
+    var overflow_arg_area: UnsafeMutablePointer<Int>? = nil
+    var reg_save_area: UnsafeMutablePointer<Int>? = nil
   }
 
   init() {
     // prepare the register save area
-    storage = Array(repeating: 0, count: _x86_64RegisterSaveWords)
+    storage = ContiguousArray(repeating: 0, count: _x86_64RegisterSaveWords)
   }
 
   func append(_ arg: CVarArg) {
@@ -423,9 +431,9 @@ final internal class _VaListBuilder {
 
   @warn_unused_result
   func va_list() -> CVaListPointer {
-    header.reg_save_area = storage._baseAddressIfContiguous
+    header.reg_save_area = storage._baseAddress
     header.overflow_arg_area
-      = storage._baseAddressIfContiguous + _x86_64RegisterSaveWords
+      = storage._baseAddress + _x86_64RegisterSaveWords
     return CVaListPointer(
              _fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
                Builtin.addressof(&self.header)))
@@ -436,7 +444,7 @@ final internal class _VaListBuilder {
 
   final  // Property must be final since it is used by Builtin.addressof.
   var header = Header()
-  var storage: [Int]
+  var storage: ContiguousArray<Int>
 }
 
 #endif

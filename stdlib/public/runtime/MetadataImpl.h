@@ -519,6 +519,22 @@ struct PointerPointerBox : NativeBox<void**> {
   }
 };
 
+/// A box implementation class for raw pointers.
+///
+/// Note that this is used for imported `void * _Nonnull`, which may include
+/// reinterpret_cast-ed integers, so we only get NULL as an extra inhabitant.
+struct RawPointerBox : NativeBox<void*> {
+  static constexpr unsigned numExtraInhabitants = 1;
+
+  static void storeExtraInhabitant(void **dest, int index) {
+    *dest = nullptr;
+  }
+
+  static int getExtraInhabitantIndex(void* const *src) {
+    return *src == nullptr ? 0 : -1;
+  }
+};
+
 /// A box implementation class for unmanaged function pointers.
 /// @convention(thin) functions have this layout, as do the first elements of
 /// Swift thick functions.

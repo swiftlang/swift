@@ -63,13 +63,8 @@ public struct Selector : StringLiteralConvertible {
   }
 }
 
-public struct NSZone: NilLiteralConvertible {
+public struct NSZone {
   public var pointer : OpaquePointer
-
-  @_transparent public
-  init(nilLiteral: ()) {
-    pointer = nil
-  }
 }
 
 internal func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {

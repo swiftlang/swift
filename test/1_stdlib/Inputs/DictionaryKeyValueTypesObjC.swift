@@ -92,7 +92,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
   }
 
   @objc(copyWithZone:)
-  func copy(with zone: NSZone) -> AnyObject {
+  func copy(with zone: NSZone?) -> AnyObject {
     return TestObjCKeyTy(value)
   }
 
@@ -491,12 +491,12 @@ import SlurpFastEnumeration
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
     for i in 0..<returnedCount {
-      let value: AnyObject = state.itemsPtr[i]!
+      let value: AnyObject = state.itemsPtr![i]!
       sink(value)
       itemsReturned += 1
     }
@@ -510,7 +510,7 @@ import SlurpFastEnumeration
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     expectEqual(0, returnedCount)
   }
 }
@@ -533,12 +533,12 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
     for i in 0..<returnedCount {
-      let key: AnyObject = state.itemsPtr[i]!
+      let key: AnyObject = state.itemsPtr![i]!
       let value: AnyObject = d.object(forKey: key)!
       let kv = (key, value)
       sink(kv)
@@ -743,12 +743,12 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
     for i in 0..<returnedCount {
-      let value: AnyObject = state.itemsPtr[i]!
+      let value: AnyObject = state.itemsPtr![i]!
       sink(value)
       itemsReturned += 1
     }
@@ -762,7 +762,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     expectEqual(0, returnedCount)
   }
 }

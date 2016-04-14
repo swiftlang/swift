@@ -43,7 +43,7 @@ extension _StringCore {
         size: numericCast(utf16Count))
 
       return (i + utf16Count, result)
-    } else if _fastPath(!_baseAddress._isNull) {
+    } else if _fastPath(_baseAddress != nil) {
       return _encodeSomeContiguousUTF16AsUTF8(from: i)
     } else {
 #if _runtime(_ObjC)
@@ -59,7 +59,7 @@ extension _StringCore {
   @warn_unused_result
   func _encodeSomeContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
-    _sanityCheck(!_baseAddress._isNull)
+    _sanityCheck(_baseAddress != nil)
 
     let storage = UnsafeBufferPointer(start: startUTF16, count: self.count)
     return _transcodeSomeUTF16AsUTF8(storage, i)
@@ -71,7 +71,7 @@ extension _StringCore {
   @warn_unused_result
   func _encodeSomeNonContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
-    _sanityCheck(_baseAddress._isNull)
+    _sanityCheck(_baseAddress == nil)
 
     let storage = _CollectionOf<Int, UInt16>(
       _startIndex: 0, endIndex: self.count
@@ -259,7 +259,7 @@ extension String {
     }
   }
 
-  public var _contiguousUTF8: UnsafeMutablePointer<UTF8.CodeUnit> {
+  public var _contiguousUTF8: UnsafeMutablePointer<UTF8.CodeUnit>? {
     return _core.elementWidth == 1 ? _core.startASCII : nil
   }
 

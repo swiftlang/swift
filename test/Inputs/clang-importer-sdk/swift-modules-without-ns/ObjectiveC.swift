@@ -59,13 +59,8 @@ public struct Selector : StringLiteralConvertible {
   }
 }
 
-public struct Zone: NilLiteralConvertible {
+public struct Zone {
   public var pointer : OpaquePointer
-
-  @_transparent public
-  init(nilLiteral: ()) {
-    pointer = nil
-  }
 }
 
 internal func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {

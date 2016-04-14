@@ -504,30 +504,31 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                               SILType::getPrimitiveObjectType(IUOptNSStringTy));
 
     // Call UIApplicationMain.
-    SILParameterInfo argTypes[] = {
-      SILParameterInfo(argc->getType().getSwiftRValueType(),
-                       ParameterConvention::Direct_Unowned),
-      SILParameterInfo(argv->getType().getSwiftRValueType(),
-                       ParameterConvention::Direct_Unowned),
-      SILParameterInfo(IUOptNSStringTy, ParameterConvention::Direct_Unowned),
-      SILParameterInfo(IUOptNSStringTy, ParameterConvention::Direct_Unowned),
-    };
-    auto UIApplicationMainType = SILFunctionType::get(nullptr,
-                  SILFunctionType::ExtInfo()
-                    .withRepresentation(SILFunctionType::Representation::
-                                        CFunctionPointer),
-                  ParameterConvention::Direct_Unowned,
-                  argTypes,
-                  SILResultInfo(argc->getType().getSwiftRValueType(),
-                                ResultConvention::Unowned),
-                  /*error result*/ None,
-                  getASTContext());
+    auto UIApplicationMainFn = SGM.M.lookUpFunction("UIApplicationMain");
+    assert(UIApplicationMainFn && "UIKit not imported?");
 
-    auto UIApplicationMainFn
-      = SGM.M.getOrCreateFunction(mainClass, "UIApplicationMain",
-                                  SILLinkage::PublicExternal,
-                                  UIApplicationMainType,
-                                  IsBare, IsTransparent, IsNotFragile);
+    // Fix up argv to have the right type.
+    auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
+    auto argvTy = fnTy->getSILArgumentType(1);
+
+    SILType unwrappedTy = argvTy;
+    if (Type innerTy = argvTy.getSwiftRValueType()->getAnyOptionalObjectType()){
+      auto canInnerTy = innerTy->getCanonicalType();
+      unwrappedTy = SILType::getPrimitiveObjectType(canInnerTy);
+    }
+
+    if (unwrappedTy != argv->getType()) {
+      auto converted =
+          emitPointerToPointer(mainClass, ManagedValue::forUnmanaged(argv),
+                               argv->getType().getSwiftRValueType(),
+                               unwrappedTy.getSwiftRValueType());
+      argv = converted.getUnmanagedSingleValue(*this, mainClass);
+    }
+
+    if (unwrappedTy != argvTy) {
+      argv = getOptionalSomeValue(mainClass, ManagedValue::forUnmanaged(argv),
+                                  getTypeLowering(argvTy)).getUnmanagedValue();
+    }
 
     auto UIApplicationMain = B.createFunctionRef(mainClass, UIApplicationMainFn);
     auto nil = B.createEnum(mainClass, SILValue(),
