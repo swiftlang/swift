@@ -98,7 +98,7 @@ public:
   llvm::GlobalVariable *emit() {
     auto tempBase = std::unique_ptr<llvm::GlobalVariable>(
         new llvm::GlobalVariable(IGM.Int8Ty, /*isConstant*/ true,
-        llvm::GlobalValue::PrivateLinkage));
+                                 llvm::GlobalValue::PrivateLinkage));
     setRelativeAddressBase(tempBase.get());
 
     layout();
@@ -112,7 +112,7 @@ public:
                                         init,
                                         "\x01l__swift3_assocty_metadata");
     var->setSection(IGM.getAssociatedTypeMetadataSectionName());
-    var->setAlignment(IGM.getPointerAlignment().getValue());
+    var->setAlignment(4);
 
     auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
     tempBase->replaceAllUsesWith(replacer);
@@ -202,7 +202,7 @@ public:
                                         init,
                                         "\x01l__swift3_reflection_metadata");
     var->setSection(IGM.getFieldTypeMetadataSectionName());
-    var->setAlignment(IGM.getPointerAlignment().getValue());
+    var->setAlignment(4);
 
     auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
     tempBase->replaceAllUsesWith(replacer);
