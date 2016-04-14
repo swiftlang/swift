@@ -306,6 +306,12 @@ details of the setups of other systems or automated environments.""")
              "target. The built LLVM and Clang will be used to compile Swift "
              "for the cross-compilation targets.",
         default=swift_build_support.targets.host_target())
+    targets_group.add_argument(
+        "--stdlib-deployment-targets",
+        help="list of targets to compile or cross-compile the Swift standard "
+             "library for. %(default)s by default.",
+        nargs="*",
+        default=swift_build_support.targets.stdlib_deployment_targets())
 
     projects_group = parser.add_argument_group(
         title="Options to select projects")
@@ -756,6 +762,7 @@ the number of parallel build jobs to use""",
         '--darwin-xcrun-toolchain',
         '--cmake',
         '--host-target',
+        '--stdlib-deployment-targets',
         '--skip-build',
         '--show-sdks',
         '--install-prefix',
@@ -772,7 +779,7 @@ the number of parallel build jobs to use""",
         '--skip-test-watchos-host',
     ]))
 
-    if args.host_target is None:
+    if args.host_target is None or args.stdlib_deployment_targets is None:
         print_with_argv0("Unknown operating system.")
         return 1
 
@@ -1110,6 +1117,8 @@ the number of parallel build jobs to use""",
         "--build-dir", build_dir,
         "--install-prefix", os.path.abspath(args.install_prefix),
         "--host-target", args.host_target,
+        "--stdlib-deployment-targets",
+        " ".join(args.stdlib_deployment_targets),
         "--host-cc", host_clang.cc,
         "--host-cxx", host_clang.cxx,
         "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
