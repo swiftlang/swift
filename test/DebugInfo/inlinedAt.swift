@@ -2,6 +2,8 @@
 // RUN:    | FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | FileCheck %s
 
+// REQUIRES: rdar25732692
+
 import StdlibUnittest
 @inline(never) func hold(n : Int) { _blackHole(n) }
 
