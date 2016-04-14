@@ -1,4 +1,4 @@
-//===--- SwiftIndexing.h --------------------------------------------------===//
+//===--- IndexSymbol.h - Index symbol data types ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTINDEXING_H
-#define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTINDEXING_H
+#ifndef SWIFT_INDEX_INDEXSYMBOL_H
+#define SWIFT_INDEX_INDEXSYMBOL_H
+
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/SmallString.h"
+
+namespace swift {
+class Decl;
+
+namespace index {
 
 enum class SymbolKind {
   Unknown,
@@ -71,4 +79,41 @@ enum class SymbolSubKind {
   ExtensionOfProtocol,
 };
 
-#endif // LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTINDEXING_H
+struct IndexSymbol {
+  enum TypeKind { Base, FuncDecl, CallReference };
+  TypeKind entityType = Base;
+
+  SymbolKind kind;
+  SymbolSubKind subKind = SymbolSubKind::None;
+  bool isRef;
+  SmallString<32> name;
+  SmallString<64> USR;
+  SmallString<16> group;
+  unsigned line = 0;
+  unsigned column = 0;
+
+  IndexSymbol() = default;
+
+protected:
+  IndexSymbol(TypeKind TK) : entityType(TK) {}
+};
+
+struct FuncDeclIndexSymbol : public IndexSymbol {
+  bool IsTestCandidate = false;
+
+  FuncDeclIndexSymbol() : IndexSymbol(FuncDecl) {}
+};
+
+struct CallRefIndexSymbol : public IndexSymbol {
+  llvm::SmallString<64> ReceiverUSR;
+  bool IsDynamic = false;
+
+  CallRefIndexSymbol() : IndexSymbol(CallReference) {}
+};
+
+SymbolKind getSymbolKindForDecl(const Decl *D);
+
+} // end namespace index
+} // end namespace swift
+
+#endif // SWIFT_INDEX_INDEXSYMBOL_H
