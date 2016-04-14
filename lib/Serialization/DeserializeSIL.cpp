@@ -1835,7 +1835,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   (void)kind;
 
   // Read function properties only, e.g. its linkage and other attributes.
-  // TODO: If this results in any noticable performance problems, Cache the
+  // TODO: If this results in any noticeable performance problems, Cache the
   // linkage to avoid re-reading it from the bitcode each time?
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
