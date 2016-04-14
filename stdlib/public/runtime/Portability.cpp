@@ -1,4 +1,4 @@
-//===--- Portability.cpp - -----------------------------------------------===//
+//===--- Portability.cpp - ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -8,11 +8,11 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Implementations of the stub APIs that make portable runtime easier to write.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Portability.h"
 #include <cstring>

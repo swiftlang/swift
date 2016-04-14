@@ -1,4 +1,4 @@
-//===--- Subprocess.cpp - Subprocess Stubs --------------------------------===//
+//===--- Subprocess.c - Subprocess Stubs ----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
