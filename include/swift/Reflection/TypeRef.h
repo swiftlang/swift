@@ -469,7 +469,7 @@ class OpaqueTypeRef final : public TypeRef {
 public:
   OpaqueTypeRef() : TypeRef(TypeRefKind::Opaque) {}
 
-  static  OpaqueTypeRef *get();
+  static OpaqueTypeRef *get();
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Opaque;
