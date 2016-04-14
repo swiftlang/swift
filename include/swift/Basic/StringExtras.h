@@ -33,12 +33,6 @@ namespace swift {
   ///
   /// \seealso Token::canBeArgumentLabel()
   bool canBeArgumentLabel(StringRef identifier);
-  
-  /// Escapes an identifier with backticks if it cannot
-  /// be used as an argument label itself.
-  ///
-  /// \seealso swift::canBeArgumentLabel()
-  StringRef formattedArgumentLabel(StringRef identifier);
 
   /// Describes the kind of preposition a word is.
   enum PrepositionKind {

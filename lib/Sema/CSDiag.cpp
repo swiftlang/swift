@@ -3491,7 +3491,7 @@ static bool diagnoseArgumentLabelError(Expr *expr,
                                        ArrayRef<Identifier> newNames,
                                        ConstraintSystem &CS) {
   
-  auto funcDeclRefExpr = dyn_cast_or_null<DeclRefExpr>(fnExpr);
+  auto funcDeclRefExpr = dyn_cast<DeclRefExpr>(fnExpr);
   auto func = funcDeclRefExpr ? dyn_cast<FuncDecl>(funcDeclRefExpr->getDecl())
                               : nullptr;
   bool declIsInModule = func &&
@@ -3529,7 +3529,7 @@ static bool diagnoseArgumentLabelError(Expr *expr,
             CS.TC.diagnose(expr->getStartLoc(),
                            diag::extra_named_single_element_tuple,
                            field.getName().str())
-            .fixItInsertAfter(expr->getEndLoc(), str);
+                 .fixItInsertAfter(expr->getEndLoc(), str);
             return true;
           }
         }
@@ -3549,7 +3549,7 @@ static bool diagnoseArgumentLabelError(Expr *expr,
       expr = parenExpr->getSubExpr();
     
     llvm::SmallString<16> str;
-    str += newNames[0].str();
+    newNames[0].getAsArgumentLabel(str);
     str += ":";
     // Don't add the trailing space in the note.
     auto diagStr = str;
@@ -3567,7 +3567,7 @@ static bool diagnoseArgumentLabelError(Expr *expr,
       CS.TC.diagnose(expr->getStartLoc(),
                      diag::add_missing_argument_label,
                      diagStr)
-      .fixItInsert(expr->getStartLoc(), str);
+           .fixItInsert(expr->getStartLoc(), str);
       
       // Emit a note to fix the decl,
       // so call sites are unaffected.
@@ -3620,7 +3620,7 @@ static bool diagnoseArgumentLabelError(Expr *expr,
   // emit the catch-all "wrong labels" diagnostic.
   bool plural = (numMissing + numExtra + numWrong) > 1;
   if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-    for(unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
       auto haveName = tuple->getElementName(i);
       if (haveName.empty())
         haveBuffer += '_';
@@ -3658,16 +3658,18 @@ static bool diagnoseArgumentLabelError(Expr *expr,
   // If we're attempting to fix only the first parameter,
   // offer up the same fix as a scalar tuple promotion.
   if (numMissing == 1 && declIsInModule &&
-      tuple->getElementName(0) != newNames[0]) {
+      tuple->getElementName(0).empty() && !newNames[0].empty()) {
     auto element = tuple->getElement(0);
     diag.flush();
-    SmallString<16> newStr = formattedArgumentLabel(newNames[0].str());
+    SmallString<16> newStr;
+    newNames[0].getAsArgumentLabel(newStr);
     newStr += ':';
     auto diag = CS.TC.diagnose(element->getStartLoc(),
                                diag::add_missing_argument_label,
                                newStr);
     newStr += ' ';
     diag.fixItInsert(element->getStartLoc(), newStr);
+    diag.flush();
     emitFirstParamImplicitDeclFixIt();
     return true;
   }
@@ -3688,7 +3690,8 @@ static bool diagnoseArgumentLabelError(Expr *expr,
       continue;
     }
     
-    SmallString<16> newStr = formattedArgumentLabel(newName.str());
+    SmallString<16> newStr;
+    newName.getAsArgumentLabel(newStr);
     
     if (oldName.empty()) {
       // Insert the name.
@@ -5210,7 +5213,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     for (auto &arg : arguments)
       expectedNames.push_back(arg.Label);
 
-    return diagnoseArgumentLabelError(argExpr, /*fnExpr=*/nullptr,
+    return diagnoseArgumentLabelError(argExpr, candidateInfo[0].getExpr(),
                                       expectedNames, *CS);
   }
   
