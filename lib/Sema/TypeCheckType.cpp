@@ -1601,7 +1601,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_objc_block, TAK_convention, TAK_thin, TAK_noreturn,
-    TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape
+    TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -1649,8 +1649,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       thin = false;
     }
     
-    bool isNoEscape = attrs.has(TAK_noescape);
-
     auto calleeConvention = ParameterConvention::Direct_Unowned;
     if (attrs.has(TAK_callee_owned)) {
       if (attrs.has(TAK_callee_guaranteed)) {
@@ -1783,8 +1781,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // Resolve the function type directly with these attributes.
       FunctionType::ExtInfo extInfo(rep,
                                     attrs.has(TAK_noreturn),
-                                    /*autoclosure is a decl attr*/false,
-                                    isNoEscape,
+                                    attrs.has(TAK_autoclosure),
+                                    attrs.has(TAK_noescape),
                                     fnRepr->throws());
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);

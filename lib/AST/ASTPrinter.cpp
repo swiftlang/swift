@@ -3695,9 +3695,12 @@ public:
       return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
         begin(), Options.ExcludeAttrList.end(), Kind);
     };
-    if (info.isAutoClosure() && !IsAttrExcluded(DAK_AutoClosure))
-      Printer << "@autoclosure ";
-    else if (info.isNoEscape() && !IsAttrExcluded(DAK_NoEscape))
+    if (info.isAutoClosure() && !IsAttrExcluded(DAK_AutoClosure)) {
+      if (info.isNoEscape())
+        Printer << "@autoclosure ";
+      else
+        Printer << "@autoclosure(escaping) ";
+    } else if (info.isNoEscape() && !IsAttrExcluded(DAK_NoEscape))
       // autoclosure implies noescape.
       Printer << "@noescape ";
 

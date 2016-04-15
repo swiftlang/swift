@@ -2362,13 +2362,10 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)
 END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
-/// FunctionType - A monomorphic function type.
+/// FunctionType - A monomorphic function type, specified with an arrow.
 ///
-/// If the AutoClosure bit is set to true, then the input type is known to be ()
-/// and a value of this function type is only assignable (in source code) from
-/// the destination type of the function. Sema inserts an ImplicitClosure to
-/// close over the value.  For example:
-///   @autoclosure var x : () -> Int = 4
+/// For example:
+///   let x : (Float, Int) -> Int
 class FunctionType : public AnyFunctionType {
 public:
   /// 'Constructor' Factory Function

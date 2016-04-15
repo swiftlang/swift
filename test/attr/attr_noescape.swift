@@ -260,12 +260,12 @@ var escape : CompletionHandlerNE
 func doThing1(@noescape _ completion: CompletionHandler) {
   // expected-error @+2 {{@noescape value 'escape' may only be called}}
   // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
-  escape = completion
+  escape = completion // expected-error {{declaration closing over @noescape parameter 'escape' may allow it to escape}}
 }
 func doThing2(_ completion: CompletionHandlerNE) {
   // expected-error @+2 {{@noescape value 'escape' may only be called}}
   // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
-  escape = completion
+  escape = completion // expected-error {{declaration closing over @noescape parameter 'escape' may allow it to escape}}
 }
 
 // <rdar://problem/19997680> @noescape doesn't work on parameters of function type
@@ -296,7 +296,7 @@ enum r19997577Type {
 func noescapeD(@noescape f: () -> Bool) {} // ok
 func noescapeT(f: @noescape () -> Bool) {} // ok
 func autoclosureD(@autoclosure f: () -> Bool) {} // ok
-func autoclosureT(f: @autoclosure () -> Bool) {} // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@autoclosure }} {{22-35=}}
+func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
 
 func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // ok
 func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // ok

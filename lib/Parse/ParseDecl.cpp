@@ -1546,6 +1546,37 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     Attributes.setAttr(attr, Loc);
   }
   
+  // Handle @autoclosure(escaping)
+  if (attr == TAK_autoclosure) {
+    bool isEscaping = false;
+
+    // We need to do a bit of lookahead here to make sure we parse a (weird)
+    // type like: "@autoclosure (escaping) -> Int" correctly (escaping is the
+    // name of a type here).  We also want to support the case where the
+    // function type coming up is a typealias, e.g. "@autoclosure (escaping) T".
+    if (Tok.is(tok::l_paren) && peekToken().getText() == "escaping") {
+      Parser::BacktrackingScope Backtrack(*this);
+      consumeToken(tok::l_paren);
+      consumeToken(tok::identifier);
+      isEscaping = Tok.is(tok::r_paren) && peekToken().isNot(tok::arrow);
+    }
+
+    if (isEscaping) {
+      consumeToken(tok::l_paren);
+      consumeToken(tok::identifier);
+      consumeToken(tok::r_paren);
+    }
+    
+    if (!justChecking) {
+      if (isEscaping)
+        ;
+      else
+        Attributes.setAttr(TAK_noescape, Loc);
+    }
+  }
+  
+  
+  
   // Handle any attribute-specific processing logic.
 
   // In just-checking mode, we only need additional parsing for the "cc"
@@ -1697,9 +1728,9 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
       Token next = peekToken();
       auto Kind = TypeAttributes::getAttrKindFromString(next.getText());
 
-      // noescape is only valid as a decl attribute and type attribute (in
-      // parameter lists) but we disambiguate it as a decl attribute.
-      if (Kind == TAK_noescape)
+      // noescape/autoclosure are valid as a decl attribute and type attribute
+      // (in parameter lists) but we disambiguate them as a decl attribute.
+      if (Kind == TAK_noescape || Kind == TAK_autoclosure)
         Kind = TAK_Count;
 
       if (Kind != TAK_Count)

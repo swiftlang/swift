@@ -23,7 +23,7 @@ func func8(@autoclosure _ x: inout () -> Bool) -> Bool {  // expected-error {{@a
 
 
 // <rdar://problem/19707366> QoI: @autoclosure declaration change fixit
-let migrate4 : @autoclosure() -> ()   // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@autoclosure }} {{16-28=}}
+let migrate4 : (@autoclosure() -> ())->()
 
 
 struct SomeStruct {
@@ -110,8 +110,13 @@ class TestFunc12 {
 
 
 enum AutoclosureFailableOf<T> {
-  case Success(@autoclosure () -> T)  // expected-error {{attribute can only be applied to declarations, not types}}
+  case Success(@autoclosure () -> T)
   case Failure()
 }
 
+let _ : (@autoclosure () -> ()) -> ()
+let _ : (@autoclosure(escaping) () -> ()) -> ()
+
+// escaping is the name of param type
+let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{use of undeclared type 'escaping'}}
 
