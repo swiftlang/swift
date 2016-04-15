@@ -1149,17 +1149,7 @@ the number of parallel build jobs to use""",
     if args.cmake_generator == 'Ninja' and \
        not swift_build_support.ninja.is_ninja_installed():
         build_script_impl_args += ["--build-ninja"]
-    if args.android:
-        build_script_impl_args += [
-            "--android-ndk", args.android_ndk,
-            "--android-ndk-version", args.android_ndk_version,
-            "--android-ndk-toolchain-version",
-            args.android_ndk_toolchain_version,
-            "--android-icu-uc", args.android_icu_uc,
-            "--android-icu-uc-include", args.android_icu_uc_include,
-            "--android-icu-i18n", args.android_icu_i18n,
-            "--android-icu-i18n-include", args.android_icu_i18n_include,
-        ]
+
     if args.skip_build_linux:
         build_script_impl_args += ["--skip-build-linux"]
     if args.skip_build_freebsd:
