@@ -72,55 +72,58 @@ public:
 /// building TypeRefs.
 class TypeRefBuilder {
 public:
-  using Type = TypeRef*;
+  using Type = const TypeRef *;
 
 private:
-  std::vector<std::unique_ptr<TypeRef>> TypeRefPool;
+  std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;
 
 public:
   template <typename TypeRefTy, typename... Args>
   TypeRefTy *make_typeref(Args... args) {
     auto TR = new TypeRefTy(::std::forward<Args>(args)...);
-    TypeRefPool.push_back(std::unique_ptr<TypeRef>(TR));
+    TypeRefPool.push_back(std::unique_ptr<const TypeRef>(TR));
     return TR;
   }
 
-  BuiltinTypeRef *createBuiltinType(const std::string &mangledName) {
+  const BuiltinTypeRef *createBuiltinType(const std::string &mangledName) {
     return BuiltinTypeRef::create(*this, mangledName);
   }
 
-  NominalTypeRef *createNominalType(const std::string &mangledName,
-                                    TypeRef *parent) {
+  const NominalTypeRef *createNominalType(const std::string &mangledName,
+                                    const TypeRef *parent) {
     return NominalTypeRef::create(*this, mangledName, parent);
   }
 
-  BoundGenericTypeRef *createBoundGenericType(const std::string &mangledName,
-                                        const std::vector<TypeRef *> &args,
-                                              TypeRef *parent) {
+  const BoundGenericTypeRef *
+  createBoundGenericType(const std::string &mangledName,
+                         const std::vector<const TypeRef *> &args,
+                         const TypeRef *parent) {
     return BoundGenericTypeRef::create(*this, mangledName, args, parent);
   }
 
-  TupleTypeRef *createTupleType(const std::vector<TypeRef *> &elements,
-                                bool isVariadic) {
+  const TupleTypeRef *
+  createTupleType(const std::vector<const TypeRef *> &elements,
+                  bool isVariadic) {
     return TupleTypeRef::create(*this, elements, isVariadic);
   }
 
-  FunctionTypeRef *createFunctionType(const std::vector<TypeRef *> &args,
-                                      const std::vector<bool> &inOutArgs,
-                                      TypeRef *result,
-                                      FunctionTypeFlags flags) {
+  const FunctionTypeRef *
+  createFunctionType(const std::vector<const TypeRef *> &args,
+                     const std::vector<bool> &inOutArgs,
+                     const TypeRef *result,
+                     FunctionTypeFlags flags) {
     // FIXME: don't ignore inOutArgs
     // FIXME: don't ignore flags
     return FunctionTypeRef::create(*this, args, result);
   }
 
-  ProtocolTypeRef *createProtocolType(const std::string &moduleName,
+  const ProtocolTypeRef *createProtocolType(const std::string &moduleName,
                                       const std::string &protocolName) {
     return ProtocolTypeRef::create(*this, moduleName, protocolName);
   }
 
-  ProtocolCompositionTypeRef *
-  createProtocolCompositionType(const std::vector<TypeRef*> &protocols) {
+  const ProtocolCompositionTypeRef *
+  createProtocolCompositionType(const std::vector<const TypeRef*> &protocols) {
     for (auto protocol : protocols) {
       if (!isa<ProtocolTypeRef>(protocol))
         return nullptr;
@@ -128,49 +131,51 @@ public:
     return ProtocolCompositionTypeRef::create(*this, protocols);
   }
 
-  ExistentialMetatypeTypeRef *
-  createExistentialMetatypeType(TypeRef *instance) {
+  const ExistentialMetatypeTypeRef *
+  createExistentialMetatypeType(const TypeRef *instance) {
     return ExistentialMetatypeTypeRef::create(*this, instance);
   }
 
-  MetatypeTypeRef *createMetatypeType(TypeRef *instance) {
+  const MetatypeTypeRef *createMetatypeType(const TypeRef *instance) {
     return MetatypeTypeRef::create(*this, instance);
   }
 
-  GenericTypeParameterTypeRef *
+  const GenericTypeParameterTypeRef *
   createGenericTypeParameterType(unsigned depth, unsigned index) {
     return GenericTypeParameterTypeRef::create(*this, depth, index);
   }
 
-  DependentMemberTypeRef *createDependentMemberType(const std::string &member,
-                                                    TypeRef *base,
-                                                    TypeRef *protocol) {
+  const DependentMemberTypeRef *
+  createDependentMemberType(const std::string &member,
+                            const TypeRef *base,
+                            const TypeRef *protocol) {
     if (!isa<ProtocolTypeRef>(protocol))
       return nullptr;
     return DependentMemberTypeRef::create(*this, member, base, protocol);
   }
 
-  UnownedStorageTypeRef *createUnownedStorageType(TypeRef *base) {
+  const UnownedStorageTypeRef *createUnownedStorageType(const TypeRef *base) {
     return UnownedStorageTypeRef::create(*this, base);
   }
 
-  UnmanagedStorageTypeRef *createUnmanagedStorageType(TypeRef *base) {
+  const UnmanagedStorageTypeRef *
+  createUnmanagedStorageType(const TypeRef *base) {
     return UnmanagedStorageTypeRef::create(*this, base);
   }
 
-  WeakStorageTypeRef *createWeakStorageType(TypeRef *base) {
+  const WeakStorageTypeRef *createWeakStorageType(const TypeRef *base) {
     return WeakStorageTypeRef::create(*this, base);
   }
 
-  ObjCClassTypeRef *getUnnamedObjCClassType() {
+  const ObjCClassTypeRef *getUnnamedObjCClassType() {
     return ObjCClassTypeRef::getUnnamed();
   }
 
-  ForeignClassTypeRef *getUnnamedForeignClassType() {
+  const ForeignClassTypeRef *getUnnamedForeignClassType() {
     return ForeignClassTypeRef::getUnnamed();
   }
 
-  OpaqueTypeRef *getOpaqueType() {
+  const OpaqueTypeRef *getOpaqueType() {
     return OpaqueTypeRef::get();
   }
 };
@@ -327,7 +332,7 @@ public:
     OS << '\n';
   }
 
-  TypeRef *
+  const TypeRef *
   getDependentMemberTypeRef(const std::string &MangledTypeName,
                             const DependentMemberTypeRef *DependentMember) {
 
@@ -344,8 +349,8 @@ public:
     return nullptr;
   }
 
-  std::vector<std::pair<std::string, TypeRef *>>
-  getFieldTypeRefs(TypeRef *TR) {
+  std::vector<std::pair<std::string, const TypeRef *>>
+  getFieldTypeRefs(const TypeRef *TR) {
     std::string MangledName;
     if (auto N = dyn_cast<NominalTypeRef>(TR))
       MangledName = N->getMangledName();
@@ -356,7 +361,7 @@ public:
 
     auto Subs = TR->getSubstMap();
 
-    std::vector<std::pair<std::string, TypeRef *>> Fields;
+    std::vector<std::pair<std::string, const TypeRef *>> Fields;
     for (auto Info : ReflectionInfos) {
       for (auto &FieldDescriptor : Info.fieldmd) {
         auto CandidateMangledName = FieldDescriptor.MangledTypeName.get();
@@ -389,7 +394,7 @@ public:
     return Fields;
   }
 
-  std::vector<std::pair<std::string, TypeRef *>>
+  std::vector<std::pair<std::string, const TypeRef *>>
   getFieldTypeRefs(StoredPointer MetadataAddress) {
     auto TR = readTypeFromMetadata(MetadataAddress);
     return getFieldTypeRefs(TR);

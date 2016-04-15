@@ -65,7 +65,7 @@ swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
 swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index) {
-  auto TR = reinterpret_cast<TypeRef *>(OpaqueTypeRef);
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
 
   if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
     auto &Params = BG->getGenericParams();
@@ -80,7 +80,7 @@ swift_typeinfo_t
 swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = reinterpret_cast<TypeRef *>(OpaqueTypeRef);
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   return Context->getInfoForTypeRef(TR);
 }
 
@@ -89,7 +89,7 @@ swift_reflection_infoForChild(SwiftReflectionContextRef ContextRef,
                               swift_typeref_t OpaqueTypeRef,
                               unsigned Index) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = reinterpret_cast<TypeRef *>(OpaqueTypeRef);
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   return Context->getInfoForChild(TR, Index);
 }
 
