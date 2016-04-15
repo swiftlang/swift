@@ -772,7 +772,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   //===--- algorithms -----------------------------------------------------===//
 
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
+    _ body: @noescape (UnsafeMutablePointer<Element>, Int) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
@@ -856,7 +856,7 @@ extension ${Self} {
   /// same algorithm on `body`'s argument lets you trade safety for
   /// speed.
   public func withUnsafeBufferPointer<R>(
-    @noescape _ body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     return try _buffer.withUnsafeBufferPointer(body)
   }
@@ -879,7 +879,7 @@ extension ${Self} {
   // function saving on allocating a closure context. This becomes unnecessary
   // once we allocate noescape closures on the stack.
   public mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @noescape (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     let count = self.count
     // Ensure unique storage

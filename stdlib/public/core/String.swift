@@ -290,7 +290,7 @@ extension String {
   // with unpaired surrogates
   func _encode<
     Encoding: UnicodeCodec
-  >(_ encoding: Encoding.Type, @noescape output: (Encoding.CodeUnit) -> Void)
+  >(_ encoding: Encoding.Type, output: @noescape (Encoding.CodeUnit) -> Void)
   {
     return _core.encode(encoding, output: output)
   }

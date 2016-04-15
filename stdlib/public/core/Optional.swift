@@ -26,7 +26,7 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   @warn_unused_result
-  public func map<U>(@noescape _ f: (Wrapped) throws -> U) rethrows -> U? {
+  public func map<U>(_ f: @noescape (Wrapped) throws -> U) rethrows -> U? {
     switch self {
     case .some(let y):
       return .some(try f(y))
@@ -37,7 +37,7 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
 
   /// Returns `nil` if `self` is `nil`, `f(self!)` otherwise.
   @warn_unused_result
-  public func flatMap<U>(@noescape _ f: (Wrapped) throws -> U?) rethrows -> U? {
+  public func flatMap<U>(_ f: @noescape (Wrapped) throws -> U?) rethrows -> U? {
     switch self {
     case .some(let y):
       return try f(y)
@@ -253,7 +253,7 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 
 @_transparent
 @warn_unused_result
-public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
+public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
   switch optional {
   case .some(let value):
@@ -265,7 +265,7 @@ public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
 
 @_transparent
 @warn_unused_result
-public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T?)
+public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
   switch optional {
   case .some(let value):

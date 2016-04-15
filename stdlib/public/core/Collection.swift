@@ -303,7 +303,7 @@ extension Collection {
   /// - Complexity: O(N).
   @warn_unused_result
   public func map<T>(
-    @noescape _ transform: (Iterator.Element) throws -> T
+    _ transform: @noescape (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     let count: Int = numericCast(self.count)
     if count == 0 {
@@ -427,7 +427,7 @@ extension Collection {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    @noescape isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
 
@@ -613,7 +613,7 @@ extension Sequence
 }
 
 extension Collection {
-  public func _preprocessingPass<R>(@noescape _ preprocess: () -> R) -> R? {
+  public func _preprocessingPass<R>(_ preprocess: @noescape () -> R) -> R? {
     return preprocess()
   }
 }
@@ -663,7 +663,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R?
   // FIXME: the signature should use UnsafeMutableBufferPointer, but the
   // compiler can't handle that.
@@ -675,7 +675,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
 
 extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     return nil
   }
@@ -759,7 +759,7 @@ extension Collection {
   public func split(
     _ maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    @noescape isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     fatalError("unavailable function can't be called")
   }
