@@ -151,7 +151,8 @@ public:
   // an empty list.
   bool empty() const {
     for (SourceLoc elt : AttrLocs)
-      if (elt.isValid()) return false;
+      if (elt.isValid())
+        return false;
     
     return true;
   }
@@ -180,6 +181,9 @@ public:
   /// corresponds to it.  This returns TAK_Count on failure.
   ///
   static TypeAttrKind getAttrKindFromString(StringRef Str);
+
+  /// Return the name (like "autoclosure") for an attribute ID.
+  static const char *getAttrName(TypeAttrKind kind);
 };
 
 class AttributeBase {

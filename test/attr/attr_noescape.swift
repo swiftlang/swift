@@ -4,10 +4,10 @@
 
 func doesEscape(_ fn : () -> Int) {}
 
-func takesGenericClosure<T>(_ a : Int, @noescape _ fn : () -> T) {}
+func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {}
 
 
-func takesNoEscapeClosure(@noescape _ fn : () -> Int) {
+func takesNoEscapeClosure(_ fn : @noescape () -> Int) {
   takesNoEscapeClosure { 4 }  // ok
 
   fn()  // ok
@@ -153,21 +153,21 @@ class SomeClass {
 
 // Implicit conversions (in this case to @convention(block)) are ok.
 @_silgen_name("whatever")
-func takeNoEscapeAsObjCBlock(@noescape _: @convention(block) () -> Void)
-func takeNoEscapeTest2(@noescape _ fn : () -> ()) {
+func takeNoEscapeAsObjCBlock(_: @noescape @convention(block) () -> Void)
+func takeNoEscapeTest2(_ fn : @noescape () -> ()) {
   takeNoEscapeAsObjCBlock(fn)
 }
 
 // Autoclosure implies noescape, but produce nice diagnostics so people know
 // why noescape problems happen.
-func testAutoclosure(@autoclosure _ a : () -> Int) { // expected-note{{parameter 'a' is implicitly @noescape because it was declared @autoclosure}}
+func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly @noescape because it was declared @autoclosure}}
   doesEscape { a() }  // expected-error {{closure use of @noescape parameter 'a' may allow it to escape}}
 }
 
 
 // <rdar://problem/19470858> QoI: @autoclosure implies @noescape, so you shouldn't be allowed to specify both
-func redundant(@noescape  // expected-error {{@noescape is implied by @autoclosure and should not be redundantly specified}} {{16-25=}}
-               @autoclosure _ fn : () -> Int) {
+func redundant(_ fn : @noescape  // expected-error @+1 {{@noescape is implied by @autoclosure and should not be redundantly specified}}
+               @autoclosure () -> Int) {
 }
 
 
@@ -184,7 +184,7 @@ func overloadedEach<P: P2, T>(_ source: P, _ transform: P.Element -> (), _: T) {
 
 struct S : P2 {
   typealias Element = Int
-  func each(@noescape _ transform: Int -> ()) {
+  func each(_ transform: @noescape Int -> ()) {
     overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape Int -> (), Int)'}}
                    transform, 1)
     // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, O.Element -> (), T), (P, P.Element -> (), T)}}
@@ -194,17 +194,17 @@ struct S : P2 {
 
 
 // rdar://19763676 - False positive in @noescape analysis triggered by parameter label
-func r19763676Callee(@noescape _ f: (param: Int) -> Int) {}
+func r19763676Callee(_ f: @noescape (param: Int) -> Int) {}
 
-func r19763676Caller(@noescape _ g: (Int) -> Int) {
+func r19763676Caller(_ g: @noescape (Int) -> Int) {
   r19763676Callee({ _ in g(1) })
 }
 
 
 // <rdar://problem/19763732> False positive in @noescape analysis triggered by default arguments
-func calleeWithDefaultParameters(@noescape _ f: () -> (), x : Int = 1) {}  // expected-warning {{closure parameter prior to parameters with default arguments will not be treated as a trailing closure}}
+func calleeWithDefaultParameters(_ f: @noescape () -> (), x : Int = 1) {}  // expected-warning {{closure parameter prior to parameters with default arguments will not be treated as a trailing closure}}
 
-func callerOfDefaultParams(@noescape _ g: () -> ()) {
+func callerOfDefaultParams(_ g: @noescape () -> ()) {
   calleeWithDefaultParameters(g)
 }
 
@@ -257,7 +257,7 @@ func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int {
 typealias CompletionHandlerNE = @noescape (success: Bool) -> ()
 typealias CompletionHandler = (success: Bool) -> ()
 var escape : CompletionHandlerNE
-func doThing1(@noescape _ completion: CompletionHandler) {
+func doThing1(_ completion: @noescape (success: Bool) -> ()) {
   // expected-error @+2 {{@noescape value 'escape' may only be called}}
   // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
   escape = completion // expected-error {{declaration closing over @noescape parameter 'escape' may allow it to escape}}
@@ -269,7 +269,7 @@ func doThing2(_ completion: CompletionHandlerNE) {
 }
 
 // <rdar://problem/19997680> @noescape doesn't work on parameters of function type
-func apply<T, U>(@noescape _ f: T -> U, @noescape g: (@noescape T -> U) -> U) -> U {
+func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape T -> U) -> U) -> U {
   return g(f)
 }
 
@@ -279,7 +279,7 @@ enum r19997577Type {
   case Function(() -> r19997577Type, () -> r19997577Type)
   case Sum(() -> r19997577Type, () -> r19997577Type)
 
-  func reduce<Result>(_ initial: Result, @noescape _ combine: (Result, r19997577Type) -> Result) -> Result {
+  func reduce<Result>(_ initial: Result, _ combine: @noescape (Result, r19997577Type) -> Result) -> Result {
     let binary: @noescape (r19997577Type, r19997577Type) -> Result = { combine(combine(combine(initial, self), $0), $1) }
     switch self {
     case Unit:

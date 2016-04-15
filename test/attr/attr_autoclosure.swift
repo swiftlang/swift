@@ -1,24 +1,24 @@
 // RUN: %target-parse-verify-swift
 
 // Simple case.
-@autoclosure var fn : () -> Int = 4  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{1-14=}} expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
+var fn : @autoclosure () -> Int = 4  // expected-error {{@autoclosure may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '@noescape () -> Int'}}
 
-@autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{1-14=}}
+@autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
 
-func func1a(@autoclosure _ v1 : Int) {} // expected-error {{@autoclosure may only be applied to values of function type}}
+func func1a(_ v1 : @autoclosure Int) {} // expected-error {{@autoclosure attribute only applies to function types}}
 
 
-func func2(@autoclosure _ fp : () -> Int) { func2(4)}
+func func2(_ fp : @autoclosure () -> Int) { func2(4)}
 
-func func3(@autoclosure fp fpx : () -> Int) {func3(fp: 0)}
-func func4(@autoclosure fp : () -> Int) {func4(fp: 0)}
-func func6(@autoclosure _: () -> Int) {func6(0)}
+func func3(fp fpx : @autoclosure () -> Int) {func3(fp: 0)}
+func func4(fp : @autoclosure () -> Int) {func4(fp: 0)}
+func func6(_: @autoclosure () -> Int) {func6(0)}
 
-// declattr and typeattr on the argument.
-func func7(@autoclosure _: @noreturn () -> Int) {func7(0)}
+// multi attributes
+func func7(_: @autoclosure @noreturn () -> Int) {func7(0)}
 
 // autoclosure + inout don't make sense.
-func func8(@autoclosure _ x: inout () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be applied to values of function type}}
+func func8(_ x: inout @autoclosure () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be used on parameters}}
 }
 
 
@@ -57,7 +57,7 @@ func overloadedEach<P: P2>(_ source: P, _ closure: () -> ()) {
 
 struct S : P2 {
   typealias Element = Int
-  func each(@autoclosure _ closure: () -> ()) {
+  func each(_ closure: @autoclosure () -> ()) {
     overloadedEach(self, closure) // expected-error {{invalid conversion from non-escaping function of type '@autoclosure () -> ()' to potentially escaping function type '() -> ()'}}
   }
 }
@@ -71,27 +71,27 @@ struct AutoclosureEscapeTest {
 func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected ')' in @autoclosure}}
 // expected-note@-1{{to match this opening '('}}
 
-func func11(@autoclosure(escaping) @noescape _: () -> ()) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}} {{36-46=}}
+func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}}
 
 
 class Super {
-  func f1(@autoclosure(escaping) _ x: () -> ()) { }
-  func f2(@autoclosure(escaping) _ x: () -> ()) { }
-  func f3(@autoclosure x: () -> ()) { }
+  func f1(_ x: @autoclosure(escaping) () -> ()) { }
+  func f2(_ x: @autoclosure(escaping) () -> ()) { }
+  func f3(x: @autoclosure () -> ()) { }
 }
 
 class Sub : Super {
-  override func f1(@autoclosure(escaping) _ x: () -> ()) { }
-  override func f2(@autoclosure _ x: () -> ()) { } // expected-error{{does not override any method}}
-  override func f3(@autoclosure(escaping) _ x: () -> ()) { }  // expected-error{{does not override any method}}
+  override func f1(_ x: @autoclosure(escaping)() -> ()) { }
+  override func f2(_ x: @autoclosure () -> ()) { } // expected-error{{does not override any method}}
+  override func f3(_ x: @autoclosure(escaping) () -> ()) { }  // expected-error{{does not override any method}}
 }
 
 func func12_sink(_ x: () -> Int) { }
 
-func func12a(@autoclosure _ x: () -> Int) { 
+func func12a(_ x: @autoclosure () -> Int) {
   func12_sink(x) // expected-error{{invalid conversion from non-escaping function of type '@autoclosure () -> Int' to potentially escaping function type '() -> Int'}}
 }
-func func12b(@autoclosure(escaping) _ x: () -> Int) { 
+func func12b(_ x: @autoclosure(escaping) () -> Int) {
   func12_sink(x)
 }
 
@@ -110,7 +110,7 @@ class TestFunc12 {
 
 
 enum AutoclosureFailableOf<T> {
-  case Success(@autoclosure () -> T)
+  case Success(@autoclosure () -> T)  // expected-error {{@autoclosure may only be used on parameters}}
   case Failure()
 }
 

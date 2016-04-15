@@ -1616,6 +1616,8 @@ ERROR(property_behavior_invalid_parameter,none,
 
 ERROR(attr_only_only_one_decl_kind,none,
       "%0 may only be used on '%1' declarations", (DeclAttribute,StringRef))
+ERROR(attr_only_only_on_parameters,none,
+      "%0 may only be used on parameters", (StringRef))
 
 
 ERROR(override_final,none,
@@ -2427,7 +2429,7 @@ NOTE(overridden_required_initializer_here,none,
 
 // Functions
 ERROR(attribute_requires_function_type,none,
-      "attribute only applies to syntactic function types", ())
+      "@%0 attribute only applies to function types", (StringRef))
 ERROR(objc_block_cannot_be_thin,none,
       "@objc_block function type cannot be @thin", ())
 ERROR(attribute_not_supported,none,

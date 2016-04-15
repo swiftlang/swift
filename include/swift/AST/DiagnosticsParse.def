@@ -1164,6 +1164,11 @@ ERROR(attr_availability_renamed, none,
 // autoclosure
 ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,
       "expected ')' in @autoclosure", ())
+ERROR(attr_noescape_conflicts_escaping_autoclosure,none,
+      "@noescape conflicts with @autoclosure(escaping)", ())
+ERROR(attr_noescape_implied_by_autoclosure,none,
+      "@noescape is implied by @autoclosure and should not be "
+      "redundantly specified", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,

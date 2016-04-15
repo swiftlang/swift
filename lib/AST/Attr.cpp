@@ -43,6 +43,16 @@ TypeAttrKind TypeAttributes::getAttrKindFromString(StringRef Str) {
   .Default(TAK_Count);
 }
 
+/// Return the name (like "autoclosure") for an attribute ID.
+const char *TypeAttributes::getAttrName(TypeAttrKind kind) {
+  switch (kind) {
+  default: assert(0 && "Invalid attribute ID");
+#define TYPE_ATTR(X) case TAK_##X: return #X;
+#include "swift/AST/Attr.def"
+  }
+}
+
+
 
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier

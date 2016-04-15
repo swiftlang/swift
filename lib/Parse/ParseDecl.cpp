@@ -1536,20 +1536,12 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef Text = Tok.getText();
   SourceLoc Loc = consumeToken();
-  
-  // Diagnose duplicated attributes.
-  if (justChecking) {
-    // do nothing
-  } else if (Attributes.has(attr)) {
-    diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
-  } else {
-    Attributes.setAttr(attr, Loc);
-  }
-  
+
+  bool isAutoclosureEscaping = false;
+  StringRef conventionName;
+
   // Handle @autoclosure(escaping)
   if (attr == TAK_autoclosure) {
-    bool isEscaping = false;
-
     // We need to do a bit of lookahead here to make sure we parse a (weird)
     // type like: "@autoclosure (escaping) -> Int" correctly (escaping is the
     // name of a type here).  We also want to support the case where the
@@ -1558,34 +1550,79 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       Parser::BacktrackingScope Backtrack(*this);
       consumeToken(tok::l_paren);
       consumeToken(tok::identifier);
-      isEscaping = Tok.is(tok::r_paren) && peekToken().isNot(tok::arrow);
+      isAutoclosureEscaping =
+        Tok.is(tok::r_paren) && peekToken().isNot(tok::arrow);
     }
 
-    if (isEscaping) {
+    if (isAutoclosureEscaping) {
       consumeToken(tok::l_paren);
       consumeToken(tok::identifier);
       consumeToken(tok::r_paren);
     }
-    
-    if (!justChecking) {
-      if (isEscaping)
-        ;
-      else
-        Attributes.setAttr(TAK_noescape, Loc);
+  } else if (attr == TAK_convention) {
+    SourceLoc LPLoc;
+    if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_expected_lparen);
+      return true;
     }
-  }
-  
-  
-  
-  // Handle any attribute-specific processing logic.
 
-  // In just-checking mode, we only need additional parsing for the "cc"
-  // attribute.  (Note that we're never in just-checking mode in SIL mode.)
+    if (Tok.isNot(tok::identifier)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_expected_name);
+      return true;
+    }
+
+    conventionName = Tok.getText();
+    consumeToken(tok::identifier);
+
+    // Parse the ')'.  We can't use parseMatchingToken if we're in
+    // just-checking mode.
+    if (justChecking && Tok.isNot(tok::r_paren))
+      return true;
+
+    SourceLoc RPLoc;
+    parseMatchingToken(tok::r_paren, RPLoc,
+                       diag::convention_attribute_expected_rparen,
+                       LPLoc);
+  }
+
+
+  // In just-checking mode, we only need to consume the tokens, and we don't
+  // want to do any other analysis.
   if (justChecking)
     return false;
 
+  // Diagnose duplicated attributes.
+  if (Attributes.has(attr)) {
+    diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
+    return false;
+  }
+
+  // Handle any attribute-specific processing logic.
   switch (attr) {
   default: break;
+  case TAK_autoclosure:
+    // Handle @autoclosure(escaping)
+    if (isAutoclosureEscaping) {
+      // @noescape @autoclosure(escaping) makes no sense.
+      if (Attributes.has(TAK_noescape))
+        diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
+    } else {
+      if (Attributes.has(TAK_noescape))
+        diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
+      Attributes.setAttr(TAK_noescape, Loc);
+    }
+    break;
+
+  case TAK_noescape:
+    // You can't specify @noescape and @autoclosure(escaping) together, and
+    // @noescape after @autoclosure is redundant.
+    if (Attributes.has(TAK_autoclosure)) {
+      diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
+      return false;
+    }
+    break;
   case TAK_out:
   case TAK_in:
   case TAK_owned:
@@ -1598,14 +1635,13 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_objc_metatype:
     if (!isInSILMode()) {
       diagnose(Loc, diag::only_allowed_in_sil, Text);
-      Attributes.clearAttribute(attr);
+      return false;
     }
     break;
     
   // Ownership attributes.
   case TAK_sil_weak:
   case TAK_sil_unowned:
-    Attributes.clearAttribute(attr);
     if (!isInSILMode()) {
       diagnose(Loc, diag::only_allowed_in_sil, Text);
       return false;
@@ -1613,10 +1649,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       
     if (Attributes.hasOwnership()) {
       diagnose(Loc, diag::duplicate_attribute, /*isModifier*/false);
-      break;
+      return false;
     }
-    if (!justChecking)
-      Attributes.setAttr(attr, Loc);
     break;
 
   // 'inout' attribute.
@@ -1628,9 +1662,13 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     break;
       
   case TAK_opened: {
+    if (!isInSILMode()) {
+      diagnose(Loc, diag::only_allowed_in_sil, "opened");
+      return false;
+    }
+
     // Parse the opened existential ID string in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
-    Attributes.setAttr(TAK_opened, beginLoc);
     if (consumeIfNotAtStartOfLine(tok::l_paren)) {
       if (Tok.is(tok::string_literal)) {
         UUID openedID;
@@ -1653,50 +1691,16 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       diagnose(Tok, diag::opened_attribute_expected_lparen);
     }
 
-    if (!isInSILMode()) {
-      diagnose(Loc, diag::only_allowed_in_sil, "opened");
-      Attributes.clearAttribute(TAK_opened);
-    }
-
     break;
   }
 
   // Convention attribute.
-  case TAK_convention: {
-    // Parse the convention name in parens.
-    SourceLoc beginLoc = Tok.getLoc(), nameLoc, endLoc;
-    StringRef name;
-    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (Tok.is(tok::identifier)) {
-        nameLoc = Tok.getLoc();
-        name = Tok.getText();
-        consumeToken();
-      } else if (!justChecking) {
-        diagnose(Tok, diag::convention_attribute_expected_name);
-      }
-
-      // Parse the ')'.  We can't use parseMatchingToken if we're in
-      // just-checking mode.
-      if (!justChecking) {
-        parseMatchingToken(tok::r_paren, endLoc,
-                           diag::convention_attribute_expected_rparen,
-                           beginLoc);
-      } else if (!consumeIf(tok::r_paren)) {
-        return true;
-      }
-    } else if (!justChecking) {
-      diagnose(Tok, diag::convention_attribute_expected_lparen);
-    }
-
-    // Don't validate the CC in just-checking mode.
-    if (justChecking) return false;
-    
-    if (!name.empty())
-      Attributes.convention = name;
-    return false;
+  case TAK_convention:
+    Attributes.convention = conventionName;
+    break;
   }
-  }
-  
+
+  Attributes.setAttr(attr, Loc);
   return false;
 }
 
