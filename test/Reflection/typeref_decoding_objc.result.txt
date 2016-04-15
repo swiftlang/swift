@@ -127,6 +127,8 @@ NestedStruct: TypesToReflect.S.NestedS
 (struct TypesToReflect.S.NestedS
   (struct TypesToReflect.S))
 
+EmptyCase
+
 TypesToReflect.References
 -------------------------
 strongRef: TypesToReflect.C

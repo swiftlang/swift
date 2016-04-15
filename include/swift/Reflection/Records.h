@@ -52,6 +52,11 @@ class FieldRecord {
 
 public:
   FieldRecord() = delete;
+
+  bool hasMangledTypeName() const {
+    return MangledTypeName;
+  }
+
   std::string getMangledTypeName() const {
     return MangledTypeName.get();
   }

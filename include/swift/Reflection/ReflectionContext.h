@@ -206,16 +206,16 @@ private:
   void dumpTypeRef(const std::string &MangledName,
                    std::ostream &OS, bool printTypeName = false) {
     auto TypeName = Demangle::demangleTypeAsString(MangledName);
-    OS << TypeName << std::endl;
+    OS << TypeName << '\n';
 
     auto DemangleTree = Demangle::demangleTypeAsNode(MangledName);
     auto TR = decodeMangledType(DemangleTree);
     if (!TR) {
-      OS << "!!! Invalid typeref: " << MangledName << std::endl;
+      OS << "!!! Invalid typeref: " << MangledName << '\n';
       return;
     }
     TR->dump(OS);
-    OS << std::endl;
+    OS << '\n';
   }
 
   const AssociatedTypeDescriptor *
@@ -259,13 +259,18 @@ public:
       for (const auto &descriptor : sections.fieldmd) {
         auto TypeName
           = Demangle::demangleTypeAsString(descriptor.getMangledTypeName());
-        OS << TypeName << std::endl;
+        OS << TypeName << '\n';
         for (size_t i = 0; i < TypeName.size(); ++i)
           OS << '-';
-        OS << std::endl;
+        OS << '\n';
         for (auto &field : descriptor) {
-          OS << field.getFieldName() << ": ";
-          dumpTypeRef(field.getMangledTypeName(), OS);
+          OS << field.getFieldName();
+          if (field.hasMangledTypeName()) {
+            OS << ": ";
+            dumpTypeRef(field.getMangledTypeName(), OS);
+          } else {
+            OS << "\n\n";
+          }
         }
       }
     }
@@ -280,7 +285,7 @@ public:
           descriptor.getMangledProtocolTypeName());
 
         OS << conformingTypeName << " : " << protocolName;
-        OS << std::endl;
+        OS << '\n';
 
         for (const auto &associatedType : descriptor) {
           OS << "typealias " << associatedType.getName() << " = ";
@@ -291,15 +296,15 @@ public:
   }
 
   void dumpAllSections(std::ostream &OS) {
-    OS << "FIELDS:" << std::endl;
+    OS << "FIELDS:\n";
     for (size_t i = 0; i < 7; ++i) OS << '=';
-    OS << std::endl;
+    OS << '\n';
     dumpFieldSection(OS);
-    OS << "\nASSOCIATED TYPES:" << std::endl;
+    OS << "\nASSOCIATED TYPES:\n";
     for (size_t i = 0; i < 17; ++i) OS << '=';
-    OS << std::endl;
+    OS << '\n';
     dumpAssociatedTypeSection(OS);
-    OS << std::endl;
+    OS << '\n';
   }
 
   TypeRef *
@@ -340,13 +345,21 @@ public:
         if (MangledName.compare(CandidateMangledName) != 0)
           continue;
         for (auto &Field : FieldDescriptor) {
+          auto FieldName = Field.getFieldName();
+
+          // Empty cases of enums do not have a type
+          if (!Field.hasMangledTypeName()) {
+            Fields.push_back({FieldName, nullptr});
+            continue;
+          }
+
           auto Demangled
-          = Demangle::demangleTypeAsNode(Field.getMangledTypeName());
+            = Demangle::demangleTypeAsNode(Field.getMangledTypeName());
           auto Unsubstituted = decodeMangledType(Demangled);
           if (!Unsubstituted)
             return {};
+
           auto Substituted = Unsubstituted->subst(*this, Subs);
-          auto FieldName = Field.getFieldName();
           if (FieldName.empty())
             FieldName = "<Redacted Field Name>";
           Fields.push_back({FieldName, Substituted});

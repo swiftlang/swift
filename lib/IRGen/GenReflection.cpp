@@ -132,7 +132,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
     addConstantInt32(Flags.getRawValue());
 
-    addTypeRef(value->getModuleContext(), type);
+    if (!type) {
+      addConstantInt32(0);
+    } else {
+      addTypeRef(value->getModuleContext(), type);
+    }
 
     if (IGM.Opts.StripReflectionNames) {
       addConstantInt32(0);
@@ -164,10 +168,15 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       auto cases = enumDecl->getAllElements();
       addConstantInt32(std::distance(cases.begin(), cases.end()));
       addConstantInt32(fieldRecordSize);
-      for (auto enumCase : cases)
-        addFieldDecl(enumCase,
-                     enumCase->getArgumentInterfaceType()
-                       ->getCanonicalType());
+      for (auto enumCase : cases) {
+        if (enumCase->hasArgumentType()) {
+          addFieldDecl(enumCase,
+                       enumCase->getArgumentInterfaceType()
+                         ->getCanonicalType());
+        } else {
+          addFieldDecl(enumCase, CanType());
+        }
+      }
       break;
     }
     default:

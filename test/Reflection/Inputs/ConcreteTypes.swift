@@ -52,6 +52,7 @@ public enum E {
   indirect case IndirectTuple(C, S, E, Int)
   case Metatype(E.Type)
   case NestedStruct(S.NestedS)
+  case EmptyCase
 }
 
 public struct References {
