@@ -5,14 +5,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
 var UnsafeBufferPointerTestSuite = TestSuite("UnsafeBufferPointer")
 var UnsafeMutableBufferPointerTestSuite = TestSuite("UnsafeMutableBufferPointer")
 
@@ -29,7 +21,7 @@ ${SelfName}TestSuite.test("nilBaseAddress") {
   var iter = emptyBuffer.makeIterator()
   expectEmpty(iter.next())
 
-  expectEqual([], Array(emptyBuffer))
+  expectEqualSequence([], emptyBuffer)
 }
 
 ${SelfName}TestSuite.test("nonNilButEmpty") {
@@ -44,7 +36,7 @@ ${SelfName}TestSuite.test("nonNilButEmpty") {
   var iter = emptyBuffer.makeIterator()
   expectEmpty(iter.next())
 
-  expectEqual([], Array(emptyBuffer))
+  expectEqualSequence([], emptyBuffer)
 }
 
 ${SelfName}TestSuite.test("nonNilNonEmpty") {
@@ -70,7 +62,7 @@ ${SelfName}TestSuite.test("nonNilNonEmpty") {
   expectEqual(1.0, iter.next())
   expectEmpty(iter.next())
 
-  expectEqual([1.0, 0.0, 1.0], Array(buffer))
+  expectEqualSequence([1.0, 0.0, 1.0], buffer)
 
   expectEqual(2.0, allocated[count-1])
 }
