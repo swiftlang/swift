@@ -326,16 +326,6 @@ Globals:
   Availability: nonswift
 - Name: kCGColorSpaceGenericRGB
   Availability: nonswift
-# The below are left alone, due to an unknown bug
-# FIXME: fix me
-- Name: kCGColorBlack
-  SwiftName: "kCGColorBlack"
-- Name: kCGColorWhite
-  SwiftName: "kCGColorWhite"
-# TODO: clear as well, but for now it's useful for testing
-- Name: kCGColorSpaceSRGB
-  SwiftName: "kCGColorSpaceSRGB"
-# TODO: other color spaces as well, but for now it's useful for testing
 
 #
 # Enums

@@ -4050,7 +4050,7 @@ public:
 
           // If we found both, point at them.
           if (prefixOp) {
-            TC.diagnose(prefixOp, diag::unary_operator_declaration_here,false)
+            TC.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
               .fixItInsert(FD->getLoc(), "prefix ");
             TC.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
               .fixItInsert(FD->getLoc(), "postfix ");
@@ -4847,7 +4847,10 @@ public:
       }
 
       // Failing that, check for subtyping.
-      if (declTy->canOverride(parentDeclTy, parentDecl->isObjC(), &TC)) {
+      auto matchMode = OverrideMatchMode::Strict;
+      if (parentDecl->isObjC())
+        matchMode = OverrideMatchMode::AllowNonOptionalForIUOParam;
+      if (declTy->canOverride(parentDeclTy, matchMode, &TC)) {
         // If the Objective-C selectors match, always call it exact.
         matches.push_back(
             std::make_tuple(parentDecl, objCMatch, parentDeclTy));
@@ -4996,7 +4999,9 @@ public:
         auto parentPropertyTy = adjustSuperclassMemberDeclType(TC, matchDecl,
                                                                superclass);
         
-        if (!propertyTy->canOverride(parentPropertyTy, false, &TC)) {
+        if (!propertyTy->canOverride(parentPropertyTy,
+                                     OverrideMatchMode::Strict,
+                                     &TC)) {
           TC.diagnose(property, diag::override_property_type_mismatch,
                       property->getName(), propertyTy, parentPropertyTy);
           TC.diagnose(matchDecl, diag::property_override_here);

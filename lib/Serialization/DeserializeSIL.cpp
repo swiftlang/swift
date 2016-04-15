@@ -1799,7 +1799,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
 }
 
 /// Check for existence of a function with a given name and required linkage.
-/// This function is modelled after readSILFunction. But it does not
+/// This function is modeled after readSILFunction. But it does not
 /// create a SILFunction object.
 bool SILDeserializer::hasSILFunction(StringRef Name,
                                      SILLinkage Linkage) {
@@ -1835,7 +1835,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   (void)kind;
 
   // Read function properties only, e.g. its linkage and other attributes.
-  // TODO: If this results in any noticable performance problems, Cache the
+  // TODO: If this results in any noticeable performance problems, Cache the
   // linkage to avoid re-reading it from the bitcode each time?
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,

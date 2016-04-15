@@ -23,6 +23,12 @@ aTuple: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int)
   (enum TypesToReflect.E)
   (struct Swift.Int))
 
+aTupleWithLabels: (a : TypesToReflect.C, s : TypesToReflect.S, e : TypesToReflect.E)
+(tuple
+  (class TypesToReflect.C)
+  (struct TypesToReflect.S)
+  (enum TypesToReflect.E))
+
 aMetatype: TypesToReflect.C.Type
 (metatype
   (class TypesToReflect.C))
@@ -34,6 +40,18 @@ aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> 
   (enum TypesToReflect.E)
   (struct Swift.Int)
   (struct Swift.Int))
+
+aFunctionWithVarArgs: (TypesToReflect.C, Swift.Array<TypesToReflect.S>...) -> ()
+(function
+  (class TypesToReflect.C)
+  (bound-generic struct Swift.Array
+    (struct TypesToReflect.S))
+  (tuple))
+
+TypesToReflect.S.NestedS
+------------------------
+aField: Swift.Int
+(struct Swift.Int)
 
 TypesToReflect.S
 ----------------
@@ -137,6 +155,29 @@ Metatype: (TypesToReflect.E.Type) -> (TypesToReflect.E.Type) -> TypesToReflect.E
     (metatype
       (enum TypesToReflect.E))
     (enum TypesToReflect.E)))
+
+NestedStruct: (TypesToReflect.E.Type) -> (TypesToReflect.S.NestedS) -> TypesToReflect.E
+(function
+  (metatype
+    (enum TypesToReflect.E))
+  (function
+    (struct TypesToReflect.S.NestedS
+      (struct TypesToReflect.S))
+    (enum TypesToReflect.E)))
+
+TypesToReflect.References
+-------------------------
+strongRef: TypesToReflect.C
+(class TypesToReflect.C)
+
+weakRef: weak Swift.Optional<TypesToReflect.C>
+(weak-storage
+  (bound-generic enum Swift.Optional
+    (class TypesToReflect.C)))
+
+unownedRef: unowned TypesToReflect.C
+(unowned-storage
+  (class TypesToReflect.C))
 
 TypesToReflect.OC
 -----------------

@@ -88,6 +88,9 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   if (triple.isOSDarwin())
     return getPlatformNameForDarwin(getDarwinPlatformKind(triple));
 
+  if (triple.isAndroid())
+    return "android";
+
   if (triple.isOSLinux())
     return "linux";
 

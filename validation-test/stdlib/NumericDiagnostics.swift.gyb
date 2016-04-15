@@ -3,7 +3,7 @@
 // REQUIRES: executable_test
 
 % from SwiftIntTypes import all_numeric_type_names, numeric_type_names_macintosh_only, \
-%   all_integer_type_names,all_integer_binary_operator_names, all_integer_or_real_binary_operator_names, \
+%   all_integer_type_names, all_integer_binary_operator_names, all_integer_or_real_binary_operator_names, \
 %   all_arithmetic_comparison_operator_names, all_integer_assignment_operator_names, \
 %   all_integer_or_real_assignment_operator_names
 

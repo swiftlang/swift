@@ -1576,6 +1576,8 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
          "variable not validated yet");
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
+  maybeAddMaterializeForSet(VD, *this);
+
   // Create the storage property as an optional of VD's type.
   SmallString<64> NameBuf = VD->getName().str();
   NameBuf += ".storage";
@@ -2142,7 +2144,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   typeCheckDecl(DD, /*isFirstPass=*/true);
 
   // Create an empty body for the destructor.
-  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(),true));
+  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(), true));
   CD->addMember(DD);
   CD->setHasDestructor();
 }

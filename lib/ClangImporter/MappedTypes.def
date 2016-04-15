@@ -127,6 +127,7 @@ MAP_STDLIB_TYPE("u_int64_t", UnsignedInt, 64, "UInt64", false, DoNothing)
 // FIXME: why does this not catch va_list on x86_64?
 MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", false, DoNothing)
 MAP_STDLIB_TYPE("__gnuc_va_list", VaList, 0, "CVaListPointer", false, DoNothing)
+MAP_STDLIB_TYPE("__va_list", VaList, 0, "CVaListPointer", false, DoNothing)
 
 // libkern/OSTypes.h types.
 MAP_STDLIB_TYPE("UInt", UnsignedInt, 32, "CUnsignedInt", false, DoNothing)

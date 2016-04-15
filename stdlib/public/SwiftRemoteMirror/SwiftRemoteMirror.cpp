@@ -1,8 +1,10 @@
 #include "swift/Reflection/ReflectionContext.h"
+#include "swift/Remote/CMemoryReader.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
 using namespace swift;
-using namespace reflection;
+using namespace swift::reflection;
+using namespace swift::remote;
 
 using NativeReflectionContext
   = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
@@ -50,17 +52,12 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
   Context->addReflectionInfo(Info);
 }
 
-void swift_reflection_clearCaches(SwiftReflectionContextRef ContextRef) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  Context->clear();
-}
-
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t metadata) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = Context->getTypeRef(metadata);
-  return reinterpret_cast<swift_typeref_t>(TR.get());
+  auto TR = Context->readTypeFromMetadata(metadata);
+  return reinterpret_cast<swift_typeref_t>(TR);
 }
 
 swift_typeref_t
@@ -71,7 +68,7 @@ swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
   if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
     auto &Params = BG->getGenericParams();
     if (Index < Params.size()) {
-      return reinterpret_cast<swift_typeref_t>(Params[Index].get());
+      return reinterpret_cast<swift_typeref_t>(Params[Index]);
     }
   }
   return 0;
@@ -85,12 +82,12 @@ swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
   return Context->getInfoForTypeRef(TR);
 }
 
-swift_fieldinfo_t
-swift_reflection_infoForField(SwiftReflectionContextRef ContextRef,
+swift_childinfo_t
+swift_reflection_infoForChild(SwiftReflectionContextRef ContextRef,
                               swift_typeref_t OpaqueTypeRef,
                               unsigned Index) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TR = reinterpret_cast<TypeRef *>(OpaqueTypeRef);
-  return Context->getInfoForField(TR, Index);
+  return Context->getInfoForChild(TR, Index);
 }
 

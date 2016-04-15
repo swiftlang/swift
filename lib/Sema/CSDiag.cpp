@@ -717,6 +717,14 @@ namespace {
 
     UncurriedCandidate(ValueDecl *decl, unsigned level)
       : declOrExpr(decl), level(level), entityType(decl->getType()) {
+      // For some reason, subscripts and properties don't include their self
+      // type.  Tack it on for consistency with other members.
+      if (isa<AbstractStorageDecl>(decl)) {
+        if (decl->getDeclContext()->isTypeContext()) {
+          auto instanceTy = decl->getDeclContext()->getSelfTypeInContext();
+          entityType = FunctionType::get(instanceTy, entityType);
+        }
+      }
     }
     UncurriedCandidate(Expr *expr)
       : declOrExpr(expr), level(0), entityType(expr->getType()) {
@@ -843,7 +851,8 @@ namespace {
     }
 
     CalleeCandidateInfo(Type baseType, ArrayRef<OverloadChoice> candidates,
-                        bool hasTrailingClosure, ConstraintSystem *CS);
+                        bool hasTrailingClosure, ConstraintSystem *CS,
+                        bool selfAlreadyApplied = true);
 
     typedef std::pair<CandidateCloseness, FailedArgumentInfo> ClosenessResultTy;
     typedef const std::function<ClosenessResultTy(UncurriedCandidate)>
@@ -852,8 +861,9 @@ namespace {
     /// After the candidate list is formed, it can be filtered down to discard
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
-    std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
-    evaluateCloseness(DeclContext *dc, Type candArgListType, ArrayRef<CallArgParam> actualArgs);
+    ClosenessResultTy
+    evaluateCloseness(DeclContext *dc, Type candArgListType,
+                      ArrayRef<CallArgParam> actualArgs);
       
     void filterList(ArrayRef<CallArgParam> actualArgs);
     void filterList(Type actualArgsType) {
@@ -1063,9 +1073,9 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
 /// Determine how close an argument list is to an already decomposed argument
 /// list.  If the closeness is a miss by a single argument, then this returns
 /// information about that failure.
-std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
+CalleeCandidateInfo::ClosenessResultTy
 CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
-                  ArrayRef<CallArgParam> actualArgs) {
+                                       ArrayRef<CallArgParam> actualArgs) {
   auto candArgs = decomposeArgParamType(candArgListType);
 
   struct OurListener : public MatchCallArgumentListener {
@@ -1156,7 +1166,7 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
         // against the type contained therein.
         if (paramType->is<InOutType>() && argType->is<LValueType>())
           matchType = matchType->getInOutObjectType();
-        matched = findGenericSubstitutions(dc, matchType , rArgType,
+        matched = findGenericSubstitutions(dc, matchType, rArgType,
                                            archetypesMap);
       }
       
@@ -1513,12 +1523,13 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
 CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
                                          ArrayRef<OverloadChoice> overloads,
                                          bool hasTrailingClosure,
-                                         ConstraintSystem *CS)
+                                         ConstraintSystem *CS,
+                                         bool selfAlreadyApplied)
   : CS(CS), hasTrailingClosure(hasTrailingClosure) {
 
   // If we have a useful base type for the candidate set, we'll want to
   // substitute it into each member.  If not, ignore it.
-  if (isUnresolvedOrTypeVarType(baseType))
+  if (baseType && isUnresolvedOrTypeVarType(baseType))
     baseType = Type();
 
   for (auto cand : overloads) {
@@ -1527,10 +1538,10 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     auto decl = cand.getDecl();
     
     // If this is a method or enum case member (not a var or subscript), then
-    // the uncurry level is 1.
+    // the uncurry level is 1 if self has already been applied.
     unsigned uncurryLevel = 0;
-    if (!isa<AbstractStorageDecl>(decl) &&
-        decl->getDeclContext()->isTypeContext())
+    if (decl->getDeclContext()->isTypeContext() &&
+        selfAlreadyApplied)
       uncurryLevel = 1;
     
     candidates.push_back({ decl, uncurryLevel });
@@ -1561,7 +1572,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
         substType = Type();
       }
 
-      if (substType)
+      if (substType && selfAlreadyApplied)
         substType = substType->getTypeOfMember(CS->DC->getParentModule(),
                                                decl, nullptr);
       if (substType)
@@ -3913,8 +3924,6 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
 
 
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
-  // FIXME: Why isn't this passing TCC_AllowLValue?  It seems that this could
-  // cause problems with subscripts that have mutating getters.
   auto baseExpr = typeCheckChildIndependently(SE->getBase());
   if (!baseExpr) return true;
   auto baseType = baseExpr->getType();
@@ -3951,19 +3960,30 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
   
   
-  CalleeCandidateInfo calleeInfo(baseType, result.ViableCandidates,
+  CalleeCandidateInfo calleeInfo(Type(), result.ViableCandidates,
                                  /*FIXME: Subscript trailing closures*/
-                                 /*hasTrailingClosure*/false, CS);
+                                 /*hasTrailingClosure*/false, CS,
+                                 /*selfAlreadyApplied*/false);
 
+  // We're about to typecheck the index list, which needs to be processed with
+  // self already applied.
+  for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
+    ++calleeInfo.candidates[i].level;
+  
   auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex(),
                                                        Type(), calleeInfo);
   if (!indexExpr) return true;
+
+  // Back to analyzing the candidate list with self applied.
+  for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
+    --calleeInfo.candidates[i].level;
 
   if (diagnoseParameterErrors(calleeInfo, SE, indexExpr))
     return true;
 
   auto indexType = indexExpr->getType();
 
+  auto decomposedBaseType = decomposeArgParamType(baseType);
   auto decomposedIndexType = decomposeArgParamType(indexType);
   calleeInfo.filterList([&](UncurriedCandidate cand) ->
                                  CalleeCandidateInfo::ClosenessResultTy
@@ -3972,31 +3992,40 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     auto *SD = dyn_cast_or_null<SubscriptDecl>(cand.getDecl());
     if (!SD) return { CC_GeneralMismatch, {}};
     
-    // Check to make sure the base expr type is convertible to the expected base
-    // type.  We check either the getter, or if it isn't present, the addressor.
+    // Check whether the self type matches.
     auto selfConstraint = CC_ExactMatch;
-    auto getter = SD->getGetter();
-    if (!getter) getter = SD->getAddressor();
-    
-    auto instanceTy =
-     getter->getImplicitSelfDecl()->getType()->getInOutObjectType();
-    if (!isUnresolvedOrTypeVarType(baseType) &&
-        // TODO: We're not handling archetypes well here.
-        !instanceTy->hasArchetype() &&
-        !CS->TC.isConvertibleTo(baseType, instanceTy, CS->DC)) {
+    if (calleeInfo.evaluateCloseness(SD->getInnermostDeclContext(),
+                                   cand.getArgumentType(), decomposedBaseType)
+          .first != CC_ExactMatch)
       selfConstraint = CC_SelfMismatch;
-    }
+    
+    // Increase the uncurry level to look past the self argument to the indices.
+    cand.level++;
     
     // Explode out multi-index subscripts to find the best match.
-    Decl *decl = cand.getDecl();
     auto indexResult =
-      calleeInfo.evaluateCloseness(decl ? decl->getInnermostDeclContext() : nullptr,
+      calleeInfo.evaluateCloseness(SD->getInnermostDeclContext(),
                                    cand.getArgumentType(), decomposedIndexType);
     if (selfConstraint > indexResult.first)
       return {selfConstraint, {}};
     return indexResult;
   });
 
+  // If the closest matches all mismatch on self, we either have something that
+  // cannot be subscripted, or an ambiguity.
+  if (calleeInfo.closeness == CC_SelfMismatch) {
+    diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
+    .highlight(SE->getBase()->getSourceRange());
+    // FIXME: Should suggest overload set, but we're not ready for that until
+    // it points to candidates and identifies the self type in the diagnostic.
+    //calleeInfo.suggestPotentialOverloads(SE->getLoc());
+    return true;
+  }
+
+  // Any other failures relate to the index list.
+  for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
+    ++calleeInfo.candidates[i].level;
+  
   // TODO: Is there any reason to check for CC_NonLValueInOut here?
   
   if (calleeInfo.closeness == CC_ExactMatch) {
@@ -4028,16 +4057,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   if (calleeInfo.diagnoseSimpleErrors(SE->getLoc()))
     return true;
 
-  // If the closest matches all mismatch on self, we either have something that
-  // cannot be subscripted, or an ambiguity.
-  if (calleeInfo.closeness == CC_SelfMismatch) {
-    diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
-      .highlight(SE->getBase()->getSourceRange());
-    // FIXME: Should suggest overload set, but we're not ready for that until
-    // it points to candidates and identifies the self type in the diagnostic.
-    //calleeInfo.suggestPotentialOverloads(SE->getLoc());
-    return true;
-  }
 
   diagnose(SE->getLoc(), diag::cannot_subscript_with_index,
            baseType, indexType);
@@ -5067,7 +5086,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   bool hasTrailingClosure = callArgHasTrailingClosure(E->getArgument());
 
   // Dump all of our viable candidates into a CalleeCandidateInfo & sort it out.
-  CalleeCandidateInfo candidateInfo(baseObjTy, result.ViableCandidates,
+  CalleeCandidateInfo candidateInfo(Type(), result.ViableCandidates,
                                     hasTrailingClosure, CS);
 
   // Filter the candidate list based on the argument we may or may not have.
@@ -5188,6 +5207,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
 
   llvm_unreachable("all cases should be handled");
 }
+
 
 /// A TupleExpr propagate contextual type information down to its children and
 /// can be erroneous when there is a label mismatch etc.

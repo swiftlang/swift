@@ -22,10 +22,10 @@ func hangCanary(_ o: AnyObject) {
 
 class FooLayer: CALayer {
   var black: CGColor
-  var white: CGColor = CGColor.constantColorForName(kCGColorWhite)!
+  var white: CGColor = CGColor.constantColorForName(CGColor.white)!
 
   override init() {
-    black = CGColor.constantColorForName(kCGColorBlack)!
+    black = CGColor.constantColorForName(CGColor.black)!
     super.init()
     hangCanary(self)
   }

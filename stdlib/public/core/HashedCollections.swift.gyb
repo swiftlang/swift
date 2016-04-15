@@ -3443,7 +3443,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
         let idealBucket = nativeStorage._bucket(nativeStorage.key(at: b))
 
         // Does this element belong between start and hole?  We need
-        // two separate tests depending on whether [start,hole] wraps
+        // two separate tests depending on whether [start, hole] wraps
         // around the end of the buffer
         let c0 = idealBucket >= start
         let c1 = idealBucket <= hole
@@ -3840,7 +3840,7 @@ elif Self == 'Dictionary':
 ///
 /// 2. Subscripting with an index, yielding a key-value pair:
 ///
-///        (k,v) = d[i]"""
+///        (k, v) = d[i]"""
 }%
 
 ${SubscriptingWithIndexDoc}

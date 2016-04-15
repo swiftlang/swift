@@ -390,7 +390,7 @@ extension ${Self} : CustomStringConvertible {
 // Operations that return an overflow bit in addition to a partial result,
 // helpful for checking for overflow when you want to handle it.
 extension ${Self} {
-% for Method,op in [('add', 'add'), ('subtract', 'sub'), ('multiply', 'mul')]:
+% for Method, op in [('add', 'add'), ('subtract', 'sub'), ('multiply', 'mul')]:
   /// ${Method.capitalize()} `lhs` and `rhs`, returning a result and a
   /// `Bool` that is `true` iff the operation caused an arithmetic
   /// overflow.
@@ -401,7 +401,7 @@ extension ${Self} {
   }
 % end
 
-% for Method,op in [('divide', 'div'), ('remainder', 'rem')]:
+% for Method, op in [('divide', 'div'), ('remainder', 'rem')]:
   /// Divide `lhs` and `rhs`, returning
   /// ${'a result' if op == 'div' else 'the remainder'} and a `Bool`
   /// that is `true` iff the operation caused an arithmetic overflow.
@@ -520,7 +520,7 @@ extension ${Self} {
 // FIXME: must use condfail in these operators, rather than
 // overflowChecked, pending <rdar://problem/16271923> so that we don't
 // foil static checking for numeric overflows.
-% for op,method in ('+','add'), ('*','mul'), ('-','sub'):
+% for op, method in ('+','add'), ('*','mul'), ('-','sub'):
 @_transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   let (result, error) = Builtin.${sign}${method}_with_overflow_${BuiltinName}(
@@ -531,7 +531,7 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 }
 % end
 
-% for op,inst in [('/', 'div'), ('%', 'rem')]:
+% for op, inst in [('/', 'div'), ('%', 'rem')]:
 @_transparent
 public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   Builtin.condfail((rhs == 0)._value)
@@ -554,8 +554,8 @@ public prefix func ~(rhs: ${Self}) -> ${Self} {
 
 % for op, name in (
 %  ('==','eq'), ('!=','ne'),
-%  ('<',sign+'lt'), ('<=',sign+'le'),
-%  ('>',sign+'gt'), ('>=',sign+'ge')):
+%  ('<', sign + 'lt'), ('<=', sign + 'le'),
+%  ('>', sign + 'gt'), ('>=', sign + 'ge')):
 @_transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.cmp_${name}_${BuiltinName}(lhs._value, rhs._value))

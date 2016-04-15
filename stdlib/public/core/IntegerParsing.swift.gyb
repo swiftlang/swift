@@ -132,7 +132,7 @@ extension ${Self} {
     if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
       text.utf16, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
       self.init(
-        ${'' if Self in (IntMax,UIntMax) else 'truncatingBitPattern:'} value)
+        ${'' if Self in (IntMax, UIntMax) else 'truncatingBitPattern:'} value)
     }
     else {
       return nil

@@ -88,9 +88,9 @@ partitionDocComment = """\
   /// Re-order the given `range` of elements in `self` and return
   /// a pivot index *p*.
   ///
-  /// - Postcondition: For all *i* in `range.lowerBound..<`\ *p*, and *j*
-  ///   in *p*\ `..<range.upperBound`, `less(self[`\ *i*\ `],
-  ///   self[`\ *j*\ `]) && !less(self[`\ *j*\ `], self[`\ *p*\ `])`.
+  /// - Postcondition: For all *i* in `range.lowerBound..<`*p*, and *j*
+  ///   in *p*`..<range.upperBound`, `less(self[`*i*`],
+  ///   self[`*j*`]) && !less(self[`*j*`], self[`*p*`])`.
   ///   Only returns `range.upperBound` when `self` is empty."""
 
 orderingRequirementForPredicate = """\

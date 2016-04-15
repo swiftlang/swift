@@ -225,7 +225,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   AddSimplifyCFGSILCombine(PM);
 
   PM.addPerformanceConstantPropagation();
-  PM.addDCE();
   PM.addCSE();
   PM.addSILCombine();
   PM.addJumpThreadSimplifyCFG();
@@ -237,6 +236,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
 
   // Perform retain/release code motion and run the first ARC optimizer.
   PM.addCSE();
+  PM.addDCE();
   PM.addEarlyCodeMotion();
   PM.addARCSequenceOpts();
 

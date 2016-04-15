@@ -24,3 +24,7 @@ final class Beer {
     set { }
   }
 }
+
+class LazyCat {
+  lazy var purrs: Int = 10
+}

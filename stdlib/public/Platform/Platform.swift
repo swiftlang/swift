@@ -103,6 +103,8 @@ public var errno : Int32 {
   get {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
     return __error().pointee
+#elseif os(Android)
+    return __errno().pointee
 #else
     return __errno_location().pointee
 #endif
@@ -110,6 +112,8 @@ public var errno : Int32 {
   set(val) {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
     return __error().pointee = val
+#elseif os(Android)
+    return __errno().pointee = val
 #else
     return __errno_location().pointee = val
 #endif
@@ -313,7 +317,7 @@ public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
-#elseif os(Linux) || os(FreeBSD)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
 public typealias sighandler_t = __sighandler_t
 
 public var SIG_DFL: sighandler_t? { return nil }
@@ -339,7 +343,7 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
   // The value is ABI.  Value verified to be correct on Glibc.
   return UnsafeMutablePointer<sem_t>(bitPattern: 0)
 #else

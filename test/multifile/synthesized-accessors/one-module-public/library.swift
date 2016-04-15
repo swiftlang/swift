@@ -18,9 +18,13 @@ public struct FishAndChips {
   }
 }
 
-final class Beer {
-  var abv: Int {
+public final class Beer {
+  public var abv: Int {
     get { return 7 }
     set { }
   }
+}
+
+public class LazyCat {
+  public lazy var purrs: Int = 10
 }

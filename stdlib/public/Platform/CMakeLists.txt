@@ -30,22 +30,26 @@ add_swift_library(${swift_platform_name} IS_SDK_OVERLAY
 
 set(glibc_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
-  if(${sdk} STREQUAL "LINUX" OR ${sdk} STREQUAL "FREEBSD")
+  if(${sdk} STREQUAL "LINUX" OR ${sdk} STREQUAL "FREEBSD" OR ${sdk} STREQUAL "ANDROID")
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
       set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
 
-      # Determine the location of glibc headers based on the target.
-      set(GLIBC_INCLUDE_PATH "/usr/include")
-      set(GLIBC_ARCH_INCLUDE_PATH ${GLIBC_INCLUDE_PATH})
-      if(CMAKE_LIBRARY_ARCHITECTURE)
+      # Determine the location of glibc based on the target.
+      if(${sdk} STREQUAL "ANDROID")
+        set(GLIBC_INCLUDE_PATH "${SWIFT_ANDROID_SDK_PATH}/usr/include")
+        set(GLIBC_ARCH_INCLUDE_PATH ${GLIBC_INCLUDE_PATH})
+      else()
+        set(GLIBC_INCLUDE_PATH "/usr/include")
+        set(GLIBC_ARCH_INCLUDE_PATH ${GLIBC_INCLUDE_PATH})
+        if((${sdk} STREQUAL "LINUX" OR ${sdk} STREQUAL "FREEBSD") AND CMAKE_LIBRARY_ARCHITECTURE)
           # FIXME: Some distributions install headers in
           #        "/usr/include/x86_64-linux-gnu/sys/...". Here we use the host
           #        machine's path, regardless of the SDK target we're building for.
           #        This will break if cross-compiling from a distro that uses the
           #        architecture as part of the path to a distro that does not.
-          set(GLIBC_ARCH_INCLUDE_PATH
-              "${GLIBC_INCLUDE_PATH}/${CMAKE_LIBRARY_ARCHITECTURE}")
+          set(GLIBC_ARCH_INCLUDE_PATH "${GLIBC_INCLUDE_PATH}/${CMAKE_LIBRARY_ARCHITECTURE}")
+        endif()
       endif()
 
       # Configure the module map based on the target. Each platform needs to

@@ -4,8 +4,12 @@ sil_stage canonical
 import Builtin
 import Swift
 
-public class Foo {
+public class Base {
   public func beep()
+}
+
+public class Foo : Base {
+  public override func beep()
 }
 
 sil @beep : $@convention(thin) () -> ()
@@ -363,6 +367,70 @@ bb0(%0 : $Foo, %1: $*Builtin.Int32, %2: $Builtin.Int32):
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   store %2 to %1 : $*Builtin.Int32
+  %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: sil @testUnsafeGuaranteed_cast_inst
+// CHECK: bb0([[P:%.*]] : $Foo
+// CHECK-NOT: retain
+// CHECK-NOT: unsafeGuaranteed
+// CHECK:  [[U:%.*]] = upcast [[P]] : $Foo to $Base
+// CHECK:   [[M:%.*]] = class_method [[U]] : $Base, #Base.beep
+// CHECK:   apply [[M]]([[U]])
+// CHECK-NOT: release
+// CHECK-NOT: unsafeGuaranteedEnd
+// CHECK:   [[T:%.*]] = tuple ()
+// CHECK:   return [[T]]
+// CHECK: }
+sil @testUnsafeGuaranteed_cast_inst : $@convention(method) (@guaranteed Foo, Builtin.Int32) -> () {
+bb0(%0 : $Foo, %1: $Builtin.Int32):
+  strong_retain %0 : $Foo
+  debug_value %0 : $Foo
+  %3 = struct $MyInt(%1 : $Builtin.Int32)
+  %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
+  %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
+  %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
+  %7 = upcast %5 : $Foo to $Base
+  %19 = class_method %7 : $Base, #Base.beep!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+  %20 = apply %19(%7) : $@convention(method) (@guaranteed Base) -> ()
+  strong_release %7 : $Base
+  %21 = struct $MyInt(%1 : $Builtin.Int32)
+  debug_value %5 : $Foo
+  %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: sil @testUnsafeGuaranteed_cast2_inst
+// CHECK: bb0([[P:%.*]] : $AnyObject
+// CHECK:  [[C:%.*]] = unchecked_ref_cast [[P]] : $AnyObject to $Foo
+// CHECK-NOT: retain
+// CHECK-NOT: unsafeGuaranteed
+// CHECK:  [[U:%.*]] = upcast [[C]] : $Foo to $Base
+// CHECK:   [[M:%.*]] = class_method [[U]] : $Base, #Base.beep
+// CHECK:   apply [[M]]([[U]])
+// CHECK-NOT: release
+// CHECK-NOT: unsafeGuaranteedEnd
+// CHECK:   [[T:%.*]] = tuple ()
+// CHECK:   return [[T]]
+// CHECK: }
+sil @testUnsafeGuaranteed_cast2_inst : $@convention(method) (@guaranteed AnyObject, Builtin.Int32) -> () {
+bb0(%0 : $AnyObject, %1: $Builtin.Int32):
+  %2 = unchecked_ref_cast %0 : $AnyObject to $Foo
+  strong_retain %0 : $AnyObject
+  debug_value %0 : $AnyObject
+  %3 = struct $MyInt(%1 : $Builtin.Int32)
+  %4 = builtin "unsafeGuaranteed"<Foo>(%2 : $Foo) : $(Foo, Builtin.Int8)
+  %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
+  %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
+  %7 = upcast %5 : $Foo to $Base
+  %19 = class_method %7 : $Base, #Base.beep!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+  %20 = apply %19(%7) : $@convention(method) (@guaranteed Base) -> ()
+  strong_release %7 : $Base
+  %21 = struct $MyInt(%1 : $Builtin.Int32)
+  debug_value %5 : $Foo
   %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
   %17 = tuple ()
   return %17 : $()
