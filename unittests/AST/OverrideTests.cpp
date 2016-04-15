@@ -164,16 +164,16 @@ TEST(Override, UnrelatedTypes) {
   EXPECT_FALSE(check(structTy, anotherStructTy));
   EXPECT_FALSE(check(anotherStructTy, structTy));
 
-  Type anothorStructToAnotherStructFn = FunctionType::get(anotherStructTy,
+  Type anotherStructToAnotherStructFn = FunctionType::get(anotherStructTy,
                                                           anotherStructTy);
-  EXPECT_FALSE(check(anothorStructToAnotherStructFn, structToStructFn));
-  EXPECT_FALSE(check(structToStructFn, anothorStructToAnotherStructFn));
+  EXPECT_FALSE(check(anotherStructToAnotherStructFn, structToStructFn));
+  EXPECT_FALSE(check(structToStructFn, anotherStructToAnotherStructFn));
 
   Type S2ASFn = FunctionType::get(structTy, anotherStructTy);
   EXPECT_FALSE(check(S2ASFn, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, S2ASFn));
-  EXPECT_FALSE(check(S2ASFn, anothorStructToAnotherStructFn));
-  EXPECT_FALSE(check(anothorStructToAnotherStructFn, S2ASFn));
+  EXPECT_FALSE(check(S2ASFn, anotherStructToAnotherStructFn));
+  EXPECT_FALSE(check(anotherStructToAnotherStructFn, S2ASFn));
 }
 
 TEST(Override, Classes) {
