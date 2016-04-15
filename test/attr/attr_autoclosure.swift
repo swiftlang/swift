@@ -23,7 +23,7 @@ func func8(@autoclosure _ x: inout () -> Bool) -> Bool {  // expected-error {{@a
 
 
 // <rdar://problem/19707366> QoI: @autoclosure declaration change fixit
-let migrate4 : (@autoclosure() -> ())->()
+let migrate4 : (@autoclosure() -> ()) -> ()
 
 
 struct SomeStruct {
