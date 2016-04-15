@@ -556,40 +556,40 @@ TypesToReflect.E4
 
 ASSOCIATED TYPES:
 =================
-TypesToReflect.Box : Swift.AnyObject
-TypesToReflect.C : Swift.AnyObject
-TypesToReflect.C1 : Swift.AnyObject
-TypesToReflect.C1 : TypesToReflect.ClassBoundP
+- TypesToReflect.Box : Swift.AnyObject
+- TypesToReflect.C : Swift.AnyObject
+- TypesToReflect.C1 : Swift.AnyObject
+- TypesToReflect.C1 : TypesToReflect.ClassBoundP
 typealias Inner = A
 (generic-type-parameter depth=0 index=0)
 
-TypesToReflect.C2 : Swift.AnyObject
-TypesToReflect.C3 : Swift.AnyObject
-TypesToReflect.C4 : TypesToReflect.P1
+- TypesToReflect.C2 : Swift.AnyObject
+- TypesToReflect.C3 : Swift.AnyObject
+- TypesToReflect.C4 : TypesToReflect.P1
 typealias Inner = A
 (generic-type-parameter depth=0 index=0)
 
-TypesToReflect.C4 : TypesToReflect.P2
+- TypesToReflect.C4 : TypesToReflect.P2
 typealias Outer = A
 (generic-type-parameter depth=0 index=0)
 
-TypesToReflect.S4 : TypesToReflect.P1
+- TypesToReflect.S4 : TypesToReflect.P1
 typealias Inner = A
 (generic-type-parameter depth=0 index=0)
 
-TypesToReflect.S4 : TypesToReflect.P2
+- TypesToReflect.S4 : TypesToReflect.P2
 typealias Outer = A
 (generic-type-parameter depth=0 index=0)
 
-TypesToReflect.E4 : TypesToReflect.P1
+- TypesToReflect.E4 : TypesToReflect.P1
 typealias Inner = A
 (generic-type-parameter depth=0 index=0)
 
-TypesToReflect.E4 : TypesToReflect.P2
+- TypesToReflect.E4 : TypesToReflect.P2
 typealias Outer = B
 (generic-type-parameter depth=0 index=1)
 
-TypesToReflect.E4 : TypesToReflect.P3
+- TypesToReflect.E4 : TypesToReflect.P3
 typealias First = A
 (generic-type-parameter depth=0 index=0)
 

@@ -286,7 +286,7 @@ public:
         auto protocolName = Demangle::demangleTypeAsString(
           descriptor.getMangledProtocolTypeName());
 
-        OS << conformingTypeName << " : " << protocolName;
+        OS << "- " << conformingTypeName << " : " << protocolName;
         OS << '\n';
 
         for (const auto &associatedType : descriptor) {
@@ -303,7 +303,7 @@ public:
         auto typeName = Demangle::demangleTypeAsString(
           descriptor.getMangledTypeName());
 
-        OS << typeName << " :\n";
+        OS << "\n- " << typeName << ":\n";
         OS << "Size: " << descriptor.Size << "\n";
         OS << "Alignment: " << descriptor.Alignment << "\n";
         OS << "Stride: " << descriptor.Stride << "\n";
