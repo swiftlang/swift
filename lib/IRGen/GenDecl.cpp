@@ -885,6 +885,7 @@ void IRGenModuleDispatcher::emitReflectionMetadataRecords() {
   }
 }
 
+
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
 void IRGenModuleDispatcher::emitLazyDefinitions() {
