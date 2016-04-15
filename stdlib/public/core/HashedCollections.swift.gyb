@@ -261,12 +261,8 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 /// Like `UnsafeMutablePointer<Unmanaged<AnyObject>>`, or `id
 /// __unsafe_unretained *` in Objective-C ARC.
 internal struct _UnmanagedAnyObjectArray {
-  // `UnsafeMutablePointer<Unmanaged<AnyObject>>` fails because of:
-  // <rdar://problem/16836348> IRGen: Couldn't find conformance
-
-  /// Underlying pointer, typed as an integer to escape from reference
-  /// counting.
-  internal var value: UnsafeMutablePointer<Int>
+  /// Underlying pointer, Unmanaged to escape reference counting.
+  internal var value: UnsafeMutablePointer<Unmanaged<AnyObject>>
 
   internal init(_ up: UnsafeMutablePointer<AnyObject>) {
     self.value = UnsafeMutablePointer(up)
@@ -279,10 +275,10 @@ internal struct _UnmanagedAnyObjectArray {
 
   internal subscript(i: Int) -> AnyObject {
     get {
-      return _reinterpretCastToAnyObject(value[i])
+      return value[i].takeUnretainedValue()
     }
     nonmutating set(newValue) {
-      value[i] = unsafeBitCast(newValue, to: Int.self)
+      value[i] = Unmanaged.passUnretained(newValue)
     }
   }
 }
