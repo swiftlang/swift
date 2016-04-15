@@ -140,6 +140,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     only needed for context. See also
     `Whole-Module Optimization <WMO (whole-module optimization)>`.
 
+  QoI
+    "Quality of implementation." Sometimes written in commit messages that
+    improve the code that implements a particular feature of the compiler. More
+    often included in FIXMEs or TODOs when the current code functions properly,
+    but should be cleaned up. Example: "FIXME: QoI could be improved here."
+
   Radar
     `Apple's bug-tracking system`__, or an issue reported on that system.
     
