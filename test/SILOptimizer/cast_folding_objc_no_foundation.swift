@@ -25,7 +25,7 @@ func testAnyObjectToArrayString(_ a: AnyObject) -> Bool {
   return a is [String]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4dg___TF31cast_folding_objc_no_foundation30testAnyObjectToArrayNotBridgedFPs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_TTSf4d___TF31cast_folding_objc_no_foundation30testAnyObjectToArrayNotBridgedFPs9AnyObject_Sb
 // CHECK-NEXT: bb0:
 // CHECK: [[VALUE:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK: [[RESULT:%.*]] = struct $Bool ([[VALUE]] : $Builtin.Int1)
