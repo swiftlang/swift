@@ -33,7 +33,6 @@ using ReleaseSet = llvm::DenseSet<SILInstruction *>;
 /// A structure that maintains all of the information about a specific
 /// SILArgument that we are tracking.
 struct ArgumentDescriptor {
-
   /// The argument that we are tracking original data for.
   SILArgument *Arg;
 
@@ -48,6 +47,9 @@ struct ArgumentDescriptor {
 
   /// Should the argument be exploded ?
   bool Explode;
+  
+  /// This parameter is owned to guaranteed.
+  bool OwnedToGuaranteed;
 
   /// Is this parameter an indirect result?
   bool IsIndirectResult;
@@ -73,16 +75,14 @@ struct ArgumentDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A,
-                     ReleaseSet Releases)
+  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A)
       : Arg(A), Index(A->getIndex()),
         Decl(A->getDecl()), IsEntirelyDead(false), Explode(false),
+        OwnedToGuaranteed(false),
         IsIndirectResult(A->isIndirectResult()),
         CalleeRelease(), CalleeReleaseInThrowBlock(),
-        ProjTree(A->getModule(), BPA, A->getType(), 
-        ProjectionTreeNode::LivenessKind::IgnoreEpilogueReleases, 
-        Releases) {
-    ProjTree.computeUsesAndLiveness(A);
+        ProjTree(A->getModule(), BPA, A->getType())  {
+    ///ProjTree.computeUsesAndLiveness(A);
   }
 
   ArgumentDescriptor(const ArgumentDescriptor &) = delete;
@@ -94,29 +94,6 @@ struct ArgumentDescriptor {
   bool hasConvention(SILArgumentConvention P) const {
     return Arg->hasConvention(P);
   }
-
-  /// Convert the potentially multiple interface params associated with this
-  /// argument.
-  void
-  computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const;
-
-  /// Add potentially multiple new arguments to NewArgs from the caller's apply
-  /// or try_apply inst.
-  void addCallerArgs(SILBuilder &Builder, FullApplySite FAS,
-                     SmallVectorImpl<SILValue> &NewArgs) const;
-
-  /// Add potentially multiple new arguments to NewArgs from the thunk's
-  /// function arguments.
-  void addThunkArgs(SILBuilder &Builder, SILBasicBlock *BB,
-                    SmallVectorImpl<SILValue> &NewArgs) const;
-
-  /// Optimize the argument at ArgOffset and return the index of the next
-  /// argument to be optimized.
-  ///
-  /// The return value makes it easy to SROA arguments since we can return the
-  /// amount of SROAed arguments we created.
-  unsigned updateOptimizedBBArgs(SILBuilder &Builder, SILBasicBlock *BB,
-                                 unsigned ArgOffset);
 
   bool canOptimizeLiveArg() const {
     return Arg->getType().isObject();
@@ -150,6 +127,9 @@ struct ResultDescriptor {
   /// @owned or we could not find such a release in the callee, this is null.
   RetainList CalleeRetain;
 
+  /// This is owned to guaranteed.
+  bool OwnedToGuaranteed;
+
   /// Initialize this argument descriptor with all information from A that we
   /// use in our optimization.
   ///
@@ -157,8 +137,9 @@ struct ResultDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ResultDescriptor() {};
-  ResultDescriptor(SILResultInfo RI) : ResultInfo(RI), CalleeRetain() {}
+  ResultDescriptor() {}
+  ResultDescriptor(SILResultInfo RI) 
+    : ResultInfo(RI), CalleeRetain(), OwnedToGuaranteed(false) {}
 
   ResultDescriptor(const ResultDescriptor &) = delete;
   ResultDescriptor(ResultDescriptor &&) = default;

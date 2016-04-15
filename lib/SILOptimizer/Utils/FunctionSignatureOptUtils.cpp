@@ -44,6 +44,10 @@ bool swift::canSpecializeFunction(SILFunction *F) {
   if (F->isExternalDeclaration())
     return false;
 
+  // For now ignore functions with indirect results.
+  if (F->getLoweredFunctionType()->hasIndirectResults())
+    return false;
+
   // Do not specialize functions that are available externally. If an external
   // function was able to be specialized, it would have been specialized in its
   // own module. We will inline the original function as a thunk. The thunk will
@@ -65,6 +69,11 @@ bool swift::canSpecializeFunction(SILFunction *F) {
   if (!isSpecializableRepresentation(F->getRepresentation()))
     return false;
 
+  // Do not handle tryapply for now. 
+  // TODO: bring this back.
+  if (F->getLoweredType().castTo<SILFunctionType>()->hasErrorResult())
+    return false;
+
   return true;
 }
 
@@ -73,14 +82,7 @@ addReleasesForConvertedOwnedParameter(SILBuilder &Builder,
                                       SILLocation Loc,
                                       ArrayRef<SILArgument*> Parameters,
                                       ArrayRef<ArgumentDescriptor> &ArgDescs) {
-  // If we have any arguments that were consumed but are now guaranteed,
-  // insert a release_value.
-  for (auto &ArgDesc : ArgDescs) {
-    if (ArgDesc.CalleeRelease.empty())
-      continue;
-    Builder.createReleaseValue(Loc, Parameters[ArgDesc.Index],
-                               Atomicity::Atomic);
-  }
+
 }
 
 void swift::
@@ -113,26 +115,7 @@ addRetainsForConvertedDirectResults(SILBuilder &Builder,
                                     SILValue ReturnValue,
                                     SILInstruction *AI,
                                     ArrayRef<ResultDescriptor> DirectResults) {
-  for (auto I : indices(DirectResults)) {
-    auto &RV = DirectResults[I];
-    if (RV.CalleeRetain.empty()) continue;
 
-    bool IsSelfRecursionEpilogueRetain = false;
-    for (auto &X : RV.CalleeRetain) {
-      IsSelfRecursionEpilogueRetain |= (AI == X);
-    }
-
-    // We do not create a retain if this ApplyInst is a self-recursion.
-    if (IsSelfRecursionEpilogueRetain)
-      continue;
-
-    // Extract the return value if necessary.
-    SILValue SpecificResultValue = ReturnValue;
-    if (DirectResults.size() != 1)
-      SpecificResultValue = Builder.createTupleExtract(Loc, ReturnValue, I);
-
-    Builder.createRetainValue(Loc, SpecificResultValue, Atomicity::Atomic);
-  }
 }
 
 using namespace swift;
@@ -239,6 +222,9 @@ bool FunctionSignatureInfo::analyzeParameters() {
   if (F->getLoweredFunctionType()->hasIndirectResults())
     return false;
 
+  return true;
+
+#if 0
   ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
 
   // A map from consumed SILArguments to the release associated with an
@@ -313,6 +299,7 @@ bool FunctionSignatureInfo::analyzeParameters() {
   }
  
   return SignatureOptimize;
+#endif
 }
 
 bool FunctionSignatureInfo::analyzeResult() {
