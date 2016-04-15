@@ -250,7 +250,7 @@ public:
       auto assocty_base
         = buffer + RemoteInfo.assocty.StartAddress - RemoteInfo.StartAddress;
       auto builtin_base
-	= buffer + RemoteInfo.builtin.StartAddress - RemoteInfo.StartAddress;
+        = buffer + RemoteInfo.builtin.StartAddress - RemoteInfo.StartAddress;
       auto typeref_base
         = buffer + RemoteInfo.typeref.StartAddress - RemoteInfo.StartAddress;
       auto reflstr_base
