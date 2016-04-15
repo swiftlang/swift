@@ -247,7 +247,7 @@ namespace swift {
 
         for (unsigned Line = FromLine; Line<=ToLine; Line++) {
           size_t Offset = getOffsetOfLine(Line,Output);
-          ssize_t Length = getOffsetOfLine(Line + 1,Output) - 1 - Offset;
+          ssize_t Length = getOffsetOfLine(Line + 1, Output) - 1 - Offset;
           if (Length < 0)
             break;
 
