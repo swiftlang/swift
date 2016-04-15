@@ -18,13 +18,10 @@
 #ifndef SWIFT_REFLECTION_TYPEREF_H
 #define SWIFT_REFLECTION_TYPEREF_H
 
-#include "swift/Basic/Demangle.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Casting.h"
 
 #include <iostream>
-
-class NodePointer;
 
 namespace swift {
 namespace reflection {
