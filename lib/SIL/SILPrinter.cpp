@@ -679,7 +679,7 @@ public:
         }
         *this << " perf_inlined_at ";
         auto CallSite = CS->Loc;
-        if (!CallSite.isNull())
+        if (!CallSite.isNull() && CallSite.isASTNode())
           CallSite.getSourceLoc().print(
             PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
         else
@@ -2185,7 +2185,8 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
                          unsigned Indent) const {
   OS << "{\n";
   OS.indent(Indent);
-  Loc.getSourceLoc().print(OS, SM);
+  if (Loc.isASTNode())
+    Loc.getSourceLoc().print(OS, SM);
   OS << "\n";
   OS.indent(Indent + 2);
   OS << " parent: ";
