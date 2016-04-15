@@ -120,7 +120,9 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     "No functionality change." Written in commit messages that are intended to
     have no change on the compiler or library's behavior, though for some this
     refers to having the *same* implementation and for others merely an
-    *equivalent* one.
+    *equivalent* one.  "NFC" is typically used to explain why a patch has no
+    included testcase, since the Swift project requires testcases for all
+    patches that change functionality.
 
   open existential
     An `existential` value with its dynamic type pulled out, so that the 
