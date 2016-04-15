@@ -1140,6 +1140,7 @@ static Type resolveIdentTypeComponent(
   
   // Don't resolve the nested type if the parent is equal to the decl context
   // we are looking in.
+  // FIXME: Should be fixed to allow inheriting from a nested type some day
   auto selfTypeBase = DC->getSelfTypeInContext().getPointer();
   if (DC->getAsClassOrClassExtensionContext() &&
       selfTypeBase && selfTypeBase->isEqual(parentTy)) {
