@@ -215,7 +215,7 @@ namespace swift {
           return true;
         }
 
-        for (unsigned i=0 ; i < Offsets.size() ; i++) {
+        for (unsigned i=0; i < Offsets.size(); i++) {
           unsigned FromLine = Doc.getLineAndColumn(Offsets[i]).first;
           unsigned ToLine = Doc.getLineAndColumn(Offsets[i] + Lengths[i]).first;
           if (ToLine == 0) {
@@ -234,7 +234,7 @@ namespace swift {
       std::string Output = Doc.memBuffer().getBuffer();
       Replacements Replaces;
 
-      for (unsigned Range = 0 ; Range < LineRanges.size() ; Range++) {
+      for (unsigned Range = 0; Range < LineRanges.size(); Range++) {
         unsigned FromLine, ToLine;
         if (parseLineRange(LineRanges[Range], FromLine, ToLine)) {
           llvm::errs() << "error: invalid <start line>:<end line> pair\n";
