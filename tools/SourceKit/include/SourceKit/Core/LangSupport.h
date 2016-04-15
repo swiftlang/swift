@@ -38,9 +38,9 @@ struct EntityInfo {
   TypeKind EntityType = Base;
 
   UIdent Kind;
-  llvm::SmallString<32> Name;
-  llvm::SmallString<64> USR;
-  llvm::SmallString<16> Group;
+  StringRef Name;
+  StringRef USR;
+  StringRef Group;
   unsigned Line = 0;
   unsigned Column = 0;
 
@@ -57,7 +57,7 @@ struct FuncDeclEntityInfo : public EntityInfo {
 };
 
 struct CallRefEntityInfo : public EntityInfo {
-  llvm::SmallString<64> ReceiverUSR;
+  StringRef ReceiverUSR;
   bool IsDynamic = false;
 
   CallRefEntityInfo() : EntityInfo(CallReference) { }
