@@ -17,10 +17,13 @@
 
 namespace swift {
 class ModuleDecl;
+class SourceFile;
 
 namespace index {
 
-void indexModule(ModuleDecl *module, StringRef hash, unsigned bufferID,
+void indexSourceFile(SourceFile *SF, StringRef hash,
+                     IndexDataConsumer &consumer);
+void indexModule(ModuleDecl *module, StringRef hash,
                  IndexDataConsumer &consumer);
 
 } // end namespace index

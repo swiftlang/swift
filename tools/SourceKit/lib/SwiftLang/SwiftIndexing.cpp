@@ -183,7 +183,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
   OwnedResolver TypeResolver = createLazyResolver(Ctx);
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
-  index::indexModule(Mod, Hash, /*BufferID=*/-1, IdxDataConsumer);
+  index::indexModule(Mod, Hash, IdxDataConsumer);
 }
 
 
@@ -282,7 +282,6 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   // Setup a typechecker for protocol conformance resolving.
   OwnedResolver TypeResolver = createLazyResolver(CI.getASTContext());
 
-  unsigned BufferID = CI.getPrimarySourceFile()->getBufferID().getValue();
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
-  index::indexModule(CI.getMainModule(), Hash, BufferID, IdxDataConsumer);
+  index::indexSourceFile(CI.getPrimarySourceFile(), Hash, IdxDataConsumer);
 }

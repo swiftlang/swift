@@ -997,9 +997,22 @@ void IndexSwiftASTWalker::getModuleHash(SourceFileOrModule Mod,
   OS << llvm::APInt(64, code).toString(36, /*Signed=*/false);
 }
 
-void index::indexModule(ModuleDecl *module, StringRef hash, unsigned bufferID,
+//===----------------------------------------------------------------------===//
+// Indexing entry points
+//===----------------------------------------------------------------------===//
+
+void index::indexSourceFile(SourceFile *SF, StringRef hash,
+                            IndexDataConsumer &consumer) {
+  assert(SF);
+  unsigned bufferID = SF->getBufferID().getValue();
+  IndexSwiftASTWalker walker(consumer, SF->getASTContext(), bufferID);
+  walker.visitModule(*SF->getParentModule(), hash);
+}
+
+void index::indexModule(ModuleDecl *module, StringRef hash,
                         IndexDataConsumer &consumer) {
   assert(module);
-  IndexSwiftASTWalker walker(consumer, module->getASTContext(), bufferID);
+  IndexSwiftASTWalker walker(consumer, module->getASTContext(),
+                             /*bufferID*/ -1);
   walker.visitModule(*module, hash);
 }
