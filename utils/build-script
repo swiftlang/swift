@@ -47,6 +47,18 @@ import swift_build_support.ninja      # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
 
+# A strict parser for bools (unlike Python's `bool()`, where
+# `bool('False')` is `True`).
+#
+# This function can be pased as `type=` argument to argparse to parse values
+# passed to command line arguments.
+def argparse_bool(string):
+    if string in ['0', 'false', 'False']:
+        return False
+    if string in ['1', 'true', 'True']:
+        return True
+    raise argparse.ArgumentTypeError("%r is not a boolean value" % string)
+
 
 # Main entry point for the preset mode.
 def main_preset():
@@ -528,11 +540,24 @@ details of the setups of other systems or automated environments.""")
     run_tests_group.add_argument(
         "-t", "--test",
         help="test Swift after building",
-        action="store_true")
+        nargs='?',
+        type=argparse_bool,
+        default=False,
+        const=True)
     run_tests_group.add_argument(
         "-T", "--validation-test",
         help="run the validation test suite (implies --test)",
-        action="store_true")
+        nargs='?',
+        type=argparse_bool,
+        default=False,
+        const=True)
+    run_tests_group.add_argument(
+        "--long-test",
+        help="run the long test suite",
+        nargs='?',
+        type=argparse_bool,
+        default=False,
+        const=True)
     run_tests_group.add_argument(
         "--host-test",
         help="run executable tests on host devices (such as iOS or tvOS)",
@@ -562,7 +587,10 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "-o", "--test-optimized",
         help="run the test suite in optimized mode too (implies --test)",
-        action="store_true")
+        nargs='?',
+        type=argparse_bool,
+        default=False,
+        const=True)
 
     run_build_group = parser.add_argument_group(
         title="Run build")
@@ -896,7 +924,7 @@ details of the setups of other systems or automated environments.""")
             "--export-compile-commands"
         ]
 
-    if not args.test:
+    if not args.test and not args.validation_test and not args.long_test:
         build_script_impl_inferred_args += [
             "--skip-test-cmark",
             "--skip-test-lldb",
@@ -918,9 +946,14 @@ details of the setups of other systems or automated environments.""")
             "--skip-test-watchos-host",
         ]
 
-    if not args.validation_test:
+    if args.validation_test:
         build_script_impl_inferred_args += [
-            "--skip-test-validation"
+            "--validation-test"
+        ]
+
+    if args.long_test:
+        build_script_impl_inferred_args += [
+            "--long-test"
         ]
 
     if not args.host_test:
