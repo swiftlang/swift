@@ -1329,8 +1329,8 @@ ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument names from any potential "
       "overrides", (DeclName))
 NOTE(overridden_near_match_here,none,
-     "potential overridden %select{method|initializer}0 %1 here",
-      (bool, DeclName))
+     "potential overridden %0 %1 here",
+      (DescriptiveDeclKind, DeclName))
 ERROR(override_decl_extension,none,
       "declarations %select{in extensions|from extensions}0 cannot "
       "%select{override|be overridden}0 yet", (bool))
@@ -1416,6 +1416,12 @@ ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
+ERROR(override_optional_mismatch,none,
+      "cannot override %0 parameter of type %1 with non-optional type %2",
+      (DescriptiveDeclKind, Type, Type))
+ERROR(override_optional_result_mismatch,none,
+      "cannot override %0 result type %1 with optional type %2",
+      (DescriptiveDeclKind, Type, Type))
 WARNING(override_unnecessary_IUO,none,
       "overriding %0 parameter of type %1 with implicitly unwrapped optional "
       "type %2",
