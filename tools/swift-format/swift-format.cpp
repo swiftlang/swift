@@ -76,12 +76,6 @@ namespace swift {
                                                llvm::cl::desc("Characters to indent"),
                                                cl::cat(SwiftFormatCategory));
 
-    static cl::opt<std::string> AssumeFileName("assume-filename",
-                                               cl::desc("When reading from stdin, clang-format assumes this\n"
-                                                        "filename to look for a style config file (with\n"
-                                                        "-style=file) and to determine the language."),
-                                               cl::init("<stdin>"), cl::cat(SwiftFormatCategory));
-
     static cl::opt<bool> Inplace("i",
                                  cl::desc("Inplace edit <file>s, if specified."),
                                  cl::cat(SwiftFormatCategory));
@@ -221,7 +215,7 @@ namespace swift {
           return true;
         }
 
-        for ( unsigned i=0 ; i < Offsets.size() ; i++ ) {
+        for (unsigned i=0 ; i < Offsets.size() ; i++) {
           unsigned FromLine = Doc.getLineAndColumn(Offsets[i]).first;
           unsigned ToLine = Doc.getLineAndColumn(Offsets[i] + Lengths[i]).first;
           if (ToLine == 0) {
@@ -240,7 +234,7 @@ namespace swift {
       std::string Output = Doc.memBuffer().getBuffer();
       Replacements Replaces;
 
-      for ( unsigned Range = 0 ; Range < LineRanges.size() ; Range++ ) {
+      for (unsigned Range = 0 ; Range < LineRanges.size() ; Range++) {
         unsigned FromLine, ToLine;
         if (parseLineRange(LineRanges[Range], FromLine, ToLine)) {
           llvm::errs() << "error: invalid <start line>:<end line> pair\n";
@@ -251,13 +245,13 @@ namespace swift {
           return true;
         }
 
-        for ( unsigned Line = FromLine ; Line<=ToLine ; Line++ ) {
+        for (unsigned Line = FromLine ; Line<=ToLine ; Line++) {
           size_t Offset = getOffsetOfLine(Line,Output);
-          ssize_t Length = getOffsetOfLine(Line+1,Output)-1-Offset;
+          ssize_t Length = getOffsetOfLine(Line + 1,Output) - 1 - Offset;
           if (Length < 0)
             break;
 
-          std::string Formatted = Doc.reformat(LineRange(Line,1), FormatOptions).second;
+          std::string Formatted = Doc.reformat(LineRange(Line, 1), FormatOptions).second;
           if (Formatted.find_first_not_of(" \t\v\f", 0) == StringRef::npos)
               Formatted = "";
 
