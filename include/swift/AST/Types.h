@@ -229,6 +229,12 @@ enum class OverrideMatchMode {
   /// Allow a parameter with IUO type to be overridden by a parameter with non-
   /// optional type.
   AllowNonOptionalForIUOParam,
+  /// Allow any mismatches of Optional or ImplicitlyUnwrappedOptional at the
+  /// top level of a type.
+  ///
+  /// This includes function parameters and result types as well as tuple
+  /// elements, but excludes generic parameters.
+  AllowTopLevelOptionalMismatch
 };
 
 /// TypeBase - Base class for all types in Swift.
