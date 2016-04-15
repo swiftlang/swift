@@ -126,8 +126,6 @@ namespace irgen {
 
 class IRGenModule;
 
-const uint32_t REFLECTION_VERSION = 1;
-
 /// A type descriptor for a field type accessor.
 class FieldTypeInfo {
   llvm::PointerIntPair<CanType, 1, unsigned> Info;
@@ -216,9 +214,6 @@ public:
 
   /// Emit reflection metadata records for nominal types.
   void emitReflectionMetadataRecords();
-
-  // Stamp the binary with the major and minor language version.
-  void emitSwiftReflectionVersion();
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
@@ -615,7 +610,6 @@ public:
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
   void emitReflectionMetadataRecords();
-  void emitSwiftReflectionVersion();
   llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
   std::string getBuiltinTypeMetadataSectionName();

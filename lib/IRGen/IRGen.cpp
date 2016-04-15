@@ -585,8 +585,6 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       IGM.emitReflectionMetadataRecords();
     }
 
-    IGM.emitSwiftReflectionVersion();
-
     // Okay, emit any definitions that we suddenly need.
     dispatcher.emitLazyDefinitions();
 
