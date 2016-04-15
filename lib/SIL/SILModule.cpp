@@ -533,7 +533,7 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
   }
 
   // If a function exists already and it is a non-optimizing
-  // compilaiton, simply convert it into an external declaration,
+  // compilation, simply convert it into an external declaration,
   // so that a compiled version from the shared library is used.
   if (F->isDefinition() &&
       F->getModule().getOptions().Optimization <
