@@ -3234,9 +3234,9 @@ public:
     auto stringType = context.getStringDecl()->getDeclaredType();
     addFromProto(LK::ImageLiteral, "", [&](Builder &builder) {
       builder.addLeftBracket();
-      builder.addTextChunk("#Image");
+      builder.addTextChunk("#imageLiteral");
       builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("imageLiteral"),
+      builder.addCallParameter(context.getIdentifier("resourceName"),
                                stringType, false, true);
       builder.addRightParen();
       builder.addTextChunk("#");

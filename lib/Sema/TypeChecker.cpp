@@ -159,7 +159,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
     if (name.str().equals("Color")) {
       return getProtocol(expr->getLoc(),
                          KnownProtocolKind::ColorLiteralConvertible);
-    } else if (name.str().equals("Image")) {
+    } else if (name.str().equals("imageLiteral")) {
       return getProtocol(expr->getLoc(),
                          KnownProtocolKind::ImageLiteralConvertible);
     } else if (name.str().equals("FileReference")) {
@@ -181,9 +181,9 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
                       Context.getIdentifier("green"),
                       Context.getIdentifier("blue"),
                       Context.getIdentifier("alpha") });
-  } else if (name.str().equals("Image")) {
+  } else if (name.str().equals("imageLiteral")) {
     return DeclName(Context, Context.Id_init,
-                    { Context.getIdentifier("imageLiteral") });
+                    { Context.getIdentifier("resourceName") });
   } else if (name.str().equals("FileReference")) {
     return DeclName(Context, Context.Id_init,
                     { Context.getIdentifier("fileReferenceLiteral") });

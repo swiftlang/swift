@@ -87,7 +87,7 @@ func test2() {
 // EXPR: true
 // EXPR: false
 // EXPR: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR: [#Image(imageLiteral: String)#]
+// EXPR: [#imageLiteral(resourceName: String)#]
 // EXPR: [values]
 // EXPR: [key: value]
 // EXPR: (values)
@@ -108,7 +108,7 @@ func test3(x: Int) {
 // EXPR_TOP_1: true
 // EXPR_TOP_1: false
 // EXPR_TOP_1: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR_TOP_1: [#Image(imageLiteral: String)#]
+// EXPR_TOP_1: [#imageLiteral(resourceName: String)#]
 // EXPR_TOP_1: [values]
 // EXPR_TOP_1: [key: value]
 // EXPR_TOP_1: (values)
@@ -133,7 +133,7 @@ func test4(x: Int) {
 // EXPR_TOP_3: true
 // EXPR_TOP_3: false
 // EXPR_TOP_3: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR_TOP_3: [#Image(imageLiteral: String)#]
+// EXPR_TOP_3: [#imageLiteral(resourceName: String)#]
 // EXPR_TOP_3: [values]
 // EXPR_TOP_3: [key: value]
 // EXPR_TOP_3: (values)
