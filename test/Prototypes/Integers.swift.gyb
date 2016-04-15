@@ -111,8 +111,8 @@ infix operator &>>= { associativity right precedence 90 assignment }
 
 @_transparent
 public func _assertCond(
-  @autoclosure _ condition: () -> Bool,
-  @autoclosure _ message: () -> String,
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String,
   file: StaticString = #file, line: UInt = #line) {
   let ok = condition()
   if _isDebugAssertConfiguration() {
@@ -126,7 +126,7 @@ public func _assertCond(
 /// Prints the message if the body is uncommented; used for
 /// diagnostics.
 @_transparent
-public func _log(@autoclosure _ message: () -> String) {
+public func _log(_ message: @autoclosure () -> String) {
   print(message())
 }
 
@@ -1332,7 +1332,7 @@ import StdlibUnittest
 
 func expectEqual<T : FixedWidthInteger>(
   _ expected: T, _ actual: T,
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
@@ -1352,7 +1352,7 @@ func expectEqual<T : FixedWidthInteger>(
 
 func expectEqual<T : FixedWidthInteger>(
   _ expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line

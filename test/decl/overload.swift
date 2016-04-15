@@ -218,11 +218,11 @@ func != <T>(lhs : T, rhs : NoneType) -> Bool { // expected-error{{invalid redecl
 }
 
 // <rdar://problem/15082356>
-func &&(lhs: Boolean, @autoclosure rhs: () -> Boolean) -> Bool { // expected-note{{previously declared}}
+func &&(lhs: Boolean, rhs: @autoclosure () -> Boolean) -> Bool { // expected-note{{previously declared}}
   return lhs.boolValue && rhs().boolValue
 }
 
-func &&(lhs: Boolean, @autoclosure rhs: () -> Boolean) -> Bool { // expected-error{{invalid redeclaration of '&&'}}
+func &&(lhs: Boolean, rhs: @autoclosure () -> Boolean) -> Bool { // expected-error{{invalid redeclaration of '&&'}}
   return lhs.boolValue || rhs().boolValue
 }
 
@@ -243,12 +243,12 @@ func noreturn_1(x: @noreturn (Int) -> Int) { } // expected-note{{previously decl
 func noreturn_1(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noreturn_1(x:)'}}
 
 // @noescape
-func noescape(@noescape x: (Int) -> Int) { } // expected-note{{previously declared}}
+func noescape(x: @noescape (Int) -> Int) { } // expected-note{{previously declared}}
 func noescape(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noescape(x:)'}}
 
 // @autoclosure
 func autoclosure(f: () -> Int) { }
-func autoclosure(@autoclosure f: () -> Int) { }
+func autoclosure(f: @autoclosure () -> Int) { }
 
 // inout
 func inout2(x: Int) { }

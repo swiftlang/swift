@@ -328,7 +328,7 @@ func closeOverLetLValue() {
 
 // Use an external function so inout deshadowing cannot see its body.
 @_silgen_name("takesNoEscapeClosure")
-func takesNoEscapeClosure(@noescape fn : () -> Int)
+func takesNoEscapeClosure(fn : @noescape () -> Int)
 
 struct StructWithMutatingMethod {
   var x = 42

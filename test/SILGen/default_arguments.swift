@@ -54,8 +54,8 @@ func testDefaultArg2() {
   defarg2(5)
 }
 
-func autocloseFile(@autoclosure x: () -> String = #file,
-                   @autoclosure y: () -> Int = #line) { }
+func autocloseFile(x: @autoclosure () -> String = #file,
+                   y: @autoclosure () -> Int = #line) { }
 // CHECK-LABEL: sil hidden @_TF17default_arguments17testAutocloseFileFT_T_
 func testAutocloseFile() {
   // CHECK-LABEL: sil shared [transparent] @_TFF17default_arguments17testAutocloseFileFT_T_u_KT_SS : $@convention(thin) () -> @owned String
@@ -87,7 +87,7 @@ func testMagicLiterals(file file: String = #file,
 // CHECK: integer_literal $Builtin.Int2048, 0
 
 func closure(_: () -> ()) {}
-func autoclosure(@autoclosure _: () -> ()) {}
+func autoclosure(_: @autoclosure () -> ()) {}
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments25testCallWithMagicLiteralsFT_T_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
