@@ -58,8 +58,7 @@ TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 TYPE_ATTR(deallocating)
 
-// Deprecated type attributes
-TYPE_ATTR(objc_block)
+// SIL metatype attributes.
 TYPE_ATTR(thin)
 TYPE_ATTR(thick)
 

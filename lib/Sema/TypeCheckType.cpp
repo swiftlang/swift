@@ -1609,7 +1609,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
-    TAK_objc_block, TAK_convention, TAK_thin, TAK_noreturn,
+    TAK_convention, TAK_noreturn,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure
   };
 
@@ -1644,15 +1644,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       break;
     }
 
-  // Functions cannot be both @thin and @objc_block.
-  // FIXME: This is obsolete with @convention.
-  if (attrs.has(TAK_thin) && attrs.has(TAK_objc_block)) {
-    TC.diagnose(attrs.getLoc(TAK_objc_block),
-                diag::objc_block_cannot_be_thin)
-    .highlight(attrs.getLoc(TAK_thin));
-    attrs.clearAttribute(TAK_thin);
-  }
-
   // Function attributes require a syntactic function type.
   FunctionTypeRepr *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
 
@@ -1670,7 +1661,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       calleeConvention = ParameterConvention::Direct_Guaranteed;
     }
 
-    if (attrs.hasConvention()) {
+    if (!attrs.hasConvention()) {
+      rep = SILFunctionType::Representation::Thick;
+    } else {
       // SIL exposes a greater number of conventions than Swift source.
       auto parsedRep =
       llvm::StringSwitch<Optional<SILFunctionType::Representation>>
@@ -1690,33 +1683,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       } else {
         rep = *parsedRep;
       }
-
-      // Don't allow both @convention and the old representation attrs.
-      if (attrs.has(TAK_thin)) {
-        TC.diagnose(attrs.getLoc(TAK_thin),
-                    diag::convention_with_deprecated_representation_attribute,
-                    "thin");
-      }
-      if (attrs.has(TAK_objc_block)) {
-        TC.diagnose(attrs.getLoc(TAK_objc_block),
-                    diag::convention_with_deprecated_representation_attribute,
-                    "objc_block");
-      }
-    } else {
-      // Error on the old @thin, @cc, and @objc_block attributes in SIL mode.
-      if (attrs.has(TAK_thin)) {
-        TC.diagnose(attrs.getLoc(TAK_thin),
-                    diag::sil_deprecated_convention_attribute,
-                    "thin", "thin");
-        rep = SILFunctionType::Representation::Block;
-      } else if (attrs.has(TAK_objc_block)) {
-        TC.diagnose(attrs.getLoc(TAK_thin),
-                    diag::sil_deprecated_convention_attribute,
-                    "objc_block", "block");
-        rep = SILFunctionType::Representation::Block;
-      } else {
-        rep = SILFunctionType::Representation::Thick;
-      }
     }
 
     // Resolve the function type directly with these attributes.
@@ -1731,7 +1697,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.convention = None;
   } else if (hasFunctionAttr && fnRepr) {
 
-    FunctionType::Representation rep;
+    FunctionType::Representation rep = FunctionType::Representation::Swift;
     if (attrs.hasConvention()) {
       auto parsedRep =
         llvm::StringSwitch<Optional<FunctionType::Representation>>
@@ -1747,46 +1713,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         rep = FunctionType::Representation::Swift;
       } else {
         rep = *parsedRep;
-      }
-      
-      // Don't allow both @convention and the old representation attrs.
-      if (attrs.has(TAK_thin)) {
-        TC.diagnose(attrs.getLoc(TAK_thin),
-                    diag::convention_with_deprecated_representation_attribute,
-                    "thin");
-      }
-      if (attrs.has(TAK_objc_block)) {
-        TC.diagnose(attrs.getLoc(TAK_objc_block),
-                    diag::convention_with_deprecated_representation_attribute,
-                    "objc_block");
-      }
-    } else {
-      auto fixDeprecatedAttribute = [&](TypeAttrKind kind,
-                                        StringRef oldName,
-                                        StringRef newName) {
-        auto start = attrs.getLoc(kind);
-        
-        SmallString<32> fixitString;
-        {
-          llvm::raw_svector_ostream os(fixitString);
-          os << "convention(" << newName << ")";
-        }
-        
-        TC.diagnose(start, diag::deprecated_convention_attribute,
-                    oldName, newName)
-          .highlight(start)
-          .fixItReplace(start, fixitString);
-      };
-    
-      // Handle the old attributes.
-      if (attrs.has(TAK_thin)) {
-        rep = FunctionType::Representation::Thin;
-        fixDeprecatedAttribute(TAK_thin, "thin", "thin");
-      } else if (attrs.has(TAK_objc_block)) {
-        rep = FunctionType::Representation::Block;
-        fixDeprecatedAttribute(TAK_objc_block, "objc_block", "block");
-      } else {
-        rep = FunctionType::Representation::Swift;
       }
     }
 

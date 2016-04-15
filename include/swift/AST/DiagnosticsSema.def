@@ -2430,20 +2430,12 @@ NOTE(overridden_required_initializer_here,none,
 // Functions
 ERROR(attribute_requires_function_type,none,
       "@%0 attribute only applies to function types", (StringRef))
-ERROR(objc_block_cannot_be_thin,none,
-      "@objc_block function type cannot be @thin", ())
 ERROR(attribute_not_supported,none,
       "this attribute is not supported", ())
-ERROR(convention_with_deprecated_representation_attribute,none,
-      "@convention attribute cannot be used with deprecated @%0 attribute",
-      (StringRef))
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
-WARNING(deprecated_convention_attribute,none,
-        "'@%0' attribute is deprecated; '@convention(%1)' should be used "
-        "instead", (StringRef, StringRef))
 
 // SIL
 ERROR(opened_non_protocol,none,
@@ -2461,9 +2453,6 @@ ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,
       "convention '%0' not supported in SIL", (StringRef))
-ERROR(sil_deprecated_convention_attribute,none,
-      "'@%0' attribute is deprecated; '@convention(%1)' must be used instead",
-      (StringRef, StringRef))
 
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
