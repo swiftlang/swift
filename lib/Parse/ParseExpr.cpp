@@ -1113,7 +1113,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = parseExprCollection();
     break;
 
-  case tok::l_square_lit: // [#Color(...)#], [#Image(...)#]
+  case tok::l_square_lit: // [#colorLiteral(...)#], [#Image(...)#]
     // If this is actually a collection literal starting with '[#', handle it
     // as such.
     if (isCollectionLiteralStartingWithLSquareLit()) {

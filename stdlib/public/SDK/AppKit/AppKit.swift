@@ -68,7 +68,7 @@ public func NSApplicationMain(
 ) -> Int32
 
 extension NSColor : _ColorLiteralConvertible {
-  public required convenience init(colorLiteralRed red: Float, green: Float,
+  public required convenience init(red: Float, green: Float,
                                    blue: Float, alpha: Float) {
     self.init(srgbRed: CGFloat(red), green: CGFloat(green),
               blue: CGFloat(blue), alpha: CGFloat(alpha))

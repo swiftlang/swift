@@ -197,9 +197,9 @@ public protocol StringInterpolationConvertible {
 }
 
 /// Conforming types can be initialized with color literals (e.g.
-/// `[#Color(colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)#]`).
+/// `[#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)#]`).
 public protocol _ColorLiteralConvertible {
-  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)
+  init(red: Float, green: Float, blue: Float, alpha: Float)
 }
 
 /// Conforming types can be initialized with image literals (e.g.

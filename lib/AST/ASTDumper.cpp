@@ -33,7 +33,7 @@
 using namespace swift;
 
 #define DEF_COLOR(NAME, COLOR)\
-static const llvm::raw_ostream::Colors NAME##Color = llvm::raw_ostream::COLOR;
+static const llvm::raw_ostream::Colors NAME##colorLiteral = llvm::raw_ostream::COLOR;
 
 DEF_COLOR(Func, YELLOW)
 DEF_COLOR(Extension, MAGENTA)

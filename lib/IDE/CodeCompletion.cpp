@@ -3213,9 +3213,9 @@ public:
     auto floatType = context.getFloatDecl()->getDeclaredType();
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
       builder.addLeftBracket();
-      builder.addTextChunk("#Color");
+      builder.addTextChunk("#colorLiteral");
       builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("colorLiteralRed"),
+      builder.addCallParameter(context.getIdentifier("red"),
                                floatType, false, true);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("green"), floatType,

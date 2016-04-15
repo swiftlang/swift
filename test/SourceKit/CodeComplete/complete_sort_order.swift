@@ -86,7 +86,7 @@ func test2() {
 // EXPR: "abc"
 // EXPR: true
 // EXPR: false
-// EXPR: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
+// EXPR: [#colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)#]
 // EXPR: [#Image(imageLiteral: String)#]
 // EXPR: [values]
 // EXPR: [key: value]
@@ -107,7 +107,7 @@ func test3(x: Int) {
 // EXPR_TOP_1: "abc"
 // EXPR_TOP_1: true
 // EXPR_TOP_1: false
-// EXPR_TOP_1: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
+// EXPR_TOP_1: [#colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)#]
 // EXPR_TOP_1: [#Image(imageLiteral: String)#]
 // EXPR_TOP_1: [values]
 // EXPR_TOP_1: [key: value]
@@ -132,7 +132,7 @@ func test4(x: Int) {
 // EXPR_TOP_3: "abc"
 // EXPR_TOP_3: true
 // EXPR_TOP_3: false
-// EXPR_TOP_3: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
+// EXPR_TOP_3: [#colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)#]
 // EXPR_TOP_3: [#Image(imageLiteral: String)#]
 // EXPR_TOP_3: [values]
 // EXPR_TOP_3: [key: value]
