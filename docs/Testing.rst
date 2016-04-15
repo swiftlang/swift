@@ -171,7 +171,7 @@ Substitutions that start with ``%target`` configure the compiler for building
 code for the target that is not the build machine:
 
 * ``%target-parse-verify-swift``: parse and type check the current Swift file
-  for the target platform and verify diagnostics, like ``swift -parse -verify
+  for the target platform and verify diagnostics, like ``swift -frontend -parse -verify
   %s``.
 
   Use this substitution for testing semantic analysis in the compiler.
