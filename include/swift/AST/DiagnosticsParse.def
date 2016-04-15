@@ -180,6 +180,9 @@ ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
 ERROR(var_init_self_referential,none,
       "variable used within its own initial value", ())
+ERROR(expected_self_before_reference,none,
+      "expected self. before member name", ())
+
 ERROR(disallowed_enum_element,none,
       "enum 'case' is not allowed outside of an enum", ())
 ERROR(decl_inner_scope,none,
