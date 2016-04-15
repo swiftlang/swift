@@ -427,7 +427,7 @@ class SILPrinter : public SILVisitor<SILPrinter> {
 public:
   SILPrinter(
       SILPrintContext &PrintCtx,
-      llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr )
+      llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr)
       : Ctx(PrintCtx),
         PrintState{{PrintCtx.OS()}, PrintOptions::printSIL()},
         LastBufferID(0) {

@@ -1038,7 +1038,7 @@ Splitting
     func **split**\ <Seq: Sliceable, IsSeparator: Predicate 
         where IsSeparator.Arguments == Seq.Element
     >(_ seq: Seq, isSeparator: IsSeparator, maxSplit: Int = Int.max(),
-      allowEmptySlices: Bool = false  ) -> [Seq]
+      allowEmptySlices: Bool = false) -> [Seq]
 
 Splitting
 ~~~~~~~~~

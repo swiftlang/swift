@@ -809,7 +809,7 @@ Debug Information
   sil-scope ::= 'sil_scope' [0-9]+ '{'
                    sil-loc
                    'parent' scope-parent
-                   ('inlined_at' sil-scope-ref )?
+                   ('inlined_at' sil-scope-ref)?
                 '}'
   scope-parent ::= sil-function-name ':' sil-type
   scope-parent ::= sil-scope-ref
