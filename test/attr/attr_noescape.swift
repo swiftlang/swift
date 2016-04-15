@@ -223,9 +223,9 @@ class NoEscapeImmediatelyApplied {
 
 
 // Reduced example from XCTest overlay, involves a TupleShuffleExpr
-public func XCTAssertTrue(@autoclosure _ expression: () -> Boolean, _ message: String = "", file: StaticString = #file, line: UInt = #line) -> Void {
+public func XCTAssertTrue(_ expression: @autoclosure () -> Boolean, _ message: String = "", file: StaticString = #file, line: UInt = #line) -> Void {
 }
-public func XCTAssert( @autoclosure _ expression: () -> Boolean, _ message: String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
+public func XCTAssert(_ expression: @autoclosure () -> Boolean, _ message: String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
   XCTAssertTrue(expression, message, file: file, line: line);
 }
 
@@ -293,10 +293,10 @@ enum r19997577Type {
 }
 
 // type attribute and decl attribute
-func noescapeD(@noescape f: () -> Bool) {} // ok
+func noescapeD(@noescape f: () -> Bool) {} // expected-warning {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape}}
 func noescapeT(f: @noescape () -> Bool) {} // ok
-func autoclosureD(@autoclosure f: () -> Bool) {} // ok
+func autoclosureD(@autoclosure f: () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure}}
 func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
 
-func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // ok
-func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // ok
+func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {}
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure}}

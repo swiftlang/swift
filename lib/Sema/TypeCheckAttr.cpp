@@ -1559,6 +1559,13 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   if (FTy->isAutoClosure())
     return;
 
+  // This decl attribute has been moved to being a type attribute.
+  auto text = attr->isEscaping() ? "@autoclosure(escaping)" : "@autoclosure";
+  diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type,
+           "@autoclosure")
+    .fixItRemove(attr->getRangeWithAt())
+    .fixItInsert(PD->getTypeLoc().getSourceRange().Start, text);
+
   auto *FuncTyInput = FTy->getInput()->getAs<TupleType>();
   if (!FuncTyInput || FuncTyInput->getNumElements() != 0) {
     diagnose(attr->getLocation(), diag::autoclosure_function_input_nonunit);
@@ -1600,6 +1607,11 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   // Just stop if we've already applied this attribute.
   if (FTy->isNoEscape())
     return;
+
+  // This decl attribute has been moved to being a type attribute.
+  diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
+    .fixItRemove(attr->getRangeWithAt())
+    .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape");
 
   // Change the type to include the noescape bit.
   PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),
