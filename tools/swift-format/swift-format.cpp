@@ -215,7 +215,7 @@ namespace swift {
           return true;
         }
 
-        for (unsigned i=0; i < Offsets.size(); i++) {
+        for (unsigned i = 0; i < Offsets.size(); i++) {
           unsigned FromLine = Doc.getLineAndColumn(Offsets[i]).first;
           unsigned ToLine = Doc.getLineAndColumn(Offsets[i] + Lengths[i]).first;
           if (ToLine == 0) {
