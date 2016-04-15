@@ -669,7 +669,8 @@ public:
     // Print inlined-at location, if any.
     if (DS) {
       SILFunction *InlinedF = DS->getInlinedFunction();
-      for (auto *CS : reversed(DS->flattenedInlineTree())) {
+      auto InlineScopes = DS->flattenedInlineTree();
+      for (auto *CS : reversed(InlineScopes)) {
         *this << ": ";
         if (InlinedF) {
           *this << demangleSymbol(InlinedF->getName());
