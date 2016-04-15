@@ -491,7 +491,7 @@ extension String : Hashable {
     if core.hasContiguousStorage {
       let stackAllocated = _NSContiguousString(core)
       return hashOffset ^ stackAllocated._unsafeWithNotEscapedSelfPointer {
-        return _stdlib_NSStringHashValuePointer($0, isASCII )
+        return _stdlib_NSStringHashValuePointer($0, isASCII)
       }
     } else {
       let cocoaString = unsafeBitCast(

@@ -379,7 +379,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       // Find all of the named, unfulfilled parameters.
       llvm::SmallVector<unsigned, 4> unfulfilledNamedParams;
       bool hasUnfulfilledUnnamedParams = false;
-      for (paramIdx = 0; paramIdx != numParams; ++paramIdx ) {
+      for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
         if (parameterBindings[paramIdx].empty()) {
           if (params[paramIdx].hasLabel())
             unfulfilledNamedParams.push_back(paramIdx);
