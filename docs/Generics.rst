@@ -208,7 +208,7 @@ interface, e.g. (in Java)::
 
 and then a class X that wants to be Comparable will inherit from
 Comparable<X>. This is ugly and has a number of pitfalls; see
-http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6479372 .
+http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6479372.
 
 Scala and Strongtalk have the notion of the 'Self' type, which effectively
 allows one to refer to the eventual type of 'self' (which we call

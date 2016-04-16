@@ -94,7 +94,7 @@ definition. These kinds are:
    Not having mutable shared state also prevents race conditions from turning
    into safety violations. Here's a description of the go issue which causes
    them to be unsafe when running multiple threads:
-   `http://research.swtch.com/2010/02/off-to-races.html`_
+   <http://research.swtch.com/gorace>
 
    Note that a highly desirable feature of the language is the ability to take
    an instance of a mutable type and *make it immutable* somehow, allowing it to

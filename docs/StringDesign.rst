@@ -144,7 +144,7 @@ string usage while discovering its essential properties.
 ``String`` is a `First-Class Type`__
 ------------------------------------
 
-__ http://en.wikipedia.org/wiki/First-class_citizen
+__ https://en.wikipedia.org/wiki/First-class_citizen
 
 .. parsed-literal::
 
@@ -581,7 +581,7 @@ How Would You Design It?
     7. UTF-8 sequences sort in code point order.
     8. UTF-8 has no "byte order."
 
-    __ http://research.swtch.com/2010/03/utf-8-bits-bytes-and-benefits.html
+    __ http://research.swtch.com/utf8
 
 * It would be efficient, taking advantage of state-of-the-art
   optimizations, including:
