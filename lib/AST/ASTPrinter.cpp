@@ -2535,16 +2535,6 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   if (!TheTypeLoc.getTypeRepr() && param->hasType())
     TheTypeLoc = TypeLoc::withoutLoc(param->getType());
 
-  auto ContainsFunc = [&] (DeclAttrKind Kind) {
-    return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
-      begin(), Options.ExcludeAttrList.end(), Kind);
-  };
-
-  auto RemoveFunc = [&] (DeclAttrKind Kind) {
-    Options.ExcludeAttrList.erase(std::find(Options.ExcludeAttrList.begin(),
-                                            Options.ExcludeAttrList.end(), Kind));
-  };
-
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
   if (param->isVariadic() && TheTypeLoc.getType()) {
