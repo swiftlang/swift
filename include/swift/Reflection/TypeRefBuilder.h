@@ -20,6 +20,7 @@
 
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
+#include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
 
@@ -89,13 +90,14 @@ public:
   using BuiltType = const TypeRef *;
   using BuiltNominalTypeDecl = Optional<std::string>;
 
-  TypeRefBuilder() {}
+  TypeRefBuilder();
 
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
 private:
   std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;
+  TypeConverter TC;
 
 public:
   template <typename TypeRefTy, typename... Args>
@@ -229,6 +231,8 @@ private:
                         const DependentMemberTypeRef *DependentMember);
 
 public:
+  TypeConverter &getTypeConverter() { return TC; }
+
   const TypeRef *
   getDependentMemberTypeRef(const std::string &MangledTypeName,
                             const DependentMemberTypeRef *DependentMember);
