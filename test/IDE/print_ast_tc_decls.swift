@@ -1329,17 +1329,17 @@ public struct DiscardableThingy {
 
 
 // <rdar://problem/19775868> Swift 1.2b1: Header gen puts @autoclosure in the wrong place
-// PASS_PRINT_AST: public func ParamAttrs1(@autoclosure a: {{.*}}() -> ())
+// PASS_PRINT_AST: public func ParamAttrs1(a: @autoclosure () -> ())
 public func ParamAttrs1(a : @autoclosure () -> ()) {
   a()
 }
 
-// PASS_PRINT_AST: public func ParamAttrs2(@autoclosure(escaping) a: {{.*}}() -> ())
+// PASS_PRINT_AST: public func ParamAttrs2(a: @autoclosure(escaping) () -> ())
 public func ParamAttrs2(a : @autoclosure(escaping) () -> ()) {
   a()
 }
 
-// PASS_PRINT_AST: public func ParamAttrs3(@noescape a: {{.*}}() -> ())
+// PASS_PRINT_AST: public func ParamAttrs3(a: @noescape () -> ())
 public func ParamAttrs3(a : @noescape () -> ()) {
   a()
 }

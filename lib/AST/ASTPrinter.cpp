@@ -2530,32 +2530,6 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
 
   auto TheTypeLoc = param->getTypeLoc();
 
-  // If the parameter is autoclosure, or noescape, print it.  This is stored
-  // on the type of the decl, not on the typerepr.
-  if (param->hasType()) {
-    auto bodyCanType = param->getType()->getCanonicalType();
-    if (auto patternType = dyn_cast<AnyFunctionType>(bodyCanType)) {
-      if (patternType->isAutoClosure() || patternType->isNoEscape()) {
-        Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-        switch (patternType->isAutoClosure()*2 + patternType->isNoEscape()) {
-        case 1:
-          Printer.printAttrName("@noescape");
-          break;
-        case 2:
-          Printer.printAttrName("@autoclosure");
-          Printer << "(escaping)";
-          break;
-        case 3: Printer.printAttrName("@autoclosure");
-          break;
-        default:
-          llvm_unreachable("impossible autoclosure/noescape");
-        }
-        Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
-        Printer << " ";
-      }
-    }
-  }
-
   printArgName();
 
   if (!TheTypeLoc.getTypeRepr() && param->hasType())
@@ -2571,16 +2545,6 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                             Options.ExcludeAttrList.end(), Kind));
   };
 
-  // Since we have already printed @noescape and @autoclosure, we exclude them
-  // when printing the type.
-  auto hasNoEscape = ContainsFunc(DAK_NoEscape);
-  auto hasAutoClosure = ContainsFunc(DAK_AutoClosure);
-  if (!hasNoEscape)
-    Options.ExcludeAttrList.push_back(DAK_NoEscape);
-  if (!hasAutoClosure)
-    Options.ExcludeAttrList.push_back(DAK_AutoClosure);
-
-
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
   if (param->isVariadic() && TheTypeLoc.getType()) {
@@ -2592,13 +2556,6 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
 
   if (param->isVariadic())
     Printer << "...";
-
-  // After printing the type, we need to restore what the option used to be.
-  if (!hasNoEscape)
-    RemoveFunc(DAK_NoEscape);
-  if (!hasAutoClosure)
-    RemoveFunc(DAK_AutoClosure);
-
 
   if (param->isDefaultArgument()) {
     auto defaultArgStr
@@ -3691,16 +3648,12 @@ public:
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
     if (Options.SkipAttributes)
       return;
-    auto IsAttrExcluded = [&](DeclAttrKind Kind) {
-      return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
-        begin(), Options.ExcludeAttrList.end(), Kind);
-    };
-    if (info.isAutoClosure() && !IsAttrExcluded(DAK_AutoClosure)) {
+    if (info.isAutoClosure()) {
       if (info.isNoEscape())
         Printer << "@autoclosure ";
       else
         Printer << "@autoclosure(escaping) ";
-    } else if (info.isNoEscape() && !IsAttrExcluded(DAK_NoEscape))
+    } else if (info.isNoEscape())
       // autoclosure implies noescape.
       Printer << "@noescape ";
 
