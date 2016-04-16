@@ -1,7 +1,6 @@
 // Please keep this file in alphabetical order!
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar25355508
 
 // RUN: rm -rf %t
 // RUN: mkdir %t

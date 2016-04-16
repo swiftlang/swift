@@ -15,7 +15,6 @@
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/simd.h -include Foundation.h
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar25355508
 
 import Foundation
 import simd

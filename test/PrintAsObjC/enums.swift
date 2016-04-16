@@ -8,7 +8,6 @@
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar25355508
 
 import Foundation
 

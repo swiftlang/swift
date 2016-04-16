@@ -7,7 +7,6 @@
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/cdecl.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar25355508
 
 // CHECK-LABEL: /// What a nightmare!
 // CHECK-LABEL: double (^ _Nonnull block_nightmare(float (^ _Nonnull x)(NSInteger)))(char);

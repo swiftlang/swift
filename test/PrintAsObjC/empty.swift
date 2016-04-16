@@ -10,7 +10,6 @@
 // RUN: %check-in-clang -include %t/empty.h -std=c99 -fno-modules -Qunused-arguments %t/empty.h
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar25355508
 
 // CHECK-NOT: @import Swift;
 
