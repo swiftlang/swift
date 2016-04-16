@@ -61,57 +61,76 @@ public:
 class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   static const uint32_t AssociatedTypeRecordSize = 8;
   ArrayRef<const NominalTypeDecl *> NominalTypeDecls;
+  ArrayRef<const ExtensionDecl *> ExtensionDecls;
 
-  void addDecl(const NominalTypeDecl *decl) {
-    PrettyStackTraceDecl DebugStack("emitting associated type metadata", decl);
-    for (auto Conformance : decl->getAllConformances()) {
-      SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
+  void addConformance(Module *ModuleContext,
+                      CanType ConformingType,
+                      const ProtocolConformance *Conformance) {
+    SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
 
-      auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
-                                    const Substitution &Sub,
-                                    const TypeDecl *TD) -> bool {
+    auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
+                                  const Substitution &Sub,
+                                  const TypeDecl *TD) -> bool {
 
-        auto Subst = ArchetypeBuilder::mapTypeOutOfContext(
-            Conformance->getDeclContext(), Sub.getReplacement());
+      auto Subst = ArchetypeBuilder::mapTypeOutOfContext(
+        Conformance->getDeclContext(), Sub.getReplacement());
 
-        AssociatedTypes.push_back({
-          AssocTy->getNameStr(),
-          Subst->getCanonicalType()
-        });
-        return false;
-      };
+      AssociatedTypes.push_back({
+        AssocTy->getNameStr(),
+        Subst->getCanonicalType()
+      });
+      return false;
+    };
 
-      auto ModuleContext = decl->getModuleContext();
-      addTypeRef(ModuleContext, decl->getDeclaredType()->getCanonicalType());
+    addTypeRef(ModuleContext, ConformingType);
 
-      auto ProtoTy = Conformance->getProtocol()->getDeclaredType();
-      addTypeRef(ModuleContext, ProtoTy->getCanonicalType());
+    auto ProtoTy = Conformance->getProtocol()->getDeclaredType();
+    addTypeRef(ModuleContext, ProtoTy->getCanonicalType());
 
-      Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
+    Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
 
-      addConstantInt32(AssociatedTypes.size());
-      addConstantInt32(AssociatedTypeRecordSize);
+    addConstantInt32(AssociatedTypes.size());
+    addConstantInt32(AssociatedTypeRecordSize);
 
-      for (auto AssocTy : AssociatedTypes) {
-        auto NameGlobal = IGM.getAddrOfStringForTypeRef(AssocTy.first);
-        addRelativeAddress(NameGlobal);
-        addBuiltinTypeRefs(AssocTy.second);
-        addTypeRef(ModuleContext, AssocTy.second);
-      }
+    for (auto AssocTy : AssociatedTypes) {
+      auto NameGlobal = IGM.getAddrOfStringForTypeRef(AssocTy.first);
+      addRelativeAddress(NameGlobal);
+      addBuiltinTypeRefs(AssocTy.second);
+      addTypeRef(ModuleContext, AssocTy.second);
     }
   }
 
   void layout() {
-    for (auto decl : NominalTypeDecls)
-      addDecl(decl);
+    for (auto Decl : NominalTypeDecls) {
+      PrettyStackTraceDecl DebugStack("emitting associated type metadata", Decl);
+      for (auto Conformance : Decl->getAllConformances()) {
+        if (Conformance->isIncomplete())
+          continue;
+        addConformance(Decl->getModuleContext(),
+                       Decl->getDeclaredType()->getCanonicalType(),
+                       Conformance);
+      }
+    }
+
+    for (auto Ext : ExtensionDecls) {
+      PrettyStackTraceDecl DebugStack("emitting associated type metadata", Ext);
+      for (auto Conformance : Ext->getLocalConformances()) {
+        auto Decl = Ext->getExtendedType()->getNominalOrBoundGenericNominal();
+        addConformance(Ext->getDeclContext()->getParentModule(),
+                       Decl->getDeclaredType()->getCanonicalType(),
+                       Conformance);
+      }
+    }
   }
 
 public:
   AssociatedTypeMetadataBuilder(IRGenModule &IGM,
-                                ArrayRef<const NominalTypeDecl *> NominalTypeDecls,
-                                SmallPtrSetImpl<CanType> &BuiltinTypes)
+    ArrayRef<const NominalTypeDecl *> NominalTypeDecls,
+    ArrayRef<const ExtensionDecl *> ExtensionDecls,
+    SmallPtrSetImpl<CanType> &BuiltinTypes)
     : ReflectionMetadataBuilder(IGM, BuiltinTypes),
-      NominalTypeDecls(NominalTypeDecls) {}
+      NominalTypeDecls(NominalTypeDecls),
+      ExtensionDecls(ExtensionDecls) {}
 
   llvm::GlobalVariable *emit() {
     auto tempBase = std::unique_ptr<llvm::GlobalVariable>(
@@ -355,7 +374,8 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef Str) {
 }
 
 void IRGenModule::emitReflectionMetadataRecords() {
-  if (Opts.StripReflectionMetadata || NominalTypeDecls.empty())
+  auto DontHaveDecls = NominalTypeDecls.empty() && ExtensionDecls.empty();
+  if (Opts.StripReflectionMetadata || DontHaveDecls)
     return;
 
   // We collect all referenced builtin types and emit records for them.
@@ -372,9 +392,11 @@ void IRGenModule::emitReflectionMetadataRecords() {
       addUsedGlobal(var);
   }
 
-  // FIXME: This must be emitted for extensions too.
   {
-    AssociatedTypeMetadataBuilder builder(*this, NominalTypeDecls, BuiltinTypes);
+    AssociatedTypeMetadataBuilder builder(*this,
+                                          NominalTypeDecls,
+                                          ExtensionDecls,
+                                          BuiltinTypes);
     auto var = builder.emit();
     if (var)
       addUsedGlobal(var);

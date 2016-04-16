@@ -671,6 +671,9 @@ private:
   SmallVector<CanType, 4> RuntimeResolvableTypes;
   /// Collection of nominal types to generate field metadata records.
   SmallVector<const NominalTypeDecl *, 4> NominalTypeDecls;
+  /// Collection of extensions to generate associated type metadata records
+  /// if they added conformance to a protocol with associated type requirements.
+  SmallVector<const ExtensionDecl *, 4> ExtensionDecls;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;

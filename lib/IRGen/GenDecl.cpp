@@ -2762,6 +2762,8 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
 }
 
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
+  ExtensionDecls.push_back(ext);
+
   emitNestedTypeDecls(ext->getMembers());
 
   // Generate a category if the extension either introduces a

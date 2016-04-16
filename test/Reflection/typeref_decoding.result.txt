@@ -596,6 +596,41 @@ typealias First = A
 typealias Second = B
 (generic-type-parameter depth=0 index=1)
 
+- TypesToReflect.C4 : TypesToReflect.P1
+typealias Inner = A
+(generic-type-parameter depth=0 index=0)
+
+- TypesToReflect.C4 : TypesToReflect.P2
+typealias Outer = A
+(generic-type-parameter depth=0 index=0)
+
+- TypesToReflect.S4 : TypesToReflect.P1
+typealias Inner = A
+(generic-type-parameter depth=0 index=0)
+
+- TypesToReflect.S4 : TypesToReflect.P2
+typealias Outer = A
+(generic-type-parameter depth=0 index=0)
+
+- TypesToReflect.E4 : TypesToReflect.P1
+typealias Inner = A
+(generic-type-parameter depth=0 index=0)
+
+- TypesToReflect.E4 : TypesToReflect.P2
+typealias Outer = B
+(generic-type-parameter depth=0 index=1)
+
+- TypesToReflect.E4 : TypesToReflect.P3
+typealias First = A
+(generic-type-parameter depth=0 index=0)
+
+typealias Second = B
+(generic-type-parameter depth=0 index=1)
+
+- TypesToReflect.S : TypesToReflect.P4
+typealias Result = Swift.Int
+(struct Swift.Int)
+
 
 BUILTIN TYPES:
 ==============
