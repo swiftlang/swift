@@ -2106,6 +2106,13 @@ public:
         "success dest block of checked_cast_addr_br must not take an argument");
     require(CCABI->getFailureBB()->bbarg_size() == 0,
         "failure dest block of checked_cast_addr_br must not take an argument");
+
+    if (CCABI->isExact()) {
+      // TODO: Restrict the target type. It cannot be an existential
+      // (at least if the source is an existential).
+      require(CCABI->getDest()->getType().isAnyExistentialType(),
+            "checked_cast_addr_br dest must not be an existential");
+    }
   }
 
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {

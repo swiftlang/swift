@@ -266,7 +266,8 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
     auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
     auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
-    B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
+    B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->isExact(),
+                                  CBI->getConsumptionKind(),
                                   CBI->getSrc(), CBI->getSourceType(),
                                   CBI->getDest(), CBI->getTargetType(),
                                   SuccessBB, FailureBB);
@@ -423,7 +424,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
     auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
-    B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
+    B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->isExact(), CBI->getConsumptionKind(),
         CBI->getSrc(), CBI->getSourceType(),
         CBI->getDest(), CBI->getTargetType(),
         SuccessBB, FailureBB);

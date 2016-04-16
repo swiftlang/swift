@@ -131,7 +131,7 @@ namespace {
         assert(operand.getType().isAddress());
         resultBuffer =
           createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
-        SGF.B.createCheckedCastAddrBranch(Loc, consumption,
+        SGF.B.createCheckedCastAddrBranch(Loc, /* isExact*/ false, consumption,
                                           operand.forward(SGF), SourceType,
                                           resultBuffer, TargetType,
                                           trueBB, falseBB);

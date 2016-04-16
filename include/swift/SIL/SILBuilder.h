@@ -1311,12 +1311,13 @@ public:
   }
 
   CheckedCastAddrBranchInst *
-  createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,
+  createCheckedCastAddrBranch(SILLocation Loc, bool isExact,
+                              CastConsumptionKind consumption,
                               SILValue src, CanType sourceType, SILValue dest,
                               CanType targetType, SILBasicBlock *successBB,
                               SILBasicBlock *failureBB) {
     return insertTerminator(new (F.getModule()) CheckedCastAddrBranchInst(
-        getSILDebugLocation(Loc), consumption, src, sourceType, dest,
+        getSILDebugLocation(Loc), isExact, consumption, src, sourceType, dest,
         targetType, successBB, failureBB));
   }
 

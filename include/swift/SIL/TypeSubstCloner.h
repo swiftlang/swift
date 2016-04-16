@@ -252,7 +252,8 @@ protected:
     }
 
     // Otherwise, use the indirect cast.
-    B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
+    B.createCheckedCastAddrBranch(loc, inst->isExact(),
+                                  inst->getConsumptionKind(),
                                   src, sourceType,
                                   dest, targetType,
                                   succBB, failBB);

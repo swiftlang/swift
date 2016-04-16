@@ -4354,6 +4354,7 @@ public:
 class CheckedCastAddrBranchInst : public TermInst {
   friend class SILBuilder;
 
+  bool IsExact;
   CastConsumptionKind ConsumptionKind;
 
   enum {
@@ -4368,12 +4369,13 @@ class CheckedCastAddrBranchInst : public TermInst {
   CanType SourceType;
   CanType TargetType;
 
-  CheckedCastAddrBranchInst(SILDebugLocation DebugLoc,
+  CheckedCastAddrBranchInst(SILDebugLocation DebugLoc, bool IsExact,
                             CastConsumptionKind consumptionKind, SILValue src,
                             CanType srcType, SILValue dest, CanType targetType,
                             SILBasicBlock *successBB, SILBasicBlock *failureBB)
       : TermInst(ValueKind::CheckedCastAddrBranchInst, DebugLoc),
-        ConsumptionKind(consumptionKind), Operands{this, src, dest},
+        IsExact(IsExact), ConsumptionKind(consumptionKind),
+        Operands{this, src, dest},
         DestBBs{{this, successBB}, {this, failureBB}}, SourceType(srcType),
         TargetType(targetType) {}
 
@@ -4382,6 +4384,8 @@ public:
 
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
+
+  bool isExact() const { return IsExact; }
 
   /// Returns the formal type of the source value.
   CanType getSourceType() const { return SourceType; }

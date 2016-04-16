@@ -1730,6 +1730,7 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
        getBuilder().createCheckedCastAddrBranch(getOpLocation(Inst->getLoc()),
+                                                Inst->isExact(),
                                                 Inst->getConsumptionKind(),
                                                 SrcValue, SrcType,
                                                 DestValue, TargetType,
