@@ -29,8 +29,8 @@
 ///   programming error.
 @_transparent
 public func assert(
-  @autoclosure _ condition: () -> Bool,
-  @autoclosure _ message: () -> String = String(),
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only assert in debug mode.
@@ -60,8 +60,8 @@ public func assert(
 ///   programming error.
 @_transparent
 public func precondition(
-  @autoclosure _ condition: () -> Bool,
-  @autoclosure _ message: () -> String = String(),
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode.  In release mode just trap.
@@ -96,7 +96,7 @@ public func precondition(
 ///   is a serious programming error.
 @inline(__always)
 public func assertionFailure(
-  @autoclosure _ message: () -> String = String(),
+  _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
@@ -125,7 +125,7 @@ public func assertionFailure(
 ///   is a serious programming error.
 @_transparent @noreturn
 public func preconditionFailure(
-  @autoclosure _ message: () -> String = String(),
+  _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode.  In release mode just trap.
@@ -141,7 +141,7 @@ public func preconditionFailure(
 /// Unconditionally print a `message` and stop execution.
 @_transparent @noreturn
 public func fatalError(
-  @autoclosure _ message: () -> String = String(),
+  _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   _assertionFailed("fatal error", message(), file, line,
@@ -156,7 +156,7 @@ public func fatalError(
 /// and abort.
 @_transparent
 public func _precondition(
-  @autoclosure _ condition: () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -210,7 +210,7 @@ public func _overflowChecked<T>(
 /// all possible errors.
 @_transparent
 public func _debugPrecondition(
-  @autoclosure _ condition: () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug mode.
@@ -240,7 +240,7 @@ public func _debugPreconditionFailure(
 /// call to this function is a noop.
 @_transparent
 public func _sanityCheck(
-  @autoclosure _ condition: () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED

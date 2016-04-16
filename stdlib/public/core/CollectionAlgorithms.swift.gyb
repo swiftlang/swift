@@ -61,7 +61,7 @@ extension Collection {
   /// - Complexity: O(`self.count`).
   @warn_unused_result
   public func index(
-    @noescape where predicate: (${IElement}) throws -> Bool
+    where predicate: @noescape (${IElement}) throws -> Bool
   ) rethrows -> Index? {
     var i = self.startIndex
     while i != self.endIndex {
@@ -128,7 +128,7 @@ ${partitionDocComment}
 ${orderingRequirementForPredicate}
   @warn_unused_result
   public mutating func partition(
-    @noescape isOrderedBefore: (${IElement}, ${IElement}) -> Bool
+    isOrderedBefore: @noescape (${IElement}, ${IElement}) -> Bool
   ) -> Index
 
 %   else:
@@ -226,8 +226,8 @@ ${sortIsUnstableForPredicate}
 ${orderingRequirementForPredicate}
   @warn_unused_result(${'mutable_variant: "sort"' if Self == 'MutableCollection' else ''})
   public func sorted(
-    @noescape isOrderedBefore:
-      (${IElement}, ${IElement}) -> Bool
+    isOrderedBefore:
+      @noescape (${IElement}, ${IElement}) -> Bool
   ) -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sort(isOrderedBefore: isOrderedBefore)
@@ -269,8 +269,8 @@ ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
   public mutating func sort(
-    @noescape isOrderedBefore:
-      (${IElement}, ${IElement}) -> Bool
+    isOrderedBefore:
+      @noescape (${IElement}, ${IElement}) -> Bool
   ) {
     typealias EscapingBinaryPredicate =
       (Iterator.Element, Iterator.Element) -> Bool
@@ -381,7 +381,7 @@ extension MutableCollection
 extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, renamed: "sort(isOrderedBefore:)")
   public mutating func sortInPlace(
-    @noescape _ isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+    _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) -> Bool
   ) {
     fatalError("unavailable function can't be called")
   }
@@ -399,7 +399,7 @@ extension Collection {
   @available(*, unavailable, renamed: "index(where:)")
   @warn_unused_result
   public func indexOf(
-    @noescape _ predicate: (${IElement}) throws -> Bool
+    _ predicate: @noescape (${IElement}) throws -> Bool
   ) rethrows -> Index? {
     fatalError("unavailable function can't be called")
   }

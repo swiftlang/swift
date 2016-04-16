@@ -77,7 +77,7 @@ public protocol UnicodeCodec {
   /// calling `processCodeUnit` on each `CodeUnit`.
   static func encode(
     _ input: UnicodeScalar,
-    @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
   )
 }
 
@@ -285,7 +285,7 @@ public struct UTF8 : UnicodeCodec {
   /// calling `processCodeUnit` on each `CodeUnit`.
   public static func encode(
     _ input: UnicodeScalar,
-    @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
   ) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
@@ -457,7 +457,7 @@ public struct UTF16 : UnicodeCodec {
   /// calling `processCodeUnit` on each `CodeUnit`.
   public static func encode(
     _ input: UnicodeScalar,
-    @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
   ) {
     let scalarValue: UInt32 = UInt32(input)
 
@@ -517,7 +517,7 @@ public struct UTF32 : UnicodeCodec {
   /// calling `processCodeUnit` on each `CodeUnit`.
   public static func encode(
     _ input: UnicodeScalar,
-    @noescape sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
   ) {
     processCodeUnit(UInt32(input))
   }
@@ -539,7 +539,7 @@ public func transcode<
   from inputEncoding: InputEncoding.Type,
   to outputEncoding: OutputEncoding.Type,
   stoppingOnError stopOnError: Bool,
-  @noescape sendingOutputTo processCodeUnit: (OutputEncoding.CodeUnit) -> Void
+  sendingOutputTo processCodeUnit: @noescape (OutputEncoding.CodeUnit) -> Void
 ) -> Bool {
   var input = input
 

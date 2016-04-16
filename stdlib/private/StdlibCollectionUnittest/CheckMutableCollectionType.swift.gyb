@@ -64,7 +64,7 @@ internal func _mapInPlace<
   C.Indices.Iterator.Element == C.Index
 >(
   _ elements: inout C,
-  @noescape _ transform: (C.Iterator.Element) -> C.Iterator.Element
+  _ transform: @noescape (C.Iterator.Element) -> C.Iterator.Element
 ) {
   for i in elements.indices {
     elements[i] = transform(elements[i])

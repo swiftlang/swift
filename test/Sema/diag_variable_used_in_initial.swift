@@ -3,14 +3,14 @@
 class A1 {
   func foo1() {}
   func foo2() {
-    var foo1 = foo1() // expected-error {{variable used within its own initial value}}{{16-16=self.}}
+    var foo1 = foo1() // expected-error {{expected self. before member name}}{{16-16=self.}}
   }
 }
 
 class A2 {
   var foo1 = 2
   func foo2() {
-    var foo1 = foo1 // expected-error {{variable used within its own initial value}}{{16-16=self.}}
+    var foo1 = foo1 // expected-error {{expected self. before member name}}{{16-16=self.}}
   }
 }
 

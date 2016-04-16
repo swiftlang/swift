@@ -90,7 +90,7 @@ class C3 : Super {
 /** Semantics ****************************************************************/
 
 func call(_ fn: () throws -> Int) rethrows -> Int { return try fn() }
-func callAC(@autoclosure _ fn: () throws -> Int) rethrows -> Int { return try fn() }
+func callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int { return try fn() }
 func raise() throws -> Int { return 0 }
 func noraise() -> Int { return 0 }
 
@@ -137,10 +137,10 @@ func testForward2(_ fn: () throws -> Int) rethrows {
 
 struct MyStruct : MyProto {
   func call(_ fn: () throws -> Int) rethrows -> Int { return try fn() }
-  func callAC(@autoclosure _ fn: () throws -> Int) rethrows -> Int { return try fn() }
+  func callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int { return try fn() }
 
   static func static_call(_ fn: () throws -> Int) rethrows -> Int { return try fn() }
-  static func static_callAC(@autoclosure _ fn: () throws -> Int) rethrows -> Int { return try fn() }
+  static func static_callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int { return try fn() }
 }
 
 func testMethodCallUnhandled(_ s: MyStruct) {
@@ -199,10 +199,10 @@ func testMethodCallACHandled(_ s: MyStruct) throws {
 
 protocol MyProto {
   func call(_ fn: () throws -> Int) rethrows -> Int
-  func callAC(@autoclosure _ fn: () throws -> Int) rethrows -> Int
+  func callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int
 
   static func static_call(_ fn: () throws -> Int) rethrows -> Int
-  static func static_callAC(@autoclosure _ fn: () throws -> Int) rethrows -> Int
+  static func static_callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int
 }
 
 /** Existentials **/
@@ -345,7 +345,7 @@ testImplicitlyUnwrappedFunctionParameter(nil)
 /** Miscellaneous bugs **/
 
 // rdar://problem/21967164 - Non-throwing closures are incorrectly marked as throwing in rethrow contexts
-func rt1(@noescape predicate: () throws -> ()) rethrows { }
+func rt1(predicate: @noescape () throws -> ()) rethrows { }
 rt1 { }
 
 func rt2(_ predicate: () throws -> ()) rethrows { }

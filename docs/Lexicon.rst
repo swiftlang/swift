@@ -116,6 +116,14 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     version information and may try to load older module files, resulting in
     crashes in ``clang::ASTReader``.
 
+  NFC
+    "No functionality change." Written in commit messages that are intended to
+    have no change on the compiler or library's behavior, though for some this
+    refers to having the *same* implementation and for others merely an
+    *equivalent* one.  "NFC" is typically used to explain why a patch has no
+    included testcase, since the Swift project requires testcases for all
+    patches that change functionality.
+
   open existential
     An `existential` value with its dynamic type pulled out, so that the 
     compiler can do something with it.
@@ -131,6 +139,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     The file currently being compiled, as opposed to the other files that are
     only needed for context. See also
     `Whole-Module Optimization <WMO (whole-module optimization)>`.
+
+  QoI
+    "Quality of implementation." Sometimes written in commit messages that
+    improve the code that implements a particular feature of the compiler. More
+    often included in FIXMEs or TODOs when the current code functions properly,
+    but should be cleaned up. Example: "FIXME: QoI could be improved here."
 
   Radar
     `Apple's bug-tracking system`__, or an issue reported on that system.

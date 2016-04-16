@@ -10,8 +10,8 @@ acceptDouble(&i2)
 
 
 func ternary<T>(_ cond: Bool,
-                @autoclosure _ ifTrue: () -> T,
-                @autoclosure _ ifFalse: () -> T) -> T {}
+                _ ifTrue: @autoclosure () -> T,
+                _ ifFalse: @autoclosure () -> T) -> T {}
 ternary(false, 1, 2.5)
 ternary(false, 2.5, 1)
 

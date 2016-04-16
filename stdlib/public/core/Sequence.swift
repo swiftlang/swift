@@ -103,14 +103,14 @@ public protocol Sequence {
   /// - Complexity: O(N).
   @warn_unused_result
   func map<T>(
-    @noescape _ transform: (Iterator.Element) throws -> T
+    _ transform: @noescape (Iterator.Element) throws -> T
   ) rethrows -> [T]
 
   /// Returns an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   func filter(
-    @noescape _ includeElement: (Iterator.Element) throws -> Bool
+    _ includeElement: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element]
 
   /// Call `body` on each element in `self` in the same order as a
@@ -133,7 +133,7 @@ public protocol Sequence {
   ///   skip subsequent calls.
   ///
   /// - Complexity: O(`self.count`)
-  func forEach(@noescape _ body: (Iterator.Element) throws -> Void) rethrows
+  func forEach(_ body: @noescape (Iterator.Element) throws -> Void) rethrows
 
   /// Returns a subsequence containing all but the first `n` elements.
   ///
@@ -190,7 +190,7 @@ public protocol Sequence {
   @warn_unused_result
   func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    @noescape isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
   @warn_unused_result
@@ -201,7 +201,7 @@ public protocol Sequence {
   /// If `self` is multi-pass (i.e., a `Collection`), invoke `preprocess` and
   /// return its result.  Otherwise, return `nil`.
   func _preprocessingPass<R>(
-    @noescape _ preprocess: () throws -> R
+    _ preprocess: @noescape () throws -> R
   ) rethrows -> R?
 
   /// Create a native array buffer containing the elements of `self`,
@@ -325,7 +325,7 @@ extension Sequence {
   /// - Complexity: O(N).
   @warn_unused_result
   public func map<T>(
-    @noescape _ transform: (Iterator.Element) throws -> T
+    _ transform: @noescape (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     let initialCapacity = underestimatedCount
     var result = ContiguousArray<T>()
@@ -348,7 +348,7 @@ extension Sequence {
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   public func filter(
-    @noescape _ includeElement: (Iterator.Element) throws -> Bool
+    _ includeElement: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element] {
 
     var result = ContiguousArray<Iterator.Element>()
@@ -414,7 +414,7 @@ extension Sequence {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    @noescape isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
     var result: [AnySequence<Iterator.Element>] = []
@@ -473,7 +473,7 @@ extension Sequence {
   }
 
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: () throws -> R
+    _ preprocess: @noescape () throws -> R
   ) rethrows -> R? {
     return nil
   }
@@ -506,7 +506,7 @@ extension Sequence {
   ///
   /// - Complexity: O(`self.count`)
   public func forEach(
-    @noescape _ body: (Iterator.Element) throws -> Void
+    _ body: @noescape (Iterator.Element) throws -> Void
   ) rethrows {
     for element in self {
       try body(element)
@@ -680,7 +680,7 @@ extension Sequence {
 
   @available(*, unavailable, message: "call 'split(_:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   func split(_ maxSplit: Int, allowEmptySlices: Bool,
-    @noescape isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     fatalError("unavailable function can't be called")
   }

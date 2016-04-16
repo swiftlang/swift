@@ -2238,6 +2238,37 @@ static bool canOverride(CanType t1, CanType t2,
                         LazyResolver *resolver) {
   if (t1 == t2) return true;
 
+  // First try unwrapping optionals.
+  // Make sure we only unwrap at most one layer of optional.
+  if (!insideOptional) {
+    // Value-to-optional and optional-to-optional.
+    if (auto obj2 = t2.getAnyOptionalObjectType()) {
+      // Optional-to-optional.
+      if (auto obj1 = t1.getAnyOptionalObjectType()) {
+        // Allow T? and T! to freely override one another.
+        return canOverride(obj1, obj2, matchMode,
+                           /*isParameter=*/false,
+                           /*insideOptional=*/true,
+                           resolver);
+      }
+
+      // Value-to-optional.
+      return canOverride(t1, obj2, matchMode,
+                         /*isParameter=*/false,
+                         /*insideOptional=*/true,
+                         resolver);
+
+    } else if (matchMode == OverrideMatchMode::AllowTopLevelOptionalMismatch) {
+      // Optional-to-value, normally disallowed.
+      if (auto obj1 = t1.getAnyOptionalObjectType()) {
+        return canOverride(obj1, t2, matchMode,
+                           /*isParameter=*/false,
+                           /*insideOptional=*/true,
+                           resolver);
+      }
+    }
+  }
+
   // Scalar-to-tuple and tuple-to-tuple.
   if (auto tuple2 = dyn_cast<TupleType>(t2)) {
     // We only ever look into singleton tuples on the RHS if we're
@@ -2294,30 +2325,9 @@ static bool canOverride(CanType t1, CanType t2,
                         resolver));
   }
 
-  // Don't unwrap optionals directly inside other optionals.
-  if (!insideOptional) {
-    // Value-to-optional and optional-to-optional.
-    if (auto obj2 = t2.getAnyOptionalObjectType()) {
-      // Optional-to-optional.
-      if (auto obj1 = t1.getAnyOptionalObjectType()) {
-        // Allow T? and T! to freely override one another.
-        return canOverride(obj1, obj2, matchMode,
-                           /*isParameter=*/false,
-                           /*insideOptional=*/true,
-                           resolver);
-      }
-
-      // Value-to-optional.
-      return canOverride(t1, obj2, matchMode,
-                         /*isParameter=*/false,
-                         /*insideOptional=*/true,
-                         resolver);
-    }
-  }
-
-  // Allow T to override T! in certain cases.
   if (matchMode == OverrideMatchMode::AllowNonOptionalForIUOParam &&
       isParameter && !insideOptional) {
+    // Allow T to override T! in certain cases.
     if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
       t1 = obj1->getCanonicalType();
       if (t1 == t2) return true;

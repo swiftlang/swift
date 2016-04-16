@@ -712,7 +712,7 @@ extension Collection {
   /// - Complexity: O(N).
   @warn_unused_result
   public func map<T>(
-    @noescape _ transform: (Iterator.Element) throws -> T
+    _ transform: @noescape (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     let count: Int = numericCast(self.count)
     if count == 0 {
@@ -844,7 +844,7 @@ extension Collection {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    @noescape isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
 
@@ -972,7 +972,7 @@ extension Sequence
 
 extension Collection {
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: () throws -> R
+    _ preprocess: @noescape () throws -> R
   ) rethrows -> R? {
     return try preprocess()
   }
@@ -1005,7 +1005,7 @@ extension Collection {
   public func split(
     _ maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    @noescape isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     fatalError("unavailable function can't be called")
   }

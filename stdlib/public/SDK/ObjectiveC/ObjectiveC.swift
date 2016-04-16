@@ -191,7 +191,7 @@ func __pushAutoreleasePool() -> OpaquePointer
 @_silgen_name("_swift_objc_autoreleasePoolPop")
 func __popAutoreleasePool(_ pool: OpaquePointer)
 
-public func autoreleasepool(@noescape _ code: () -> Void) {
+public func autoreleasepool(_ code: @noescape () -> Void) {
   let pool = __pushAutoreleasePool()
   code()
   __popAutoreleasePool(pool)
@@ -216,7 +216,7 @@ public var NO: ObjCBool {
 @_transparent
 @warn_unused_result
 public func && <T : Boolean>(
-  lhs: T, @autoclosure rhs: () -> ObjCBool
+  lhs: T, rhs: @autoclosure () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
@@ -224,7 +224,7 @@ public func && <T : Boolean>(
 @_transparent
 @warn_unused_result
 public func || <T : Boolean>(
-  lhs: T, @autoclosure rhs: () -> ObjCBool
+  lhs: T, rhs: @autoclosure () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }

@@ -446,8 +446,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
                   DRE->getDecl()->getName(), isa<ParamDecl>(DRE->getDecl()));
-      if (DRE->getDecl()->getAttrs().hasAttribute<AutoClosureAttr>() &&
-          DRE->getDecl()->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
+      if (AFT->isAutoClosure())
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
                     DRE->getDecl()->getName());
     }

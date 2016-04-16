@@ -47,7 +47,7 @@
 ///       /// - Complexity: O(N)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         @noescape combine: (ResultElement, Iterator.Element) -> ResultElement
+///         combine: @noescape (ResultElement, Iterator.Element) -> ResultElement
 ///       ) -> [ResultElement] {
 ///         var result = [initial]
 ///         for x in self {

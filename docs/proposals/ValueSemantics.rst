@@ -179,7 +179,7 @@ Here's a version of cycle_length that works when state is a mutable
 value type::
 
  func cycle_length<State>(
-   _ s : State, mutate : ( [inout] State ) -> ()
+   _ s : State, mutate : ([inout] State) -> ()
  ) -> Int
    requires State : EqualityComparable
  {
@@ -211,7 +211,7 @@ classes:
  }
 
  func cycle_length<State>(
-   _ s : State, mutate : ( [inout] State ) -> ()
+   _ s : State, mutate : ([inout] State) -> ()
  ) -> Int
    requires State : EqualityComparable, **Clonable**
  {

@@ -19,6 +19,6 @@ struct S<T> {
 }
 
 func test<T>(_ t : T) {
-  let a = S(a: t )
+  let a = S(a: t)
   a.foo()
 }

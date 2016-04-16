@@ -290,7 +290,7 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
     // FIXME: Can weaken input type, but we really don't want to get in the
     // business of strengthening the result type.
 
-    // An [autoclosure] function type can be viewed as scalar of the result
+    // An @autoclosure function type can be viewed as scalar of the result
     // type.
     if (functionTy->isAutoClosure())
       result.push_back(functionTy->getResult());

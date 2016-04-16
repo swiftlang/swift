@@ -21,6 +21,7 @@
 #include "SourceKit/Support/Tracing.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/IDE/Formatting.h"
+#include "swift/Index/IndexSymbol.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Mutex.h"
@@ -245,6 +246,10 @@ public:
       swift::ide::SyntaxStructureKind Kind);
   static SourceKit::UIdent getUIDForSyntaxStructureElementKind(
       swift::ide::SyntaxStructureElementKind Kind);
+
+  static SourceKit::UIdent getUIDForSymbol(swift::index::SymbolKind kind,
+                                           swift::index::SymbolSubKind subKind,
+                                           bool isRef);
 
   static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 

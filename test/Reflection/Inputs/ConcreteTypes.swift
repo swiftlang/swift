@@ -1,7 +1,3 @@
-#if _runtime(_ObjC)
-import Foundation
-#endif
-
 public class Box<Treasure> {
   public let item: Treasure
   public init(item: Treasure) {
@@ -52,6 +48,7 @@ public enum E {
   indirect case IndirectTuple(C, S, E, Int)
   case Metatype(E.Type)
   case NestedStruct(S.NestedS)
+  case EmptyCase
 }
 
 public struct References {
@@ -59,30 +56,3 @@ public struct References {
   public weak var weakRef: C?
   public unowned var unownedRef: C
 }
-
-#if _runtime(_ObjC)
-
-public class OC : NSObject {
-  public let aClass: C
-  public let aStruct: S
-  public let anEnum: E
-  public let aTuple: (C, S, E, Int)
-  public let aMetatype: C.Type
-  public let aFunction: (C, S, E, Int) -> (Int)
-  public let nsObject: NSObject
-  public let nsString: NSString
-  public let cfString: CFString
-  public init(aClass: C, aStruct: S, anEnum: E, aTuple: (C, S, E, Int), aMetatype: C.Type, aFunction: (C, S, E, Int) -> Int, nsObject: NSObject, nsString: NSString, cfString: CFString) {
-    self.aClass = aClass
-    self.aStruct = aStruct
-    self.anEnum = anEnum
-    self.aTuple = aTuple
-    self.aMetatype = aMetatype
-    self.aFunction = aFunction
-    self.nsObject = nsObject
-    self.nsString = nsString
-    self.cfString = cfString
-  }
-}
-
-#endif

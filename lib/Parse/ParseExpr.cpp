@@ -1673,10 +1673,12 @@ Expr *Parser::parseExprIdentifier() {
   } else {
     for (auto activeVar : DisabledVars) {
       if (activeVar->getFullName() == name) {
-        auto diag = diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-        if (DisabledVarReason.ID == diag::var_init_self_referential.ID
-            && shouldAddSelfFixit(CurDeclContext, name)) {
-          diag.fixItInsert(loc.getBaseNameLoc(), "self.");
+        if (DisabledVarReason.ID == diag::var_init_self_referential.ID &&
+            shouldAddSelfFixit(CurDeclContext, name)) {
+          diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference).
+            fixItInsert(loc.getBaseNameLoc(), "self.");
+        } else {
+          diagnose(loc.getBaseNameLoc(), DisabledVarReason);
         }
         return new (Context) ErrorExpr(loc.getSourceRange());
       }
