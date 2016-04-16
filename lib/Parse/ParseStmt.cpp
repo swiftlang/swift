@@ -295,7 +295,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         && Tok.isNot(tok::pound_if, tok::pound_setline,
                      tok::pound_sourceLocation)) {
       ParserStatus Status =
-          parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
+          parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
+                    [&](Decl *D) {TmpDecls.push_back(D);});
       if (Status.isError()) {
         NeedParseErrorRecovery = true;
         if (Status.hasCodeCompletion() && IsTopLevel &&

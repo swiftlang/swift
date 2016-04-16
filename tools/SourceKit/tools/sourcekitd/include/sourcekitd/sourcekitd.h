@@ -33,7 +33,7 @@
 
 #define SOURCEKITD_VERSION SOURCEKITD_VERSION_ENCODE( \
     SOURCEKITD_VERSION_MAJOR,                         \
-    SOURCEKITD_VERSION_MINOR )
+    SOURCEKITD_VERSION_MINOR)
 
 #define SOURCEKITD_VERSION_STRINGIZE_(major, minor)   \
     #major"."#minor

@@ -347,9 +347,16 @@ Advice: Use @_specialize to direct the compiler to specialize generics
 ----------------------------------------------------------------------
 
 The compiler only automatically specializes generic code if the call
-site and the callee function are located in the same module. However, the programmer can provide hints to the compiler in the form of @_specialize attributes. See :ref:`generics-specialization` for details.
+site and the callee function are located in the same module. However,
+the programmer can provide hints to the compiler in the form of
+@_specialize attributes. For details see
+https://github.com/apple/swift/blob/master/docs/Generics.rst#specialization.
 
-This attribute instructs the compiler to specialize on the specified concrete type list. The compiler inserts type checks and dispatches from the generic function to the specialized variant. In the following example, injecting the @_specialize attribute speeds up the code by about 10 times.
+This attribute instructs the compiler to specialize on the specified
+concrete type list. The compiler inserts type checks and dispatches
+from the generic function to the specialized variant. In the following
+example, injecting the @_specialize attribute speeds up the code by
+about 10 times.
 
 ::
 

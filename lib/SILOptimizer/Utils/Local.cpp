@@ -207,29 +207,31 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst,
   }
 }
 
-void swift::eraseUsesOfValue(SILValue V) {
-  for (auto UI = V->use_begin(), E = V->use_end(); UI != E;) {
+void
+swift::collectUsesOfValue(SILValue V, llvm::DenseSet<SILInstruction *> &Insts) {
+  for (auto UI = V->use_begin(), E = V->use_end(); UI != E; UI++) {
     auto *User = UI->getUser();
-    UI++;
+    // Instruction has been processed.
+    if (Insts.find(User) != Insts.end())
+      continue;
 
-    // If the instruction itself has any uses, recursively zap them so that
-    // nothing uses this instruction.
-    eraseUsesOfValue(User);
+    // Collect the users of this instruction.
+    Insts.insert(User);
+    collectUsesOfValue(User, Insts);
+  }
+}
 
-    // Walk through the operand list and delete any random instructions that
-    // will become trivially dead when this instruction is removed.
-    for (auto &Op : User->getAllOperands()) {
-      if (auto *OpI = dyn_cast<SILInstruction>(Op.get())) {
-        // Don't recursively delete the pointer we're getting in.
-        if (Op.get() != V) {
-          Op.drop();
-          recursivelyDeleteTriviallyDeadInstructions(OpI, false,
-                                                     [](SILInstruction *){});
-        }
-      }
-    }
-
-    User->eraseFromParent();
+void swift::eraseUsesOfValue(SILValue V) {
+  llvm::DenseSet<SILInstruction *> Insts;
+  // Collect the uses.
+  collectUsesOfValue(V, Insts);
+  // Erase the uses, we can have instructions that become dead because
+  // of the removal of these instructions, leave to DCE to cleanup.
+  // Its not safe to do recursively delete here as some of the SILInstruction
+  // maybe tracked by this set.
+  for (auto I : Insts) {
+    I->replaceAllUsesWithUndef();
+    I->eraseFromParent();
   }
 }
 

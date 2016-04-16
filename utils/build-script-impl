@@ -186,6 +186,7 @@ KNOWN_SETTINGS=(
     install-libdispatch         ""               "whether to install libdispatch"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
+    stdlib-deployment-targets   ""               "space-separated list of targets to compile or cross-compile the Swift standard library for"
     cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for"
     skip-merge-lipo-cross-compile-tools ""       "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     darwin-deployment-version-osx     "10.9"     "minimum deployment target version for OS X"
@@ -897,76 +898,6 @@ function is_cross_tools_deployment_target() {
     done
 }
 
-# A list of deployment targets that we compile or cross-compile the
-# Swift standard library for.
-STDLIB_DEPLOYMENT_TARGETS=()
-case "$(uname -s -m)" in
-    Linux\ x86_64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-x86_64"
-            "android-armv7"
-        )
-        ;;
-    Linux\ armv6*)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-armv6"
-        )
-        ;;
-    Linux\ armv7*)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-armv7"
-        )
-        ;;
-    Linux\ aarch64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-aarch64"
-        )
-        ;;
-    Linux\ ppc64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-powerpc64"
-        )
-        ;;
-    Linux\ ppc64le)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-powerpc64le"
-        )
-        ;;
-    Darwin\ x86_64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "macosx-x86_64"
-            "iphonesimulator-i386"
-            "iphonesimulator-x86_64"
-            "appletvsimulator-x86_64"
-            "watchsimulator-i386"
-
-            # Put iOS native targets last so that we test them last (it takes a
-            # long time).
-            "iphoneos-arm64"
-            "iphoneos-armv7"
-            "appletvos-arm64"
-            "watchos-armv7k"
-        )
-        ;;
-
-    FreeBSD\ amd64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "freebsd-x86_64"
-        )
-        ;;
-
-    CYGWIN_NT-10.0\ x86_64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "cygwin-x86_64"
-        )
-        ;;
-
-    *)
-        echo "Unknown operating system"
-        exit 1
-        ;;
-esac
-
 #
 # Calculate source directories for each product.
 #
@@ -1058,6 +989,7 @@ SWIFT_STDLIB_TARGETS=()
 SWIFT_BENCHMARK_TARGETS=()
 SWIFT_RUN_BENCHMARK_TARGETS=()
 SWIFT_TEST_TARGETS=()
+STDLIB_DEPLOYMENT_TARGETS=($STDLIB_DEPLOYMENT_TARGETS)
 for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     build_for_this_target=1
     test_this_target=1
@@ -1135,24 +1067,19 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     esac
     if [[ "${build_for_this_target}" ]] ; then
         if [[ "${BUILD_SWIFT_STDLIB_UNITTEST_EXTRA}" == "1" ]] ; then
-            SWIFT_STDLIB_TARGETS=(
-                "${SWIFT_STDLIB_TARGETS[@]}" "swift-stdlib-${deployment_target}")
+            SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
         else
             if [[ "${SKIP_TEST_VALIDATION}" ]] ; then
-                SWIFT_STDLIB_TARGETS=(
-                    "${SWIFT_STDLIB_TARGETS[@]}" "swift-test-stdlib-${deployment_target}")
+                SWIFT_STDLIB_TARGETS+=("swift-test-stdlib-${deployment_target}")
             else
-                SWIFT_STDLIB_TARGETS=(
-                    "${SWIFT_STDLIB_TARGETS[@]}" "swift-stdlib-${deployment_target}")
+                SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
             fi
         fi
     fi
     if [[ "${build_benchmark_this_target}" ]] ; then
-        SWIFT_BENCHMARK_TARGETS=(
-            "${SWIFT_BENCHMARK_TARGETS[@]}" "swift-benchmark-${deployment_target}")
+        SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${deployment_target}")
         if [[ $(not ${SKIP_TEST_BENCHMARK}) ]] ; then
-          SWIFT_RUN_BENCHMARK_TARGETS=(
-              "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" "check-swift-benchmark-${deployment_target}")
+          SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${deployment_target}")
         fi
     fi
     if [[ "${test_this_target}" ]] ; then
@@ -1160,18 +1087,14 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             test_target_suffix="-non-executable"
         fi
         if [[ "${SKIP_TEST_VALIDATION}" ]] ; then
-            SWIFT_TEST_TARGETS=(
-                "${SWIFT_TEST_TARGETS[@]}" "check-swift${test_target_suffix}-${deployment_target}")
+            SWIFT_TEST_TARGETS+=("check-swift${test_target_suffix}-${deployment_target}")
             if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
-              SWIFT_TEST_TARGETS=(
-                 "${SWIFT_TEST_TARGETS[@]}" "check-swift-optimize-${deployment_target}")
+              SWIFT_TEST_TARGETS+=("check-swift-optimize-${deployment_target}")
             fi
         else
-            SWIFT_TEST_TARGETS=(
-                "${SWIFT_TEST_TARGETS[@]}" "check-swift-all${test_target_suffix}-${deployment_target}")
+            SWIFT_TEST_TARGETS+=("check-swift-all${test_target_suffix}-${deployment_target}")
             if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
-              SWIFT_TEST_TARGETS=(
-                 "${SWIFT_TEST_TARGETS[@]}" "check-swift-all-optimize-${deployment_target}")
+              SWIFT_TEST_TARGETS+=("check-swift-all-optimize-${deployment_target}")
             fi
         fi
     fi
@@ -1456,8 +1379,6 @@ function cmake_config_opt() {
 }
 
 function set_swiftpm_bootstrap_command() {
-    swiftpm_bootstrap_command=()
-    
     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
     LLBUILD_BIN="$(build_directory_bin ${deployment_target} llbuild)/swift-build-tool"
     if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
@@ -1470,13 +1391,16 @@ function set_swiftpm_bootstrap_command() {
     fi
     swiftpm_bootstrap_command=("${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
     if [[ "${VERBOSE_BUILD}" ]] ; then
-        swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" -v)
+        swiftpm_bootstrap_command+=(-v)
     fi
-    swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --swiftc="${SWIFTC_BIN}")
-    swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --sbt="${LLBUILD_BIN}")
-    swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --build="${build_dir}")
+    swiftpm_bootstrap_command+=(
+        --swiftc="${SWIFTC_BIN}"
+        --sbt="${LLBUILD_BIN}"
+        --build="${build_dir}")
     if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
-        swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --foundation="${FOUNDATION_BUILD_DIR}/Foundation" --xctest="${XCTEST_BUILD_DIR}")
+        swiftpm_bootstrap_command+=(
+            --foundation="${FOUNDATION_BUILD_DIR}/Foundation"
+            --xctest="${XCTEST_BUILD_DIR}")
     fi
 }
 

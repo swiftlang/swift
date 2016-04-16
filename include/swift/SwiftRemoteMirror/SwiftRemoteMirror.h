@@ -51,9 +51,10 @@ void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    const char *ImageName,
                                    swift_reflection_section_t fieldmd,
+                                   swift_reflection_section_t builtin,
+                                   swift_reflection_section_t assocty,
                                    swift_reflection_section_t typeref,
-                                   swift_reflection_section_t reflstr,
-                                   swift_reflection_section_t assocty);
+                                   swift_reflection_section_t reflstr);
 
 
 /// Returns an opaque type reference for a metadata pointer, or

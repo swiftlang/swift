@@ -821,7 +821,8 @@ namespace {
 
       // If VD is a noescape decl, then the closure we're computing this for
       // must also be noescape.
-      if (VD->getAttrs().hasAttribute<NoEscapeAttr>() &&
+      if (VD->hasType() && VD->getType()->is<AnyFunctionType>() &&
+          VD->getType()->castTo<AnyFunctionType>()->isNoEscape() &&
           !capture.isNoEscape() &&
           // Don't repeatedly diagnose the same thing.
           Diagnosed.insert(VD).second) {
@@ -832,8 +833,7 @@ namespace {
         TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use :
                     diag::closure_noescape_use, VD->getName());
 
-        if (VD->getAttrs().hasAttribute<AutoClosureAttr>() &&
-            VD->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
+        if (VD->getType()->castTo<AnyFunctionType>()->isAutoClosure())
           TC.diagnose(VD->getLoc(), diag::noescape_autoclosure,
                       VD->getName());
       }

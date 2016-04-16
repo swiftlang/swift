@@ -19,6 +19,7 @@ except ImportError:
 
 import os
 import pipes
+import platform
 import subprocess
 import sys
 
@@ -72,7 +73,13 @@ def quote_shell_command(args):
     return " ".join([pipes.quote(a) for a in args])
 
 
-def check_call(args, print_command=False, verbose=False):
+def check_call(args, print_command=False, verbose=False, disable_sleep=False):
+    if disable_sleep:
+        if platform.system() == 'Darwin':
+            # Don't mutate the caller's copy of the arguments.
+            args = list(args)
+            args.insert(0, "caffeinate")
+
     if print_command:
         print(os.getcwd() + "$ " + quote_shell_command(args))
     try:

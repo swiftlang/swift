@@ -147,7 +147,7 @@ public func myMap<C : Collection, T>(
 }
 
 @available(*, unavailable, message: "call the 'map()' method on the optional value")
-public func myMap<T, U>(_ x: T?, @noescape _ f: (T) -> U) -> U? {
+public func myMap<T, U>(_ x: T?, _ f: @noescape (T) -> U) -> U? {
   fatalError("unavailable function can't be called")
 }
 

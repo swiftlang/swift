@@ -57,8 +57,8 @@ func one() {
   }
 }
 
-func takesAutoclosure(@autoclosure _ fn : () -> Int) {}
-func takesThrowingAutoclosure(@autoclosure _ fn : () throws -> Int) {}
+func takesAutoclosure(_ fn : @autoclosure () -> Int) {}
+func takesThrowingAutoclosure(_ fn : @autoclosure () throws -> Int) {}
 
 func genError() throws -> Int { throw MSV.Foo }
 func genNoError() -> Int { return 0 }

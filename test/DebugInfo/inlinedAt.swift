@@ -2,28 +2,33 @@
 // RUN:    | FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | FileCheck %s
 
+public var glob : Int = 0
+@inline(never) public func hold(_ n : Int) { glob = n }
+
 #sourceLocation(file: "abc.swift", line: 100)
 @inline(__always)
-func h(_ k : Int) -> Int {        // 101
-  return k                      // 102
+func h(_ k : Int) -> Int {      // 101
+  hold(k)                       // 102
+  return k                      // 103
 }
 
 #sourceLocation(file: "abc.swift", line: 200)
 @inline(__always)
-func g(_ j : Int) -> Int {        // 201
-  return h(j)                   // 202
+func g(_ j : Int) -> Int {      // 201
+  hold(j)                       // 202
+  return h(j)                   // 203
 }
 
 #sourceLocation(file: "abc.swift", line: 301)
 public func f(_ i : Int) -> Int { // 301
-  return g(i)                   // 302
+  return g(i)                     // 302
 }
 
 // CHECK-SIL: sil {{.*}}@_TF9inlinedAt1fFSiSi :
 // CHECK-SIL-NOT: return
 // CHECK-SIL: debug_value %0 : $Int, let, name "k", argno 1
 // CHECK-SIL-SAME: line:101:10:in_prologue
-// CHECK-SIL-SAME: perf_inlined_at line:202:10
+// CHECK-SIL-SAME: perf_inlined_at line:203:10
 // CHECK-SIL-SAME: perf_inlined_at line:302:10
 
 // CHECK: define {{.*}}@_TF9inlinedAt1fFSiSi
@@ -40,9 +45,9 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK-SAME:                     scope: ![[F_SCOPE:.*]])
 // CHECK: ![[F_SCOPE]] = distinct !DILexicalBlock(scope: ![[F]],
 // CHECK-SAME:                                    line: 301, column: 33)
+// CHECK: ![[G_SCOPE:.*]] = distinct !DILexicalBlock(scope: ![[G]],
+// CHECK-SAME:                                    line: 201, column: 26)
 // CHECK: ![[L1]] = !DILocation(line: 101, column: 8, scope: ![[H]],
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
-// CHECK: ![[L2]] = !DILocation(line: 202, column: 13, scope: ![[G_SCOPE:.*]],
+// CHECK: ![[L2]] = !DILocation(line: 203, column: 13, scope: ![[G_SCOPE]],
 // CHECK-SAME:                  inlinedAt: ![[L3]])
-// CHECK: ![[G_SCOPE]] = distinct !DILexicalBlock(scope: ![[G]],
-// CHECK-SAME:                                    line: 201, column: 26)

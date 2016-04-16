@@ -18,8 +18,8 @@ var fi : F<Int>
 func f0(_ b : B) {}
 
 func ternary<T>(_ cond: Bool,
-                @autoclosure _ ifTrue: () -> T,
-                @autoclosure _ ifFalse: () -> T) -> T {}
+                _ ifTrue: @autoclosure () -> T,
+                _ ifFalse: @autoclosure () -> T) -> T {}
 
 f0(c)
 f0(a) // expected-error{{cannot convert value of type 'A' to expected argument type 'B'}}

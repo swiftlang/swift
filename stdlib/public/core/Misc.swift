@@ -121,30 +121,6 @@ func _typeByName(_ name: String) -> Any.Type? {
     return type
   }
 }
- 
-@warn_unused_result
-@_silgen_name("swift_stdlib_demangleName")
-func _stdlib_demangleNameImpl(
-  _ mangledName: UnsafePointer<UInt8>,
-  _ mangledNameLength: UInt,
-  _ demangledName: UnsafeMutablePointer<String>)
-
-// NB: This function is not used directly in the Swift codebase, but is
-// exported for Xcode support. Please coordinate before changing.
-@warn_unused_result
-public // @testable
-func _stdlib_demangleName(_ mangledName: String) -> String {
-  let mangledNameUTF8 = Array(mangledName.utf8)
-  return mangledNameUTF8.withUnsafeBufferPointer {
-    (mangledNameUTF8) in
-    let (_, demangledName) = _withUninitializedString {
-      _stdlib_demangleNameImpl(
-        mangledNameUTF8.baseAddress!, UInt(mangledNameUTF8.endIndex),
-        $0)
-    }
-    return demangledName
-  }
-}
 
 /// Returns `floor(log(x))`.  This equals to the position of the most
 /// significant non-zero bit, or 63 - number-of-zeros before it.

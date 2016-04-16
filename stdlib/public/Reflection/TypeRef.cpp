@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
-#include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
+#include "swift/Reflection/TypeRefBuilder.h"
 
 using namespace swift;
 using namespace reflection;
@@ -46,7 +46,7 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
     return OS;
   }
 
-  void printRec(TypeRef *typeRef) {
+  void printRec(const TypeRef *typeRef) {
     OS << "\n";
 
     Indent += 2;
@@ -58,14 +58,14 @@ public:
   PrintTypeRef(std::ostream &OS, unsigned Indent)
   : OS(OS), Indent(Indent) {}
 
-  void visitBuiltinTypeRef(BuiltinTypeRef *B) {
+  void visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     printHeader("builtin");
     auto demangled = Demangle::demangleTypeAsString(B->getMangledName());
     printField("", demangled);
     OS << ')';
   }
 
-  void visitNominalTypeRef(NominalTypeRef *N) {
+  void visitNominalTypeRef(const NominalTypeRef *N) {
     if (N->isStruct())
       printHeader("struct");
     else if (N->isEnum())
@@ -81,7 +81,7 @@ public:
     OS << ')';
   }
 
-  void visitBoundGenericTypeRef(BoundGenericTypeRef *BG) {
+  void visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
     if (BG->isStruct())
       printHeader("bound-generic struct");
     else if (BG->isEnum())
@@ -100,14 +100,14 @@ public:
     OS << ')';
   }
 
-  void visitTupleTypeRef(TupleTypeRef *T) {
+  void visitTupleTypeRef(const TupleTypeRef *T) {
     printHeader("tuple");
     for (auto element : T->getElements())
       printRec(element);
     OS << ')';
   }
 
-  void visitFunctionTypeRef(FunctionTypeRef *F) {
+  void visitFunctionTypeRef(const FunctionTypeRef *F) {
     printHeader("function");
     for (auto Arg : F->getArguments())
       printRec(Arg);
@@ -115,40 +115,40 @@ public:
     OS << ')';
   }
 
-  void visitProtocolTypeRef(ProtocolTypeRef *P) {
+  void visitProtocolTypeRef(const ProtocolTypeRef *P) {
     printHeader("protocol");
     printField("module", P->getModuleName());
     printField("name", P->getName());
     OS << ')';
   }
 
-  void visitProtocolCompositionTypeRef(ProtocolCompositionTypeRef *PC) {
+  void visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     printHeader("protocol-composition");
     for (auto protocol : PC->getProtocols())
       printRec(protocol);
     OS << ')';
   }
 
-  void visitMetatypeTypeRef(MetatypeTypeRef *M) {
+  void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     printHeader("metatype");
     printRec(M->getInstanceType());
     OS << ')';
   }
 
-  void visitExistentialMetatypeTypeRef(ExistentialMetatypeTypeRef *EM) {
+  void visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     printHeader("existential-metatype");
     printRec(EM->getInstanceType());
     OS << ')';
   }
 
-  void visitGenericTypeParameterTypeRef(GenericTypeParameterTypeRef *GTP){
+  void visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
     printHeader("generic-type-parameter");
     printField("depth", GTP->getDepth());
     printField("index", GTP->getIndex());
     OS << ')';
   }
 
-  void visitDependentMemberTypeRef(DependentMemberTypeRef *DM) {
+  void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     printHeader("dependent-member");
     printRec(DM->getProtocol());
     printRec(DM->getBase());
@@ -156,39 +156,39 @@ public:
     OS << ')';
   }
 
-  void visitForeignClassTypeRef(ForeignClassTypeRef *F) {
+  void visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
     printHeader("foreign");
     if (!F->getName().empty())
       printField("name", F->getName());
     OS << ')';
   }
 
-  void visitObjCClassTypeRef(ObjCClassTypeRef *OC) {
+  void visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     printHeader("objective-c-class");
     if (!OC->getName().empty())
       printField("name", OC->getName());
     OS << ')';
   }
 
-  void visitUnownedStorageTypeRef(UnownedStorageTypeRef *US) {
+  void visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
     printHeader("unowned-storage");
     printRec(US->getType());
     OS << ')';
   }
 
-  void visitWeakStorageTypeRef(WeakStorageTypeRef *WS) {
+  void visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
     printHeader("weak-storage");
     printRec(WS->getType());
     OS << ')';
   }
 
-  void visitUnmanagedStorageTypeRef(UnmanagedStorageTypeRef *US) {
+  void visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
     printHeader("weak-storage");
     printRec(US->getType());
     OS << ')';
   }
 
-  void visitOpaqueTypeRef(OpaqueTypeRef *O) {
+  void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
     OS << ')';
   }
@@ -196,15 +196,15 @@ public:
 
 struct TypeRefIsConcrete
   : public TypeRefVisitor<TypeRefIsConcrete, bool> {
-  bool visitBuiltinTypeRef(BuiltinTypeRef *B) {
+  bool visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return true;
   }
 
-  bool visitNominalTypeRef(NominalTypeRef *N) {
+  bool visitNominalTypeRef(const NominalTypeRef *N) {
     return true;
   }
 
-  bool visitBoundGenericTypeRef(BoundGenericTypeRef *BG) {
+  bool visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
     std::vector<TypeRef *> GenericParams;
     for (auto Param : BG->getGenericParams())
       if (!visit(Param))
@@ -212,7 +212,7 @@ struct TypeRefIsConcrete
     return true;
   }
 
-  bool visitTupleTypeRef(TupleTypeRef *T) {
+  bool visitTupleTypeRef(const TupleTypeRef *T) {
     for (auto Element : T->getElements()) {
       if (!visit(Element))
         return false;
@@ -220,7 +220,7 @@ struct TypeRefIsConcrete
     return true;
   }
 
-  bool visitFunctionTypeRef(FunctionTypeRef *F) {
+  bool visitFunctionTypeRef(const FunctionTypeRef *F) {
     std::vector<TypeRef *> SubstitutedArguments;
     for (auto Argument : F->getArguments())
       if (!visit(Argument))
@@ -228,93 +228,93 @@ struct TypeRefIsConcrete
     return visit(F->getResult());
   }
 
-  bool visitProtocolTypeRef(ProtocolTypeRef *P) {
+  bool visitProtocolTypeRef(const ProtocolTypeRef *P) {
     return true;
   }
 
   bool
-  visitProtocolCompositionTypeRef(ProtocolCompositionTypeRef *PC) {
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     for (auto Protocol : PC->getProtocols())
       if (!visit(Protocol))
         return false;
     return true;
   }
 
-  bool visitMetatypeTypeRef(MetatypeTypeRef *M) {
+  bool visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     return visit(M->getInstanceType());
   }
 
   bool
-  visitExistentialMetatypeTypeRef(ExistentialMetatypeTypeRef *EM) {
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     return visit(EM->getInstanceType());
   }
 
   bool
-  visitGenericTypeParameterTypeRef(GenericTypeParameterTypeRef *GTP){
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
     return false;
   }
 
   bool
-  visitDependentMemberTypeRef(DependentMemberTypeRef *DM) {
+  visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     return visit(DM->getBase());
   }
 
-  bool visitForeignClassTypeRef(ForeignClassTypeRef *F) {
+  bool visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
     return true;
   }
 
-  bool visitObjCClassTypeRef(ObjCClassTypeRef *OC) {
+  bool visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     return true;
   }
   
-  bool visitOpaqueTypeRef(OpaqueTypeRef *Op) {
+  bool visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
     return true;
   }
 
-  bool visitUnownedStorageTypeRef(UnownedStorageTypeRef *US) {
+  bool visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
     return visit(US->getType());
   }
 
-  bool visitWeakStorageTypeRef(WeakStorageTypeRef *WS) {
+  bool visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
     return visit(WS->getType());
   }
 
-  bool visitUnmanagedStorageTypeRef(UnmanagedStorageTypeRef *US) {
+  bool visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
     return visit(US->getType());
   }
 };
 
-ForeignClassTypeRef *
+const ForeignClassTypeRef *
 ForeignClassTypeRef::UnnamedSingleton = new ForeignClassTypeRef("");
 
-ForeignClassTypeRef *ForeignClassTypeRef::getUnnamed() {
+const ForeignClassTypeRef *ForeignClassTypeRef::getUnnamed() {
   return UnnamedSingleton;
 }
 
-ObjCClassTypeRef *
+const ObjCClassTypeRef *
 ObjCClassTypeRef::UnnamedSingleton = new ObjCClassTypeRef("");
 
-ObjCClassTypeRef *ObjCClassTypeRef::getUnnamed() {
+const ObjCClassTypeRef *ObjCClassTypeRef::getUnnamed() {
   return UnnamedSingleton;
 }
 
-OpaqueTypeRef *
+const OpaqueTypeRef *
 OpaqueTypeRef::Singleton = new OpaqueTypeRef();
 
-OpaqueTypeRef *OpaqueTypeRef::get() {
+const OpaqueTypeRef *OpaqueTypeRef::get() {
   return Singleton;
 }
 
-void TypeRef::dump() {
+void TypeRef::dump() const {
   dump(std::cerr);
 }
 
-void TypeRef::dump(std::ostream &OS, unsigned Indent) {
+void TypeRef::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeRef(OS, Indent).visit(this);
   OS << std::endl;
 }
 
-bool TypeRef::isConcrete() {
+bool TypeRef::isConcrete() const {
   return TypeRefIsConcrete().visit(this);
 }
 
@@ -412,3 +412,133 @@ bool NominalTypeTrait::isClass() const {
   auto Demangled = Demangle::demangleTypeAsNode(MangledName);
   return ::isClass(Demangled);
 }
+
+class TypeRefSubstitution
+  : public TypeRefVisitor<TypeRefSubstitution, const TypeRef *> {
+  TypeRefBuilder &Builder;
+  GenericArgumentMap Substitutions;
+public:
+  using TypeRefVisitor<TypeRefSubstitution, const TypeRef *>::visit;
+
+  TypeRefSubstitution(TypeRefBuilder &Builder, GenericArgumentMap Substitutions)
+    : Builder(Builder), Substitutions(Substitutions) {}
+
+  const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return B;
+  }
+
+  const TypeRef *visitNominalTypeRef(const NominalTypeRef *N) {
+    return N;
+  }
+
+  const TypeRef *visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    std::vector<const TypeRef *> GenericParams;
+    for (auto Param : BG->getGenericParams())
+      GenericParams.push_back(visit(Param));
+    return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
+                                       GenericParams);
+  }
+
+  const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
+    std::vector<const TypeRef *> Elements;
+    for (auto Element : T->getElements()) {
+      Elements.push_back(visit(Element));
+    }
+    return TupleTypeRef::create(Builder, Elements);
+  }
+
+  const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
+    std::vector<const TypeRef *> SubstitutedArguments;
+    for (auto Argument : F->getArguments())
+      SubstitutedArguments.push_back(visit(Argument));
+
+    auto SubstitutedResult = visit(F->getResult());
+
+    return FunctionTypeRef::create(Builder, SubstitutedArguments,
+                                   SubstitutedResult);
+  }
+
+  const TypeRef *visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return P;
+  }
+
+  const TypeRef *
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return PC;
+  }
+
+  const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()));
+  }
+
+  const TypeRef *
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    assert(EM->getInstanceType()->isConcrete());
+    return EM;
+  }
+
+  const TypeRef *
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
+    auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
+    assert(found != Substitutions.end());
+    assert(found->second->isConcrete());
+    return found->second;
+  }
+
+  const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    auto SubstBase = visit(DM->getBase());
+
+    const TypeRef *TypeWitness;
+
+    switch (SubstBase->getKind()) {
+    case TypeRefKind::Nominal: {
+      auto Nominal = cast<NominalTypeRef>(SubstBase);
+      TypeWitness = Builder.getDependentMemberTypeRef(Nominal->getMangledName(), DM);
+      break;
+    }
+    case TypeRefKind::BoundGeneric: {
+      auto BG = cast<BoundGenericTypeRef>(SubstBase);
+      TypeWitness = Builder.getDependentMemberTypeRef(BG->getMangledName(), DM);
+      break;
+    }
+    default:
+      assert(false && "Unknown base type");
+    }
+
+    assert(TypeWitness);
+    return TypeWitness->subst(Builder, SubstBase->getSubstMap());
+  }
+
+  const TypeRef *visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return F;
+  }
+
+  const TypeRef *visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return OC;
+  }
+
+  const TypeRef *visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    return UnownedStorageTypeRef::create(Builder, visit(US->getType()));
+  }
+
+  const TypeRef *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    return WeakStorageTypeRef::create(Builder, visit(WS->getType()));
+  }
+
+  const TypeRef *
+  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    return UnmanagedStorageTypeRef::create(Builder, visit(US->getType()));
+  }
+
+  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
+    return Op;
+  }
+};
+
+const TypeRef *
+TypeRef::subst(TypeRefBuilder &Builder, GenericArgumentMap Subs) const {
+  const TypeRef *Result = TypeRefSubstitution(Builder, Subs).visit(this);
+  assert(Result->isConcrete());
+  return Result;
+}
+

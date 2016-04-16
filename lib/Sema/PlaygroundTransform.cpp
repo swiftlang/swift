@@ -971,37 +971,6 @@ public:
                                         SourceRange SR) {
     Expr *LoggerArgs = nullptr;
 
-    if (Args.size() == 1) {
-      LoggerArgs = new (Context) ParenExpr(SourceLoc(),
-                                           Args[0],
-                                           SourceLoc(),
-                                           false);
-    } else {
-      LoggerArgs = TupleExpr::createImplicit(Context, Args, { });
-    }
-
-    UnresolvedDeclRefExpr *LoggerRef =
-      new (Context) UnresolvedDeclRefExpr(
-        Context.getIdentifier(LoggerName),
-        DeclRefKind::Ordinary,
-        DeclNameLoc(SR.End));
-
-    LoggerRef->setImplicit(true);
-
-    ApplyExpr *LoggerCall = new (Context) CallExpr(LoggerRef, LoggerArgs, true,
-                                                   Type());
-    Added<ApplyExpr*> AddedLogger(LoggerCall);
-
-    if (!doTypeCheck(Context, TypeCheckDC, AddedLogger)) {
-      return nullptr;
-    }
-
-    return buildLoggerCallWithApply(AddedLogger, SR);
-  }
-
-  // Assumes Apply has already been type-checked.
-  Added<Stmt *> buildLoggerCallWithApply(Added<ApplyExpr*> Apply,
-                                         SourceRange SR) {
     std::pair<unsigned, unsigned> StartLC =
       Context.SourceMgr.getLineAndColumn(SR.Start);
 
@@ -1030,6 +999,34 @@ public:
     Expr *EndColumn = new (Context) IntegerLiteralExpr(end_column_buf, 
                                                        SR.End, true);
 
+    llvm::SmallVector<Expr *, 6> ArgsWithSourceRange(Args.begin(), Args.end());
+
+    ArgsWithSourceRange.append({StartLine, EndLine, StartColumn, EndColumn});
+
+    LoggerArgs = TupleExpr::createImplicit(Context, ArgsWithSourceRange, { });
+
+    UnresolvedDeclRefExpr *LoggerRef =
+      new (Context) UnresolvedDeclRefExpr(
+        Context.getIdentifier(LoggerName),
+        DeclRefKind::Ordinary,
+        DeclNameLoc(SR.End));
+
+    LoggerRef->setImplicit(true);
+
+    ApplyExpr *LoggerCall = new (Context) CallExpr(LoggerRef, LoggerArgs, true,
+                                                   Type());
+    Added<ApplyExpr*> AddedLogger(LoggerCall);
+
+    if (!doTypeCheck(Context, TypeCheckDC, AddedLogger)) {
+      return nullptr;
+    }
+
+    return buildLoggerCallWithApply(AddedLogger, SR);
+  }
+
+  // Assumes Apply has already been type-checked.
+  Added<Stmt *> buildLoggerCallWithApply(Added<ApplyExpr*> Apply,
+                                         SourceRange SR) {
     std::pair<PatternBindingDecl *, VarDecl *> PV =
       buildPatternAndVariable(*Apply);
 
@@ -1039,16 +1036,10 @@ public:
                                                  AccessSemantics::Ordinary,
                                                  Apply->getType());
 
-    Expr *SendDataArgExprs[] = {
-        DRE,
-        StartLine,
-        EndLine,
-        StartColumn,
-        EndColumn
-      };
-
-    TupleExpr *SendDataArgs = TupleExpr::createImplicit(Context, 
-                                                        SendDataArgExprs, { });
+    ParenExpr *SendDataArgs = new (Context) ParenExpr(SourceLoc(),
+                                                      DRE,
+                                                      SourceLoc(),
+                                                      false);
     UnresolvedDeclRefExpr *SendDataRef = 
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier("$builtin_send_data"),

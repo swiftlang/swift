@@ -286,6 +286,7 @@ public:
   AbstractStorageDecl *getBehaviorDecl() const;
   
   void dump() const;
+  void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 
 private:
   friend class Substitution;
