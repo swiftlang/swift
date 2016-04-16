@@ -336,6 +336,10 @@ private:
 public:
   BuilderType Builder;
 
+  BuilderType &getBuilder() {
+    return this->Builder;
+  }
+
   std::shared_ptr<MemoryReader> Reader;
 
   template <class... T>

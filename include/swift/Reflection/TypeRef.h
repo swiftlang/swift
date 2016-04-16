@@ -26,11 +26,6 @@
 namespace swift {
 namespace reflection {
 
-template <typename Allocator>
-class ReflectionContext;
-
-struct ReflectionInfo;
-
 using llvm::cast;
 using llvm::dyn_cast;
 
@@ -41,6 +36,7 @@ enum class TypeRefKind {
 };
 
 class TypeRef;
+class TypeRefBuilder;
 using DepthAndIndex = std::pair<unsigned, unsigned>;
 using GenericArgumentMap = llvm::DenseMap<DepthAndIndex, const TypeRef *>;
 
@@ -59,9 +55,8 @@ public:
 
   bool isConcrete() const;
 
-  template <typename Runtime>
   const TypeRef *
-  subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs) const;
+  subst(TypeRefBuilder &Builder, GenericArgumentMap Subs) const;
 
   GenericArgumentMap getSubstMap() const;
 
@@ -519,139 +514,6 @@ public:
     }
   }
 };
-
-template <typename Runtime>
-class TypeRefSubstitution
-  : public TypeRefVisitor<TypeRefSubstitution<Runtime>, const TypeRef *> {
-  using StoredPointer = typename Runtime::StoredPointer;
-  ReflectionContext<Runtime> &RC;
-  GenericArgumentMap Substitutions;
-public:
-  using TypeRefVisitor<TypeRefSubstitution<Runtime>, const TypeRef *>::visit;
-  TypeRefSubstitution(ReflectionContext<Runtime> &RC,
-                      GenericArgumentMap Substitutions)
-  : RC(RC),
-    Substitutions(Substitutions) {}
-
-  const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
-    return B;
-  }
-
-  const TypeRef *visitNominalTypeRef(const NominalTypeRef *N) {
-    return N;
-  }
-
-  const TypeRef *visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    std::vector<const TypeRef *> GenericParams;
-    for (auto Param : BG->getGenericParams())
-      GenericParams.push_back(visit(Param));
-    return BoundGenericTypeRef::create(RC.Builder, BG->getMangledName(),
-                                       GenericParams);
-  }
-
-  const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
-    std::vector<const TypeRef *> Elements;
-    for (auto Element : T->getElements()) {
-      Elements.push_back(visit(Element));
-    }
-    return TupleTypeRef::create(RC.Builder, Elements);
-  }
-
-  const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
-    std::vector<const TypeRef *> SubstitutedArguments;
-    for (auto Argument : F->getArguments())
-      SubstitutedArguments.push_back(visit(Argument));
-
-    auto SubstitutedResult = visit(F->getResult());
-
-    return FunctionTypeRef::create(RC.Builder, SubstitutedArguments,
-                                   SubstitutedResult);
-  }
-
-  const TypeRef *visitProtocolTypeRef(const ProtocolTypeRef *P) {
-    return P;
-  }
-
-  const TypeRef *
-  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
-    return PC;
-  }
-
-  const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
-    return MetatypeTypeRef::create(RC.Builder, visit(M->getInstanceType()));
-  }
-
-  const TypeRef *
-  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
-    assert(EM->getInstanceType()->isConcrete());
-    return EM;
-  }
-
-  const TypeRef *
-  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
-    assert(found != Substitutions.end());
-    assert(found->second->isConcrete());
-    return found->second;
-  }
-
-  const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    auto SubstBase = visit(DM->getBase());
-
-    const TypeRef *TypeWitness;
-
-    switch (SubstBase->getKind()) {
-    case TypeRefKind::Nominal: {
-      auto Nominal = cast<NominalTypeRef>(SubstBase);
-      TypeWitness = RC.getDependentMemberTypeRef(Nominal->getMangledName(), DM);
-      break;
-    }
-    case TypeRefKind::BoundGeneric: {
-      auto BG = cast<BoundGenericTypeRef>(SubstBase);
-      TypeWitness = RC.getDependentMemberTypeRef(BG->getMangledName(), DM);
-      break;
-    }
-    default:
-      assert(false && "Unknown base type");
-    }
-
-    assert(TypeWitness);
-    return TypeWitness->subst(RC, SubstBase->getSubstMap());
-  }
-
-  const TypeRef *visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
-    return F;
-  }
-
-  const TypeRef *visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
-    return OC;
-  }
-
-  const TypeRef *visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    return UnownedStorageTypeRef::create(RC.Builder, visit(US->getType()));
-  }
-
-  const TypeRef *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return WeakStorageTypeRef::create(RC.Builder, visit(WS->getType()));
-  }
-
-  const TypeRef *
-  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return UnmanagedStorageTypeRef::create(RC.Builder, visit(US->getType()));
-  }
-
-  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
-    return Op;
-  }
-};
-
-template <typename Runtime>
-const TypeRef *
-TypeRef::subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs) const {
-  const TypeRef *Result = TypeRefSubstitution<Runtime>(RC, Subs).visit(this);
-  assert(Result->isConcrete());
-  return Result;
-}
 
 } // end namespace reflection
 } // end namespace swift
