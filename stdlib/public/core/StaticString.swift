@@ -76,7 +76,9 @@ public struct StaticString
     _precondition(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
-    return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, to: UInt.self)))
+    return UnicodeScalar(
+      UInt32(UInt(bitPattern: UnsafePointer<Builtin.RawPointer>(_startPtrOrData)))
+    )
   }
 
   /// If `self` stores a pointer to ASCII or UTF-8 code units, the

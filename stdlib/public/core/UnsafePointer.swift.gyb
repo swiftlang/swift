@@ -577,6 +577,28 @@ extension ${Self} {
     fatalError("unavailable function can't be called")
   }
 }
+
+extension Int {
+  @warn_unused_result
+  public init<U>(bitPattern: ${Self}<U>?) {
+    if let bitPattern = bitPattern {
+      self = Int(Builtin.ptrtoint_Word(bitPattern._rawValue))
+    } else {
+      self = Int(0)
+    }
+  }
+}
+
+extension UInt {
+  @warn_unused_result
+  public init<U>(bitPattern: ${Self}<U>?) {
+    if let bitPattern = bitPattern {
+      self = UInt(Builtin.ptrtoint_Word(bitPattern._rawValue))
+    } else {
+      self = UInt(0)
+    }
+  }
+}
 % end # for mutable
 
 /// A byte-sized thing that isn't designed to interoperate with
