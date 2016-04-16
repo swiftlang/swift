@@ -17,8 +17,8 @@ let z: I = [#Image(imageLiteral: "hello.png")#]
 let z2 = [#Image(imageLiteral: "hello.png")#] // expected-error{{could not infer type of image literal}} expected-note{{import UIKit to use 'UIImage' as the default image literal type}}
 
 struct Path: _FileReferenceLiteralConvertible {
-  init(fileReferenceLiteral: String) {}
+  init(resourceName: String) {}
 }
 
-let p1: Path = [#FileReference(fileReferenceLiteral: "what.txt")#]
-let p2 = [#FileReference(fileReferenceLiteral: "what.txt")#] // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'NSURL' as the default file reference literal type}}
+let p1: Path = [#fileLiteral(resourceName: "what.txt")#]
+let p2 = [#fileLiteral(resourceName: "what.txt")#] // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'NSURL' as the default file reference literal type}}

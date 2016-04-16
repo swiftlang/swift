@@ -209,9 +209,9 @@ public protocol _ImageLiteralConvertible {
 }
 
 /// Conforming types can be initialized with strings (e.g.
-/// `[#FileReference(fileReferenceLiteral: "resource.txt")#]`).
+/// `[#fileLiteral(resourceName: "resource.txt")#]`).
 public protocol _FileReferenceLiteralConvertible {
-  init(fileReferenceLiteral: String)
+  init(resourceName: String)
 }
 
 /// A container is destructor safe if whether it may store to memory on
