@@ -2,12 +2,12 @@
 // REQUIRES: OS=macosx
 
 struct S: _ColorLiteralConvertible {
-  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
+  init(red: Float, green: Float, blue: Float, alpha: Float) {}
 }
 
-let y: S = [#Color(colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)#]
-let y2 = [#Color(colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)#] // expected-error{{could not infer type of color literal}} expected-note{{import AppKit to use 'NSColor' as the default color literal type}}
-let y3 = [#Color(colorLiteralRed: 1, bleen: 0, grue: 0, alpha: 1)#] // expected-error{{cannot convert value of type '(colorLiteralRed: Int, bleen: Int, grue: Int, alpha: Int)' to expected argument type '(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)'}}
+let y: S = [#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)#]
+let y2 = [#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)#] // expected-error{{could not infer type of color literal}} expected-note{{import AppKit to use 'NSColor' as the default color literal type}}
+let y3 = [#colorLiteral(red: 1, bleen: 0, grue: 0, alpha: 1)#] // expected-error{{cannot convert value of type '(red: Int, bleen: Int, grue: Int, alpha: Int)' to expected argument type '(red: Float, green: Float, blue: Float, alpha: Float)'}}
 
 struct I: _ImageLiteralConvertible {
   init(imageLiteral: String) {}

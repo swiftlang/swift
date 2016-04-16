@@ -30,7 +30,7 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.var.parameter,
-          key.name: "colorLiteralRed",
+          key.name: "red",
           key.offset: 167,
           key.length: 18,
           key.nameoffset: 167,

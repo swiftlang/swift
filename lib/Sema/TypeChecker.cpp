@@ -177,7 +177,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   Identifier name = expr->getName();
   if (name.str().equals("Color")) {
     return DeclName(Context, Context.Id_init,
-                    { Context.getIdentifier("colorLiteralRed"),
+                    { Context.getIdentifier("red"),
                       Context.getIdentifier("green"),
                       Context.getIdentifier("blue"),
                       Context.getIdentifier("alpha") });
