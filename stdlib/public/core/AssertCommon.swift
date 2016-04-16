@@ -260,7 +260,7 @@ func _unimplemented_initializer(className: StaticString,
 @noreturn
 public // COMPILER_INTRINSIC
 func _undefined<T>(
-  @autoclosure _ message: () -> String = String(),
+  _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
   _assertionFailed("fatal error", message(), file, line, flags: 0)

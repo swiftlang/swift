@@ -127,7 +127,7 @@ func testUnreachableAfterNoReturnMethod() -> Int {
   return 0; // expected-warning {{will never be executed}}
 }
 
-func testCleanupCodeEmptyTuple(@autoclosure fn: () -> Bool = false,
+func testCleanupCodeEmptyTuple(fn: @autoclosure () -> Bool = false,
           message: String = "",
           file: String = #file,
           line: Int = #line) {

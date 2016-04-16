@@ -79,7 +79,7 @@ func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
 @warn_unused_result
 public func && <T : Boolean>(
   lhs: T,
-  @autoclosure rhs: () -> DarwinBoolean
+  rhs: @autoclosure () -> DarwinBoolean
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
@@ -88,7 +88,7 @@ public func && <T : Boolean>(
 @warn_unused_result
 public func || <T : Boolean>(
   lhs: T,
-  @autoclosure rhs: () -> DarwinBoolean
+  rhs: @autoclosure () -> DarwinBoolean
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }

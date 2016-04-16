@@ -186,6 +186,7 @@ KNOWN_SETTINGS=(
     install-libdispatch         ""               "whether to install libdispatch"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
+    stdlib-deployment-targets   ""               "space-separated list of targets to compile or cross-compile the Swift standard library for"
     cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for"
     skip-merge-lipo-cross-compile-tools ""       "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     darwin-deployment-version-osx     "10.9"     "minimum deployment target version for OS X"
@@ -897,76 +898,6 @@ function is_cross_tools_deployment_target() {
     done
 }
 
-# A list of deployment targets that we compile or cross-compile the
-# Swift standard library for.
-STDLIB_DEPLOYMENT_TARGETS=()
-case "$(uname -s -m)" in
-    Linux\ x86_64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-x86_64"
-            "android-armv7"
-        )
-        ;;
-    Linux\ armv6*)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-armv6"
-        )
-        ;;
-    Linux\ armv7*)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-armv7"
-        )
-        ;;
-    Linux\ aarch64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-aarch64"
-        )
-        ;;
-    Linux\ ppc64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-powerpc64"
-        )
-        ;;
-    Linux\ ppc64le)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "linux-powerpc64le"
-        )
-        ;;
-    Darwin\ x86_64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "macosx-x86_64"
-            "iphonesimulator-i386"
-            "iphonesimulator-x86_64"
-            "appletvsimulator-x86_64"
-            "watchsimulator-i386"
-
-            # Put iOS native targets last so that we test them last (it takes a
-            # long time).
-            "iphoneos-arm64"
-            "iphoneos-armv7"
-            "appletvos-arm64"
-            "watchos-armv7k"
-        )
-        ;;
-
-    FreeBSD\ amd64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "freebsd-x86_64"
-        )
-        ;;
-
-    CYGWIN_NT-10.0\ x86_64)
-        STDLIB_DEPLOYMENT_TARGETS=(
-            "cygwin-x86_64"
-        )
-        ;;
-
-    *)
-        echo "Unknown operating system"
-        exit 1
-        ;;
-esac
-
 #
 # Calculate source directories for each product.
 #
@@ -1058,6 +989,7 @@ SWIFT_STDLIB_TARGETS=()
 SWIFT_BENCHMARK_TARGETS=()
 SWIFT_RUN_BENCHMARK_TARGETS=()
 SWIFT_TEST_TARGETS=()
+STDLIB_DEPLOYMENT_TARGETS=($STDLIB_DEPLOYMENT_TARGETS)
 for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     build_for_this_target=1
     test_this_target=1

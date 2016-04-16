@@ -92,14 +92,14 @@ getSectionRef(const ObjectFile *objectFile,
   return SectionRef();
 }
 
-static int doDumpReflectionSections(std::string BinaryFilename,
+static int doDumpReflectionSections(std::string binaryFilename,
                                     StringRef arch) {
   // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
   // once they go out of scope, we can no longer do anything.
   OwningBinary<Binary> binaryOwner;
   std::unique_ptr<llvm::object::ObjectFile> objectOwner;
 
-  binaryOwner = unwrap(llvm::object::createBinary(BinaryFilename));
+  binaryOwner = unwrap(llvm::object::createBinary(binaryFilename));
   const llvm::object::Binary *binaryFile = binaryOwner.getBinary();
 
   // The object file we are doing lookups in -- either the binary itself, or
@@ -114,87 +114,109 @@ static int doDumpReflectionSections(std::string BinaryFilename,
     objectFile = objectOwner.get();
   }
 
-  auto FieldSectionRef = getSectionRef(objectFile, {
+  // Field descriptor section
+  auto fieldSectionRef = getSectionRef(objectFile, {
     "__swift3_fieldmd", ".swift3_fieldmd"
   });
 
-  if (FieldSectionRef.getObject() == nullptr) {
-    std::cerr << BinaryFilename;
+  if (fieldSectionRef.getObject() == nullptr) {
+    std::cerr << binaryFilename;
     std::cerr << " doesn't have a field reflection section!\n";
     return EXIT_FAILURE;
   }
 
-  auto AssociatedTypeSectionRef = getSectionRef(objectFile, {
+  StringRef fieldSectionContents;
+  fieldSectionRef.getContents(fieldSectionContents);
+
+  const FieldSection fieldSection {
+    reinterpret_cast<const void *>(fieldSectionContents.begin()),
+    reinterpret_cast<const void *>(fieldSectionContents.end())
+  };
+
+  // Associated type section - optional
+  AssociatedTypeSection associatedTypeSection {nullptr, nullptr};
+
+  auto associatedTypeSectionRef = getSectionRef(objectFile, {
     "__swift3_assocty", ".swift3_assocty"
   });
 
-  if (AssociatedTypeSectionRef.getObject() == nullptr) {
-    std::cerr << BinaryFilename;
-    std::cerr << " doesn't have an associated type reflection section!\n";
-    return EXIT_FAILURE;
+  if (associatedTypeSectionRef.getObject() != nullptr) {
+    StringRef associatedTypeSectionContents;
+    associatedTypeSectionRef.getContents(associatedTypeSectionContents);
+    associatedTypeSection = {
+      reinterpret_cast<const void *>(associatedTypeSectionContents.begin()),
+      reinterpret_cast<const void *>(associatedTypeSectionContents.end()),
+    };
   }
 
-  auto ReflectionStringsSectionRef = getSectionRef(objectFile, {
-    "__swift3_reflstr", ".swift3_reflstr"
+  // Builtin types section
+  BuiltinTypeSection builtinTypeSection {nullptr, nullptr};
+
+  auto builtinTypeSectionRef = getSectionRef(objectFile, {
+    "__swift3_builtin", ".swift3_builtin"
   });
 
-  if (ReflectionStringsSectionRef.getObject() == nullptr) {
-    std::cerr << BinaryFilename;
-    std::cerr << " doesn't have an associated reflection strings section!\n";
-    return EXIT_FAILURE;
+  if (builtinTypeSectionRef.getObject() != nullptr) {
+    StringRef builtinTypeSectionContents;
+    builtinTypeSectionRef.getContents(builtinTypeSectionContents);
+
+    builtinTypeSection = {
+      reinterpret_cast<const void *>(builtinTypeSectionContents.begin()),
+      reinterpret_cast<const void *>(builtinTypeSectionContents.end())
+    };
   }
 
-  auto TypeRefSectionRef = getSectionRef(objectFile, {
+  // Typeref section
+  auto typeRefSectionRef = getSectionRef(objectFile, {
     "__swift3_typeref", ".swift3_typeref"
   });
 
-  if (TypeRefSectionRef.getObject() == nullptr) {
-    std::cerr << BinaryFilename;
+  if (typeRefSectionRef.getObject() == nullptr) {
+    std::cerr << binaryFilename;
     std::cerr << " doesn't have an associated typeref section!\n";
     return EXIT_FAILURE;
   }
 
-  StringRef FieldSectionContents;
-  FieldSectionRef.getContents(FieldSectionContents);
+  StringRef typeRefSectionContents;
+  typeRefSectionRef.getContents(typeRefSectionContents);
 
-  const FieldSection fieldSection {
-    reinterpret_cast<const void *>(FieldSectionContents.begin()),
-    reinterpret_cast<const void *>(FieldSectionContents.end())
+  const GenericSection typeRefSection {
+    reinterpret_cast<const void *>(typeRefSectionContents.begin()),
+    reinterpret_cast<const void *>(typeRefSectionContents.end())
   };
 
-  StringRef AssociatedTypeSectionContents;
-  AssociatedTypeSectionRef.getContents(AssociatedTypeSectionContents);
+  // Reflection strings section
+  auto reflectionStringsSectionRef = getSectionRef(objectFile, {
+    "__swift3_reflstr", ".swift3_reflstr"
+  });
 
-  const AssociatedTypeSection associatedTypeSection {
-    reinterpret_cast<const void *>(AssociatedTypeSectionContents.begin()),
-    reinterpret_cast<const void *>(AssociatedTypeSectionContents.end())
+  if (reflectionStringsSectionRef.getObject() == nullptr) {
+    std::cerr << binaryFilename;
+    std::cerr << " doesn't have an associated reflection strings section!\n";
+    return EXIT_FAILURE;
+  }
+
+  StringRef reflectionStringsSectionContents;
+  reflectionStringsSectionRef.getContents(reflectionStringsSectionContents);
+
+  const GenericSection reflectionStringsSection {
+    reinterpret_cast<const void *>(reflectionStringsSectionContents.begin()),
+    reinterpret_cast<const void *>(reflectionStringsSectionContents.end())
   };
 
-  StringRef ReflectionStringsSectionContents;
-  ReflectionStringsSectionRef.getContents(ReflectionStringsSectionContents);
-
-  const GenericSection ReflectionStringsSection {
-    reinterpret_cast<const void *>(ReflectionStringsSectionContents.begin()),
-    reinterpret_cast<const void *>(ReflectionStringsSectionContents.end())
-  };
-
-  StringRef TypeRefSectionContents;
-  AssociatedTypeSectionRef.getContents(TypeRefSectionContents);
-
-  const GenericSection TypeRefSection {
-    reinterpret_cast<const void *>(TypeRefSectionContents.begin()),
-    reinterpret_cast<const void *>(TypeRefSectionContents.end())
-  };
-
-  auto Reader = std::make_shared<InProcessMemoryReader>();
-  ReflectionContext<External<RuntimeTarget<8>>> RC(Reader);
+  // Construct the reflection context
+  auto reader = std::make_shared<InProcessMemoryReader>();
+  ReflectionContext<External<RuntimeTarget<8>>> RC(reader);
   RC.addReflectionInfo({
-    BinaryFilename,
+    binaryFilename,
     fieldSection,
     associatedTypeSection,
-    ReflectionStringsSection,
-    TypeRefSection,
+    builtinTypeSection,
+    typeRefSection,
+    reflectionStringsSection,
   });
+
+  // Dump everything
   RC.dumpAllSections(std::cout);
 
   return EXIT_SUCCESS;

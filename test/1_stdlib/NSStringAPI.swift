@@ -263,7 +263,7 @@ func expectLocalizedEquality(
   _ expected: String,
   _ op: (_: NSLocale?) -> String,
   _ localeID: String? = nil,
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line

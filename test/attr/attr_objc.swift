@@ -1164,7 +1164,7 @@ class infer_instanceVar1 {
   // CHECK-LABEL: @objc var var_CFunctionPointer_1: @convention(c) () -> ()
   var var_CFunctionPointer_1: @convention(c) () -> ()
   // CHECK-LABEL: @objc var var_CFunctionPointer_invalid_1: Int
-  var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{attribute only applies to syntactic function types}}
+  var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{@convention attribute only applies to function types}}
   // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int
   var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int // expected-error {{'PlainStruct -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
   

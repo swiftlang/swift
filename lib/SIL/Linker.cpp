@@ -139,6 +139,10 @@ SILFunction *SILLinkerVisitor::lookupFunction(StringRef Name,
   return NewFn;
 }
 
+/// Process Decl, recursively deserializing any thing Decl may reference.
+bool SILLinkerVisitor::hasFunction(StringRef Name, SILLinkage Linkage) {
+  return Loader->hasSILFunction(Name, Linkage);
+}
 
 /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
 /// transitively references.

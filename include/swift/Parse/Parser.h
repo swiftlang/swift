@@ -697,7 +697,9 @@ public:
     return AlreadyHandledDecls.erase(D);
   }
 
-  ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, ParseDeclOptions Flags);
+  ParserStatus parseDecl(ParseDeclOptions Flags,
+                         llvm::function_ref<void(Decl*)> Handler);
+
   void parseDeclDelayed();
 
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
@@ -750,9 +752,9 @@ public:
                                        DeclAttributes &Attributes);
   ParserStatus parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
                                  SmallVectorImpl<Decl *> &decls);
-  bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
-                               SourceLoc LBLoc, SourceLoc &RBLoc,
-                               Diag<> ErrorDiag, ParseDeclOptions flags);
+  bool parseNominalDeclMembers(SourceLoc LBLoc, SourceLoc &RBLoc,
+                               Diag<> ErrorDiag, ParseDeclOptions flags,
+                               llvm::function_ref<void(Decl*)> handler);
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>

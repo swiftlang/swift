@@ -114,7 +114,8 @@ def main_preset():
     print_with_argv0(
         "using preset '" + args.preset + "', which expands to " +
         quote_shell_command(build_script_args))
-    check_call(build_script_args)
+
+    check_call(build_script_args, disable_sleep=True)
 
     return 0
 
@@ -306,6 +307,12 @@ details of the setups of other systems or automated environments.""")
              "target. The built LLVM and Clang will be used to compile Swift "
              "for the cross-compilation targets.",
         default=swift_build_support.targets.host_target())
+    targets_group.add_argument(
+        "--stdlib-deployment-targets",
+        help="list of targets to compile or cross-compile the Swift standard "
+             "library for. %(default)s by default.",
+        nargs="*",
+        default=swift_build_support.targets.stdlib_deployment_targets())
 
     projects_group = parser.add_argument_group(
         title="Options to select projects")
@@ -756,6 +763,7 @@ the number of parallel build jobs to use""",
         '--darwin-xcrun-toolchain',
         '--cmake',
         '--host-target',
+        '--stdlib-deployment-targets',
         '--skip-build',
         '--show-sdks',
         '--install-prefix',
@@ -772,7 +780,7 @@ the number of parallel build jobs to use""",
         '--skip-test-watchos-host',
     ]))
 
-    if args.host_target is None:
+    if args.host_target is None or args.stdlib_deployment_targets is None:
         print_with_argv0("Unknown operating system.")
         return 1
 
@@ -1110,6 +1118,8 @@ the number of parallel build jobs to use""",
         "--build-dir", build_dir,
         "--install-prefix", os.path.abspath(args.install_prefix),
         "--host-target", args.host_target,
+        "--stdlib-deployment-targets",
+        " ".join(args.stdlib_deployment_targets),
         "--host-cc", host_clang.cc,
         "--host-cxx", host_clang.cxx,
         "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
@@ -1140,17 +1150,7 @@ the number of parallel build jobs to use""",
     if args.cmake_generator == 'Ninja' and \
        not swift_build_support.ninja.is_ninja_installed():
         build_script_impl_args += ["--build-ninja"]
-    if args.android:
-        build_script_impl_args += [
-            "--android-ndk", args.android_ndk,
-            "--android-ndk-version", args.android_ndk_version,
-            "--android-ndk-toolchain-version",
-            args.android_ndk_toolchain_version,
-            "--android-icu-uc", args.android_icu_uc,
-            "--android-icu-uc-include", args.android_icu_uc_include,
-            "--android-icu-i18n", args.android_icu_i18n,
-            "--android-icu-i18n-include", args.android_icu_i18n_include,
-        ]
+
     if args.skip_build_linux:
         build_script_impl_args += ["--skip-build-linux"]
     if args.skip_build_freebsd:
@@ -1221,7 +1221,7 @@ the number of parallel build jobs to use""",
     if args.show_sdks:
         swift_build_support.debug.print_xcodebuild_versions()
 
-    check_call(build_script_impl_args)
+    check_call(build_script_impl_args, disable_sleep=True)
 
     if args.symbols_package:
         print('--- Creating symbols package ---')

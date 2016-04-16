@@ -42,7 +42,7 @@ internal class _SwiftNativeNSArrayWithContiguousStorage
 
   // Operate on our contiguous storage
   internal func withUnsafeBufferOfObjects<R>(
-    @noescape _ body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     _sanityCheckFailure(
       "Must override withUnsafeBufferOfObjects in derived classes")
@@ -167,7 +167,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   }
 
   internal override func withUnsafeBufferOfObjects<R>(
-    @noescape _ body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     repeat {
       var buffer: UnsafeBufferPointer<AnyObject>
@@ -233,7 +233,7 @@ internal class _ContiguousArrayStorageBase
 
 #if _runtime(_ObjC)
   internal override func withUnsafeBufferOfObjects<R>(
-    @noescape _ body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     if let result = try _withVerbatimBridgedUnsafeBuffer(body) {
       return result
@@ -246,7 +246,7 @@ internal class _ContiguousArrayStorageBase
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
   internal func _withVerbatimBridgedUnsafeBuffer<R>(
-    @noescape _ body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
     _sanityCheckFailure(
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")

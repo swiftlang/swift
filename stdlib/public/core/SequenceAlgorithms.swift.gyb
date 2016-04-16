@@ -70,8 +70,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   @warn_unused_result
   public func min(
 %   if preds:
-    @noescape isOrderedBefore:
-      (${GElement}, ${GElement}) throws -> Bool
+    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var it = makeIterator()
@@ -93,8 +92,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   @warn_unused_result
   public func max(
 %   if preds:
-    @noescape isOrderedBefore:
-      (${GElement}, ${GElement}) throws -> Bool
+    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var it = makeIterator()
@@ -146,7 +144,7 @@ else:
   >(
     with possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
-    @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
+    isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool {
     var possiblePrefixIterator = possiblePrefix.makeIterator()
@@ -199,7 +197,7 @@ else:
   >(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
+    isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool {
     var iter1 = self.makeIterator()
@@ -267,7 +265,7 @@ else:
   >(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
+    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool {
     var iter1 = self.makeIterator()
@@ -318,7 +316,7 @@ extension Sequence {
   /// Returns `true` iff an element in `self` satisfies `predicate`.
   @warn_unused_result
   public func contains(
-    @noescape _ predicate: (${GElement}) throws -> Bool
+    _ predicate: @noescape (${GElement}) throws -> Bool
   ) rethrows -> Bool {
     for e in self {
       if try predicate(e) {
@@ -341,7 +339,7 @@ extension Sequence {
   /// self[1]),...self[count-2]), self[count-1])`.
   @warn_unused_result
   public func reduce<T>(
-    _ initial: T, @noescape combine: (T, ${GElement}) throws -> T
+    _ initial: T, combine: @noescape (T, ${GElement}) throws -> T
   ) rethrows -> T {
     var result = initial
     for element in self {
@@ -392,7 +390,7 @@ extension Sequence {
   ///   and *N* is the length of the result.
   @warn_unused_result
   public func flatMap<S : Sequence>(
-    @noescape _ transform: (${GElement}) throws -> S
+    _ transform: @noescape (${GElement}) throws -> S
   ) rethrows -> [S.${GElement}] {
     var result: [S.${GElement}] = []
     for element in self {
@@ -410,7 +408,7 @@ extension Sequence {
   ///   and *N* is the length of the result.
   @warn_unused_result
   public func flatMap<T>(
-    @noescape _ transform: (${GElement}) throws -> T?
+    _ transform: @noescape (${GElement}) throws -> T?
   ) rethrows -> [T] {
     var result: [T] = []
     for element in self {
@@ -430,14 +428,14 @@ extension Sequence {
 
   @available(*, unavailable, renamed: "min")
   public func minElement(
-    @noescape _ isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
+    _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "max")
   public func maxElement(
-    @noescape _ isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
+    _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
     fatalError("unavailable function can't be called")
   }
@@ -452,7 +450,7 @@ extension Sequence {
     PossiblePrefix : Sequence where PossiblePrefix.Iterator.Element == Iterator.Element
   >(
     with possiblePrefix: PossiblePrefix,
-    @noescape isEquivalent: (Iterator.Element, Iterator.Element) throws -> Bool
+    isEquivalent: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows-> Bool {
     fatalError("unavailable function can't be called")
   }
@@ -462,7 +460,7 @@ extension Sequence {
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
     _ other: OtherSequence,
-    @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
+    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
   ) rethrows -> Bool {
     fatalError("unavailable function can't be called")
   }

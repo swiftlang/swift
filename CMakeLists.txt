@@ -458,6 +458,9 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     is_sdk_requested(ANDROID swift_build_android)
     if(swift_build_android AND ${swift_can_crosscompile_stdlib})
       configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi")
+      # This must be set, as variables such as "${SWIFT_SDK_${sdk}_PATH}" are
+      # referenced in several other locations.
+      set(SWIFT_SDK_ANDROID_PATH "${SWIFT_ANDROID_SDK_PATH}")
 
       set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
       set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")

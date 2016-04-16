@@ -20,7 +20,7 @@ var TupleTestSuite = TestSuite("Tuple")
 func testEquality<A : Equatable, B : Equatable, C : Equatable>(
   _ lhs: (A, B, C), equal: Bool, to rhs: (A, B, C),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line
@@ -94,7 +94,7 @@ enum Ordering : Equatable {
 func testOrdering<A : Comparable, B : Comparable, C : Comparable>(
   _ lhs: (A, B, C), _ ordering: Ordering, _ rhs: (A, B, C),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line

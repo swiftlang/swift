@@ -18,18 +18,15 @@
 #ifndef SWIFT_REFLECTION_TYPEREF_H
 #define SWIFT_REFLECTION_TYPEREF_H
 
-#include "swift/Basic/Demangle.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Casting.h"
 
 #include <iostream>
 
-class NodePointer;
-
 namespace swift {
 namespace reflection {
 
-template <typename Runtime>
+template <typename Allocator>
 class ReflectionContext;
 
 struct ReflectionInfo;
@@ -45,7 +42,7 @@ enum class TypeRefKind {
 
 class TypeRef;
 using DepthAndIndex = std::pair<unsigned, unsigned>;
-using GenericArgumentMap = llvm::DenseMap<DepthAndIndex, TypeRef *>;
+using GenericArgumentMap = llvm::DenseMap<DepthAndIndex, const TypeRef *>;
 
 class alignas(void *) TypeRef {
   TypeRefKind Kind;
@@ -57,14 +54,14 @@ public:
     return Kind;
   }
 
-  void dump();
-  void dump(std::ostream &OS, unsigned Indent = 0);
+  void dump() const;
+  void dump(std::ostream &OS, unsigned Indent = 0) const;
 
-  bool isConcrete();
+  bool isConcrete() const;
 
   template <typename Runtime>
-  TypeRef *
-  subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs);
+  const TypeRef *
+  subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs) const;
 
   GenericArgumentMap getSubstMap() const;
 
@@ -78,10 +75,9 @@ public:
   BuiltinTypeRef(const std::string &MangledName)
     : TypeRef(TypeRefKind::Builtin), MangledName(MangledName) {}
 
-  template <typename Runtime>
-  static BuiltinTypeRef *create(ReflectionContext<Runtime> &RC,
-                                std::string MangledName) {
-    return RC.template make_typeref<BuiltinTypeRef>(MangledName);
+  template <typename Allocator>
+  static const BuiltinTypeRef *create(Allocator &A, std::string MangledName) {
+    return A.template make_typeref<BuiltinTypeRef>(MangledName);
   }
 
   const std::string &getMangledName() const {
@@ -95,10 +91,10 @@ public:
 
 class NominalTypeTrait {
   std::string MangledName;
-  TypeRef *Parent;
+  const TypeRef *Parent;
 
 protected:
-  NominalTypeTrait(const std::string &MangledName, TypeRef *Parent)
+  NominalTypeTrait(const std::string &MangledName, const TypeRef *Parent)
       : MangledName(MangledName), Parent(Parent) {}
 
 public:
@@ -114,28 +110,20 @@ public:
     return Parent;
   }
 
-  TypeRef *getParent() {
-    return Parent;
-  }
-
-  void setParent(TypeRef *P) {
-    Parent = P;
-  }
-
   unsigned getDepth() const;
 };
 
 class NominalTypeRef final : public TypeRef, public NominalTypeTrait {
 public:
   NominalTypeRef(const std::string &MangledName,
-                 TypeRef *Parent = nullptr)
+                 const TypeRef *Parent = nullptr)
     : TypeRef(TypeRefKind::Nominal), NominalTypeTrait(MangledName, Parent) {}
 
-  template <typename Runtime>
-  static NominalTypeRef *create(ReflectionContext<Runtime> &RC,
-                                const std::string &MangledName,
-                                TypeRef *Parent = nullptr) {
-    return RC.template make_typeref<NominalTypeRef>(MangledName, Parent);
+  template <typename Allocator>
+  static const NominalTypeRef *create(Allocator &A,
+                                      const std::string &MangledName,
+                                      const TypeRef *Parent = nullptr) {
+    return A.template make_typeref<NominalTypeRef>(MangledName, Parent);
   }
 
   static bool classof(const TypeRef *TR) {
@@ -144,27 +132,27 @@ public:
 };
 
 class BoundGenericTypeRef final : public TypeRef, public NominalTypeTrait {
-  std::vector<TypeRef *> GenericParams;
+  std::vector<const TypeRef *> GenericParams;
 
 public:
   BoundGenericTypeRef(const std::string &MangledName,
-                      std::vector<TypeRef *> GenericParams,
-                      TypeRef *Parent = nullptr)
+                      std::vector<const TypeRef *> GenericParams,
+                      const TypeRef *Parent = nullptr)
     : TypeRef(TypeRefKind::BoundGeneric),
       NominalTypeTrait(MangledName, Parent),
       GenericParams(GenericParams) {}
 
-  template <typename Runtime>
-  static BoundGenericTypeRef *
-  create(ReflectionContext<Runtime> &RC, const std::string &MangledName,
-         std::vector<TypeRef *> GenericParams,
-         TypeRef *Parent = nullptr) {
-    return RC.template make_typeref<BoundGenericTypeRef>(MangledName,
-                                                         GenericParams,
-                                                         Parent);
+  template <typename Allocator>
+  static const BoundGenericTypeRef *
+  create(Allocator &A, const std::string &MangledName,
+         std::vector<const TypeRef *> GenericParams,
+         const TypeRef *Parent = nullptr) {
+    return A.template make_typeref<BoundGenericTypeRef>(MangledName,
+                                                        GenericParams,
+                                                        Parent);
   }
 
-  const std::vector<TypeRef *> &getGenericParams() const {
+  const std::vector<const TypeRef *> &getGenericParams() const {
     return GenericParams;
   }
 
@@ -174,21 +162,21 @@ public:
 };
 
 class TupleTypeRef final : public TypeRef {
-  std::vector<TypeRef *> Elements;
+  std::vector<const TypeRef *> Elements;
   bool Variadic;
 
 public:
-  TupleTypeRef(std::vector<TypeRef *> Elements, bool Variadic=false)
+  TupleTypeRef(std::vector<const TypeRef *> Elements, bool Variadic=false)
     : TypeRef(TypeRefKind::Tuple), Elements(Elements), Variadic(Variadic) {}
 
-  template <typename Runtime>
-  static TupleTypeRef *create(ReflectionContext<Runtime> &RC,
-                              std::vector<TypeRef *> Elements,
+  template <typename Allocator>
+  static TupleTypeRef *create(Allocator &A,
+                              std::vector<const TypeRef *> Elements,
                               bool Variadic = false) {
-    return RC.template make_typeref<TupleTypeRef>(Elements, Variadic);
+    return A.template make_typeref<TupleTypeRef>(Elements, Variadic);
   }
 
-  const std::vector<TypeRef *> &getElements() const {
+  const std::vector<const TypeRef *> &getElements() const {
     return Elements;
   };
 
@@ -202,27 +190,23 @@ public:
 };
 
 class FunctionTypeRef final : public TypeRef {
-  std::vector<TypeRef *> Arguments;
-  TypeRef *Result;
+  std::vector<const TypeRef *> Arguments;
+  const TypeRef *Result;
 
 public:
-  FunctionTypeRef(std::vector<TypeRef *> Arguments, TypeRef *Result)
+  FunctionTypeRef(std::vector<const TypeRef *> Arguments, const TypeRef *Result)
     : TypeRef(TypeRefKind::Function), Arguments(Arguments), Result(Result) {}
 
-  template <typename Runtime>
-  static FunctionTypeRef *create(ReflectionContext<Runtime> &RC,
-                                 std::vector<TypeRef *> Arguments,
-                                 TypeRef *Result) {
-    return RC.template make_typeref<FunctionTypeRef>(Arguments, Result);
+  template <typename Allocator>
+  static FunctionTypeRef *create(Allocator &A,
+                                 std::vector<const TypeRef *> Arguments,
+                                 const TypeRef *Result) {
+    return A.template make_typeref<FunctionTypeRef>(Arguments, Result);
   }
 
-  const std::vector<TypeRef *> &getArguments() const {
+  const std::vector<const TypeRef *> &getArguments() const {
     return Arguments;
   };
-
-  TypeRef *getResult() {
-    return Result;
-  }
 
   const TypeRef *getResult() const {
     return Result;
@@ -242,11 +226,11 @@ public:
                   const std::string &Name)
     : TypeRef(TypeRefKind::Protocol), ModuleName(ModuleName), Name(Name) {}
 
-  template <typename Runtime>
-  static ProtocolTypeRef *
-  create(ReflectionContext<Runtime> &RC, const std::string &ModuleName,
+  template <typename Allocator>
+  static const ProtocolTypeRef *
+  create(Allocator &A, const std::string &ModuleName,
          const std::string &Name) {
-    return RC.template make_typeref<ProtocolTypeRef>(ModuleName, Name);
+    return A.template make_typeref<ProtocolTypeRef>(ModuleName, Name);
   }
 
   const std::string &getName() const {
@@ -261,29 +245,29 @@ public:
     return TR->getKind() == TypeRefKind::Protocol;
   }
 
-  bool operator==(const ProtocolTypeRef &Other) {
+  bool operator==(const ProtocolTypeRef &Other) const {
     return ModuleName.compare(Other.ModuleName) == 0 &&
            Name.compare(Other.Name) == 0;
   }
-  bool operator!=(const ProtocolTypeRef &Other) {
+  bool operator!=(const ProtocolTypeRef &Other) const {
     return !(*this == Other);
   }
 };
 
 class ProtocolCompositionTypeRef final : public TypeRef {
-  std::vector<TypeRef *> Protocols;
+  std::vector<const TypeRef *> Protocols;
 
 public:
-  ProtocolCompositionTypeRef(std::vector<TypeRef *> Protocols)
+  ProtocolCompositionTypeRef(std::vector<const TypeRef *> Protocols)
     : TypeRef(TypeRefKind::ProtocolComposition), Protocols(Protocols) {}
 
-  template <typename Runtime>
-  static ProtocolCompositionTypeRef *
-  create(ReflectionContext<Runtime> &RC, std::vector<TypeRef *> Protocols) {
-    return RC.template make_typeref<ProtocolCompositionTypeRef>(Protocols);
+  template <typename Allocator>
+  static const ProtocolCompositionTypeRef *
+  create(Allocator &A, std::vector<const TypeRef *> Protocols) {
+    return A.template make_typeref<ProtocolCompositionTypeRef>(Protocols);
   }
 
-  const std::vector<TypeRef *> &getProtocols() const {
+  const std::vector<const TypeRef *> &getProtocols() const {
     return Protocols;
   }
 
@@ -293,20 +277,16 @@ public:
 };
 
 class MetatypeTypeRef final : public TypeRef {
-  TypeRef *InstanceType;
+  const TypeRef *InstanceType;
 
 public:
-  MetatypeTypeRef(TypeRef *InstanceType)
+  MetatypeTypeRef(const TypeRef *InstanceType)
     : TypeRef(TypeRefKind::Metatype), InstanceType(InstanceType) {}
 
-  template <typename Runtime>
-  static MetatypeTypeRef *create(ReflectionContext<Runtime> &RC,
-                                 TypeRef *InstanceType) {
-    return RC.template make_typeref<MetatypeTypeRef>(InstanceType);
-  }
-
-  TypeRef *getInstanceType() {
-    return InstanceType;
+  template <typename Allocator>
+  static const MetatypeTypeRef *create(Allocator &A,
+                                 const TypeRef *InstanceType) {
+    return A.template make_typeref<MetatypeTypeRef>(InstanceType);
   }
 
   const TypeRef *getInstanceType() const {
@@ -319,20 +299,16 @@ public:
 };
 
 class ExistentialMetatypeTypeRef final : public TypeRef {
-  TypeRef *InstanceType;
+  const TypeRef *InstanceType;
 
 public:
-  ExistentialMetatypeTypeRef(TypeRef *InstanceType)
+  ExistentialMetatypeTypeRef(const TypeRef *InstanceType)
     : TypeRef(TypeRefKind::ExistentialMetatype), InstanceType(InstanceType) {}
 
-  template <typename Runtime>
-  static ExistentialMetatypeTypeRef *
-  create(ReflectionContext<Runtime> &RC, TypeRef *InstanceType) {
-    return RC.template make_typeref<ExistentialMetatypeTypeRef>(InstanceType);
-  }
-
-  TypeRef *getInstanceType() {
-    return InstanceType;
+  template <typename Allocator>
+  static const ExistentialMetatypeTypeRef *
+  create(Allocator &A, const TypeRef *InstanceType) {
+    return A.template make_typeref<ExistentialMetatypeTypeRef>(InstanceType);
   }
 
   const TypeRef *getInstanceType() const {
@@ -352,10 +328,10 @@ public:
   GenericTypeParameterTypeRef(uint32_t Depth, uint32_t Index)
     : TypeRef(TypeRefKind::GenericTypeParameter), Depth(Depth), Index(Index) {}
 
-  template <typename Runtime>
-  static GenericTypeParameterTypeRef *
-  create(ReflectionContext<Runtime> &RC, uint32_t Depth, uint32_t Index) {
-    return RC.template make_typeref<GenericTypeParameterTypeRef>(Depth, Index);
+  template <typename Allocator>
+  static const GenericTypeParameterTypeRef *
+  create(Allocator &A, uint32_t Depth, uint32_t Index) {
+    return A.template make_typeref<GenericTypeParameterTypeRef>(Depth, Index);
   }
 
   uint32_t getDepth() const {
@@ -373,20 +349,20 @@ public:
 
 class DependentMemberTypeRef final : public TypeRef {
   std::string Member;
-  TypeRef *Base;
-  TypeRef *Protocol;
+  const TypeRef *Base;
+  const TypeRef *Protocol;
 
 public:
-  DependentMemberTypeRef(const std::string &Member, TypeRef *Base,
-                         TypeRef *Protocol)
+  DependentMemberTypeRef(const std::string &Member, const TypeRef *Base,
+                         const TypeRef *Protocol)
     : TypeRef(TypeRefKind::DependentMember), Member(Member), Base(Base),
       Protocol(Protocol) {}
 
-  template <typename Runtime>
-  static DependentMemberTypeRef *
-  create(ReflectionContext<Runtime> &RC, const std::string &Member,
-         TypeRef *Base, TypeRef *Protocol) {
-    return RC.template make_typeref<DependentMemberTypeRef>(Member, Base,
+  template <typename Allocator>
+  static const DependentMemberTypeRef *
+  create(Allocator &A, const std::string &Member,
+         const TypeRef *Base, const TypeRef *Protocol) {
+    return A.template make_typeref<DependentMemberTypeRef>(Member, Base,
                                                            Protocol);
   }
 
@@ -394,16 +370,8 @@ public:
     return Member;
   }
 
-  TypeRef *getBase() {
-    return Base;
-  }
-
   const TypeRef *getBase() const {
     return Base;
-  }
-
-  ProtocolTypeRef *getProtocol() {
-    return cast<ProtocolTypeRef>(Protocol);
   }
 
   const ProtocolTypeRef *getProtocol() const {
@@ -417,18 +385,18 @@ public:
 
 class ForeignClassTypeRef final : public TypeRef {
   std::string Name;
-  static ForeignClassTypeRef *UnnamedSingleton;
+  static const ForeignClassTypeRef *UnnamedSingleton;
 public:
   ForeignClassTypeRef(const std::string &Name)
     : TypeRef(TypeRefKind::ForeignClass), Name(Name) {}
 
-  static ForeignClassTypeRef *getUnnamed();
+  static const ForeignClassTypeRef *getUnnamed();
 
 
-  template <typename Runtime>
-  static ForeignClassTypeRef *create(ReflectionContext<Runtime> &RC,
+  template <typename Allocator>
+  static ForeignClassTypeRef *create(Allocator &A,
                                      const std::string &Name) {
-    return RC.template make_typeref<ForeignClassTypeRef>(Name);
+    return A.template make_typeref<ForeignClassTypeRef>(Name);
   }
 
   const std::string &getName() const {
@@ -442,17 +410,16 @@ public:
 
 class ObjCClassTypeRef final : public TypeRef {
   std::string Name;
-  static ObjCClassTypeRef *UnnamedSingleton;
+  static const ObjCClassTypeRef *UnnamedSingleton;
 public:
   ObjCClassTypeRef(const std::string &Name)
     : TypeRef(TypeRefKind::ObjCClass), Name(Name) {}
 
-  static ObjCClassTypeRef *getUnnamed();
+  static const ObjCClassTypeRef *getUnnamed();
 
-  template <typename Runtime>
-  static ObjCClassTypeRef *create(ReflectionContext<Runtime> &RC,
-                                  const std::string &Name) {
-    return RC.template make_typeref<ObjCClassTypeRef>(Name);
+  template <typename Allocator>
+  static const ObjCClassTypeRef *create(Allocator &A, const std::string &Name) {
+    return A.template make_typeref<ObjCClassTypeRef>(Name);
   }
 
   const std::string &getName() const {
@@ -465,11 +432,11 @@ public:
 };
 
 class OpaqueTypeRef final : public TypeRef {
-  static OpaqueTypeRef *Singleton;
+  static const OpaqueTypeRef *Singleton;
 public:
   OpaqueTypeRef() : TypeRef(TypeRefKind::Opaque) {}
 
-  static  OpaqueTypeRef *get();
+  static const OpaqueTypeRef *get();
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Opaque;
@@ -477,35 +444,27 @@ public:
 };
 
 class ReferenceStorageTypeRef : public TypeRef {
-  TypeRef *Type;
+  const TypeRef *Type;
 
 protected:
-  ReferenceStorageTypeRef(TypeRefKind Kind, TypeRef *Type)
+  ReferenceStorageTypeRef(TypeRefKind Kind, const TypeRef *Type)
     : TypeRef(Kind), Type(Type) {}
 
 public:
   const TypeRef *getType() const {
     return Type;
   }
-
-  TypeRef *getType() {
-    return Type;
-  }
-
-  void setType(TypeRef *T) {
-    Type = T;
-  }
 };
 
 class UnownedStorageTypeRef final : public ReferenceStorageTypeRef {
 public:
-  UnownedStorageTypeRef(TypeRef *Type)
+  UnownedStorageTypeRef(const TypeRef *Type)
     : ReferenceStorageTypeRef(TypeRefKind::UnownedStorage, Type) {}
 
-  template <typename Runtime>
-  static UnownedStorageTypeRef *create(ReflectionContext<Runtime> &RC,
-                                       TypeRef *Type) {
-    return RC.template make_typeref<UnownedStorageTypeRef>(Type);
+  template <typename Allocator>
+  static const UnownedStorageTypeRef *create(Allocator &A,
+                                       const TypeRef *Type) {
+    return A.template make_typeref<UnownedStorageTypeRef>(Type);
   }
 
   static bool classof(const TypeRef *TR) {
@@ -515,13 +474,13 @@ public:
 
 class WeakStorageTypeRef final : public ReferenceStorageTypeRef {
 public:
-  WeakStorageTypeRef(TypeRef *Type)
+  WeakStorageTypeRef(const TypeRef *Type)
     : ReferenceStorageTypeRef(TypeRefKind::WeakStorage, Type) {}
 
-  template <typename Runtime>
-  static WeakStorageTypeRef *create(ReflectionContext<Runtime> &RC,
-                                    TypeRef *Type) {
-    return RC.template make_typeref<WeakStorageTypeRef>(Type);
+  template <typename Allocator>
+  static const WeakStorageTypeRef *create(Allocator &A,
+                                    const TypeRef *Type) {
+    return A.template make_typeref<WeakStorageTypeRef>(Type);
   }
 
   static bool classof(const TypeRef *TR) {
@@ -531,13 +490,13 @@ public:
 
 class UnmanagedStorageTypeRef final : public ReferenceStorageTypeRef {
 public:
-  UnmanagedStorageTypeRef(TypeRef *Type)
+  UnmanagedStorageTypeRef(const TypeRef *Type)
     : ReferenceStorageTypeRef(TypeRefKind::UnmanagedStorage, Type) {}
 
-  template <typename Runtime>
-  static UnmanagedStorageTypeRef *create(ReflectionContext<Runtime> &RC,
-                                         TypeRef *Type) {
-    return RC.template make_typeref<UnmanagedStorageTypeRef>(Type);
+  template <typename Allocator>
+  static const UnmanagedStorageTypeRef *create(Allocator &A,
+                                               const TypeRef *Type) {
+    return A.template make_typeref<UnmanagedStorageTypeRef>(Type);
   }
 
   static bool classof(const TypeRef *TR) {
@@ -549,7 +508,7 @@ template <typename ImplClass, typename RetTy = void, typename... Args>
 class TypeRefVisitor {
 public:
 
-  RetTy visit(TypeRef *typeRef, Args... args) {
+  RetTy visit(const TypeRef *typeRef, Args... args) {
     switch (typeRef->getKind()) {
 #define TYPEREF(Id, Parent) \
     case TypeRefKind::Id: \
@@ -563,80 +522,83 @@ public:
 
 template <typename Runtime>
 class TypeRefSubstitution
-  : public TypeRefVisitor<TypeRefSubstitution<Runtime>, TypeRef *> {
+  : public TypeRefVisitor<TypeRefSubstitution<Runtime>, const TypeRef *> {
   using StoredPointer = typename Runtime::StoredPointer;
   ReflectionContext<Runtime> &RC;
   GenericArgumentMap Substitutions;
 public:
-  using TypeRefVisitor<TypeRefSubstitution<Runtime>, TypeRef *>::visit;
+  using TypeRefVisitor<TypeRefSubstitution<Runtime>, const TypeRef *>::visit;
   TypeRefSubstitution(ReflectionContext<Runtime> &RC,
                       GenericArgumentMap Substitutions)
   : RC(RC),
     Substitutions(Substitutions) {}
 
-  TypeRef *visitBuiltinTypeRef(BuiltinTypeRef *B) {
+  const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return B;
   }
 
-  TypeRef *visitNominalTypeRef(NominalTypeRef *N) {
+  const TypeRef *visitNominalTypeRef(const NominalTypeRef *N) {
     return N;
   }
 
-  TypeRef *visitBoundGenericTypeRef(BoundGenericTypeRef *BG) {
-    std::vector<TypeRef *> GenericParams;
+  const TypeRef *visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    std::vector<const TypeRef *> GenericParams;
     for (auto Param : BG->getGenericParams())
       GenericParams.push_back(visit(Param));
-    return BoundGenericTypeRef::create(RC, BG->getMangledName(),
+    return BoundGenericTypeRef::create(RC.Builder, BG->getMangledName(),
                                        GenericParams);
   }
 
-  TypeRef *visitTupleTypeRef(TupleTypeRef *T) {
-    std::vector<TypeRef *> Elements;
+  const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
+    std::vector<const TypeRef *> Elements;
     for (auto Element : T->getElements()) {
       Elements.push_back(visit(Element));
     }
-    return TupleTypeRef::create(RC, Elements);
+    return TupleTypeRef::create(RC.Builder, Elements);
   }
 
-  TypeRef *visitFunctionTypeRef(FunctionTypeRef *F) {
-    std::vector<TypeRef *> SubstitutedArguments;
+  const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
+    std::vector<const TypeRef *> SubstitutedArguments;
     for (auto Argument : F->getArguments())
       SubstitutedArguments.push_back(visit(Argument));
 
     auto SubstitutedResult = visit(F->getResult());
 
-    return FunctionTypeRef::create(RC, SubstitutedArguments, SubstitutedResult);
+    return FunctionTypeRef::create(RC.Builder, SubstitutedArguments,
+                                   SubstitutedResult);
   }
 
-  TypeRef *visitProtocolTypeRef(ProtocolTypeRef *P) {
+  const TypeRef *visitProtocolTypeRef(const ProtocolTypeRef *P) {
     return P;
   }
 
-  TypeRef *
-  visitProtocolCompositionTypeRef(ProtocolCompositionTypeRef *PC) {
+  const TypeRef *
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     return PC;
   }
 
-  TypeRef *visitMetatypeTypeRef(MetatypeTypeRef *M) {
-    return MetatypeTypeRef::create(RC, visit(M->getInstanceType()));
+  const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    return MetatypeTypeRef::create(RC.Builder, visit(M->getInstanceType()));
   }
 
-  TypeRef *visitExistentialMetatypeTypeRef(ExistentialMetatypeTypeRef *EM) {
+  const TypeRef *
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     assert(EM->getInstanceType()->isConcrete());
     return EM;
   }
 
-  TypeRef *visitGenericTypeParameterTypeRef(GenericTypeParameterTypeRef *GTP) {
+  const TypeRef *
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
     assert(found != Substitutions.end());
     assert(found->second->isConcrete());
     return found->second;
   }
 
-  TypeRef *visitDependentMemberTypeRef(DependentMemberTypeRef *DM) {
+  const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     auto SubstBase = visit(DM->getBase());
 
-    TypeRef *TypeWitness;
+    const TypeRef *TypeWitness;
 
     switch (SubstBase->getKind()) {
     case TypeRefKind::Nominal: {
@@ -657,35 +619,36 @@ public:
     return TypeWitness->subst(RC, SubstBase->getSubstMap());
   }
 
-  TypeRef *visitForeignClassTypeRef(ForeignClassTypeRef *F) {
+  const TypeRef *visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
     return F;
   }
 
-  TypeRef *visitObjCClassTypeRef(ObjCClassTypeRef *OC) {
+  const TypeRef *visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     return OC;
   }
 
-  TypeRef *visitUnownedStorageTypeRef(UnownedStorageTypeRef *US) {
-    return UnownedStorageTypeRef::create(RC, visit(US->getType()));
+  const TypeRef *visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    return UnownedStorageTypeRef::create(RC.Builder, visit(US->getType()));
   }
 
-  TypeRef *visitWeakStorageTypeRef(WeakStorageTypeRef *WS) {
-    return WeakStorageTypeRef::create(RC, visit(WS->getType()));
+  const TypeRef *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    return WeakStorageTypeRef::create(RC.Builder, visit(WS->getType()));
   }
 
-  TypeRef *visitUnmanagedStorageTypeRef(UnmanagedStorageTypeRef *US) {
-    return UnmanagedStorageTypeRef::create(RC, visit(US->getType()));
+  const TypeRef *
+  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    return UnmanagedStorageTypeRef::create(RC.Builder, visit(US->getType()));
   }
 
-  TypeRef *visitOpaqueTypeRef(OpaqueTypeRef *Op) {
+  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
     return Op;
   }
 };
 
 template <typename Runtime>
-TypeRef *
-TypeRef::subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs) {
-  TypeRef *Result = TypeRefSubstitution<Runtime>(RC, Subs).visit(this);
+const TypeRef *
+TypeRef::subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs) const {
+  const TypeRef *Result = TypeRefSubstitution<Runtime>(RC, Subs).visit(this);
   assert(Result->isConcrete());
   return Result;
 }

@@ -218,14 +218,14 @@ public struct LoggingRangeReplaceableCollection<
 
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Base.Iterator.Element) throws -> T
+    transform: @noescape (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     return try base.map(transform)
   }
 
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Base.Iterator.Element) throws -> Bool
+    includeElement: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
     return try base.filter(includeElement)
   }
@@ -440,7 +440,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
 
 %   if Kind == 'MutableCollection':
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
@@ -462,7 +462,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   }
 
   public func forEach(
-    @noescape _ body: (Base.Iterator.Element) throws -> Void
+    _ body: @noescape (Base.Iterator.Element) throws -> Void
   ) rethrows {
     Log.forEach[selfType] += 1
     try base.forEach(body)
@@ -470,7 +470,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
 
   @warn_unused_result
   public func map<T>(
-    @noescape _ transform: (Base.Iterator.Element) throws -> T
+    _ transform: @noescape (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     Log.map[selfType] += 1
     return try base.map(transform)
@@ -478,7 +478,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
 
   @warn_unused_result
   public func filter(
-    @noescape _ includeElement: (Base.Iterator.Element) throws -> Bool
+    _ includeElement: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
     Log.filter[selfType] += 1
     return try base.filter(includeElement)
@@ -507,7 +507,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    @noescape isSeparator: (Base.Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.SubSequence] {
     Log.split[selfType] += 1
     return try base.split(
@@ -546,7 +546,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: () -> R
+    _ preprocess: @noescape () -> R
   ) -> R? {
     Log._preprocessingPass[selfType] += 1
     return base._preprocessingPass { preprocess() }
@@ -579,7 +579,7 @@ public func expectCustomizable<
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line
@@ -597,7 +597,7 @@ public func expectNotCustomizable<
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line

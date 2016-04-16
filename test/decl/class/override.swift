@@ -122,8 +122,8 @@ class G {
   func f6(_: Int, int: Int) { }
   func f7(_: Int, int: Int) { }
 
-  func g1(_: Int, string: String) { } // expected-note{{potential overridden method 'g1(_:string:)' here}} {{28-28=string }}
-  func g1(_: Int, path: String) { } // expected-note{{potential overridden method 'g1(_:path:)' here}} {{28-28=path }}
+  func g1(_: Int, string: String) { } // expected-note{{potential overridden instance method 'g1(_:string:)' here}} {{28-28=string }}
+  func g1(_: Int, path: String) { } // expected-note{{potential overridden instance method 'g1(_:path:)' here}} {{28-28=path }}
 }
 
 class H : G {
