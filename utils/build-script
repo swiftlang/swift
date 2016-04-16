@@ -17,7 +17,6 @@ import os
 import platform
 import shutil
 import sys
-import textwrap
 
 # FIXME: Instead of modifying the system path in order to enable imports from
 #        other directories, all Python modules related to the build script
@@ -361,22 +360,21 @@ details of the setups of other systems or automated environments.""")
         "--symbols-package",
         metavar="PATH",
         help="if provided, an archive of the symbols directory will be "
-        "generated at this path")
+             "generated at this path")
 
     build_variant_group = parser.add_mutually_exclusive_group(required=False)
     build_variant_group.add_argument(
         "-d", "--debug",
-        help="""
-build the Debug variant of everything (LLVM, Clang, Swift host tools, target
-Swift standard libraries, LLDB (if enabled)
-(default)""",
+        help="build the Debug variant of everything (LLVM, Clang, Swift host "
+             "tools, target Swift standard libraries, LLDB (if enabled) "
+             "(default)",
         action="store_const",
         const="Debug",
         dest="build_variant")
     build_variant_group.add_argument(
         "-r", "--release-debuginfo",
-        help="""
-build the RelWithDebInfo variant of everything (default is Debug)""",
+        help="build the RelWithDebInfo variant of everything (default is "
+             "Debug)",
         action="store_const",
         const="RelWithDebInfo",
         dest="build_variant")
@@ -403,8 +401,8 @@ build the RelWithDebInfo variant of everything (default is Debug)""",
         dest="swift_build_variant")
     build_variant_override_group.add_argument(
         "--debug-swift-stdlib",
-        help="""
-build the Debug variant of the Swift standard library and SDK overlay""",
+        help="build the Debug variant of the Swift standard library and SDK "
+             "overlay",
         action="store_const",
         const="Debug",
         dest="swift_stdlib_build_variant")
@@ -557,8 +555,8 @@ build the Debug variant of the Swift standard library and SDK overlay""",
         action="store_true")
     parser.add_argument(
         "--build-runtime-with-host-compiler",
-        help="Use the host compiler, not the self-built one to compile the " +
-        "Swift runtime",
+        help="Use the host compiler, not the self-built one to compile the "
+             "Swift runtime",
         action="store_true")
 
     parser.add_argument(
@@ -595,7 +593,7 @@ build the Debug variant of the Swift standard library and SDK overlay""",
     skip_test_group.add_argument(
         "--skip-test-ios",
         help="skip testing all iOS targets. Equivalent to specifying both "
-        "--skip-test-ios-simulator and --skip-test-ios-host",
+             "--skip-test-ios-simulator and --skip-test-ios-host",
         action="store_true")
     skip_test_group.add_argument(
         "--skip-test-ios-simulator",
@@ -604,12 +602,12 @@ build the Debug variant of the Swift standard library and SDK overlay""",
     skip_test_group.add_argument(
         "--skip-test-ios-host",
         help="skip testing iOS device targets on the host machine (the phone "
-        "itself)",
+             "itself)",
         action="store_true")
     skip_test_group.add_argument(
         "--skip-test-tvos",
         help="skip testing all tvOS targets. Equivalent to specifying both "
-        "--skip-test-tvos-simulator and --skip-test-tvos-host",
+             "--skip-test-tvos-simulator and --skip-test-tvos-host",
         action="store_true")
     skip_test_group.add_argument(
         "--skip-test-tvos-simulator",
@@ -618,12 +616,12 @@ build the Debug variant of the Swift standard library and SDK overlay""",
     skip_test_group.add_argument(
         "--skip-test-tvos-host",
         help="skip testing tvOS device targets on the host machine (the TV "
-        "itself)",
+             "itself)",
         action="store_true")
     skip_test_group.add_argument(
         "--skip-test-watchos",
         help="skip testing all tvOS targets. Equivalent to specifying both "
-        "--skip-test-watchos-simulator and --skip-test-watchos-host",
+             "--skip-test-watchos-simulator and --skip-test-watchos-host",
         action="store_true")
     skip_test_group.add_argument(
         "--skip-test-watchos-simulator",
@@ -632,25 +630,25 @@ build the Debug variant of the Swift standard library and SDK overlay""",
     skip_test_group.add_argument(
         "--skip-test-watchos-host",
         help="skip testing watchOS device targets on the host machine (the "
-        "watch itself)",
+             "watch itself)",
         action="store_true")
 
     parser.add_argument(
         "-i", "--ios",
-        help="""
-also build for iOS, but disallow tests that require an iOS device""",
+        help="also build for iOS, but disallow tests that require an iOS "
+             "device",
         action="store_true")
 
     parser.add_argument(
         "--tvos",
-        help="""
-also build for tvOS, but disallow tests that require a tvos device""",
+        help="also build for tvOS, but disallow tests that require a tvos "
+             "device",
         action="store_true")
 
     parser.add_argument(
         "--watchos",
-        help="""
-also build for watchOS, but disallow tests that require an watchOS device""",
+        help="also build for watchOS, but disallow tests that require an "
+             "watchOS device",
         action="store_true")
 
     parser.add_argument(
@@ -660,22 +658,21 @@ also build for watchOS, but disallow tests that require an watchOS device""",
 
     parser.add_argument(
         "--swift-analyze-code-coverage",
-        help="""enable code coverage analysis in Swift (false, not-merged,
-        merged).""",
+        help="enable code coverage analysis in Swift (false, not-merged, "
+             "merged).",
         choices=["false", "not-merged", "merged"],
         default="false",  # so CMake can see the inert mode as a false value
         dest="swift_analyze_code_coverage")
 
     parser.add_argument(
         "--build-subdir",
-        help="""
-name of the directory under $SWIFT_BUILD_ROOT where the build products will be
-placed""",
+        help="name of the directory under $SWIFT_BUILD_ROOT where the build "
+             "products will be placed",
         metavar="PATH")
     parser.add_argument(
         "--install-prefix",
         help="The installation prefix. This is where built Swift products "
-        "(like bin, lib, and include) will be installed.",
+             "(like bin, lib, and include) will be installed.",
         metavar="PATH",
         default=swift_build_support.targets.install_prefix())
     parser.add_argument(
@@ -685,8 +682,7 @@ placed""",
 
     parser.add_argument(
         "-j", "--jobs",
-        help="""
-the number of parallel build jobs to use""",
+        help="the number of parallel build jobs to use",
         type=int,
         dest="build_jobs",
         default=multiprocessing.cpu_count())
@@ -697,19 +693,19 @@ the number of parallel build jobs to use""",
         default="default")
     parser.add_argument(
         "--cmake",
-        help="the path to a CMake executable that will be "
-        "used to build Swift")
+        help="the path to a CMake executable that will be used to build "
+             "Swift")
     parser.add_argument(
         "--show-sdks",
         help="print installed Xcode and SDK versions",
         action="store_true")
 
     parser.add_argument(
-        "--extra-swift-args", help=textwrap.dedent("""
-    Pass through extra flags to swift in the form of a cmake list
-    'module_regexp;flag'. Can be called multiple times to add multiple such
-    module_regexp flag pairs. All semicolons in flags must be escaped with
-    a '\'"""),
+        "--extra-swift-args",
+        help="Pass through extra flags to swift in the form of a cmake list "
+             "'module_regexp;flag'. Can be called multiple times to add "
+             "multiple such module_regexp flag pairs. All semicolons in flags "
+             "must be escaped with a '\\'",
         action="append", dest="extra_swift_args", default=[])
 
     android_group = parser.add_argument_group(
@@ -748,10 +744,10 @@ the number of parallel build jobs to use""",
         metavar="PATH")
 
     parser.add_argument(
-        "--extra-cmake-options", help=textwrap.dedent("""
-    Pass through extra options to CMake in the form of comma separated options
-    '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be called multiple times to add
-    multiple such options."""),
+        "--extra-cmake-options",
+        help="Pass through extra options to CMake in the form of comma "
+             "separated options '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be "
+             "called multiple times to add multiple such options.",
         action="append", dest="extra_cmake_options", default=[])
 
     parser.add_argument(
