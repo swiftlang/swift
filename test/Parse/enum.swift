@@ -433,3 +433,93 @@ enum RawValueBTest: Double, RawValueB {
 enum foo : String {
   case bar = nil // expected-error {{cannot convert nil to raw type 'String'}}
 }
+
+// Static member lookup from instance methods
+
+struct EmptyStruct {}
+
+enum EnumWithStaticMember {
+  static let staticVar = EmptyStruct()
+
+  func foo() {
+    let _ = staticVar // expected-error {{static member 'staticVar' cannot be used on instance of type 'EnumWithStaticMember'}}
+  }
+}
+
+// SE-0036:
+
+struct SE0036_Auxiliary {}
+
+enum SE0036 {
+  case A
+  case B(SE0036_Auxiliary)
+
+  static func staticReference() {
+    _ = A
+    _ = SE0036.A
+  }
+
+  func staticReferencInInstanceMethod() {
+    _ = A // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{9-9=SE0036.}}
+    _ = SE0036.A
+  }
+
+  static func staticReferencInSwitchInStaticMethod() {
+    switch SE0036.A {
+    case A: break
+    case B(_): break
+    }
+  }
+
+  func staticReferencInSwitchInInstanceMethod() {
+    switch self {
+    case A: break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=.}}
+    case B(_): break // expected-error {{enum element 'B' cannot be referenced as an instance member}} {{10-10=.}}
+    }
+  }
+
+  func explicitReferencInSwitch() {
+    switch SE0036.A {
+    case SE0036.A: break
+    case SE0036.B(_): break
+    }
+  }
+
+  func dotReferencInSwitchInInstanceMethod() {
+    switch self {
+    case .A: break
+    case .B(_): break
+    }
+  }
+
+  static func dotReferencInSwitchInStaticMethod() {
+    switch SE0036.A {
+    case .A: break
+    case .B(_): break
+    }
+  }
+
+  init() {
+    self = .A
+    self = A // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{12-12=.}}
+    self = SE0036.A
+    self = .B(SE0036_Auxiliary())
+    self = B(SE0036_Auxiliary()) // expected-error {{enum element 'B' cannot be referenced as an instance member}} {{12-12=.}}
+    self = SE0036.B(SE0036_Auxiliary())
+  }
+}
+
+enum SE0036_Generic<T> {
+  case A(x: T)
+
+  func foo() {
+    switch self {
+    case A(_): break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=SE0036_Generic.}}
+    }
+
+    switch self {
+    case SE0036_Generic.A(let a): print(a)
+    }
+  }
+}
+

@@ -1331,25 +1331,25 @@ public enum OSVersion : CustomStringConvertible {
 
   public var description: String {
     switch self {
-    case osx(let major, let minor, let bugFix):
+    case .osx(let major, let minor, let bugFix):
       return "OS X \(major).\(minor).\(bugFix)"
-    case iOS(let major, let minor, let bugFix):
+    case .iOS(let major, let minor, let bugFix):
       return "iOS \(major).\(minor).\(bugFix)"
-    case tvOS(let major, let minor, let bugFix):
+    case .tvOS(let major, let minor, let bugFix):
       return "TVOS \(major).\(minor).\(bugFix)"
-    case watchOS(let major, let minor, let bugFix):
+    case .watchOS(let major, let minor, let bugFix):
       return "watchOS \(major).\(minor).\(bugFix)"
-    case iOSSimulator:
+    case .iOSSimulator:
       return "iOSSimulator"
-    case tvOSSimulator:
+    case .tvOSSimulator:
       return "TVOSSimulator"
-    case watchOSSimulator:
+    case .watchOSSimulator:
       return "watchOSSimulator"
-    case linux:
+    case .linux:
       return "Linux"
-    case freeBSD:
+    case .freeBSD:
       return "FreeBSD"
-    case android:
+    case .android:
       return "Android"
     }
   }
@@ -1468,102 +1468,102 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   public var description: String {
     switch self {
-    case custom(_, let reason):
+    case .custom(_, let reason):
       return "Custom(reason: \(reason))"
 
-    case always(let reason):
+    case .always(let reason):
       return "Always(reason: \(reason))"
-    case never:
+    case .never:
       return ""
 
-    case osxAny(let reason):
+    case .osxAny(let reason):
       return "osx(*, reason: \(reason))"
-    case osxMajor(let major, let reason):
+    case .osxMajor(let major, let reason):
       return "osx(\(major).*, reason: \(reason))"
-    case osxMinor(let major, let minor, let reason):
+    case .osxMinor(let major, let minor, let reason):
       return "osx(\(major).\(minor), reason: \(reason))"
-    case osxMinorRange(let major, let minorRange, let reason):
+    case .osxMinorRange(let major, let minorRange, let reason):
       return "osx(\(major).[\(minorRange)], reason: \(reason))"
-    case osxBugFix(let major, let minor, let bugFix, let reason):
+    case .osxBugFix(let major, let minor, let bugFix, let reason):
       return "osx(\(major).\(minor).\(bugFix), reason: \(reason))"
-    case osxBugFixRange(let major, let minor, let bugFixRange, let reason):
+    case .osxBugFixRange(let major, let minor, let bugFixRange, let reason):
       return "osx(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
 
-    case iOSAny(let reason):
+    case .iOSAny(let reason):
       return "iOS(*, reason: \(reason))"
-    case iOSMajor(let major, let reason):
+    case .iOSMajor(let major, let reason):
       return "iOS(\(major).*, reason: \(reason))"
-    case iOSMinor(let major, let minor, let reason):
+    case .iOSMinor(let major, let minor, let reason):
       return "iOS(\(major).\(minor), reason: \(reason))"
-    case iOSMinorRange(let major, let minorRange, let reason):
+    case .iOSMinorRange(let major, let minorRange, let reason):
       return "iOS(\(major).[\(minorRange)], reason: \(reason))"
-    case iOSBugFix(let major, let minor, let bugFix, let reason):
+    case .iOSBugFix(let major, let minor, let bugFix, let reason):
       return "iOS(\(major).\(minor).\(bugFix), reason: \(reason))"
-    case iOSBugFixRange(let major, let minor, let bugFixRange, let reason):
+    case .iOSBugFixRange(let major, let minor, let bugFixRange, let reason):
       return "iOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
 
-    case iOSSimulatorAny(let reason):
+    case .iOSSimulatorAny(let reason):
       return "iOSSimulatorAny(*, reason: \(reason))"
 
-    case tvOSAny(let reason):
+    case .tvOSAny(let reason):
       return "tvOS(*, reason: \(reason))"
-    case tvOSMajor(let major, let reason):
+    case .tvOSMajor(let major, let reason):
       return "tvOS(\(major).*, reason: \(reason))"
-    case tvOSMinor(let major, let minor, let reason):
+    case .tvOSMinor(let major, let minor, let reason):
       return "tvOS(\(major).\(minor), reason: \(reason))"
-    case tvOSMinorRange(let major, let minorRange, let reason):
+    case .tvOSMinorRange(let major, let minorRange, let reason):
       return "tvOS(\(major).[\(minorRange)], reason: \(reason))"
-    case tvOSBugFix(let major, let minor, let bugFix, let reason):
+    case .tvOSBugFix(let major, let minor, let bugFix, let reason):
       return "tvOS(\(major).\(minor).\(bugFix), reason: \(reason))"
-    case tvOSBugFixRange(let major, let minor, let bugFixRange, let reason):
+    case .tvOSBugFixRange(let major, let minor, let bugFixRange, let reason):
       return "tvOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
 
-    case tvOSSimulatorAny(let reason):
+    case .tvOSSimulatorAny(let reason):
       return "tvOSSimulatorAny(*, reason: \(reason))"
 
-    case watchOSAny(let reason):
+    case .watchOSAny(let reason):
       return "watchOS(*, reason: \(reason))"
-    case watchOSMajor(let major, let reason):
+    case .watchOSMajor(let major, let reason):
       return "watchOS(\(major).*, reason: \(reason))"
-    case watchOSMinor(let major, let minor, let reason):
+    case .watchOSMinor(let major, let minor, let reason):
       return "watchOS(\(major).\(minor), reason: \(reason))"
-    case watchOSMinorRange(let major, let minorRange, let reason):
+    case .watchOSMinorRange(let major, let minorRange, let reason):
       return "watchOS(\(major).[\(minorRange)], reason: \(reason))"
-    case watchOSBugFix(let major, let minor, let bugFix, let reason):
+    case .watchOSBugFix(let major, let minor, let bugFix, let reason):
       return "watchOS(\(major).\(minor).\(bugFix), reason: \(reason))"
-    case watchOSBugFixRange(let major, let minor, let bugFixRange, let reason):
+    case .watchOSBugFixRange(let major, let minor, let bugFixRange, let reason):
       return "watchOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
 
-    case watchOSSimulatorAny(let reason):
+    case .watchOSSimulatorAny(let reason):
       return "watchOSSimulatorAny(*, reason: \(reason))"
 
-    case linuxAny(reason: let reason):
+    case .linuxAny(reason: let reason):
       return "linuxAny(*, reason: \(reason))"
 
-    case androidAny(reason: let reason):
+    case .androidAny(reason: let reason):
       return "androidAny(*, reason: \(reason))"
 
-    case freeBSDAny(reason: let reason):
+    case .freeBSDAny(reason: let reason):
       return "freeBSDAny(*, reason: \(reason))"
 
-    case objCRuntime(let reason):
+    case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
-    case nativeRuntime(let reason):
+    case .nativeRuntime(let reason):
       return "Native runtime (no ObjC), reason: \(reason))"
     }
   }
 
   public func evaluate() -> Bool {
     switch self {
-    case custom(let predicate, _):
+    case .custom(let predicate, _):
       return predicate()
 
-    case always:
+    case .always:
       return true
-    case never:
+    case .never:
       return false
 
-    case osxAny:
+    case .osxAny:
       switch _getRunningOSVersion() {
       case .osx:
         return true
@@ -1571,7 +1571,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case osxMajor(let major, _):
+    case .osxMajor(let major, _):
       switch _getRunningOSVersion() {
       case .osx(major, _, _):
         return true
@@ -1579,7 +1579,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case osxMinor(let major, let minor, _):
+    case .osxMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .osx(major, minor, _):
         return true
@@ -1587,7 +1587,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case osxMinorRange(let major, let minorRange, _):
+    case .osxMinorRange(let major, let minorRange, _):
       switch _getRunningOSVersion() {
       case .osx(major, let runningMinor, _):
         return minorRange.contains(runningMinor)
@@ -1595,7 +1595,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case osxBugFix(let major, let minor, let bugFix, _):
+    case .osxBugFix(let major, let minor, let bugFix, _):
       switch _getRunningOSVersion() {
       case .osx(major, minor, bugFix):
         return true
@@ -1603,7 +1603,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case osxBugFixRange(let major, let minor, let bugFixRange, _):
+    case .osxBugFixRange(let major, let minor, let bugFixRange, _):
       switch _getRunningOSVersion() {
       case .osx(major, minor, let runningBugFix):
         return bugFixRange.contains(runningBugFix)
@@ -1611,7 +1611,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case iOSAny:
+    case .iOSAny:
       switch _getRunningOSVersion() {
       case .iOS:
         return true
@@ -1619,7 +1619,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case iOSMajor(let major, _):
+    case .iOSMajor(let major, _):
       switch _getRunningOSVersion() {
       case .iOS(major, _, _):
         return true
@@ -1627,7 +1627,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case iOSMinor(let major, let minor, _):
+    case .iOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .iOS(major, minor, _):
         return true
@@ -1635,7 +1635,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case iOSMinorRange(let major, let minorRange, _):
+    case .iOSMinorRange(let major, let minorRange, _):
       switch _getRunningOSVersion() {
       case .iOS(major, let runningMinor, _):
         return minorRange.contains(runningMinor)
@@ -1643,7 +1643,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case iOSBugFix(let major, let minor, let bugFix, _):
+    case .iOSBugFix(let major, let minor, let bugFix, _):
       switch _getRunningOSVersion() {
       case .iOS(major, minor, bugFix):
         return true
@@ -1651,7 +1651,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case iOSBugFixRange(let major, let minor, let bugFixRange, _):
+    case .iOSBugFixRange(let major, let minor, let bugFixRange, _):
       switch _getRunningOSVersion() {
       case .iOS(major, minor, let runningBugFix):
         return bugFixRange.contains(runningBugFix)
@@ -1659,7 +1659,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case iOSSimulatorAny:
+    case .iOSSimulatorAny:
       switch _getRunningOSVersion() {
       case .iOSSimulator:
         return true
@@ -1667,7 +1667,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case tvOSAny:
+    case .tvOSAny:
       switch _getRunningOSVersion() {
       case .tvOS:
         return true
@@ -1675,7 +1675,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case tvOSMajor(let major, _):
+    case .tvOSMajor(let major, _):
       switch _getRunningOSVersion() {
       case .tvOS(major, _, _):
         return true
@@ -1683,7 +1683,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case tvOSMinor(let major, let minor, _):
+    case .tvOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .tvOS(major, minor, _):
         return true
@@ -1691,7 +1691,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case tvOSMinorRange(let major, let minorRange, _):
+    case .tvOSMinorRange(let major, let minorRange, _):
       switch _getRunningOSVersion() {
       case .tvOS(major, let runningMinor, _):
         return minorRange.contains(runningMinor)
@@ -1699,7 +1699,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case tvOSBugFix(let major, let minor, let bugFix, _):
+    case .tvOSBugFix(let major, let minor, let bugFix, _):
       switch _getRunningOSVersion() {
       case .tvOS(major, minor, bugFix):
         return true
@@ -1707,7 +1707,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case tvOSBugFixRange(let major, let minor, let bugFixRange, _):
+    case .tvOSBugFixRange(let major, let minor, let bugFixRange, _):
       switch _getRunningOSVersion() {
       case .tvOS(major, minor, let runningBugFix):
         return bugFixRange.contains(runningBugFix)
@@ -1715,7 +1715,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case tvOSSimulatorAny:
+    case .tvOSSimulatorAny:
       switch _getRunningOSVersion() {
       case .tvOSSimulator:
         return true
@@ -1723,7 +1723,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case watchOSAny:
+    case .watchOSAny:
       switch _getRunningOSVersion() {
       case .watchOS:
         return true
@@ -1731,7 +1731,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case watchOSMajor(let major, _):
+    case .watchOSMajor(let major, _):
       switch _getRunningOSVersion() {
       case .watchOS(major, _, _):
         return true
@@ -1739,7 +1739,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case watchOSMinor(let major, let minor, _):
+    case .watchOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .watchOS(major, minor, _):
         return true
@@ -1747,7 +1747,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case watchOSMinorRange(let major, let minorRange, _):
+    case .watchOSMinorRange(let major, let minorRange, _):
       switch _getRunningOSVersion() {
       case .watchOS(major, let runningMinor, _):
         return minorRange.contains(runningMinor)
@@ -1755,7 +1755,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case watchOSBugFix(let major, let minor, let bugFix, _):
+    case .watchOSBugFix(let major, let minor, let bugFix, _):
       switch _getRunningOSVersion() {
       case .watchOS(major, minor, bugFix):
         return true
@@ -1763,7 +1763,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case watchOSBugFixRange(let major, let minor, let bugFixRange, _):
+    case .watchOSBugFixRange(let major, let minor, let bugFixRange, _):
       switch _getRunningOSVersion() {
       case .watchOS(major, minor, let runningBugFix):
         return bugFixRange.contains(runningBugFix)
@@ -1771,7 +1771,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case watchOSSimulatorAny:
+    case .watchOSSimulatorAny:
       switch _getRunningOSVersion() {
       case .watchOSSimulator:
         return true
@@ -1779,7 +1779,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case linuxAny:
+    case .linuxAny:
       switch _getRunningOSVersion() {
       case .linux:
         return true
@@ -1787,7 +1787,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case androidAny:
+    case .androidAny:
       switch _getRunningOSVersion() {
       case .android:
         return true
@@ -1795,7 +1795,7 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case freeBSDAny:
+    case .freeBSDAny:
       switch _getRunningOSVersion() {
       case .freeBSD:
         return true
@@ -1803,14 +1803,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case objCRuntime:
+    case .objCRuntime:
 #if _runtime(_ObjC)
       return true
 #else
       return false
 #endif
 
-    case nativeRuntime:
+    case .nativeRuntime:
 #if _runtime(_ObjC)
       return false
 #else

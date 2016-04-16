@@ -1850,6 +1850,11 @@ private:
   /// the exact expression kind).
   bool diagnoseGeneralMemberFailure(Constraint *constraint);
   
+  /// Diagnose the lookup of an enum element as instance member where only a
+  /// static member is allowed
+  void diagnoseEnumInstanceMemberLookup(EnumElementDecl *enumElementDecl,
+                                        SourceLoc loc);
+
   /// Given a result of name lookup that had no viable results, diagnose the
   /// unviable ones.
   void diagnoseUnviableLookupResults(MemberLookupResult &lookupResults,
@@ -2210,6 +2215,70 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   return false;
 }
 
+void FailureDiagnosis::
+diagnoseEnumInstanceMemberLookup(EnumElementDecl *enumElementDecl,
+                                 SourceLoc loc) {
+  auto diag = diagnose(loc, diag::could_not_use_enum_element_on_instance,
+                       enumElementDecl->getName());
+  auto parentEnum = enumElementDecl->getParentEnum();
+  auto enumMetatype = parentEnum->getType()->castTo<AnyMetatypeType>();
+
+  // Determine the contextual type of the expression
+  Type contextualType;
+  for (auto iterateCS = CS;
+         contextualType.isNull() && iterateCS;
+         iterateCS = iterateCS->baseCS) {
+    contextualType = iterateCS->getContextualType();
+  }
+
+  // Try to provide a fix-it that only contains a '.'
+  if (contextualType) {
+    if (enumMetatype->getInstanceType()->isEqual(contextualType)) {
+      diag.fixItInsert(loc, ".");
+      return;
+    }
+  }
+
+  // Check if the expression is the matching operator ~=, most often used in
+  // case statements. If so, try to provide a single dot fix-it
+  const Expr *contextualTypeNode;
+  for (auto iterateCS = CS; iterateCS; iterateCS = iterateCS->baseCS) {
+    contextualTypeNode = iterateCS->getContextualTypeNode();
+  }
+
+  // The '~=' operator is an overloaded decl ref inside a binaryExpr
+  if (auto binaryExpr = dyn_cast<BinaryExpr>(contextualTypeNode)) {
+    if (auto overloadedFn
+          = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn())) {
+      if (overloadedFn->getDecls().size() > 0) {
+        // Fetch any declaration to check if the name is '~='
+        ValueDecl *decl0 = overloadedFn->getDecls()[0];
+
+        if (decl0->getName() == decl0->getASTContext().Id_MatchOperator) {
+          assert(binaryExpr->getArg()->getElements().size() == 2);
+
+          // If the rhs of '~=' is the enum type, a single dot suffices
+          // since the type can be inferred
+          Type secondArgType = binaryExpr->getArg()->getElement(1)->getType();
+          if (secondArgType->isEqual(enumMetatype->getInstanceType())) {
+            diag.fixItInsert(loc, ".");
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  // Fall back to a fix-it with a full type qualifier
+  SmallString<32> enumTypeName;
+  llvm::raw_svector_ostream typeNameStream(enumTypeName);
+  typeNameStream << parentEnum->getName();
+  typeNameStream << ".";
+
+  diag.fixItInsert(loc, typeNameStream.str());
+  return;
+}
+
 
 /// Given a result of name lookup that had no viable results, diagnose the
 /// unviable ones.
@@ -2298,6 +2367,21 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       } else {
         // Otherwise the static member lookup was invalid because it was
         // called on an instance
+        
+        // Handle enum element lookup on instance type
+        auto lookThroughBaseObjTy = baseObjTy->lookThroughAllAnyOptionalTypes();
+        if (lookThroughBaseObjTy->is<EnumType>()
+            || lookThroughBaseObjTy->is<BoundGenericEnumType>()) {
+          for (auto cand : result.UnviableCandidates) {
+            ValueDecl *decl = cand.first;
+            if (auto enumElementDecl = dyn_cast<EnumElementDecl>(decl)) {
+              diagnoseEnumInstanceMemberLookup(enumElementDecl, loc);
+              return;
+            }
+          }
+        }
+        
+        // Provide diagnostic other static member lookups on instance type
         diagnose(loc, diag::could_not_use_type_member_on_instance,
                  baseObjTy, memberName)
           .highlight(baseRange).highlight(nameLoc.getSourceRange());
@@ -2933,7 +3017,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC,
                                              TypeLoc::withoutLoc(convertType),
                                              convertTypePurpose, TCEOptions,
-                                             listener);
+                                             listener, CS);
 
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,

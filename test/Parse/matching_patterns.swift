@@ -82,26 +82,26 @@ enum Voluntary<T> : Equatable {
     case other:
       ()
 
-    case Naught,
-         Naught(),
-         Naught(_, _): // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+    case .Naught,
+         .Naught(),
+         .Naught(_, _): // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
       ()
 
-    case Mere,
-         Mere(), // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
-         Mere(_),
-         Mere(_, _): // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
+    case .Mere,
+         .Mere(), // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
+         .Mere(_),
+         .Mere(_, _): // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
       ()
 
-    case Twain(), // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
-         Twain(_),
-         Twain(_, _),
-         Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
+    case .Twain(), // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
+         .Twain(_),
+         .Twain(_, _),
+         .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
       ()
     }
 
     switch foo {
-    case Naught: // expected-error{{enum case 'Naught' is not a member of type 'Foo'}}
+    case .Naught: // expected-error{{enum case 'Naught' not found in type 'Foo'}}
       ()
     case .A, .B, .C:
       ()

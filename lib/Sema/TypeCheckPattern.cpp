@@ -65,9 +65,14 @@ filterForEnumElement(LookupResult foundElements) {
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
 
-  for (ValueDecl *e : foundElements) {
+  for (swift::LookupResult::Result result : foundElements) {
+    ValueDecl *e = result.Decl;
     assert(e);
     if (e->isInvalid()) {
+      continue;
+    }
+    // Skip if the enum element was referenced as an instance member
+    if (!result.Base || !result.Base->getType()->is<MetatypeType>()) {
       continue;
     }
 
