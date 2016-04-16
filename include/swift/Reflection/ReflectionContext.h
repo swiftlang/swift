@@ -94,7 +94,8 @@ public:
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader)) {}
 
-  ReflectionContext(const ReflectionContext&) = delete;
+  ReflectionContext(const ReflectionContext &other) = delete;
+  ReflectionContext &operator=(const ReflectionContext &other) = delete;
 
   MemoryReader &getReader() {
     return *this->Reader;
