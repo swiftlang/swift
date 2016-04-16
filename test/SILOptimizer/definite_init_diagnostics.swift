@@ -565,7 +565,7 @@ enum TrivialEnum : TriviallyConstructible {
   case NotSoTrivial
 
   init() {
-    self = NotSoTrivial
+    self = .NotSoTrivial
   }
 
   func go(_ x: Int) {}
