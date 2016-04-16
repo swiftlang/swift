@@ -8,8 +8,8 @@ struct S: _ColorLiteralConvertible {
 let y: S = [#Color(colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)#]
 
 struct I: _ImageLiteralConvertible {
-  init?(imageLiteral: String) {}
+  init?(resourceName: String) {}
 }
 
 // CHECK: <gvar>let <name>z</name>: I? = <object-literal-expression>[#<name>Image</name>(<param><name>imageLiteral</name>: "hello.png"</param>)#]</object-literal-expression></gvar>
-let z: I? = [#Image(imageLiteral: "hello.png")#]
+let z: I? = [#imageLiteral(resourceName: "hello.png")#]

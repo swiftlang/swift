@@ -203,9 +203,9 @@ public protocol _ColorLiteralConvertible {
 }
 
 /// Conforming types can be initialized with image literals (e.g.
-/// `[#Image(imageLiteral: "hi.png")#]`).
+/// `[#imageLiteral(resourceName: "hi.png")#]`).
 public protocol _ImageLiteralConvertible {
-  init(imageLiteral: String)
+  init(resourceName: String)
 }
 
 /// Conforming types can be initialized with strings (e.g.

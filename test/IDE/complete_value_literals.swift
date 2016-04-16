@@ -41,7 +41,7 @@ func testAll0() {
 // NO_CONTEXT_0-DAG: Literal[Array]/None:                [{#(values)#}][#Array#];
 // NO_CONTEXT_0-DAG: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary#];
 // NO_CONTEXT_0-DAG: Literal[_Color]/None:               [#Color({#colorLiteralRed: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})#];
-// NO_CONTEXT_0-DAG: Literal[_Image]/None:               [#Image({#imageLiteral: String#})#];
+// NO_CONTEXT_0-DAG: Literal[_Image]/None:               [#imageLiteral({#resourceName: String#})#];
 // NO_CONTEXT_0: End completions
 }
 
@@ -219,14 +219,14 @@ func testColor2() {
 // COLOR_2: Literal[_Color]/None/TypeRelation[Convertible]: [#Color({#colorLiteralRed: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})#][#MyColor1#];
 
 struct MyImage1: _ImageLiteralConvertible {
-  init(imageLiteral: String) {}
+  init(resourceName: String) {}
 }
 func testImage0() {
   let x: Int = #^IMAGE_0^#
 }
-// IMAGE_0: Literal[_Image]/None: [#Image({#imageLiteral: String#})#];
+// IMAGE_0: Literal[_Image]/None: [#imageLiteral({#resourceName: String#})#];
 
 func testImage1() {
   let x: MyImage1 = #^IMAGE_1^#
 }
-// IMAGE_1: Literal[_Image]/None/TypeRelation[Identical]: [#Image({#imageLiteral: String#})#][#MyImage1#];
+// IMAGE_1: Literal[_Image]/None/TypeRelation[Identical]: [#imageLiteral({#resourceName: String#})#][#MyImage1#];

@@ -10,11 +10,11 @@ let y2 = [#Color(colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)#] // expected-
 let y3 = [#Color(colorLiteralRed: 1, bleen: 0, grue: 0, alpha: 1)#] // expected-error{{cannot convert value of type '(colorLiteralRed: Int, bleen: Int, grue: Int, alpha: Int)' to expected argument type '(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)'}}
 
 struct I: _ImageLiteralConvertible {
-  init(imageLiteral: String) {}
+  init(resourceName: String) {}
 }
 
-let z: I = [#Image(imageLiteral: "hello.png")#]
-let z2 = [#Image(imageLiteral: "hello.png")#] // expected-error{{could not infer type of image literal}} expected-note{{import UIKit to use 'UIImage' as the default image literal type}}
+let z: I = [#imageLiteral(resourceName: "hello.png")#]
+let z2 = [#imageLiteral(resourceName: "hello.png")#] // expected-error{{could not infer type of image literal}} expected-note{{import UIKit to use 'UIImage' as the default image literal type}}
 
 struct Path: _FileReferenceLiteralConvertible {
   init(fileReferenceLiteral: String) {}
