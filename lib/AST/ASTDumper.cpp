@@ -1623,9 +1623,8 @@ public:
   }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-    printCommon(E, "object_literal")
-      << " name=" << E->getName();
-    OS << '\n';
+    printCommon(E, "object_literal") 
+      << " kind='" << E->getLiteralKindPlainName() << "'\n";
     printRec(E->getArg());
   }
 

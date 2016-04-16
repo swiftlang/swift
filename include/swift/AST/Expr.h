@@ -831,27 +831,31 @@ public:
 };
 
 // ObjectLiteralExpr - An expression of the form
-// '[#Color(red: 1, blue: 0, green: 0, alpha: 1)#]' with a name and a list
+// '#colorLiteral(red: 1, blue: 0, green: 0, alpha: 1)' with a name and a list
 // argument. The components of the list argument are meant to be themselves
 // constant.
 class ObjectLiteralExpr : public LiteralExpr {
-  Identifier Name;
+public:
+  /// The kind of object literal.
+  enum LiteralKind : unsigned {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) Name,
+#include "swift/Parse/Tokens.def"    
+  };
+
+private:
+  LiteralKind LitKind;
   Expr *Arg;
   Expr *SemanticExpr;
-
-  SourceLoc LLitLoc;
-  SourceLoc NameLoc;
-  SourceLoc RLitLoc;
+  SourceLoc PoundLoc;
 
 public:
-  ObjectLiteralExpr(SourceLoc LLitLoc, Identifier Name, SourceLoc NameLoc,
-                    Expr *Arg, SourceLoc RLitLoc, bool implicit = false)
+  ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
+                    Expr *Arg, bool implicit = false)
     : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
-      Name(Name), Arg(Arg), SemanticExpr(nullptr),
-      LLitLoc(LLitLoc), NameLoc(NameLoc), RLitLoc(RLitLoc) {}
+      LitKind(LitKind), Arg(Arg), SemanticExpr(nullptr),
+      PoundLoc(PoundLoc) {}
 
-  Identifier getName() const { return Name; }
-  SourceLoc getNameLoc() const { return NameLoc; }
+  LiteralKind getLiteralKind() const { return LitKind; }
 
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
@@ -859,8 +863,12 @@ public:
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
 
-  SourceLoc getSourceLoc() const { return NameLoc; }
-  SourceRange getSourceRange() const { return SourceRange(LLitLoc, RLitLoc); }
+  SourceLoc getSourceLoc() const { return PoundLoc; }
+  SourceRange getSourceRange() const { 
+    return SourceRange(PoundLoc, Arg->getEndLoc());
+  }
+
+  StringRef getLiteralKindPlainName() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ObjectLiteral;

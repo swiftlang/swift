@@ -1176,8 +1176,7 @@ public:
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
-  bool isCollectionLiteralStartingWithLSquareLit();
-  ParserResult<Expr> parseExprObjectLiteral();
+  ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          Identifier firstSelectorPiece
                                            = Identifier(),

@@ -30,7 +30,7 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.var.parameter,
-          key.name: "colorLiteralRed",
+          key.name: "red",
           key.offset: 167,
           key.length: 18,
           key.nameoffset: 167,
@@ -82,7 +82,7 @@
     },
     {
       key.kind: source.lang.swift.expr.object_literal,
-      key.name: "Image",
+      key.name: "imageLiteral",
       key.offset: 234,
       key.length: 36,
       key.nameoffset: 236,
@@ -92,7 +92,7 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.var.parameter,
-          key.name: "imageLiteral",
+          key.name: "resourceName",
           key.offset: 242,
           key.length: 25,
           key.nameoffset: 242,

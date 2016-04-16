@@ -742,9 +742,8 @@ shallowCloneImpl(const MagicIdentifierLiteralExpr *E, ASTContext &Ctx) {
 
 static LiteralExpr *
 shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx) {
-  auto res = new (Ctx) ObjectLiteralExpr(E->getStartLoc(), E->getName(),
-                                         E->getNameLoc(), E->getArg(),
-                                         E->getEndLoc());
+  auto res = new (Ctx) ObjectLiteralExpr(E->getStartLoc(), E->getLiteralKind(),
+                                         E->getArg());
   res->setSemanticExpr(E->getSemanticExpr());
   return res;
 }
@@ -843,6 +842,14 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
       unicode::isSingleUnicodeScalar(Val);
   StringLiteralExprBits.IsSingleExtendedGraphemeCluster =
       unicode::isSingleExtendedGraphemeCluster(Val);
+}
+
+StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
+  switch (LitKind) {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
+#include "swift/Parse/Tokens.def"    
+  }
+  llvm_unreachable("unspecified literal");
 }
 
 void DeclRefExpr::setSpecialized() {

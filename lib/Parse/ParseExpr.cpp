@@ -1113,21 +1113,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = parseExprCollection();
     break;
 
-  case tok::l_square_lit: // [#Color(...)#], [#Image(...)#]
-    // If this is actually a collection literal starting with '[#', handle it
-    // as such.
-    if (isCollectionLiteralStartingWithLSquareLit()) {
-      // Split the token into two.
-      SourceLoc LSquareLoc = consumeStartingCharacterOfCurrentToken();
-
-      // Consume the '[' token.
-      Result = parseExprCollection(LSquareLoc);
-      break;
-    }
-
-    Result = parseExprObjectLiteral();
-    break;
-
   case tok::pound_available: {
     // For better error recovery, parse but reject #available in an expr
     // context.
@@ -1141,6 +1126,11 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                   new (Context) ErrorExpr(res.get()->getSourceRange()));
     break;
   }
+
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:\
+  Result = parseExprObjectLiteral(ObjectLiteralExpr::Name);\
+  break;
+#include "swift/Parse/Tokens.def"
 
   case tok::code_complete:
     Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getRange()));
@@ -2327,30 +2317,13 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
                         /*Implicit=*/false));
 }
 
-bool Parser::isCollectionLiteralStartingWithLSquareLit() {
-  BacktrackingScope backtracking(*this);
-  (void)consumeToken(tok::l_square_lit);
-  if (!consumeIf(tok::identifier)) return false;
-
-  // Skip over a parenthesized argument, if present.
-  if (Tok.is(tok::l_paren)) skipSingle();
-
-  return Tok.isNot(tok::r_square_lit);
-}
-
 /// \brief Parse an object literal expression.
 ///
 /// expr-literal:
-///   '[#' identifier expr-paren '#]'
+///   '#' identifier expr-paren
 ParserResult<Expr>
-Parser::parseExprObjectLiteral() {
-  SourceLoc LLitLoc = consumeToken(tok::l_square_lit);
-  Identifier Name;
-  SourceLoc NameLoc;
-  if (parseIdentifier(Name, NameLoc,
-                      diag::expected_identifier_after_l_square_lit)) {
-    return makeParserError();
-  }
+Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind) {
+  SourceLoc PoundLoc = consumeToken();
   // Parse a tuple of args
   if (!Tok.is(tok::l_paren)) {
     diagnose(Tok, diag::expected_arg_list_in_object_literal);
@@ -2364,13 +2337,8 @@ Parser::parseExprObjectLiteral() {
   if (Arg.isParseError()) {
     return makeParserError();
   }
-  if (!Tok.is(tok::r_square_lit)) {
-    diagnose(Tok, diag::expected_r_square_lit_after_object_literal);
-    return makeParserError();
-  }
-  SourceLoc RLitLoc = consumeToken(tok::r_square_lit);
   return makeParserResult(
-    new (Context) ObjectLiteralExpr(LLitLoc, Name, NameLoc, Arg.get(), RLitLoc,
+    new (Context) ObjectLiteralExpr(PoundLoc, LitKind, Arg.get(),
                                     /*implicit=*/false));
 }
 
