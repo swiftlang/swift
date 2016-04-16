@@ -3,4 +3,5 @@ add_swift_library(swiftReflection IS_STDLIB IS_HOST
   MetadataSource.cpp
   Remangle.cpp
   TypeRef.cpp
+  TypeRefBuilder.cpp
   INSTALL_IN_COMPONENT dev)
