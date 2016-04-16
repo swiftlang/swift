@@ -291,10 +291,10 @@ class MismatchOptionalBase {
     set {}
   }
 
-  subscript(get a: Int?) -> Void { // expected-note {{potential overridden subscript 'subscript(get:)' here}}
+  subscript(get a: Int?) -> Void {
     return ()
   }
-  subscript(get b: Void) -> Int { // expected-note {{potential overridden subscript 'subscript(get:)' here}}
+  subscript(get b: Void) -> Int {
     return 0
   }
 
@@ -349,10 +349,10 @@ class MismatchOptional : MismatchOptionalBase {
     set {}
   }
 
-  override subscript(get a: Int) -> Void { // expected-error {{subscript does not override any subscript from its superclass}}
+  override subscript(get a: Int) -> Void { // expected-error {{cannot override subscript index of type 'Int?' with non-optional type 'Int'}} {{32-32=?}}
     return ()
   }
-  override subscript(get b: Void) -> Int? { // expected-error {{subscript does not override any subscript from its superclass}}
+  override subscript(get b: Void) -> Int? { // expected-error {{cannot override subscript element type 'Int' with optional type 'Int?'}} {{41-42=}}
     return nil
   }
 

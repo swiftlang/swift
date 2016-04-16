@@ -4576,15 +4576,18 @@ public:
 
   static bool
   diagnoseMismatchedOptionals(TypeChecker &TC,
-                              const AbstractFunctionDecl *method,
-                              const AbstractFunctionDecl *parentMethod,
+                              const Decl *member,
+                              const ParameterList *params,
+                              TypeLoc resultTL,
+                              const ValueDecl *parentMember,
                               Type owningTy,
                               bool treatIUOResultAsError) {
     bool emittedError = false;
-    Type plainParentTy = adjustSuperclassMemberDeclType(TC, parentMethod,
+    Type plainParentTy = adjustSuperclassMemberDeclType(TC, parentMember,
                                                         owningTy);
     const auto *parentTy = plainParentTy->castTo<AnyFunctionType>();
-    parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
+    if (isa<AbstractFunctionDecl>(parentMember))
+      parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
 
     // Check the parameter types.
     auto checkParam = [&](const ParamDecl *decl, Type parentParamTy) {
@@ -4619,7 +4622,8 @@ public:
         emittedError = true;
         auto diag = TC.diagnose(decl->getStartLoc(),
                                 diag::override_optional_mismatch,
-                                method->getDescriptiveKind(),
+                                member->getDescriptiveKind(),
+                                isa<SubscriptDecl>(member),
                                 parentParamTy, paramTy);
         if (TL.getTypeRepr()->isSimple()) {
           diag.fixItInsertAfter(TL.getSourceRange().End, "?");
@@ -4638,7 +4642,7 @@ public:
         return;
 
       TC.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
-                  method->getDescriptiveKind(), parentParamTy, paramTy)
+                  member->getDescriptiveKind(), parentParamTy, paramTy)
         .highlight(TL.getSourceRange());
 
       auto sugaredForm =
@@ -4655,21 +4659,19 @@ public:
         .fixItInsertAfter(TL.getSourceRange().End, ")");
     };
 
-    auto paramList = method->getParameterList(1);
     auto parentInput = parentTy->getInput();
     
     if (auto parentTupleInput = parentInput->getAs<TupleType>()) {
       // FIXME: If we ever allow argument reordering, this is incorrect.
-      ArrayRef<ParamDecl*> sharedParams = paramList->getArray();
+      ArrayRef<ParamDecl*> sharedParams = params->getArray();
       sharedParams = sharedParams.slice(0, parentTupleInput->getNumElements());
       for_each(sharedParams, parentTupleInput->getElementTypes(), checkParam);
     } else {
       // Otherwise, the parent has a single parameter with no label.
-      checkParam(paramList->get(0), parentInput);
+      checkParam(params->get(0), parentInput);
     }
 
-    auto methodAsFunc = dyn_cast<FuncDecl>(method);
-    if (!methodAsFunc)
+    if (!resultTL.getTypeRepr())
       return emittedError;
 
     auto checkResult = [&](TypeLoc resultTL, Type parentResultTy) {
@@ -4677,13 +4679,11 @@ public:
       if (!resultTy || !parentResultTy)
         return;
 
-      TypeRepr *TR = resultTL.getTypeRepr();
-      if (!TR)
-        return;
-
       OptionalTypeKind resultOTK;
       if (!resultTy->getAnyOptionalObjectType(resultOTK))
         return;
+
+      TypeRepr *TR = resultTL.getTypeRepr();
 
       if (resultOTK == OTK_Optional || treatIUOResultAsError) {
         if (parentResultTy->getAnyOptionalObjectType())
@@ -4691,7 +4691,8 @@ public:
         emittedError = true;
         auto diag = TC.diagnose(resultTL.getSourceRange().Start,
                                 diag::override_optional_result_mismatch,
-                                method->getDescriptiveKind(),
+                                member->getDescriptiveKind(),
+                                isa<SubscriptDecl>(member),
                                 parentResultTy, resultTy);
         if (auto optForm = dyn_cast<OptionalTypeRepr>(TR)) {
           diag.fixItRemove(optForm->getQuestionLoc());
@@ -4711,7 +4712,7 @@ public:
 
       TC.diagnose(resultTL.getSourceRange().Start,
                   diag::override_unnecessary_result_IUO,
-                  method->getDescriptiveKind(), parentResultTy, resultTy)
+                  member->getDescriptiveKind(), parentResultTy, resultTy)
         .highlight(resultTL.getSourceRange());
 
       auto sugaredForm = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(TR);
@@ -4727,7 +4728,7 @@ public:
         .fixItInsertAfter(resultTL.getSourceRange().End, ")");
     };
 
-    checkResult(methodAsFunc->getBodyResultTypeLoc(), parentTy->getResult());
+    checkResult(resultTL, parentTy->getResult());
     return emittedError;
   }
 
@@ -5115,21 +5116,26 @@ public:
         TC.diagnose(matchDecl, diag::overridden_here);
       }
 
+      bool mayHaveMismatchedOptionals =
+          (attempt == OverrideCheckingAttempt::MismatchedOptional ||
+           attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional);
+
       // If this is an exact type match, we're successful!
       if (declTy->isEqual(matchType)) {
         // Nothing to do.
         
       } else if (method) {
         // Private migration help for overrides of Objective-C methods.
-        bool mayHaveMismatchedOptionals =
-            (attempt==OverrideCheckingAttempt::MismatchedOptional ||
-             attempt==OverrideCheckingAttempt::BaseNameWithMismatchedOptional);
         if ((!isa<FuncDecl>(method) || !cast<FuncDecl>(method)->isAccessor()) &&
             (matchDecl->isObjC() || mayHaveMismatchedOptionals)) {
+          TypeLoc resultTL;
+          if (auto *methodAsFunc = dyn_cast<FuncDecl>(method))
+            resultTL = methodAsFunc->getBodyResultTypeLoc();
           emittedMatchError |=
               diagnoseMismatchedOptionals(TC, method,
-                                          cast<AbstractFunctionDecl>(matchDecl),
-                                          owningTy, mayHaveMismatchedOptionals);
+                                          method->getParameterList(1), resultTL,
+                                          matchDecl, owningTy,
+                                          mayHaveMismatchedOptionals);
         }
       } else if (auto subscript =
                    dyn_cast_or_null<SubscriptDecl>(abstractStorage)) {
@@ -5141,6 +5147,15 @@ public:
                       declTy, matchType);
           TC.diagnose(matchDecl, diag::subscript_override_here);
           return true;
+        }
+
+        if (mayHaveMismatchedOptionals) {
+          emittedMatchError |=
+              diagnoseMismatchedOptionals(TC, subscript,
+                                          subscript->getIndices(),
+                                          subscript->getElementTypeLoc(),
+                                          matchDecl, owningTy,
+                                          mayHaveMismatchedOptionals);
         }
       } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
         auto propertyTy = property->getInterfaceType();

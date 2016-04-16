@@ -1417,11 +1417,13 @@ ERROR(override_throws_objc,none,
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
 ERROR(override_optional_mismatch,none,
-      "cannot override %0 parameter of type %1 with non-optional type %2",
-      (DescriptiveDeclKind, Type, Type))
+      "cannot override %0 %select{parameter|index}1 of type %2 with "
+      "non-optional type %3",
+      (DescriptiveDeclKind, bool, Type, Type))
 ERROR(override_optional_result_mismatch,none,
-      "cannot override %0 result type %1 with optional type %2",
-      (DescriptiveDeclKind, Type, Type))
+      "cannot override %0 %select{result|element}1 type %2 with "
+      "optional type %3",
+      (DescriptiveDeclKind, bool, Type, Type))
 WARNING(override_unnecessary_IUO,none,
       "overriding %0 parameter of type %1 with implicitly unwrapped optional "
       "type %2",
