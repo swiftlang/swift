@@ -114,7 +114,8 @@ def main_preset():
     print_with_argv0(
         "using preset '" + args.preset + "', which expands to " +
         quote_shell_command(build_script_args))
-    check_call(build_script_args)
+
+    check_call(build_script_args, disable_sleep=True)
 
     return 0
 
@@ -1220,7 +1221,7 @@ the number of parallel build jobs to use""",
     if args.show_sdks:
         swift_build_support.debug.print_xcodebuild_versions()
 
-    check_call(build_script_impl_args)
+    check_call(build_script_impl_args, disable_sleep=True)
 
     if args.symbols_package:
         print('--- Creating symbols package ---')
