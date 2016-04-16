@@ -1067,24 +1067,19 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     esac
     if [[ "${build_for_this_target}" ]] ; then
         if [[ "${BUILD_SWIFT_STDLIB_UNITTEST_EXTRA}" == "1" ]] ; then
-            SWIFT_STDLIB_TARGETS=(
-                "${SWIFT_STDLIB_TARGETS[@]}" "swift-stdlib-${deployment_target}")
+            SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
         else
             if [[ "${SKIP_TEST_VALIDATION}" ]] ; then
-                SWIFT_STDLIB_TARGETS=(
-                    "${SWIFT_STDLIB_TARGETS[@]}" "swift-test-stdlib-${deployment_target}")
+                SWIFT_STDLIB_TARGETS+=("swift-test-stdlib-${deployment_target}")
             else
-                SWIFT_STDLIB_TARGETS=(
-                    "${SWIFT_STDLIB_TARGETS[@]}" "swift-stdlib-${deployment_target}")
+                SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
             fi
         fi
     fi
     if [[ "${build_benchmark_this_target}" ]] ; then
-        SWIFT_BENCHMARK_TARGETS=(
-            "${SWIFT_BENCHMARK_TARGETS[@]}" "swift-benchmark-${deployment_target}")
+        SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${deployment_target}")
         if [[ $(not ${SKIP_TEST_BENCHMARK}) ]] ; then
-          SWIFT_RUN_BENCHMARK_TARGETS=(
-              "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" "check-swift-benchmark-${deployment_target}")
+          SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${deployment_target}")
         fi
     fi
     if [[ "${test_this_target}" ]] ; then
@@ -1092,18 +1087,14 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             test_target_suffix="-non-executable"
         fi
         if [[ "${SKIP_TEST_VALIDATION}" ]] ; then
-            SWIFT_TEST_TARGETS=(
-                "${SWIFT_TEST_TARGETS[@]}" "check-swift${test_target_suffix}-${deployment_target}")
+            SWIFT_TEST_TARGETS+=("check-swift${test_target_suffix}-${deployment_target}")
             if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
-              SWIFT_TEST_TARGETS=(
-                 "${SWIFT_TEST_TARGETS[@]}" "check-swift-optimize-${deployment_target}")
+              SWIFT_TEST_TARGETS+=("check-swift-optimize-${deployment_target}")
             fi
         else
-            SWIFT_TEST_TARGETS=(
-                "${SWIFT_TEST_TARGETS[@]}" "check-swift-all${test_target_suffix}-${deployment_target}")
+            SWIFT_TEST_TARGETS+=("check-swift-all${test_target_suffix}-${deployment_target}")
             if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
-              SWIFT_TEST_TARGETS=(
-                 "${SWIFT_TEST_TARGETS[@]}" "check-swift-all-optimize-${deployment_target}")
+              SWIFT_TEST_TARGETS+=("check-swift-all-optimize-${deployment_target}")
             fi
         fi
     fi
@@ -1388,8 +1379,6 @@ function cmake_config_opt() {
 }
 
 function set_swiftpm_bootstrap_command() {
-    swiftpm_bootstrap_command=()
-    
     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
     LLBUILD_BIN="$(build_directory_bin ${deployment_target} llbuild)/swift-build-tool"
     if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
@@ -1402,13 +1391,16 @@ function set_swiftpm_bootstrap_command() {
     fi
     swiftpm_bootstrap_command=("${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
     if [[ "${VERBOSE_BUILD}" ]] ; then
-        swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" -v)
+        swiftpm_bootstrap_command+=(-v)
     fi
-    swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --swiftc="${SWIFTC_BIN}")
-    swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --sbt="${LLBUILD_BIN}")
-    swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --build="${build_dir}")
+    swiftpm_bootstrap_command+=(
+        --swiftc="${SWIFTC_BIN}"
+        --sbt="${LLBUILD_BIN}"
+        --build="${build_dir}")
     if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
-        swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --foundation="${FOUNDATION_BUILD_DIR}/Foundation" --xctest="${XCTEST_BUILD_DIR}")
+        swiftpm_bootstrap_command+=(
+            --foundation="${FOUNDATION_BUILD_DIR}/Foundation"
+            --xctest="${XCTEST_BUILD_DIR}")
     fi
 }
 
