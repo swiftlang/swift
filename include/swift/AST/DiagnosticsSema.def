@@ -1061,8 +1061,10 @@ ERROR(extension_protocol_via_typealias,none,
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
 ERROR(objc_generic_extension_using_type_parameter,none,
-      "Extension of a generic Objective-C class cannot access the class's "
-      "generic parameters", ())
+      "extension of a generic Objective-C class cannot access the class's "
+      "generic parameters at runtime", ())
+NOTE(objc_generic_extension_using_type_parameter_here,none,
+     "generic parameter used here", ())
 
 // Protocols
 ERROR(type_does_not_conform,none,

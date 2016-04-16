@@ -1919,13 +1919,14 @@ bool TypeBase::isPotentiallyBridgedValueType() {
 }
 
 /// Determine whether this is a representable Objective-C object type.
-static ForeignRepresentableKind getObjCObjectRepresentable(Type type) {
+static ForeignRepresentableKind getObjCObjectRepresentable(Type type,
+                                                           DeclContext *dc) {
   // @objc metatypes are representable when their instance type is.
   if (auto metatype = type->getAs<AnyMetatypeType>()) {
     // If the instance type is not representable, the metatype is not
     // representable.
     auto instanceType = metatype->getInstanceType();
-    if (getObjCObjectRepresentable(instanceType)
+    if (getObjCObjectRepresentable(instanceType, dc)
           == ForeignRepresentableKind::None)
       return ForeignRepresentableKind::None;
 
@@ -1955,6 +1956,14 @@ static ForeignRepresentableKind getObjCObjectRepresentable(Type type) {
   // Objective-C existential types.
   if (type->isObjCExistentialType())
     return ForeignRepresentableKind::Object;
+  
+  // Class-constrained generic parameters, from ObjC generic classes.
+  if (auto tyContext = dc->getInnermostTypeContext())
+    if (auto clas = tyContext->getAsClassOrClassExtensionContext())
+      if (clas->hasClangNode())
+        if (auto archetype = type->getAs<ArchetypeType>())
+          if (archetype->requiresClass())
+            return ForeignRepresentableKind::Object;
 
   return ForeignRepresentableKind::None;
 }
@@ -1976,7 +1985,7 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 
   // Objective-C object types, including metatypes.
   if (language == ForeignLanguage::ObjectiveC) {
-    auto representable = getObjCObjectRepresentable(type);
+    auto representable = getObjCObjectRepresentable(type, dc);
     if (representable != ForeignRepresentableKind::None)
       return { representable, nullptr };
   }
@@ -2137,7 +2146,7 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
         pointerElt = objectType;
 
       if (language == ForeignLanguage::ObjectiveC &&
-          getObjCObjectRepresentable(pointerElt)
+          getObjCObjectRepresentable(pointerElt, dc)
             != ForeignRepresentableKind::None)
         return { ForeignRepresentableKind::Trivial, nullptr };
 

@@ -596,15 +596,14 @@ public class NonObjCClass { }
   init(fn: Int -> Int) throws { }
 }
 
-@objc class Pet: Pettable {}
-@objc protocol Runcible {}
+@objc class Spoon: Fungible {}
 
 // CHECK-LABEL: @interface UsesImportedGenerics
 @objc class UsesImportedGenerics {
   // CHECK: - (GenericClass<id> * _Nonnull)takeAndReturnGenericClass:(GenericClass<NSString *> * _Nullable)x;
   @objc func takeAndReturnGenericClass(_ x: GenericClass<NSString>?) -> GenericClass<AnyObject> { fatalError("") }
-  // CHECK: - (PettableContainer<id <Pettable>> * _Null_unspecified)takeAndReturnPettableContainer:(PettableContainer<Pet *> * _Nonnull)x;
-  @objc func takeAndReturnPettableContainer(_ x: PettableContainer<Pet>) -> PettableContainer<Pettable>! { fatalError("") }
+  // CHECK: - (FungibleContainer<id <Fungible>> * _Null_unspecified)takeAndReturnFungibleContainer:(FungibleContainer<Spoon *> * _Nonnull)x;
+  @objc func takeAndReturnFungibleContainer(_ x: FungibleContainer<Spoon>) -> FungibleContainer<Fungible>! { fatalError("") }
 }
 // CHECK: @end
 
