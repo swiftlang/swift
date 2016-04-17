@@ -477,11 +477,11 @@ func _uint64ToString(
 func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
     UInt64(
-      UInt(bitPattern: UnsafePointer<Builtin.RawPointer>(value))),
+      UInt(bitPattern: UnsafePointer<Void>(value))),
       radix: 16,
       uppercase: false
     )
-  for _ in 0..<(2 * sizeof(Builtin.RawPointer) - result.utf16.count) {
+  for _ in 0..<(2 * sizeof(UnsafePointer<Void>) - result.utf16.count) {
     result = "0" + result
   }
   return "0x" + result
