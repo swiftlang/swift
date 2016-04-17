@@ -584,7 +584,7 @@ extension Int {
     if let bitPattern = bitPattern {
       self = Int(Builtin.ptrtoint_Word(bitPattern._rawValue))
     } else {
-      self = Int(0)
+      self = 0
     }
   }
 }
@@ -595,7 +595,7 @@ extension UInt {
     if let bitPattern = bitPattern {
       self = UInt(Builtin.ptrtoint_Word(bitPattern._rawValue))
     } else {
-      self = UInt(0)
+      self = 0
     }
   }
 }
