@@ -25,11 +25,11 @@ public struct S { // expected-note{{in declaration of 'S'}}
 // expected-error@+1{{expected declaration}}
 / ###line 25 "line-directive.swift"
 }
-// expected-warning@+1{{#line directive is deprecated, please use #sourceLocation instead}}
+// expected-error@+1{{#line directive was renamed to #sourceLocation}}
 #line 32000 "troops_on_the_water"
 
 #sourceLocation()
 
 
-// expected-warning@+1{{#line directive is deprecated, please use #sourceLocation instead}}
+// expected-error@+1{{#line directive was renamed to #sourceLocation}}
 #setline 32000 "troops_on_the_water"

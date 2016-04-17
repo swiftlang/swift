@@ -583,10 +583,10 @@ func iterators() {
 //===----------------------------------------------------------------------===//
 
 func magic_literals() {
-  _ = __FILE__  // expected-warning {{__FILE__ is deprecated and will be removed in Swift 3, please use #file}}
-  _ = __LINE__  // expected-warning {{__LINE__ is deprecated and will be removed in Swift 3, please use #line}}
-  _ = __COLUMN__  // expected-warning {{__COLUMN__ is deprecated and will be removed in Swift 3, please use #column}}
-  _ = __DSO_HANDLE__  // expected-warning {{__DSO_HANDLE__ is deprecated and will be removed in Swift 3, please use #dsohandle}}
+  _ = __FILE__  // expected-error {{__FILE__ has been replaced with #file in Swift 3}}
+  _ = __LINE__  // expected-error {{__LINE__ has been replaced with #line in Swift 3}}
+  _ = __COLUMN__  // expected-error {{__COLUMN__ has been replaced with #column in Swift 3}}
+  _ = __DSO_HANDLE__  // expected-error {{__DSO_HANDLE__ has been replaced with #dsohandle in Swift 3}}
 
   _ = #file
   _ = #line + #column

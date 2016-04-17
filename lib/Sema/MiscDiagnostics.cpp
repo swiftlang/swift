@@ -1862,7 +1862,6 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
     
   if (checker.isVarDeclEverWritten(loopVar)) {
     diagnostic.flush();
-    TC.diagnose(FS->getStartLoc(), diag::cant_fix_c_style_for_stmt);
     return;
   }
     

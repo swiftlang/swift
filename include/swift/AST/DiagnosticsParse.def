@@ -148,8 +148,8 @@ WARNING(lex_editor_placeholder_in_playground,none,
 
 NOTE(note_in_decl_extension,none,
      "in %select{declaration|extension}0 of %1", (bool, Identifier))
-WARNING(line_directive_style_deprecated,none,
-        "#line directive is deprecated, please use #sourceLocation instead",
+ERROR(line_directive_style_deprecated,none,
+        "#line directive was renamed to #sourceLocation",
         ())
 
 ERROR(declaration_same_line_without_semi,none,
@@ -739,9 +739,9 @@ ERROR(invalid_label_on_stmt,none,
 NOTE(discard_result_of_closure,none,
      "explicitly discard the result of the closure by assigning to '_'", ())
 
-WARNING(snake_case_deprecated,none,
-        "%0 is deprecated and will be removed in Swift 3, please use %1",
-        (StringRef, StringRef))
+ERROR(snake_case_deprecated,none,
+      "%0 has been replaced with %1 in Swift 3",
+      (StringRef, StringRef))
 
 
 // Assignment statement
@@ -1079,8 +1079,8 @@ ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
 
-WARNING(replace_equal_with_colon_for_value,none,
-        "'=' is deprecated in favor of ':' before an attribute argument", ())
+ERROR(replace_equal_with_colon_for_value,none,
+      "'=' has been replaced with ':' in attribute arguments", ())
 ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
 ERROR(unknown_attribute,none,
