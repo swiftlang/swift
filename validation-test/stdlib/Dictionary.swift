@@ -45,7 +45,7 @@ extension DictionaryIterator
 var DictionaryTestSuite = TestSuite("Dictionary")
 
 DictionaryTestSuite.test("sizeof") {
-  var dict = [ 1: "meow", 2: "meow" ]
+  var dict = [1: "meow", 2: "meow"]
 #if arch(i386) || arch(arm)
   expectEqual(4, sizeofValue(dict))
 #else
@@ -3746,7 +3746,7 @@ DictionaryTestSuite.test(
 DictionaryTestSuite.test("misc") {
   do {
     // Dictionary literal
-    var dict = [ "Hello": 1, "World": 2 ]
+    var dict = ["Hello": 1, "World": 2]
 
     // Insertion
     dict["Swift"] = 3

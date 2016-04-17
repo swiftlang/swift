@@ -58,11 +58,11 @@ func withInoutT<T>(_ x: inout T, body: (x: inout T) -> Void) {
 %   for array_type in all_array_types:
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
-  var a: ${array_type}<${array_type}<${element_type}>> = [ [
+  var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70)
-  ] ]
+  ]]
   let identityOuter = a.identity
   var identityInner = a[0].identity
 
@@ -128,11 +128,11 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
 }
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW") {
-  var a: ${array_type}<${array_type}<${element_type}>> = [ [
+  var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70), ${element_type}(80), ${element_type}(90),
-  ] ]
+  ]]
   let identityOuter = a.identity
   var identityInner = a[0].identity
 

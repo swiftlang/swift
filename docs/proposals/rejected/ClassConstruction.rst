@@ -40,7 +40,7 @@ of its subclasses.  This leads to a soundness problem:
   - (void)print { printf(\ **name**\ ); } // oops
   @end
 
-  mySubclassInstance = [ [Subclass alloc] initSuperClass ]
+  mySubclassInstance = [[Subclass alloc] initSuperClass]
 
 Because there is no way to hide a superclass' ``init`` method from
 clients, ensuring that subclass instances are properly initialized

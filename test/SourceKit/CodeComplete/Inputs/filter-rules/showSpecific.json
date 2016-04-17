@@ -6,7 +6,7 @@
   {
     key.kind: source.codecompletion.identifier,
     key.hide: 0,
-    key.names: [ "myFunFunction1()" ]
+    key.names: ["myFunFunction1()"]
   },
   {
     key.kind: source.codecompletion.keyword,
