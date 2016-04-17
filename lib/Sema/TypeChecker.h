@@ -1757,9 +1757,7 @@ public:
   void diagnoseDeprecated(SourceRange SourceRange,
                           const DeclContext *ReferenceDC,
                           const AvailableAttr *Attr,
-                          DeclName Name,
-              std::function<void(InFlightDiagnostic&)> extraInfoHandler =
-                          [](InFlightDiagnostic&){});
+                          DeclName Name);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
