@@ -204,7 +204,7 @@ interface, e.g. (in Java)::
 
 .. @ignore()
 .. This test just doesn't compile at the moment, but that represents a
-   bug in swift
+   bug in Swift
 
 and then a class X that wants to be Comparable will inherit from
 Comparable<X>. This is ugly and has a number of pitfalls; see

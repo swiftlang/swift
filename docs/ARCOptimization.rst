@@ -8,7 +8,7 @@ ARC Optimization for Swift
 
 .. admonition:: TODO
 
-   This is an evolving document on ARC optimization in the swift
+   This is an evolving document on ARC optimization in the Swift
    compiler. Please extend it.
 
 Terms
@@ -332,7 +332,7 @@ is_unique performs depends on the argument type:
       (Builtin.NativeObject, known native class reference)
 
     - Objective-C object types require an additional check that the
-      dynamic object type uses native swift reference counting:
+      dynamic object type uses native Swift reference counting:
       (Builtin.UnknownObject, unknown class reference, class existential)
 
     - Bridged object types allow the dynamic object type check to be
@@ -342,7 +342,7 @@ is_unique performs depends on the argument type:
 Any of the above types may also be wrapped in an optional.  If the
 static argument type is optional, then a null check is also performed.
 
-Thus, is_unique only returns true for non-null, native swift object
+Thus, is_unique only returns true for non-null, native Swift object
 references with a strong reference count of one.
 
 is_unique_or_pinned has the same semantics as is_unique except that it

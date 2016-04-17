@@ -386,7 +386,7 @@ about 10 times.
 
   Game(10).play
 
-The cost of large swift values
+The cost of large Swift values
 ==============================
 
 In Swift, values keep a unique copy of their data. There are several advantages
@@ -501,12 +501,12 @@ The type ``Box`` can replace the array in the code sample above.
 Unsafe code
 ===========
 
-Swift classes are always reference counted. The swift compiler inserts code
+Swift classes are always reference counted. The Swift compiler inserts code
 that increments the reference count every time the object is accessed.
 For example, consider the problem of scanning a linked list that's
 implemented using classes. Scanning the list is done by moving a
 reference from one node to the next: ``elem = elem.next``. Every time we move
-the reference swift will increment the reference count of the ``next`` object
+the reference Swift will increment the reference count of the ``next`` object
 and decrement the reference count of the previous object. These reference
 count operations are expensive and unavoidable when using Swift classes.
 
