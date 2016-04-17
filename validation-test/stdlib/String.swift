@@ -881,7 +881,7 @@ StringTests.test("growth") {
 }
 
 StringTests.test("Construction") {
-  expectEqual("abc", String([ "a", "b", "c" ] as [Character]))
+  expectEqual("abc", String(["a", "b", "c"] as [Character]))
 }
 
 StringTests.test("Conversions") {
@@ -1097,26 +1097,26 @@ StringTests.test("String.append(_: UnicodeScalar)") {
     // U+0061 LATIN SMALL LETTER A
     let input: UnicodeScalar = "\u{61}"
     s.append(input)
-    expectEqual([ "\u{61}" ], Array(s.unicodeScalars))
+    expectEqual(["\u{61}"], Array(s.unicodeScalars))
   }
   do {
     // U+304B HIRAGANA LETTER KA
     let input: UnicodeScalar = "\u{304b}"
     s.append(input)
-    expectEqual([ "\u{61}", "\u{304b}" ], Array(s.unicodeScalars))
+    expectEqual(["\u{61}", "\u{304b}"], Array(s.unicodeScalars))
   }
   do {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let input: UnicodeScalar = "\u{3099}"
     s.append(input)
-    expectEqual([ "\u{61}", "\u{304b}", "\u{3099}" ], Array(s.unicodeScalars))
+    expectEqual(["\u{61}", "\u{304b}", "\u{3099}"], Array(s.unicodeScalars))
   }
   do {
     // U+1F425 FRONT-FACING BABY CHICK
     let input: UnicodeScalar = "\u{1f425}"
     s.append(input)
     expectEqual(
-      [ "\u{61}", "\u{304b}", "\u{3099}", "\u{1f425}" ],
+      ["\u{61}", "\u{304b}", "\u{3099}", "\u{1f425}"],
       Array(s.unicodeScalars))
   }
 }
@@ -1155,7 +1155,7 @@ StringTests.test("String.append(_: Character)") {
     // U+0303 COMBINING TILDE
     "\u{61}\u{0300}\u{0301}\u{0302}\u{0303}",
   ]
-  let baseStrings = [ "" ] + baseCharacters.map { String($0) }
+  let baseStrings = [""] + baseCharacters.map { String($0) }
 
   for baseIdx in baseStrings.indices {
     for prefix in ["", " "] {
@@ -1165,7 +1165,7 @@ StringTests.test("String.append(_: Character)") {
         var s = base
         s.append(input)
         expectEqualSequence(
-          Array(base.characters) + [ input ],
+          Array(base.characters) + [input],
           Array(s.characters),
           "baseIdx=\(baseIdx) inputIdx=\(inputIdx)")
       }

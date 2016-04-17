@@ -549,7 +549,7 @@ Reflection.test("Struct/Generic/DefaultMirror") {
   do {
     var value = GenericStructWithDefaultMirror<Int, [Any?]>(
       first: 123,
-      second: [ "abc", 456, 789.25 ])
+      second: ["abc", 456, 789.25])
     var output = ""
     dump(value, to: &output)
 

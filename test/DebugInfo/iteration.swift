@@ -7,7 +7,7 @@ var puzzleOutput: [String] = []
 // CHECK-NOT: !DILocalVariable(name: "$letter$generator"
 // CHECK: !DILocalVariable(name: "letter",
 // CHECK-SAME:             line: [[@LINE+1]]
-for letter in [ "g", "r", "e", "a", "t" ] {
+for letter in ["g", "r", "e", "a", "t"] {
   switch letter {
   case "a", "e", "i", "o", "u", " ":
     continue

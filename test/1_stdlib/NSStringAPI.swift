@@ -386,13 +386,13 @@ NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
 
   do {
     var outputName = "None Found"
-    var outputArray: [String] = [ "foo", "bar" ]
+    var outputArray: [String] = ["foo", "bar"]
     var count = nonExistentPath.completePath(
         into: &outputName, caseSensitive: false, matchesInto: &outputArray)
 
     expectEqual(0, count)
     expectEqual("None Found", outputName)
-    expectEqual([ "foo", "bar" ], outputArray)
+    expectEqual(["foo", "bar"], outputArray)
   }
 
   do {
@@ -411,7 +411,7 @@ NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
 
   do {
     var outputName = "None Found"
-    var outputArray: [String] = [ "foo", "bar" ]
+    var outputArray: [String] = ["foo", "bar"]
     var count = existingPath.completePath(
         into: &outputName, caseSensitive: false, matchesInto: &outputArray)
 
@@ -423,7 +423,7 @@ NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
   do {
     var outputName = "None Found"
     var count = existingPath.completePath(
-        into: &outputName, caseSensitive: false, filterTypes: [ "txt" ])
+        into: &outputName, caseSensitive: false, filterTypes: ["txt"])
 
     expectEqual(1, count)
     expectEqual(existingPath, outputName)
@@ -431,37 +431,37 @@ NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
 }
 
 NSStringAPIs.test("components(separatedBy:) (NSCharacterSet)") {
-  expectEqual([ "" ], "".components(
+  expectEqual([""], "".components(
     separatedBy: NSCharacterSet.decimalDigits()))
 
   expectEqual(
-    [ "абв", "", "あいう", "abc" ],
+    ["абв", "", "あいう", "abc"],
     "абв12あいう3abc".components(
         separatedBy: NSCharacterSet.decimalDigits()))
 
   expectEqual(
-    [ "абв", "", "あいう", "abc" ],
+    ["абв", "", "あいう", "abc"],
     "абв\u{1F601}\u{1F602}あいう\u{1F603}abc"
       .components(
         separatedBy: NSCharacterSet(charactersIn: "\u{1F601}\u{1F602}\u{1F603}")))
 
   // Performs Unicode scalar comparison.
   expectEqual(
-    [ "abcし\u{3099}def" ],
+    ["abcし\u{3099}def"],
     "abcし\u{3099}def".components(
       separatedBy: NSCharacterSet(charactersIn: "\u{3058}")))
 }
 
 NSStringAPIs.test("components(separatedBy:) (String)") {
-  expectEqual([ "" ], "".components(separatedBy: "//"))
+  expectEqual([""], "".components(separatedBy: "//"))
 
   expectEqual(
-    [ "абв", "あいう", "abc" ],
+    ["абв", "あいう", "abc"],
     "абв//あいう//abc".components(separatedBy: "//"))
 
   // Performs normalization.
   expectEqual(
-    [ "abc", "def" ],
+    ["abc", "def"],
     "abcし\u{3099}def".components(separatedBy: "\u{3058}"))
 }
 
@@ -521,7 +521,7 @@ NSStringAPIs.test("enumerateLines(_:)") {
       stop = true
     }
   }
-  expectEqual([ "abc", "", "defghi" ], lines)
+  expectEqual(["abc", "", "defghi"], lines)
 }
 
 NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
@@ -548,7 +548,7 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
       [ NSLinguisticTagWord, NSLinguisticTagWhitespace,
         NSLinguisticTagWord ],
       tags)
-  expectEqual([ "Глокая", " ", "куздра" ], tokens)
+  expectEqual(["Глокая", " ", "куздра"], tokens)
   let sentence = s[startIndex..<endIndex]
   expectEqual([ sentence, sentence, sentence ], sentences)
 }
@@ -568,7 +568,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
       expectEqual(substring, s[substringRange])
       expectEqual(substring, s[enclosingRange])
     }
-    expectEqual([ "\u{304b}\u{3099}", "お", "☺️", "😀" ], substrings)
+    expectEqual(["\u{304b}\u{3099}", "お", "☺️", "😀"], substrings)
   }
   do {
     var substrings: [String] = []
@@ -582,7 +582,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
       substrings.append(substring)
       expectEqual(substring, s[enclosingRange])
     }
-    expectEqual([ "\u{304b}\u{3099}", "お", "☺️", "😀" ], substrings)
+    expectEqual(["\u{304b}\u{3099}", "お", "☺️", "😀"], substrings)
   }
 }
 
@@ -891,7 +891,7 @@ NSStringAPIs.test("linguisticTagsIn(_:scheme:options:orthography:tokenRanges:)")
       [ NSLinguisticTagWord, NSLinguisticTagWhitespace,
         NSLinguisticTagWord ],
       tags)
-  expectEqual([ "Глокая", " ", "куздра" ],
+  expectEqual(["Глокая", " ", "куздра"],
       tokenRanges.map { s[$0] } )
 }
 
@@ -1045,8 +1045,8 @@ NSStringAPIs.test("paragraphRangeFor(_:)") {
 }
 
 NSStringAPIs.test("pathComponents") {
-  expectEqual([ "/", "foo", "bar" ], "/foo/bar".pathComponents)
-  expectEqual([ "/", "абв", "где" ], "/абв/где".pathComponents)
+  expectEqual(["/", "foo", "bar"], "/foo/bar".pathComponents)
+  expectEqual(["/", "абв", "где"], "/абв/где".pathComponents)
 }
 
 NSStringAPIs.test("pathExtension") {
@@ -1077,12 +1077,12 @@ NSStringAPIs.test("precomposedStringWithCompatibilityMapping") {
 }
 
 NSStringAPIs.test("propertyList()") {
-  expectEqual([ "foo", "bar" ],
+  expectEqual(["foo", "bar"],
       "(\"foo\", \"bar\")".propertyList() as! [String])
 }
 
 NSStringAPIs.test("propertyListFromStringsFileFormat()") {
-  expectEqual([ "foo": "bar", "baz": "baz" ],
+  expectEqual(["foo": "bar", "baz": "baz"],
       "/* comment */\n\"foo\" = \"bar\";\n\"baz\";"
           .propertyListFromStringsFileFormat() as Dictionary<String, String>)
 }
@@ -1650,8 +1650,8 @@ NSStringAPIs.test("trimmingCharacters(in:)") {
 NSStringAPIs.test("NSString.stringsByAppendingPaths(_:)") {
   expectEqual([], "".strings(byAppendingPaths: []))
   expectEqual(
-    [ "/tmp/foo", "/tmp/bar" ],
-    "/tmp".strings(byAppendingPaths: [ "foo", "bar" ]))
+    ["/tmp/foo", "/tmp/bar"],
+    "/tmp".strings(byAppendingPaths: ["foo", "bar"]))
 }
 
 NSStringAPIs.test("substring(from:)") {

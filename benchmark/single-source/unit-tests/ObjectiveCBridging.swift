@@ -150,8 +150,8 @@ public func run_ObjectiveCBridgeFromNSArrayAnyObjectForced(_ N: Int) {
 
 @inline(never)
 func testObjectiveCBridgeToNSArray() {
-  let nativeArray = [ "abcde", "abcde", "abcde", "abcde", "abcde",
-                      "abcde", "abcde", "abcde", "abcde", "abcde"]
+  let nativeArray = ["abcde", "abcde", "abcde", "abcde", "abcde",
+    "abcde", "abcde", "abcde", "abcde", "abcde"]
 
   var nsString : AnyObject?
   for _ in 0 ..< 10_000 {
@@ -175,7 +175,7 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToString() {
   var nativeString : String?
   for _ in 0 ..< 10_000 {
     if let nativeArray : [String] = conditionalCast(nsArray) {
-       nativeString = nativeArray[0]
+      nativeString = nativeArray[0]
     }
   }
 	CheckResults(nativeString != nil && nativeString == "NSString that does not fit in tagged pointer", "Expected results did not match")
@@ -197,7 +197,7 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToStringForced() {
     let nativeArray : [String] = forcedCast(nsArray)
     nativeString = nativeArray[0]
   }
-	CheckResults(nativeString != nil && nativeString == "NSString that does not fit in tagged pointer", "Expected results did not match")
+  CheckResults(nativeString != nil && nativeString == "NSString that does not fit in tagged pointer", "Expected results did not match")
 }
 
 @inline(never)
@@ -246,7 +246,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObject() {
        nativeInt = forcedCast(nativeDictionary[nsString])
     }
   }
-	CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
+  CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
 }
 
 @inline(never)
@@ -267,7 +267,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectForced() {
        nativeInt = forcedCast(nativeDictionary[nsString])
     }
   }
-	CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
+  CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
 }
 
 @inline(never)
@@ -279,8 +279,9 @@ public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced(_ N: Int) {
 
 @inline(never)
 func testObjectiveCBridgeToNSDictionary() {
-  let nativeDictionary = [ "abcde1" : 1, "abcde2" : 2, "abcde3" : 3, "abcde4" : 4, "abcde5" : 5,
-                      "abcde6" : 6, "abcde7" : 7, "abcde8" : 8, "abcde9" : 9, "abcde10" : 10]
+  let nativeDictionary = ["abcde1": 1, "abcde2": 2, "abcde3": 3, "abcde4": 4,
+    "abcde5": 5, "abcde6": 6, "abcde7": 7, "abcde8": 8, "abcde9": 9,
+    "abcde10": 10]
   let key = "abcde1" as NSString
 
   var nsNumber : AnyObject?
@@ -288,7 +289,7 @@ func testObjectiveCBridgeToNSDictionary() {
     let nsDict = nativeDictionary as NSDictionary
     nsNumber = nsDict.object(forKey: key)
   }
-	CheckResults(nsNumber != nil && (nsNumber as! Int) == 1, "Expected results did not match")
+  CheckResults(nsNumber != nil && (nsNumber as! Int) == 1, "Expected results did not match")
 }
 
 @inline(never)
@@ -302,7 +303,7 @@ public func run_ObjectiveCBridgeToNSDictionary(_ N: Int) {
 func testObjectiveCBridgeFromNSDictionaryAnyObjectToString() {
   let nsDictionary = createNSDictionary()
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
-	let nativeString = nsString as String
+  let nativeString = nsString as String
 
   var nativeInt : Int?
   for _ in 0 ..< 10_000 {
@@ -310,7 +311,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToString() {
        nativeInt = nativeDictionary[nativeString]
     }
   }
-	CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
+  CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
 }
 
 @inline(never)
@@ -324,7 +325,7 @@ public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString(_ N: Int) {
 func testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced() {
   let nsDictionary = createNSDictionary()
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
-	let nativeString = nsString as String
+  let nativeString = nsString as String
 
   var nativeInt : Int?
   for _ in 0 ..< 10_000 {
@@ -332,7 +333,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced() {
        nativeInt = nativeDictionary[nativeString]
     }
   }
-	CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
+  CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
 }
 
 @inline(never)
@@ -382,7 +383,7 @@ func testObjectiveCBridgeFromNSSetAnyObject() {
        result = nativeSet.contains(nsString)
     }
   }
-	CheckResults(result != nil && result!, "Expected results did not match")
+  CheckResults(result != nil && result!, "Expected results did not match")
 }
 
 @inline(never)
@@ -415,8 +416,8 @@ public func run_ObjectiveCBridgeFromNSSetAnyObjectForced(_ N: Int) {
 
 @inline(never)
 func testObjectiveCBridgeToNSSet() {
-  let nativeSet = Set<String>([ "abcde1", "abcde2", "abcde3", "abcde4", "abcde5",
-                      "abcde6", "abcde7", "abcde8", "abcde9", "abcde10"])
+  let nativeSet = Set<String>(["abcde1", "abcde2", "abcde3", "abcde4", "abcde5",
+      "abcde6", "abcde7", "abcde8", "abcde9", "abcde10"])
   let key = "abcde1" as NSString
 
   var nsString : AnyObject?
@@ -424,7 +425,7 @@ func testObjectiveCBridgeToNSSet() {
     let nsDict = nativeSet as NSSet
     nsString = nsDict.member(key)
   }
-	CheckResults(nsString != nil && (nsString as! String) == "abcde1", "Expected results did not match")
+  CheckResults(nsString != nil && (nsString as! String) == "abcde1", "Expected results did not match")
 }
 
 @inline(never)
@@ -437,8 +438,8 @@ public func run_ObjectiveCBridgeToNSSet(_ N: Int) {
 @inline(never)
 func testObjectiveCBridgeFromNSSetAnyObjectToString() {
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
-	let nativeString = nsString as String
-	let nsSet = createNSSet()
+  let nativeString = nsString as String
+  let nsSet = createNSSet()
 
   var result : Bool?
   for _ in 0 ..< 10_000 {
@@ -460,7 +461,7 @@ public func run_ObjectiveCBridgeFromNSSetAnyObjectToString(_ N: Int) {
 func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
   let nsSet = createNSSet()
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
-	let nativeString = nsString as String
+  let nativeString = nsString as String
 
   var result : Bool?
   for _ in 0 ..< 10_000 {
@@ -468,7 +469,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
        result = nativeSet.contains(nativeString)
     }
   }
-	CheckResults(result != nil && result!, "Expected results did not match")
+  CheckResults(result != nil && result!, "Expected results did not match")
 }
 
 @inline(never)

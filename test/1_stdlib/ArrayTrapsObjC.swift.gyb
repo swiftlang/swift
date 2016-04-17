@@ -37,7 +37,7 @@ ArrayTraps.test("downcast2")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-  let a: [AnyObject] = [ "String", 1 ]
+  let a: [AnyObject] = ["String", 1]
   let sa = a as! [NSString]
   let s0 = sa[0]
   expectCrashLater()
