@@ -50,7 +50,7 @@ public struct SourceLocStack {
   }
 
   public init(_ loc: SourceLoc) {
-    locs = [ loc ]
+    locs = [loc]
   }
 
   init(_locs: [SourceLoc]) {
@@ -2613,8 +2613,8 @@ func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
 }
 
 func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
-  return [ lhs.first, lhs.second ].lexicographicallyPrecedes(
-    [ rhs.first, rhs.second ])
+  return [lhs.first, lhs.second].lexicographicallyPrecedes(
+    [rhs.first, rhs.second])
 }
 
 public func expectEqualsUnordered<
@@ -2628,7 +2628,7 @@ public func expectEqualsUnordered<
     _ expected: Expected, _ actual: Actual, ${TRACE}
 ) {
   func comparePairLess(_ lhs: (T, T), rhs: (T, T)) -> Bool {
-    return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
+    return [lhs.0, lhs.1].lexicographicallyPrecedes([rhs.0, rhs.1])
   }
 
   let x: [(T, T)] =

@@ -133,7 +133,7 @@ func checkGraphemeClusterSegmentation(
   for c in subject.characters {
     let currentClusterSize = String(c).unicodeScalars.count
     unicodeScalarCount += currentClusterSize
-    actualBoundaries += [ unicodeScalarCount ]
+    actualBoundaries += [unicodeScalarCount]
   }
   expectEqual(
     expectedBoundaries, actualBoundaries,
@@ -167,9 +167,9 @@ UnicodeTrie.test("GraphemeClusterSegmentation/UnicodeSpec") {
 % for code_points, expected_boundaries in grapheme_cluster_break_tests:
   do {
     let scalars: [UInt32] =
-        [ ${", ".join([ str(cp) for cp in code_points ])} ]
+        [ ${", ".join([str(cp) for cp in code_points])} ]
     let expectedBoundaries: [Int] =
-        [ ${", ".join([ str(x) for x in expected_boundaries ])} ]
+        [ ${", ".join([str(x) for x in expected_boundaries])} ]
     checkGraphemeClusterSegmentation(expectedBoundaries, scalars: scalars,
         SourceLocStack().withCurrentLoc())
   }

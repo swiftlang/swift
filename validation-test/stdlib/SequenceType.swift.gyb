@@ -665,7 +665,7 @@ SequenceTypeTests.test("reduce") {
       (partialResult: OpaqueValue<[Int]>, element: OpaqueValue<Int>)
         -> OpaqueValue<[Int]> in
       timesClosureWasCalled += 1
-      return OpaqueValue<[Int]>(partialResult.value + [ element.value ])
+      return OpaqueValue<[Int]>(partialResult.value + [element.value])
     }
     expectEqual(test.sequence, result.value)
     expectEqual([], s.map { $0.value }, "sequence should be consumed")

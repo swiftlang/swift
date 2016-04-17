@@ -1162,7 +1162,7 @@ func getAsNSMutableDictionary(_ d: Dictionary<Int, Int>) -> NSMutableDictionary 
 }
 
 func getBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
-  let nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  let nsd = getAsNSDictionary([10: 1010, 20: 1020, 30: 1030])
   return convertNSDictionaryToDictionary(nsd)
 }
 
@@ -1173,12 +1173,12 @@ func getBridgedVerbatimDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<NSObj
 
 func getBridgedVerbatimDictionaryAndNSMutableDictionary()
     -> (Dictionary<NSObject, AnyObject>, NSMutableDictionary) {
-  let nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  let nsd = getAsNSMutableDictionary([10: 1010, 20: 1020, 30: 1030])
   return (convertNSDictionaryToDictionary(nsd), nsd)
 }
 
 func getBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
-  let nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  let nsd = getAsNSDictionary([10: 1010, 20: 1020, 30: 1030 ])
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
@@ -1189,7 +1189,7 @@ func getBridgedNonverbatimDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<Te
 
 func getBridgedNonverbatimDictionaryAndNSMutableDictionary()
     -> (Dictionary<TestBridgedKeyTy, TestBridgedValueTy>, NSMutableDictionary) {
-  let nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  let nsd = getAsNSMutableDictionary([10: 1010, 20: 1020, 30: 1030])
   return (Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self), nsd)
 }
 
@@ -1319,12 +1319,12 @@ class CustomImmutableNSDictionary : NSDictionary {
 
   override func object(forKey aKey: AnyObject) -> AnyObject? {
     CustomImmutableNSDictionary.timesObjectForKeyWasCalled += 1
-    return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).object(forKey: aKey)
+    return getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]).object(forKey: aKey)
   }
 
   override func keyEnumerator() -> NSEnumerator {
     CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled += 1
-    return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).keyEnumerator()
+    return getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]).keyEnumerator()
   }
 
   override var count: Int {
@@ -1391,7 +1391,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
   var nsd: NSDictionary = NSDictionary(dictionary:
-    getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]))
+    getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
 
   var d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
 
@@ -1408,7 +1408,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
   var nsd: NSDictionary = NSDictionary(dictionary:
-    getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]))
+    getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
 
   var d: [TestBridgedKeyTy : TestBridgedValueTy] =
     convertNSDictionaryToDictionary(nsd)
@@ -2438,40 +2438,40 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
 
   helper([:], [:], true)
 
-  helper([ 10: 1010 ],
-         [ 10: 1010 ],
+  helper([10: 1010],
+         [10: 1010],
          true)
 
-  helper([ 10: 1010, 20: 1020 ],
-         [ 10: 1010, 20: 1020 ],
+  helper([10: 1010, 20: 1020],
+         [10: 1010, 20: 1020],
          true)
 
-  helper([ 10: 1010, 20: 1020, 30: 1030 ],
-         [ 10: 1010, 20: 1020, 30: 1030 ],
+  helper([10: 1010, 20: 1020, 30: 1030],
+         [10: 1010, 20: 1020, 30: 1030],
          true)
 
-  helper([ 10: 1010, 20: 1020, 30: 1030 ],
-         [ 10: 1010, 20: 1020, 1111: 1030 ],
+  helper([10: 1010, 20: 1020, 30: 1030],
+         [10: 1010, 20: 1020, 1111: 1030],
          false)
 
-  helper([ 10: 1010, 20: 1020, 30: 1030 ],
-         [ 10: 1010, 20: 1020, 30: 1111 ],
+  helper([10: 1010, 20: 1020, 30: 1030],
+         [10: 1010, 20: 1020, 30: 1111],
          false)
 
-  helper([ 10: 1010, 20: 1020, 30: 1030 ],
-         [ 10: 1010, 20: 1020 ],
+  helper([10: 1010, 20: 1020, 30: 1030],
+         [10: 1010, 20: 1020],
          false)
 
-  helper([ 10: 1010, 20: 1020, 30: 1030 ],
-         [ 10: 1010 ],
+  helper([10: 1010, 20: 1020, 30: 1030],
+         [10: 1010],
          false)
 
-  helper([ 10: 1010, 20: 1020, 30: 1030 ],
+  helper([10: 1010, 20: 1020, 30: 1030],
          [:],
          false)
 
-  helper([ 10: 1010, 20: 1020, 30: 1030 ],
-         [ 10: 1010, 20: 1020, 30: 1030, 40: 1040 ],
+  helper([10: 1010, 20: 1020, 30: 1030],
+         [10: 1010, 20: 1020, 30: 1030, 40: 1040],
          false)
 }
 
@@ -2480,7 +2480,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
+        getAsNSDictionary([10: 1010 + i, 20: 1020 + i, 30: 1030 + i]))
   }
 
   var a = nsa as [AnyObject] as! [Dictionary<NSObject, AnyObject>]
@@ -2501,7 +2501,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
+        getAsNSDictionary([10: 1010 + i, 20: 1020 + i, 30: 1030 + i]))
   }
 
   var a = nsa as [AnyObject] as! [Dictionary<TestBridgedKeyTy, TestBridgedValueTy>]

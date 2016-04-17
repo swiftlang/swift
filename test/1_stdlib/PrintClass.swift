@@ -24,8 +24,8 @@ PrintTests.test("ClassPrintable") {
   let classMetatype = ClassPrintable.self
   expectPrinted("ClassPrintable", classMetatype)
   expectDebugPrinted("PrintTestTypes.ClassPrintable", classMetatype)
-  expectPrinted("[PrintTestTypes.ClassPrintable]", [ classMetatype ])
-  expectDebugPrinted("[PrintTestTypes.ClassPrintable]", [ classMetatype ])
+  expectPrinted("[PrintTestTypes.ClassPrintable]", [classMetatype])
+  expectDebugPrinted("[PrintTestTypes.ClassPrintable]", [classMetatype])
 }
 
 PrintTests.test("ClassVeryPrintable") {

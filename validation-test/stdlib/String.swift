@@ -317,8 +317,8 @@ StringTests.test("literalConcatenation") {
 
 StringTests.test("appendToSubstring") {
   for initialSize in 1..<16 {
-    for sliceStart in [ 0, 2, 8, initialSize ] {
-      for sliceEnd in [ 0, 2, 8, sliceStart + 1 ] {
+    for sliceStart in [0, 2, 8, initialSize] {
+      for sliceEnd in [0, 2, 8, sliceStart + 1] {
         if sliceStart > initialSize || sliceEnd > initialSize ||
           sliceEnd < sliceStart {
           continue
