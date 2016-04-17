@@ -53,9 +53,9 @@ func test_ThickMetatypePrintingImpl<T>(
   _ expectedDebug: String
   ) {
     expectPrinted(expectedPrint, thickMetatype)
-    expectPrinted("[\(expectedDebug)]", [ thickMetatype ])
+    expectPrinted("[\(expectedDebug)]", [thickMetatype])
     expectDebugPrinted(expectedDebug, thickMetatype)
-    expectDebugPrinted("[\(expectedDebug)]", [ thickMetatype ])
+    expectDebugPrinted("[\(expectedDebug)]", [thickMetatype])
 }
 
 PrintTests.test("StructPrintable") {
@@ -72,8 +72,8 @@ PrintTests.test("StructPrintable") {
   let structMetatype = StructPrintable.self
   expectPrinted("StructPrintable", structMetatype)
   expectDebugPrinted("PrintTestTypes.StructPrintable", structMetatype)
-  expectPrinted("[PrintTestTypes.StructPrintable]", [ structMetatype ])
-  expectDebugPrinted("[PrintTestTypes.StructPrintable]", [ structMetatype ])
+  expectPrinted("[PrintTestTypes.StructPrintable]", [structMetatype])
+  expectDebugPrinted("[PrintTestTypes.StructPrintable]", [structMetatype])
   test_ThickMetatypePrintingImpl(structMetatype, "StructPrintable",
     "PrintTestTypes.StructPrintable")
 }

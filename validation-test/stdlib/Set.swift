@@ -2092,7 +2092,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSSet([ 1 + i,  2 + i, 3 + i ]))
+        getAsNSSet([1 + i,  2 + i, 3 + i]))
   }
 
   var a = nsa as [AnyObject] as! [Set<NSObject>]
@@ -2104,7 +2104,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
       let v = (value as! TestObjCKeyTy).value
       items.append(v)
     }
-    var expectedItems = [ 1 + i, 2 + i, 3 + i ]
+    var expectedItems = [1 + i, 2 + i, 3 + i]
     expectTrue(equalsUnordered(items, expectedItems))
   }
 }
@@ -2113,7 +2113,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSSet([ 1 + i, 2 + i, 3 + i ]))
+        getAsNSSet([1 + i, 2 + i, 3 + i]))
   }
 
   var a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
@@ -2124,7 +2124,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
     while let value = iter.next() {
       items.append(value.value)
     }
-    var expectedItems = [ 1 + i, 2 + i, 3 + i ]
+    var expectedItems = [1 + i, 2 + i, 3 + i]
     expectTrue(equalsUnordered(items, expectedItems))
   }
 }
@@ -2162,7 +2162,7 @@ SetTestSuite.test("BridgingRoundtrip") {
     let v = (value as! TestObjCKeyTy).value
     items.append(v)
   }
-  expectTrue(equalsUnordered([ 1010, 2020, 3030 ], items))
+  expectTrue(equalsUnordered([1010, 2020, 3030], items))
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromSwift") {
@@ -2325,7 +2325,7 @@ SetTestSuite.test("BridgedToObjC.MemberTypesCustomBridged") {
   while let nextObject = enumerator.nextObject() {
     members.append((nextObject as! TestObjCKeyTy).value)
   }
-  expectTrue(equalsUnordered([ 1010, 2020, 3030 ], members))
+  expectTrue(equalsUnordered([1010, 2020, 3030], members))
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
@@ -3437,7 +3437,7 @@ class MockSetWithCustomCount : NSSet {
 
   override func objectEnumerator() -> NSEnumerator {
     expectUnreachable()
-    return getAsNSSet([ 1010, 1020, 1030 ]).objectEnumerator()
+    return getAsNSSet([1010, 1020, 1030]).objectEnumerator()
   }
 
   override var count: Int {
@@ -3686,37 +3686,37 @@ SetTestSuite.test("Operator.Precedence") {
 //===---
 
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,1") {
-  var set = Set([ 1010, 1020, 1030 ])
+  var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   expectOptionalEqual(1010, set.remove(1010))
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+  expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,all") {
-  var set = Set([ 1010, 1020, 1030 ])
+  var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   expectOptionalEqual(1010, set.remove(1010))
   expectOptionalEqual(1020, set.remove(1020))
   expectOptionalEqual(1030, set.remove(1030))
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+  expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
-  var set = Set([ 1010, 1020, 1030 ])
+  var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   set.removeAll(keepingCapacity: false)
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+  expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
-  var set = Set([ 1010, 1020, 1030 ])
+  var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   set.removeAll(keepingCapacity: true)
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+  expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
 runAllTests()

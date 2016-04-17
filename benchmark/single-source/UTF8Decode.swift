@@ -25,7 +25,7 @@ public func run_UTF8Decode(_ N: Int) {
   // Most commonly emoji, which are usually mixed with other text.
   let emoji = "Panda 🐼, Dog 🐶, Cat 🐱, Mouse 🐭."
 
-  let strings = [ ascii, russian, japanese, emoji ].map { Array($0.utf8) }
+  let strings = [ascii, russian, japanese, emoji].map { Array($0.utf8) }
 
   func isEmpty(_ result: UnicodeDecodingResult) -> Bool {
     switch result {

@@ -46,7 +46,7 @@ extension Sequence {
 
 % # Generate two versions: with explicit predicates and with
 % # a Comparable requirement.
-% for preds in [ True, False ]:
+% for preds in [True, False]:
 
 %{
 if preds:
@@ -116,7 +116,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
 % # Generate two versions: with explicit predicates and with
 % # an Equatable requirement.
-% for preds in [ True, False ]:
+% for preds in [True, False]:
 
 extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 
@@ -170,7 +170,7 @@ else:
 
 % # Generate two versions: with explicit predicates and with
 % # an Equatable requirement.
-% for preds in [ True, False ]:
+% for preds in [True, False]:
 
 extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 
@@ -226,7 +226,7 @@ else:
 
 % # Generate two versions: with explicit predicates and with
 % # Comparable requirement.
-% for preds in [ True, False ]:
+% for preds in [True, False]:
 
 extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 

@@ -417,7 +417,7 @@ NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
 
     expectEqual(1, count)
     expectEqual(existingPath, outputName)
-    expectEqual([ existingPath ], outputArray)
+    expectEqual([existingPath], outputArray)
   }
 
   do {
@@ -545,12 +545,11 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
     }
   }
   expectEqual(
-      [ NSLinguisticTagWord, NSLinguisticTagWhitespace,
-        NSLinguisticTagWord ],
-      tags)
+    [NSLinguisticTagWord, NSLinguisticTagWhitespace, NSLinguisticTagWord],
+    tags)
   expectEqual(["Глокая", " ", "куздра"], tokens)
   let sentence = s[startIndex..<endIndex]
-  expectEqual([ sentence, sentence, sentence ], sentences)
+  expectEqual([sentence, sentence, sentence], sentences)
 }
 
 NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
@@ -888,9 +887,8 @@ NSStringAPIs.test("linguisticTagsIn(_:scheme:options:orthography:tokenRanges:)")
       options: [],
       orthography: nil, tokenRanges: &tokenRanges)
   expectEqual(
-      [ NSLinguisticTagWord, NSLinguisticTagWhitespace,
-        NSLinguisticTagWord ],
-      tags)
+    [NSLinguisticTagWord, NSLinguisticTagWhitespace, NSLinguisticTagWord],
+    tags)
   expectEqual(["Глокая", " ", "куздра"],
       tokenRanges.map { s[$0] } )
 }
