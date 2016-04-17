@@ -151,7 +151,7 @@ __ https://en.wikipedia.org/wiki/First-class_citizen
   |swift| var s = "Yo"
   `// s:` :emph:`String` `= "Yo"`
 
-Unlike, say, C's ``char*``, the meaning of a swift string is always
+Unlike, say, C's ``char*``, the meaning of a Swift string is always
 unambiguous.
 
 Strings are **Efficient**
