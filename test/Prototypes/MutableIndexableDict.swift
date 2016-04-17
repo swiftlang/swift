@@ -369,8 +369,10 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
 
     // Find the last bucket in the contiguous chain
     var lastInChain = hole
-    for var b = _next(lastInChain); _buffer[b] != nil; b = _next(b) {
+    var b = _next(lastInChain)
+    while _buffer[b] != nil {
       lastInChain = b
+      b = _next(b)
     }
 
     // Relocate out-of-place elements in the chain, repeating until
@@ -378,8 +380,8 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
     while hole != lastInChain {
       // Walk backwards from the end of the chain looking for
       // something out-of-place.
-      var b: Int
-      for b = lastInChain; b != hole; b = _prev(b) {
+      var b = lastInChain
+      while b != hole {
 
         var idealBucket = _bucket(_buffer[b]!.key)
 
@@ -401,6 +403,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
       _buffer[hole] = _buffer[b]
       _buffer[b] = .none
       hole = b
+      b = _prev(b)
     }
 
     return true
