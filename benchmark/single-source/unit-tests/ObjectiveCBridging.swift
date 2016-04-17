@@ -27,7 +27,7 @@ public func conditionalCast<NS, T>(_ ns: NS) -> T? {
 // === String === //
 
 func createNSString() -> NSString {
-	return NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  return NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
 }
 
 @inline(never)
@@ -178,7 +178,7 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToString() {
       nativeString = nativeArray[0]
     }
   }
-	CheckResults(nativeString != nil && nativeString == "NSString that does not fit in tagged pointer", "Expected results did not match")
+  CheckResults(nativeString != nil && nativeString == "NSString that does not fit in tagged pointer", "Expected results did not match")
 }
 
 @inline(never)
@@ -404,7 +404,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectForced() {
        result = nativeSet.contains(nsString)
     }
   }
-	CheckResults(result != nil && result!, "Expected results did not match")
+  CheckResults(result != nil && result!, "Expected results did not match")
 }
 
 @inline(never)
@@ -447,7 +447,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectToString() {
        result = nativeSet.contains(nativeString)
     }
   }
-	CheckResults(result != nil && result!, "Expected results did not match")
+  CheckResults(result != nil && result!, "Expected results did not match")
 }
 
 @inline(never)
