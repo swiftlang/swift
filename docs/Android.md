@@ -52,7 +52,7 @@ To build libiconv and libicu for Android:
    `git` installed.
 2. Clone the [SwiftAndroid/libiconv-libicu-android](https://github.com/SwiftAndroid/libiconv-libicu-android)
    project. From the command-line, run the following command:
-   `git@github.com:SwiftAndroid/libiconv-libicu-android.git`.
+   `git clone git@github.com:SwiftAndroid/libiconv-libicu-android.git`.
 3. From the command-line, run `which ndk-build`. Confirm that the path to
    the `ndk-build` executable in the Android NDK you downloaded is displayed.
    If not, you may need to add the Android NDK directory to your `PATH`.
