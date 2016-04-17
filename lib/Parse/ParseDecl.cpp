@@ -2952,17 +2952,6 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags
       diagnose(genericParams->getWhereLoc(),
                diag::associated_type_generic_parameter_list)
           .highlight(genericParams->getWhereClauseSourceRange());
-    } else {
-      // Reject inheritance clauses.
-      for (auto *P : genericParams->getParams()) {
-        if (!P->getInherited().empty()) {
-          diagnose(P->getInherited().front().getLoc(),
-                   diag::typealias_generic_list_constraint);
-
-          P->setInvalid();
-          P->setInherited({});
-        }
-      }
     }
   }
 

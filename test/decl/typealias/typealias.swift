@@ -38,7 +38,7 @@ typealias basicTypealias = Int
 typealias DSI = MyType<String, Int>
 typealias DS<T> = MyType<String, T>
 
-typealias BadA<T : Int> = MyType<String, T>  // expected-error {{type parameters may not be constrained in typealias argument list}}
+typealias BadA<T : Int> = MyType<String, T>  // expected-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types may not have a generic parameter list}}
 // expected-error @-1 {{same-type requirement makes generic parameter 'T' non-generic}}
@@ -58,7 +58,6 @@ func f() {
   let _ : Tuple2b = (1, "foo")
   
 }
-
 
 
 typealias A<T1, T2> = MyType<T2, T1>  // expected-note {{generic type 'A' declared here}}
@@ -110,6 +109,19 @@ _ = C(a: 42,        // expected-error {{'Int' is not convertible to 'String'}}
 
 _ = G(a: "foo", b: 42)
 _ = G<Int, String>(a: "foo", b: 42)
+
+
+struct MyTypeWithHashable<TyA, TyB : Hashable> {
+}
+
+typealias MTWHInt<HT : Hashable> = MyTypeWithHashable<Int, HT>
+typealias MTWHInt2<HT> = MyTypeWithHashable<Int, HT> // expected-error {{type 'HT' does not conform to protocol 'Hashable'}}
+
+func f(a : MyTypeWithHashable<Int, Int>) {
+  f(a: MyTypeWithHashable<Int, Int>())
+  f(a: MTWHInt<Int>())
+}
+
 
 
 
