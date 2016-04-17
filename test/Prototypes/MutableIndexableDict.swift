@@ -120,7 +120,7 @@ struct FixedSizedRefArrayOfOptional<T>
   init(capacity: Int)
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
-    for var i = 0; i < capacity; ++i {
+    for i in 0 ..< capacity {
       (buffer.baseAddress + i).initialize(with: .none)
     }
 
@@ -182,7 +182,8 @@ struct DictionaryIndex<Element> : BidirectionalIndex {
 
   func predecessor() -> Index {
     var j = self.offset
-    while --j > 0 {
+    while j > 1 {
+      j -= 1
       if buffer[j] != nil {
         return Index(buffer: buffer, offset: j)
       }
@@ -275,7 +276,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
       _buffer[i.offset] = Element(key: key, value: value)
 
       if !found {
-        ++_count
+        _count += 1
       }
     }
   }
@@ -360,7 +361,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
 
     // remove the element
     _buffer[pos.offset] = .none
-    --_count
+    _count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
