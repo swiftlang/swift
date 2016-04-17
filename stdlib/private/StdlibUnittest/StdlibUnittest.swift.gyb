@@ -416,6 +416,8 @@ extension ProcessTerminationStatus {
       return false
     case .signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
+    default:
+      return false
     }
   }
 }
