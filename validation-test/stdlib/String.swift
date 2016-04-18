@@ -48,6 +48,54 @@ StringTests.test("sizeof") {
   expectEqual(3 * sizeof(Int.self), sizeof(String.self))
 }
 
+StringTests.test("AssociatedTypes") {
+  
+}
+
+StringTests.test("AssociatedTypes-UTF8View") {
+  typealias View = String.UTF8View
+  expectCollectionAssociatedTypes(
+    collectionType: View.self,
+    iteratorType: IndexingIterator<View>.self,
+    subSequenceType: View.self,
+    indexType: View.Index.self,
+    indexDistanceType: Int.self,
+    indicesType: DefaultIndices<View>.self)
+}
+
+StringTests.test("AssociatedTypes-UTF16View") {
+  typealias View = String.UTF16View
+  expectCollectionAssociatedTypes(
+    collectionType: View.self,
+    iteratorType: IndexingIterator<View>.self,
+    subSequenceType: View.self,
+    indexType: View.Index.self,
+    indexDistanceType: Int.self,
+    indicesType: View.Indices.self)
+}
+
+StringTests.test("AssociatedTypes-UnicodeScalarView") {
+  typealias View = String.UnicodeScalarView
+  expectCollectionAssociatedTypes(
+    collectionType: View.self,
+    iteratorType: View.Iterator.self,
+    subSequenceType: View.self,
+    indexType: View.Index.self,
+    indexDistanceType: Int.self,
+    indicesType: DefaultBidirectionalIndices<View>.self)
+}
+
+StringTests.test("AssociatedTypes-CharacterView") {
+  typealias View = String.CharacterView
+  expectCollectionAssociatedTypes(
+    collectionType: View.self,
+    iteratorType: IndexingIterator<View>.self,
+    subSequenceType: View.self,
+    indexType: View.Index.self,
+    indexDistanceType: Int.self,
+    indicesType: DefaultBidirectionalIndices<View>.self)
+}
+
 func checkUnicodeScalarViewIteration(
     _ expectedScalars: [UInt32], _ str: String
 ) {

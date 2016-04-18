@@ -12,6 +12,22 @@ func testIntSubscripting(s: String, i: Int) {
   _ = s[i...i] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}}
   _ = s[17..<20] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableRange<Int>, see the documentation comment for discussion}}
   _ = s[17...20] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}}
+
+  _ = s[Range(i...i)] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
+  _ = s[Range(17..<20)] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
+  _ = s[Range(17...20)] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
+
+  _ = s[CountableRange(i...i)] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableRange<Int>, see the documentation comment for discussion}}
+  _ = s[CountableRange(17..<20)] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableRange<Int>, see the documentation comment for discussion}}
+  _ = s[CountableRange(17...20)] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableRange<Int>, see the documentation comment for discussion}}
+
+  _ = s[ClosedRange(i...i)] // expected-error{{subscript' is unavailable: cannot subscript String with a ClosedRange<Int>, see the documentation comment for discussion}}
+  _ = s[ClosedRange(17..<20)] // expected-error{{subscript' is unavailable: cannot subscript String with a ClosedRange<Int>, see the documentation comment for discussion}}
+  _ = s[ClosedRange(17...20)] // expected-error{{subscript' is unavailable: cannot subscript String with a ClosedRange<Int>, see the documentation comment for discussion}}
+
+  _ = s[CountableClosedRange(i...i)] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}}
+  _ = s[CountableClosedRange(17..<20)] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}}
+  _ = s[CountableClosedRange(17...20)] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}}
 }
 
 // Common pitfall: trying to access `String.count`.
@@ -60,20 +76,27 @@ func testStringDeprecation(hello: String) {
 
 }
 
-// Positive and negative tests for String collection types
-func acceptsCollection<I: Collection>(_: I) {}
-func acceptsBidirectionalCollection<I: BidirectionalCollection>(_: I) {}
-func acceptsRandomAccessCollection<I: RandomAccessCollection>(_: I) {}
+// Positive and negative tests for String collection types. Testing the complete
+// set of conformance just in case protocol hierarchy changes.
+func acceptsCollection<C: Collection>(_: C) {}
+func acceptsBidirectionalCollection<C: BidirectionalCollection>(_: C) {}
+func acceptsRandomAccessCollection<C: RandomAccessCollection>(_: C) {}
 
 func testStringCollectionTypes(s: String) {
   acceptsCollection(s.utf8)
   acceptsBidirectionalCollection(s.utf8) // expected-error{{argument type 'String.UTF8View' does not conform to expected type 'BidirectionalCollection'}}
+  acceptsRandomAccessCollection(s.utf8) // expected-error{{argument type 'String.UTF8View' does not conform to expected type 'RandomAccessCollection'}}
+
+  // UTF16View.Collection is random-access with Foundation, bidirectional without
+  acceptsCollection(s.utf16)
+  acceptsBidirectionalCollection(s.utf16)
+  acceptsRandomAccessCollection(s.utf16)
+
+  acceptsCollection(s.unicodeScalars)
   acceptsBidirectionalCollection(s.unicodeScalars)
   acceptsRandomAccessCollection(s.unicodeScalars) // expected-error{{argument type 'String.UnicodeScalarView' does not conform to expected type 'RandomAccessCollection'}}
+
+  acceptsCollection(s.characters)
   acceptsBidirectionalCollection(s.characters)
   acceptsRandomAccessCollection(s.characters) // expected-error{{argument type 'String.CharacterView' does not conform to expected type 'RandomAccessCollection'}}
-  
-  // UTF16View.Collection is random-access with Foundation, bidirectional without
-  acceptsRandomAccessCollection(s.utf16)
 }
-
