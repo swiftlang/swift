@@ -207,22 +207,21 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst,
   }
 }
 
-void
-swift::collectUsesOfValue(SILValue V, llvm::DenseSet<SILInstruction *> &Insts) {
+void swift::
+collectUsesOfValue(SILValue V, llvm::SmallPtrSetImpl<SILInstruction *> &Insts) {
   for (auto UI = V->use_begin(), E = V->use_end(); UI != E; UI++) {
     auto *User = UI->getUser();
     // Instruction has been processed.
-    if (Insts.find(User) != Insts.end())
+    if (!Insts.insert(User).second)
       continue;
 
     // Collect the users of this instruction.
-    Insts.insert(User);
     collectUsesOfValue(User, Insts);
   }
 }
 
 void swift::eraseUsesOfValue(SILValue V) {
-  llvm::DenseSet<SILInstruction *> Insts;
+  llvm::SmallPtrSet<SILInstruction *, 4> Insts;
   // Collect the uses.
   collectUsesOfValue(V, Insts);
   // Erase the uses, we can have instructions that become dead because

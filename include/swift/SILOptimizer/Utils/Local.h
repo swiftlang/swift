@@ -79,7 +79,8 @@ bool isIntermediateRelease(SILInstruction *I,
 
 /// \brief Recursively collect all the uses and transitive uses of the
 /// instruction.
-void collectUsesOfValue(SILValue V, llvm::DenseSet<SILInstruction *> &Insts);
+void
+collectUsesOfValue(SILValue V, llvm::SmallPtrSetImpl<SILInstruction *> &Insts);
 
 /// \brief Recursively erase all of the uses of the instruction (but not the
 /// instruction itself)
