@@ -2037,10 +2037,12 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
         fi
 
         # Configure if necessary.
-        if [[  "${RECONFIGURE}" || ! -f "${build_dir}/CMakeCache.txt" || \
+        cmake_cache_path="${build_dir}/CMakeCache.txt"
+        if [[  "${RECONFIGURE}" || ! -f "${cmake_cache_path}" || \
                     ( ! -z "${generator_output_path}" && ! -f "${generator_output_path}" ) ]] ; then
-            mkdir -p "${build_dir}"
             set -x
+            mkdir -p "${build_dir}"
+            rm -f "${cmake_cache_path}"
             (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" ${USER_CONFIG_ARGS})
             { set +x; } 2>/dev/null
         fi
