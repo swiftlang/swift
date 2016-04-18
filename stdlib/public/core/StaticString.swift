@@ -39,6 +39,9 @@ public struct StaticString
     CustomDebugStringConvertible,
     CustomReflectable {
 
+  // FIXME(ABI): RawPointer is non-nullable, but we can store a null Unicode
+  // scalar in it.  Change it to an integer.
+  //
   /// Either a pointer to the start of UTF-8 data, or an integer representation
   /// of a single Unicode scalar.
   internal var _startPtrOrData: Builtin.RawPointer
