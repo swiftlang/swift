@@ -323,7 +323,7 @@ std::string getSwiftFullVersion() {
   OS << SWIFT_VENDOR " ";
 #endif
 
-  OS << "Swift version " SWIFT_VERSION_STRING " (swift-2.2-RELEASE)";
+  OS << "Swift version " SWIFT_VERSION_STRING " (swift-2.2.1-RELEASE)";
   return OS.str();
 }
 
