@@ -144,20 +144,20 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   @warn_unused_result
   internal func _map<T>(
-    @noescape _ transform: (Element) throws -> T
+    _ transform: @noescape (Element) throws -> T
   ) rethrows -> [T] {
     _abstract()
   }
 
   @warn_unused_result
   internal func _filter(
-    @noescape _ includeElement: (Element) throws -> Bool
+    _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
     _abstract()
   }
 
   internal func _forEach(
-    @noescape _ body: (Element) throws -> Void
+    _ body: @noescape (Element) throws -> Void
   ) rethrows {
     _abstract()
   }
@@ -171,7 +171,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   @warn_unused_result
   internal func __preprocessingPass<R>(
-    @noescape _ preprocess: () throws -> R
+    _ preprocess: @noescape () throws -> R
   ) rethrows -> R? {
     _abstract()
   }
@@ -213,7 +213,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   @warn_unused_result
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    @noescape isSeparator: (Element) throws -> Bool
+    isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     _abstract()
   }
@@ -367,18 +367,18 @@ internal final class _${Kind}Box<
   }
   @warn_unused_result
   internal override func _map<T>(
-    @noescape _ transform: (Element) throws -> T
+    _ transform: @noescape (Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
   @warn_unused_result
   internal override func _filter(
-    @noescape _ includeElement: (Element) throws -> Bool
+    _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
     return try _base.filter(includeElement)
   }
   internal override func _forEach(
-    @noescape _ body: (Element) throws -> Void
+    _ body: @noescape (Element) throws -> Void
   ) rethrows {
     return try _base.forEach(body)
   }
@@ -390,7 +390,7 @@ internal final class _${Kind}Box<
   }
   @warn_unused_result
   internal override func __preprocessingPass<R>(
-    @noescape _ preprocess: () throws -> R
+    _ preprocess: @noescape () throws -> R
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
@@ -423,7 +423,7 @@ internal final class _${Kind}Box<
   @warn_unused_result
   internal override func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    @noescape isSeparator: (Element) throws -> Bool
+    isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${ResultKind}<Element>] {
     return try _base.split(
       maxSplits: maxSplits,
@@ -633,20 +633,20 @@ extension Any${Kind} {
 
   @warn_unused_result
   public func map<T>(
-    @noescape _ transform: (Element) throws -> T
+    _ transform: @noescape (Element) throws -> T
   ) rethrows -> [T] {
     return try _box._map(transform)
   }
 
   @warn_unused_result
   public func filter(
-    @noescape _ includeElement: (Element) throws -> Bool
+    _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
     return try _box._filter(includeElement)
   }
 
   public func forEach(
-    @noescape _ body: (Element) throws -> Void
+    _ body: @noescape (Element) throws -> Void
   ) rethrows {
     return try _box._forEach(body)
   }
@@ -675,7 +675,7 @@ extension Any${Kind} {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    @noescape isSeparator: (Element) throws -> Bool
+    isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     return try _box._split(
       maxSplits: maxSplits,
@@ -685,7 +685,7 @@ extension Any${Kind} {
 
   @warn_unused_result
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: () throws -> R
+    _ preprocess: @noescape () throws -> R
   ) rethrows -> R? {
     return try _box.__preprocessingPass(preprocess)
   }
