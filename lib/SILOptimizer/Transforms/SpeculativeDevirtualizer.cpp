@@ -527,14 +527,22 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     return false;
 
   ProtocolDecl *WMIProtocol = CMI->getLookupProtocol();
+#if 1
+  // Support only devirtualization of class protocols.
   if (!WMIProtocol->requiresClass())
     return false;
-
+#endif
   // Strip any upcasts off of our 'self' value, potentially leaving us
   // with a value whose type is closer (in the class hierarchy) to the
   // actual dynamic type.
-  auto SubTypeValue = CMI->getOperand();//.stripUpCasts();
-  SILType SubType = SubTypeValue->getType();
+  // CMI->getOperand() crashes, if this is a call like in
+  // func foo<T:S> (t: T) -> Int32 { return t.foo() }
+  SILType SubType;
+  if (CMI->hasOperand()) {
+    SubType = CMI->getOperand()->getType();
+  } else {
+    SubType = SILType::getPrimitiveObjectType(CMI->getLookupType());
+  }
 
   auto &M = CMI->getModule();
   auto ClassType = SubType;
@@ -609,26 +617,31 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
           << WMIProtocol->getName() << " and implementation " << S->getName() << "\n");
 
-    CanType CanClassType = S->getDeclaredType()->getCanonicalType();
-    SILType ClassType = SILType::getPrimitiveObjectType(CanClassType);
-    if (!ClassType.getClassOrBoundGenericClass()) {
+    CanType CanTy = S->getDeclaredType()->getCanonicalType();
+    SILType ObjectTy = SILType::getPrimitiveObjectType(CanTy);
+    if (!ObjectTy.getClassOrBoundGenericClass() &&
+        !ObjectTy.getStructOrBoundGenericStruct()) {
       // This subclass cannot be handled. This happens e.g. if it is
       // a generic class.
       NotHandledSubsNum++;
       continue;
     }
 
-    auto ClassOrMetatypeType = ClassType;
+    auto ObjectOrMetatypeType = ObjectTy;
     if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
-      auto InstTy = ClassType.getSwiftRValueType();
+      auto InstTy = ObjectTy.getSwiftRValueType();
       auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
       auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
-      ClassOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);
+      ObjectOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);
     }
 
     // Pass the metatype of the subclass.
     CheckedCastBranchInst *LastCCBI = nullptr;
-    auto NewAI = speculateMonomorphicTarget(AI, ClassOrMetatypeType, LastCCBI);
+    // TODO: Don't use checked_cast_br. Use something else if it is not
+    // known that all implementations are classes, i.e. it is effectively
+    // a class existential. Most likely, a checked_cast_addr_br [exact] should
+    // be used.
+    auto NewAI = speculateMonomorphicTarget(AI, ObjectOrMetatypeType, LastCCBI);
     if (!NewAI) {
       NotHandledSubsNum++;
       continue;
@@ -667,6 +680,11 @@ namespace {
       for (auto &BB : *getFunction()) {
         for (auto II = BB.begin(), IE = BB.end(); II != IE; ++II) {
           FullApplySite AI = FullApplySite::isa(&*II);
+          if (!AI)
+            continue;
+          //if (AI.getSubstCalleeType()->getRepresentation() ==
+          //    SILFunctionType::Representation::ObjCMethod)
+          //  continue;
           if (AI && isa<ClassMethodInst>(AI.getCallee())) {
             ToSpecialize.push_back(AI);
             continue;

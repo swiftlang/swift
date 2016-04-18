@@ -444,25 +444,33 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
 static SILFunction *getTargetClassMethod(SILModule &M,
                                          SILType ClassOrMetatypeType,
                                          MethodInst *MI) {
-  SILDeclRef Member = MI->getMember();
-  if (ClassOrMetatypeType.is<MetatypeType>())
-    ClassOrMetatypeType = ClassOrMetatypeType.getMetatypeInstanceType(M);
+  assert((isa<ClassMethodInst>(MI) || isa<WitnessMethodInst>(MI) ||
+          isa<SuperMethodInst>(MI)) &&
+         "Only class_method and witness_method instructions are supported");
 
-  auto *CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
+  if (isa<ClassMethodInst>(MI)) {
+    SILDeclRef Member = MI->getMember();
+    if (ClassOrMetatypeType.is<MetatypeType>())
+      ClassOrMetatypeType = ClassOrMetatypeType.getMetatypeInstanceType(M);
 
-  if (isa<ClassMethodInst>(MI))
+    auto *CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
     return M.lookUpFunctionInVTable(CD, Member);
-  else if (WitnessMethodInst *WMI = dyn_cast<WitnessMethodInst>(MI)) {
-    auto CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
-    ArrayRef<Substitution> Subs;
-    SILWitnessTable *WT;
-    auto Conformances = CD->getAllConformances();
-    SILDeclRef Member = WMI->getMember();
-    for (auto &C : Conformances) {
-      if (C->getProtocol() == WMI->getLookupProtocol()) {
-        SILFunction *F = nullptr;
-        std::tie(F, WT, Subs) = M.lookUpFunctionInWitnessTable(ProtocolConformanceRef(C), Member);
-        return F;
+  }
+
+  if (WitnessMethodInst *WMI = dyn_cast<WitnessMethodInst>(MI)) {
+    auto ND = ClassOrMetatypeType.getNominalOrBoundGenericNominal();
+    if (ND) {
+      ArrayRef<Substitution> Subs;
+      SILWitnessTable *WT;
+      auto Conformances = ND->getAllConformances();
+      SILDeclRef Member = WMI->getMember();
+      for (auto &C : Conformances) {
+        if (C->getProtocol() == WMI->getLookupProtocol()) {
+          SILFunction *F = nullptr;
+          std::tie(F, WT, Subs) =
+              M.lookUpFunctionInWitnessTable(ProtocolConformanceRef(C), Member);
+          return F;
+        }
       }
     }
   }

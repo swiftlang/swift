@@ -4432,11 +4432,29 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
     return emitLoadOfHeapMetadataRef(IGF, object,
                                      getIsaEncodingForType(IGF.IGM, objectType),
                                      suppressCast);
-  // Is it an opened class existential?
-  if (objectType.isAnyClassReferenceType() && isa<ArchetypeType>(objectType))
-    return emitLoadOfHeapMetadataRef(IGF, object,
-                                     getIsaEncodingForType(IGF.IGM, objectType),
-                                     suppressCast);
+  // Is it a class-bounded archetype?
+  if (auto Arch = dyn_cast<ArchetypeType>(objectType)) {
+    if (Arch->requiresClass()) {
+      // Try to find a known class requirement, e.g. like in
+      // func foo<T: MyClass> (t:T)
+      auto Super = Arch->getSuperclass();
+      if (Super)
+        theClass = Super->getClassOrBoundGenericClass();
+      if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass))
+        return emitLoadOfHeapMetadataRef(
+            IGF, object, getIsaEncodingForType(IGF.IGM, objectType),
+            suppressCast);
+      // Check SwiftTargetInfo to see if tagged pointers are used
+      // on the target platform. Use the mask to see if it is a
+      // tagged pointer. If it is, bail. Otherwise, use the
+      // emitLoadOfHeapMetadataRef to load the heap metadata ref
+      // in a usual way.
+      return emitLoadOfHeapMetadataRef(
+          IGF, object, getIsaEncodingForType(IGF.IGM, objectType),
+          suppressCast);
+    }
+  }
+  // TODO: Call emitLoadOfObjCHeapMetadataRef instead????
   // OK, ask the runtime for the class pointer of this potentially-ObjC object.
   return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
 }
