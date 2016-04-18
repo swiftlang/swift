@@ -149,7 +149,8 @@ KNOWN_SETTINGS=(
     skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
-    skip-test-validation        ""               "set to skip validation test suite"
+    validation-test             "0"              "set to run the validation test suite"
+    long-test                   "0"              "set to run the long test suite"
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
@@ -1069,10 +1070,10 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         if [[ "${BUILD_SWIFT_STDLIB_UNITTEST_EXTRA}" == "1" ]] ; then
             SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
         else
-            if [[ "${SKIP_TEST_VALIDATION}" ]] ; then
-                SWIFT_STDLIB_TARGETS+=("swift-test-stdlib-${deployment_target}")
-            else
+            if [[ "${VALIDATION_TEST}" == "1" ]] ; then
                 SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
+            else
+                SWIFT_STDLIB_TARGETS+=("swift-test-stdlib-${deployment_target}")
             fi
         fi
     fi
@@ -1083,19 +1084,26 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         fi
     fi
     if [[ "${test_this_target}" ]] ; then
+        test_target_suffix=""
         if [[ -n "${test_host_only}" ]] ; then
             test_target_suffix="-non-executable"
         fi
-        if [[ "${SKIP_TEST_VALIDATION}" ]] ; then
-            SWIFT_TEST_TARGETS+=("check-swift${test_target_suffix}-${deployment_target}")
-            if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
-              SWIFT_TEST_TARGETS+=("check-swift-optimize-${deployment_target}")
+
+        test_subset_target_suffix=""
+        if [[ "${VALIDATION_TEST}" == "1" ]] ; then
+            if [[ "${LONG_TEST}" == "1" ]] ; then
+                test_subset_target_suffix="-all"
+            else
+                test_subset_target_suffix="-validation"
             fi
         else
-            SWIFT_TEST_TARGETS+=("check-swift-all${test_target_suffix}-${deployment_target}")
-            if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
-              SWIFT_TEST_TARGETS+=("check-swift-all-optimize-${deployment_target}")
+            if [[ "${LONG_TEST}" == "1" ]] ; then
+                test_subset_target_suffix="-only_long"
             fi
+        fi
+        SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}${test_target_suffix}-${deployment_target}")
+        if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
+            SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize-${deployment_target}")
         fi
     fi
 done

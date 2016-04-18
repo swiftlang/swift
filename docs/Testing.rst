@@ -33,6 +33,17 @@ The LLVM lit-based testsuite
 
 * Buildbots run all tests, on all supported platforms.
 
+Testsuite subsets
+-----------------
+
+The testsuite is split into three subsets:
+
+* Primary testsuite, located under ``swift/test``.
+
+* Validation testsuite, located under ``swift/validation-test``.
+
+* Long tests, which are marked with ``REQUIRES: long_test``.
+
 Running the LLVM lit-based testsuite
 ------------------------------------
 
@@ -59,13 +70,21 @@ Besides ``check-swift``, other targets are also available. Here's the full list:
 
   Runs tests from the ``${SWIFT_SOURCE_ROOT}/test`` directory.
 
-* ``check-swift-validation``
+* ``check-swift-only_validation``
 
   Runs tests from the ``${SWIFT_SOURCE_ROOT}/validation-test`` directory.
 
+* ``check-swift-validation``
+
+  Runs the primary and validation tests, without the long tests.
+
+* ``check-swift-only_long``
+
+  Runs long tests only.
+
 * ``check-swift-all``
 
-  Runs all tests.
+  Runs all tests (primary, validation, and long).
 
 For every target above, there are variants for different optimizations:
 
