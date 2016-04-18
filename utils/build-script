@@ -18,7 +18,6 @@ import pipes
 import platform
 import re
 import shlex
-import shutil
 import sys
 
 # FIXME: Instead of modifying the system path in order to enable imports from
@@ -31,7 +30,6 @@ from SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
     SWIFT_SOURCE_ROOT,
-    WorkingDirectory,
     check_call,
     get_all_preset_names,
     get_preset_options,
@@ -45,6 +43,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 from swift_build_support.toolchain import host_toolchain  # noqa (E402)
 import swift_build_support.debug      # noqa (E402)
 from swift_build_support import migration  # noqa (E402)
+from swift_build_support import shell  # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
 from swift_build_support.cmake import CMake  # noqa (E402)
@@ -1200,8 +1199,9 @@ details of the setups of other systems or automated environments.""")
         source_root=SWIFT_SOURCE_ROOT,
         build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-    if args.clean and os.path.isdir(workspace.build_root):
-        shutil.rmtree(workspace.build_root)
+    # Clean build_dir if requested.
+    if args.clean:
+        shell.rmtree(workspace.build_root)
 
     cmake = CMake(args=args,
                   toolchain=toolchain)
@@ -1411,7 +1411,7 @@ details of the setups of other systems or automated environments.""")
         # it is archiving. To stay safe, we change working directories, then
         # run `tar` without the leading '/' (we remove it ourselves to keep
         # `tar` from emitting a warning).
-        with WorkingDirectory(args.install_symroot):
+        with shell.pushd(args.install_symroot):
             swift_build_support.tar.tar(source=prefix.lstrip('/'),
                                         destination=args.symbols_package)
 

@@ -8,8 +8,12 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+from __future__ import absolute_import
+
 import platform
 import subprocess
+
+from . import shell
 
 
 def tar(source, destination):
@@ -28,4 +32,4 @@ def tar(source, destination):
     # Capture stderr output such as 'tar: Failed to open ...'. We'll detect
     # these cases using the exit code, which should cause 'check_call' to
     # raise.
-    subprocess.check_call(args + [source], stderr=subprocess.PIPE)
+    shell.call(args + [source], stderr=subprocess.PIPE)
