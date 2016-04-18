@@ -126,12 +126,8 @@ namespace {
     /// The witness is not rethrows, but the requirement is.
     RethrowsConflict,
 
-    /// The witness has a different Objective-C selector than the
-    /// requirement.
-    ObjCSelectorConflict,
-
-    /// The witness is not @objc but the requirement is.
-    NotObjC,
+    /// The witness is explicitly @nonobjc but the requirement is @objc.
+    NonObjC,
   };
 
   /// Describes the kind of optional adjustment performed when
@@ -317,8 +313,7 @@ namespace {
       case MatchKind::NoReturnConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
-      case MatchKind::ObjCSelectorConflict:
-      case MatchKind::NotObjC:
+      case MatchKind::NonObjC:
         return false;
       }
     }
@@ -342,8 +337,7 @@ namespace {
       case MatchKind::NoReturnConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
-      case MatchKind::ObjCSelectorConflict:
-      case MatchKind::NotObjC:
+      case MatchKind::NonObjC:
         return false;
       }
     }
@@ -633,23 +627,128 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
   return !requirementMutating && witnessMutating;
 }
 
+/// Retrieve the location at which '@objc' should be inserted for the
+/// given declaration.
+static SourceLoc getAtObjCInsertionLoc(ValueDecl *vd) {
+  SourceLoc startLoc = vd->getStartLoc();
+  SourceLoc attrStartLoc = vd->getAttrs().getStartLoc();
+  if (attrStartLoc.isValid())
+    startLoc = attrStartLoc;
+  
+  if (auto var = dyn_cast<VarDecl>(vd)) {
+    if (auto patternBinding = var->getParentPatternBinding())
+      startLoc = patternBinding->getStartLoc();
+  }
+
+  return startLoc;
+}
+
+/// Retrieve the Objective-C name of the given declaration.
+///
+/// This is a full-fledged selector for methods and initializers, and a
+/// no-parameter selector for properties.
+static ObjCSelector getObjCName(ValueDecl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    return func->getObjCSelector();
+
+  auto var = cast<VarDecl>(decl);
+  return ObjCSelector(decl->getASTContext(), 0, var->getObjCPropertyName());
+}
+
+/// Add the appropriate @objc Fix-It to make the given witness '@objc' and
+/// match the Objective-C name of the requirement.
+static InFlightDiagnostic &addObjCFixIt(ValueDecl *requirement,
+                                        ValueDecl *witness,
+                                        InFlightDiagnostic &&diag) {
+  // Subscripts cannot be renamed, so handle them directly.
+  if (isa<SubscriptDecl>(requirement)) {
+    diag.fixItInsert(getAtObjCInsertionLoc(witness), "@objc ");
+    return diag;
+  }
+
+  // Determine the Objective-C name of the requirement and witness.
+  ObjCSelector requirementName = getObjCName(requirement);
+  ObjCSelector witnessName = getObjCName(witness);
+
+  // Dig out the existing '@objc' attribute on the witness. We don't care
+  // about implicit ones because they don't have useful source location
+  // information.
+  auto witnessAttr = witness->getAttrs().getAttribute<ObjCAttr>();
+  if (witnessAttr && witnessAttr->isImplicit())
+    witnessAttr = nullptr;
+
+  // If there is an @objc attribute with an explicit, incorrect witness
+  // name, go fix the witness name.
+  if (witnessAttr && requirementName != witnessName &&
+      witnessAttr->hasName() && !witnessAttr->isNameImplicit()) {
+    // Find the source range covering the full name.
+    SourceLoc startLoc;
+    if (witnessAttr->getNameLocs().empty())
+      startLoc = witnessAttr->getRParenLoc();
+    else
+      startLoc = witnessAttr->getNameLocs().front();
+
+    // Replace the name with the name of the requirement.
+    SmallString<64> scratch;
+    diag.fixItReplaceChars(startLoc, witnessAttr->getRParenLoc(),
+                           requirementName.getString(scratch));
+    return diag;
+  }
+
+  // We need to create or amend an @objc attribute with the appropriate
+  // new selector.
+
+  // Form the Fix-It text.
+  SourceLoc startLoc;
+  SmallString<64> fixItText;
+  {
+    assert((!witnessAttr || !witnessAttr->hasName() ||
+            witnessAttr->isNameImplicit() ||
+            requirementName == witnessName) &&
+           "Nothing to diagnose!");
+    llvm::raw_svector_ostream out(fixItText);
+
+    // If there is no @objc attribute, we need to add our own '@objc'.
+    if (!witnessAttr) {
+      startLoc = getAtObjCInsertionLoc(witness);
+      out << "@objc";
+    } else {
+      startLoc = Lexer::getLocForEndOfToken(requirement->getASTContext().SourceMgr,
+                                            witnessAttr->getRange().End);
+    }
+
+    // If the names of the witness and requirement differ, we need to
+    // specify the name.
+    if (requirementName != witnessName) {
+      out << "(";
+      out << requirementName;
+      out << ")";
+    }
+
+    if (!witnessAttr)
+      out << " ";
+  }
+
+  diag.fixItInsert(startLoc, fixItText);
+  return diag;
+}
+
 /// Check that the Objective-C method(s) provided by the witness have
 /// the same selectors as those required by the requirement.
 static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
-                                     ValueDecl *witness,
-                                     bool complain) {
-  // Simple case: for methods, check that the selectors match.
+                                     ValueDecl *witness) {
+  // Simple case: for methods and initializers, check that the selectors match.
   if (auto reqFunc = dyn_cast<AbstractFunctionDecl>(req)) {
     auto witnessFunc = cast<AbstractFunctionDecl>(witness);
     if (reqFunc->getObjCSelector() == witnessFunc->getObjCSelector())
       return false;
 
-    if (complain) {
-      auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
-      tc.diagnose(witness, diag::objc_witness_selector_mismatch,
-                  diagInfo.first, diagInfo.second,
-                  witnessFunc->getObjCSelector(), reqFunc->getObjCSelector());
-    }
+    auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
+    addObjCFixIt(req, witness,
+                 tc.diagnose(witness, diag::objc_witness_selector_mismatch,
+                             diagInfo.first, diagInfo.second,
+                             witnessFunc->getObjCSelector(),
+                             reqFunc->getObjCSelector()));
 
     return true;
   }
@@ -658,17 +757,17 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   auto reqStorage = cast<AbstractStorageDecl>(req);
   auto witnessStorage = cast<AbstractStorageDecl>(witness);
 
+  // FIXME: Check property names!
+
   // Check the getter.
   if (auto reqGetter = reqStorage->getGetter()) {
-    if (checkObjCWitnessSelector(tc, reqGetter, witnessStorage->getGetter(),
-                                 complain))
+    if (checkObjCWitnessSelector(tc, reqGetter, witnessStorage->getGetter()))
       return true;
   }
 
   // Check the setter.
   if (auto reqSetter = reqStorage->getSetter()) {
-    if (checkObjCWitnessSelector(tc, reqSetter, witnessStorage->getSetter(),
-                                 complain))
+    if (checkObjCWitnessSelector(tc, reqSetter, witnessStorage->getSetter()))
       return true;
   }
 
@@ -794,17 +893,11 @@ matchWitness(TypeChecker &tc,
     ignoreReturnType = true;
   }
 
-  // Objective-C checking for @objc requirements.
-  if (req->isObjC()) {
-    // The witness must also be @objc.
-    if (!witness->isObjC())
-      return RequirementMatch(witness, MatchKind::NotObjC);
-
-    
-    // The selectors must coincide.
-    if (checkObjCWitnessSelector(tc, req, witness, /*complain=*/false))
-      return RequirementMatch(witness, MatchKind::ObjCSelectorConflict);
-  }
+  // If the requirement is @objc, the witness must not be marked with @nonobjc.
+  // @objc-ness will be inferred (separately) and the selector will be checked
+  // later.
+  if (req->isObjC() && witness->getAttrs().hasAttribute<NonObjCAttr>())
+    return RequirementMatch(witness, MatchKind::NonObjC);
 
   // Set up the match, determining the requirement and witness types
   // in the process.
@@ -928,6 +1021,7 @@ matchWitness(TypeChecker &tc,
   // Initialized by the setup operation.
   Optional<ConstraintSystem> cs;
   ConstraintLocator *locator = nullptr;
+  ConstraintLocator *reqLocator = nullptr;
   ConstraintLocator *witnessLocator = nullptr;
   Type witnessType, openWitnessType;
   Type openedFullWitnessType;
@@ -983,11 +1077,14 @@ matchWitness(TypeChecker &tc,
     // mapped to their archetypes directly.
     DeclContext *reqDC = req->getInnermostDeclContext();
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
+    reqLocator = cs->getConstraintLocator(
+                     static_cast<Expr *>(nullptr),
+                     LocatorPathElt(ConstraintLocator::Requirement, req));
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(selfTy, req,
                                      /*isTypeReference=*/false,
                                      /*isDynamicResult=*/false,
-                                     locator,
+                                     reqLocator,
                                      /*base=*/nullptr,
                                      &replacements);
 
@@ -1408,6 +1505,11 @@ namespace {
     /// @objc optional requirement.
     void checkOptionalWitnessNonObjCMatch(ValueDecl *requirement);
 
+    /// Check whether there is a potential non-@objc witness for an
+    /// @objc optional requirement.
+    bool diagnoseOptionalWitnessNonObjCMatch(ValueDecl *requirement,
+                                             ValueDecl *witness);
+
     /// Record a type witness.
     ///
     /// \param assocType The associated type whose witness is being recorded.
@@ -1576,22 +1678,6 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
 
   //
   return type;
-}
-
-/// Retrieve the location at which '@objc' should be inserted for the
-/// given declaration.
-static SourceLoc getAtObjCInsertionLoc(ValueDecl *vd) {
-  SourceLoc startLoc = vd->getStartLoc();
-  SourceLoc attrStartLoc = vd->getAttrs().getStartLoc();
-  if (attrStartLoc.isValid())
-    startLoc = attrStartLoc;
-  
-  if (auto var = dyn_cast<VarDecl>(vd)) {
-    if (auto patternBinding = var->getParentPatternBinding())
-      startLoc = patternBinding->getStartLoc();
-  }
-
-  return startLoc;
 }
 
 /// \brief Retrieve the kind of requirement described by the given declaration,
@@ -1804,15 +1890,9 @@ diagnoseMatch(TypeChecker &tc, Module *module,
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_rethrows_conflict);
     break;
-  case MatchKind::ObjCSelectorConflict:
-    (void)checkObjCWitnessSelector(tc, req, match.Witness, /*complain=*/true);
+  case MatchKind::NonObjC:
+    tc.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
-  case MatchKind::NotObjC: {
-    SourceLoc witnessStartLoc = getAtObjCInsertionLoc(match.Witness);
-    tc.diagnose(match.Witness, diag::protocol_witness_not_objc)
-      .fixItInsert(witnessStartLoc, "@objc ");
-    break;
-  }
   }
 }
 
@@ -1906,9 +1986,9 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
     if (!SuppressDiagnostics)
       checkOptionalWitnessNonObjCMatch(requirement);
 
-    if (auto funcReq = dyn_cast<AbstractFunctionDecl>(requirement))
+    if (auto funcReq = dyn_cast<AbstractFunctionDecl>(requirement)) {
       TC.Context.recordObjCUnsatisfiedOptReq(DC, funcReq);
-    else {
+    } else {
       auto storageReq = cast<AbstractStorageDecl>(requirement);
       if (auto getter = storageReq->getGetter())
         TC.Context.recordObjCUnsatisfiedOptReq(DC, getter);
@@ -1929,22 +2009,32 @@ void ConformanceChecker::checkOptionalWitnessNonObjCMatch(
     // handle this if there actually is a collision.
     if (witness->isObjC())
       continue;
-    
-    // This is silenced by writing @nonobjc.
-    if (witness->getAttrs().hasAttribute<NonObjCAttr>())
-      continue;
 
-    // Diagnose the non-@objc declaration.
-    TC.diagnose(witness, diag::optional_req_nonobjc_near_match,
-                getRequirementKind(requirement), requirement->getFullName(),
-                Proto->getFullName())
-      .fixItInsert(getAtObjCInsertionLoc(witness), "@objc ");
-    
-    TC.diagnose(requirement, diag::protocol_requirement_here,
-                requirement->getFullName());
-
-    break;
+    // Diagnose if needed.
+    if (diagnoseOptionalWitnessNonObjCMatch(requirement, witness))
+      break;
   }
+}
+
+bool ConformanceChecker::diagnoseOptionalWitnessNonObjCMatch(
+       ValueDecl *requirement, ValueDecl *witness) {
+  // This is silenced by writing @nonobjc.
+  if (witness->getAttrs().hasAttribute<NonObjCAttr>())
+    return false;;
+
+  // Diagnose the non-@objc declaration.
+  TC.diagnose(witness, diag::optional_req_nonobjc_near_match,
+              getRequirementKind(requirement), requirement->getFullName(),
+              Proto->getFullName());
+  addObjCFixIt(requirement, witness,
+               TC.diagnose(witness,
+                           diag::optional_req_nonobjc_near_match_add_objc));
+  TC.diagnose(witness, diag::optional_req_nonobjc_near_match_silence)
+    .fixItInsert(getAtObjCInsertionLoc(witness), "@nonobjc ");
+
+  TC.diagnose(requirement, diag::protocol_requirement_here,
+              requirement->getFullName());
+  return true;
 }
 
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
@@ -3707,15 +3797,62 @@ void ConformanceChecker::checkConformance() {
     // Type aliases don't have requirements themselves.
     if (isa<TypeAliasDecl>(requirement))
       continue;
-      
+
+    /// Local function to finalize the witness.
+    auto finalizeWitness = [&] {
+      // Find the witness.
+      auto witness = Conformance->getWitness(requirement, nullptr).getDecl();
+      if (!witness) {
+        // If this is an unsatisfied @objc optional requirement,
+        // diagnose it.
+        if (requirement->isObjC())
+          checkOptionalWitnessNonObjCMatch(requirement);
+
+        return;
+      }
+
+      // Objective-C checking for @objc requirements.
+      if (requirement->isObjC()) {
+        // The witness must also be @objc.
+        if (!witness->isObjC()) {
+          // If the requirement is optional, warn.
+          if (requirement->getAttrs().hasAttribute<OptionalAttr>()) {
+            diagnoseOptionalWitnessNonObjCMatch(requirement, witness);
+            return;
+          }
+
+          if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness)) {
+            auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
+            addObjCFixIt(requirement, witness,
+                         TC.diagnose(witness, diag::witness_non_objc,
+                                     diagInfo.first, diagInfo.second,
+                                     Proto->getFullName()));
+          } else if (isa<AbstractStorageDecl>(witness)) {
+            addObjCFixIt(requirement, witness,
+                         TC.diagnose(witness, diag::witness_non_objc_storage,
+                                     isa<SubscriptDecl>(witness),
+                                     witness->getFullName(),
+                                     Proto->getFullName()));
+          }
+
+          TC.diagnose(requirement, diag::protocol_requirement_here,
+                      requirement->getFullName());
+
+          Conformance->setInvalid();
+          return;
+        }
+
+        // The selectors must coincide.
+        if (checkObjCWitnessSelector(TC, requirement, witness)) {
+          Conformance->setInvalid();
+          return;
+        }
+      }
+    };
+
     // If we've already determined this witness, skip it.
     if (Conformance->hasWitness(requirement)) {
-      // If this is an unsatisfied @objc optional requirement,
-      // diagnose it.
-      if (!Conformance->getWitness(requirement, nullptr) &&
-          requirement->isObjC())
-        checkOptionalWitnessNonObjCMatch(requirement);
-
+      finalizeWitness();
       continue;
     }
 
@@ -3736,6 +3873,7 @@ void ConformanceChecker::checkConformance() {
     // Try to resolve the witness via explicit definitions.
     switch (resolveWitnessViaLookup(requirement)) {
     case ResolveWitnessResult::Success:
+      finalizeWitness();
       continue;
 
     case ResolveWitnessResult::ExplicitFailed:
@@ -3750,6 +3888,7 @@ void ConformanceChecker::checkConformance() {
     // Try to resolve the witness via derivation.
     switch (resolveWitnessViaDerivation(requirement)) {
     case ResolveWitnessResult::Success:
+      finalizeWitness();
       continue;
 
     case ResolveWitnessResult::ExplicitFailed:
@@ -3764,6 +3903,7 @@ void ConformanceChecker::checkConformance() {
     // Try to resolve the witness via defaults.
     switch (resolveWitnessViaDefault(requirement)) {
     case ResolveWitnessResult::Success:
+      finalizeWitness();
       continue;
 
     case ResolveWitnessResult::ExplicitFailed:

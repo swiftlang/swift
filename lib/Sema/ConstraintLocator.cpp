@@ -37,6 +37,10 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(elt.getArchetype()->getCanonicalType().getPointer());
       break;
 
+    case Requirement:
+      id.AddPointer(elt.getRequirement());
+      break;
+
     case Witness:
       id.AddPointer(elt.getWitness());
       break;
@@ -214,6 +218,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case TupleElement:
       out << "tuple element #" << llvm::utostr(elt.getValue());
+      break;
+
+    case Requirement:
+      out << "requirement ";
+      elt.getRequirement()->dumpRef(out);
       break;
 
     case Witness:
