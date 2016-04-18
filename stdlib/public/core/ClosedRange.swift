@@ -13,6 +13,9 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range and [Closed]CountableRange.
 
+// FIXME(ABI)(compiler limitation): remove `ClosedRangeProtocol` and make
+// `ClosedRange` conditionally conform to `RandomAccessCollection`.
+//
 /// A type that represents a contiguous range of any comparable value,
 /// containing both its lower and upper bounds.
 ///
@@ -58,6 +61,8 @@ case pastEnd
 case inRange(Bound)
 }
 
+// FIXME(ABI)(compiler limitation): should be a nested type in
+// `ClosedRange`.
 /// A position in a `CountableClosedRange` instance.
 public struct ClosedRangeIndex<
   // WORKAROUND rdar://25214598 - should be Bound : Strideable

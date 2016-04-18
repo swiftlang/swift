@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME(ABI)(compiler limitation): remove this type, it creates an ABI burden
+// on the library.
+//
 // A dummy type that we can use when we /don't/ want to create an
 // ambiguity indexing CountableRange<T> outside a generic context.
 public enum _DisabledRangeIndex_ {}
@@ -138,6 +141,9 @@ extension RangeProtocol {
   }
 }
 
+// FIXME(ABI)(compiler limitation): remove `HalfOpenRangeProtocol` and make
+// `Range` conditionally conform to `RandomAccessCollection`.
+//
 /// A type that represents a contiguous range of any `Comparable` value,
 /// with nonempty ranges containing their lower bounds but not their
 /// upper bounds.
@@ -344,6 +350,9 @@ public struct CountableRange<
 }
 
 extension RangeProtocol {
+  // FIXME(ABI)(performance): make this a protocol requirement, and let
+  // models return true or false directly.
+  //
   /// Return true if this is not a closed range type.
   ///
   /// - parameter x: any arbitrary value of type `Bound`.
@@ -388,6 +397,9 @@ extension RangeProtocol where Bound : Strideable, Bound.Stride : Integer {
 // indices for ranges, outside a generic context.  This prevents mistakes
 // such as x = r[0], which will trap unless 0 happens to be contained in the
 // range r.
+//
+// FIXME(ABI)(compiler limitation): remove this code, it creates an ABI burden
+// on the library.
 extension CountableRange {
   /// Accesses the element at `position`.
   ///

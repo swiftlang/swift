@@ -16,6 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME(ABI): The UTF-8 string view should conform to
+// `BidirectionalCollection`.
+
 extension _StringCore {
   /// An integral type that holds a sequence of UTF-8 code units, starting in
   /// its low byte.

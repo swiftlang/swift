@@ -3842,6 +3842,9 @@ elif Self == 'Dictionary':
 ${SubscriptingWithIndexDoc}
 public struct ${Self}Index<${TypeParametersDecl}> :
   Comparable {
+  // FIXME(ABI)(compiler limitation): `DictionaryIndex` and `SetIndex` should
+  // be nested types.
+
   // Index for native storage is efficient.  Index for bridged NS${Self} is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
