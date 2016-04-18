@@ -225,6 +225,8 @@ public:
   std::vector<std::pair<std::string, const TypeRef *>>
   getFieldTypeRefs(const TypeRef *TR);
 
+  const BuiltinTypeDescriptor *getBuiltinTypeInfo(const TypeRef *TR);
+
   ///
   /// Dumping typerefs, field declarations, associated types
   ///

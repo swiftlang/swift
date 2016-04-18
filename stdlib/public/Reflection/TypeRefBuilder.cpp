@@ -112,6 +112,28 @@ getFieldTypeRefs(const TypeRef *TR) {
   return Fields;
 }
 
+const BuiltinTypeDescriptor *
+TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
+  std::string MangledName;
+  if (auto B = dyn_cast<BuiltinTypeRef>(TR))
+    MangledName = B->getMangledName();
+  else
+    return nullptr;
+
+  for (auto Info : ReflectionInfos) {
+    for (auto &BuiltinTypeDescriptor : Info.builtin) {
+      if (!BuiltinTypeDescriptor.hasMangledTypeName())
+        continue;
+      auto CandidateMangledName = BuiltinTypeDescriptor.getMangledTypeName();
+      if (MangledName.compare(CandidateMangledName) != 0)
+        continue;
+      return &BuiltinTypeDescriptor;
+    }
+  }
+
+  return nullptr;
+}
+
 ///
 /// Dumping typerefs, field declarations, associated types
 ///
