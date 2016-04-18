@@ -219,24 +219,24 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   // Promote stack allocations to values and eliminate redundant
   // loads.
   PM.addMem2Reg();
-  PM.addRedundantLoadElimination();
+  PM.addPerformanceConstantPropagation();
   //  Do a round of CFG simplification, followed by peepholes, then
   //  more CFG simplification.
-  AddSimplifyCFGSILCombine(PM);
 
-  PM.addPerformanceConstantPropagation();
-  PM.addCSE();
-  PM.addSILCombine();
-  PM.addJumpThreadSimplifyCFG();
-  // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
+  // Jump threading can expose opportunity for SILCombine (enum -> is_enum_tag->
   // cond_br).
+  PM.addJumpThreadSimplifyCFG();
   PM.addSILCombine();
-  // Which can expose opportunity for simplifcfg.
+  // SILCombine can expose further opportunities for SimplifyCFG.
   PM.addSimplifyCFG();
+
+  PM.addCSE();
+  PM.addRedundantLoadElimination();
 
   // Perform retain/release code motion and run the first ARC optimizer.
   PM.addCSE();
   PM.addDCE();
+
   PM.addEarlyCodeMotion();
   PM.addARCSequenceOpts();
 
