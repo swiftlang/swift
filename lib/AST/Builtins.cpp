@@ -16,6 +16,7 @@
 
 #include "swift/AST/Builtins.h"
 #include "swift/AST/AST.h"
+#include "swift/Basic/LLVMContext.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Attributes.h"
@@ -42,7 +43,7 @@ bool BuiltinInfo::isReadNone() const {
 bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {
   // FIXME: We should not be relying on the global LLVM context.
   llvm::AttributeSet attrs
-    = llvm::Intrinsic::getAttributes(llvm::getGlobalContext(), ID);
+    = llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
   return (attrs.hasAttribute(llvm::AttributeSet::FunctionIndex, Kind));
 }
 
@@ -1177,8 +1178,8 @@ getSwiftFunctionTypeForIntrinsic(unsigned iid, ArrayRef<Type> TypeArgs,
   }
   
   // Translate LLVM function attributes to Swift function attributes.
-  llvm::AttributeSet attrs
-    = llvm::Intrinsic::getAttributes(llvm::getGlobalContext(), ID);
+  llvm::AttributeSet attrs =
+      llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
   Info = FunctionType::ExtInfo();
   if (attrs.hasAttribute(llvm::AttributeSet::FunctionIndex,
                          llvm::Attribute::NoReturn))

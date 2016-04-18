@@ -24,6 +24,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/LLVMContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/LLVMPasses/Passes.h"
@@ -245,7 +246,7 @@ int main(int argc, char **argv) {
 
   // Load the input module...
   std::unique_ptr<Module> M =
-      parseIRFile(InputFilename, Err, getGlobalContext());
+      parseIRFile(InputFilename, Err, getGlobalLLVMContext());
 
   if (!M) {
     Err.print(argv[0], errs());
