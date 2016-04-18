@@ -162,13 +162,6 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     nominalFunc(nominal);
   }
 
-  // Protocol extensions do not contribute protocol conformances. This
-  // is enforced by semantic analysis, so the early exit here is a
-  // performance optimization and also prevents us from erroneously
-  // including those protocols before they get diagnosed.
-  if (isa<ProtocolDecl>(nominal))
-    return;
-
   // Handle the extensions that we have not yet visited.
   llvm::SetVector<ExtensionDecl *> &delayedExtensionDecls
     = DelayedExtensionDecls[static_cast<unsigned>(stage)];
@@ -198,7 +191,15 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       delayedExtensionDecls.remove(next);
       resolver->resolveExtension(next);
     }
-
+    // For protocol extensions only call extensionFunc if it is usable,
+    // i.e. the Type meets the where clause requirements.
+    if (resolver && next->getAsProtocolOrProtocolExtensionContext()) {
+      if (!resolver->isProtocolExtensionUsable(nominal->getDeclContext(),
+                                               nominal->getType(), next)) {
+        continue;
+      }
+    }
+    
     extensionFunc(next);
   }
 
@@ -209,8 +210,12 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       // Remove the last extension declaration.
       auto ext = delayedExtensionDecls.back();
       delayedExtensionDecls.remove(ext);
-
       resolver->resolveExtension(ext);
+      if (ext->getAsProtocolOrProtocolExtensionContext() &&
+          !resolver->isProtocolExtensionUsable(nominal->getDeclContext(),
+                                               nominal->getType(), ext)) {
+        continue;
+      }
       extensionFunc(ext);
     }
   }
@@ -525,6 +530,17 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
     addProtocols(nominal, conformingProtocol->getInherited(),
                  ConformanceSource::forImplied(conformanceEntry),
                  resolver);
+    if (resolver) {
+      conformingProtocol->prepareExtensions();
+      for (auto ext: conformingProtocol->getExtensions()) {
+        // Only add the protocol extensions inherited protocols if it is usable
+        // i.e. if the type meets the where clause conditions if one exists.
+        if (resolver->isProtocolExtensionUsable(dc, nominal->getType(), ext)) {
+          addProtocols(nominal, ext->getInherited(),
+                       ConformanceSource::forImplied(conformanceEntry), resolver);
+        }
+      }
+    }
   }
 }
 

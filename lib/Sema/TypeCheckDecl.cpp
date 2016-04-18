@@ -318,27 +318,18 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     ext->setCheckedInheritanceClause();
     inheritedClause = ext->getInherited();
 
-    // Protocol extensions cannot have inheritance clauses.
-    if (ext->getExtendedType()->is<ProtocolType>()) {
-      if (!inheritedClause.empty()) {
-        diagnose(ext->getLoc(), diag::extension_protocol_inheritance,
+    if (!ext->getExtendedType()->is<ProtocolType>()) {
+      // Constrained extensions on classes cannot have inheritance clauses.
+      // FIXME: The generics model should allow this at some point
+      if (!inheritedClause.empty() &&
+                  ext->getGenericParams() &&
+                  ext->getGenericParams()->hasTrailingWhereClause()) {
+        diagnose(ext->getLoc(), diag::extension_constrained_inheritance,
                  ext->getExtendedType())
-          .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
-                                 inheritedClause.back().getSourceRange().End));
+        .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
+                               inheritedClause.back().getSourceRange().End));
         ext->setInherited({ });
-        return;
       }
-    }
-
-    // Constrained extensions cannot have inheritance clauses.
-    if (!inheritedClause.empty() &&
-        ext->getGenericParams() &&
-        ext->getGenericParams()->hasTrailingWhereClause()) {
-      diagnose(ext->getLoc(), diag::extension_constrained_inheritance,
-               ext->getExtendedType())
-      .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
-                             inheritedClause.back().getSourceRange().End));
-      ext->setInherited({ });
     }
   }
 
