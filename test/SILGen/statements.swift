@@ -156,21 +156,10 @@ func do_loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops1
 func for_loops1(_ x: Int, c: Bool) {
-  var x = x
   for i in 1..<100 {
     markUsed(i)
   }
-  
-  for ; x < 40;  { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-   markUsed(x)
-   x += 1
-  }
-  
-  for var i = 0; i < 100; i += 1 { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  }
-  
-  for let i = 0; i < 100; i { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  }
+
 }
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops2

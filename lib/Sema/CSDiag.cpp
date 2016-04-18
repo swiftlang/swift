@@ -4209,9 +4209,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //
-  auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(), argType,
-                                                     calleeInfo,
-                                                     TCC_AllowUnresolvedTypeVariables);
+  auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(),
+                                                     argType, calleeInfo,
+                                             TCC_AllowUnresolvedTypeVariables);
   if (!argExpr)
     return true; // already diagnosed.
 

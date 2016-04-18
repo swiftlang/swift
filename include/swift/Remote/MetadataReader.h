@@ -39,52 +39,18 @@ template <typename Runtime>
 using SharedProtocolDescriptorRef
   = std::shared_ptr<TargetProtocolDescriptor<Runtime>>;
 
-/// A generic reader of metadata.
-///
-/// BuilderType must implement a particular interface which is currently
-/// too fluid to allow useful documentation; consult the actual
-/// implementations.  The chief thing is that it provides several member
-/// types which should obey the following constraints:
-///   - T() yields a value which is false when contextually converted to bool
-///   - a false value signals that an error occurred when building a value
-template <typename Runtime, typename BuilderType>
-class MetadataReader {
-public:
+/// A utility class for constructing abstract types from
+/// a textual mangling.
+template <typename BuilderType>
+class TypeDecoder {
   using Type = typename BuilderType::Type;
-  using StoredPointer = typename Runtime::StoredPointer;
-  using StoredSize = typename Runtime::StoredSize;
+  using NodeKind = Demangle::Node::Kind;
 
-private:
-  std::unordered_map<StoredPointer, Type> TypeCache;
-  std::unordered_map<StoredPointer, SharedTargetMetadataRef<Runtime>>
-  MetadataCache;
+  BuilderType &Builder;
 
-  std::unordered_map<StoredPointer,
-                     std::pair<SharedTargetNominalTypeDescriptorRef<Runtime>,
-                               StoredPointer>>
-    NominalTypeDescriptorCache;
-
-public:
-  BuilderType Builder;
-
-  std::shared_ptr<MemoryReader> Reader;
-
-  template <class... T>
-  MetadataReader(std::shared_ptr<MemoryReader> reader, T &&... args)
-    : Builder(std::forward<T>(args)...),
-      Reader(std::move(reader)) {
-
-  }
-
-  MetadataReader(const MetadataReader &other) = delete;
-  MetadataReader &operator=(const MetadataReader &other) = delete;  
-
-  /// Clear all of the caches in this reader.
-  void clear() {
-    TypeCache.clear();
-    MetadataCache.clear();
-    NominalTypeDescriptorCache.clear();
-  }
+ public:
+  explicit TypeDecoder(BuilderType &Builder)
+    : Builder(Builder) {}
 
   /// Given a demangle tree, attempt to turn it into a type.
   Type decodeMangledType(const Demangle::NodePointer &Node) {
@@ -257,11 +223,11 @@ public:
         return Type();
     }
   }
+
 private:
   bool decodeMangledNominalType(const Demangle::NodePointer &node,
                                 std::string &mangledName,
                                 Type &parent) {
-    using NodeKind = Demangle::Node::Kind;
     if (node->getKind() == NodeKind::Type)
       return decodeMangledNominalType(node->getChild(0), mangledName, parent);
 
@@ -286,8 +252,6 @@ private:
                                       std::vector<Type> &args,
                                       std::vector<bool> &argsAreInOut,
                                       FunctionTypeFlags &flags) {
-    using NodeKind = Demangle::Node::Kind;
-
     // Look through a couple of sugar nodes.
     if (node->getKind() == NodeKind::Type ||
         node->getKind() == NodeKind::ArgumentTuple) {
@@ -335,8 +299,71 @@ private:
     // Otherwise, handle the type as a single argument.
     return decodeSingle(node);
   }
+};
+
+template<typename BuilderType>
+static inline typename BuilderType::Type
+decodeMangledType(BuilderType &Builder,
+                  const Demangle::NodePointer &Node) {
+  return TypeDecoder<BuilderType>(Builder).decodeMangledType(Node);
+}
+
+/// A generic reader of metadata.
+///
+/// BuilderType must implement a particular interface which is currently
+/// too fluid to allow useful documentation; consult the actual
+/// implementations.  The chief thing is that it provides several member
+/// types which should obey the following constraints:
+///   - T() yields a value which is false when contextually converted to bool
+///   - a false value signals that an error occurred when building a value
+template <typename Runtime, typename BuilderType>
+class MetadataReader {
+public:
+  using Type = typename BuilderType::Type;
+  using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSize = typename Runtime::StoredSize;
+
+private:
+  std::unordered_map<StoredPointer, Type> TypeCache;
+  std::unordered_map<StoredPointer, SharedTargetMetadataRef<Runtime>>
+  MetadataCache;
+
+  std::unordered_map<StoredPointer,
+                     std::pair<SharedTargetNominalTypeDescriptorRef<Runtime>,
+                               StoredPointer>>
+    NominalTypeDescriptorCache;
 
 public:
+  BuilderType Builder;
+
+  BuilderType &getBuilder() {
+    return this->Builder;
+  }
+
+  std::shared_ptr<MemoryReader> Reader;
+
+  template <class... T>
+  MetadataReader(std::shared_ptr<MemoryReader> reader, T &&... args)
+    : Builder(std::forward<T>(args)...),
+      Reader(std::move(reader)) {
+
+  }
+
+  MetadataReader(const MetadataReader &other) = delete;
+  MetadataReader &operator=(const MetadataReader &other) = delete;
+
+  /// Clear all of the caches in this reader.
+  void clear() {
+    TypeCache.clear();
+    MetadataCache.clear();
+    NominalTypeDescriptorCache.clear();
+  }
+
+  /// Given a demangle tree, attempt to turn it into a type.
+  Type decodeMangledType(const Demangle::NodePointer &Node) {
+    return swift::remote::decodeMangledType(Builder, Node);
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   Type readTypeFromMetadata(StoredPointer MetadataAddress) {
     auto Cached = TypeCache.find(MetadataAddress);

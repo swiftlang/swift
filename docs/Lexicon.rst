@@ -141,10 +141,14 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     `Whole-Module Optimization <WMO (whole-module optimization)>`.
 
   QoI
-    "Quality of implementation." Sometimes written in commit messages that
-    improve the code that implements a particular feature of the compiler. More
-    often included in FIXMEs or TODOs when the current code functions properly,
-    but should be cleaned up. Example: "FIXME: QoI could be improved here."
+    "Quality of implementation." The term is meant to describe not how
+    well-engineered a particular implementation is, but how much value it
+    provides to users beyond a sort of minimum expectation. Good diagnostics
+    are a matter of QoI, as is good unoptimized performance. For example, a
+    comment like "FIXME: QoI could be improved here" is suggesting that there's
+    some sort of non-mandatory work that could be done that would improve the
+    behavior of the compiler--it is not just a general statement that the code
+    needs to be improved.
 
   Radar
     `Apple's bug-tracking system`__, or an issue reported on that system.

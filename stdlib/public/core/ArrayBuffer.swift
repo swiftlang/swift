@@ -133,7 +133,7 @@ extension _ArrayBuffer {
   /// Otherwise, returns `nil`.
   @warn_unused_result
   public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
-	-> NativeBuffer? {
+  -> NativeBuffer? {
     if _fastPath(isUniquelyReferenced()) {
       let b = _native
       if _fastPath(b.capacity >= minimumCapacity) {

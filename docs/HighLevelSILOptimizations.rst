@@ -96,7 +96,7 @@ getElement instruction::
 
 Swift optimizations
 -------------------
-The swift optimizer can access the information that is provided by the
+The Swift optimizer can access the information that is provided by the
 ``@_semantics`` attribute to perform high-level optimizations. In the early
 stages of the optimization pipeline the optimizer does not inline functions
 with special semantics in order to allow the early high-level optimization

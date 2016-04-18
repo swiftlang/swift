@@ -1061,8 +1061,10 @@ ERROR(extension_protocol_via_typealias,none,
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
 ERROR(objc_generic_extension_using_type_parameter,none,
-      "Extension of a generic Objective-C class cannot access the class's "
-      "generic parameters", ())
+      "extension of a generic Objective-C class cannot access the class's "
+      "generic parameters at runtime", ())
+NOTE(objc_generic_extension_using_type_parameter_here,none,
+     "generic parameter used here", ())
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -2057,8 +2059,8 @@ WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
 
-WARNING(tuple_splat_use,none,
-        "passing %0 arguments to a callee as a single tuple value is deprecated",
+ERROR(tuple_splat_use,none,
+      "passing %0 arguments to a callee as a single tuple value has been removed in Swift 3",
         (unsigned))
 
 
@@ -2169,10 +2171,8 @@ NOTE(change_to_mutating,none,
      (bool))
 
 // For Stmt
-WARNING(deprecated_c_style_for_stmt,none,
-"C-style for statement is deprecated and will be removed in a future version of Swift", ())
-NOTE(cant_fix_c_style_for_stmt,none,
-"C-style for statement can't be automatically fixed to for-in, because the loop variable is modified inside the loop", ())
+ERROR(deprecated_c_style_for_stmt,none,
+      "C-style for statement has been removed in Swift 3", ())
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,none,

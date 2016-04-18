@@ -32,7 +32,7 @@ func basic(a : Int32) {
   }
 
   // CHECK: builtin "int_instrprof_increment"
-  for var i: Int32 = 0; i < a; ++i {
+  for i in 0 ..< a {
   }
 
   // CHECK: builtin "int_instrprof_increment"

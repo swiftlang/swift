@@ -137,7 +137,6 @@ func missingWhileInRepeat() {
   } // expected-error {{expected 'while' after body of 'repeat' statement}}
 }
 
-// expected-note @+1 {{in call to function 'acceptsClosure'}}
 func acceptsClosure<T>(t: T) -> Bool { return true }
 
 func missingControllingExprInFor() {
@@ -167,25 +166,7 @@ func missingControllingExprInFor() {
   for var i = 0; true { // expected-error {{expected ';' in 'for' statement}}
   }
 
-  // Ensure that we don't do recovery in the following cases.
-  for ; ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  }
-
-  for { true }(); ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  }
-
-  for ; { true }() ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  }
-
-  for acceptsClosure { 42 }; ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  }
-
-  // A trailing closure is not accepted for the condition.
-  for ; acceptsClosure { 42 }; { // expected-error{{generic parameter 'T' could not be inferred}} expected-error{{expression resolves to an unused function}}
-// expected-error@-1{{expected ';' in 'for' statement}}
-// expected-error@-2{{braced block}}
-  }
-  
+ 
 // The #if block is used to provide a scope for the for stmt to force it to end
 // where necessary to provoke the crash.
 #if true  // <rdar://problem/21679557> compiler crashes on "for{{"

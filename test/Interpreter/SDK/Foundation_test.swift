@@ -69,7 +69,7 @@ FoundationTestSuite.test("NSNumber") {
 
 FoundationTestSuite.test("NSArray") {
   // Literals
-  var nsArr: NSArray = [ 1, 2.5, "Hello" ]
+  var nsArr: NSArray = [1, 2.5, "Hello"]
   assert(nsArr.count == 3)
 
   // Subscripting
@@ -82,7 +82,7 @@ FoundationTestSuite.test("NSArray") {
   for x: AnyObject in nsArr {
     result.append((x as! NSObject).description)
   }
-  expectEqualSequence([ "1", "2.5", "Hello" ], result)
+  expectEqualSequence(["1", "2.5", "Hello"], result)
 }
 
 FoundationTestSuite.test("NSMutableArray") {
@@ -189,7 +189,7 @@ class ClassWithDtor : NSObject {
 FoundationTestSuite.test("rdar://17584531") {
   // <rdar://problem/17584531>
   // Type checker used to be confused by this.
-  var dict: NSDictionary = [ "status": 200, "people": [ [ "id": 255, "name": [ "first": "John", "last": "Appleseed" ] ] ] ]
+  var dict: NSDictionary = ["status": 200, "people": [["id": 255, "name": ["first": "John", "last": "Appleseed"]]]]
   var dict2 = dict["people"]?[0] as! NSDictionary
   expectEqual("Optional(255)", String(dict2["id"]))
 }

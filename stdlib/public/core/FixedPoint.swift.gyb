@@ -607,17 +607,15 @@ extension ${Self} {
 
 // Prefix and postfix increment and decrement.
 
-// FIXME: After <rdar://problem/20226526> is fixed, we should be able
-//        to remove these.
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public prefix func ++ (x: inout ${Self}) -> ${Self} {
   x = x + 1
   return x
 }
 
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public postfix func ++ (x: inout ${Self}) -> ${Self} {
   let ret = x
   x = x + 1
@@ -625,14 +623,14 @@ public postfix func ++ (x: inout ${Self}) -> ${Self} {
 }
 
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public prefix func -- (x: inout ${Self}) -> ${Self} {
   x = x - 1
   return x
 }
 
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public postfix func -- (x: inout ${Self}) -> ${Self} {
   let ret = x
   x = x - 1

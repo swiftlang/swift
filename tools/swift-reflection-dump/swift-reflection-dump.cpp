@@ -16,9 +16,8 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVMInitialize.h"
-#include "swift/Reflection/ReflectionContext.h"
-#include "swift/Remote/InProcessMemoryReader.h"
 #include "swift/Reflection/TypeRef.h"
+#include "swift/Reflection/TypeRefBuilder.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/MachOUniversal.h"
@@ -204,10 +203,9 @@ static int doDumpReflectionSections(std::string binaryFilename,
     reinterpret_cast<const void *>(reflectionStringsSectionContents.end())
   };
 
-  // Construct the reflection context
-  auto reader = std::make_shared<InProcessMemoryReader>();
-  ReflectionContext<External<RuntimeTarget<8>>> RC(reader);
-  RC.addReflectionInfo({
+  // Construct the TypeRefBuilder
+  TypeRefBuilder builder;
+  builder.addReflectionInfo({
     binaryFilename,
     fieldSection,
     associatedTypeSection,
@@ -217,7 +215,7 @@ static int doDumpReflectionSections(std::string binaryFilename,
   });
 
   // Dump everything
-  RC.dumpAllSections(std::cout);
+  builder.dumpAllSections(std::cout);
 
   return EXIT_SUCCESS;
 }

@@ -10,12 +10,12 @@ import Foundation
 import SpriteKit
 
 // Check that the subscript is there.
-@available(OSX,introduced=10.10)
-@available(iOS,introduced=8.0)
-@available(tvOS,introduced=8.0)
-@available(watchOS,introduced=2.0)
+@available(OSX,introduced: 10.10)
+@available(iOS,introduced: 8.0)
+@available(tvOS,introduced: 8.0)
+@available(watchOS,introduced: 2.0)
 func testSubscript(_ node: SKNode) {
-  var nodes: [SKNode] = node["me"]
+  var _: [SKNode] = node["me"]
 }
 
 // SKColor is NSColor on OS X and UIColor on iOS.

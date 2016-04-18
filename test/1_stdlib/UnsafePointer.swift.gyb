@@ -151,6 +151,29 @@ ${SelfName}TestSuite.test("Hashable") {
   }
 }
 
+% if SelfName != 'OpaquePointer':
+${SelfName}TestSuite.test("toInteger") {
+  do {
+    let word: Int = 0x12345678
+    let ptr = ${SelfType}(bitPattern: word)
+    expectEqual(word, Int(bitPattern: ptr))
+  }
+  do {
+    let ptr: ${SelfType}? = nil
+    expectEqual(Int(0), Int(bitPattern: ptr))
+  }
+  do {
+    let uword: UInt = 0x12345678
+    let ptr = ${SelfType}(bitPattern: uword)
+    expectEqual(uword, UInt(bitPattern: ptr))
+  }
+  do {
+    let ptr: ${SelfType}? = nil
+    expectEqual(UInt(0), UInt(bitPattern: ptr))
+  }
+}
+% end
+
 % end
 
 enum Check {

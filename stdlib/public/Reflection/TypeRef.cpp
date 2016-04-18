@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
-#include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
+#include "swift/Reflection/TypeRefBuilder.h"
 
 using namespace swift;
 using namespace reflection;
@@ -412,3 +412,133 @@ bool NominalTypeTrait::isClass() const {
   auto Demangled = Demangle::demangleTypeAsNode(MangledName);
   return ::isClass(Demangled);
 }
+
+class TypeRefSubstitution
+  : public TypeRefVisitor<TypeRefSubstitution, const TypeRef *> {
+  TypeRefBuilder &Builder;
+  GenericArgumentMap Substitutions;
+public:
+  using TypeRefVisitor<TypeRefSubstitution, const TypeRef *>::visit;
+
+  TypeRefSubstitution(TypeRefBuilder &Builder, GenericArgumentMap Substitutions)
+    : Builder(Builder), Substitutions(Substitutions) {}
+
+  const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return B;
+  }
+
+  const TypeRef *visitNominalTypeRef(const NominalTypeRef *N) {
+    return N;
+  }
+
+  const TypeRef *visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    std::vector<const TypeRef *> GenericParams;
+    for (auto Param : BG->getGenericParams())
+      GenericParams.push_back(visit(Param));
+    return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
+                                       GenericParams);
+  }
+
+  const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
+    std::vector<const TypeRef *> Elements;
+    for (auto Element : T->getElements()) {
+      Elements.push_back(visit(Element));
+    }
+    return TupleTypeRef::create(Builder, Elements);
+  }
+
+  const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
+    std::vector<const TypeRef *> SubstitutedArguments;
+    for (auto Argument : F->getArguments())
+      SubstitutedArguments.push_back(visit(Argument));
+
+    auto SubstitutedResult = visit(F->getResult());
+
+    return FunctionTypeRef::create(Builder, SubstitutedArguments,
+                                   SubstitutedResult);
+  }
+
+  const TypeRef *visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return P;
+  }
+
+  const TypeRef *
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return PC;
+  }
+
+  const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()));
+  }
+
+  const TypeRef *
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    assert(EM->getInstanceType()->isConcrete());
+    return EM;
+  }
+
+  const TypeRef *
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
+    auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
+    assert(found != Substitutions.end());
+    assert(found->second->isConcrete());
+    return found->second;
+  }
+
+  const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    auto SubstBase = visit(DM->getBase());
+
+    const TypeRef *TypeWitness;
+
+    switch (SubstBase->getKind()) {
+    case TypeRefKind::Nominal: {
+      auto Nominal = cast<NominalTypeRef>(SubstBase);
+      TypeWitness = Builder.getDependentMemberTypeRef(Nominal->getMangledName(), DM);
+      break;
+    }
+    case TypeRefKind::BoundGeneric: {
+      auto BG = cast<BoundGenericTypeRef>(SubstBase);
+      TypeWitness = Builder.getDependentMemberTypeRef(BG->getMangledName(), DM);
+      break;
+    }
+    default:
+      assert(false && "Unknown base type");
+    }
+
+    assert(TypeWitness);
+    return TypeWitness->subst(Builder, SubstBase->getSubstMap());
+  }
+
+  const TypeRef *visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return F;
+  }
+
+  const TypeRef *visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return OC;
+  }
+
+  const TypeRef *visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    return UnownedStorageTypeRef::create(Builder, visit(US->getType()));
+  }
+
+  const TypeRef *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    return WeakStorageTypeRef::create(Builder, visit(WS->getType()));
+  }
+
+  const TypeRef *
+  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    return UnmanagedStorageTypeRef::create(Builder, visit(US->getType()));
+  }
+
+  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
+    return Op;
+  }
+};
+
+const TypeRef *
+TypeRef::subst(TypeRefBuilder &Builder, GenericArgumentMap Subs) const {
+  const TypeRef *Result = TypeRefSubstitution(Builder, Subs).visit(this);
+  assert(Result->isConcrete());
+  return Result;
+}
+

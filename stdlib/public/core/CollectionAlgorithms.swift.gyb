@@ -108,7 +108,7 @@ orderingRequirementForComparable = """\
 
 % # Generate two versions: with explicit predicates and with
 % # a Comparable requirement.
-% for preds in [ True, False ]:
+% for preds in [True, False]:
 
 %   if preds:
 

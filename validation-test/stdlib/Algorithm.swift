@@ -79,13 +79,13 @@ Algorithm.test("sorted/strings")
     "https://bugs.swift.org/browse/SR-530"))
   .code {
   expectEqual(
-    [ "Banana", "apple", "cherry" ],
-    [ "apple", "Banana", "cherry" ].sorted())
+    ["Banana", "apple", "cherry"],
+    ["apple", "Banana", "cherry"].sorted())
 
   let s = ["apple", "Banana", "cherry"].sorted() {
     $0.characters.count > $1.characters.count
   }
-  expectEqual([ "Banana", "cherry", "apple" ], s)
+  expectEqual(["Banana", "cherry", "apple"], s)
 }
 
 // A wrapper around Array<T> that disables any type-specific algorithm

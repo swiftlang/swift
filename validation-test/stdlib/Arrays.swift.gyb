@@ -207,7 +207,7 @@ ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   typealias E = EnumWithoutPayloads
 
   do {
-    let expected = [ E.A, E.B, E.C, E.D ]
+    let expected = [E.A, E.B, E.C, E.D]
     let sliceable = ${array_type}(expected)
     checkSliceableWithBidirectionalIndex(expected, sliceable)
   }
@@ -215,7 +215,7 @@ ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   /*
   FIXME: add this test when Array<T> can be conditionally Equatable.
   do {
-    let expected = [ [ E.A, E.B ], [ E.B, E.C ], [ E.D ], [ E.A, E.B, E.D ] ]
+    let expected = [[E.A, E.B], [E.B, E.C], [E.D], [E.A, E.B, E.D]]
     let sliceable = ${array_type}(expected)
     checkSliceableWithBidirectionalIndex(
       expected, sliceable, SourceLocStack().withCurrentLoc())

@@ -978,7 +978,7 @@ extension Collection {
   }
 }
 
-@available(*, unavailable, message: "Bit enum has been deprecated. Please use Int instead.")
+@available(*, unavailable, message: "Bit enum has been removed. Please use Int instead.")
 public enum Bit {}
 
 @available(*, unavailable, renamed: "IndexingIterator")
