@@ -115,7 +115,7 @@ IR.
 - **Performance Inlining**
 - **Reference Counting Optimizations**
 - **Memory Promotion/Optimizations**
-- **High-level domain specific optimizations** The swift compiler implements
+- **High-level domain specific optimizations** The Swift compiler implements
   high-level optimizations on basic Swift containers such as Array or String.
   Domain specific optimizations require a defined interface between
   the standard library and the optimizer. More details can be found here:
@@ -306,13 +306,13 @@ unrestricted type, it is lowered as if the pattern were replaced with
 a type sharing the same structure but replacing all materializable
 types with fresh type variables.
 
-For example, if ``g`` has type ``Generator<(Int,Int) -> Float>``, ``g.fn`` is
-lowered using the pattern ``() -> T``, which eventually causes ``(Int,Int)
+For example, if ``g`` has type ``Generator<(Int, Int) -> Float>``, ``g.fn`` is
+lowered using the pattern ``() -> T``, which eventually causes ``(Int, Int)
 -> Float`` to be lowered using the pattern ``T``, which is the same as
 lowering it with the pattern ``U -> V``; the result is that ``g.fn``
 has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@in (Int,Int)) -> @out Float.
+  @callee_owned () -> @owned @callee_owned (@in (Int, Int)) -> @out Float.
 
 As another example, suppose that ``h`` has type
 ``Generator<(Int, inout Int) -> Float>``.  Neither ``(Int, inout Int)``
@@ -809,7 +809,7 @@ Debug Information
   sil-scope ::= 'sil_scope' [0-9]+ '{'
                    sil-loc
                    'parent' scope-parent
-                   ('inlined_at' sil-scope-ref )?
+                   ('inlined_at' sil-scope-ref)?
                 '}'
   scope-parent ::= sil-function-name ':' sil-type
   scope-parent ::= sil-scope-ref

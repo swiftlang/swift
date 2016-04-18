@@ -2031,6 +2031,12 @@ const ToolChain *Driver::getToolChain(const ArgList &Args) const {
       TC = new toolchains::Darwin(*this, Target);
       break;
     case llvm::Triple::Linux:
+      if (Target.isAndroid()) {
+        TC = new toolchains::Android(*this, Target);
+      } else {
+        TC = new toolchains::GenericUnix(*this, Target);
+      }
+      break;
     case llvm::Triple::FreeBSD:
       TC = new toolchains::GenericUnix(*this, Target);
       break;

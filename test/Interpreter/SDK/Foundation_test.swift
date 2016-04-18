@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Foundation
@@ -70,7 +69,7 @@ FoundationTestSuite.test("NSNumber") {
 
 FoundationTestSuite.test("NSArray") {
   // Literals
-  var nsArr: NSArray = [ 1, 2.5, "Hello" ]
+  var nsArr: NSArray = [1, 2.5, "Hello"]
   assert(nsArr.count == 3)
 
   // Subscripting
@@ -83,7 +82,7 @@ FoundationTestSuite.test("NSArray") {
   for x: AnyObject in nsArr {
     result.append((x as! NSObject).description)
   }
-  expectEqualSequence([ "1", "2.5", "Hello" ], result)
+  expectEqualSequence(["1", "2.5", "Hello"], result)
 }
 
 FoundationTestSuite.test("NSMutableArray") {
@@ -165,10 +164,10 @@ func matchesEither(_ input: NSNumber, _ a: NSNumber, _ b: NSNumber) -> Bool {
 
 FoundationTestSuite.test("patternMatching") {
   var one, two, three, oneAgain : NSNumber
-  one = NSNumber(int: 1)
-  two = NSNumber(int: 2)
-  three = NSNumber(int: 3)
-  oneAgain = NSNumber(int: 1)
+  one = NSNumber(value: 1)
+  two = NSNumber(value: 2)
+  three = NSNumber(value: 3)
+  oneAgain = NSNumber(value: 1)
   expectFalse(matchesEither(one, two, three))
   expectTrue(matchesEither(one, oneAgain, three))
   expectTrue(matchesEither(one, two, oneAgain))
@@ -190,7 +189,7 @@ class ClassWithDtor : NSObject {
 FoundationTestSuite.test("rdar://17584531") {
   // <rdar://problem/17584531>
   // Type checker used to be confused by this.
-  var dict: NSDictionary = [ "status": 200, "people": [ [ "id": 255, "name": [ "first": "John", "last": "Appleseed" ] ] ] ]
+  var dict: NSDictionary = ["status": 200, "people": [["id": 255, "name": ["first": "John", "last": "Appleseed"]]]]
   var dict2 = dict["people"]?[0] as! NSDictionary
   expectEqual("Optional(255)", String(dict2["id"]))
 }

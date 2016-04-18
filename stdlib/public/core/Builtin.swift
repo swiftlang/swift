@@ -15,14 +15,6 @@ import SwiftShims
 // Definitions that make elements of Builtin usable in real code
 // without gobs of boilerplate.
 
-/// An initialized raw pointer to use as a NULL value.
-@_versioned
-@_transparent
-internal var _nilRawPointer: Builtin.RawPointer {
-  let zero: Int8 = 0
-  return Builtin.inttoptr_Int8(zero._value)
-}
-
 /// Returns the contiguous memory footprint of `T`.
 ///
 /// Does not include any dynamically-allocated or "remote" storage.

@@ -74,6 +74,10 @@ const ValueWitnessTable swift::_TWVXwGSqBo_ =
 const ExtraInhabitantsValueWitnessTable swift::_TWVMBo =
   ValueWitnessTableForBox<PointerPointerBox>::table;
 
+/// The value-witness table for raw pointers.
+const ExtraInhabitantsValueWitnessTable swift::_TWVBp =
+  ValueWitnessTableForBox<RawPointerBox>::table;
+
 /// The value-witness table for BridgeObject.
 const ExtraInhabitantsValueWitnessTable swift::_TWVBb =
   ValueWitnessTableForBox<BridgeObjectBox>::table;
@@ -153,6 +157,7 @@ OPAQUE_METADATA(Bi128_)
 OPAQUE_METADATA(Bi256_)
 OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(Bb)
+OPAQUE_METADATA(Bp)
 OPAQUE_METADATA(BB)
 #if SWIFT_OBJC_INTEROP
 OPAQUE_METADATA(BO)

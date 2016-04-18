@@ -15,7 +15,7 @@ import Darwin
 
 func IsPowerOfTwo(_ x: Int) -> Bool { return (x & (x - 1)) == 0 }
 
-//Fast Walsh Hadamard Transform
+// Fast Walsh Hadamard Transform
 func WalshTransform(_ data: inout [Double]) {
   assert(IsPowerOfTwo(data.count), "Not a power of two")
   var temp = [Double](repeating: 0, count: data.count)

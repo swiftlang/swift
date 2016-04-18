@@ -379,6 +379,10 @@ enum class ConventionsKind : uint8_t {
       // (An ObjC class type wouldn't be const-qualified.)
       if (clangTy->isPointerType()
           && clangTy->getPointeeType().isConstQualified()) {
+        // Peek through optionals.
+        if (auto substObjTy = substTy.getAnyOptionalObjectType())
+          substTy = substObjTy;
+
         // Void pointers aren't usefully indirectable.
         if (clangTy->isVoidPointerType())
           return false;
@@ -394,10 +398,6 @@ enum class ConventionsKind : uint8_t {
           // since we only ever indirect the 'self' parameter of functions
           // imported as methods.
           return false;
-        
-        // Peek through optionals.
-        if (auto substObjTy = substTy.getAnyOptionalObjectType())
-          substTy = substObjTy;
         
         if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
           // CF type as foreign class

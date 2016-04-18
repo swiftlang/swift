@@ -37,7 +37,7 @@ class NestedSingleExpr {
 // Autoclosure nested inside single-expr closure should get discriminator
 // <rdar://problem/22441425> Swift compiler "INTERNAL ERROR: this diagnostic should not be produced"
 struct Expectation<T> {}
-func expect<T>(@autoclosure _ expression: () -> T) -> Expectation<T> {
+func expect<T>(_ expression: @autoclosure () -> T) -> Expectation<T> {
   return Expectation<T>()
 }
 func describe(_ closure: () -> ()) {}

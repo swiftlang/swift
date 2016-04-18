@@ -4,7 +4,7 @@ struct Bool {}
 var false_ = Bool()
 
 // CHECK-LABEL: sil hidden @_TF13auto_closures17call_auto_closure
-func call_auto_closure(@autoclosure _ x: () -> Bool) -> Bool {
+func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   // CHECK: [[RET:%.*]] = apply %0()
   // CHECK: return [[RET]]
   return x()
@@ -56,7 +56,7 @@ func compareBool(_ lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
 func testBool(_ x: Bool, _ pred: (Bool) -> Bool) -> Bool {
   return pred(x)
 }
-func delayBool(@autoclosure _ fn: () -> Bool) -> Bool {
+func delayBool(_ fn: @autoclosure () -> Bool) -> Bool {
   return fn()
 }
 func closureInAutoclosure(_ lhs: Bool, _ rhs: Bool) -> Bool {

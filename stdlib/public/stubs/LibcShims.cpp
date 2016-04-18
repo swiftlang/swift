@@ -19,7 +19,7 @@
 #include "../SwiftShims/LibcShims.h"
 
 static_assert(std::is_same<ssize_t, swift::__swift_ssize_t>::value,
-              "__swift_ssize_t is wrong");
+              "__swift_ssize_t must be defined as equivalent to ssize_t");
 
 namespace swift {
 
@@ -61,6 +61,13 @@ size_t _swift_stdlib_malloc_size(const void *ptr) {
 #include <malloc_np.h>
 size_t _swift_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
+}
+#elif defined(__ANDROID__)
+extern "C" {
+extern size_t dlmalloc_usable_size(void*);
+}
+size_t _swift_stdlib_malloc_size(const void *ptr) {
+  return dlmalloc_usable_size(const_cast<void *>(ptr));
 }
 #else
 #error No malloc_size analog known for this platform/libc.

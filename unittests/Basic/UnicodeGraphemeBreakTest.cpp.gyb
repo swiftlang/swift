@@ -45,8 +45,8 @@ static std::vector<unsigned> FindGraphemeClusterBoundaries(StringRef Str) {
 }
 
 TEST(ExtractExtendedGraphemeCluster, TestsFromUnicodeSpec) {
-% for subject_string,expected_boundaries in grapheme_cluster_break_tests:
-  EXPECT_EQ((std::vector<unsigned>{ ${', '.join([ str(x) for x in expected_boundaries ])} }),
+% for subject_string, expected_boundaries in grapheme_cluster_break_tests:
+  EXPECT_EQ((std::vector<unsigned>{ ${', '.join([str(x) for x in expected_boundaries])} }),
       FindGraphemeClusterBoundaries("${subject_string}"));
 % end
 }

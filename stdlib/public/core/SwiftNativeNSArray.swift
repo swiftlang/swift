@@ -42,7 +42,7 @@ internal class _SwiftNativeNSArrayWithContiguousStorage
 
   // Operate on our contiguous storage
   internal func withUnsafeBufferOfObjects<R>(
-    @noescape _ body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     _sanityCheckFailure(
       "Must override withUnsafeBufferOfObjects in derived classes")
@@ -80,18 +80,20 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
           range.location + range.length, count: objects.count),
         "Array index out of range")
 
+      if objects.isEmpty { return }
+
       // These objects are "returned" at +0, so treat them as values to
       // avoid retains.
       UnsafeMutablePointer<Int>(aBuffer).initializeFrom(
-        UnsafeMutablePointer(objects.baseAddress + range.location),
+        UnsafeMutablePointer(objects.baseAddress! + range.location),
         count: range.length)
     }
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
-  internal func countByEnumeratingWith(
-    _ state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
     var enumerationState = state.pointee
 
@@ -102,9 +104,8 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
     return withUnsafeBufferOfObjects {
       objects in
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      enumerationState.itemsPtr = unsafeBitCast(
-        objects.baseAddress,
-        to: AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
+      enumerationState.itemsPtr =
+        AutoreleasingUnsafeMutablePointer(objects.baseAddress)
       enumerationState.state = 1
       state.pointee = enumerationState
       return objects.count
@@ -112,7 +113,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   }
 
   @objc(copyWithZone:)
-  internal func copy(with _: _SwiftNSZone) -> AnyObject {
+  internal func copy(with _: _SwiftNSZone?) -> AnyObject {
     return self
   }
 }
@@ -166,7 +167,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   }
 
   internal override func withUnsafeBufferOfObjects<R>(
-    @noescape _ body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     repeat {
       var buffer: UnsafeBufferPointer<AnyObject>
@@ -232,7 +233,7 @@ internal class _ContiguousArrayStorageBase
 
 #if _runtime(_ObjC)
   internal override func withUnsafeBufferOfObjects<R>(
-    @noescape _ body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     if let result = try _withVerbatimBridgedUnsafeBuffer(body) {
       return result
@@ -245,7 +246,7 @@ internal class _ContiguousArrayStorageBase
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
   internal func _withVerbatimBridgedUnsafeBuffer<R>(
-    @noescape _ body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
     _sanityCheckFailure(
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")

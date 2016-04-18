@@ -19,7 +19,6 @@
 // RUN: %target-run-stdlib-swift %s | FileCheck %s
 // REQUIRES: executable_test
 //
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Swift
@@ -134,7 +133,7 @@ func testScope() {
     // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
     (buf: inout UnsafeMutableBufferPointer<Int>) -> () in
     nsx.getObjects(
-      UnsafeMutablePointer<AnyObject>(buf.baseAddress),
+      UnsafeMutablePointer<AnyObject>(buf.baseAddress!),
       range: _SwiftNSRange(location: 1, length: 2))
   }
 

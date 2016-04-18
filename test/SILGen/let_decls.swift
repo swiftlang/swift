@@ -366,7 +366,7 @@ func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> Int 
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
 // CHECK: apply %0()
-func call_auto_closure(@autoclosure x: () -> Bool) -> Bool {
+func call_auto_closure(x: @autoclosure () -> Bool) -> Bool {
   return x()  // Calls of autoclosures should be marked transparent.
 }
 

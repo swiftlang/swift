@@ -27,7 +27,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/Index/CommentToXML.h"
 
-using namespace llvm::markup;
+using namespace swift::markup;
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -69,7 +69,7 @@ struct CommentToXMLConverter {
 #include "swift/Markup/SimpleFields.def"
 
   void printDocument(const Document *D) {
-    llvm_unreachable("Can't print an llvm::markup::Document as XML directly");
+    llvm_unreachable("Can't print a swift::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
@@ -211,13 +211,24 @@ struct CommentToXMLConverter {
   }
 
   void printParamField(const ParamField *PF) {
-    OS << "<Parameter><Name>";
+    OS << "<Parameter>";
+    OS << "<Name>";
     OS << PF->getName();
-    OS << "</Name><Direction isExplicit=\"0\">in</Direction><Discussion>";
-    for (auto Child : PF->getChildren())
-      printASTNode(Child);
+    OS << "</Name>";
+    OS << "<Direction isExplicit=\"0\">in</Direction>";
 
-    OS << "</Discussion></Parameter>";
+    if (PF->isClosureParameter()) {
+      OS << "<ClosureParameter>";
+      visitCommentParts(PF->getParts().getValue());
+      OS << "</ClosureParameter>";
+    } else {
+      OS << "<Discussion>";
+      for (auto Child : PF->getChildren()) {
+        printASTNode(Child);
+      }
+      OS << "</Discussion>";
+    }
+    OS << "</Parameter>";
   }
 
   void printResultDiscussion(const ReturnsField *RF) {
@@ -235,8 +246,39 @@ struct CommentToXMLConverter {
   }
 
   void visitDocComment(const DocComment *DC);
+  void visitCommentParts(const swift::markup::CommentParts &Parts);
 };
 } // unnamed namespace
+
+void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts &Parts) {
+  if (Parts.Brief.hasValue()) {
+    OS << "<Abstract>";
+    printASTNode(Parts.Brief.getValue());
+    OS << "</Abstract>";
+  }
+
+  if (!Parts.ParamFields.empty()) {
+    OS << "<Parameters>";
+    for (const auto *PF : Parts.ParamFields)
+      printParamField(PF);
+
+    OS << "</Parameters>";
+  }
+
+  if (Parts.ReturnsField.hasValue())
+    printResultDiscussion(Parts.ReturnsField.getValue());
+
+  if (Parts.ThrowsField.hasValue())
+    printThrowsDiscussion(Parts.ThrowsField.getValue());
+
+  if (!Parts.BodyNodes.empty()) {
+    OS << "<Discussion>";
+    for (const auto *N : Parts.BodyNodes)
+      printASTNode(N);
+
+    OS << "</Discussion>";
+  }
+}
 
 void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
   const Decl *D = DC->getDecl();
@@ -313,36 +355,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     OS << "</Declaration>";
   }
 
-  auto Brief = DC->getBrief();
-  if (Brief.hasValue()) {
-    OS << "<Abstract>";
-    printASTNode(Brief.getValue());
-    OS << "</Abstract>";
-  }
-
-  if (!DC->getParamFields().empty()) {
-    OS << "<Parameters>";
-    for (const auto *PF : DC->getParamFields())
-      printParamField(PF);
-
-    OS << "</Parameters>";
-  }
-
-  auto RF = DC->getReturnsField();
-  if (RF.hasValue())
-    printResultDiscussion(RF.getValue());
-
-  auto TF = DC->getThrowsField();
-  if (TF.hasValue())
-    printThrowsDiscussion(TF.getValue());
-
-  if (!DC->getBodyNodes().empty()) {
-    OS << "<Discussion>";
-    for (const auto *N : DC->getBodyNodes())
-      printASTNode(N);
-
-    OS << "</Discussion>";
-  }
+  visitCommentParts(DC->getParts());
 
   OS << RootEndTag;
 }
@@ -400,7 +413,7 @@ std::string ide::extractPlainTextFromComment(const StringRef Text) {
     return {};
 
   RawComment Comment(Comments);
-  llvm::markup::MarkupContext MC;
+  swift::markup::MarkupContext MC;
   return MC.getLineList(Comment).str();
 }
 
@@ -418,7 +431,7 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
     return false;
   }
 
-  llvm::markup::MarkupContext MC;
+  swift::markup::MarkupContext MC;
   auto DC = getDocComment(MC, D);
   if (!DC.hasValue())
     return false;
@@ -478,7 +491,7 @@ break;
 
   void printDocument(const Document *D) {
     // FIXME: Why keep doing this?
-    llvm_unreachable("Can't print an llvm::markup::Document as XML directly");
+    llvm_unreachable("Can't print a swift::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
@@ -619,13 +632,78 @@ break;
     llvm_unreachable("Can't directly print Doxygen for a Swift Markup PrivateExtension");
   }
 
+  void printNestedParamField(const ParamField *PF) {
+    auto Parts = PF->getParts().getValue();
+    if (Parts.Brief.hasValue()) {
+      printASTNode(Parts.Brief.getValue());
+      printNewline();
+    }
+
+    if (!Parts.ParamFields.empty()) {
+      printNewline();
+      print("\\a ");
+      print(PF->getName());
+      print(" parameters:");
+      printNewline();
+
+      print("<ul>");
+      printNewline();
+      for (auto Param : Parts.ParamFields) {
+        print("<li>");
+        printNewline();
+        print(Param->getName());
+        print(": ");
+        printNestedParamField(Param);
+        print("</li>");
+        printNewline();
+      }
+      print("</ul>");
+      printNewline();
+      printNewline();
+    }
+
+    if (Parts.ReturnsField.hasValue()) {
+      printNewline();
+      print("\\a ");
+      print(PF->getName());
+      print(" returns: ");
+
+      for (auto Child : Parts.ReturnsField.getValue()->getChildren()) {
+        printASTNode(Child);
+        printNewline();
+      }
+    }
+
+    if (Parts.ThrowsField.hasValue()) {
+      printNewline();
+      print("\\a ");
+      print(PF->getName());
+      print(" error: ");
+
+      for (auto Child : Parts.ThrowsField.getValue()->getChildren()) {
+        printASTNode(Child);
+        printNewline();
+      }
+    }
+
+    for (auto BodyNode : Parts.BodyNodes) {
+      printASTNode(BodyNode);
+      printNewline();
+    }
+    printNewline();
+  }
+
   void printParamField(const ParamField *PF) {
     print("\\param ");
     print(PF->getName());
     print(" ");
-    for (auto Child : PF->getChildren())
-      printASTNode(Child);
-
+    if (PF->isClosureParameter()) {
+      printNestedParamField(PF);
+    } else {
+      for (auto Child : PF->getChildren()) {
+        printASTNode(Child);
+      }
+    }
     printNewline();
   }
 
@@ -656,7 +734,7 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
   if (Brief.hasValue()) {
     SmallString<256> BriefStr;
     llvm::raw_svector_ostream OS(BriefStr);
-    llvm::markup::printInlinesUnder(Brief.getValue(), OS);
+    swift::markup::printInlinesUnder(Brief.getValue(), OS);
     Converter.print(OS.str());
     Converter.printNewline();
     Converter.printNewline();

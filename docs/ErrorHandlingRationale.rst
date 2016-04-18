@@ -1072,10 +1072,10 @@ from out-of-memory conditions.  For this reason, many C++ projects
 explicitly disable exceptions and rely on other error propagation
 mechanisms, on which there is no widespread consensus.
 
-Objective C
+Objective-C
 -----------
 
-Objective C has a first-class exceptions mechanism which is similar in
+Objective-C has a first-class exceptions mechanism which is similar in
 feature set to Java's: ``@throw`` / ``@try`` / ``@catch`` / ``@finally``.
 Exception values must be instances of an Objective-C class.  The
 language does a small amount of implicit frame cleanup during
@@ -1084,18 +1084,18 @@ stack copies of ``__block`` variables are torn down, and ARC ``__weak``
 variables are destroyed.  However, the language does not release
 object pointers held in local variables, even (by default) under ARC.
 
-Objective C exceptions used to be implemented with ``setjmp``,
+Objective-C exceptions used to be implemented with ``setjmp``,
 ``longjmp``, and thread-local state managed by a runtime, but the only
 surviving platform we support which does that is i386, and all others
 now use a "zero-cost" implementation that interoperates with C++
 exceptions.
 
-Objective C exceptions are *mostly* only used for unrecoverable
+Objective-C exceptions are *mostly* only used for unrecoverable
 conditions, akin to what I called "failures" above.  There are a few
 major exceptions to this rule, where APIs that do use exceptions to
 report errors.
 
-Instead, Objective C mostly relies on manual propagation,
+Instead, Objective-C mostly relies on manual propagation,
 predominantly using out-parameters of type ``NSError**``.  Whether the
 call failed is usually *not* indicated by whether a non-``nil`` error
 was written into this parameter; calls are permitted both to succeed
@@ -1110,7 +1110,7 @@ null object result is valid.
 CF APIs, meanwhile, have their own magnificent set of somewhat
 inconsistent conventions.
 
-Therefore, we can expect that incrementally improving CF / Objective C
+Therefore, we can expect that incrementally improving CF / Objective-C
 interoperation is going to be a long and remarkably painful process.
 
 
@@ -1458,7 +1458,7 @@ done in a fairly simple way: a function can declare that it throws if
 any of a set of named arguments do.  As an example (using strawman
 syntax)::
 
-  func map<T,U>(_ array: [T], fn: T throws -> U) throwsIf(fn) -> [U] {
+  func map<T, U>(_ array: [T], fn: T throws -> U) throwsIf(fn) -> [U] {
     ...
   }
 

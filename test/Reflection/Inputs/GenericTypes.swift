@@ -1,7 +1,3 @@
-#if _runtime(_ObjC)
-import Foundation
-#endif
-
 public class C1<T> : ClassBoundP {
   public typealias Function = C1<T> -> S1<T> -> E1<T> -> Int
   public typealias Tuple = (C1<T>, S1<T>, E1<T>, Int)
@@ -162,16 +158,3 @@ extension E4 : P1, P2, P3 {
   public typealias Outer = U
   public typealias Second = U
 }
-
-#if _runtime(_ObjC)
-
-public class GenericOC<T> : NSObject {
-  public let ocnss: GenericOC<NSString>
-  public let occfs: GenericOC<CFString>
-  public init(nss: GenericOC<NSString>, cfs: GenericOC<CFString>) {
-    self.ocnss = nss
-    self.occfs = cfs
-  }
-}
-
-#endif

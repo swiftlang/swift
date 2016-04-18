@@ -362,7 +362,7 @@ internal var _nilNativeObject: AnyObject? {
 /// already have writeback-scoped lifetime.
 @_fixed_layout
 public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
-  : Equatable, NilLiteralConvertible, _Pointer {
+  : Equatable, _Pointer {
 
   public let _rawValue: Builtin.RawPointer
 
@@ -372,12 +372,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     self._rawValue = _rawValue
   }
 
-  @_versioned
-  @_transparent
-  var _isNull : Bool {
-    return UnsafeMutablePointer<Pointee>(self)._isNull
-  }
-
   /// Access the `Pointee` instance referenced by `self`.
   ///
   /// - Precondition: the pointee has been initialized with an instance of type
@@ -385,7 +379,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   public var pointee: Pointee {
     /// Retrieve the value the pointer points to.
     @_transparent get {
-      _debugPrecondition(!_isNull)
       // We can do a strong load normally.
       return UnsafeMutablePointer<Pointee>(self).pointee
     }
@@ -396,7 +389,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     /// in ARC. This autoreleases the argument before trivially
     /// storing it to the referenced memory.
     @_transparent nonmutating set {
-      _debugPrecondition(!_isNull)
       // Autorelease the object reference.
       typealias OptionalAnyObject = AnyObject?
       Builtin.retain(unsafeBitCast(newValue, to: OptionalAnyObject.self))
@@ -404,9 +396,10 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       // Trivially assign it as an OpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
-      let p = UnsafeMutablePointer<OpaquePointer>(
+      typealias OptionalOpaquePointer = OpaquePointer?
+      let p = UnsafeMutablePointer<OptionalOpaquePointer>(
         UnsafeMutablePointer<Pointee>(self))
-        p.pointee = unsafeBitCast(newValue, to: OpaquePointer.self)
+      p.pointee = unsafeBitCast(newValue, to: OptionalOpaquePointer.self)
     }
   }
 
@@ -417,16 +410,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   public subscript(i: Int) -> Pointee {
     @_transparent
     get {
-      _debugPrecondition(!_isNull)
       // We can do a strong load normally.
       return (UnsafePointer<Pointee>(self) + i).pointee
     }
-  }
-
-  /// Create an instance initialized with `nil`.
-  @_transparent
-  public init(nilLiteral: ()) {
-    self._rawValue = _nilRawPointer
   }
 
   /// Explicit construction from an UnsafeMutablePointer.
@@ -435,8 +421,21 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// referenced memory has +1 strong ownership semantics, whereas
   /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
   @_transparent public
-  init<U>(_ ptr: UnsafeMutablePointer<U>) {
-    self._rawValue = ptr._rawValue
+  init<U>(_ from: UnsafeMutablePointer<U>) {
+    self._rawValue = from._rawValue
+  }
+
+  /// Explicit construction from an UnsafeMutablePointer.
+  ///
+  /// Returns nil if `from` is nil.
+  ///
+  /// This is inherently unsafe; UnsafeMutablePointer assumes the
+  /// referenced memory has +1 strong ownership semantics, whereas
+  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
+  @_transparent public
+  init?<U>(_ from: UnsafeMutablePointer<U>?) {
+    guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
   }
 
   /// Explicit construction from a UnsafePointer.
@@ -444,8 +443,20 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// This is inherently unsafe because UnsafePointers do not imply
   /// mutability.
   @_transparent
-  init<U>(_ ptr: UnsafePointer<U>) {
-    self._rawValue = ptr._rawValue
+  init<U>(_ from: UnsafePointer<U>) {
+    self._rawValue = from._rawValue
+  }
+
+  /// Explicit construction from a UnsafePointer.
+  ///
+  /// Returns nil if `from` is nil.
+  ///
+  /// This is inherently unsafe because UnsafePointers do not imply
+  /// mutability.
+  @_transparent
+  init?<U>(_ from: UnsafePointer<U>?) {
+    guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
   }
 }
 
@@ -468,22 +479,22 @@ public func == <Pointee> (
 @_fixed_layout
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
-  internal var _item0: Builtin.RawPointer
-  internal var _item1: Builtin.RawPointer
-  internal var _item2: Builtin.RawPointer
-  internal var _item3: Builtin.RawPointer
-  internal var _item4: Builtin.RawPointer
-  internal var _item5: Builtin.RawPointer
-  internal var _item6: Builtin.RawPointer
-  internal var _item7: Builtin.RawPointer
-  internal var _item8: Builtin.RawPointer
-  internal var _item9: Builtin.RawPointer
-  internal var _item10: Builtin.RawPointer
-  internal var _item11: Builtin.RawPointer
-  internal var _item12: Builtin.RawPointer
-  internal var _item13: Builtin.RawPointer
-  internal var _item14: Builtin.RawPointer
-  internal var _item15: Builtin.RawPointer
+  internal var _item0: UnsafePointer<Void>?
+  internal var _item1: UnsafePointer<Void>?
+  internal var _item2: UnsafePointer<Void>?
+  internal var _item3: UnsafePointer<Void>?
+  internal var _item4: UnsafePointer<Void>?
+  internal var _item5: UnsafePointer<Void>?
+  internal var _item6: UnsafePointer<Void>?
+  internal var _item7: UnsafePointer<Void>?
+  internal var _item8: UnsafePointer<Void>?
+  internal var _item9: UnsafePointer<Void>?
+  internal var _item10: UnsafePointer<Void>?
+  internal var _item11: UnsafePointer<Void>?
+  internal var _item12: UnsafePointer<Void>?
+  internal var _item13: UnsafePointer<Void>?
+  internal var _item14: UnsafePointer<Void>?
+  internal var _item15: UnsafePointer<Void>?
 
   @_transparent
   internal var count: Int {
@@ -491,7 +502,7 @@ internal struct _CocoaFastEnumerationStackBuf {
   }
 
   internal init() {
-    _item0 = _nilRawPointer
+    _item0 = nil
     _item1 = _item0
     _item2 = _item0
     _item3 = _item0
@@ -508,7 +519,8 @@ internal struct _CocoaFastEnumerationStackBuf {
     _item14 = _item0
     _item15 = _item0
 
-    _sanityCheck(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * count)
+    _sanityCheck(sizeofValue(self) >=
+                   sizeof(Optional<UnsafePointer<Void>>.self) * count)
   }
 }
 

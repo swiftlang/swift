@@ -16,7 +16,7 @@ import SwiftPrivateLibcExtras
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
 import Glibc
 #endif
 
@@ -50,7 +50,7 @@ public struct SourceLocStack {
   }
 
   public init(_ loc: SourceLoc) {
-    locs = [ loc ]
+    locs = [loc]
   }
 
   init(_locs: [SourceLoc]) {
@@ -87,7 +87,7 @@ public struct SourceLocStack {
 }
 
 %{
-  TRACE = '''@autoclosure _ message: () -> String = "",
+  TRACE = '''_ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = #file, line: UInt = #line'''
@@ -161,7 +161,7 @@ public func expectationFailure(
 }
 
 public func expectEqual<T>(
-  _ expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T) -> Bool
+  _ expected: T, _ actual: T, ${TRACE}, sameValue equal: (T, T) -> Bool
 ) {
   if !equal(expected, actual) {
     expectationFailure(
@@ -182,7 +182,7 @@ public func expectNotEqual<T : Equatable>(_ expected: T, _ actual: T, ${TRACE}) 
 }
 
 // Cannot write a sane set of overloads using generics because of:
-// <rdar://problem/17015923> Array->NSArray implicit conversion insanity
+// <rdar://problem/17015923> Array -> NSArray implicit conversion insanity
 public func expectOptionalEqual<T : Equatable>(
   _ expected: T, _ actual: T?, ${TRACE}
 ) {
@@ -190,7 +190,7 @@ public func expectOptionalEqual<T : Equatable>(
 }
 
 public func expectOptionalEqual<T>(
-  _ expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T,T) -> Bool
+  _ expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T, T) -> Bool
 ) {
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
@@ -201,11 +201,20 @@ public func expectOptionalEqual<T>(
 }
 
 public func expectEqual<T : Equatable>(_ expected: T?, _ actual: T?, ${TRACE}) {
-  if (actual == nil) != (expected == nil)
-    || actual != nil && expected! != actual! {
+  if expected != actual {
     expectationFailure(
       "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      trace: ${trace})
+  }
+}
+
+public func expectNotEqual<T : Equatable>(
+  _ expected: T?, _ actual: T?, ${TRACE}
+) {
+  if expected == actual {
+    expectationFailure(
+      "unexpected value: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
   }
 }
@@ -408,7 +417,7 @@ extension ProcessTerminationStatus {
     case .signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
     default:
-      fatalError("Bad ProcessTerminationStatus")
+      return false
     }
   }
 }
@@ -432,7 +441,14 @@ func _stdlib_getline() -> String? {
 
 func _printDebuggingAdvice(_ fullTestName: String) {
   print("To debug, run:")
-  print("$ \(Process.arguments[0]) " +
+  var invocation = [Process.arguments[0]]
+  let interpreter = getenv("SWIFT_INTERPRETER")
+  if interpreter != nil {
+    if let interpreterCmd = String(validatingUTF8: interpreter) {
+        invocation.insert(interpreterCmd, at: 0)
+    }
+  }
+  print("$ \(invocation.joined(separator: " ")) " +
     "--stdlib-unittest-in-process --stdlib-unittest-filter \"\(fullTestName)\"")
 }
 
@@ -512,7 +528,7 @@ struct _ParentProcess {
   }
 
   mutating func _spawnChild() {
-    let params = [ "--stdlib-unittest-run-child" ] + _args
+    let params = ["--stdlib-unittest-run-child"] + _args
     let (pid, childStdinFD, childStdoutFD, childStderrFD) = spawnChild(params)
     _pid = pid
     _childStdin = _FDOutputStream(fd: childStdinFD)
@@ -1136,11 +1152,11 @@ public final class TestSuite {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 @_silgen_name("swift_stdlib_getSystemVersionPlistProperty")
 func _stdlib_getSystemVersionPlistPropertyImpl(
-  _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>
+  _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>?
 
 func _stdlib_getSystemVersionPlistProperty(_ propertyName: String) -> String? {
   let cs = _stdlib_getSystemVersionPlistPropertyImpl(propertyName)
-  return (cs != nil) ? String(cString: cs) : nil
+  return cs.map(String.init(cString:))
 }
 #endif
 
@@ -1154,6 +1170,7 @@ public enum OSVersion : CustomStringConvertible {
   case watchOSSimulator
   case linux
   case freeBSD
+  case android
 
   public var description: String {
     switch self {
@@ -1175,6 +1192,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Linux"
     case freeBSD:
       return "FreeBSD"
+    case android:
+      return "Android"
     }
   }
 }
@@ -1209,6 +1228,8 @@ func _getOSVersion() -> OSVersion {
   return .linux
 #elseif os(FreeBSD)
   return .freeBSD
+#elseif os(Android)
+  return .android
 #else
   let productVersion = _stdlib_getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
@@ -1282,6 +1303,8 @@ public enum TestRunPredicate : CustomStringConvertible {
   case linuxAny(reason: String)
 
   case freeBSDAny(reason: String)
+
+  case androidAny(reason: String)
 
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
@@ -1359,6 +1382,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case linuxAny(reason: let reason):
       return "linuxAny(*, reason: \(reason))"
+
+    case androidAny(reason: let reason):
+      return "androidAny(*, reason: \(reason))"
 
     case freeBSDAny(reason: let reason):
       return "freeBSDAny(*, reason: \(reason))"
@@ -1599,6 +1625,14 @@ public enum TestRunPredicate : CustomStringConvertible {
     case linuxAny:
       switch _getRunningOSVersion() {
       case .linux:
+        return true
+      default:
+        return false
+      }
+
+    case androidAny:
+      switch _getRunningOSVersion() {
+      case .android:
         return true
       default:
         return false
@@ -2249,8 +2283,8 @@ public func check${traversal}Collection<
   checkRandomAccessIndex(
     instances,
     distances: distances,
-    distanceOracle: { (x:Int,y:Int) in Distance(IntMax(y - x)) },
-    advanceOracle: { x,y in nextN(distances[y], instances[x]) },
+    distanceOracle: { (x: Int, y: Int) in Distance(IntMax(y - x)) },
+    advanceOracle: { x, y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), ${trace})
 % end
@@ -2579,8 +2613,8 @@ func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
 }
 
 func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
-  return [ lhs.first, lhs.second ].lexicographicallyPrecedes(
-    [ rhs.first, rhs.second ])
+  return [lhs.first, lhs.second].lexicographicallyPrecedes(
+    [rhs.first, rhs.second])
 }
 
 public func expectEqualsUnordered<
@@ -2594,7 +2628,7 @@ public func expectEqualsUnordered<
     _ expected: Expected, _ actual: Actual, ${TRACE}
 ) {
   func comparePairLess(_ lhs: (T, T), rhs: (T, T)) -> Bool {
-    return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
+    return [lhs.0, lhs.1].lexicographicallyPrecedes([rhs.0, rhs.1])
   }
 
   let x: [(T, T)] =

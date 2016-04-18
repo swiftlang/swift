@@ -217,7 +217,7 @@ extension CGRect : Equatable {}
 @_transparent // @fragile
 @warn_unused_result
 public func == (lhs: CGRect, rhs: CGRect) -> Bool {
-  return lhs.equalToRect(rect2: rhs)
+  return lhs.equalTo(rhs)
 }
 
 extension CGAffineTransform {

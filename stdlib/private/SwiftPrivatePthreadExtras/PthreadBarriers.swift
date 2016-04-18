@@ -12,7 +12,7 @@
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
 import Glibc
 #endif
 
@@ -43,8 +43,8 @@ public var _stdlib_PTHREAD_BARRIER_SERIAL_THREAD: CInt {
 }
 
 public struct _stdlib_pthread_barrier_t {
-  var mutex: UnsafeMutablePointer<pthread_mutex_t> = nil
-  var cond: UnsafeMutablePointer<pthread_cond_t> = nil
+  var mutex: UnsafeMutablePointer<pthread_mutex_t>? = nil
+  var cond: UnsafeMutablePointer<pthread_cond_t>? = nil
 
   /// The number of threads to synchronize.
   var count: CUnsignedInt = 0
@@ -59,7 +59,7 @@ public struct _stdlib_pthread_barrier_t {
 
 public func _stdlib_pthread_barrier_init(
   _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>,
-  _ attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>,
+  _ attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>?,
   _ count: CUnsignedInt
 ) -> CInt {
   barrier.pointee = _stdlib_pthread_barrier_t()
@@ -68,12 +68,12 @@ public func _stdlib_pthread_barrier_init(
     return -1
   }
   barrier.pointee.mutex = UnsafeMutablePointer(allocatingCapacity: 1)
-  if pthread_mutex_init(barrier.pointee.mutex, nil) != 0 {
+  if pthread_mutex_init(barrier.pointee.mutex!, nil) != 0 {
     // FIXME: leaking memory.
     return -1
   }
   barrier.pointee.cond = UnsafeMutablePointer(allocatingCapacity: 1)
-  if pthread_cond_init(barrier.pointee.cond, nil) != 0 {
+  if pthread_cond_init(barrier.pointee.cond!, nil) != 0 {
     // FIXME: leaking memory, leaking a mutex.
     return -1
   }
@@ -84,34 +84,34 @@ public func _stdlib_pthread_barrier_init(
 public func _stdlib_pthread_barrier_destroy(
   _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>
 ) -> CInt {
-  if pthread_cond_destroy(barrier.pointee.cond) != 0 {
+  if pthread_cond_destroy(barrier.pointee.cond!) != 0 {
     // FIXME: leaking memory, leaking a mutex.
     return -1
   }
-  if pthread_mutex_destroy(barrier.pointee.mutex) != 0 {
+  if pthread_mutex_destroy(barrier.pointee.mutex!) != 0 {
     // FIXME: leaking memory.
     return -1
   }
-  barrier.pointee.cond.deinitialize()
-  barrier.pointee.cond.deallocateCapacity(1)
-  barrier.pointee.mutex.deinitialize()
-  barrier.pointee.mutex.deallocateCapacity(1)
+  barrier.pointee.cond!.deinitialize()
+  barrier.pointee.cond!.deallocateCapacity(1)
+  barrier.pointee.mutex!.deinitialize()
+  barrier.pointee.mutex!.deallocateCapacity(1)
   return 0
 }
 
 public func _stdlib_pthread_barrier_wait(
   _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>
 ) -> CInt {
-  if pthread_mutex_lock(barrier.pointee.mutex) != 0 {
+  if pthread_mutex_lock(barrier.pointee.mutex!) != 0 {
     return -1
   }
   barrier.pointee.numThreadsWaiting += 1
   if barrier.pointee.numThreadsWaiting < barrier.pointee.count {
     // Put the thread to sleep.
-    if pthread_cond_wait(barrier.pointee.cond, barrier.pointee.mutex) != 0 {
+    if pthread_cond_wait(barrier.pointee.cond!, barrier.pointee.mutex!) != 0 {
       return -1
     }
-    if pthread_mutex_unlock(barrier.pointee.mutex) != 0 {
+    if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
       return -1
     }
     return 0
@@ -120,10 +120,10 @@ public func _stdlib_pthread_barrier_wait(
     barrier.pointee.numThreadsWaiting = 0
 
     // Wake up all threads.
-    if pthread_cond_broadcast(barrier.pointee.cond) != 0 {
+    if pthread_cond_broadcast(barrier.pointee.cond!) != 0 {
       return -1
     }
-    if pthread_mutex_unlock(barrier.pointee.mutex) != 0 {
+    if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
       return -1
     }
     return _stdlib_PTHREAD_BARRIER_SERIAL_THREAD

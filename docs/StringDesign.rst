@@ -144,14 +144,14 @@ string usage while discovering its essential properties.
 ``String`` is a `First-Class Type`__
 ------------------------------------
 
-__ http://en.wikipedia.org/wiki/First-class_citizen
+__ https://en.wikipedia.org/wiki/First-class_citizen
 
 .. parsed-literal::
 
   |swift| var s = "Yo"
   `// s:` :emph:`String` `= "Yo"`
 
-Unlike, say, C's ``char*``, the meaning of a swift string is always
+Unlike, say, C's ``char*``, the meaning of a Swift string is always
 unambiguous.
 
 Strings are **Efficient**
@@ -581,7 +581,7 @@ How Would You Design It?
     7. UTF-8 sequences sort in code point order.
     8. UTF-8 has no "byte order."
 
-    __ http://research.swtch.com/2010/03/utf-8-bits-bytes-and-benefits.html
+    __ http://research.swtch.com/utf8
 
 * It would be efficient, taking advantage of state-of-the-art
   optimizations, including:
@@ -744,7 +744,7 @@ Indexing
          doSomethingWith(\ **someString[i]**\ )
        }
 
-       var (i,j) = **someString.indices().bounds**
+       var (i, j) = **someString.indices().bounds**
        while (i != j) {
          doSomethingElseWith(\ **someString[i]**\ )
          ++i
@@ -981,7 +981,7 @@ Building
 :Swift:
   .. parsed-literal::
         func **+** (lhs: String, rhs: String) -> String
-        func [infix,assignment] **+=** (lhs: [inout] String, rhs: String)
+        func [infix, assignment] **+=** (lhs: [inout] String, rhs: String)
         func **append**\ (_ suffix: String)
 
 
@@ -1038,7 +1038,7 @@ Splitting
     func **split**\ <Seq: Sliceable, IsSeparator: Predicate 
         where IsSeparator.Arguments == Seq.Element
     >(_ seq: Seq, isSeparator: IsSeparator, maxSplit: Int = Int.max(),
-      allowEmptySlices: Bool = false  ) -> [Seq]
+      allowEmptySlices: Bool = false) -> [Seq]
 
 Splitting
 ~~~~~~~~~

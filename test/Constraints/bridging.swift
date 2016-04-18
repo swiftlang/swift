@@ -16,7 +16,7 @@ public extension _ObjectiveCBridgeable {
 
 public class BridgedClass : NSObject, NSCopying {
   @objc(copyWithZone:)
-  public func copy(with zone: NSZone) -> AnyObject {
+  public func copy(with zone: NSZone?) -> AnyObject {
     return self
   }
 }

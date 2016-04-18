@@ -107,6 +107,44 @@ public enum A012_AttachToEntities {
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f3()</Name><USR>s:FC14swift_ide_test5Brief2f3FT_T_</USR><Declaration>public func f3()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
 }
 
+@objc public class ClosureContainer {
+/// Partially applies a binary operator.
+///
+/// - Parameter a: The left-hand side to partially apply.
+/// - Parameter combine: A binary operator.
+///   - Parameter lhs: The left-hand side of the operator
+///   - Parameter rhs: The right-hand side of the operator
+///   - Returns: A result.
+///   - Throws: Nothing.
+@objc public func closureParameterExplodedExploded(a: Int, combine: (lhs: Int, rhs: Int) -> Int) {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>closureParameterExplodedExploded(a:combine:)</Name><USR>s:FC14swift_ide_test16ClosureContainer32closureParameterExplodedExplodedFT1aSi7combineFT3lhsSi3rhsSi_Si_T_</USR><Declaration>@objc public func closureParameterExplodedExploded(a: Int, combine: (lhs: Int, rhs: Int) -&gt; Int)</Declaration><Abstract><Para>Partially applies a binary operator.</Para></Abstract><Parameters><Parameter><Name>a</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side to partially apply.</Para></Discussion></Parameter><Parameter><Name>combine</Name><Direction isExplicit="0">in</Direction><ClosureParameter><Abstract><Para>A binary operator.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side of the operator</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The right-hand side of the operator</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A result.</Para></ResultDiscussion><ThrowsDiscussion><Para>Nothing.</Para></ThrowsDiscussion></ClosureParameter></Parameter></Parameters></Function>]
+
+/// Partially applies a binary operator.
+///
+/// - Parameters:
+///   - a: The left-hand side to partially apply.
+///   - combine: A binary operator.
+///     - Parameter lhs: The left-hand side of the operator
+///     - Parameter rhs: The right-hand side of the operator
+///     - Returns: A result.
+///     - Throws: Nothing.
+@objc public func closureParameterOutlineExploded(a: Int, combine: (lhs: Int, rhs: Int) -> Int) {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>closureParameterOutlineExploded(a:combine:)</Name><USR>s:FC14swift_ide_test16ClosureContainer31closureParameterOutlineExplodedFT1aSi7combineFT3lhsSi3rhsSi_Si_T_</USR><Declaration>@objc public func closureParameterOutlineExploded(a: Int, combine: (lhs: Int, rhs: Int) -&gt; Int)</Declaration><Abstract><Para>Partially applies a binary operator.</Para></Abstract><Parameters><Parameter><Name>a</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side to partially apply.</Para></Discussion></Parameter><Parameter><Name>combine</Name><Direction isExplicit="0">in</Direction><ClosureParameter><Abstract><Para>A binary operator.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side of the operator</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The right-hand side of the operator</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A result.</Para></ResultDiscussion><ThrowsDiscussion><Para>Nothing.</Para></ThrowsDiscussion></ClosureParameter></Parameter></Parameters></Function>]
+
+/// Partially applies a binary operator.
+///
+/// - Parameters:
+///   - a: The left-hand side to partially apply.
+///   - combine: A binary operator.
+///     - Parameters:
+///       - lhs: The left-hand side of the operator
+///       - rhs: The right-hand side of the operator
+///     - Returns: A result.
+///     - Throws: Nothing.
+@objc public func closureParameterOutlineOutline(a: Int, combine: (lhs: Int, rhs: Int) -> Int) {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>closureParameterOutlineOutline(a:combine:)</Name><USR>s:FC14swift_ide_test16ClosureContainer30closureParameterOutlineOutlineFT1aSi7combineFT3lhsSi3rhsSi_Si_T_</USR><Declaration>@objc public func closureParameterOutlineOutline(a: Int, combine: (lhs: Int, rhs: Int) -&gt; Int)</Declaration><Abstract><Para>Partially applies a binary operator.</Para></Abstract><Parameters><Parameter><Name>a</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side to partially apply.</Para></Discussion></Parameter><Parameter><Name>combine</Name><Direction isExplicit="0">in</Direction><ClosureParameter><Abstract><Para>A binary operator.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The left-hand side of the operator</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit="0">in</Direction><Discussion><Para>The right-hand side of the operator</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A result.</Para></ResultDiscussion><ThrowsDiscussion><Para>Nothing.</Para></ThrowsDiscussion></ClosureParameter></Parameter></Parameters></Function>]
+}
+
 @objc public class CodeBlock {
 // CHECK: {{.*}}DocCommentAsXML=none
   /// This is how you use this code.

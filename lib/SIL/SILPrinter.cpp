@@ -427,7 +427,7 @@ class SILPrinter : public SILVisitor<SILPrinter> {
 public:
   SILPrinter(
       SILPrintContext &PrintCtx,
-      llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr )
+      llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr)
       : Ctx(PrintCtx),
         PrintState{{PrintCtx.OS()}, PrintOptions::printSIL()},
         LastBufferID(0) {
@@ -669,7 +669,8 @@ public:
     // Print inlined-at location, if any.
     if (DS) {
       SILFunction *InlinedF = DS->getInlinedFunction();
-      for (auto *CS : reversed(DS->flattenedInlineTree())) {
+      auto InlineScopes = DS->flattenedInlineTree();
+      for (auto *CS : reversed(InlineScopes)) {
         *this << ": ";
         if (InlinedF) {
           *this << demangleSymbol(InlinedF->getName());
@@ -678,7 +679,7 @@ public:
         }
         *this << " perf_inlined_at ";
         auto CallSite = CS->Loc;
-        if (!CallSite.isNull())
+        if (!CallSite.isNull() && CallSite.isASTNode())
           CallSite.getSourceLoc().print(
             PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
         else
@@ -2184,7 +2185,8 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
                          unsigned Indent) const {
   OS << "{\n";
   OS.indent(Indent);
-  Loc.getSourceLoc().print(OS, SM);
+  if (Loc.isASTNode())
+    Loc.getSourceLoc().print(OS, SM);
   OS << "\n";
   OS.indent(Indent + 2);
   OS << " parent: ";

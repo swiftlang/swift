@@ -2,13 +2,75 @@
 Name: Foundation
 Classes:
 - Name: NSArray
-  SwiftBridge: 'Swift.Array'
+  SwiftBridge: Swift.Array
+  Methods:
+  - Selector: 'pathsMatchingExtensions:'
+    SwiftName: pathsMatchingExtensions(_:)
+    MethodKind: Instance
+  - Selector: 'filteredArrayUsingPredicate:'
+    SwiftName: filtered(using:)
+    MethodKind: Instance
 - Name: NSDictionary
-  SwiftBridge: 'Swift.Dictionary'
+  SwiftBridge: Swift.Dictionary
 - Name: NSSet
-  SwiftBridge: 'Swift.Set'
+  SwiftBridge: Swift.Set
+  Methods:
+  - Selector: 'filteredSetUsingPredicate:'
+    SwiftName: filtered(using:)
+    MethodKind: Instance
 - Name: NSString
-  SwiftBridge: 'Swift.String'
+  SwiftBridge: Swift.String
+  Methods:
+  - Selector: 'uppercaseStringWithLocale:'
+    SwiftName: uppercased(with:)
+    MethodKind: Instance
+  - Selector: 'lowercaseStringWithLocale:'
+    SwiftName: lowercased(with:)
+    MethodKind: Instance
+  - Selector: 'capitalizedStringWithLocale:'
+    SwiftName: capitalized(with:)
+    MethodKind: Instance
+  - Selector: 'dataUsingEncoding:allowLossyConversion:'
+    SwiftName: data(using:allowLossyConversion:)
+    MethodKind: Instance
+  - Selector: 'dataUsingEncoding:'
+    SwiftName: data(using:)
+    MethodKind: Instance
+  - Selector: 'canBeConvertedToEncoding:'
+    SwiftName: canBeConverted(to:)
+    MethodKind: Instance
+  - Selector: 'cStringUsingEncoding:'
+    SwiftName: cString(using:)
+    MethodKind: Instance
+  - Selector: 'maximumLengthOfBytesUsingEncoding:'
+    SwiftName: maximumLengthOfBytes(using:)
+    MethodKind: Instance
+  - Selector: 'lengthOfBytesUsingEncoding:'
+    SwiftName: lengthOfBytes(using:)
+    MethodKind: Instance
+  - Selector: 'localizedNameOfStringEncoding:'
+    SwiftName: localizedName(of:)
+    MethodKind: Class
+  - Selector: 'componentsSeparatedByString:'
+    SwiftName: components(separatedBy:)
+    MethodKind: Instance
+  - Selector: 'componentsSeparatedByCharactersInSet:'
+    SwiftName: components(separatedBy:)
+    MethodKind: Instance
+  - Selector: 'stringByPaddingToLength:withString:startingAtIndex:'
+    SwiftName: padding(toLength:withPad:startingAt:)
+    MethodKind: Instance
+  - Selector: 'stringByAddingPercentEscapesUsingEncoding:'
+    SwiftName: addingPercentEscapes(using:)
+    MethodKind: Instance
+  - Selector: 'stringByReplacingPercentEscapesUsingEncoding:'
+    SwiftName: replacingPercentEscapes(using:)
+    MethodKind: Instance
+  Properties:
+  - Name: uppercaseString
+    SwiftName: uppercased
+  - Name: lowercaseString
+    SwiftName: lowercased
 - Name: NSDistributedNotificationCenter
   Methods:
   - Selector: 'notificationCenterForType:'
@@ -20,9 +82,656 @@ Classes:
     MethodKind: Instance
     Availability: nonswift
     AvailabilityMsg: use generic 'decodeObjectOfClass(_:forKey:)'
+  - Selector: 'encodeInt:forKey:'
+    Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'decodeIntForKey:'
+    Availability: nonswift
+    MethodKind: Instance
 - Name: NSProcessInfo
   Methods:
   - Selector: processInfo
     MethodKind: Class
     NullabilityOfRet: N
     FactoryAsInit: C
+  - Selector: 'isOperatingSystemAtLeastVersion:'
+    SwiftName: isOperatingSystemAtLeast(_:)
+    MethodKind: Instance
+- Name: NSMutableArray
+  Methods:
+  - Selector: 'removeObjectIdenticalTo:inRange:'
+    SwiftName: removeObject(identicalTo:in:)
+    MethodKind: Instance
+  - Selector: 'removeObjectIdenticalTo:'
+    SwiftName: removeObject(identicalTo:)
+    MethodKind: Instance
+- Name: NSBundle
+  Methods:
+  - Selector: 'URLForAuxiliaryExecutable:'
+    SwiftName: urlForAuxiliaryExecutable(_:)
+    MethodKind: Instance
+  - Selector: 'pathForAuxiliaryExecutable:'
+    SwiftName: pathForAuxiliaryExecutable(_:)
+    MethodKind: Instance
+  - Selector: 'URLForResource:withExtension:subdirectory:inBundleWithURL:'
+    SwiftName: urlForResource(_:withExtension:subdirectory:inBundleWith:)
+    MethodKind: Class
+  - Selector: 'URLForResource:withExtension:'
+    SwiftName: urlForResource(_:withExtension:)
+    MethodKind: Instance
+  - Selector: 'URLForResource:withExtension:subdirectory:'
+    SwiftName: urlForResource(_:withExtension:subdirectory:)
+    MethodKind: Instance
+  - Selector: 'URLForResource:withExtension:subdirectory:localization:'
+    SwiftName: urlForResource(_:withExtension:subdirectory:localization:)
+    MethodKind: Instance
+  - Selector: 'pathForResource:ofType:inDirectory:'
+    SwiftName: pathForResource(_:ofType:inDirectory:)
+    MethodKind: Class
+  - Selector: 'pathForResource:ofType:'
+    SwiftName: pathForResource(_:ofType:)
+    MethodKind: Instance
+  - Selector: 'pathForResource:ofType:inDirectory:'
+    SwiftName: pathForResource(_:ofType:inDirectory:)
+    MethodKind: Instance
+  - Selector: 'pathForResource:ofType:inDirectory:forLocalization:'
+    SwiftName: pathForResource(_:ofType:inDirectory:forLocalization:)
+    MethodKind: Instance
+  - Selector: 'objectForInfoDictionaryKey:'
+    SwiftName: objectForInfoDictionaryKey(_:)
+    MethodKind: Instance
+- Name: NSByteCountFormatter
+  Methods:
+  - Selector: 'stringFromByteCount:'
+    SwiftName: stringFromByteCount(_:)
+    MethodKind: Instance
+- Name: NSCalendar
+  Methods:
+  - Selector: 'dateWithEra:year:month:day:hour:minute:second:nanosecond:'
+    SwiftName: date(era:year:month:day:hour:minute:second:nanosecond:)
+    MethodKind: Instance
+  - Selector: 'dateWithEra:yearForWeekOfYear:weekOfYear:weekday:hour:minute:second:nanosecond:'
+    SwiftName: date(era:yearForWeekOfYear:weekOfYear:weekday:hour:minute:second:nanosecond:)
+    MethodKind: Instance
+  - Selector: 'enumerateDatesStartingAfterDate:matchingComponents:options:usingBlock:'
+    SwiftName: enumerateDates(startingAfter:matching:options:using:)
+    MethodKind: Instance
+  - Selector: 'isDateInToday:'
+    SwiftName: isDateInToday(_:)
+    MethodKind: Instance
+  - Selector: 'isDateInYesterday:'
+    SwiftName: isDateInYesterday(_:)
+    MethodKind: Instance
+  - Selector: 'isDateInTomorrow:'
+    SwiftName: isDateInTomorrow(_:)
+    MethodKind: Instance
+  - Selector: 'isDateInWeekend:'
+    SwiftName: isDateInWeekend(_:)
+    MethodKind: Instance
+- Name: NSCharacterSet
+  Methods:
+  - Selector: controlCharacterSet
+    SwiftName: controlCharacters()
+    MethodKind: Class
+  - Selector: whitespaceCharacterSet
+    SwiftName: whitespaces()
+    MethodKind: Class
+  - Selector: whitespaceAndNewlineCharacterSet
+    SwiftName: whitespacesAndNewlines()
+    MethodKind: Class
+  - Selector: decimalDigitCharacterSet
+    SwiftName: decimalDigits()
+    MethodKind: Class
+  - Selector: letterCharacterSet
+    SwiftName: letters()
+    MethodKind: Class
+  - Selector: lowercaseLetterCharacterSet
+    SwiftName: lowercaseLetters()
+    MethodKind: Class
+  - Selector: uppercaseLetterCharacterSet
+    SwiftName: uppercaseLetters()
+    MethodKind: Class
+  - Selector: nonBaseCharacterSet
+    SwiftName: nonBaseCharacters()
+    MethodKind: Class
+  - Selector: alphanumericCharacterSet
+    SwiftName: alphanumerics()
+    MethodKind: Class
+  - Selector: decomposableCharacterSet
+    SwiftName: decomposables()
+    MethodKind: Class
+  - Selector: illegalCharacterSet
+    SwiftName: illegalCharacters()
+    MethodKind: Class
+  - Selector: capitalizedLetterCharacterSet
+    SwiftName: capitalizedLetters()
+    MethodKind: Class
+  - Selector: symbolCharacterSet
+    SwiftName: symbols()
+    MethodKind: Class
+  - Selector: newlineCharacterSet
+    SwiftName: newlines()
+    MethodKind: Class
+  - Selector: 'hasMemberInPlane:'
+    SwiftName: hasMemberInPlane(_:)
+    MethodKind: Instance
+- Name: NSData
+  Methods:
+  - Selector: 'enumerateByteRangesUsingBlock:'
+    SwiftName: enumerateBytes(_:)
+    MethodKind: Instance
+  - Selector: 'rangeOfData:options:range:'
+    SwiftName: range(of:options:in:)
+    MethodKind: Instance
+  - Selector: 'initWithBase64EncodedString:options:'
+    SwiftName: init(base64Encoded:options:)
+    MethodKind: Instance
+  - Selector: 'initWithBase64EncodedData:options:'
+    SwiftName: init(base64Encoded:options:)
+    MethodKind: Instance
+  - Selector: 'dataWithContentsOfMappedFile:'
+    SwiftName: dataWithContentsOfMappedFile(_:)
+    MethodKind: Class
+- Name: NSMutableData
+  Methods:
+  - Selector: 'appendBytes:length:'
+    SwiftName: append(_:length:)
+    MethodKind: Instance
+- Name: NSDate
+  Methods:
+  - Selector: 'timeIntervalSinceDate:'
+    SwiftName: timeIntervalSince(_:)
+    MethodKind: Instance
+  - Selector: 'descriptionWithLocale:'
+    SwiftName: description(with:)
+    MethodKind: Instance
+- Name: NSDateComponentsFormatter
+  Methods:
+  - Selector: 'stringFromTimeInterval:'
+    SwiftName: string(from:)
+    MethodKind: Instance
+- Name: NSDateFormatter
+  Methods:
+  - Selector: 'localizedStringFromDate:dateStyle:timeStyle:'
+    SwiftName: localizedString(from:dateStyle:timeStyle:)
+    MethodKind: Class
+- Name: NSDecimalNumber
+  Methods:
+  - Selector: notANumber
+    SwiftName: notANumber()
+    MethodKind: Class
+- Name: NSObject
+  Methods:
+  - Selector: 'attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:'
+    SwiftName: attemptRecovery(fromError:optionIndex:delegate:didRecoverSelector:contextInfo:)
+    MethodKind: Class
+  - Selector: 'attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:'
+    SwiftName: attemptRecovery(fromError:optionIndex:delegate:didRecoverSelector:contextInfo:)
+    MethodKind: Instance
+  - Selector: 'setValuesForKeysWithDictionary:'
+    SwiftName: setValuesForKeys(_:)
+    MethodKind: Class
+  - Selector: 'setValuesForKeysWithDictionary:'
+    SwiftName: setValuesForKeys(_:)
+    MethodKind: Instance
+- Name: NSExpression
+  Methods:
+  - Selector: expressionForEvaluatedObject
+    SwiftName: expressionForEvaluatedObject()
+    MethodKind: Class
+  - Selector: expressionForAnyKey
+    SwiftName: expressionForAnyKey()
+    MethodKind: Class
+  - Selector: 'expressionForBlock:arguments:'
+    SwiftName: init(block:arguments:)
+    MethodKind: Class
+- Name: NSExtensionContext
+  Methods:
+  - Selector: 'completeRequestReturningItems:completionHandler:'
+    SwiftName: completeRequest(returningItems:completionHandler:)
+    MethodKind: Instance
+  - Selector: 'cancelRequestWithError:'
+    SwiftName: cancelRequest(withError:)
+    MethodKind: Instance
+- Name: NSFileCoordinator
+  Methods:
+  - Selector: 'coordinateAccessWithIntents:queue:byAccessor:'
+    SwiftName: coordinate(with:queue:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'coordinateReadingItemAtURL:options:error:byAccessor:'
+    SwiftName: coordinate(readingItemAt:options:error:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'coordinateWritingItemAtURL:options:error:byAccessor:'
+    SwiftName: coordinate(writingItemAt:options:error:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'coordinateReadingItemAtURL:options:writingItemAtURL:options:error:byAccessor:'
+    SwiftName: coordinate(readingItemAt:options:writingItemAt:options:error:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'coordinateWritingItemAtURL:options:writingItemAtURL:options:error:byAccessor:'
+    SwiftName: coordinate(writingItemAt:options:writingItemAt:options:error:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'prepareForReadingItemsAtURLs:options:writingItemsAtURLs:options:error:byAccessor:'
+    SwiftName: prepare(forReadingItemsAt:options:writingItemsAt:options:error:byAccessor:)
+    MethodKind: Instance
+- Name: NSFileHandle
+  Methods:
+  - Selector: fileHandleWithStandardInput
+    SwiftName: standardInput()
+    MethodKind: Class
+  - Selector: fileHandleWithStandardOutput
+    SwiftName: standardOutput()
+    MethodKind: Class
+  - Selector: fileHandleWithStandardError
+    SwiftName: standardError()
+    MethodKind: Class
+  - Selector: fileHandleWithNullDevice
+    SwiftName: nullDevice()
+    MethodKind: Class
+- Name: NSFileManager
+  Methods:
+  - Selector: 'mountedVolumeURLsIncludingResourceValuesForKeys:options:'
+    SwiftName: mountedVolumeURLs(includingResourceValuesForKeys:options:)
+    MethodKind: Instance
+  - Selector: 'URLsForDirectory:inDomains:'
+    SwiftName: urlsForDirectory(_:inDomains:)
+    MethodKind: Instance
+  - Selector: 'URLForDirectory:inDomain:appropriateForURL:create:error:'
+    SwiftName: urlForDirectory(_:in:appropriateFor:create:)
+    MethodKind: Instance
+  - Selector: 'URLForUbiquityContainerIdentifier:'
+    SwiftName: urlForUbiquityContainerIdentifier(_:)
+    MethodKind: Instance
+  - Selector: 'containerURLForSecurityApplicationGroupIdentifier:'
+    SwiftName: containerURLForSecurityApplicationGroupIdentifier(_:)
+    MethodKind: Instance
+- Name: NSFileVersion
+  Methods:
+  - Selector: 'versionOfItemAtURL:forPersistentIdentifier:'
+    SwiftName: init(itemAt:forPersistentIdentifier:)
+    MethodKind: Class
+- Name: NSFileWrapper
+  Methods:
+  - Selector: 'keyForFileWrapper:'
+    SwiftName: keyForChildFileWrapper(_:)
+    MethodKind: Instance
+- Name: NSFormatter
+  Methods:
+  - Selector: 'isPartialStringValid:newEditingString:errorDescription:'
+    SwiftName: isPartialStringValid(_:newEditingString:errorDescription:)
+    MethodKind: Instance
+- Name: NSItemProvider
+  Methods:
+  - Selector: 'hasItemConformingToTypeIdentifier:'
+    SwiftName: hasItemConformingToTypeIdentifier(_:)
+    MethodKind: Instance
+- Name: NSConditionLock
+  Methods:
+  - Selector: 'tryLockWhenCondition:'
+    SwiftName: tryLock(whenCondition:)
+    MethodKind: Instance
+- Name: NSNotificationCenter
+  Methods:
+  - Selector: 'postNotificationName:object:'
+    SwiftName: post(name:object:)
+    MethodKind: Instance
+  - Selector: 'postNotificationName:object:userInfo:'
+    SwiftName: post(name:object:userInfo:)
+    MethodKind: Instance
+- Name: NSOrderedSet
+  Methods:
+  - Selector: 'enumerateObjectsWithOptions:usingBlock:'
+    SwiftName: enumerateObjects(options:using:)
+    MethodKind: Instance
+  - Selector: 'filteredOrderedSetUsingPredicate:'
+    SwiftName: filtered(using:)
+    MethodKind: Instance
+  - Selector: 'indexesOfObjectsAtIndexes:options:passingTest:'
+    SwiftName: indexes(ofObjectsAt:options:passingTest:)
+    MethodKind: Instance
+  - Selector: 'indexesOfObjectsPassingTest:'
+    SwiftName: indexes(ofObjectsPassingTest:)
+    MethodKind: Instance
+  - Selector: 'indexesOfObjectsWithOptions:passingTest:'
+    SwiftName: indexes(options:ofObjectsPassingTest:)
+    MethodKind: Instance
+  - Selector: 'indexOfObjectAtIndexes:options:passingTest:'
+    SwiftName: index(ofObjectAt:options:passingTest:)
+    MethodKind: Instance
+  - Selector: 'indexOfObjectPassingTest:'
+    SwiftName: index(ofObjectPassingTest:)
+    MethodKind: Instance
+  - Selector: 'indexOfObjectWithOptions:passingTest:'
+    SwiftName: index(_:ofObjectPassingTest:)
+    MethodKind: Instance
+- Name: NSProgress
+  Methods:
+  - Selector: 'discreteProgressWithTotalUnitCount:'
+    SwiftName: discreteProgress(totalUnitCount:)
+    MethodKind: Class
+- Name: NSPropertyListSerialization
+  Methods:
+  - Selector: 'dataWithPropertyList:format:options:error:'
+    SwiftName: data(fromPropertyList:format:options:)
+    MethodKind: Class
+  - Selector: 'propertyListWithData:options:format:error:'
+    SwiftName: propertyList(from:options:format:)
+    MethodKind: Class
+  - Selector: 'dataFromPropertyList:format:errorDescription:'
+    SwiftName: dataFromPropertyList(_:format:errorDescription:)
+    MethodKind: Class
+  - Selector: 'propertyListFromData:mutabilityOption:format:errorDescription:'
+    SwiftName: propertyListFromData(_:mutabilityOption:format:errorDescription:)
+    MethodKind: Class
+- Name: NSRunLoop
+  Methods:
+  - Selector: 'runMode:beforeDate:'
+    SwiftName: run(mode:before:)
+    MethodKind: Instance
+- Name: NSScanner
+  Methods:
+  - Selector: 'scanInt:'
+    SwiftName: scanInt32(_:)
+    MethodKind: Instance
+  - Selector: 'scanInteger:'
+    SwiftName: scanInt(_:)
+    MethodKind: Instance
+  - Selector: 'scanLongLong:'
+    SwiftName: scanInt64(_:)
+    MethodKind: Instance
+  - Selector: 'scanHexInt:'
+    SwiftName: scanHexInt32(_:)
+    MethodKind: Instance
+  - Selector: 'scanHexLongLong:'
+    SwiftName: scanHexInt64(_:)
+    MethodKind: Instance
+  - Selector: 'scanUpToString:intoString:'
+    SwiftName: scanUpTo(_:into:)
+    MethodKind: Instance
+- Name: NSTextCheckingResult
+  Methods:
+  - Selector: 'resultByAdjustingRangesWithOffset:'
+    SwiftName: resultByAdjustingRangesWithOffset(_:)
+    MethodKind: Instance
+  - Selector: 'orthographyCheckingResultWithRange:orthography:'
+    SwiftName: orthographyCheckingResult(range:orthography:)
+    MethodKind: Class
+  - Selector: 'spellCheckingResultWithRange:'
+    SwiftName: spellCheckingResult(range:)
+    MethodKind: Class
+  - Selector: 'grammarCheckingResultWithRange:details:'
+    SwiftName: grammarCheckingResult(range:details:)
+    MethodKind: Class
+  - Selector: 'dateCheckingResultWithRange:date:'
+    SwiftName: dateCheckingResult(range:date:)
+    MethodKind: Class
+  - Selector: 'dateCheckingResultWithRange:date:timeZone:duration:'
+    SwiftName: dateCheckingResult(range:date:timeZone:duration:)
+    MethodKind: Class
+  - Selector: 'addressCheckingResultWithRange:components:'
+    SwiftName: addressCheckingResult(range:components:)
+    MethodKind: Class
+  - Selector: 'linkCheckingResultWithRange:URL:'
+    SwiftName: linkCheckingResult(range:url:)
+    MethodKind: Class
+  - Selector: 'quoteCheckingResultWithRange:replacementString:'
+    SwiftName: quoteCheckingResult(range:replacementString:)
+    MethodKind: Class
+  - Selector: 'dashCheckingResultWithRange:replacementString:'
+    SwiftName: dashCheckingResult(range:replacementString:)
+    MethodKind: Class
+  - Selector: 'replacementCheckingResultWithRange:replacementString:'
+    SwiftName: replacementCheckingResult(range:replacementString:)
+    MethodKind: Class
+  - Selector: 'correctionCheckingResultWithRange:replacementString:'
+    SwiftName: correctionCheckingResult(range:replacementString:)
+    MethodKind: Class
+  - Selector: 'regularExpressionCheckingResultWithRanges:count:regularExpression:'
+    SwiftName: regularExpressionCheckingResult(ranges:count:regularExpression:)
+    MethodKind: Class
+  - Selector: 'phoneNumberCheckingResultWithRange:phoneNumber:'
+    SwiftName: phoneNumberCheckingResult(range:phoneNumber:)
+    MethodKind: Class
+  - Selector: 'transitInformationCheckingResultWithRange:components:'
+    SwiftName: transitInformationCheckingResult(range:components:)
+    MethodKind: Class
+- Name: NSTimer
+  Methods:
+  - Selector: 'scheduledTimerWithTimeInterval:invocation:repeats:'
+    SwiftName: scheduledTimer(timeInterval:invocation:repeats:)
+    MethodKind: Class
+  - Selector: 'scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:'
+    SwiftName: scheduledTimer(timeInterval:target:selector:userInfo:repeats:)
+    MethodKind: Class
+  - Selector: 'initWithFireDate:interval:target:selector:userInfo:repeats:'
+    SwiftName: init(fireAt:interval:target:selector:userInfo:repeats:)
+    MethodKind: Instance
+- Name: NSURL
+  Properties:
+  - Name: baseURL
+    SwiftName: baseURL
+  - Name: absoluteURL
+    SwiftName: absoluteURL
+  - Name: filePathURL
+    SwiftName: filePathURL
+  Methods:
+  - Selector: fileReferenceURL
+    SwiftName: fileReferenceURL()
+    MethodKind: Instance
+  - Selector: 'initByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:'
+    SwiftName: init(resolvingBookmarkData:options:relativeTo:bookmarkDataIsStale:)
+    MethodKind: Instance
+  - Selector: 'URLByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'URLByResolvingAliasFileAtURL:options:error:'
+    SwiftName: init(resolvingAliasFileAt:options:)
+    MethodKind: Class
+- Name: NSURLComponents
+  Methods:
+  - Selector: 'URLRelativeToURL:'
+    SwiftName: url(relativeTo:)
+    MethodKind: Instance
+- Name: NSURLCredential
+  Methods:
+  - Selector: 'credentialForTrust:'
+    SwiftName: init(trust:)
+    MethodKind: Class
+- Name: NSURLCredentialStorage
+  Methods:
+  - Selector: 'setCredential:forProtectionSpace:'
+    SwiftName: set(_:for:)
+    MethodKind: Instance
+- Name: NSUbiquitousKeyValueStore
+  Methods:
+  - Selector: 'setObject:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setString:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setData:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setArray:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setDictionary:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setLongLong:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setDouble:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setBool:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+- Name: NSUndoManager
+  Methods:
+  - Selector: 'registerUndoWithTarget:handler:'
+    SwiftName: __registerUndoWithTarget(_:handler:)
+    MethodKind: Instance
+- Name: NSUserDefaults
+  Methods:
+  - Selector: 'setObject:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setInteger:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setFloat:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setDouble:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setBool:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'addSuiteNamed:'
+    SwiftName: addSuite(named:)
+    MethodKind: Instance
+  - Selector: 'removeSuiteNamed:'
+    SwiftName: removeSuite(named:)
+    MethodKind: Instance
+- Name: NSNumber
+  Methods:
+  - Selector: 'initWithChar:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedChar:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithShort:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedShort:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithInt:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedInt:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithLong:'
+    Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedLong:'
+    Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'initWithLongLong:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedLongLong:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithFloat:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithDouble:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithBool:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithInteger:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedInteger:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'numberWithChar:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedChar:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithShort:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedShort:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithInt:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedInt:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithLongLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedLongLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithFloat:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithDouble:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithBool:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithInteger:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedInteger:'
+    Availability: nonswift
+    MethodKind: Class
+  Properties:
+  - Name: charValue
+    SwiftName: int8Value
+  - Name: unsignedCharValue
+    SwiftName: uint8Value
+  - Name: shortValue
+    SwiftName: int16Value
+  - Name: unsignedShortValue
+    SwiftName: uint16Value
+  - Name: intValue
+    SwiftName: int32Value
+  - Name: unsignedIntValue
+    SwiftName: uint32Value
+  - Name: longValue
+    Availability: nonswift
+  - Name: unsignedLongValue
+    Availability: nonswift
+  - Name: longLongValue
+    SwiftName: int64Value
+  - Name: unsignedLongLongValue
+    SwiftName: uint64Value
+  - Name: integerValue
+    SwiftName: intValue
+  - Name: unsignedIntegerValue
+    SwiftName: uintValue
+Protocols:
+- Name: NSFilePresenter
+  Methods:
+  - Selector: 'presentedItemDidGainVersion:'
+    SwiftName: presentedItemDidGain(_:)
+    MethodKind: Instance
+  - Selector: 'presentedItemDidResolveConflictVersion:'
+    SwiftName: presentedItemDidResolveConflict(_:)
+    MethodKind: Instance
+  - Selector: 'presentedSubitemAtURL:didGainVersion:'
+    SwiftName: presentedSubitem(at:didGain:)
+    MethodKind: Instance
+  - Selector: 'presentedSubitemAtURL:didResolveConflictVersion:'
+    SwiftName: presentedSubitem(at:didResolve:)
+    MethodKind: Instance
+- Name: NSDiscardableContent
+  Methods:
+  - Selector: beginContentAccess
+    SwiftName: beginContentAccess()
+    MethodKind: Instance
+  - Selector: endContentAccess
+    SwiftName: endContentAccess()
+    MethodKind: Instance

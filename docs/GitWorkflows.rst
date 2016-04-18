@@ -30,7 +30,7 @@ This document will show how to translate these commands to Git and additionally
 how to configure Git. It assumes that one is attempting to manipulate a Git
 repository via bash in a terminal. A lot of information since this is supposed
 to be a short, actionable guide. For more information, please see the Git crash
-course guide for SVN users at <https://git-scm.com/course/SVN.html>
+course guide for SVN users at <https://git-scm.com/course/svn.html>
 
 *NOTE* Whenever we say the Swift repository, we mean any repository in the
 Swift project.
@@ -94,7 +94,7 @@ as follows::
 This will cause Git to clone the repository at 'repository url' and check out
 the 'master' branch. The 'master' branch corresponds to 'trunk' in SVN. For more
 information about branching in Git please see
-<https://git-scm.com/course/SVN.html#branch>
+<https://git-scm.com/course/svn.html#branch>
 
 Before beginning to commit though, we /must/ perform some default configuration
 of our repository to match the Swift repository default configuration by

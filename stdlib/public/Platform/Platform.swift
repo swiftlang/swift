@@ -79,7 +79,7 @@ func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
 @warn_unused_result
 public func && <T : Boolean>(
   lhs: T,
-  @autoclosure rhs: () -> DarwinBoolean
+  rhs: @autoclosure () -> DarwinBoolean
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
@@ -88,7 +88,7 @@ public func && <T : Boolean>(
 @warn_unused_result
 public func || <T : Boolean>(
   lhs: T,
-  @autoclosure rhs: () -> DarwinBoolean
+  rhs: @autoclosure () -> DarwinBoolean
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }
@@ -103,6 +103,8 @@ public var errno : Int32 {
   get {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
     return __error().pointee
+#elseif os(Android)
+    return __errno().pointee
 #else
     return __errno_location().pointee
 #endif
@@ -110,6 +112,8 @@ public var errno : Int32 {
   set(val) {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
     return __error().pointee = val
+#elseif os(Android)
+    return __errno().pointee = val
 #else
     return __errno_location().pointee = val
 #endif
@@ -313,7 +317,7 @@ public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
-#elseif os(Linux) || os(FreeBSD)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
 public typealias sighandler_t = __sighandler_t
 
 public var SIG_DFL: sighandler_t? { return nil }
@@ -335,11 +339,11 @@ internal var _ignore = _UnsupportedPlatformError()
 //===----------------------------------------------------------------------===//
 
 /// The value returned by `sem_open()` in the case of failure.
-public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
+public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
   // The value is ABI.  Value verified to be correct on Glibc.
   return UnsafeMutablePointer<sem_t>(bitPattern: 0)
 #else
@@ -352,7 +356,7 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
 internal func _swift_Platform_sem_open2(
   _ name: UnsafePointer<CChar>,
   _ oflag: CInt
-) -> UnsafeMutablePointer<sem_t>
+) -> UnsafeMutablePointer<sem_t>?
 
 @warn_unused_result
 @_silgen_name("_swift_Platform_sem_open4")
@@ -361,13 +365,13 @@ internal func _swift_Platform_sem_open4(
   _ oflag: CInt,
   _ mode: mode_t,
   _ value: CUnsignedInt
-) -> UnsafeMutablePointer<sem_t>
+) -> UnsafeMutablePointer<sem_t>?
 
 @warn_unused_result
 public func sem_open(
   _ name: UnsafePointer<CChar>,
   _ oflag: CInt
-) -> UnsafeMutablePointer<sem_t> {
+) -> UnsafeMutablePointer<sem_t>? {
   return _swift_Platform_sem_open2(name, oflag)
 }
 
@@ -377,7 +381,7 @@ public func sem_open(
   _ oflag: CInt,
   _ mode: mode_t,
   _ value: CUnsignedInt
-) -> UnsafeMutablePointer<sem_t> {
+) -> UnsafeMutablePointer<sem_t>? {
   return _swift_Platform_sem_open4(name, oflag, mode, value)
 }
 
@@ -390,9 +394,9 @@ public func sem_open(
 @warn_unused_result
 @_silgen_name("_swift_FreeBSD_getEnv")
 func _swift_FreeBSD_getEnv(
-) -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+) -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>>
 
-public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
+public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
   return _swift_FreeBSD_getEnv().pointee
 }
 #endif

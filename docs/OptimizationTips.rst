@@ -59,9 +59,9 @@ This mode can be enabled using the Xcode build setting 'Whole Module Optimizatio
 Reducing Dynamic Dispatch
 =========================
 
-Swift by default is a very dynamic language like Objective-C. Unlike Objective
-C, Swift gives the programmer the ability to improve runtime performance when
-necessary by removing or reducing this dynamicism. This section goes through
+Swift by default is a very dynamic language like Objective-C. Unlike Objective-C,
+Swift gives the programmer the ability to improve runtime performance when
+necessary by removing or reducing this dynamism. This section goes through
 several examples of language constructs that can be used to perform such an
 operation.
 
@@ -347,9 +347,16 @@ Advice: Use @_specialize to direct the compiler to specialize generics
 ----------------------------------------------------------------------
 
 The compiler only automatically specializes generic code if the call
-site and the callee function are located in the same module. However, the programmer can provide hints to the compiler in the form of @_specialize attributes. See :ref:`generics-specialization` for details.
+site and the callee function are located in the same module. However,
+the programmer can provide hints to the compiler in the form of
+@_specialize attributes. For details see
+:ref:`generics-specialization`.
 
-This attribute instructs the compiler to specialize on the specified concrete type list. The compiler inserts type checks and dispatches from the generic function to the specialized variant. In the following example, injecting the @_specialize attribute speeds up the code by about 10 times.
+This attribute instructs the compiler to specialize on the specified
+concrete type list. The compiler inserts type checks and dispatches
+from the generic function to the specialized variant. In the following
+example, injecting the @_specialize attribute speeds up the code by
+about 10 times.
 
 ::
 
@@ -379,7 +386,7 @@ This attribute instructs the compiler to specialize on the specified concrete ty
 
   Game(10).play
 
-The cost of large swift values
+The cost of large Swift values
 ==============================
 
 In Swift, values keep a unique copy of their data. There are several advantages
@@ -439,7 +446,7 @@ argument drops from being O(n), depending on the size of the tree to O(1).
   struct Tree : P {
     var node : [P?]
     init() {
-      node = [ thing ]
+      node = [thing]
     }
   }
 
@@ -494,12 +501,12 @@ The type ``Box`` can replace the array in the code sample above.
 Unsafe code
 ===========
 
-Swift classes are always reference counted. The swift compiler inserts code
+Swift classes are always reference counted. The Swift compiler inserts code
 that increments the reference count every time the object is accessed.
 For example, consider the problem of scanning a linked list that's
 implemented using classes. Scanning the list is done by moving a
 reference from one node to the next: ``elem = elem.next``. Every time we move
-the reference swift will increment the reference count of the ``next`` object
+the reference Swift will increment the reference count of the ``next`` object
 and decrement the reference count of the previous object. These reference
 count operations are expensive and unavoidable when using Swift classes.
 

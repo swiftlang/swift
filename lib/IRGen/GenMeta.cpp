@@ -1765,7 +1765,8 @@ namespace {
       if (t == C.TheEmptyTupleType
           || t == C.TheNativeObjectType
           || t == C.TheUnknownObjectType
-          || t == C.TheBridgeObjectType)
+          || t == C.TheBridgeObjectType
+          || t == C.TheRawPointerType)
         return true;
       if (auto intTy = dyn_cast<BuiltinIntegerType>(t)) {
         auto width = intTy->getWidth();

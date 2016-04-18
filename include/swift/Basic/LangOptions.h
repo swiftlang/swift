@@ -184,7 +184,7 @@ namespace swift {
       } else if (Target.isWatchOS()) {
         Target.getOSVersion(major, minor, revision);
       } else if (Target.isOSLinux() || Target.isOSFreeBSD() ||
-                 Target.isOSWindows() ||
+                 Target.isAndroid() || Target.isOSWindows() ||
                  Target.getTriple().empty())
       {
         major = minor = revision = 0;

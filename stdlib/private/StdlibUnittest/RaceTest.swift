@@ -40,14 +40,14 @@ import SwiftPrivate
 import SwiftPrivatePthreadExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
 import Glibc
 #endif
 
 #if _runtime(_ObjC)
 import ObjectiveC
 #else
-func autoreleasepool(@noescape _ code: () -> Void) {
+func autoreleasepool(_ code: @noescape () -> Void) {
   // Native runtime does not have autorelease pools.  Execute the code
   // directly.
   code()

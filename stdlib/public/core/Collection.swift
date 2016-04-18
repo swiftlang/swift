@@ -303,7 +303,7 @@ extension Collection {
   /// - Complexity: O(N).
   @warn_unused_result
   public func map<T>(
-    @noescape _ transform: (Iterator.Element) throws -> T
+    _ transform: @noescape (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     let count: Int = numericCast(self.count)
     if count == 0 {
@@ -427,7 +427,7 @@ extension Collection {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    @noescape isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
 
@@ -596,8 +596,7 @@ extension Sequence
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Iterator.Element>
   ) -> UnsafeMutablePointer<Iterator.Element> {
-    let s = self._baseAddressIfContiguous
-    if s != nil {
+    if let s = self._baseAddressIfContiguous {
       let count = self.count
       ptr.initializeFrom(s, count: count)
       _fixLifetime(self._owner)
@@ -614,7 +613,7 @@ extension Sequence
 }
 
 extension Collection {
-  public func _preprocessingPass<R>(@noescape _ preprocess: () -> R) -> R? {
+  public func _preprocessingPass<R>(_ preprocess: @noescape () -> R) -> R? {
     return preprocess()
   }
 }
@@ -664,7 +663,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R?
   // FIXME: the signature should use UnsafeMutableBufferPointer, but the
   // compiler can't handle that.
@@ -676,7 +675,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
 
 extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     return nil
   }
@@ -733,7 +732,7 @@ internal func _writeBackMutableSlice<
     "Cannot replace a slice of a MutableCollection with a slice of a larger size")
 }
 
-@available(*, unavailable, message: "Bit enum has been deprecated. Please use Int instead.")
+@available(*, unavailable, message: "Bit enum has been removed. Please use Int instead.")
 public enum Bit {}
 
 @available(*, unavailable, renamed: "IndexingIterator")
@@ -760,7 +759,7 @@ extension Collection {
   public func split(
     _ maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    @noescape isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     fatalError("unavailable function can't be called")
   }

@@ -118,35 +118,6 @@ SomeGeneric<Int>
   .builderProp
   .builder2()
 
-func for_loop() {
-  var x = 0
-  for ;; { } // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  for x = 1; x != 42; x += 1 { } // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  for infloopbooltest(); x != 12; infloopbooltest() {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  
-  for ; { } // expected-error {{expected ';' in 'for' statement}}
-  
-  for var y = 1; y != 42; y += 1 {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  for (var y = 1; y != 42; y += 1) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  var z = 10
-  for (; z != 0; z -= 1) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  for (z = 10; z != 0; z -= 1) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  for var (a,b) = (0,12); a != b; b -= 1 {a += 1} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  for (var (a,b) = (0,12); a != b; b -= 1) {a += 1} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  var j, k : Int
-  for ((j,k) = (0,10); j != k; k -= 1) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  for var i = 0, j = 0; i * j < 10; i += 1, j += 1 {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  for j = 0, k = 52; j < k; j += 1, k -= 1 { } // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-  // rdar://19540536
-  // expected-error@+4{{expected var declaration in a 'for' statement}}
-  // expected-error@+3{{expression resolves to an unused function}}
-  // expected-error@+2{{expected an attribute name}}
-  // expected-error@+1{{braced block of statements is an unused closure}}
-  for @ {}
-
-  // <rdar://problem/17462274> Is increment in for loop optional?
-  for (let i = 0; i < 10; ) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-}
 
 break // expected-error {{'break' is only allowed inside a loop, if, do, or switch}}
 continue // expected-error {{'continue' is only allowed inside a loop}}
@@ -431,21 +402,6 @@ func testThrowNil() throws {
   throw nil  // expected-error {{cannot infer concrete ErrorProtocol for thrown 'nil' value}}
 }
 
-
-// <rdar://problem/16650625>
-func for_ignored_lvalue_init() {
-  var i = 0
-  for i;  // expected-error {{expression resolves to an unused l-value}} expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-    i < 10; i += 1 {}
-}
-
-// rdar://problem/18643692
-func for_loop_multi_iter() {
-  for (var i = 0, x = 0; i < 10; i += 1, // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
-       x) { // expected-error {{expression resolves to an unused l-value}}
-    x -= 1
-  }
-}
 
 // rdar://problem/23684220
 // Even if the condition fails to typecheck, save it in the AST anyway; the old

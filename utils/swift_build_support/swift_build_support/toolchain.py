@@ -36,7 +36,8 @@ class Toolchain(object):
         self.cc = cc
         self.cxx = cxx
         self.tools = [cc, cxx]
-        for tool, path in kwargs.iteritems():
+        for tool in kwargs:
+            path = kwargs[tool]
             self.tools.append(path)
             setattr(self, tool, path)
 
@@ -68,7 +69,8 @@ def _first_common_toolchain(tools, suffixes=None):
 
     for suffix in suffixes:
         path_map = dict()
-        for name, tool in tools.iteritems():
+        for name in tools:
+            tool = tools[name]
             path = which(tool + suffix)
             if not path:
                 break
@@ -98,7 +100,8 @@ def host_toolchain(xcrun_toolchain='default', tools=None, suffixes=None):
     if platform.system() == 'Darwin':
         # Only use xcrun on Darwin
         path_map = {}
-        for name, tool in tools.iteritems():
+        for name in tools:
+            tool = tools[name]
             path = xcrun.find(xcrun_toolchain, tool)
             if not path:
                 return None

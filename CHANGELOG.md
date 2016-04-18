@@ -3,23 +3,46 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 -------
 
-* [SE-0046] (https://github.com/apple/swift-evolution/blob/master/proposals/0046-first-label.md) Function parameters now have consistent labelling across all function parameters. With this update the first parameter declarations will now match the existing behavior of the second and later parameters. This change makes the language simpler. 
+* As part of the changes for SE-0055 (see below), the *pointee* types of
+  imported pointers (e.g. the `id` in `id *`) are no longer assumed to always
+  be `_Nullable` even if annotated otherwise. However, an implicit or explicit
+  annotation of `_Null_unspecified` on a pointee type is still imported as
+  `Optional`.
 
-    Functions that were written and called as follows 
+* [SE-0055](https://github.com/apple/swift-evolution/blob/master/proposals/0055-optional-unsafe-pointers.md):
+  The types `UnsafePointer`, `UnsafeMutablePointer`,
+  `AutoreleasingUnsafeMutablePointer`, `OpaquePointer`, `Selector`, and `Zone`
+  (formerly `NSZone`) now represent non-nullable pointers, i.e. pointers that
+  are never `nil`. A nullable pointer is now represented using `Optional`, e.g.
+  `UnsafePointer<Int>?` For types imported from C, non-object pointers (such as
+  `int *`) now have their nullability taken into account.
+
+  One possible area of difficulty is passing a nullable pointer to a function
+  that uses C variadics. Swift will not permit this directly, so as a
+  workaround please use the following idiom to pass it as a pointer-sized
+  integer value instead:
+
+  ```swift
+  unsafeBitCast(nullablePointer, to: Int.self)
+  ```
+
+* [SE-0046] (https://github.com/apple/swift-evolution/blob/master/proposals/0046-first-label.md) Function parameters now have consistent labelling across all function parameters. With this update the first parameter declarations will now match the existing behavior of the second and later parameters. This change makes the language simpler.
+
+    Functions that were written and called as follows
     ```swift
       func foo(x: Int, y: Int) {
       }
       foo(1, y: 2)
-      
+
       func bar(a a: Int, b: Int) {
-      } 
+      }
       bar(a: 3, b: 4)
     ```
     will now be written as (to achieve the same behavior):
     ```swift
         func foo(_ x: Int, y: Int) {}
         foo(1, y: 2)
-        func bar(a: Int, b: Int) {} 
+        func bar(a: Int, b: Int) {}
         bar(a: 3, b: 4)
     ```
 
@@ -83,7 +106,7 @@ Swift 3.0
     typealias StringDictionary<T> = Dictionary<String, T>
     typealias IntFunction<T> = (T) -> Int
     typealias MatchingTriple<T> = (T, T, T)
-    typealias BackwardTriple<T1,T2,T3> = (T3, T2, T1)
+    typealias BackwardTriple<T1, T2, T3> = (T3, T2, T1)
 ```
   etc.
 
@@ -153,7 +176,7 @@ Swift 2.2
   The `typealias` keyword is still allowed (but deprecated and produces a warning)
   in Swift 2.2. This warning will become an error in Swift 3.0.
 
-* Curried function syntax has been deprecated, and is slated to be removed in 
+* Curried function syntax has been deprecated, and is slated to be removed in
   Swift 3.0.
 
 * The `++` and `--` operators have been deprecated, and are slated to be removed in
@@ -170,12 +193,12 @@ Swift 2.2
     ```
 
   should move to being written as:
-  
+
     ```swift
     foo(x.0, x.b)
     ```
 
-  For more information and rationale, see 
+  For more information and rationale, see
   [SE-0029](https://github.com/apple/swift-evolution/blob/master/proposals/0029-remove-implicit-tuple-splat.md).
 
 * New `#file`, `#line`, `#column`, and `#function` expressions have been introduced to
@@ -293,7 +316,7 @@ Swift 2.2
 
       let buttonFactory = UIButton.init(type:)
    ```
-   
+
   For more information, see [SE-0021](https://github.com/apple/swift-evolution/blob/master/proposals/0021-generalized-naming.md).
 
 * There is a new build configuration function, `#if swift(>=x.y)`, which
@@ -320,14 +343,14 @@ Swift 2.2
    ```swift
       let sel = #selector(insertSubview(_:aboveSubview:)) // sel has type Selector
    ```
-   
+
   Along with this change, the use of string literals as selectors has
   been deprecated, e.g.,
 
   ```swift
       let sel: Selector = "insertSubview:aboveSubview:"
   ```
-   
+
   Generally, such string literals should be replaced with uses of
   `#selector`, and the compiler will provide Fix-Its that use
   `#selector`. In cases where this is not possible (e.g., when referring
@@ -337,7 +360,7 @@ Swift 2.2
   ```swift
       let sel = Selector("propertyName")
   ```
-   
+
   Note that the compiler is now checking the string literals used to
   construct Selectors to ensure that they are well-formed Objective-C
   selectors and that there is an `@objc` method with that selector.
@@ -866,8 +889,8 @@ Swift 2.2
   value for the enum to be stored indirectly, allowing for recursive data
   structures to be defined. For example:
 
-  ```swift  
-  enum List<T> {
+  ```swift
+    enum List<T> {
     case Nil
     indirect case Cons(head: T, tail: List<T>)
   }
@@ -1115,7 +1138,7 @@ Swift 2.2
   needs to be written as:
 
   ```swift
-  var (a,b) : (Int, Float) = foo()
+  var (a, b) : (Int, Float) = foo()
   ```
 
   if an explicit type annotation is needed. The former syntax was ambiguous
@@ -1911,10 +1934,10 @@ Swift 2.2
 2014-10-09 [Roughly Xcode 6.1, and Swift 1.1]
 ----------
 
-* `HeapBuffer<Value,Element>`, `HeapBufferStorage<Value,Element>`, and
+* `HeapBuffer<Value, Element>`, `HeapBufferStorage<Value, Element>`, and
   `OnHeap<Value>` were never really useful, because their APIs were
   insufficiently public.  They have been replaced with a single class,
-  `ManagedBuffer<Value,Element>`.  See also the new function
+  `ManagedBuffer<Value, Element>`.  See also the new function
   `isUniquelyReferenced(x)` which is often useful in conjunction with
   `ManagedBuffer`.
 
@@ -2017,7 +2040,7 @@ Swift 2.2
     ```swift
     enum Foo: Int { case A = 0, B = 1, C = 2 }
     let foo = Foo(rawValue: 2)! // formerly 'Foo.fromRaw(2)!'
-    println(foo.rawValue)  // formerly 'foo.toRaw()'
+    println(foo.rawValue) // formerly 'foo.toRaw()'
     ```
 
 2014-09-02
@@ -2722,7 +2745,7 @@ Swift 2.2
 
   In many common cases, this will just work.  Unfortunately, values
   are returned from `CF`-style APIs in a wide variety of ways, and
-  unlike Objective C methods, there simply isn't enough consistency
+  unlike Objective-C methods, there simply isn't enough consistency
   for Swift to be able to safely apply the documented conventions
   universally.  The framework teams have already audited many of the
   most important `CF`-style APIs, and those APIs should be imported
@@ -3951,7 +3974,7 @@ Swift 2.2
 
     ```swift
     func swap<T>(a : @inout T, b : @inout T) {
-      (a,b) = (b,a)
+      (a, b) = (b, a)
     }
     ```
 
@@ -3959,7 +3982,7 @@ Swift 2.2
 
     ```swift
     func swap<T>(inout a : T, inout b : T) {
-      (a,b) = (b,a)
+      (a, b) = (b, a)
     }
     ```
 
@@ -4820,8 +4843,8 @@ Swift 2.2
 * Array and dictionary literals allow an optional trailing comma:
 
     ```swift
-    var a = [ 1, 2, ]
-    var d = [ "a": 1, "b": 2, ]
+    var a = [1, 2,]
+    var d = ["a": 1, "b": 2,]
     ```
 
 2013-10-16

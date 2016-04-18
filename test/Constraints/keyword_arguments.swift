@@ -291,7 +291,7 @@ func testClosures() {
   c2(1, 2)
 }
 
-func acceptAutoclosure(@autoclosure f: () -> Int) { }
+func acceptAutoclosure(f: @autoclosure () -> Int) { }
 func produceInt() -> Int { }
 acceptAutoclosure(f: produceInt) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{32-32=()}}
 

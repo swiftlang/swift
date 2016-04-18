@@ -115,34 +115,10 @@ func _typeByName(_ name: String) -> Any.Type? {
 
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
-    let type = _getTypeByMangledName(nameUTF8.baseAddress,
+    let type = _getTypeByMangledName(nameUTF8.baseAddress!,
                                      UInt(nameUTF8.endIndex))
 
     return type
-  }
-}
- 
-@warn_unused_result
-@_silgen_name("swift_stdlib_demangleName")
-func _stdlib_demangleNameImpl(
-  _ mangledName: UnsafePointer<UInt8>,
-  _ mangledNameLength: UInt,
-  _ demangledName: UnsafeMutablePointer<String>)
-
-// NB: This function is not used directly in the Swift codebase, but is
-// exported for Xcode support. Please coordinate before changing.
-@warn_unused_result
-public // @testable
-func _stdlib_demangleName(_ mangledName: String) -> String {
-  let mangledNameUTF8 = Array(mangledName.utf8)
-  return mangledNameUTF8.withUnsafeBufferPointer {
-    (mangledNameUTF8) in
-    let (_, demangledName) = _withUninitializedString {
-      _stdlib_demangleNameImpl(
-        mangledNameUTF8.baseAddress, UInt(mangledNameUTF8.endIndex),
-        $0)
-    }
-    return demangledName
   }
 }
 

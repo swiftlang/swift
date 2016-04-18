@@ -20,6 +20,8 @@
 #ifndef SWIFT_REFLECTION_SWIFT_REFLECTION_H
 #define SWIFT_REFLECTION_SWIFT_REFLECTION_H
 
+#include "SwiftRemoteMirrorTypes.h"
+
 /// Major version changes when there are ABI or source incompatible changes.
 #define SWIFT_REFLECTION_VERSION_MAJOR 3
 
@@ -31,39 +33,51 @@
 extern "C" {
 #endif
 
-/// \brief Represents the __swift{n}_reflect section of an image.
-///
-/// If this section is virtually mapped, the following corresponding sections
-/// should also be mapped into the current address space:
-///
-/// __swift{n}_typeref
-/// --swift{n}_reflstr
-///
-/// where {n} is SWIFT_REFLECTION_VERSION_MAJOR.
-typedef struct ReflectionSection {
-  const char *ImageName;
-  void *Begin;
-  void *End;
-} ReflectionSection;
-
-/// \brief An opaque pointer to a context which maintains state and
-/// caching of reflection structure for heap instances.
-typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
-
 /// \returns An opaque reflection context.
 SwiftReflectionContextRef
-swift_reflection_createReflectionContext(PointerSizeFunction getPointerSize,
-                                         SizeSizeFunction getSizeSize,
-                                         ReadBytesFunction readBytes,
-                                         GetStringLengthFunction getStringLength,
-                                         GetSymbolAddressFunction getSymbolAddress);
+swift_reflection_createReflectionContext(
+    PointerSizeFunction getPointerSize,
+    SizeSizeFunction getSizeSize,
+    ReadBytesFunction readBytes,
+    GetStringLengthFunction getStringLength,
+    GetSymbolAddressFunction getSymbolAddress);
 
 /// Destroys an opaque reflection context.
-void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
+void
+swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
 
-/// Clear any caching of field type information for all known heap instances.
-void swift_reflection_clearCaches(SwiftReflectionContextRef Context);
+/// Add reflection sections for a loaded Swift image.
+void
+swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
+                                   const char *ImageName,
+                                   swift_reflection_section_t fieldmd,
+                                   swift_reflection_section_t builtin,
+                                   swift_reflection_section_t assocty,
+                                   swift_reflection_section_t typeref,
+                                   swift_reflection_section_t reflstr);
 
+
+/// Returns an opaque type reference for a metadata pointer, or
+/// NULL if one can't be constructed.
+swift_typeref_t
+swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
+                                    uintptr_t metadata);
+
+/// Returns a structure describing the overall layout of a typeref.
+swift_typeinfo_t
+swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
+                                swift_typeref_t OpaqueTypeRef);
+
+/// Returns the information about a child by index.
+swift_childinfo_t
+swift_reflection_infoForField(SwiftReflectionContextRef ContextRef,
+                              swift_typeref_t OpaqueTypeRef,
+                              unsigned Index);
+
+/// Returns a fully instantiated typeref for a generic argument by index.
+swift_typeref_t
+swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
+                                          unsigned Index);
 #ifdef __cplusplus
 } // extern "C"
 #endif

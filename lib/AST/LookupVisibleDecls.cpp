@@ -20,6 +20,7 @@
 #include "swift/AST/AST.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/SetVector.h"
 #include <set>
 
@@ -174,6 +175,9 @@ static void doGlobalExtensionLookup(Type BaseType,
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
+    if (!isExtensionApplied(*const_cast<DeclContext*>(CurrDC), BaseType,
+                            extension))
+      continue;
     bool validatedExtension = false;
     if (TypeResolver && extension->getAsProtocolExtensionContext()) {
       if (!TypeResolver->isProtocolExtensionUsable(

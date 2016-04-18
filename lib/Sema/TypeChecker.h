@@ -1339,9 +1339,12 @@ public:
   ///
   /// \param expr The expression, which will be updated in place.
   /// \param type The type to convert to.
+  /// \param typeFromPattern Optionally, the caller can specify the pattern
+  ///   from where the toType is derived, so that we can deliver better fixit.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool convertToType(Expr *&expr, Type type, DeclContext *dc);
+  bool convertToType(Expr *&expr, Type type, DeclContext *dc,
+                     Optional<Pattern*> typeFromPattern = None);
 
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
@@ -1754,9 +1757,7 @@ public:
   void diagnoseDeprecated(SourceRange SourceRange,
                           const DeclContext *ReferenceDC,
                           const AvailableAttr *Attr,
-                          DeclName Name,
-              std::function<void(InFlightDiagnostic&)> extraInfoHandler =
-                          [](InFlightDiagnostic&){});
+                          DeclName Name);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl

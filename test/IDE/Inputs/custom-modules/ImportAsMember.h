@@ -11,6 +11,9 @@ extern double IAMStruct1GlobalVar
 extern struct IAMStruct1 IAMStruct1CreateSimple(double value)
     __attribute__((swift_name("Struct1.init(value:)")));
 
+extern struct IAMStruct1 IAMStruct1CreateSpecialLabel()
+    __attribute__((swift_name("Struct1.init(specialLabel:)")));
+
 extern struct IAMStruct1 IAMStruct1Invert(struct IAMStruct1 s)
     __attribute__((swift_name("Struct1.inverted(self:)")));
 

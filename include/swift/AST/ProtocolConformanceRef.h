@@ -20,6 +20,10 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/TypeAlignments.h"
 
+namespace llvm {
+  class raw_ostream;
+}
+
 namespace swift {
 
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
@@ -80,6 +84,7 @@ public:
   ProtocolDecl *getRequirement() const;
 
   void dump() const;
+  void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 
   bool operator==(ProtocolConformanceRef other) const {
     return Union == other.Union;

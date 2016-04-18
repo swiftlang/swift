@@ -56,7 +56,7 @@ internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
   let endIndex = range.endIndex
   let length = startIndex.distance(to: endIndex).toIntMax()
   if length < 2 {
-    return [ range ]
+    return [range]
   }
   let middle = startIndex.advanced(by: Index.Distance(length / 2))
   return [startIndex ..< middle, middle ..< endIndex]
@@ -230,7 +230,7 @@ struct _ForkJoinMutex {
     _mutex.deallocateCapacity(1)
   }
 
-  func withLock<Result>(@noescape body: () -> Result) -> Result {
+  func withLock<Result>(body: @noescape () -> Result) -> Result {
     if pthread_mutex_lock(_mutex) != 0 {
       fatalError("pthread_mutex_lock")
     }
@@ -243,7 +243,7 @@ struct _ForkJoinMutex {
 }
 
 struct _ForkJoinCond {
-  var _cond: UnsafeMutablePointer<pthread_cond_t> = nil
+  var _cond: UnsafeMutablePointer<pthread_cond_t>
 
   init() {
     _cond = UnsafeMutablePointer(allocatingCapacity: 1)
@@ -698,7 +698,7 @@ final public class ForkJoinPool {
   }
 
   internal func _tryCreateThread(
-    @noescape _ makeTask: () -> ForkJoinTaskBase?
+    _ makeTask: @noescape () -> ForkJoinTaskBase?
   ) -> Bool {
     var success = false
     var oldNumThreads = _totalThreads.load()

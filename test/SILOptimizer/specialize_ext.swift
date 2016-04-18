@@ -17,5 +17,5 @@ public func exp1() {
   var J = XXX<Int>(t: 4)
   J.bar(3)
 }
-//Make sure that we are able to specialize the extension 'bar'
+// Make sure that we are able to specialize the extension 'bar'
 //CHECK: sil shared [noinline] @_TTSg5Si___TFV14specialize_ext3XXX3bar

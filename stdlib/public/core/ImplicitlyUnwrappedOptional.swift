@@ -130,14 +130,14 @@ extension ImplicitlyUnwrappedOptional {
 
   @available(*, unavailable, message: "Has been removed in Swift 3.")
   public func map<U>(
-    @noescape _ f: (Wrapped) throws -> U
+    _ f: @noescape (Wrapped) throws -> U
   ) rethrows -> ImplicitlyUnwrappedOptional<U> {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, message: "Has been removed in Swift 3.")
   public func flatMap<U>(
-      @noescape _ f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
+      _ f: @noescape (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
   ) rethrows -> ImplicitlyUnwrappedOptional<U> {
     fatalError("unavailable function can't be called")
   }

@@ -31,8 +31,10 @@
 #endif
 
 // Type attributes
+TYPE_ATTR(autoclosure)
 TYPE_ATTR(convention)
 TYPE_ATTR(noreturn)
+TYPE_ATTR(noescape)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -46,7 +48,6 @@ TYPE_ATTR(in)
 TYPE_ATTR(inout)
 TYPE_ATTR(inout_aliasable)
 TYPE_ATTR(in_guaranteed)
-TYPE_ATTR(noescape)
 TYPE_ATTR(owned)
 TYPE_ATTR(unowned_inner_pointer)
 TYPE_ATTR(guaranteed)
@@ -57,8 +58,7 @@ TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 TYPE_ATTR(deallocating)
 
-// Deprecated type attributes
-TYPE_ATTR(objc_block)
+// SIL metatype attributes.
 TYPE_ATTR(thin)
 TYPE_ATTR(thick)
 

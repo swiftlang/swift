@@ -1103,6 +1103,9 @@ class infer_instanceVar1 {
   var var_Optional9: protocol<Protocol_ObjC1>.Type?
   var var_Optional10: protocol<Protocol_ObjC1, Protocol_ObjC2>?
   var var_Optional11: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type?
+  var var_Optional12: OpaquePointer?
+  var var_Optional13: UnsafeMutablePointer<Int>?
+  var var_Optional14: UnsafeMutablePointer<Class_ObjC1>?
 
 // CHECK-LABEL: @objc var var_Optional1: Class_ObjC1?
 // CHECK-LABEL: @objc var var_Optional2: Protocol_ObjC1?
@@ -1115,6 +1118,9 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_Optional9: Protocol_ObjC1.Type?
 // CHECK-LABEL: @objc var var_Optional10: protocol<Protocol_ObjC1, Protocol_ObjC2>?
 // CHECK-LABEL: @objc var var_Optional11: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type?
+// CHECK-LABEL: @objc var var_Optional12: OpaquePointer?
+// CHECK-LABEL: @objc var var_Optional13: UnsafeMutablePointer<Int>?
+// CHECK-LABEL: @objc var var_Optional14: UnsafeMutablePointer<Class_ObjC1>?
 
 
   var var_ImplicitlyUnwrappedOptional1: Class_ObjC1!
@@ -1151,9 +1157,6 @@ class infer_instanceVar1 {
   var var_Optional_fail12: Int?
   var var_Optional_fail13: Bool?
   var var_Optional_fail14: CBool?
-  var var_Optional_fail16: OpaquePointer?
-  var var_Optional_fail17: UnsafeMutablePointer<Int>?
-  var var_Optional_fail18: UnsafeMutablePointer<Class_ObjC1>?
   var var_Optional_fail20: AnyObject??
   var var_Optional_fail21: AnyObject.Type??
 // CHECK-NOT: @objc{{.*}}Optional_fail
@@ -1161,7 +1164,7 @@ class infer_instanceVar1 {
   // CHECK-LABEL: @objc var var_CFunctionPointer_1: @convention(c) () -> ()
   var var_CFunctionPointer_1: @convention(c) () -> ()
   // CHECK-LABEL: @objc var var_CFunctionPointer_invalid_1: Int
-  var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{attribute only applies to syntactic function types}}
+  var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{@convention attribute only applies to function types}}
   // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int
   var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int // expected-error {{'PlainStruct -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
   
@@ -1656,7 +1659,7 @@ class HasNSManaged {
 
   func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {}
   // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
-}
+  }
 
 // @objc with nullary names
 @objc(NSObjC2)
@@ -1937,11 +1940,11 @@ class ClassThrows1 {
 // CHECK-DUMP-LABEL: class_decl "ImplicitClassThrows1"
 @objc class ImplicitClassThrows1 {
   // CHECK: @objc func methodReturnsVoid() throws
-  // CHECK-DUMP: func_decl "methodReturnsVoid()"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "methodReturnsVoid()"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
   func methodReturnsVoid() throws { }
 
   // CHECK: @objc func methodReturnsObjCClass() throws -> Class_ObjC1
-  // CHECK-DUMP: func_decl "methodReturnsObjCClass()" {{.*}}foreign_error=NilResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>
+  // CHECK-DUMP: func_decl "methodReturnsObjCClass()" {{.*}}foreign_error=NilResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
   func methodReturnsObjCClass() throws -> Class_ObjC1 {
     return Class_ObjC1()
   }
@@ -1956,18 +1959,18 @@ class ClassThrows1 {
   func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil }
 
   // CHECK: @objc func methodWithTrailingClosures(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int)
-  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
   func methodWithTrailingClosures(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int) throws { }
 
   // CHECK: @objc init(degrees: Double) throws
-  // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>
+  // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
   init(degrees: Double) throws { }
 }
 
 // CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"
 @objc class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
   // CHECK: @objc override func methodWithTrailingClosures(_ s: String, fn1: ((Int) -> Int), fn2: ((Int) -> Int), fn3: ((Int) -> Int))
-  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
   override func methodWithTrailingClosures(_ s: String, fn1: ((Int) -> Int), fn2: ((Int) -> Int), fn3: ((Int) -> Int)) throws { }
 }
 
@@ -2000,20 +2003,20 @@ class ThrowsObjCName {
 
   @objc(method7) func method7(x: Int) throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
 
-  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
   @objc(method8:fn1:error:fn2:)
   func method8(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 
-  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
   @objc(method9AndReturnError:s:fn1:fn2:)
   func method9(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 }
 
 class SubclassThrowsObjCName : ThrowsObjCName {
-  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
   override func method8(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 
-  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
   override func method9(_ s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 }
 

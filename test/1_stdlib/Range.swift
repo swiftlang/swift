@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// XFAIL: interpret
-
 import StdlibUnittest
 
 

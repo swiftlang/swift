@@ -20,7 +20,7 @@ public class NonObjectiveCBase {
   public init() {}
 }
 
-/// A base class of `ManagedBuffer<Value,Element>`, used during
+/// A base class of `ManagedBuffer<Value, Element>`, used during
 /// instance creation.
 ///
 /// During instance creation, in particular during
@@ -35,7 +35,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// idea to store this information in the "value" area when
   /// an instance is created.
   public final var capacity: Int {
-    let p = ManagedBufferPointer<Value,Element>(self)
+    let p = ManagedBufferPointer<Value, Element>(self)
     return p.capacity
   }
 
@@ -102,7 +102,7 @@ public class ManagedBuffer<Value, Element>
     initialValue: (ManagedProtoBuffer<Value, Element>) -> Value
   ) -> ManagedBuffer<Value, Element> {
 
-    let p = ManagedBufferPointer<Value,Element>(
+    let p = ManagedBufferPointer<Value, Element>(
       bufferClass: self,
       minimumCapacity: minimumCapacity,
       initialValue: { buffer, _ in
@@ -146,7 +146,7 @@ public class ManagedBuffer<Value, Element>
 /// --------------------
 ///
 ///      class MyBuffer<Element> { // non-@objc
-///        typealias Manager = ManagedBufferPointer<(Int,String), Element>
+///        typealias Manager = ManagedBufferPointer<(Int, String), Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToValue, pointerToElements) -> Void in
@@ -279,7 +279,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointers<R>(
-    _ body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
+    _ body: @noescape (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
   ) -> R {
     let result = body(_valuePointer, _elementPointer)
     _fixLifetime(_nativeBuffer)

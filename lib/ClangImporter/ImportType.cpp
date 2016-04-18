@@ -85,9 +85,8 @@ namespace {
       /// The source type is a function pointer type.
       CFunctionPointer,
 
-      /// The source type is a specially-handled pointer type (usually a mapped
-      /// typedef) that nonetheless needs to preserve nullability.
-      CustomNullablePointer,
+      /// The source type is any other pointer type.
+      OtherPointer,
     };
 
     ImportHintKind Kind;
@@ -126,7 +125,7 @@ namespace {
     case ImportHint::ObjCBridged:
     case ImportHint::ObjCPointer:
     case ImportHint::CFunctionPointer:
-    case ImportHint::CustomNullablePointer:
+    case ImportHint::OtherPointer:
       return true;
     }
   }
@@ -151,17 +150,16 @@ namespace {
   getOptionalType(Type payloadType,
                   ImportTypeKind kind,
                   OptionalTypeKind OptKind = OTK_ImplicitlyUnwrappedOptional) {
-    // Import pointee types as true Optional.
-    if (kind == ImportTypeKind::Pointee)
-      return OptionalType::get(payloadType);
-
     switch (OptKind) {
-      case OTK_ImplicitlyUnwrappedOptional:
-        return ImplicitlyUnwrappedOptionalType::get(payloadType);
-      case OTK_None:
-        return payloadType;
-      case OTK_Optional:
+    case OTK_None:
+      return payloadType;
+    case OTK_Optional:
+      return OptionalType::get(payloadType);
+    case OTK_ImplicitlyUnwrappedOptional:
+      // Import pointee types as true Optional.
+      if (kind == ImportTypeKind::Pointee)
         return OptionalType::get(payloadType);
+      return ImplicitlyUnwrappedOptionalType::get(payloadType);
     }
   }
 
@@ -292,7 +290,7 @@ namespace {
                              Impl.SwiftContext.getSwiftName(
                                KnownFoundationEntity::NSZone));
           if (wrapperTy)
-            return wrapperTy;
+            return {wrapperTy, ImportHint::OtherPointer};
         }
       }
       
@@ -315,7 +313,8 @@ namespace {
       // If the pointed-to type is unrepresentable in Swift, import as
       // OpaquePointer.
       if (!pointeeType)
-        return getOpaquePointerType();
+        return {Impl.SwiftContext.getOpaquePointerDecl()->getDeclaredType(),
+                ImportHint::OtherPointer};
       
       if (pointeeQualType->isFunctionType()) {
         auto funcTy = pointeeType->castTo<FunctionType>();
@@ -329,29 +328,29 @@ namespace {
 
       auto quals = pointeeQualType.getQualifiers();
       
-      if (quals.hasConst())
+      if (quals.hasConst()) {
         return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                      "UnsafePointer",
                                                      pointeeType),
-                ImportHint::None};
+                ImportHint::OtherPointer};
+      }
+
       // Mutable pointers with __autoreleasing or __unsafe_unretained
       // ownership map to AutoreleasingUnsafeMutablePointer<T>.
-      else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing
-            || quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone)
+      if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
+          quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone) {
         return {
           Impl.getNamedSwiftTypeSpecialization(
             Impl.getStdlibModule(), "AutoreleasingUnsafeMutablePointer",
             pointeeType),
-            ImportHint::None};
+          ImportHint::OtherPointer};
+      }
+
       // All other mutable pointers map to UnsafeMutablePointer.
       return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                    "UnsafeMutablePointer",
                                                    pointeeType),
-              ImportHint::None};
-    }
-
-    Type getOpaquePointerType() {
-      return Impl.getNamedSwiftType(Impl.getStdlibModule(), "OpaquePointer");
+              ImportHint::OtherPointer};
     }
 
     ImportResult VisitBlockPointerType(const clang::BlockPointerType *type) {
@@ -568,11 +567,8 @@ namespace {
           hint = ImportHint::CFPointer;
         } else if (mappedType->isAnyExistentialType()) { // id, Class
           hint = ImportHint::ObjCPointer;
-        } else if (type->isBlockPointerType()) {
-          // FIXME: This should eventually be "isAnyPointerType", but right now
-          // non-object, non-block pointers are never Optional in Swift; they
-          // just can have a value of 'nil' themselves.
-          hint = ImportHint::CustomNullablePointer;
+        } else if (type->isPointerType() || type->isBlockPointerType()) {
+          hint = ImportHint::OtherPointer;
         }
         // Any other interesting mapped types should be hinted here.
 
@@ -2097,9 +2093,10 @@ Type ClangImporter::Implementation::importMethodType(
 
     bool allowNSUIntegerAsIntInResult = isFromSystemModule;
     if (allowNSUIntegerAsIntInResult) {
-      Identifier name = methodName.getBaseName();
+      clang::Selector sel = clangDecl->getSelector();
+      StringRef name = sel.getNameForSlot(0);
       if (!name.empty()) {
-        allowNSUIntegerAsIntInResult = !nameContainsUnsigned(name.str());
+        allowNSUIntegerAsIntInResult = !nameContainsUnsigned(name);
       }
     }
 
@@ -2179,13 +2176,14 @@ Type ClangImporter::Implementation::importMethodType(
 
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
     if (allowNSUIntegerAsIntInParam) {
-      Identifier name;
-      if (nameIndex < argNames.size())
-        name = argNames[nameIndex];
+      StringRef name;
+      clang::Selector sel = clangDecl->getSelector();
+      if (nameIndex < sel.getNumArgs())
+        name = sel.getNameForSlot(nameIndex);
       if (name.empty() && nameIndex == 0)
-        name = methodName.getBaseName();
+        name = sel.getNameForSlot(0);
       if (!name.empty())
-        allowNSUIntegerAsIntInParam = !nameContainsUnsigned(name.str());
+        allowNSUIntegerAsIntInParam = !nameContainsUnsigned(name);
     }
 
     Type swiftParamTy;

@@ -280,7 +280,7 @@ public func abs(_ x: ${vectype}) -> ${vectype} {
 @warn_unused_result
 public func min(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:             \
-                    'min(x.' + c + ',y.' + c + ')', \
+                    'min(x.' + c + ', y.' + c + ')', \
                     component[:size]))})
 }
 
@@ -290,7 +290,7 @@ public func min(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 @warn_unused_result
 public func max(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:             \
-                    'max(x.' + c + ',y.' + c + ')', \
+                    'max(x.' + c + ', y.' + c + ')', \
                     component[:size]))})
 }
 
@@ -472,21 +472,21 @@ public func smoothstep(_ x: ${vectype},
                               edge1: ${vectype})
                                 -> ${vectype} {
   let t = clamp((x-edge0)/(edge1-edge0), min: 0, max: 1)
-  return t*t*(${vectype}(3) - 2*t)
+  return t * t * (${vectype}(3) - 2 * t)
 }
 
 /// Dot product of `x` and `y`.
 @inline(__always)
 @warn_unused_result
 public func dot(_ x: ${vectype}, _ y: ${vectype}) -> ${type} {
-  return reduce_add(x*y)
+  return reduce_add(x * y)
 }
 
 /// Projection of `x` onto `y`.
 @inline(__always)
 @warn_unused_result
 public func project(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
-  return dot(x,y)/dot(y,y)*y
+  return dot(x, y) / dot(y, y) * y
 }
 
 /// Length of `x`, squared.  This is more efficient to compute than the length,
@@ -504,7 +504,7 @@ public func project(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 @inline(__always)
 @warn_unused_result
 public func length_squared(_ x: ${vectype}) -> ${type} {
-  return dot(x,x)
+  return dot(x, x)
 }
 
 /// Length (two-norm or "Euclidean norm") of `x`.
@@ -555,7 +555,7 @@ public func normalize(_ x: ${vectype}) -> ${vectype} {
 @inline(__always)
 @warn_unused_result
 public func reflect(_ x: ${vectype}, n: ${vectype}) -> ${vectype} {
-  return x - 2*dot(x,n)*n
+  return x - 2 * dot(x, n) * n
 }
 
 /// The refraction direction given unit incident vector `x`, unit surface
@@ -568,8 +568,8 @@ public func refract(_ x: ${vectype},
                            n: ${vectype},
                            eta: ${type})
                              -> ${vectype} {
-  let k = 1 - eta*eta*(1 - dot(x,n)*dot(x,n))
-  if k >= 0 { return eta*x - (eta*dot(x,n) + sqrt(k))*n }
+  let k = 1 - eta * eta * (1 - dot(x, n) * dot(x, n))
+  if k >= 0 { return eta * x - (eta * dot(x, n) + sqrt(k)) * n }
   return ${vectype}(0)
 }
 

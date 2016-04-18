@@ -9,6 +9,37 @@ import StdlibUnittest
 import SwiftShims
 
 
+@warn_unused_result
+@_silgen_name("swift_demangle")
+public
+func _stdlib_demangleImpl(
+  mangledName: UnsafePointer<UInt8>?,
+  mangledNameLength: UInt,
+  outputBuffer: UnsafeMutablePointer<UInt8>?,
+  outputBufferSize: UnsafeMutablePointer<UInt>?,
+  flags: UInt32
+) -> UnsafeMutablePointer<CChar>?
+
+@warn_unused_result
+func _stdlib_demangleName(_ mangledName: String) -> String {
+  return mangledName.nulTerminatedUTF8.withUnsafeBufferPointer {
+    (mangledNameUTF8) in
+
+    let demangledNamePtr = _stdlib_demangleImpl(
+      mangledName: mangledNameUTF8.baseAddress,
+      mangledNameLength: UInt(mangledNameUTF8.count - 1),
+      outputBuffer: nil,
+      outputBufferSize: nil,
+      flags: 0)
+
+    if let demangledNamePtr = demangledNamePtr {
+      let demangledName = String(cString: demangledNamePtr)
+      _swift_stdlib_free(demangledNamePtr)
+      return demangledName
+    }
+    return mangledName
+  }
+}
 
 var swiftObjectCanaryCount = 0
 class SwiftObjectCanary {
@@ -113,7 +144,7 @@ class ClassConformsToP1 : Boolean, Q1 {
 
 class Class2ConformsToP1<T : Boolean> : Boolean, Q1 {
   init(_ value: T) {
-    self.value = [ value ]
+    self.value = [value]
   }
   var boolValue: Bool {
     return value[0].boolValue
@@ -329,9 +360,9 @@ Runtime.test("demangleName") {
 
 Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   typealias IntPtr = UnsafeMutablePointer<Int>
-  var origP1 = IntPtr(bitPattern: 0x10101010)
-  var origP2 = IntPtr(bitPattern: 0x20202020)
-  var origP3 = IntPtr(bitPattern: 0x30303030)
+  var origP1 = IntPtr(bitPattern: 0x10101010)!
+  var origP2 = IntPtr(bitPattern: 0x20202020)!
+  var origP3 = IntPtr(bitPattern: 0x30303030)!
 
   do {
     var object = origP1
@@ -518,7 +549,7 @@ Reflection.test("Struct/Generic/DefaultMirror") {
   do {
     var value = GenericStructWithDefaultMirror<Int, [Any?]>(
       first: 123,
-      second: [ "abc", 456, 789.25 ])
+      second: ["abc", 456, 789.25])
     var output = ""
     dump(value, to: &output)
 
@@ -1360,10 +1391,9 @@ Reflection.test("MirrorMirror") {
 
 Reflection.test("OpaquePointer/null") {
   // Don't crash on null pointers. rdar://problem/19708338
-  var sequence: OpaquePointer = nil
-  var mirror = Mirror(reflecting: sequence)
-  var child = mirror.children.first!
-  expectEqual("(Opaque Value)", "\(child.1)")
+  let pointer: OpaquePointer? = nil
+  let mirror = Mirror(reflecting: pointer)
+  expectEqual(0, mirror.children.count)
 }
 
 Reflection.test("StaticString/Mirror") {

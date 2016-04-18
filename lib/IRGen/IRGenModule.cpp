@@ -20,7 +20,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "clang/Basic/CodeGenOptions.h"
 #include "swift/Basic/Dwarf.h"
-#include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
@@ -927,26 +926,6 @@ void IRGenModule::emitAutolinkInfo() {
                                    llvm::Constant::getNullValue(Int1Ty),
                                    buf.str());
   }
-}
-
-void IRGenModuleDispatcher::emitSwiftReflectionVersion() {
-  for (auto &m : *this) {
-    m.second->emitSwiftReflectionVersion();
-  }
-}
-
-llvm::Constant*
-IRGenModule::emitSwiftReflectionVersion() {
-  auto Init = llvm::ConstantInt::get(Int32Ty, REFLECTION_VERSION);
-
-  auto Version = new llvm::GlobalVariable(Module, Int32Ty,
-                                               /*constant*/ true,
-                                          llvm::GlobalValue::LinkOnceODRLinkage,
-                                               Init,
-                                               "__swift_reflection_version");
-  addUsedGlobal(Version);
-
-  return Version;
 }
 
 void IRGenModule::cleanupClangCodeGenMetadata() {

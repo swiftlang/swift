@@ -1243,7 +1243,7 @@ func fixitForReferenceInGlobalFunctionWithAttribute() {
     // expected-note@-3 {{add @available attribute to enclosing global function}} {{1-1=@available(OSX 10.51, *)\n}}
 }
 
-func takesAutoclosure(@autoclosure _ c : () -> ()) {
+func takesAutoclosure(_ c : @autoclosure () -> ()) {
 }
 
 class ClassForFixit {

@@ -39,6 +39,9 @@ public struct StaticString
     CustomDebugStringConvertible,
     CustomReflectable {
 
+  // FIXME(ABI): RawPointer is non-nullable, but we can store a null Unicode
+  // scalar in it.  Change it to an integer.
+  //
   /// Either a pointer to the start of UTF-8 data, or an integer representation
   /// of a single Unicode scalar.
   internal var _startPtrOrData: Builtin.RawPointer
@@ -76,7 +79,9 @@ public struct StaticString
     _precondition(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
-    return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, to: UInt.self)))
+    return UnicodeScalar(
+      UInt32(UInt(bitPattern: UnsafePointer<Builtin.RawPointer>(_startPtrOrData)))
+    )
   }
 
   /// If `self` stores a pointer to ASCII or UTF-8 code units, the
@@ -112,7 +117,7 @@ public struct StaticString
   ///
   /// This method works regardless of what `self` stores.
   public func withUTF8Buffer<R>(
-    @noescape invoke body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
+    invoke body: @noescape (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(
         start: utf8Start, count: Int(utf8CodeUnitCount)))

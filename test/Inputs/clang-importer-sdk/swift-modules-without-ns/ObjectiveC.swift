@@ -1,6 +1,6 @@
 @_exported import ObjectiveC // Clang module
 
-// The iOS/arm64 target uses _Bool for Objective C's BOOL.  We include
+// The iOS/arm64 target uses _Bool for Objective-C's BOOL.  We include
 // x86_64 here as well because the iOS simulator also uses _Bool.
 #if ((os(iOS) || os(tvOS)) && (arch(arm64) || arch(x86_64))) || os(watchOS)
 public struct ObjCBool : Boolean {
@@ -59,13 +59,8 @@ public struct Selector : StringLiteralConvertible {
   }
 }
 
-public struct Zone: NilLiteralConvertible {
+public struct Zone {
   public var pointer : OpaquePointer
-
-  @_transparent public
-  init(nilLiteral: ()) {
-    pointer = nil
-  }
 }
 
 internal func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {

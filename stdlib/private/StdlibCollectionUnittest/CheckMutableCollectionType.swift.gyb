@@ -50,7 +50,7 @@ public let partitionExhaustiveTests = [
   PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60, 70 ]),
 ]
 
-public func withInvalidOrderings(_ body: ((Int,Int) -> Bool) -> Void) {
+public func withInvalidOrderings(_ body: ((Int, Int) -> Bool) -> Void) {
   // Test some ordering predicates that don't create strict weak orderings
   body { (_,_) in true }
   body { (_,_) in false }
@@ -62,7 +62,7 @@ public func withInvalidOrderings(_ body: ((Int,Int) -> Bool) -> Void) {
 
 internal func _mapInPlace<C : MutableCollection>(
   _ elements: inout C,
-  @noescape transform: (C.Iterator.Element) -> C.Iterator.Element
+  transform: @noescape (C.Iterator.Element) -> C.Iterator.Element
 ) {
   for i in elements.indices {
     elements[i] = transform(elements[i])
@@ -275,7 +275,7 @@ self.test("\(testNamePrefix)._withUnsafeMutableBufferPointerIfSupported()/semant
 // sort()
 //===----------------------------------------------------------------------===//
 
-% for predicate in [ False, True ]:
+% for predicate in [False, True]:
 
 self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
   let sequence = [ 5, 4, 3, 2, 1 ]
@@ -615,7 +615,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
 // sort()
 //===----------------------------------------------------------------------===//
 
-% for predicate in [ False, True ]:
+% for predicate in [False, True]:
 
 func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   sequence: [Int],
@@ -705,7 +705,7 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
 // partition()
 //===----------------------------------------------------------------------===//
 
-% for predicate in [ False, True ]:
+% for predicate in [False, True]:
 
 func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   sequence: [Int],

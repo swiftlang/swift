@@ -412,7 +412,7 @@ final class r17828355Class {
 
 
 // <rdar://problem/19981118> Swift 1.2 beta 2: Closures nested in @noescape closures copy, rather than reference, captured vars.
-func noescapefunc(@noescape f: () -> ()) {}
+func noescapefunc(f: @noescape () -> ()) {}
 func escapefunc(_ f : () -> ()) {}
 
 func testNoescape() {

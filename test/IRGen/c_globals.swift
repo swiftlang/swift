@@ -19,7 +19,7 @@ public func testStaticGlobal() {
 public func testCaptureGlobal() {
   var f: Float = 0
   var i: CInt = 0
-  var s: UnsafePointer<CChar> = nil
+  var s: UnsafePointer<CChar>! = nil
   // CHECK-LABEL: define linkonce_odr hidden void @_TFF9c_globals17testCaptureGlobalFT_T_U_FT_T_{{.*}} {
   blackHole({ () -> Void in
     // CHECK: @staticFloat

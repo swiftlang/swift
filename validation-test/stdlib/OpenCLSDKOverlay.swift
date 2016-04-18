@@ -86,14 +86,11 @@ tests.test("clSetKernelArgsListAPPLE") {
   var global: size_t                      // global domain size for our calculation
   var local: size_t = 0                       // local domain size for our calculation
 
-  var device_id: cl_device_id = nil             // compute device id 
-  var context: cl_context                 // compute context
-  var commands: cl_command_queue          // compute command queue
-  var program: cl_program                 // compute program
-  var kernel: cl_kernel                   // compute kernel
-  
-  var input: cl_mem                       // device memory used for the input array
-  var output: cl_mem                      // device memory used for the output array
+  var device_id: cl_device_id? = nil             // compute device id
+  var context: cl_context?                 // compute context
+  var commands: cl_command_queue?          // compute command queue
+  var program: cl_program?                 // compute program
+  var kernel: cl_kernel?                   // compute kernel
   
   // Fill our data set with random float values
   //
@@ -133,8 +130,8 @@ tests.test("clSetKernelArgsListAPPLE") {
   // Create the compute program from the source buffer
   //
   program = KernelSource.withCString {
-    (s: UnsafePointer<CChar>)->cl_program in
-    var s = s
+    (p: UnsafePointer<CChar>) -> cl_program in
+    var s: UnsafePointer? = p
     return withUnsafeMutablePointer(&s) {
       return clCreateProgramWithSource(context, 1, $0, nil, &err)
     }
@@ -172,13 +169,11 @@ tests.test("clSetKernelArgsListAPPLE") {
 
   // Create the input and output arrays in device memory for our calculation
   //
-  input = clCreateBuffer(context,  cl_mem_flags(CL_MEM_READ_ONLY),  sizeof(Float.self) * count, nil, nil)
-  output = clCreateBuffer(context, cl_mem_flags(CL_MEM_WRITE_ONLY), sizeof(Float.self) * count, nil, nil)
-  if (input == nil || output == nil)
-  {
+  guard var input = clCreateBuffer(context,  cl_mem_flags(CL_MEM_READ_ONLY),  sizeof(Float.self) * count, nil, nil),
+        var output = clCreateBuffer(context, cl_mem_flags(CL_MEM_WRITE_ONLY), sizeof(Float.self) * count, nil, nil) else {
     print("Error: Failed to allocate device memory!")
     exit(1)
-  }    
+  }
   
   // Write our data set into the input array in device memory 
   //
@@ -195,7 +190,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   err = withUnsafePointers(&input, &output, &count) {
     inputPtr, outputPtr, countPtr in
     clSetKernelArgsListAPPLE(
-      kernel, 3,
+      kernel!, 3,
       0, sizeof(cl_mem.self), inputPtr,
       1, sizeof(cl_mem.self), outputPtr,
       2, sizeofValue(count), countPtr)

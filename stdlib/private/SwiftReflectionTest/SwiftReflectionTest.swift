@@ -68,11 +68,11 @@ internal struct ReflectionInfo : Sequence {
   /// type requirements.
   internal let assocty: Section
 
-  internal func makeIterator() -> AnyIterator<Section> {
+  internal func makeIterator() -> AnyIterator<Section?> {
     return AnyIterator([
       fieldmd,
       typeref,
-      reflstr ?? Section(startAddress: nil, size: 0),
+      reflstr,
       assocty
     ].makeIterator())
   }
@@ -94,15 +94,11 @@ typealias MachHeader = mach_header
 internal func getSectionInfo(_ name: String,
   _ imageHeader: UnsafePointer<MachHeader>) -> Section? {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  var section: Section? = nil
-  name.withCString {
-    var size: UInt = 0
-    let address = getsectiondata(imageHeader, "__DATA", $0, &size)
-    guard address != nil else { return }
-    guard size != 0 else { return }
-    section = Section(startAddress: address, size: size)
-  }
-  return section
+  var size: UInt = 0
+  let address = getsectiondata(imageHeader, "__DATA", name, &size)
+  guard let nonNullAddress = address else { return nil }
+  guard size != 0 else { return nil }
+  return Section(startAddress: nonNullAddress, size: size)
 }
 
 /// Get the Swift Reflection section locations for a loaded image.
@@ -193,8 +189,8 @@ internal func sendReflectionInfos() {
     fwrite(imageNameBytes, 1, imageNameBytes.count, stdout)
     fflush(stdout)
     for section in info {
-      sendValue(section.startAddress)
-      sendValue(section.size)
+      sendValue(section?.startAddress)
+      sendValue(section?.size ?? 0)
     }
   }
 }

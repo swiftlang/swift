@@ -55,7 +55,7 @@ public struct _FDInputStream {
     let readResult: __swift_ssize_t = _buffer.withUnsafeMutableBufferPointer {
       (_buffer) in
       let fd = self.fd
-      let addr = _buffer.baseAddress + self._bufferUsed
+      let addr = _buffer.baseAddress! + self._bufferUsed
       let size = bufferFree
       return _swift_stdlib_read(fd, addr, size)
     }
@@ -107,7 +107,7 @@ public struct _FDOutputStream : OutputStream {
       let bufferSize = utf8.count - 1
       while writtenBytes != bufferSize {
         let result = _swift_stdlib_write(
-          self.fd, UnsafePointer(utf8.baseAddress + Int(writtenBytes)),
+          self.fd, UnsafePointer(utf8.baseAddress! + Int(writtenBytes)),
           bufferSize - writtenBytes)
         if result < 0 {
           fatalError("write() returned an error")

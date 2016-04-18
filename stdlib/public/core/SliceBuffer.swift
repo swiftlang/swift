@@ -124,6 +124,10 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     return subscriptBaseAddress + startIndex
   }
 
+  public var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    return firstElementAddress
+  }
+
   /// [63:1: 63-bit index][0: has a native buffer]
   var endIndexAndFlags: UInt
 
@@ -310,7 +314,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// underlying contiguous storage.
   public
   func withUnsafeBufferPointer<R>(
-    @noescape _ body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(UnsafeBufferPointer(start: firstElementAddress,
@@ -321,7 +325,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// over the underlying contiguous storage.
   public
   mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(
@@ -341,7 +345,8 @@ extension _SliceBuffer {
     let result = _ContiguousArrayBuffer<Element>(
       uninitializedCount: count,
       minimumCapacity: 0)
-    result.firstElementAddress.initializeFrom(firstElementAddress, count: count)
+    result.firstElementAddress.initializeFrom(
+      firstElementAddress, count: count)
     return result
   }
 }

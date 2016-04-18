@@ -583,10 +583,10 @@ func iterators() {
 //===----------------------------------------------------------------------===//
 
 func magic_literals() {
-  _ = __FILE__  // expected-warning {{__FILE__ is deprecated and will be removed in Swift 3, please use #file}}
-  _ = __LINE__  // expected-warning {{__LINE__ is deprecated and will be removed in Swift 3, please use #line}}
-  _ = __COLUMN__  // expected-warning {{__COLUMN__ is deprecated and will be removed in Swift 3, please use #column}}
-  _ = __DSO_HANDLE__  // expected-warning {{__DSO_HANDLE__ is deprecated and will be removed in Swift 3, please use #dsohandle}}
+  _ = __FILE__  // expected-error {{__FILE__ has been replaced with #file in Swift 3}}
+  _ = __LINE__  // expected-error {{__LINE__ has been replaced with #line in Swift 3}}
+  _ = __COLUMN__  // expected-error {{__COLUMN__ has been replaced with #column in Swift 3}}
+  _ = __DSO_HANDLE__  // expected-error {{__DSO_HANDLE__ has been replaced with #dsohandle in Swift 3}}
 
   _ = #file
   _ = #line + #column
@@ -818,26 +818,26 @@ func swift22_deprecation_increment_decrement() {
   var f = 1.0
   var si = "foo".startIndex
 
-  i++     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{4-6= += 1}}
-  --i     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= -= 1}}
-  _ = i++ // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
+  i++     // expected-error {{'++' is unavailable}} {{4-6= += 1}}
+  --i     // expected-error {{'--' is unavailable}} {{3-5=}} {{6-6= -= 1}}
+  _ = i++ // expected-error {{'++' is unavailable}}
 
-  ++f     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= += 1}}
-  f--     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{4-6= -= 1}}
-  _ = f-- // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{none}}
+  ++f     // expected-error {{'++' is unavailable}} {{3-5=}} {{6-6= += 1}}
+  f--     // expected-error {{'--' is unavailable}} {{4-6= -= 1}}
+  _ = f-- // expected-error {{'--' is unavailable}} {{none}}
 
 
-  ++si      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.successor()}}
-  --si      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.predecessor()}}
-  si++      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{5-7= = si.successor()}}
-  si--      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{5-7= = si.predecessor()}}
-  _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{none}}
+  ++si      // expected-error {{'++' is unavailable}} {{3-5=}} {{7-7= = si.successor()}}
+  --si      // expected-error {{'--' is unavailable}} {{3-5=}} {{7-7= = si.predecessor()}}
+  si++      // expected-error {{'++' is unavailable}} {{5-7= = si.successor()}}
+  si--      // expected-error {{'--' is unavailable}} {{5-7= = si.predecessor()}}
+  _ = --si  // expected-error {{'--' is unavailable}} {{none}}
 
 
   // <rdar://problem/24530312> Swift ++fix-it produces bad code in nested expressions
   // This should not get a fixit hint.
   var j = 2
-  i = ++j   // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{none}}
+  i = ++j   // expected-error {{'++' is unavailable}} {{none}}
 }
 
 // SR-628 mixing lvalues and rvalues in tuple expression

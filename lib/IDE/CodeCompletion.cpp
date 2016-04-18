@@ -52,6 +52,8 @@ enum CodeCompletionCommandKind {
   keyword,
   recommended,
   recommendedover,
+  mutatingvariant,
+  nonmutatingvariant,
 };
 
 CodeCompletionCommandKind getCommandKind(StringRef Command) {
@@ -61,6 +63,8 @@ CodeCompletionCommandKind getCommandKind(StringRef Command) {
   CHECK_CASE(keyword);
   CHECK_CASE(recommended);
   CHECK_CASE(recommendedover);
+  CHECK_CASE(mutatingvariant);
+  CHECK_CASE(nonmutatingvariant);
 #undef CHECK_CASE
   return CodeCompletionCommandKind::none;
 }
@@ -74,6 +78,8 @@ StringRef getCommandName(CodeCompletionCommandKind Kind) {
   CHECK_CASE(keyword)
   CHECK_CASE(recommended)
   CHECK_CASE(recommendedover)
+  CHECK_CASE(mutatingvariant);
+  CHECK_CASE(nonmutatingvariant);
 #undef CHECK_CASE
   llvm_unreachable("Cannot handle this Kind.");
 }
@@ -89,6 +95,8 @@ return true;
     CHECK_CASE(keyword)
     CHECK_CASE(recommended)
     CHECK_CASE(recommendedover)
+    CHECK_CASE(mutatingvariant);
+    CHECK_CASE(nonmutatingvariant);
 #undef CHECK_CASE
   } while (!Content.empty());
   return false;
@@ -204,7 +212,7 @@ void getClangDocKeyword(ClangImporter &Importer, const Decl *D,
 } // end namespace comments
 } // end namespace clang
 
-namespace llvm {
+namespace swift {
 namespace markup {
 class SwiftDocWordExtractor : public MarkupASTWalker {
   CommandWordsPairs &Pairs;
@@ -220,6 +228,12 @@ public:
   }
   void visitRecommendedoverField(const RecommendedoverField *Field) override {
     Kind = CodeCompletionCommandKind::recommendedover;
+  }
+  void visitMutatingvariantField(const MutatingvariantField *Field) override {
+    Kind = CodeCompletionCommandKind::mutatingvariant;
+  }
+  void visitNonmutatingvariantField(const NonmutatingvariantField *Field) override {
+    Kind = CodeCompletionCommandKind::nonmutatingvariant;
   }
   void visitText(const Text *Text) override {
     if (Kind == CodeCompletionCommandKind::none)
@@ -242,7 +256,7 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
   }
   if (!Interested)
     return;
-  static llvm::markup::MarkupContext MC;
+  static swift::markup::MarkupContext MC;
   auto DC = getDocComment(MC, D);
   if (!DC.hasValue())
     return;
@@ -252,6 +266,8 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
       case ASTNodeKind::KeywordField:
       case ASTNodeKind::RecommendedField:
       case ASTNodeKind::RecommendedoverField:
+      case ASTNodeKind::MutatingvariantField:
+      case ASTNodeKind::NonmutatingvariantField:
         Extractor.walk(Part);
         break;
       default:
@@ -260,7 +276,7 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
   }
 }
 } // end namespace markup
-} // end namespace llvm
+} // end namespace swift
 
 typedef llvm::function_ref<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
 DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
@@ -1496,7 +1512,7 @@ private:
     if (auto *CD = VD->getClangDecl()) {
       clang::comments::getClangDocKeyword(*Importer, CD, Pairs);
     } else {
-      llvm::markup::getSwiftDocKeyword(VD, Pairs);
+      swift::markup::getSwiftDocKeyword(VD, Pairs);
     }
     Builder.addDeclDocCommentWords(llvm::makeArrayRef(Pairs));
   }
@@ -3309,6 +3325,7 @@ public:
     // If the expected type is ObjectiveC.Selector, add #selector.
     if (Ctx.LangOpts.EnableObjCInterop) {
       for (auto T : ExpectedTypes) {
+        T = T->lookThroughAllAnyOptionalTypes();
         if (auto structDecl = T->getStructOrBoundGenericStruct()) {
           if (structDecl->getName() == Ctx.Id_Selector &&
               structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
