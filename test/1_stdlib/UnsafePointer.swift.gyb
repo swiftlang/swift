@@ -151,7 +151,6 @@ ${SelfName}TestSuite.test("Hashable") {
   }
 }
 
-% if SelfName != 'OpaquePointer':
 ${SelfName}TestSuite.test("toInteger") {
   do {
     let word: Int = 0x12345678
@@ -172,7 +171,6 @@ ${SelfName}TestSuite.test("toInteger") {
     expectEqual(UInt(0), UInt(bitPattern: ptr))
   }
 }
-% end
 
 % end
 
