@@ -54,11 +54,11 @@ extension ClosedRangeProtocol {
 }
 
 // WORKAROUND rdar://25214598 - should be Bound : Strideable
-internal enum ClosedRangeProtocolIndex<
+internal enum _ClosedRangeIndexRepresentation<
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
 > {
-case pastEnd
-case inRange(Bound)
+  case pastEnd
+  case inRange(Bound)
 }
 
 // FIXME(ABI)(compiler limitation): should be a nested type in
@@ -105,7 +105,7 @@ public struct ClosedRangeIndex<
     }
   }
   
-  internal var _value : ClosedRangeProtocolIndex<Bound>
+  internal var _value: _ClosedRangeIndexRepresentation<Bound>
   internal var _dereferenced : Bound {
     switch _value {
     case .inRange(let x): return x
