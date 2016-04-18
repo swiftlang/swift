@@ -39,7 +39,6 @@ public func f(_ i : Int) -> Int { // 301
 
 // CHECK: ![[F:.*]] = distinct !DISubprogram(name: "f",
 // CHECK: ![[G:.*]] = distinct !DISubprogram(name: "g",
-// CHECK: ![[H:.*]] = distinct !DISubprogram(name: "h",
 
 // CHECK: ![[L3:.*]] = !DILocation(line: 302, column: 13,
 // CHECK-SAME:                     scope: ![[F_SCOPE:.*]])
@@ -47,6 +46,7 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK-SAME:                                    line: 301, column: 33)
 // CHECK: ![[G_SCOPE:.*]] = distinct !DILexicalBlock(scope: ![[G]],
 // CHECK-SAME:                                    line: 201, column: 26)
+// CHECK: ![[H:.*]] = distinct !DISubprogram(name: "h",
 // CHECK: ![[L1]] = !DILocation(line: 101, column: 8, scope: ![[H]],
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
 // CHECK: ![[L2]] = !DILocation(line: 203, column: 13, scope: ![[G_SCOPE]],
