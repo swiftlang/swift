@@ -1564,32 +1564,8 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             echo "${product}: using standard linker"
         fi
 
-        PRODUCT=$(toupper ${product})
         llvm_build_dir=$(build_directory ${deployment_target} llvm)
         module_cache="${build_dir}/module-cache"
-        swift_cmake_options=(
-            "${swift_cmake_options[@]}"
-            -DCMAKE_INSTALL_PREFIX:PATH="${INSTALL_PREFIX}"
-            -DLLVM_CONFIG:PATH="$(build_directory_bin ${deployment_target} llvm)/llvm-config"
-            -D${PRODUCT}_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-            -D${PRODUCT}_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-            -D${PRODUCT}_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-            -D${PRODUCT}_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-            -D${PRODUCT}_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
-            -D${PRODUCT}_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${deployment_target} cmark)"
-        )
-
-        if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-            swift_cmake_options=(
-                "${swift_cmake_options[@]-}"
-                -D${PRODUCT}_CMARK_LIBRARY_DIR:PATH=$(build_directory ${deployment_target} cmark)/src/${CMARK_BUILD_TYPE}
-            )
-        else
-            swift_cmake_options=(
-                "${swift_cmake_options[@]-}"
-                -D${PRODUCT}_CMARK_LIBRARY_DIR:PATH=$(build_directory ${deployment_target} cmark)/src
-            )
-        fi
 
         case ${product} in
             cmark)
@@ -1747,8 +1723,32 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DSWIFT_ENABLE_LTO:BOOL=$(true_false "${SWIFT_ENABLE_LTO}")
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     "${swift_cmake_options[@]}"
-                    "${SWIFT_SOURCE_DIR}"
                 )
+
+                cmake_options=(
+                    "${cmake_options[@]}"
+                    -DCMAKE_INSTALL_PREFIX:PATH="${INSTALL_PREFIX}"
+                    -DLLVM_CONFIG:PATH="$(build_directory_bin ${deployment_target} llvm)/llvm-config"
+                    -DSWIFT_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                    -DSWIFT_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                    -DSWIFT_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                    -DSWIFT_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                    -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
+                    -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${deployment_target} cmark)"
+                )
+
+                if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${deployment_target} cmark)/src/${CMARK_BUILD_TYPE}
+                    )
+                else
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${deployment_target} cmark)/src
+                    )
+                fi
+
                 if [[ "${SWIFT_SDKS}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -1773,6 +1773,12 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     build_targets=("${build_targets[@]}"
                                    "${SWIFT_BENCHMARK_TARGETS[@]}")
                 fi
+
+                cmake_options=(
+                    "${cmake_options[@]}"
+                    "${SWIFT_SOURCE_DIR}"
+                )
+
                 skip_build=${SKIP_BUILD_SWIFT}
                 ;;
             lldb)
