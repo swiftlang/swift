@@ -19,7 +19,7 @@
 /// It's not named just Glibc so that it doesn't conflict in the event of a
 /// future official glibc modulemap.
 module SwiftGlibc [system] {
-% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
   link "pthread"
 % end
 
@@ -27,14 +27,14 @@ module SwiftGlibc [system] {
 
   // C standard library
   module C {
-% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
     module complex {
       header "@GLIBC_INCLUDE_PATH@/complex.h"
       export *
     }
 % end
 
-% if CMAKE_SDK in ["LINUX", "ANDROID"]:
+% if CMAKE_SDK in ["LINUX", "ANDROID", "CYGWIN"]:
     module features {
       header "@GLIBC_INCLUDE_PATH@/features.h"
       export *
@@ -139,7 +139,7 @@ module SwiftGlibc [system] {
 
   // POSIX
   module POSIX {
-% if CMAKE_SDK in ["LINUX"]:
+% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
     module wait {
       header "@GLIBC_INCLUDE_PATH@/wait.h"
       export *
@@ -159,6 +159,17 @@ module SwiftGlibc [system] {
       header "@GLIBC_INCLUDE_PATH@/fmtmsg.h"
       export *
     }
+    module nl_types {
+      header "@GLIBC_INCLUDE_PATH@/nl_types.h"
+      export *
+    }
+    module ulimit {
+      header "@GLIBC_INCLUDE_PATH@/ulimit.h"
+      export *
+    }
+% end
+
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
     module ftw {
       header "@GLIBC_INCLUDE_PATH@/ftw.h"
       export *
@@ -183,10 +194,6 @@ module SwiftGlibc [system] {
       header "@GLIBC_INCLUDE_PATH@/netdb.h"
       export *
     }
-    module nl_types {
-      header "@GLIBC_INCLUDE_PATH@/nl_types.h"
-      export *
-    }
     module search {
       header "@GLIBC_INCLUDE_PATH@/search.h"
       export *
@@ -201,10 +208,6 @@ module SwiftGlibc [system] {
     }
     module tar {
       header "@GLIBC_INCLUDE_PATH@/tar.h"
-      export *
-    }
-    module ulimit {
-      header "@GLIBC_INCLUDE_PATH@/ulimit.h"
       export *
     }
     module utmpx {
@@ -302,7 +305,7 @@ module SwiftGlibc [system] {
     module sys {
       export *
 
-% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
       module sem {
         header "@GLIBC_ARCH_INCLUDE_PATH@/sys/sem.h"
         export *

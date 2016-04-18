@@ -934,6 +934,13 @@ extern "C" bool swift_isKind(id object, NSString *className) {
 #error __USER_LABEL_PREFIX__ is undefined
 #endif
 
+// Workaround the bug of clang in Cygwin 64bit
+// https://llvm.org/bugs/show_bug.cgi?id=26744
+#if defined(__CYGWIN__) && defined(__x86_64__)
+#undef __USER_LABEL_PREFIX__
+#define __USER_LABEL_PREFIX__
+#endif
+
 #define GLUE_EXPANDED(a, b) a##b
 #define GLUE(a, b) GLUE_EXPANDED(a, b)
 #define SYMBOL_NAME(name) GLUE(__USER_LABEL_PREFIX__, name)

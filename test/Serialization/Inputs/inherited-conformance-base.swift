@@ -1,5 +1,7 @@
-// Adopt ForwardIndex via BidirectionalIndex.
-public struct Counter<T: protocol<RandomAccessIndex, IntegerLiteralConvertible>> : BidirectionalIndex {
+import Lib
+
+// Adopt SimpleProto via ComplexProto.
+public struct Counter<T> : ComplexProto {
   public var value = 0
   
   public func predecessor() -> Counter {
@@ -12,8 +14,3 @@ public struct Counter<T: protocol<RandomAccessIndex, IntegerLiteralConvertible>>
 
   public init(value: Int) { self.value = value }
 }
-
-public func == <T>(lhs: Counter<T>, rhs: Counter<T>) -> Bool {
-  return lhs.value == rhs.value
-}
-
