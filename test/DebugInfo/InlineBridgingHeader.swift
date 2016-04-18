@@ -7,7 +7,6 @@
 // CHECK: !llvm.dbg.cu = !{![[SWIFT_CU:[0-9]+]], ![[CLANG_CU:[0-9]+]]}
 // CHECK: ![[SWIFT_CU]] = distinct !DICompileUnit(language: DW_LANG_Swift
 // CHECK: ![[CLANG_CU]] = distinct !DICompileUnit(language: DW_LANG_ObjC
-// CHECK: DISubprogram(
-// CHECK-SAME: "Foo"
+// CHECK: DISubprogram(name: "Foo"{{.*}} unit: ![[CLANG_CU]],
 
 Foo()
