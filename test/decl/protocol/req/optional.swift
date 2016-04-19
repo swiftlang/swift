@@ -6,11 +6,16 @@
 @objc class ObjCClass { }
 
 @objc protocol P1 {
-  optional func method(_ x: Int) // expected-note 3{{requirement 'method' declared here}}
+  optional func method(_ x: Int) // expected-note 4{{requirement 'method' declared here}}
 
   optional var prop: Int { get } // expected-note 3{{requirement 'prop' declared here}}
 
   optional subscript (i: Int) -> ObjCClass? { get } // expected-note 3{{requirement 'subscript' declared here}}
+}
+
+@objc protocol P2 {
+  @objc(objcMethodWithInt:)
+  optional func method(y: Int) // expected-note 1{{requirement 'method(y:)' declared here}}
 }
 
 // -----------------------------------------------------------------------
@@ -123,6 +128,19 @@ extension C6 : P1 {
     set {}
   }
 }
+
+// Note: warn about selector matches where the Swift names didn't match.
+@objc class C7 : P1 { // expected-note{{class 'C7' declares conformance to protocol 'P1' here}}
+  @objc(method:) func otherMethod(x: Int) { } // expected-error{{Objective-C method 'method:' provided by method 'otherMethod(x:)' conflicts with optional requirement method 'method' in protocol 'P1'}}
+  // expected-note@-1{{rename method to match requirement 'method'}}{{23-34=method}}{{35-35=_ }}
+}
+
+@objc class C8 : P2 { // expected-note{{class 'C8' declares conformance to protocol 'P2' here}}
+  func objcMethod(int x: Int) { } // expected-error{{Objective-C method 'objcMethodWithInt:' provided by method 'objcMethod(int:)' conflicts with optional requirement method 'method(y:)' in protocol 'P2'}}
+  // expected-note@-1{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
+  // expected-note@-2{{rename method to match requirement 'method(y:)'}}{{3-3=@objc(objcMethodWithInt:) }}{{8-18=method}}{{19-22=y}}
+}
+
 
 // -----------------------------------------------------------------------
 // Using optional requirements

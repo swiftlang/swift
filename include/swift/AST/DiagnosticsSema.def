@@ -2677,6 +2677,10 @@ ERROR(objc_optional_requirement_conflict,none,
       " in protocol %5",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, DeclName))
 
+NOTE(objc_optional_requirement_swift_rename,none,
+     "rename %select{method|initializer|property|subscript}0 to match "
+     "requirement %1", (bool, DeclName))
+
 ERROR(witness_non_objc,none,
       "non-'@objc' " OBJC_DIAG_SELECT " does not satisfy '@objc' requirement in "
       "protocol %2", (unsigned, DeclName, DeclName))

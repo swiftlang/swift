@@ -627,22 +627,6 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
   return !requirementMutating && witnessMutating;
 }
 
-/// Retrieve the location at which '@objc' should be inserted for the
-/// given declaration.
-static SourceLoc getAtObjCInsertionLoc(ValueDecl *vd) {
-  SourceLoc startLoc = vd->getStartLoc();
-  SourceLoc attrStartLoc = vd->getAttrs().getStartLoc();
-  if (attrStartLoc.isValid())
-    startLoc = attrStartLoc;
-  
-  if (auto var = dyn_cast<VarDecl>(vd)) {
-    if (auto patternBinding = var->getParentPatternBinding())
-      startLoc = patternBinding->getStartLoc();
-  }
-
-  return startLoc;
-}
-
 /// Retrieve the Objective-C name of the given declaration.
 ///
 /// This is a full-fledged selector for methods and initializers, and a
@@ -653,84 +637,6 @@ static ObjCSelector getObjCName(ValueDecl *decl) {
 
   auto var = cast<VarDecl>(decl);
   return ObjCSelector(decl->getASTContext(), 0, var->getObjCPropertyName());
-}
-
-/// Add the appropriate @objc Fix-It to make the given witness '@objc' and
-/// match the Objective-C name of the requirement.
-static InFlightDiagnostic &addObjCFixIt(ValueDecl *requirement,
-                                        ValueDecl *witness,
-                                        InFlightDiagnostic &&diag) {
-  // Subscripts cannot be renamed, so handle them directly.
-  if (isa<SubscriptDecl>(requirement)) {
-    diag.fixItInsert(getAtObjCInsertionLoc(witness), "@objc ");
-    return diag;
-  }
-
-  // Determine the Objective-C name of the requirement and witness.
-  ObjCSelector requirementName = getObjCName(requirement);
-  ObjCSelector witnessName = getObjCName(witness);
-
-  // Dig out the existing '@objc' attribute on the witness. We don't care
-  // about implicit ones because they don't have useful source location
-  // information.
-  auto witnessAttr = witness->getAttrs().getAttribute<ObjCAttr>();
-  if (witnessAttr && witnessAttr->isImplicit())
-    witnessAttr = nullptr;
-
-  // If there is an @objc attribute with an explicit, incorrect witness
-  // name, go fix the witness name.
-  if (witnessAttr && requirementName != witnessName &&
-      witnessAttr->hasName() && !witnessAttr->isNameImplicit()) {
-    // Find the source range covering the full name.
-    SourceLoc startLoc;
-    if (witnessAttr->getNameLocs().empty())
-      startLoc = witnessAttr->getRParenLoc();
-    else
-      startLoc = witnessAttr->getNameLocs().front();
-
-    // Replace the name with the name of the requirement.
-    SmallString<64> scratch;
-    diag.fixItReplaceChars(startLoc, witnessAttr->getRParenLoc(),
-                           requirementName.getString(scratch));
-    return diag;
-  }
-
-  // We need to create or amend an @objc attribute with the appropriate
-  // new selector.
-
-  // Form the Fix-It text.
-  SourceLoc startLoc;
-  SmallString<64> fixItText;
-  {
-    assert((!witnessAttr || !witnessAttr->hasName() ||
-            witnessAttr->isNameImplicit() ||
-            requirementName == witnessName) &&
-           "Nothing to diagnose!");
-    llvm::raw_svector_ostream out(fixItText);
-
-    // If there is no @objc attribute, we need to add our own '@objc'.
-    if (!witnessAttr) {
-      startLoc = getAtObjCInsertionLoc(witness);
-      out << "@objc";
-    } else {
-      startLoc = Lexer::getLocForEndOfToken(requirement->getASTContext().SourceMgr,
-                                            witnessAttr->getRange().End);
-    }
-
-    // If the names of the witness and requirement differ, we need to
-    // specify the name.
-    if (requirementName != witnessName) {
-      out << "(";
-      out << requirementName;
-      out << ")";
-    }
-
-    if (!witnessAttr)
-      out << " ";
-  }
-
-  diag.fixItInsert(startLoc, fixItText);
-  return diag;
 }
 
 /// Check that the Objective-C method(s) provided by the witness have
@@ -744,11 +650,11 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
       return false;
 
     auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
-    addObjCFixIt(req, witness,
-                 tc.diagnose(witness, diag::objc_witness_selector_mismatch,
-                             diagInfo.first, diagInfo.second,
-                             witnessFunc->getObjCSelector(),
-                             reqFunc->getObjCSelector()));
+    auto diag = tc.diagnose(witness, diag::objc_witness_selector_mismatch,
+                            diagInfo.first, diagInfo.second,
+                            witnessFunc->getObjCSelector(),
+                            reqFunc->getObjCSelector());
+    fixDeclarationObjCName(diag, witnessFunc, reqFunc->getObjCSelector());
 
     return true;
   }
@@ -2026,11 +1932,18 @@ bool ConformanceChecker::diagnoseOptionalWitnessNonObjCMatch(
   TC.diagnose(witness, diag::optional_req_nonobjc_near_match,
               getRequirementKind(requirement), requirement->getFullName(),
               Proto->getFullName());
-  addObjCFixIt(requirement, witness,
-               TC.diagnose(witness,
-                           diag::optional_req_nonobjc_near_match_add_objc));
+
+  // Add the appropriate "@objc" attribute to make the witness match.
+  {
+    auto diag = TC.diagnose(witness,
+                            diag::optional_req_nonobjc_near_match_add_objc);
+    fixDeclarationObjCName(diag, witness, requirement->getObjCRuntimeName());
+  }
+
+  // Add the "@nonobjc" attribute to suppress the warning.
   TC.diagnose(witness, diag::optional_req_nonobjc_near_match_silence)
-    .fixItInsert(getAtObjCInsertionLoc(witness), "@nonobjc ");
+    .fixItInsert(witness->getAttributeInsertionLoc(/*forModifier=*/false),
+                 "@nonobjc ");
 
   TC.diagnose(requirement, diag::protocol_requirement_here,
               requirement->getFullName());
@@ -2222,9 +2135,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                                     witness->getFullName(),
                                     proto->getDeclaredType(),
                                     requirement->getFullName());
-            tc.fixAbstractFunctionNames(diag,
-                                        cast<AbstractFunctionDecl>(witness),
-                                        requirement->getFullName());
+            fixDeclarationName(diag, cast<AbstractFunctionDecl>(witness),
+                               requirement->getFullName());
           }
 
           tc.diagnose(requirement, diag::protocol_requirement_here,
@@ -3826,16 +3738,26 @@ void ConformanceChecker::checkConformance() {
 
           if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness)) {
             auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
-            addObjCFixIt(requirement, witness,
-                         TC.diagnose(witness, diag::witness_non_objc,
-                                     diagInfo.first, diagInfo.second,
-                                     Proto->getFullName()));
-          } else if (isa<AbstractStorageDecl>(witness)) {
-            addObjCFixIt(requirement, witness,
-                         TC.diagnose(witness, diag::witness_non_objc_storage,
-                                     isa<SubscriptDecl>(witness),
-                                     witness->getFullName(),
-                                     Proto->getFullName()));
+            auto diag = TC.diagnose(witness, diag::witness_non_objc,
+                                    diagInfo.first, diagInfo.second,
+                                    Proto->getFullName());
+            fixDeclarationObjCName(
+              diag, witness,
+              cast<AbstractFunctionDecl>(requirement)->getObjCSelector());
+          } else if (isa<VarDecl>(witness)) {
+            auto diag = TC.diagnose(witness, diag::witness_non_objc_storage,
+                                    /*isSubscript=*/false,
+                                    witness->getFullName(),
+                                    Proto->getFullName());
+            fixDeclarationObjCName(
+               diag, witness,
+               ObjCSelector(requirement->getASTContext(), 0,
+                            cast<VarDecl>(requirement)->getObjCPropertyName()));
+          } else if (isa<SubscriptDecl>(witness)) {
+            TC.diagnose(witness, diag::witness_non_objc_storage,
+                        /*isSubscript=*/true,
+                        witness->getFullName(),
+                        Proto->getFullName());
           }
 
           TC.diagnose(requirement, diag::protocol_requirement_here,

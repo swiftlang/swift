@@ -77,6 +77,7 @@ class C3a : P3 {
 
 @objc class OptC1a : OptP1 { // expected-note 3{{class 'OptC1a' declares conformance to protocol 'OptP1' here}}
   @objc(method) func otherMethod() { } // expected-error{{Objective-C method 'method' provided by method 'otherMethod()' conflicts with optional requirement method 'method()' in protocol 'OptP1'}}
+  // expected-note@-1{{rename method to match requirement 'method()'}}{{22-33=method}}
 
   var otherProp1: ObjCClass {
     @objc(property1) get { return ObjCClass() } // expected-error{{Objective-C method 'property1' provided by getter for 'otherProp1' conflicts with optional requirement getter for 'property1' in protocol 'OptP1'}}
