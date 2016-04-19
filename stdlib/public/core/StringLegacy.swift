@@ -99,9 +99,22 @@ extension String {
 
   /// Returns `true` iff `self` ends with `suffix`.
   public func hasSuffix(_ suffix: String) -> Bool {
-    if self._core.hasContiguousStorage && suffix._core.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(self._core)
-      let rhsStr = _NSContiguousString(suffix._core)
+    let selfCore = self._core
+    let suffixCore = suffix._core
+    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
+      if selfCore.isASCII && suffixCore.isASCII {
+        // Prefix longer than self.
+        let suffixCount = suffixCore.count
+        let selfCount = selfCore.count
+        if suffixCount > selfCount || suffixCount == 0 {
+          return false
+        }
+        return Int(_swift_stdlib_memcmp(
+                   selfCore.startASCII + (selfCount - suffixCount),
+                   suffixCore.startASCII, suffixCount)) == 0
+      }
+      let lhsStr = _NSContiguousString(selfCore)
+      let rhsStr = _NSContiguousString(suffixCore)
       return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
         return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
       }
