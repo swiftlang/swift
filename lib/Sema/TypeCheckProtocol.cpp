@@ -627,18 +627,6 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
   return !requirementMutating && witnessMutating;
 }
 
-/// Retrieve the Objective-C name of the given declaration.
-///
-/// This is a full-fledged selector for methods and initializers, and a
-/// no-parameter selector for properties.
-static ObjCSelector getObjCName(ValueDecl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    return func->getObjCSelector();
-
-  auto var = cast<VarDecl>(decl);
-  return ObjCSelector(decl->getASTContext(), 0, var->getObjCPropertyName());
-}
-
 /// Check that the Objective-C method(s) provided by the witness have
 /// the same selectors as those required by the requirement.
 static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
