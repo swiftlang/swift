@@ -69,3 +69,32 @@ protocol Subscriptable {
 // CHECK-LABEL: sil shared [thunk] @_TTOFCSo7NSArrayg9subscriptFSiPs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject {
 // CHECK:         class_method [volatile] %1 : $NSArray, #NSArray.subscript!getter.1.foreign
 extension NSArray: Subscriptable {}
+
+// witness is a dynamic thunk:
+
+protocol Orbital {
+  var quantumNumber: Int { get set }
+}
+
+class Electron : Orbital {
+  dynamic var quantumNumber: Int = 0
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC14objc_witnesses8ElectronS_7OrbitalS_FS1_g13quantumNumberSi
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC14objc_witnesses8Electrong13quantumNumberSi
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC14objc_witnesses8ElectronS_7OrbitalS_FS1_s13quantumNumberSi
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC14objc_witnesses8Electrons13quantumNumberSi
+
+// witness is a dynamic thunk and is public:
+
+public protocol Lepton {
+  var spin: Float { get }
+}
+
+public class Positron : Lepton {
+  public dynamic var spin: Float = 0.5
+}
+
+// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_TTWC14objc_witnesses8PositronS_6LeptonS_FS1_g4spinSf
+// CHECK-LABEL: sil shared [transparent] [fragile] [thunk] @_TTDFC14objc_witnesses8Positrong4spinSf

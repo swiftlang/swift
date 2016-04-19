@@ -35,11 +35,14 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   // Mangle the constant with a _TTD header.
   auto name = constant.mangle("_TTD");
 
+  IsFragile_t isFragile = IsNotFragile;
+  if (makeModuleFragile)
+    isFragile = IsFragile;
+  if (constant.isFragile())
+    isFragile = IsFragile;
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
-                            IsBare, IsTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile,
-                            IsThunk);
+                            IsBare, IsTransparent, isFragile, IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
