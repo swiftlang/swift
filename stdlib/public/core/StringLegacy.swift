@@ -61,20 +61,39 @@ extension String {
 @_silgen_name("swift_stdlib_NSStringHasPrefixNFD")
 func _stdlib_NSStringHasPrefixNFD(_ theString: AnyObject, _ prefix: AnyObject) -> Bool
 
+@_silgen_name("swift_stdlib_NSStringHasPrefixNFDPointer")
+func _stdlib_NSStringHasPrefixNFDPointer(_ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
+
 /// Determines if `theString` ends with `suffix` comparing the strings under
 /// canonical equivalence.
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFD")
 func _stdlib_NSStringHasSuffixNFD(_ theString: AnyObject, _ suffix: AnyObject) -> Bool
+@_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
+func _stdlib_NSStringHasSuffixNFDPointer(_ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
 
 extension String {
   /// Returns `true` iff `self` begins with `prefix`.
   public func hasPrefix(_ prefix: String) -> Bool {
+    if self._core.hasContiguousStorage && prefix._core.hasContiguousStorage {
+      let lhsStr = _NSContiguousString(self._core)
+      let rhsStr = _NSContiguousString(prefix._core)
+      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+        return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
+      }
+    }
     return _stdlib_NSStringHasPrefixNFD(
       self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
   /// Returns `true` iff `self` ends with `suffix`.
   public func hasSuffix(_ suffix: String) -> Bool {
+    if self._core.hasContiguousStorage && suffix._core.hasContiguousStorage {
+      let lhsStr = _NSContiguousString(self._core)
+      let rhsStr = _NSContiguousString(suffix._core)
+      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+        return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
+      }
+    }
     return _stdlib_NSStringHasSuffixNFD(
       self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
   }
