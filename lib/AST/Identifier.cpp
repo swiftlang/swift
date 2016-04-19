@@ -102,16 +102,6 @@ void DeclName::dump() const {
   llvm::errs() << *this << "\n";
 }
 
-StringRef DeclName::getString(llvm::SmallVectorImpl<char> &scratch,
-                              bool skipEmptyArgumentNames) const {
-  {
-    llvm::raw_svector_ostream out(scratch);
-    print(out, skipEmptyArgumentNames);
-  }
-
-  return StringRef(scratch.data(), scratch.size());
-}
-
 llvm::raw_ostream &DeclName::print(llvm::raw_ostream &os,
                                    bool skipEmptyArgumentNames) const {
   // Print the base name.

@@ -2248,12 +2248,13 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
           // inherit the selector.
           if (auto attr = method->getAttrs().getAttribute<ObjCAttr>()) {
             if (attr->hasName() && !attr->isNameImplicit()) {
-              {
-                auto diag = TC.diagnose(attr->AtLoc,
-                                        diag::objc_override_method_selector_mismatch,
-                                        *attr->getName(), baseSelector);
-                fixDeclarationObjCName(diag, method, baseSelector);
-              }
+              llvm::SmallString<64> baseScratch;
+              TC.diagnose(attr->AtLoc,
+                          diag::objc_override_method_selector_mismatch,
+                          *attr->getName(), baseSelector)
+                .fixItReplaceChars(attr->getNameLocs().front(),
+                                   attr->getRParenLoc(),
+                                   baseSelector.getString(baseScratch));
               TC.diagnose(baseMethod, diag::overridden_here);
             }
 
@@ -4817,8 +4818,8 @@ public:
                               matchDecl->getDescriptiveKind(),
                               matchDecl->getFullName());
       if (attempt == OverrideCheckingAttempt::BaseName) {
-        fixDeclarationName(diag, cast<AbstractFunctionDecl>(decl),
-                           matchDecl->getFullName());
+        TC.fixAbstractFunctionNames(diag, cast<AbstractFunctionDecl>(decl),
+                                    matchDecl->getFullName());
       }
     }
   }
@@ -5057,8 +5058,8 @@ public:
                                 isa<ConstructorDecl>(decl),
                                 decl->getFullName(),
                                 matchDecl->getFullName());
-        fixDeclarationName(diag, cast<AbstractFunctionDecl>(decl),
-                           matchDecl->getFullName());
+        TC.fixAbstractFunctionNames(diag, cast<AbstractFunctionDecl>(decl),
+                                    matchDecl->getFullName());
         emittedMatchError = true;
       }
 
@@ -7803,4 +7804,64 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       }
     }
   }
+}
+
+/// Fix the names in the given function to match those in the given target
+/// name by adding Fix-Its to the provided in-flight diagnostic.
+void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
+                                           AbstractFunctionDecl *func,
+                                           DeclName targetName) {
+  // There is no reasonable way to fix an implicitly-generated function.
+  if (func->isImplicit())
+    return;
+
+  auto name = func->getFullName();
+  
+  // Fix the name of the function itself.
+  if (name.getBaseName() != targetName.getBaseName()) {
+    diag.fixItReplace(func->getLoc(), targetName.getBaseName().str());
+  }
+  
+  // Fix the argument names that need fixing.
+  assert(name.getArgumentNames().size()
+           == targetName.getArgumentNames().size());
+  auto params = func->getParameterList(func->getDeclContext()->isTypeContext());
+  for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
+    auto origArg = name.getArgumentNames()[i];
+    auto targetArg = targetName.getArgumentNames()[i];
+    
+    if (origArg == targetArg)
+      continue;
+    
+    auto *param = params->get(i);
+    
+    // The parameter has an explicitly-specified API name, and it's wrong.
+    if (param->getArgumentNameLoc() != param->getLoc() &&
+        param->getArgumentNameLoc().isValid()) {
+      // ... but the internal parameter name was right. Just zap the
+      // incorrect explicit specialization.
+      if (param->getName() == targetArg) {
+        diag.fixItRemoveChars(param->getArgumentNameLoc(),
+                              param->getLoc());
+        continue;
+      }
+      
+      // Fix the API name.
+      StringRef targetArgStr = targetArg.empty()? "_" : targetArg.str();
+      diag.fixItReplace(param->getArgumentNameLoc(), targetArgStr);
+      continue;
+    }
+    
+    // The parameter did not specify a separate API name. Insert one.
+    if (targetArg.empty())
+      diag.fixItInsert(param->getLoc(), "_ ");
+    else {
+      llvm::SmallString<8> targetArgStr;
+      targetArgStr += targetArg.str();
+      targetArgStr += ' ';
+      diag.fixItInsert(param->getLoc(), targetArgStr);
+    }
+  }
+  
+  // FIXME: Update the AST accordingly.
 }

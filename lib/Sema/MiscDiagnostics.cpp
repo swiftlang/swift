@@ -2681,7 +2681,7 @@ void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
   auto name = afd->getFullName();
   InFlightDiagnostic diag = diagnose(afd->getLoc(), diag::omit_needless_words,
                                      name, *newName);
-  fixDeclarationName(diag, afd, *newName);
+  fixAbstractFunctionNames(diag, afd, *newName);
 }
 
 void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {

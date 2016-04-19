@@ -1558,6 +1558,12 @@ public:
 
   /// @}
 
+  /// Fix the name of the given function to the target name, attaching
+  /// Fix-Its to the provided in-flight diagnostic.
+  void fixAbstractFunctionNames(InFlightDiagnostic &diag,
+                                AbstractFunctionDecl *func,
+                                DeclName targetName);
+
   /// \name Overload resolution
   ///
   /// Routines that perform overload resolution or provide diagnostics related

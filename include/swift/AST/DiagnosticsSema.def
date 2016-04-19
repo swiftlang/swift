@@ -1244,7 +1244,7 @@ NOTE(protocol_witness_rethrows_conflict,none,
 NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
-     "candidate is explicitly '@nonobjc'", ())
+     "candidate is not '@objc', but protocol requires it", ())
 
 NOTE(protocol_witness_type,none,
      "possibly intended match", ())
@@ -1269,12 +1269,8 @@ NOTE(protocol_conformance_implied_here,none,
      "implied protocol conformance %0 here can be made explicit", (Identifier))
 WARNING(optional_req_nonobjc_near_match,none,
         "non-@objc %select{initializer %1|method %1|property %1|subscript}0 "
-        "does not satisfy optional requirement of @objc protocol %2",
+        "cannot satisfy optional requirement of @objc protocol %2",
         (RequirementKind, DeclName, DeclName))
-NOTE(optional_req_nonobjc_near_match_add_objc,none,
-     "add '@objc' to provide an Objective-C entrypoint", ())
-NOTE(optional_req_nonobjc_near_match_silence,none,
-     "add '@nonobjc' to silence this warning", ())
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
@@ -2666,7 +2662,7 @@ ERROR(objc_class_method_not_permitted,none,
       OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
       "not permitted by Swift", (unsigned, DeclName, ObjCSelector))
 
-ERROR(objc_witness_selector_mismatch,none,
+NOTE(objc_witness_selector_mismatch,none,
       "Objective-C method %2 provided by " OBJC_DIAG_SELECT
       " does not match the requirement's selector (%3)",
       (unsigned, DeclName, ObjCSelector, ObjCSelector))
@@ -2676,18 +2672,6 @@ ERROR(objc_optional_requirement_conflict,none,
       " conflicts with optional requirement " OBJC_DIAG_SELECT_2
       " in protocol %5",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, DeclName))
-
-NOTE(objc_optional_requirement_swift_rename,none,
-     "rename %select{method|initializer|property|subscript}0 to match "
-     "requirement %1", (bool, DeclName))
-
-ERROR(witness_non_objc,none,
-      "non-'@objc' " OBJC_DIAG_SELECT " does not satisfy '@objc' requirement in "
-      "protocol %2", (unsigned, DeclName, DeclName))
-
-ERROR(witness_non_objc_storage,none,
-      "non-'@objc' %select{property %1|subscript}0 does not satisfy '@objc' "
-      "requirement in protocol %2", (bool, DeclName, DeclName))
 
 ERROR(nonobjc_not_allowed,none,
       "declaration is %" OBJC_ATTR_SELECT "0, and cannot be marked @nonobjc",
