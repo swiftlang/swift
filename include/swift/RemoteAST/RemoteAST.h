@@ -24,6 +24,8 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
+#include <memory>
+
 namespace swift {
 class ASTContext;
 class NominalTypeDecl;
