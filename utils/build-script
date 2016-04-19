@@ -47,6 +47,7 @@ import swift_build_support.ninja      # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
 
+
 # A strict parser for bools (unlike Python's `bool()`, where
 # `bool('False')` is `True`).
 #
