@@ -5,14 +5,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
 // Check that the generic parameter is called 'Bound'.
 protocol TestProtocol1 {}
 
@@ -29,15 +21,6 @@ extension CountableRange where Bound : TestProtocol1 {
 }
 
 var RangeTestSuite = TestSuite("Range")
-
-RangeTestSuite.test("TypeInference/Comparable") {
-  let v = MinimalComparableValue(1)
-  do {
-    var range = v..<v
-    expectType(Range<MinimalComparableValue>.self, &range)
-  }
-
-}
 
 % for (Self, Bound) in [
 %  ('Range', 'MinimalComparableValue'),
