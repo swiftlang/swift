@@ -488,7 +488,7 @@ public:
   const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     auto SubstBase = visit(DM->getBase());
 
-    const TypeRef *TypeWitness;
+    const TypeRef *TypeWitness = nullptr;
 
     switch (SubstBase->getKind()) {
     case TypeRefKind::Nominal: {
