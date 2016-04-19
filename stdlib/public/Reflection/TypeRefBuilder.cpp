@@ -67,8 +67,8 @@ getDependentMemberTypeRef(const std::string &MangledTypeName,
   return nullptr;
 }
 
-std::vector<std::pair<std::string, const TypeRef *>> TypeRefBuilder::
-getFieldTypeRefs(const TypeRef *TR) {
+const FieldDescriptor *
+TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   std::string MangledName;
   if (auto N = dyn_cast<NominalTypeRef>(TR))
     MangledName = N->getMangledName();
@@ -77,37 +77,47 @@ getFieldTypeRefs(const TypeRef *TR) {
   else
     return {};
 
+  std::vector<std::pair<std::string, const TypeRef *>> Fields;
+  for (auto Info : ReflectionInfos) {
+    for (auto &FD : Info.fieldmd) {
+      if (!FD.hasMangledTypeName())
+        continue;
+      auto CandidateMangledName = FD.getMangledTypeName();
+      if (MangledName.compare(CandidateMangledName) != 0)
+        continue;
+      return &FD;
+    }
+  }
+
+  return nullptr;
+}
+
+std::vector<std::pair<std::string, const TypeRef *>> TypeRefBuilder::
+getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
+  if (FD == nullptr)
+    return {};
+
   auto Subs = TR->getSubstMap();
 
   std::vector<std::pair<std::string, const TypeRef *>> Fields;
-  for (auto Info : ReflectionInfos) {
-    for (auto &FieldDescriptor : Info.fieldmd) {
-      if (!FieldDescriptor.hasMangledTypeName())
-        continue;
-      auto CandidateMangledName = FieldDescriptor.getMangledTypeName();
-      if (MangledName.compare(CandidateMangledName) != 0)
-        continue;
-      for (auto &Field : FieldDescriptor) {
-        auto FieldName = Field.getFieldName();
+  for (auto &Field : *FD) {
+    auto FieldName = Field.getFieldName();
 
-        // Empty cases of enums do not have a type
-        if (!Field.hasMangledTypeName()) {
-          Fields.push_back({FieldName, nullptr});
-          continue;
-        }
-
-        auto Demangled
-          = Demangle::demangleTypeAsNode(Field.getMangledTypeName());
-        auto Unsubstituted = swift::remote::decodeMangledType(*this, Demangled);
-        if (!Unsubstituted)
-          return {};
-
-        auto Substituted = Unsubstituted->subst(*this, Subs);
-        if (FieldName.empty())
-          FieldName = "<Redacted Field Name>";
-        Fields.push_back({FieldName, Substituted});
-      }
+    // Empty cases of enums do not have a type
+    if (FD->Kind == FieldDescriptorKind::Enum &&
+        !Field.hasMangledTypeName()) {
+      Fields.push_back({FieldName, nullptr});
+      continue;
     }
+
+    auto Demangled
+      = Demangle::demangleTypeAsNode(Field.getMangledTypeName());
+    auto Unsubstituted = swift::remote::decodeMangledType(*this, Demangled);
+    if (!Unsubstituted)
+      return {};
+
+    auto Substituted = Unsubstituted->subst(*this, Subs);
+    Fields.push_back({FieldName, Substituted});
   }
   return Fields;
 }

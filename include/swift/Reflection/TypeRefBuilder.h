@@ -222,9 +222,14 @@ public:
   getDependentMemberTypeRef(const std::string &MangledTypeName,
                             const DependentMemberTypeRef *DependentMember);
 
-  std::vector<std::pair<std::string, const TypeRef *>>
-  getFieldTypeRefs(const TypeRef *TR);
+  /// Load unsubstituted field types for a nominal type.
+  const FieldDescriptor *getFieldTypeInfo(const TypeRef *TR);
 
+  /// Get the parsed and substituted field types for a nominal type.
+  std::vector<std::pair<std::string, const TypeRef *>>
+  getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD);
+
+  /// Get the primitive type lowering for a builtin type.
   const BuiltinTypeDescriptor *getBuiltinTypeInfo(const TypeRef *TR);
 
   ///

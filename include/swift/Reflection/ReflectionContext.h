@@ -63,7 +63,11 @@ public:
 
   std::vector<std::pair<std::string, const TypeRef *>>
   getFieldTypeRefs(const TypeRef *TR) {
-    return getBuilder().getFieldTypeRefs(TR);
+    TypeRefBuilder &Builder = getBuilder();
+    auto *FD = Builder.getFieldTypeInfo(TR);
+    if (FD == nullptr)
+      return {};
+    return Builder.getFieldTypeRefs(TR, FD);
   }
 
   std::vector<std::pair<std::string, const TypeRef *>>
