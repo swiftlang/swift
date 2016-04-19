@@ -186,7 +186,9 @@ private:
   RCIdentityFunctionInfo *RCFI;
   ExitKind Kind;
   llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
-  bool HasBlock = false;
+
+  /// Eventually this will be used in place of HasBlock.
+  SILBasicBlock *ProcessedBlock;
 
   /// Return true if we have seen releases to part or all of \p Derived in
   /// \p Insts.
@@ -219,7 +221,22 @@ public:
   /// Finds matching releases in the provided block \p BB.
   void findMatchingReleases(SILBasicBlock *BB);
 
-  bool hasBlock() const { return HasBlock; }
+  bool hasBlock() const { return ProcessedBlock != nullptr; }
+
+  bool isEpilogueRelease(SILInstruction *I) const {
+    // This is not a release instruction in the epilogue block.
+    if (I->getParent() != ProcessedBlock)
+      return false;
+    for (auto &X : ArgInstMap) {
+      // Either did not find epilogue release or found exploded epilogue
+      // releases.
+      if (X.second.size() != 1)
+        continue;
+      if (*X.second.begin() == I) 
+        return true;
+    }
+    return false;
+  }
 
   bool isSingleRelease(SILArgument *Arg) const {
     auto Iter = ArgInstMap.find(Arg);

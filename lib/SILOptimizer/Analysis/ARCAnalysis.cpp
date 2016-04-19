@@ -649,7 +649,7 @@ findMatchingRetains(SILBasicBlock *BB) {
 ConsumedArgToEpilogueReleaseMatcher::
 ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCFI,
                                     SILFunction *F, ExitKind Kind)
-   : F(F), RCFI(RCFI), Kind(Kind) {
+   : F(F), RCFI(RCFI), Kind(Kind), ProcessedBlock(nullptr) {
   recompute();
 }
 
@@ -668,10 +668,10 @@ void ConsumedArgToEpilogueReleaseMatcher::recompute() {
   }
 
   if (BB == F->end()) {
-    HasBlock = false;
+    ProcessedBlock = nullptr;
     return;
   }
-  HasBlock = true;
+  ProcessedBlock = &*BB;
   findMatchingReleases(&*BB);
 }
 
