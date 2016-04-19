@@ -538,15 +538,29 @@ details of the setups of other systems or automated environments.""")
     run_tests_group = parser.add_argument_group(
         title="Run tests")
     run_tests_group.add_argument(
-        "-t", "--test",
+        "-t",
         help="test Swift after building",
+        action="store_const",
+        const=True,
+        dest="test")
+    run_tests_group.add_argument(
+        "--test",
+        help="test Swift after building",
+        metavar="BOOL",
         nargs='?',
         type=argparse_bool,
         default=False,
         const=True)
     run_tests_group.add_argument(
-        "-T", "--validation-test",
+        "-T",
         help="run the validation test suite (implies --test)",
+        action="store_const",
+        const=True,
+        dest="validation_test")
+    run_tests_group.add_argument(
+        "--validation-test",
+        help="run the validation test suite (implies --test)",
+        metavar="BOOL",
         nargs='?',
         type=argparse_bool,
         default=False,
