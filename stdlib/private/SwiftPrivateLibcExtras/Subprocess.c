@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Spawn is not available on Android.
+#if !defined(__ANDROID__)
+
 // NOTE: preprocess away the availability information to allow use of
 // unsupported APIs on certain targets (i.e. tvOS)
 #define availability(...)
@@ -19,7 +22,7 @@
 // NOTE: forward declare this rather than including crt_externs.h as not all
 // SDKs provide it
 extern char ***_NSGetEnviron(void);
-#endif
+#endif // defined(__APPLE__)
 
 int swift_posix_spawn_file_actions_init(
     posix_spawn_file_actions_t *file_actions) {
@@ -53,5 +56,6 @@ int swift_posix_spawn(pid_t *__restrict pid, const char * __restrict path,
 char ***swift_SwiftPrivateLibcExtras_NSGetEnviron(void) {
   return _NSGetEnviron();
 }
-#endif
+#endif // defined(__APPLE__)
+#endif // defined(__ANDROID__)
 
