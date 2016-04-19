@@ -249,6 +249,7 @@ if(PYTHONINTERP_FOUND)
           set(dependencies ${test_dependencies})
 
           if((test_subset STREQUAL "primary") OR
+             (test_subset STREQUAL "validation") OR
              (test_subset STREQUAL "only_long") OR
              (test_subset STREQUAL "all"))
             list(APPEND directories "${test_bin_dir}")
