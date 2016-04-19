@@ -101,7 +101,7 @@ struct FieldRecordIterator {
 
 // Field descriptors contain a collection of field records for a single
 // class, struct or enum declaration.
-struct FieldDescriptor {
+class FieldDescriptor {
   const FieldRecord *getFieldRecordBuffer() const {
     return reinterpret_cast<const FieldRecord *>(this + 1);
   }
@@ -109,6 +109,8 @@ struct FieldDescriptor {
   const RelativeDirectPointer<const char> MangledTypeName;
 
 public:
+  FieldDescriptor() = delete;
+
   const uint32_t NumFields;
   const uint32_t FieldRecordSize;
 
@@ -124,6 +126,10 @@ public:
     auto Begin = getFieldRecordBuffer();
     auto End = Begin + NumFields;
     return const_iterator { End, End };
+  }
+
+  bool hasMangledTypeName() const {
+    return MangledTypeName;
   }
 
   std::string getMangledTypeName() const {
@@ -290,6 +296,10 @@ public:
   uint32_t Alignment;
   uint32_t Stride;
   uint32_t NumExtraInhabitants;
+
+  bool hasMangledTypeName() const {
+    return TypeName;
+  }
 
   std::string getMangledTypeName() const {
     return TypeName.get();

@@ -56,7 +56,7 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
 
 public:
   PrintTypeRef(std::ostream &OS, unsigned Indent)
-  : OS(OS), Indent(Indent) {}
+    : OS(OS), Indent(Indent) {}
 
   void visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     printHeader("builtin");
@@ -83,13 +83,13 @@ public:
 
   void visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
     if (BG->isStruct())
-      printHeader("bound-generic struct");
+      printHeader("bound_generic_struct");
     else if (BG->isEnum())
-      printHeader("bound-generic enum");
+      printHeader("bound_generic_enum");
     else if (BG->isClass())
-      printHeader("bound-generic class");
+      printHeader("bound_generic_class");
     else
-      printHeader("bound-generic");
+      printHeader("bound_generic");
 
     auto demangled = Demangle::demangleTypeAsString(BG->getMangledName());
     printField("", demangled);
@@ -123,7 +123,7 @@ public:
   }
 
   void visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
-    printHeader("protocol-composition");
+    printHeader("protocol_composition");
     for (auto protocol : PC->getProtocols())
       printRec(protocol);
     OS << ')';
@@ -136,20 +136,20 @@ public:
   }
 
   void visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
-    printHeader("existential-metatype");
+    printHeader("existential_metatype");
     printRec(EM->getInstanceType());
     OS << ')';
   }
 
   void visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
-    printHeader("generic-type-parameter");
+    printHeader("generic_type_parameter");
     printField("depth", GTP->getDepth());
     printField("index", GTP->getIndex());
     OS << ')';
   }
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    printHeader("dependent-member");
+    printHeader("dependent_member");
     printRec(DM->getProtocol());
     printRec(DM->getBase());
     printField("member", DM->getMember());
@@ -164,26 +164,26 @@ public:
   }
 
   void visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
-    printHeader("objective-c-class");
+    printHeader("objective_c_class");
     if (!OC->getName().empty())
       printField("name", OC->getName());
     OS << ')';
   }
 
   void visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    printHeader("unowned-storage");
+    printHeader("unowned_storage");
     printRec(US->getType());
     OS << ')';
   }
 
   void visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    printHeader("weak-storage");
+    printHeader("weak_storage");
     printRec(WS->getType());
     OS << ')';
   }
 
   void visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    printHeader("weak-storage");
+    printHeader("unmanaged_storage");
     printRec(US->getType());
     OS << ')';
   }

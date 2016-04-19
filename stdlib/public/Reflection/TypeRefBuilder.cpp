@@ -82,9 +82,9 @@ getFieldTypeRefs(const TypeRef *TR) {
   std::vector<std::pair<std::string, const TypeRef *>> Fields;
   for (auto Info : ReflectionInfos) {
     for (auto &FieldDescriptor : Info.fieldmd) {
-      auto CandidateMangledName = FieldDescriptor.MangledTypeName.get();
-      if (!CandidateMangledName)
+      if (!FieldDescriptor.hasMangledTypeName())
         continue;
+      auto CandidateMangledName = FieldDescriptor.getMangledTypeName();
       if (MangledName.compare(CandidateMangledName) != 0)
         continue;
       for (auto &Field : FieldDescriptor) {
