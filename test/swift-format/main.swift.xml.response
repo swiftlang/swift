@@ -1,0 +1,208 @@
+<?xml version='1.0'?>
+<replacements>
+<replacement offset='720' length='59'>    print( "\u{001b}[2K"+str, separator: "", terminator: "\r" )</replacement>
+<replacement offset='784' length='16'>    fflush( stdout )</replacement>
+<replacement offset='834' length='58'>    convenience init?( createForWritingAtPath path: String ) {</replacement>
+<replacement offset='897' length='62'>        filemgr.createFileAtPath( path, contents:nil, attributes:nil )</replacement>
+<replacement offset='968' length='35'>        self.init( forWritingAtPath: path )</replacement>
+<replacement offset='1012' length='1'>    }</replacement>
+<replacement offset='1019' length='33'>    func writeString( str: String ) {</replacement>
+<replacement offset='1057' length='26'>        str.withCString { bytes in</replacement>
+<replacement offset='1092' length='66'>            writeData( NSData( bytesNoCopy: UnsafeMutablePointer&lt;Void>(bytes),</replacement>
+<replacement offset='1171' length='51'>                               length: Int(strlen(bytes)), freeWhenDone: false ) )</replacement>
+<replacement offset='1254' length='1'>        }</replacement>
+<replacement offset='1264' length='1'>    }</replacement>
+<replacement offset='1433' length='33'>    override func next() -> String? {</replacement>
+<replacement offset='1471' length='23'>        let next = super.next()</replacement>
+<replacement offset='1503' length='16'>        if next == nil {</replacement>
+<replacement offset='1528' length='28'>            let failedLog = "failed.log"</replacement>
+<replacement offset='1569' length='42'>            if filemgr.fileExistsAtPath( failedLog ) {</replacement>
+<replacement offset='1624' length='42'>                try! filemgr.removeItemAtPath( failedLog )</replacement>
+<replacement offset='1683' length='1'>            }</replacement>
+<replacement offset='1698' length='20'>            task.waitUntilExit()</replacement>
+<replacement offset='1731' length='59'>            if task.terminationStatus != EXIT_SUCCESS &amp;&amp; !linkProblem {</replacement>
+<replacement offset='1803' length='59'>                try! filemgr.moveItemAtPath( storedLog, toPath: failedLog )</replacement>
+<replacement offset='1879' length='54'>                print( "\nxcodebuild failed, consult ./\(failedLog)" )</replacement>
+<replacement offset='1950' length='9'>                exit( 1 )</replacement>
+<replacement offset='1976' length='1'>            }</replacement>
+<replacement offset='1990' length='1'>        }</replacement>
+<replacement offset='2000' length='11'>        return next</replacement>
+<replacement offset='2020' length='1'>    }</replacement>
+<replacement offset='2073' length='42'>    buildLog = FileGenerator(path: storedLog)!</replacement>
+<replacement offset='2176' length='41'>    if filemgr.fileExistsAtPath( ".build" ) {</replacement>
+<replacement offset='2222' length='41'>        try! filemgr.removeItemAtPath( ".build" )</replacement>
+<replacement offset='2272' length='1'>    }</replacement>
+<replacement offset='2278' length='111'>    buildLog = StatusGenerator( launchPath: "/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin/swift",</replacement>
+<replacement offset='2394' length='34'>                                arguments: ["build", "-v", "-v"] )</replacement>
+<replacement offset='2461' length='62'>    storingLog = NSFileHandle( createForWritingAtPath: storedLog )</replacement>
+<replacement offset='2537' length='33'>    var buildargs = Process.arguments</replacement>
+<replacement offset='2575' length='43'>    "/tmp/siteify.XXXX".withCString( { (str) in</replacement>
+<replacement offset='2623' length='90'>        buildargs[0] = "SYMROOT="+String.fromCString( mktemp( UnsafeMutablePointer&lt;Int8>(str) ) )!</replacement>
+<replacement offset='2722' length='3'>    } )</replacement>
+<replacement offset='2730' length='85'>    buildLog = StatusGenerator( launchPath: "/usr/bin/xcodebuild", arguments: buildargs )</replacement>
+<replacement offset='2820' length='62'>    storingLog = NSFileHandle( createForWritingAtPath: storedLog )</replacement>
+<replacement offset='3001' length='115'>    if storingLog == nil, let symroot = line["^    SYMROOT = ([^\n]+)"][1] where !filemgr.fileExistsAtPath( symroot ) {</replacement>
+<replacement offset='3121' length='63'>        print( "Pre-built project no longer exists, rerun to rebuild" )</replacement>
+<replacement offset='3193' length='42'>        try! filemgr.removeItemAtPath( storedLog )</replacement>
+<replacement offset='3244' length='9'>        exit( 1 )</replacement>
+<replacement offset='3262' length='1'>    }</replacement>
+<replacement offset='3268' length='73'>    else if line["ld: framework not found ImageIO for architecture x86_64"] {</replacement>
+<replacement offset='3346' length='18'>        linkProblem = true</replacement>
+<replacement offset='3373' length='1'>    }</replacement>
+<replacement offset='3379' length='36'>    else if line[" -output-file-map "] {</replacement>
+<replacement offset='3420' length='70'>        filelist = SK.compilerArgs( line ).filter { $0.hasSuffix( ".swift" ) }</replacement>
+<replacement offset='3499' length='1'>    }</replacement>
+<replacement offset='3506' length='58'>    let regex = line["-primary-file (?:\"([^\"]+)\"|(\\S+)) "]</replacement>
+<replacement offset='3570' length='39'>    if let primary = regex[1] ?? regex[2] {</replacement>
+<replacement offset='3614' length='89'>        compilations.append( (primary, SK.array( SK.compilerArgs( line, filelist: filelist ) )) )</replacement>
+<replacement offset='3712' length='22'>        if storingLog != nil {</replacement>
+<replacement offset='3743' length='30'>            progress( "Built \(primary)" )</replacement>
+<replacement offset='3786' length='1'>        }</replacement>
+<replacement offset='3796' length='1'>    }</replacement>
+<replacement offset='3803' length='36'>    storingLog?.writeString( line+"\n" )</replacement>
+<replacement offset='3933' length='27'>    var references = [Entity]()</replacement>
+<replacement offset='3965' length='25'>    var reflines = [String]()</replacement>
+<replacement offset='3995' length='22'>    var declaring: Entity?</replacement>
+<replacement offset='4103' length='11'>    fileno += 1</replacement>
+<replacement offset='4119' length='62'>    progress( "Indexing \(fileno)/\(compilations.count) \(file)" )</replacement>
+<replacement offset='4187' length='46'>    if let data = NSData( contentsOfFile: file ) {</replacement>
+<replacement offset='4238' length='51'>        let resp = SK.indexFile( file, compilerArgs: argv )</replacement>
+<replacement offset='4298' length='48'>        let dict = sourcekitd_response_get_value( resp )</replacement>
+<replacement offset='4355' length='59'>        SK.recurseOver( SK.entitiesID, resp: dict, block: { dict in</replacement>
+<replacement offset='4423' length='47'>            if let usrString = dict.getString( SK.usrID ) {</replacement>
+<replacement offset='4483' length='42'>                let kind = dict.getUUIDString( SK.kindID )</replacement>
+<replacement offset='4542' length='32'>                let entity = Entity( file: file,</replacement>
+<replacement offset='4591' length='31'>                                     line: dict.getInt( SK.lineID ),</replacement>
+<replacement offset='4660' length='29'>                                     col: dict.getInt( SK.colID ),</replacement>
+<replacement offset='4727' length='51'>                                     kind: kind, decl: kind.containsString( ".decl." ) )</replacement>
+<replacement offset='4817' length='27'>                if usrs[usrString] == nil {</replacement>
+<replacement offset='4861' length='23'>                    usrs[usrString] = USR()</replacement>
+<replacement offset='4905' length='1'>                }</replacement>
+<replacement offset='4924' length='74'>                if !kind.containsString( ".decl.extension." ), var usr = usrs[usrString] {</replacement>
+<replacement offset='5015' length='31'>                    usr.references.append( entity )</replacement>
+<replacement offset='5067' length='63'>                    usr.reflines.append( entity.patchText( data, value: "\\w*" )! )</replacement>
+<replacement offset='5152' length='41'>                    if !kind.containsString( ".accessor." ) {</replacement>
+<replacement offset='5214' length='23'>                        entities[entity] = dict</replacement>
+<replacement offset='5262' length='1'>                    }</replacement>
+<replacement offset='5284' length='1'>                }</replacement>
+<replacement offset='5302' length='1'>            }</replacement>
+<replacement offset='5316' length='3'>        } )</replacement>
+<replacement offset='5328' length='1'>    }</replacement>
+<replacement offset='5370' length='41'>    if let usr = dict.getString( SK.usrID ) {</replacement>
+<replacement offset='5416' length='37'>        if entity.decl, var usr = usrs[usr] {</replacement>
+<replacement offset='5462' length='22'>            usr.declaring = entity</replacement>
+<replacement offset='5497' length='1'>        }</replacement>
+<replacement offset='5507' length='1'>    }</replacement>
+<replacement offset='5641' length='41'>    if let filename = filenameForFile[file] {</replacement>
+<replacement offset='5687' length='15'>        return filename</replacement>
+<replacement offset='5711' length='1'>    }</replacement>
+<replacement offset='5717' length='92'>    var filename = NSURL( fileURLWithPath: file ).URLByDeletingPathExtension!.lastPathComponent!</replacement>
+<replacement offset='5814' length='41'>    while filesForFileName[filename] != nil {</replacement>
+<replacement offset='5860' length='15'>        filename += "_"</replacement>
+<replacement offset='5884' length='1'>    }</replacement>
+<replacement offset='5890' length='33'>    filesForFileName[filename] = file</replacement>
+<replacement offset='5928' length='32'>    filenameForFile[file] = filename</replacement>
+<replacement offset='5965' length='15'>    return filename</replacement>
+<replacement offset='6008' length='20'>    var anchor: String {</replacement>
+<replacement offset='6033' length='23'>        return "\(line)_\(col)"</replacement>
+<replacement offset='6065' length='1'>    }</replacement>
+<replacement offset='6072' length='22'>    var filename: String {</replacement>
+<replacement offset='6099' length='27'>        return fileFilename( file )</replacement>
+<replacement offset='6135' length='1'>    }</replacement>
+<replacement offset='6142' length='18'>    var href: String {</replacement>
+<replacement offset='6165' length='35'>        return "\(filename).html#\(anchor)"</replacement>
+<replacement offset='6209' length='1'>    }</replacement>
+<replacement offset='6433' length='95'>    var input = try! NSString( contentsOfFile: resources+template, encoding: NSUTF8StringEncoding )</replacement>
+<replacement offset='6533' length='29'>    for (tag, value) in patches {</replacement>
+<replacement offset='6567' length='76'>        input = input.stringByReplacingOccurrencesOfString( tag, withString: value )</replacement>
+<replacement offset='6652' length='1'>    }</replacement>
+<replacement offset='6658' length='48'>    let out = fopen( dest ?? "html/"+template, "w" )</replacement>
+<replacement offset='6711' length='30'>    fputs( input.UTF8String, out )</replacement>
+<replacement offset='6746' length='10'>    return out</replacement>
+<replacement offset='6805' length='97'>    try! filemgr.createDirectoryAtPath( "html", withIntermediateDirectories: false, attributes: nil )</replacement>
+<replacement offset='7156' length='80'>                                                  "__ROOT__": cwd.stringByReplacingOccurrencesOfString( home, withString: "~" )] )</replacement>
+<replacement offset='7424' length='46'>    if let data = NSData( contentsOfFile: file ) {</replacement>
+<replacement offset='7475' length='45'>        let bytes = UnsafePointer&lt;Int8>( data.bytes )</replacement>
+<replacement offset='7529' length='43'>        let filename = fileFilename( file )+".html"</replacement>
+<replacement offset='7581' length='83'>        let relative = file.stringByReplacingOccurrencesOfString( cwd+"/", withString: "" )</replacement>
+<replacement offset='7674' length='11'>        fileno += 1</replacement>
+<replacement offset='7694' length='69'>        progress( "Saving \(fileno)/\(compilations.count) html/\(filename)" )</replacement>
+<replacement offset='7773' length='106'>        fputs( "&lt;a href='\(filename)'>\(relative)&lt;a> \(comma.stringFromNumber(data.length)!) bytes&lt;br>\n", index )</replacement>
+<replacement offset='7889' length='36'>        let newline = Int8("\n".utf16.last!)</replacement>
+<replacement offset='7934' length='30'>        var ptr = 0, line = 1, col = 1</replacement>
+<replacement offset='7974' length='38'>        func skipTo( offset: Int ) -> String {</replacement>
+<replacement offset='8021' length='96'>            let out = NSString( bytes: bytes+ptr, length: offset-ptr, encoding: NSUTF8StringEncoding ) ?? ""</replacement>
+<replacement offset='8130' length='20'>            while ptr &lt; offset {</replacement>
+<replacement offset='8163' length='26'>                if bytes[ptr] == newline {</replacement>
+<replacement offset='8206' length='9'>                    line += 1</replacement>
+<replacement offset='8236' length='7'>                    col = 1</replacement>
+<replacement offset='8264' length='1'>                }</replacement>
+<replacement offset='8282' length='6'>                else {</replacement>
+<replacement offset='8305' length='8'>                    col += 1</replacement>
+<replacement offset='8334' length='1'>                }</replacement>
+<replacement offset='8352' length='8'>                ptr += 1</replacement>
+<replacement offset='8377' length='1'>            }</replacement>
+<replacement offset='8391' length='75'>            return out.stringByReplacingOccurrencesOfString( "&amp;", withString: "&amp;amp;" )</replacement>
+<replacement offset='8479' length='74'>                .stringByReplacingOccurrencesOfString( "&lt;", withString: "&amp;lt;" ) as String</replacement>
+<replacement offset='8570' length='1'>        }</replacement>
+<replacement offset='8581' length='13'>        var html = ""</replacement>
+<replacement offset='8604' length='51'>        let resp = SK.syntaxMap( file, compilerArgs: argv )</replacement>
+<replacement offset='8664' length='48'>        let dict = sourcekitd_response_get_value( resp )</replacement>
+<replacement offset='8721' length='70'>        let map = sourcekitd_variant_dictionary_get_value( dict, SK.syntaxID )</replacement>
+<replacement offset='8800' length='51'>        sourcekitd_variant_array_apply( map ) { (_,dict) in</replacement>
+<replacement offset='8860' length='39'>            let offset = dict.getInt( SK.offsetID )</replacement>
+<replacement offset='8912' length='39'>            let length = dict.getInt( SK.lengthID )</replacement>
+<replacement offset='8965' length='24'>            html += skipTo( offset )</replacement>
+<replacement offset='9003' length='52'>            let ent = Entity( file: file, line: line, col: col )</replacement>
+<replacement offset='9068' length='34'>            let text = skipTo( offset+length )</replacement>
+<replacement offset='9115' length='48'>            var span = "&lt;a name='\(ent.anchor)'>\(text)&lt;/a>"</replacement>
+<replacement offset='9177' length='42'>            let kind = dict.getUUIDString( SK.kindID )</replacement>
+<replacement offset='9232' length='62'>            let kindSuffix = NSURL( fileURLWithPath: kind ).pathExtension!</replacement>
+<replacement offset='9308' length='24'>            if kindSuffix == "url" {</replacement>
+<replacement offset='9345' length='38'>                span = "&lt;a href='\(text)'>\(text)&lt;/a>"</replacement>
+<replacement offset='9400' length='1'>            }</replacement>
+<replacement offset='9414' length='74'>            else if let dict = entities[ent], usrString = dict.getString( SK.usrID ) {</replacement>
+<replacement offset='9501' length='52'>                if let usr = usrs[usrString], decl = usr.declaring {</replacement>
+<replacement offset='9570' length='16'>                    if decl != ent {</replacement>
+<replacement offset='9607' length='85'>                        span = "&lt;a name='\(ent.anchor)' href='\(decl.href)' title='\(usrString)'>\(text)&lt;/a>"</replacement>
+<replacement offset='9717' length='1'>                    }</replacement>
+<replacement offset='9739' length='34'>                    else if usr.references.count > 1 {</replacement>
+<replacement offset='9794' length='14'>                        var popup = ""</replacement>
+<replacement offset='9833' length='35'>                        for i in 0..&lt;usr.references.count {</replacement>
+<replacement offset='9893' length='27'>                            let ref = usr.references[i]</replacement>
+<replacement offset='9949' length='15'>                            if ref == ent {</replacement>
+<replacement offset='9993' length='8'>                                continue</replacement>
+<replacement offset='10034' length='1'>                            }</replacement>
+<replacement offset='10064' length='75'>                            let keepListOpen = ref.file != decl.file ? "event.stopPropagation(); " : ""</replacement>
+<replacement offset='10168' length='172'>                            popup += "&lt;tr>&lt;td style='text-decoration: underline;' onclick='document.location.href=\"\(ref.href)\"; \(keepListOpen)return false;'>\(ref.filename).swift:\(ref.line)&lt;/td>"</replacement>
+<replacement offset='10369' length='49'>                            popup += "&lt;td>&lt;pre>\(usr.reflines[i])&lt;/pre>&lt;/td>"</replacement>
+<replacement offset='10447' length='1'>                        }</replacement>
+<replacement offset='10473' length='96'>                        span = "&lt;a name='\(ent.anchor)' href='#' title='\(usrString)' onclick='return expand(this);'>" +</replacement>
+<replacement offset='10594' length='68'>                            "\(text)&lt;span class='references'>&lt;table>\(popup)&lt;/table>&lt;/span>&lt;/a>"</replacement>
+<replacement offset='10691' length='1'>                    }</replacement>
+<replacement offset='10713' length='1'>                }</replacement>
+<replacement offset='10731' length='6'>                else {</replacement>
+<replacement offset='10754' length='65'>                    span = "&lt;a name='\(ent.anchor)' title='\(usrString)'>\(text)&lt;/a>"</replacement>
+<replacement offset='10840' length='1'>                }</replacement>
+<replacement offset='10858' length='1'>            }</replacement>
+<replacement offset='10873' length='52'>            html += "&lt;span class='\(kindSuffix)'>\(span)&lt;/span>"</replacement>
+<replacement offset='10938' length='11'>            return true</replacement>
+<replacement offset='10962' length='1'>        }</replacement>
+<replacement offset='10973' length='29'>        html += skipTo( data.length )</replacement>
+<replacement offset='11012' length='31'>        let htmp = RegexMutable( html )</replacement>
+<replacement offset='11052' length='8'>        line = 0</replacement>
+<replacement offset='11070' length='39'>        htmp["(^|\\n)"] ~= { (group: String) in</replacement>
+<replacement offset='11118' length='9'>            line += 1</replacement>
+<replacement offset='11140' length='63'>            return group + (NSString( format: "%04d    ", line ) as String)</replacement>
+<replacement offset='11216' length='1'>        }</replacement>
+<replacement offset='11227' length='77'>        let out = copyTemplate( "source.html", patches: [:], dest: "html/"+filename )</replacement>
+<replacement offset='11313' length='29'>        fputs( htmp.UTF8String, out )</replacement>
+<replacement offset='11351' length='13'>        fclose( out )</replacement>
+<replacement offset='11373' length='1'>    }</replacement>
+<replacement offset='11455' length='71'>    if usrString.hasPrefix( "s:" ), let decl = usrs[usrString]?.declaring {</replacement>
+<replacement offset='11531' length='84'>        let usrString = usrString.substringFromIndex( usrString.startIndex.advancedBy( 2 ) )</replacement>
+<replacement offset='11624' length='80'>        symbols.append( (_stdlib_demangleName( "_T"+usrString ), usrString, decl.href) )</replacement>
+<replacement offset='11713' length='1'>    }</replacement>
+<replacement offset='11827' length='83'>    let symbol = symbol.stringByReplacingOccurrencesOfString( "&lt;", withString: "&amp;lt;" )</replacement>
+<replacement offset='11915' length='74'>    fputs( "&lt;a href='\(href)' title='\(usrString)'>\(symbol)&lt;a>&lt;br>\n", xref )</replacement>
+</replacements>
